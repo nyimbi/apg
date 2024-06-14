@@ -1,0 +1,98 @@
+#include test another
+
+project test_pj {
+    project_name = 'Test Project1',
+    version = 3.1.2,
+    author = 'Nyimbi Odero',
+    something = 'whatever',
+    languages = ['en', 'fr', 'pt', 'swa'],
+    dev_db_uri = 'pgsql://me@localhost:54325/mydtabase',
+    theme = 'cerulean',
+    generate = [ios, web, desktop, sql dialect pgsql]
+
+}
+mixin mxtest {
+    id: integer [pk, not null, ++],
+    namex: string [note:'users first name'],
+    file_name: file,
+    author: string,
+    docx: document,
+    pic: image [note:'The ides of march', min = 1],
+
+
+}
+
+table Person (mxtest, mxtet) {
+    name: string [pk],
+    emailx: string,
+    pic: image,
+    bc: file,
+}
+
+table PersonDesc  {
+    id: int [pk, not null, ++, max = 1000, min = 10],
+    name: string [ref: < table1.name],
+    description: string [cache, unique,
+                            enum = {'red', 'blue', 'green'},
+                            max = 3
+                        ],
+    age: integer [required,
+                    layout = {
+                        color = red,
+                        width = 20
+                        }
+                    ],
+    gender: bool [default = "M", placeholder = "gender"],
+    dob: date,
+    state: int [ref: <> states.id],
+    some_text: varchar(100),
+    pay: money [check ('pay > 0')],
+
+
+    indexes = {
+        namedx = [name],
+        descdx = [name, description]
+    }
+}
+
+ref: Person.id > PersonDesc.id
+
+index person_dx on PersonDesc [id, name, description] of type btree
+
+dbfunc add_one {"
+ One = 1 + 1
+ Two = 2 + 2
+"
+"
+    Yet another string thing, should be concatenated
+"
+}
+
+
+rule Person_added = {
+ if (person = True):
+    do email ("somebody@there.com", "Person added", "time; now()")
+}
+
+rule periodic_backup = {
+ at (0:0:0:0:0) do backup
+}
+
+
+workflow my_workflow {
+    step step_one do {
+        // statements to execute when reaching step_one
+        log("Reached step one")
+        check_inputs()
+    }
+    step step_two do {
+        // statements to execute when reaching step_two
+        log("Reached step two")
+        process_data()
+    }
+}
+
+script bash "movement.sh"= {
+     "cp ./*.* ./tmp",
+     "mv *.* ./bak"
+}
