@@ -1,0 +1,319 @@
+{
+  "name": "apg-language-support",
+  "displayName": "APG Language Support",
+  "description": "Full-featured language support for APG (Application Programming Generation) language",
+  "version": "1.0.0",
+  "publisher": "apg-lang",
+  "license": "MIT",
+  "homepage": "https://apg-lang.org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/apg-lang/vscode-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/apg-lang/vscode-extension/issues"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters",
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "apg",
+    "application-generation",
+    "dsl",
+    "agents",
+    "workflows",
+    "digital-twins",
+    "iot",
+    "database",
+    "flask-appbuilder"
+  ],
+  "activationEvents": [
+    "onLanguage:apg"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "apg",
+        "aliases": [
+          "APG",
+          "apg"
+        ],
+        "extensions": [
+          ".apg"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/apg-light.svg",
+          "dark": "./icons/apg-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "apg",
+        "scopeName": "source.apg",
+        "path": "./syntaxes/apg.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "apg",
+        "path": "./snippets/apg.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "APG Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/apg-dark.json"
+      },
+      {
+        "label": "APG Light",
+        "uiTheme": "vs",
+        "path": "./themes/apg-light.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "APG Language Configuration",
+      "properties": {
+        "apg.languageServer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable APG Language Server integration"
+        },
+        "apg.languageServer.host": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Language server host"
+        },
+        "apg.languageServer.port": {
+          "type": "number",
+          "default": 2087,
+          "description": "Language server port"
+        },
+        "apg.compiler.target": {
+          "type": "string",
+          "default": "flask-appbuilder",
+          "enum": [
+            "flask-appbuilder"
+          ],
+          "description": "APG compilation target"
+        },
+        "apg.compiler.outputDir": {
+          "type": "string",
+          "default": "generated",
+          "description": "Output directory for generated code"
+        },
+        "apg.validation.enableRealTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time validation"
+        },
+        "apg.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable code completion"
+        },
+        "apg.hover.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable hover information"
+        },
+        "apg.symbols.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable symbol navigation"
+        },
+        "apg.diagnostics.maxProblems": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of problems to show"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "apg.compile",
+        "title": "APG: Compile Current File",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "apg.compileProject",
+        "title": "APG: Compile Project",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "apg.runGenerated",
+        "title": "APG: Run Generated Application",
+        "icon": "$(play)"
+      },
+      {
+        "command": "apg.validateSyntax",
+        "title": "APG: Validate Syntax",
+        "icon": "$(check)"
+      },
+      {
+        "command": "apg.showPreview",
+        "title": "APG: Show Preview",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "apg.createProject",
+        "title": "APG: Create New Project",
+        "icon": "$(add)"
+      },
+      {
+        "command": "apg.restartLanguageServer",
+        "title": "APG: Restart Language Server",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "apg.compile",
+          "when": "resourceExtname == .apg",
+          "group": "navigation"
+        },
+        {
+          "command": "apg.showPreview",
+          "when": "resourceExtname == .apg",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "apg.validateSyntax",
+          "when": "resourceExtname == .apg",
+          "group": "apg"
+        },
+        {
+          "command": "apg.compile",
+          "when": "resourceExtname == .apg",
+          "group": "apg"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "apg.compileProject",
+          "when": "explorerResourceIsFolder",
+          "group": "apg"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "apg.compile",
+          "when": "resourceExtname == .apg"
+        },
+        {
+          "command": "apg.compileProject"
+        },
+        {
+          "command": "apg.runGenerated"
+        },
+        {
+          "command": "apg.validateSyntax",
+          "when": "resourceExtname == .apg"
+        },
+        {
+          "command": "apg.showPreview",
+          "when": "resourceExtname == .apg"
+        },
+        {
+          "command": "apg.createProject"
+        },
+        {
+          "command": "apg.restartLanguageServer"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "apg.compile",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b",
+        "when": "resourceExtname == .apg"
+      },
+      {
+        "command": "apg.runGenerated",
+        "key": "ctrl+f5",
+        "mac": "cmd+f5",
+        "when": "resourceExtname == .apg"
+      },
+      {
+        "command": "apg.validateSyntax",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "resourceExtname == .apg"
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "apg",
+        "owner": "apg",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "apg",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The APG command to execute"
+          },
+          "args": {
+            "type": "array",
+            "description": "Additional arguments"
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "16.x",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4",
+    "@vscode/test-electron": "^2.2.0",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.0.2"
+  }
+}

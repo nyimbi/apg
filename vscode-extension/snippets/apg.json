@@ -1,0 +1,293 @@
+{
+  "Module Declaration": {
+    "prefix": "module",
+    "body": [
+      "module ${1:module_name} version ${2:1.0.0} {",
+      "\tdescription: \"${3:Module description}\";",
+      "\tauthor: \"${4:Your Name}\";",
+      "\tlicense: \"${5:MIT}\";",
+      "}",
+      "",
+      "$0"
+    ],
+    "description": "APG module declaration"
+  },
+  "Agent Declaration": {
+    "prefix": "agent",
+    "body": [
+      "agent ${1:AgentName} {",
+      "\tname: str = \"${2:Agent Name}\";",
+      "\tstatus: str = \"${3:idle}\";",
+      "\t",
+      "\tprocess: () -> ${4:str} = {",
+      "\t\t${5:// Agent processing logic}",
+      "\t\treturn ${6:\"result\"};",
+      "\t};",
+      "\t",
+      "\tget_status: () -> str = {",
+      "\t\treturn status;",
+      "\t};",
+      "}",
+      "",
+      "$0"
+    ],
+    "description": "APG agent declaration"
+  },
+  "Digital Twin Declaration": {
+    "prefix": "digital_twin",
+    "body": [
+      "digital_twin ${1:TwinName} {",
+      "\tsensor_id: str = \"${2:sensor_001}\";",
+      "\tstate: dict[str, any] = {",
+      "\t\t\"${3:property}\": ${4:value}",
+      "\t};",
+      "\tlast_updated: str = \"${5:2023-01-01T00:00:00Z}\";",
+      "\t",
+      "\tupdate_state: (new_state: dict) -> void = {",
+      "\t\tstate = new_state;",
+      "\t\tlast_updated = now();",
+      "\t};",
+      "\t",
+      "\tget_state: () -> dict = {",
+      "\t\treturn state;",
+      "\t};",
+      "}",
+      "",
+      "$0"
+    ],
+    "description": "APG digital twin declaration"
+  },
+  "Workflow Declaration": {
+    "prefix": "workflow",
+    "body": [
+      "workflow ${1:WorkflowName} {",
+      "\tname: str = \"${2:Workflow Name}\";",
+      "\tsteps: list[str] = [${3:\"step1\", \"step2\", \"step3\"}];",
+      "\tcurrent_step: int = 0;",
+      "\t",
+      "\texecute_step: (step_name: str) -> bool = {",
+      "\t\t${4:// Step execution logic}",
+      "\t\treturn true;",
+      "\t};",
+      "\t",
+      "\tget_progress: () -> dict = {",
+      "\t\treturn {",
+      "\t\t\t\"current\": current_step,",
+      "\t\t\t\"total\": len(steps),",
+      "\t\t\t\"progress\": current_step / len(steps) * 100",
+      "\t\t};",
+      "\t};",
+      "}",
+      "",
+      "$0"
+    ],
+    "description": "APG workflow declaration"
+  },
+  "Database Declaration": {
+    "prefix": "db",
+    "body": [
+      "db ${1:DatabaseName} {",
+      "\turl: \"${2:postgresql://localhost:5432/dbname}\";",
+      "\thost: \"${3:localhost}\";",
+      "\tport: ${4:5432};",
+      "\tdatabase: \"${5:dbname}\";",
+      "\t",
+      "\tschema ${6:main_schema} {",
+      "\t\ttable ${7:example_table} {",
+      "\t\t\tid serial [pk]",
+      "\t\t\tname varchar(255) [not null]",
+      "\t\t\tcreated_at timestamp [default: now()]",
+      "\t\t\t",
+      "\t\t\tindexes {",
+      "\t\t\t\t(name)",
+      "\t\t\t}",
+      "\t\t}",
+      "\t}",
+      "}",
+      "",
+      "$0"
+    ],
+    "description": "APG database declaration"
+  },
+  "Database Table": {
+    "prefix": "table",
+    "body": [
+      "table ${1:table_name} {",
+      "\tid serial [pk]",
+      "\t${2:column_name} ${3:varchar(255)} [${4:not null}]",
+      "\tcreated_at timestamp [default: now()]",
+      "\tupdated_at timestamp [default: now()]",
+      "\t",
+      "\tindexes {",
+      "\t\t(${5:column_name})",
+      "\t}",
+      "}",
+      "",
+      "$0"
+    ],
+    "description": "Database table definition"
+  },
+  "Vector Table": {
+    "prefix": "vector_table",
+    "body": [
+      "table ${1:embeddings} {",
+      "\tid serial [pk]",
+      "\tcontent text [not null]",
+      "\tcontent_embedding vector(${2:1536}) [dimensions: ${2:1536}, normalized]",
+      "\tfeature_vector halfvec(${3:128}) [dimensions: ${3:128}]",
+      "\tcategory_sparse sparsevec(${4:1000}) [sparse]",
+      "\tcreated_at timestamp [default: now()]",
+      "\t",
+      "\tvector_index idx_${1:embeddings}_similarity on ${1:embeddings} (content_embedding) [",
+      "\t\tmethod: ${5:hnsw},",
+      "\t\tdistance: ${6:cosine},",
+      "\t\tdimensions: ${2:1536}",
+      "\t]",
+      "}",
+      "",
+      "$0"
+    ],
+    "description": "Database table with vector storage"
+  },
+  "Database Trigger": {
+    "prefix": "trigger",
+    "body": [
+      "trigger ${1:trigger_name} ${2:after} ${3:insert} on ${4:table_name} {",
+      "\tbegin",
+      "\t\t${5:// Trigger logic}",
+      "\t\texecute procedure ${6:procedure_name}(NEW.id);",
+      "\tend",
+      "}",
+      "",
+      "$0"
+    ],
+    "description": "Database trigger definition"
+  },
+  "Database Procedure": {
+    "prefix": "procedure",
+    "body": [
+      "procedure ${1:procedure_name}(in ${2:param_name} ${3:int}) [language: ${4:plpgsql}] {",
+      "\tbegin",
+      "\t\t${5:// Procedure logic}",
+      "\tend",
+      "}",
+      "",
+      "$0"
+    ],
+    "description": "Database stored procedure"
+  },
+  "Method Declaration": {
+    "prefix": "method",
+    "body": [
+      "${1:method_name}: (${2:param}: ${3:type}) -> ${4:return_type} = {",
+      "\t${5:// Method implementation}",
+      "\treturn ${6:result};",
+      "};",
+      "",
+      "$0"
+    ],
+    "description": "Method declaration"
+  },
+  "Async Method": {
+    "prefix": "async_method",
+    "body": [
+      "${1:method_name}: async (${2:param}: ${3:type}) -> ${4:return_type} = {",
+      "\t${5:// Async method implementation}",
+      "\treturn ${6:result};",
+      "};",
+      "",
+      "$0"
+    ],
+    "description": "Async method declaration"
+  },
+  "Property Declaration": {
+    "prefix": "property",
+    "body": [
+      "${1:property_name}: ${2:type} = ${3:default_value};"
+    ],
+    "description": "Property declaration"
+  },
+  "If Statement": {
+    "prefix": "if",
+    "body": [
+      "if (${1:condition}) {",
+      "\t${2:// if body}",
+      "}"
+    ],
+    "description": "If statement"
+  },
+  "If-Else Statement": {
+    "prefix": "ifelse",
+    "body": [
+      "if (${1:condition}) {",
+      "\t${2:// if body}",
+      "} else {",
+      "\t${3:// else body}",
+      "}"
+    ],
+    "description": "If-else statement"
+  },
+  "For Loop": {
+    "prefix": "for",
+    "body": [
+      "for (${1:item} in ${2:collection}) {",
+      "\t${3:// loop body}",
+      "}"
+    ],
+    "description": "For loop"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": [
+      "while (${1:condition}) {",
+      "\t${2:// loop body}",
+      "}"
+    ],
+    "description": "While loop"
+  },
+  "Dictionary Literal": {
+    "prefix": "dict",
+    "body": [
+      "{",
+      "\t\"${1:key}\": ${2:value},",
+      "\t\"${3:key2}\": ${4:value2}",
+      "}"
+    ],
+    "description": "Dictionary literal"
+  },
+  "List Literal": {
+    "prefix": "list",
+    "body": [
+      "[${1:item1}, ${2:item2}, ${3:item3}]"
+    ],
+    "description": "List literal"
+  },
+  "Log Statement": {
+    "prefix": "log",
+    "body": [
+      "log(\"${1:message}\", ${2:data});"
+    ],
+    "description": "Log statement"
+  },
+  "Query Statement": {
+    "prefix": "query",
+    "body": [
+      "query(\"${1:SELECT * FROM table WHERE condition = $1}\", ${2:param});"
+    ],
+    "description": "Database query statement"
+  },
+  "Import Statement": {
+    "prefix": "import",
+    "body": [
+      "import ${1:module_name} from \"${2:module_path}\";"
+    ],
+    "description": "Import statement"
+  },
+  "Export Statement": {
+    "prefix": "export",
+    "body": [
+      "export [${1:symbol1}, ${2:symbol2}];"
+    ],
+    "description": "Export statement"
+  }
+}
