@@ -1,0 +1,422 @@
+// ========================================
+// BASIC APG APPLICATION EXAMPLES
+// Fundamental patterns for web, mobile, and desktop apps
+// ========================================
+
+// 1. SIMPLE WEB APPLICATION - Blog System
+db BlogDatabase {
+    posts: table {
+        id: int [pk, increment];
+        title: str [required, max_length=200];
+        content: str [required];
+        author: str [required];
+        created_at: datetime [default=now()];
+        updated_at: datetime [auto_update];
+        published: bool [default=false];
+        tags: list[str] [default=[]];
+        view_count: int [default=0];
+    };
+    
+    comments: table {
+        id: int [pk, increment];
+        post_id: int [ref: posts.id, cascade_delete];
+        author_name: str [required];
+        author_email: str [email, required];
+        content: str [required, max_length=1000];
+        created_at: datetime [default=now()];
+        approved: bool [default=false];
+    };
+    
+    users: table {
+        id: int [pk, increment];
+        username: str [unique, required, min_length=3];
+        email: str [unique, email, required];
+        password_hash: str [required];
+        is_admin: bool [default=false];
+        created_at: datetime [default=now()];
+        last_login: datetime?;
+    };
+}
+
+form PostForm {
+    fields: title, content, tags, published;
+    validation: {
+        title: [required, min_length=5, max_length=200];
+        content: [required, min_length=10];
+        tags: [optional, max_items=10];
+    };
+    
+    @security: {
+        authentication: required;
+        authorization: is_admin || is_author;
+        csrf_protection: enabled;
+    };
+    
+    actions: {
+        save_draft: save -> BlogDatabase.posts {published: false};
+        publish: save -> BlogDatabase.posts {published: true};
+        preview: render_preview(title, content);
+    };
+}
+
+form CommentForm {
+    fields: author_name, author_email, content;
+    validation: {
+        author_name: [required, max_length=100];
+        author_email: [required, email];
+        content: [required, min_length=5, max_length=1000];
+    };
+    
+    @anti_spam: {
+        rate_limiting: 3_comments_per_minute;
+        content_filtering: profanity_filter + spam_detection;
+        captcha: recaptcha_v3(score_threshold=0.5);
+    };
+    
+    action: save -> BlogDatabase.comments {approved: false};
+}
+
+report PostList {
+    source: BlogDatabase.posts;
+    filter: published = true;
+    fields: title, author, created_at, view_count;
+    sort: created_at [desc];
+    pagination: 10_per_page;
+    search: [title, content, tags];
+    
+    @seo: {
+        meta_tags: auto_generate;
+        structured_data: article_schema;
+        canonical_url: auto_generate;
+    };
+}
+
+// 2. E-COMMERCE SYSTEM
+db ECommerceDB {
+    products: table {
+        id: int [pk, increment];
+        name: str [required, max_length=200];
+        description: str;
+        price: decimal(10,2) [required, min_value=0];
+        stock_quantity: int [default=0, min_value=0];
+        category_id: int [ref: categories.id];
+        brand: str [max_length=100];
+        sku: str [unique, required];
+        images: list[str] [default=[]];
+        weight: decimal(5,2); // kg
+        dimensions: dict[str, decimal]; // {width, height, depth}
+        is_active: bool [default=true];
+        created_at: datetime [default=now()];
+    };
+    
+    categories: table {
+        id: int [pk, increment];
+        name: str [required, unique];
+        description: str;
+        parent_id: int? [ref: categories.id];
+        is_active: bool [default=true];
+    };
+    
+    orders: table {
+        id: int [pk, increment];
+        user_id: int [ref: users.id];
+        status: str [choices=['pending', 'processing', 'shipped', 'delivered', 'cancelled']];
+        total_amount: decimal(10,2) [required];
+        shipping_address: dict[str, str];
+        billing_address: dict[str, str];
+        payment_method: str;
+        created_at: datetime [default=now()];
+        shipped_at: datetime?;
+        delivered_at: datetime?;
+    };
+    
+    order_items: table {
+        id: int [pk, increment];
+        order_id: int [ref: orders.id, cascade_delete];
+        product_id: int [ref: products.id];
+        quantity: int [required, min_value=1];
+        unit_price: decimal(10,2) [required];
+        total_price: decimal(10,2) [computed: quantity * unit_price];
+    };
+}
+
+form ProductForm {
+    fields: name, description, price, stock_quantity, category_id, brand, sku, images, weight, dimensions;
+    
+    validation: {
+        name: [required, min_length=3, max_length=200];
+        price: [required, min_value=0.01];
+        stock_quantity: [required, min_value=0];
+        sku: [required, unique, pattern=/^[A-Z0-9-]+$/];
+    };
+    
+    @file_upload: {
+        images: {
+            max_files: 10;
+            max_size: 5MB;
+            allowed_types: [jpg, png, webp];
+            thumbnail_generation: [150x150, 300x300, 800x600];
+        };
+    };
+    
+    action: save -> ECommerceDB.products;
+}
+
+flow OrderProcessing {
+    order_received -> validate_inventory -> calculate_total -> process_payment -> 
+    update_inventory -> send_confirmation -> prepare_shipment -> ship_order -> 
+    track_delivery -> complete_order;
+    
+    @validation: {
+        inventory_check: ensure_stock_availability;
+        payment_validation: secure_payment_processing;
+        address_verification: shipping_address_validation;
+    };
+    
+    @notifications: {
+        customer: order_confirmation + shipping_notification + delivery_confirmation;
+        admin: low_stock_alerts + payment_failures + shipping_issues;
+    };
+}
+
+// 3. TASK MANAGEMENT SYSTEM
+db TaskManager {
+    projects: table {
+        id: int [pk, increment];
+        name: str [required, max_length=200];
+        description: str;
+        owner_id: int [ref: users.id];
+        status: str [choices=['active', 'completed', 'archived'], default='active'];
+        start_date: date;
+        end_date: date?;
+        created_at: datetime [default=now()];
+    };
+    
+    tasks: table {
+        id: int [pk, increment];
+        title: str [required, max_length=200];
+        description: str;
+        project_id: int [ref: projects.id, cascade_delete];
+        assignee_id: int? [ref: users.id];
+        priority: str [choices=['low', 'medium', 'high', 'urgent'], default='medium'];
+        status: str [choices=['todo', 'in_progress', 'review', 'done'], default='todo'];
+        due_date: datetime?;
+        estimated_hours: decimal(5,2)?;
+        actual_hours: decimal(5,2)?;
+        created_at: datetime [default=now()];
+        completed_at: datetime?;
+    };
+    
+    time_entries: table {
+        id: int [pk, increment];
+        task_id: int [ref: tasks.id, cascade_delete];
+        user_id: int [ref: users.id];
+        start_time: datetime [required];
+        end_time: datetime?;
+        duration: int [computed]; // minutes
+        description: str;
+        billable: bool [default=true];
+    };
+}
+
+form TaskForm {
+    fields: title, description, project_id, assignee_id, priority, due_date, estimated_hours;
+    
+    validation: {
+        title: [required, min_length=3, max_length=200];
+        project_id: [required, exists_in_db];
+        assignee_id: [optional, exists_in_db];
+        due_date: [optional, future_date];
+        estimated_hours: [optional, min_value=0.25, max_value=1000];
+    };
+    
+    @dependencies: {
+        project_change: reload_assignee_options;
+        assignee_change: check_availability;
+    };
+    
+    action: save -> TaskManager.tasks;
+}
+
+report ProjectDashboard {
+    source: TaskManager.projects + TaskManager.tasks + TaskManager.time_entries;
+    
+    @aggregations: {
+        task_counts: group_by(status) + count();
+        progress: completed_tasks / total_tasks * 100;
+        time_tracking: sum(actual_hours) by assignee;
+        overdue_tasks: filter(due_date < now() && status != 'done');
+    };
+    
+    @visualizations: {
+        progress_chart: pie_chart(task_status_distribution);
+        timeline: gantt_chart(tasks_by_due_date);
+        workload: bar_chart(hours_by_assignee);
+        burndown: line_chart(remaining_work_over_time);
+    };
+}
+
+// 4. CUSTOMER RELATIONSHIP MANAGEMENT (CRM)
+db CRM {
+    contacts: table {
+        id: int [pk, increment];
+        first_name: str [required, max_length=100];
+        last_name: str [required, max_length=100];
+        email: str [email, unique];
+        phone: str [phone_number];
+        company: str [max_length=200];
+        title: str [max_length=100];
+        address: dict[str, str];
+        lead_source: str [choices=['website', 'referral', 'social_media', 'advertising', 'cold_call']];
+        status: str [choices=['lead', 'prospect', 'customer', 'inactive'], default='lead'];
+        assigned_to: int? [ref: users.id];
+        created_at: datetime [default=now()];
+        last_contact: datetime?;
+    };
+    
+    deals: table {
+        id: int [pk, increment];
+        name: str [required, max_length=200];
+        contact_id: int [ref: contacts.id];
+        value: decimal(12,2) [required, min_value=0];
+        probability: int [range=0..100, default=50]; // percentage
+        stage: str [choices=['prospecting', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost']];
+        expected_close_date: date;
+        actual_close_date: date?;
+        notes: str;
+        created_at: datetime [default=now()];
+    };
+    
+    activities: table {
+        id: int [pk, increment];
+        contact_id: int [ref: contacts.id];
+        type: str [choices=['call', 'email', 'meeting', 'note', 'task']];
+        subject: str [required, max_length=200];
+        description: str;
+        scheduled_at: datetime?;
+        completed_at: datetime?;
+        created_by: int [ref: users.id];
+        created_at: datetime [default=now()];
+    };
+}
+
+form ContactForm {
+    fields: first_name, last_name, email, phone, company, title, address, lead_source, assigned_to;
+    
+    validation: {
+        first_name: [required, min_length=2, max_length=100];
+        last_name: [required, min_length=2, max_length=100];
+        email: [required, email, unique];
+        phone: [optional, phone_number];
+    };
+    
+    @automation: {
+        lead_scoring: calculate_based_on(company_size + engagement_level + budget);
+        auto_assignment: round_robin(sales_team);
+        welcome_sequence: trigger_email_campaign;
+    };
+    
+    action: save -> CRM.contacts;
+}
+
+workflow LeadNurturing {
+    new_lead -> score_lead -> assign_salesperson -> send_welcome_email -> 
+    schedule_follow_up -> qualify_lead -> create_opportunity;
+    
+    @rules: {
+        high_value_leads: value > $10000 -> priority_assignment;
+        inactive_leads: no_activity_30_days -> re_engagement_campaign;
+        hot_prospects: high_engagement -> immediate_call_scheduling;
+    };
+    
+    @metrics: {
+        conversion_rate: leads_to_customers / total_leads;
+        average_deal_size: sum(deal_values) / count(closed_deals);
+        sales_cycle_length: average_days_from_lead_to_close;
+    };
+}
+
+// 5. INVENTORY MANAGEMENT SYSTEM
+db Inventory {
+    warehouses: table {
+        id: int [pk, increment];
+        name: str [required, unique, max_length=100];
+        address: dict[str, str];
+        manager_id: int [ref: users.id];
+        is_active: bool [default=true];
+    };
+    
+    inventory_items: table {
+        id: int [pk, increment];
+        warehouse_id: int [ref: warehouses.id];
+        product_id: int [ref: products.id];
+        quantity: int [required, min_value=0];
+        reserved_quantity: int [default=0, min_value=0];
+        reorder_point: int [default=10];
+        max_stock_level: int;
+        last_counted: datetime?;
+        cost_per_unit: decimal(10,2);
+        location: str [max_length=50]; // e.g., "A1-B3"
+    };
+    
+    stock_movements: table {
+        id: int [pk, increment];
+        inventory_item_id: int [ref: inventory_items.id];
+        movement_type: str [choices=['in', 'out', 'adjustment', 'transfer']];
+        quantity: int [required];
+        reference_type: str [choices=['purchase', 'sale', 'adjustment', 'transfer']];
+        reference_id: int;
+        notes: str;
+        created_by: int [ref: users.id];
+        created_at: datetime [default=now()];
+    };
+}
+
+form StockAdjustmentForm {
+    fields: inventory_item_id, adjustment_quantity, reason, notes;
+    
+    validation: {
+        inventory_item_id: [required, exists_in_db];
+        adjustment_quantity: [required, not_zero];
+        reason: [required, choices=['damaged', 'lost', 'found', 'expired', 'correction']];
+    };
+    
+    @approval: {
+        required_for: adjustment_quantity > 100 || abs(value) > $1000;
+        approver: warehouse_manager || inventory_manager;
+        notification: email + in_app_alert;
+    };
+    
+    action: create_stock_movement -> update_inventory_quantity -> log_audit_trail;
+}
+
+report InventoryReport {
+    source: Inventory.inventory_items + Inventory.stock_movements;
+    
+    @calculations: {
+        available_stock: quantity - reserved_quantity;
+        stock_value: quantity * cost_per_unit;
+        turnover_rate: annual_sales / average_inventory;
+        reorder_alerts: available_stock <= reorder_point;
+    };
+    
+    @filters: {
+        warehouse: multi_select;
+        product_category: dropdown;
+        stock_status: [in_stock, low_stock, out_of_stock, overstock];
+        value_range: slider;
+    };
+    
+    @exports: {
+        formats: [pdf, excel, csv];
+        scheduling: daily + weekly + monthly;
+        distribution: email_to_stakeholders;
+    };
+}
+
+// Usage examples:
+// blog.create_post(title="Hello World", content="My first post");
+// ecommerce.process_order(order_id=123);
+// tasks.assign_task(task_id=456, assignee_id=789);
+// crm.follow_up_lead(contact_id=101);
+// inventory.check_stock_levels();

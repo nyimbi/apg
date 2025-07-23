@@ -1,0 +1,322 @@
+// ========================================
+// PRODUCTION LINE MONITORING EXAMPLES
+// Real-time quality control and process optimization
+// ========================================
+
+// 1. AUTOMOTIVE ASSEMBLY LINE MONITORING
+production AutoAssemblyLine {
+    stations: [
+        body_welding: {
+            robots: [kuka_kr_500, abb_irb_6700, fanuc_r_2000ib],
+            sensors: [force_torque, vision_guided, weld_monitoring],
+            quality_checks: [weld_penetration, joint_strength, dimensional_accuracy]
+        },
+        
+        paint_booth: {
+            equipment: [spray_robots, ovens, conveyor_system],
+            monitoring: [coating_thickness, color_matching, surface_defects],
+            environmental: [temperature, humidity, air_flow, particle_count]
+        },
+        
+        final_assembly: {
+            workstations: [engine_installation, interior_assembly, electrical_systems],
+            tools: [torque_wrenches, pneumatic_tools, test_equipment],
+            verification: [functionality_tests, leak_tests, electrical_continuity]
+        }
+    ];
+    
+    @line_monitoring: {
+        cycle_time: target(180s) ± tolerance(10s);
+        takt_time: customer_demand(480_units/day) / operating_time(16h);
+        throughput: real_time_calculation(units_per_hour);
+        bottleneck_detection: constraint_analysis(real_time);
+        
+        quality_gates: [
+            station_01: pass_criteria(weld_quality>98% && dimensional_ok),
+            station_02: pass_criteria(paint_quality>99.5% && no_defects),
+            station_03: pass_criteria(all_tests_pass && no_rework)
+        ];
+    };
+    
+    @anomaly_detection: statistical_process_control {
+        control_charts: [
+            x_bar_r: sample_size(5) + control_limits(3σ),
+            p_chart: defect_rate + control_limits(3σ),
+            c_chart: defects_per_unit + poisson_distribution
+        ];
+        
+        trend_analysis: {
+            algorithms: [exponential_smoothing, regression_analysis, arima],
+            warning_rules: [
+                seven_points_one_side,
+                two_of_three_beyond_2σ,
+                four_of_five_beyond_1σ,
+                fifteen_points_within_1σ
+            ];
+        };
+    };
+}
+
+// 2. PHARMACEUTICAL TABLET MANUFACTURING
+line PharmaceuticalProduction {
+    processes: [
+        granulation: {
+            equipment: "fluid_bed_granulator_fbd_500",
+            critical_parameters: [
+                inlet_temperature: range(40, 80)°C,
+                spray_rate: range(50, 200)g/min,
+                atomizing_pressure: range(1.5, 3.0)bar,
+                fluidizing_air: range(150, 300)m³/h
+            ],
+            monitoring: continuous + real_time_trending
+        },
+        
+        tablet_compression: {
+            equipment: "rotary_tablet_press_rtp_41",
+            critical_quality_attributes: [
+                tablet_weight: target(500mg) ± 5%,
+                hardness: range(8, 12)kp,
+                thickness: target(5.2mm) ± 0.1mm,
+                friability: <0.8%,
+                disintegration_time: <15min
+            ],
+            process_analytical_technology: near_infrared_spectroscopy
+        },
+        
+        coating: {
+            equipment: "perforated_coating_pan_ldcs_250",
+            parameters: [
+                coating_solution_temperature: 20±2°C,
+                spray_pressure: 2.0±0.2bar,
+                pan_speed: 6±1rpm,
+                inlet_air_temperature: 50±5°C
+            ],
+            quality_control: coating_uniformity + color_consistency
+        }
+    ];
+    
+    @regulatory_compliance: {
+        standards: [fda_21_cfr_part_211, ich_q8_q9_q10, eu_gmp_guidelines],
+        validation: installation_qualification + operational_qualification + performance_qualification,
+        documentation: batch_records + deviation_reports + change_controls,
+        audit_trail: electronic_signatures + data_integrity + traceability
+    };
+    
+    @quality_by_design: {
+        critical_quality_attributes: [potency, purity, dissolution, stability],
+        critical_process_parameters: identified_through_risk_assessment,
+        design_space: proven_acceptable_ranges,
+        control_strategy: real_time_release_testing + parametric_release
+    };
+}
+
+// 3. SEMICONDUCTOR FAB MONITORING
+inspect SemiconductorWaferInspection {
+    inspection_stations: [
+        optical_inspection: {
+            equipment: "kla_tencor_brightfield_inspector_2920",
+            capabilities: [
+                defect_detection: particles>50nm,
+                pattern_recognition: design_rule_violations,
+                critical_dimension_measurement: <3nm_precision,
+                overlay_measurement: <1nm_accuracy
+            ],
+            throughput: 150_wafers_per_hour
+        },
+        
+        electron_beam_inspection: {
+            equipment: "applied_materials_probevision_g7",
+            resolution: sub_10nm,
+            inspection_types: [voltage_contrast, material_contrast, topographic],
+            defect_classification: automated_pattern_recognition
+        },
+        
+        atomic_force_microscopy: {
+            equipment: "bruker_dimension_icon",
+            measurements: [surface_roughness, step_height, critical_dimensions],
+            resolution: atomic_scale,
+            sample_preparation: minimal_to_none
+        }
+    ];
+    
+    @defect_classification: machine_learning_pipeline {
+        training_data: expert_labeled_defects(1M_samples);
+        models: [
+            convolutional_neural_network: defect_detection + localization,
+            transformer_architecture: contextual_analysis + pattern_matching,
+            ensemble_methods: voting_classifier(5_models)
+        ];
+        
+        defect_categories: [
+            particles: foreign_material + process_residue,
+            scratches: mechanical_damage + handling_issues,
+            stains: chemical_contamination + cleaning_residue,
+            pattern_defects: lithography_issues + etch_problems,
+            crystal_defects: material_quality + growth_issues
+        ];
+        
+        performance_metrics: {
+            detection_rate: >99.9%,
+            false_positive_rate: <0.01%,
+            classification_accuracy: >98%,
+            processing_speed: <100ms_per_die
+        };
+    };
+}
+
+// 4. FOOD AND BEVERAGE QUALITY CONTROL
+quality FoodProcessingQC {
+    inspection_systems: [
+        x_ray_inspection: {
+            equipment: "mettler_toledo_safeline_x36",
+            detection_capabilities: [
+                foreign_objects: metal + glass + stone + bone,
+                product_integrity: missing_components + broken_pieces,
+                fill_level: volume_measurement + weight_verification,
+                package_seal: seal_integrity + leak_detection
+            ],
+            sensitivity: metal_particles>0.4mm, glass>1.0mm
+        },
+        
+        vision_inspection: {
+            cameras: [color_camera, infrared_camera, uv_fluorescence],
+            lighting: [led_arrays, laser_illumination, structured_light],
+            analyses: [
+                color_grading: rgb + lab_color_space,
+                size_sorting: length + width + thickness,
+                surface_defects: blemishes + cuts + bruises,
+                shape_classification: geometric_analysis + morphology
+            ]
+        },
+        
+        spectroscopy: {
+            near_infrared: [moisture_content, fat_content, protein_content, sugar_content],
+            raman_spectroscopy: [molecular_composition, contamination_detection],
+            mass_spectrometry: [volatile_compounds, pesticide_residues, additives]
+        }
+    ];
+    
+    @safety_monitoring: {
+        haccp_critical_control_points: [
+            temperature: continuous_monitoring + alert_thresholds,
+            ph_levels: inline_measurement + automatic_adjustment,
+            metal_detection: reject_system + contamination_tracking,
+            pathogen_testing: rapid_methods + preventive_controls
+        ];
+        
+        traceability: {
+            raw_materials: supplier_data + batch_numbers + certificates,
+            processing: time_stamps + parameter_logs + operator_ids,
+            packaging: lot_codes + expiration_dates + distribution_records,
+            recall_capability: within_2_hours + complete_chain_visibility
+        };
+    };
+}
+
+// 5. TEXTILE MANUFACTURING QUALITY
+inspect TextileQualityControl {
+    fabric_inspection: {
+        optical_scanning: {
+            equipment: "uster_fabriscan",
+            parameters: [
+                fabric_width: ±2mm_tolerance,
+                weight_per_area: ±3%_tolerance,
+                thickness_variation: ±5%_tolerance,
+                color_consistency: ΔE<1.0_throughout_roll
+            ],
+            defect_detection: [
+                weaving_defects: broken_threads + missing_threads + wrong_threads,
+                dyeing_defects: color_variation + staining + uneven_dyeing,
+                finishing_defects: pilling + shrinkage + dimensional_instability
+            ]
+        };
+        
+        automated_grading: {
+            classification_system: 4_point_system + textile_standards,
+            penalty_points: [
+                major_defects: 4_points,
+                minor_defects: 2_points,
+                slight_defects: 1_point
+            ],
+            acceptance_criteria: <40_points_per_100_square_yards
+        };
+    };
+    
+    @process_control: {
+        knitting_machines: [
+            tension_control: automatic_adjustment + feedback_loops,
+            yarn_monitoring: break_detection + splice_detection,
+            pattern_verification: real_time_comparison + automatic_correction
+        ];
+        
+        dyeing_process: [
+            temperature_profile: precise_control + ramping_rates,
+            chemical_dosing: automated_systems + recipe_management,
+            ph_monitoring: continuous_measurement + adjustment,
+            color_matching: spectrophotometric_analysis + recipe_prediction
+        ];
+    };
+}
+
+// 6. ELECTRONICS MANUFACTURING INSPECTION
+vision ElectronicsAssemblyInspection {
+    smt_inspection: {
+        solder_paste_inspection: {
+            equipment: "koh_young_aspire",
+            measurements: [
+                volume: ±25%_tolerance,
+                height: ±50μm_tolerance,
+                area: ±20%_tolerance,
+                offset: ±25%_tolerance
+            ],
+            3d_measurement: laser_triangulation + structured_light
+        };
+        
+        component_placement: {
+            verification: [
+                component_presence: missing_parts_detection,
+                component_orientation: rotation_angle_measurement,
+                component_position: x_y_offset_measurement,
+                component_type: part_number_verification
+            ],
+            accuracy: ±10μm_placement + ±0.1°_rotation
+        };
+        
+        post_reflow_inspection: {
+            solder_joint_quality: [
+                fillet_formation: acceptable_shape + size,
+                void_analysis: <25%_void_area,
+                bridging_detection: short_circuit_prevention,
+                insufficient_solder: open_circuit_prevention
+            ]
+        };
+    };
+    
+    @statistical_analysis: {
+        spc_charts: real_time_monitoring + trend_analysis,
+        cpk_calculation: process_capability_index>1.33,
+        yield_analysis: first_pass_yield + final_yield,
+        pareto_analysis: defect_prioritization + root_cause_focus
+    };
+}
+
+// Example deployment showing integration across multiple systems:
+deploy IntegratedQualitySystem {
+    edge_processing: {
+        vision_systems: real_time_image_processing + immediate_decisions,
+        sensor_fusion: multi_modal_data_combination + uncertainty_quantification,
+        local_analytics: anomaly_detection + pattern_recognition
+    };
+    
+    cloud_analytics: {
+        big_data_processing: historical_analysis + predictive_modeling,
+        machine_learning: continuous_model_improvement + transfer_learning,
+        dashboard_reporting: real_time_kpis + executive_summaries
+    };
+    
+    @integration: {
+        mes_systems: production_data + quality_data + traceability,
+        erp_integration: cost_accounting + inventory_management + scheduling,
+        plm_systems: design_feedback + engineering_changes + specifications
+    };
+}
