@@ -1,0 +1,705 @@
+grammar appgen;
+
+//TODO: Extend the list of supported data types
+//TODO: Tidy up indexes and views on tables
+//TODO: Add Event and Notification to Tables/View/Databases
+//TODO: Add jhipster style deployment features
+//TODO: Add a business rules language
+//TODO: Add a singer.io tap interface
+
+
+// LEXER_PART
+// Lexer tokens
+COMMA           : ',';
+COLON           : ':';
+SEMI_COLON      : ';';
+EQ              : '=';
+L_PAR           : '(';
+R_PAR           : ')';
+L_SQUARE        : '[';
+R_SQUARE        : ']';
+L_CURLY         : '{';
+R_CURLY         : '}';
+DOT             : '.';
+ADD             : '+';
+SUB             : '-';
+DIV             : '/';
+MUL             : '*';
+LT              : '<';
+GT              : '>';
+M2M             : ('<>' | MUL);
+NEQ             : '!=';
+LTE             : '<=';
+GTE             : '>=';
+AND             : '&&';
+OR              : '||';
+
+// Whitespace and comments
+WS                  : [ \t\r\n\u000C\u00A0]+    -> skip;
+NL                  : [\r\n\u2028\u2029]        -> skip;
+C_LINE_COMMENT      : '//' ~[\r\n]*     -> channel(HIDDEN);
+C_STYLE_COMMENT     : '/*' .*? '*/'     -> channel(HIDDEN);
+//P_STYLE_COMMENT     : '#' ~[(\r)? \n]*  -> channel(HIDDEN);
+
+
+//    | ~[\u0000-\u00FF\uD800-\uDBFF]
+//    | [\uD800-\uDBFF] [\uDC00-\uDFFF]
+//    | [\u00E9]
+fragment Letter
+    : [_A-Za-z]
+    ;
+
+fragment SpecialChars
+    :  [!$&'*+;=?^_`|~]
+    ;
+
+fragment Digit
+    : [0-9]
+    ;
+
+fragment LetterOrDigit
+    : Letter
+    | Digit
+    ;
+
+IDENT
+    : Letter+ (LetterOrDigit)*
+    ;
+
+fragment DirectorySeparators
+    :  [\\/] // Both Unix-like and Windows directory separators
+    ;
+// Now to define a string
+fragment OctalEscape
+    :   '\\' ('0'..'3') ('0'..'7') ('0'..'7')
+    |   '\\' ('0'..'7') ('0'..'7')
+    |   '\\' ('0'..'7')
+    ;
+
+fragment UnicodeEscape
+    :   '\\' 'u' HexDigit HexDigit HexDigit HexDigit
+    ;
+
+fragment EscapeSequence
+    :   '\\' ('b'|'B'|'t'|'n'|'f'|'r'|'\''|'\\'|'.'|'o'|
+              'x'|'a'|'e'|'c'|'d'|'D'|'s'|'S'|'w'|'W'|'p'|'A'|
+              'G'|'Z'|'z'|'Q'|'E'|'*'|'['|']'|'('|')'|'$'|'^'|
+              '{'|'}'|'?'|'+'|'-'|'&'|'|')
+    |   UnicodeEscape
+    |   OctalEscape
+    ;
+
+STRING
+    :  ('"' ( EscapeSequence | ~('\\'|'"') )* '"')
+    |  ('\'' ( EscapeSequence | ~('\\'|'\'') )* '\'')
+    { // Semantic Action
+        setText( normalizeString( getText() ) );
+    }
+    ;
+
+// Now define numbers
+
+// INT has no leading zeros
+//Can use _ and , to separate digits in a integer 1,000 or 1_000_000 are valid numbers
+INT
+   : '0' | [1-9] (Digit|'_')*
+   ;
+
+fragment EXP
+    : ('e'|'E') ('+'|'-')? Digit+
+    ;
+
+fragment FloatTypeSuffix
+    : ('f'|'F'|'d'|'D'|'B')
+    ;
+
+fragment HexDigit
+    : ('0'..'9'|'a'..'f'|'A'..'F')
+    ;
+
+fragment IntegerTypeSuffix
+    : ('l'|'L'|'I')
+    ;
+
+NUMBER
+   : '-'? INT (DOT Digit+)? EXP?
+   | '-'? INT EXP
+   | '-'? INT
+   ;
+
+FLOAT
+    :   Digit+ DOT Digit* EXP? FloatTypeSuffix?
+    |   '.' Digit+ EXP? FloatTypeSuffix?
+    |   Digit+ EXP FloatTypeSuffix?
+    |   Digit+ FloatTypeSuffix
+    ;
+
+TRUE
+    : ('T' | 'True' | 'true')
+    ;
+
+FALSE
+    : ('F' | 'False' | 'false')
+    ;
+
+BOOL
+	: (TRUE|FALSE)
+    ;
+
+HEX 	: '0' ('x'|'X') HexDigit+ IntegerTypeSuffix? ;
+
+DECIMAL	: INT IntegerTypeSuffix? ;
+
+// Now to define time and dates, complex
+TIME_INTERVAL
+    : (('0'..'9')+ 'd') (('0'..'9')+ 'h')?(('0'..'9')+ 'm')?(('0'..'9')+ 's')?(('0'..'9')+ 'ms'?)?
+    | (('0'..'9')+ 'h') (('0'..'9')+ 'm')?(('0'..'9')+ 's')?(('0'..'9')+ 'ms'?)?
+    | (('0'..'9')+ 'm') (('0'..'9')+ 's')?(('0'..'9')+ 'ms'?)?
+    | (('0'..'9')+ 's') (('0'..'9')+ 'ms'?)?
+    | (('0'..'9')+ 'ms'?)
+    ;
+
+DATE_TIME_LITERAL: Bound FullDate 'T' FullTime Bound;
+
+fragment Bound: '"' | '\'';
+fragment FullDate: Year '-' Month '-' Day;
+fragment Year: Digit Digit (Digit Digit)?;  // EITHER 2 or 4 digits
+fragment Month: [0][0-9]|[1][0-2];
+fragment Day: [0-2][0-9]|[0-3][01];
+
+fragment FullTime
+    : PartialTime TimeOffset;
+
+fragment TimeOffset
+    : 'Z' | TimeNumOffset;
+
+fragment TimeNumOffset
+    : '-' [01][0-2] (':' (HalfHour))?
+    | '+' [01][0-5] (':' (HalfHour | [4][5]))?
+    ;
+fragment HalfHour: [0][0] | [3][0];
+
+fragment PartialTime
+    : [0-2][0-3] ':' Sixty ':' Sixty ('.' [0-9]*)?;
+
+fragment Sixty: [0-5] Digit;
+VersionLiteral
+  : [0-9]+ '.' [0-9]+ ('.' [0-9]+)? ;
+
+
+// KEYWORDS
+ANDROID : 'android';
+BLOB    : 'blob';
+CACHE   : 'cache';
+CHART   : 'chart';
+CHECK   : 'check';
+CONFIG  : 'config';
+DBFUNC  : 'dbfunc';
+DBVIEW  : 'dbview';
+DECR    : ('decrement' | 'decr' | '--');
+DEFAULT : 'default';
+DEFAULT_EXPR: 'default-expression' ;
+DEPLOYMENT: 'deployment';
+DESKTOP : 'desktop';
+DIALECT : 'dialect';
+DISPLAY : 'display';
+ENUM    : 'enum';
+FILE    : 'file';
+GENERATE: 'generate';
+IMPORT  : '#import' ;
+INCLUDE : '#include' ;
+INCR    : ('increment' | 'incr' | '++');
+IOS     : 'ios';
+LANGUAGES: 'languages';
+MAX     : 'max';
+MIN     : 'min';
+MIXIN   : 'mixin';
+MODE    : 'mode';
+MSSQL   : 'mssql';
+MYSQL   : 'mysql';
+NOT_NULL: 'not' 'null';
+NOTE    : 'note';
+NOW     : 'now';
+NULL    : ('null' | 'nil' | 'naught');
+NULLABLE: 'nullable';
+ORACLE  : 'oracle';
+OS      : 'os';
+PGSQL   : 'pgsql';
+PK_LONG : 'primary_key';
+PK_SHORT: 'pk';
+PROJECT : 'project';
+PUBLIC  : 'public';
+REF     : 'ref';
+REPORT  : 'report';
+REQUIRED: 'required';
+SQL     : 'sql';
+SQLITE  : 'sqlite';
+TABLE   : 'table';
+TBLGROUP: 'tablegroup';
+THEME   : 'theme';
+TODAY   : 'today';
+TOMORROW: 'tomorrow';
+TSERIES : ('tseries' | 'time_series' | 'timeseries');   //so that we can handle
+UNIQ    : ('uniq' | '!' | 'unique') ;
+VARCHAR : 'varchar';
+VERSION : 'version';
+VIEW    : 'view';
+WEB     : 'web';
+YESTERDAY: 'yesterday';
+
+//Parameters
+DDB_URI: 'dev_db_uri';
+PDB_URI: 'prod_db_uri';
+
+unique: UNIQ;
+db
+    : PGSQL
+    | MYSQL
+    | SQLITE
+    | ORACLE
+    | MSSQL
+    ;
+// Covenience Parser Rules
+int: INT;
+string: STRING;
+ident: IDENT;
+name_attr: ident ;
+
+int_list
+    :  int (COMMA int)* COMMA?
+    ;
+ident_list
+    :  ident (COMMA ident)* COMMA?
+    ;
+string_list
+    :  string (',' string)* COMMA?
+    ;
+
+option
+    : (ident | string) EQ (string | string_list | ident| ident_list | int_list | int)
+    ;
+option_list
+    :  option (COMMA option)* COMMA?
+    ;
+
+
+/////////////////////
+appgen
+    : importDeclaration? projectBlock?  (statement)+ EOF
+    ;
+
+
+importDeclaration
+	: IMPORT import_file_list
+	| INCLUDE import_file_list
+	;
+
+import_file_list
+	: L_CURLY import_file_name (COMMA? import_file_name)* R_CURLY
+	| import_file_name (COMMA? import_file_name)* NL
+	| L_CURLY R_CURLY
+	;
+
+import_file_name
+	:  ident //(ident | string)  //filename
+	;
+
+projectBlock
+    : PROJECT projectName  L_CURLY project_property_list R_CURLY
+    ;
+
+projectName : name_attr;
+
+project_property_list
+    :   project_property (COMMA project_property)* COMMA?
+    ;
+
+project_property
+    : ( 'name' EQ string
+    | 'version' EQ (string | VersionLiteral)
+    | DDB_URI EQ string
+    | PDB_URI EQ string
+    | config
+    | deployment
+    | language
+    | report_spec
+    | theme
+    | gen_option
+    | option)
+    ;
+
+
+gen_option
+    : GENERATE EQ '[' app_gen_target+ ']'
+    ;
+
+app_gen_target
+	: IOS
+	| WEB
+	| DESKTOP
+	| ANDROID
+	| SQL (DIALECT (db | string))?   //Generate just the sql for the tables
+	| string
+	;
+
+deployment
+    : DEPLOYMENT EQ  deployment_option_list
+    ;
+
+deployment_option_list
+    : L_SQUARE option_list R_SQUARE
+    | L_SQUARE R_SQUARE  //empty list
+    ;
+
+language
+    : LANGUAGES EQ lang_list
+    ;
+
+lang_list
+    : L_SQUARE string_list R_SQUARE
+    ;
+
+theme
+    : THEME EQ string
+    ;
+
+report_spec
+    : REPORT report_name report_property_list
+    ;
+
+report_name: name_attr;
+
+report_property_list
+    : L_CURLY report_property (COMMA report_property)* COMMA? R_CURLY
+    | L_CURLY R_CURLY
+    ;
+
+report_property
+    : option
+    ;
+
+chart_specification
+    : CHART chart_name chart_property_list
+    ;
+
+chart_name: name_attr;
+
+chart_property_list
+    : L_CURLY chart_property (COMMA chart_property)* COMMA? R_CURLY
+    | L_CURLY R_CURLY
+    ;
+
+chart_property
+    : option
+    ;
+
+config
+    : CONFIG EQ  config_options_list
+    ;
+config_options_list
+    : L_CURLY config_option ( COMMA config_option)* COMMA? R_CURLY
+    | L_CURLY R_CURLY
+    ;
+config_option
+    : option
+    ;
+
+statement
+    : object
+    | ext_ref           //References defined outside the table definition
+    | enum_out          // Enumeration
+    | index_ext         //Index definition
+    | business_rule
+    ;
+
+dbfunc // A container for triggers and functions. Will be passed through directly
+    : 'dbfunc' func_name string
+    ;
+
+func_name
+    : name_attr
+    ;
+
+object
+    : database
+    | schema
+    | tableDecl
+    | mixin
+    | dbview
+    | dbfunc            // Database function
+    ;
+
+database
+    : name_attr
+    ;
+schema
+    : (PUBLIC | ident)
+    ;
+
+mixin
+    : MIXIN mixin_name  column_list
+    ;
+
+mixin_name : name_attr;
+
+column_list
+    :  L_CURLY column (COMMA column)* COMMA? R_CURLY
+    |  L_CURLY R_CURLY
+    ;
+
+column
+    : column_name data_type ( column_option_list )?
+    ;
+
+column_name: name_attr;
+
+
+column_option_list
+    :  L_SQUARE column_option (COMMA column_option)* COMMA? R_SQUARE
+    ;
+
+primary_key: PK_SHORT | PK_SHORT;
+
+column_option
+    : primary_key
+    | DEFAULT EQ column_default
+    | CACHE ( '(' INT ')' )? // Cache this column (lifetime defaults to 300 seconds)
+    | DEFAULT_EXPR EQ '(' string ')'
+    | INCR | DECR
+    | unique
+    | NULLABLE
+    | 'not' 'null'
+    | ref_internal   //internal reference
+    | enum_internal
+    | MIN EQ INT
+    | MAX EQ INT
+    | CHECK check_expr
+    | display_method
+    | note_option
+//    | option
+    ;
+
+check_expr: '(' string ')';  //TODO refine the check expressions
+
+data_type
+    : 'bit'| 'boolean'
+    | 'tinyint'| 'smallint'| 'int'| 'integer' | 'bigint'
+    | 'double' | 'decimal' | 'float'
+    | 'money'| 'smallmoney'
+    | 'char'| 'nchar'| varchar | 'nvarchar'
+    | 'text'| 'mediumtext' | 'longtext' | 'xml' | 'document'
+    | 'blob'| 'mediumblob'| 'longblob'
+    | 'binary'|'varbinary'
+    | 'json'| 'jsonb'
+    | 'interval'| 'time'| 'timestamp'| 'timestamptz'| 'timestampltz'| 'datetime'| 'date'
+    | 'geography'| 'geometry'| 'point'
+    | 'hllsketch'| 'hstore'| 'pseudo_type'|'super'
+    | 'serial'| 'smallserial'| 'bigserial'| 'uniqueidentifier'
+    | 'rowversion'| 'variant'| 'inet'|
+    | 'file' | 'image' | 'object' | 'uuid'
+    | enum_name
+    | 'array' int_list  'of' data_type
+    ;
+
+column_reference:
+     (table_reference DOT)? column_name
+    ;
+
+table_reference
+    : (schema DOT)? table_name
+    ;
+
+
+column_default
+    : NUMBER
+    | string
+    | BOOL
+    | NOW | TODAY | TOMORROW
+    | 'CURRENT_DATE' | 'CURRENT_USER'
+    | NULL
+    ;
+
+enum_name: name_attr;
+
+enum_internal  //Defined in table options, anonymous enum
+    : 'enum' EQ L_CURLY enum_list R_CURLY
+    ;
+
+enum_out  //self standing enums
+    : 'enum' enum_name L_CURLY enum_list R_CURLY
+    ;
+
+enum_list
+    : enum_item (COMMA enum_item)* COMMA?
+    ;
+
+enum_item
+    : (enum_idx EQ)? enum_value ('[' note_option ']')?
+    ;
+
+enum_idx: int;
+enum_value : string ;
+
+
+
+display_method
+    : 'display' EQ option_list
+    ;
+
+
+note_option
+    : 'note' EQ note_value
+    ;
+
+note_value
+    : string
+    ;
+
+varchar
+    : VARCHAR L_PAR INT R_PAR
+    ;
+
+tableDecl
+    : 'table' table_name ('(' mixin_list ')')? '{' column_list (index_int)? (view_s_spec)?  '}'
+    ;
+
+mixin_list
+    : mixin_name? (COMMA mixin_name)*
+    ;
+
+table_name: name_attr;
+
+dbview //TODO develop a method of creating views
+    : 'dbview' EQ '(' db_join  ')'
+    ;
+db_join
+    : column_reference EQ column_reference
+    ;
+ref_internal //defined in table options
+    : 'ref' ref_name? COLON ref_type (schema DOT)? table_name DOT column_name
+    ;
+
+ext_ref //Free standing Reference Foreign_Key
+    : 'ref' ref_name? COLON (schema DOT)? table_name DOT (column_name)+ ref_type table_name DOT (column_name)+
+    ;
+ref_name: name_attr;
+ref_type
+    : oneToOne
+    | oneToMany
+    | manyToOne
+    | manyToMany
+    ;
+
+oneToOne: SUB;
+oneToMany: LT;
+manyToOne: GT;
+manyToMany: M2M;
+
+index_ext
+    : 'index' (index_name)? 'on' table_name '[' column_names ']' ('of type' ('btree'|'gin'|'gist'|'hash'))?
+    ;
+
+index_int //For specification inside a table
+    : 'indexes'  EQ '{' index_item_list '}'
+    ;
+
+index_item_list
+    :  index_item (',' index_item)*
+    ;
+
+index_item
+    :( index_name EQ)? '[' column_names ']' ('of type' ('btree'|'gin'|'gist'|'hash'))?
+    ;
+
+column_names
+    :  column_name (',' column_name)* (',')?
+    ;
+
+index_name: name_attr;
+view_s_spec
+    : 'views' EQ '{' view_spec_list  '}'
+    ;
+
+view_spec_list
+    : view_spec (',' view_spec)
+    ;
+
+view_spec
+    : view_type COLON '{' view_spec_options '}'
+    ;
+
+view_type
+    : ('add' | 'show' | 'list' | 'edit' | 'all')
+    ;
+
+view_spec_options
+    : ('ex' | 'exclude') EQ '[' column_names ']'
+    | ('in' | 'include') EQ '[' column_names ']'
+    ;
+
+
+business_rule: 'rule' rule_name ':' businessRule;
+businessRule: ifExpr 'then' actionExpr;
+ifExpr: ('if' | 'on') '(' expr ')' ( 'else' '(' expr ')' )?;
+rule_name: name_attr;
+
+actionExpr: 'action' (python_code | 'email' '(' string ')' | sms| notify | search | flag | execute_query| upload | download);
+python_code: 'python' '(' string ')';
+sms: 'sms' '(' destination ',' string ')';
+notify: 'NOTIFY' '(' string ')'; // using postgresql notifications?
+search: 'search' '(' string ')';
+flag: 'flag' '(' string ')';
+upload: 'upload' '(' server_loc ',' string ')';
+download: 'download' '(' server_loc ',' string ')';
+execute_query: 'execute_query' '(' string ')';
+
+destination: string;
+server_loc: string;
+
+expr
+    : ident                             # identExpression
+    | literal                           # literalExpr
+    | functionCall                      # functionCallExpr
+    | '(' expr ')'                      # nestedExpr
+    | expr op=(MUL | DIV) expr          # binaryMultiplicationDiv
+    | expr op=(ADD | SUB) expr        # binaryAdditionSubtraction
+    | expr booleanOp expr               # booleanCombination
+    | expr comparisonOp expr            # binaryComparison
+    | SUB expr                        # unaryMinus
+    | 'sin' expr                        # trigonometricSin
+    | 'cos' expr                        # trigonometricCos
+    | 'tan' expr                        # trigonometricTan
+    | 'asin' expr                       # inverseTrigonometricSin
+    | 'acos' expr                       # inverseTrigonometricCos
+    | 'atan' expr                       # inverseTrigonometricTan
+    | 'sinh' expr                       # hyperbolicSine
+    | 'cosh' expr                       # hyperbolicCosine
+    | 'tanh' expr                       # hyperbolicTangent
+    | 'asinh' expr                      # inverseHyperbolicSine
+    | 'acosh' expr                      # inverseHyperbolicCosine
+    | 'atanh' expr                      # inverseHyperbolicTangent
+    | 'avg' '(' expr_list ')'           # statisticalAverage
+    | 'min' '(' expr_list ')'           # statisticalMinimum
+    | 'max' '(' expr_list ')'           # statisticalMaximum
+    | 'sum' '(' expr_list ')'           # statisticalSum
+  ;
+
+expr_list
+    : expr (COMMA expr)* COMMA?
+    ;
+
+literal: INT | FLOAT | STRING | TRUE | FALSE;
+booleanOp: AND | OR;
+comparisonOp: EQ | NEQ | LT | LTE | GT | GTE;
+arithmeticOp: ADD | SUB | MUL | DIV;
+
+functionCall: 'exec' function_name  param_list?;  // params are in square brackets
+function_name: name_attr;
+param_list: string_list;
+
+//binaryOp
+//    : expr arithmeticOp expr
+//    | expr booleanOp expr
+//    | expr comparisonOp expr;
+
+

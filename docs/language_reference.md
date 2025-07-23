@@ -676,6 +676,270 @@ unique_domains = {email.split("@")[1] for email in email_list};
 
 ## Domain-Specific Extensions
 
+### Marketplace and E-commerce Extensions
+
+APG v11 includes comprehensive support for building two-sided and multi-sided marketplaces, matching platforms, and e-commerce solutions.
+
+```apg
+// Two-sided marketplace definition
+marketplace FreelanceHub {
+    user_types: {
+        client: {
+            permissions: ["create_projects", "browse_freelancers", "make_payments"];
+            verification_required: {
+                email: true;
+                payment_method: true;
+            };
+            commission_structure: {
+                platform_fee: 0%;
+                payment_processing_fee: 2.9%;
+            };
+        };
+        
+        freelancer: {
+            permissions: ["create_profile", "submit_proposals", "receive_payments"];
+            verification_required: {
+                identity: true;
+                professional_credentials: true;
+            };
+            commission_structure: {
+                platform_fee: 8%;
+                payment_processing_fee: 2.9%;
+            };
+        };
+    };
+    
+    transactions: {
+        escrow_enabled: true;
+        payment_providers: ["stripe", "paypal", "cryptocurrency"];
+        supported_currencies: ["USD", "EUR", "GBP"];
+        dispute_resolution: {
+            auto_resolution_enabled: true;
+            mediation_process: {
+                stages: ["automated_review", "peer_mediation", "admin_arbitration"];
+            };
+        };
+    };
+    
+    trust_safety: {
+        identity_verification: {
+            levels: {
+                basic: {requirements: ["email", "phone"]};
+                premium: {requirements: ["government_id", "address_proof"]};
+            };
+        };
+        
+        rating_system: {
+            scale: 1..5;
+            categories: ["communication", "quality_of_work", "adherence_to_deadline"];
+        };
+        
+        fraud_prevention: {
+            ml_models: ["payment_fraud_detector", "account_takeover_detector"];
+            behavioral_analysis: true;
+        };
+    };
+    
+    search_discovery: {
+        search_engine: {
+            provider: "elasticsearch";
+            features: ["fuzzy_matching", "faceted_search", "geolocation"];
+        };
+        
+        recommendation_engine: {
+            algorithms: {
+                collaborative_filtering: {weight: 0.4};
+                content_based: {weight: 0.3};
+                popularity: {weight: 0.3};
+            };
+        };
+    };
+}
+```
+
+### Microservices Architecture
+
+APG provides native support for defining and deploying microservices architectures:
+
+```apg
+// Service definition with placement strategy
+service user_service {
+    type: "core_domain_service";
+    responsibilities: [
+        "user_registration", "profile_management", 
+        "authentication", "authorization"
+    ];
+    
+    api_endpoints: [
+        {
+            path: "/api/v1/users";
+            methods: ["GET", "POST", "PUT", "DELETE"];
+            authentication: "jwt_required";
+            rate_limit: "100/minute/user";
+        }
+    ];
+    
+    database: {
+        type: "postgresql";
+        name: "users_db";
+        tables: ["users", "profiles", "verifications"];
+        partitioning: {
+            strategy: "range";
+            column: "created_at";
+            interval: "monthly";
+        };
+    };
+    
+    scaling: {
+        strategy: "horizontal";
+        min_instances: 3;
+        max_instances: 20;
+        cpu_threshold: 70%;
+        custom_metrics: [
+            {
+                name: "active_sessions";
+                threshold: 1000;
+                scale_up: 2;
+            }
+        ];
+    };
+    
+    deployment: {
+        container: {
+            image: "company/user-service:v2.3.1";
+            resources: {
+                requests: {cpu: "200m", memory: "512Mi"};
+                limits: {cpu: "1000m", memory: "2Gi"};
+            };
+        };
+        
+        placement_strategy: {
+            type: "multi_az_spread";
+            constraints: ["node.role == worker"];
+            preferences: ["zone == us-west-2a"];
+        };
+        
+        networking: {
+            service_mesh: "istio";
+            protocols: ["grpc", "http"];
+            security: "mutual_tls";
+        };
+    };
+    
+    monitoring: {
+        metrics: {
+            business: ["user_registrations_per_minute", "active_sessions"];
+            technical: ["request_duration", "error_rate"];
+        };
+        
+        alerts: [
+            {
+                name: "high_error_rate";
+                condition: "error_rate > 5%";
+                severity: "critical";
+                notification: ["pagerduty", "slack"];
+            }
+        ];
+    };
+}
+
+// Service mesh configuration
+microservices: {
+    api_gateway: {
+        provider: "kong";
+        features: {
+            rate_limiting: true;
+            authentication: ["jwt", "oauth2"];
+            load_balancing: "round_robin";
+        };
+    };
+    
+    service_mesh: {
+        provider: "istio";
+        features: {
+            traffic_management: true;
+            security_policies: true;
+            mutual_tls: "strict";
+        };
+    };
+    
+    service_discovery: {
+        provider: "consul";
+        health_checking: true;
+        automatic_registration: true;
+    };
+}
+```
+
+### Advanced Deployment Strategies
+
+```apg
+// Multi-region deployment strategy
+deployment_strategy MultiRegionDeployment {
+    regions: {
+        primary: {
+            name: "us-west-2";
+            services: ["all"];
+            capacity: "100%";
+        };
+        
+        secondary: {
+            name: "us-east-1";
+            services: ["user_service", "payment_service"];
+            capacity: "75%";
+        };
+    };
+    
+    service_placement_matrix: {
+        user_service: {
+            placement: "all_regions";
+            replication_strategy: "active_active";
+            data_consistency: "eventual";
+        };
+        
+        payment_service: {
+            placement: "primary_and_secondary";
+            replication_strategy: "active_passive";
+            data_consistency: "strong";
+            compliance_requirements: ["pci_dss"];
+        };
+    };
+    
+    disaster_recovery: {
+        rto: "5_minutes";
+        rpo: "30_seconds";
+        automatic_failover: true;
+    };
+}
+
+// Canary deployment pattern
+deployment_pattern CanaryDeployment {
+    stages: [
+        {
+            name: "initial_canary";
+            traffic_percentage: 5%;
+            duration: "10m";
+            success_criteria: {
+                error_rate: "<1%";
+                latency_p99: "<500ms";
+            };
+        },
+        {
+            name: "full_rollout";
+            traffic_percentage: 100%;
+            duration: "monitored";
+        }
+    ];
+    
+    rollback_triggers: [
+        {
+            condition: "error_rate > 2%";
+            action: "immediate_rollback";
+        }
+    ];
+}
+```
+
 ### Digital Twin Extensions
 
 ```apg

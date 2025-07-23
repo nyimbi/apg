@@ -1,0 +1,988 @@
+// ========================================
+// MODULE SYSTEM DEMONSTRATION
+// Showcasing APG v11's comprehensive module system with imports, exports, and dependencies
+// ========================================
+
+// 1. MODULE DECLARATION WITH METADATA
+module InventoryManagement version 2.1.0 {
+	description: "Comprehensive inventory management system with real-time tracking";
+	author: "Development Team";
+	license: "MIT";
+	
+	dependencies: {
+		UserManagement: "^1.5.0";
+		NotificationSystem: "~2.0.1";
+		ReportingEngine: ">=1.2.0 <2.0.0";
+		DatabaseConnector: "latest";
+	};
+	
+	dev_dependencies: {
+		TestFramework: "^3.1.0";
+		MockingLibrary: "^2.5.0";
+		DataGenerator: "dev";
+	};
+	
+	repository: "https://github.com/company/inventory-management";
+	homepage: "https://docs.company.com/inventory";
+	keywords: ["inventory", "warehouse", "tracking", "management"];
+}
+
+// 2. IMPORT STATEMENTS WITH OPTIONS
+import UserManagement as Users from "core/user_management" {
+	lazy: false;
+	version: "^1.5.0";
+	optional: false;
+	cache: true;
+};
+
+import NotificationSystem.{EmailService, SMSService, SlackNotifier} from "communications/notifications" {
+	lazy: true;
+	cache: true;
+	conditional: env("ENABLE_NOTIFICATIONS") == "true";
+};
+
+import DatabaseConnector.* from "data/database" {
+	lazy: false;
+	version: "latest";
+	fallback: "data/mock_database";
+};
+
+from ReportingEngine import {
+	ReportGenerator,
+	ChartBuilder,
+	ExcelExporter as Excel,
+	PDFExporter as PDF
+} {
+	lazy: true;
+	version: ">=1.2.0";
+	optional: true;
+};
+
+// Conditional imports based on environment
+if (env("NODE_ENV") == "development") {
+	import TestFramework.* from "testing/framework";
+	import MockingLibrary as Mock from "testing/mocks";
+}
+
+// 3. DATABASE ENTITY WITH CONSTRAINTS
+db InventoryDB {
+	// Products table with comprehensive constraints
+	products: table {
+		id: int [pk, increment];
+		sku: str [unique, required, max_length=50, pattern=/^[A-Z0-9-]+$/];
+		name: str [required, max_length=200, searchable];
+		description: text [max_length=1000];
+		category_id: int [fk="categories.id", required];
+		supplier_id: int [fk="suppliers.id"];
+		
+		// Pricing and cost information
+		cost_price: decimal [precision=10, scale=2, min_value=0];
+		selling_price: decimal [precision=10, scale=2, min_value=0];
+		margin: decimal [computed] = (selling_price - cost_price) / cost_price * 100;
+		
+		// Inventory tracking
+		stock_quantity: int [min_value=0, default=0];
+		reserved_quantity: int [min_value=0, default=0];
+		available_quantity: int [computed] = stock_quantity - reserved_quantity;
+		reorder_point: int [min_value=0, default=10];
+		reorder_quantity: int [min_value=1, default=50];
+		
+		// Physical properties
+		weight: decimal [precision=8, scale=3, unit="kg"];
+		dimensions: json {
+			length: decimal [unit="cm"];
+			width: decimal [unit="cm"];
+			height: decimal [unit="cm"];
+		};
+		
+		// Status and tracking
+		status: enum ["active", "discontinued", "pending", "out_of_stock"];
+		is_serialized: bool [default=false];
+		is_perishable: bool [default=false];
+		expiry_date: datetime?;
+		
+		// Audit fields
+		created_at: datetime [default=now(), immutable];
+		updated_at: datetime [auto_update];
+		created_by: int [fk="users.id"];
+		updated_by: int [fk="users.id"];
+		
+		// Indexes for performance
+		@indexes: [
+			{fields: ["sku"], type: "unique"},
+			{fields: ["category_id", "status"], type: "composite"},
+			{fields: ["supplier_id"], type: "standard"},
+			{fields: ["name"], type: "fulltext"}
+		];
+	};
+	
+	// Categories table with hierarchical structure
+	categories: table {
+		id: int [pk, increment];
+		name: str [required, max_length=100];
+		parent_id: int? [fk="categories.id"];  // Self-referencing for hierarchy
+		description: text;
+		is_active: bool [default=true];
+		sort_order: int [default=0];
+		
+		// Hierarchical path for efficient queries
+		path: str [max_length=500, computed];  // e.g., "/Electronics/Computers/Laptops"
+		level: int [computed];  // Depth in hierarchy
+		
+		created_at: datetime [default=now()];
+		updated_at: datetime [auto_update];
+		
+		@indexes: [
+			{fields: ["parent_id"], type: "standard"},
+			{fields: ["path"], type: "standard"},
+			{fields: ["is_active", "sort_order"], type: "composite"}
+		];
+	};
+	
+	// Suppliers table
+	suppliers: table {
+		id: int [pk, increment];
+		company_name: str [required, max_length=200];
+		contact_person: str [max_length=100];
+		email: str [email, max_length=255];
+		phone: str [phone, max_length=20];
+		address: json {
+			street: str;
+			city: str;
+			state: str;
+			zip_code: str;
+			country: str [default="US"];
+		};
+		payment_terms: enum ["net_30", "net_60", "cash_on_delivery", "prepaid"];
+		is_active: bool [default=true];
+		rating: decimal [precision=3, scale=2, range=1.0..5.0];
+		
+		created_at: datetime [default=now()];
+		updated_at: datetime [auto_update];
+		
+		@indexes: [
+			{fields: ["company_name"], type: "standard"},
+			{fields: ["is_active"], type: "standard"}
+		];
+	};
+}
+
+// 4. BUSINESS LOGIC WITH ADVANCED FEATURES
+biz InventoryManagement {
+	@async: parallel_processing + batch_size(100);
+	@retry: max_attempts(3) + backoff(exponential);
+	@cache: ttl(300s) + eviction_policy(lru);
+	@security: authentication_required + rate_limit(1000/minute);
+	
+	// Stock management operations
+	async def check_stock_levels() -> list[StockAlert] {
+		low_stock_products = await InventoryDB.products.query()
+			.where(available_quantity <= reorder_point)
+			.where(status == "active")
+			.select(id, name, sku, available_quantity, reorder_point)
+			.execute();
+		
+		alerts = [];
+		for product in low_stock_products {
+			alert = StockAlert {
+				product_id: product.id;
+				current_stock: product.available_quantity;
+				reorder_point: product.reorder_point;
+				severity: product.available_quantity == 0 ? "critical" : "warning";
+				message: f"Product {product.name} ({product.sku}) is running low";
+			};
+			alerts.append(alert);
+		}
+		
+		// Send notifications for critical items
+		critical_alerts = alerts.filter(severity == "critical");
+		if (critical_alerts.length > 0) {
+			await NotificationSystem.send_bulk_notifications(
+				type: "stock_alert",
+				recipients: ["inventory@company.com", "operations@company.com"],
+				data: critical_alerts
+			);
+		}
+		
+		return alerts;
+	}
+	
+	async def reserve_stock(product_id: int, quantity: int, order_id: str) -> ReservationResult {
+		try {
+			// Start database transaction
+			async with InventoryDB.transaction() as tx {
+				// Lock the product row to prevent race conditions
+				product = await tx.products.query()
+					.where(id == product_id)
+					.for_update()
+					.first();
+				
+				if (!product) {
+					return ReservationResult {
+						success: false;
+						error: "Product not found";
+					};
+				}
+				
+				if (product.available_quantity < quantity) {
+					return ReservationResult {
+						success: false;
+						error: f"Insufficient stock. Available: {product.available_quantity}, Requested: {quantity}";
+					};
+				}
+				
+				// Update reserved quantity
+				await tx.products.update(product_id) {
+					reserved_quantity: product.reserved_quantity + quantity;
+					updated_at: now();
+					updated_by: current_user().id;
+				};
+				
+				// Create reservation record
+				await tx.stock_reservations.insert() {
+					product_id: product_id;
+					order_id: order_id;
+					quantity: quantity;
+					status: "active";
+					expires_at: now() + interval("2 hours");
+					created_by: current_user().id;
+				};
+				
+				return ReservationResult {
+					success: true;
+					reservation_id: tx.last_insert_id();
+					expires_at: now() + interval("2 hours");
+				};
+			}
+		} except InsufficientStockError as e {
+			log.warning(f"Stock reservation failed: {e}");
+			return ReservationResult {
+				success: false;
+				error: e.message;
+			};
+		} except DatabaseError as e {
+			log.error(f"Database error during stock reservation: {e}");
+			throw ServiceUnavailableError("Unable to process stock reservation");
+		}
+	}
+	
+	// Inventory optimization using ML predictions
+	@ml_model: demand_forecasting_v2
+	async def optimize_reorder_points() -> OptimizationReport {
+		// Get historical sales data
+		sales_data = await InventoryDB.sales_history.query()
+			.where(sale_date >= now() - interval("1 year"))
+			.group_by(product_id, date_trunc("week", sale_date))
+			.select(product_id, week, sum(quantity) as weekly_demand)
+			.execute();
+		
+		// Predict demand for each product
+		optimization_results = [];
+		for product_id in sales_data.distinct(product_id) {
+			product_sales = sales_data.filter(product_id == product_id);
+			
+			// Use ML model for demand forecasting
+			forecast = await DemandForecastingModel.predict(
+				historical_data: product_sales,
+				forecast_horizon: 12,  // 12 weeks ahead
+				confidence_level: 0.95
+			);
+			
+			// Calculate optimal reorder point using service level
+			optimal_reorder_point = calculate_optimal_reorder_point(
+				demand_forecast: forecast,
+				lead_time: product.supplier.average_lead_time,
+				service_level: 0.95,
+				demand_variability: forecast.standard_deviation
+			);
+			
+			optimization_results.append({
+				product_id: product_id;
+				current_reorder_point: product.reorder_point;
+				recommended_reorder_point: optimal_reorder_point;
+				potential_savings: calculate_holding_cost_savings(
+					current: product.reorder_point,
+					optimal: optimal_reorder_point,
+					holding_cost_rate: 0.25
+				);
+			});
+		}
+		
+		return OptimizationReport {
+			total_products_analyzed: optimization_results.length;
+			total_potential_savings: optimization_results.sum(potential_savings);
+			recommendations: optimization_results;
+			generated_at: now();
+		};
+	}
+}
+
+// 5. FORM LAYOUT FOR INVENTORY MANAGEMENT
+form ProductForm {
+	layout: responsive {
+		breakpoints: {
+			mobile: 768px;
+			tablet: 1024px;
+			desktop: 1440px;
+		};
+	};
+	
+	// Product Information Section
+	section ProductInfo {
+		title: "Product Information";
+		collapsible: true;
+		
+		row {
+			column(span: 6) {
+				input sku {
+					label: "Product SKU";
+					type: text;
+					required: true;
+					pattern: /^[A-Z0-9-]+$/;
+					placeholder: "e.g., LAPTOP-DELL-001";
+					help_text: "Unique product identifier (uppercase letters, numbers, and hyphens only)";
+					
+					@validation: {
+						async_validator: check_sku_uniqueness;
+						debounce: 500ms;
+					};
+				};
+			};
+			
+			column(span: 6) {
+				select category_id {
+					label: "Category";
+					required: true;
+					data_source: "api/categories";
+					option_value: "id";
+					option_label: "name";
+					searchable: true;
+					
+					@cascade: {
+						triggers: ["subcategory"];
+						url: "api/categories/{value}/subcategories";
+					};
+				};
+			};
+		};
+		
+		row {
+			column(span: 12) {
+				input name {
+					label: "Product Name";
+					type: text;
+					required: true;
+					max_length: 200;
+					placeholder: "Enter descriptive product name";
+				};
+			};
+		};
+		
+		row {
+			column(span: 12) {
+				textarea description {
+					label: "Description";
+					max_length: 1000;
+					rows: 4;
+					placeholder: "Detailed product description...";
+					
+					@rich_text: {
+						toolbar: ["bold", "italic", "list", "link"];
+						max_words: 200;
+					};
+				};
+			};
+		};
+	};
+	
+	// Pricing Section
+	section Pricing {
+		title: "Pricing & Cost";
+		
+		row {
+			column(span: 4) {
+				input cost_price {
+					label: "Cost Price";
+					type: currency;
+					currency: "USD";
+					required: true;
+					min_value: 0;
+					step: 0.01;
+					
+					@calculation_trigger: ["selling_price"];
+				};
+			};
+			
+			column(span: 4) {
+				input selling_price {
+					label: "Selling Price";
+					type: currency;
+					currency: "USD";
+					required: true;
+					min_value: 0;
+					step: 0.01;
+					
+					@validation: {
+						custom_validator: (value, form) => {
+							if (value <= form.cost_price) {
+								return "Selling price must be greater than cost price";
+							}
+							return null;
+						};
+					};
+				};
+			};
+			
+			column(span: 4) {
+				display margin {
+					label: "Margin %";
+					type: percentage;
+					readonly: true;
+					precision: 2;
+					
+					@computed: (form) => {
+						if (form.cost_price && form.selling_price) {
+							return ((form.selling_price - form.cost_price) / form.cost_price * 100);
+						}
+						return 0;
+					};
+					
+					@conditional_styling: {
+						rules: [
+							{condition: "value < 10", style: "color: red"},
+							{condition: "value >= 10 && value < 25", style: "color: orange"},
+							{condition: "value >= 25", style: "color: green"}
+						];
+					};
+				};
+			};
+		};
+	};
+	
+	// Inventory Section
+	section Inventory {
+		title: "Inventory Management";
+		
+		row {
+			column(span: 3) {
+				input stock_quantity {
+					label: "Current Stock";
+					type: number;
+					min_value: 0;
+					default: 0;
+					
+					@real_time_validation: true;
+				};
+			};
+			
+			column(span: 3) {
+				input reorder_point {
+					label: "Reorder Point";
+					type: number;
+					min_value: 0;
+					default: 10;
+					help_text: "Minimum stock level before reordering";
+				};
+			};
+			
+			column(span: 3) {
+				input reorder_quantity {
+					label: "Reorder Quantity";
+					type: number;
+					min_value: 1;
+					default: 50;
+					help_text: "Quantity to order when restocking";
+				};
+			};
+			
+			column(span: 3) {
+				display available_quantity {
+					label: "Available";
+					type: number;
+					readonly: true;
+					
+					@computed: (form) => {
+						return (form.stock_quantity || 0) - (form.reserved_quantity || 0);
+					};
+					
+					@conditional_styling: {
+						rules: [
+							{condition: "value == 0", style: "background: #ffebee; color: #c62828"},
+							{condition: "value <= reorder_point", style: "background: #fff3e0; color: #ef6c00"},
+							{condition: "value > reorder_point", style: "background: #e8f5e8; color: #2e7d32"}
+						];
+					};
+				};
+			};
+		};
+	};
+	
+	// Physical Properties Section
+	section PhysicalProperties {
+		title: "Physical Properties";
+		collapsible: true;
+		collapsed: true;
+		
+		row {
+			column(span: 6) {
+				input weight {
+					label: "Weight";
+					type: number;
+					step: 0.001;
+					min_value: 0;
+					unit: "kg";
+					precision: 3;
+				};
+			};
+			
+			column(span: 6) {
+				fieldset dimensions {
+					legend: "Dimensions (cm)";
+					
+					grid(columns: 3, gap: "10px") {
+						input length {
+							label: "L";
+							type: number;
+							step: 0.1;
+							min_value: 0;
+							unit: "cm";
+						};
+						
+						input width {
+							label: "W";
+							type: number;
+							step: 0.1;
+							min_value: 0;
+							unit: "cm";
+						};
+						
+						input height {
+							label: "H";
+							type: number;
+							step: 0.1;
+							min_value: 0;
+							unit: "cm";
+						};
+					};
+				};
+			};
+		};
+	};
+	
+	// Advanced Options Section
+	section AdvancedOptions {
+		title: "Advanced Options";
+		collapsible: true;
+		collapsed: true;
+		
+		row {
+			column(span: 6) {
+				select status {
+					label: "Status";
+					options: [
+						{value: "active", label: "Active"},
+						{value: "discontinued", label: "Discontinued"},
+						{value: "pending", label: "Pending Approval"},
+						{value: "out_of_stock", label: "Out of Stock"}
+					];
+					default: "active";
+				};
+				
+				checkbox is_serialized {
+					label: "Track by Serial Number";
+					help_text: "Enable individual item tracking";
+				};
+				
+				checkbox is_perishable {
+					label: "Perishable Item";
+					help_text: "Item has expiration date";
+					
+					@toggle_fields: ["expiry_date"];
+				};
+			};
+			
+			column(span: 6) {
+				input expiry_date {
+					label: "Expiry Date";
+					type: date;
+					min_value: today();
+					
+					@conditional: "is_perishable == true";
+				};
+				
+				select supplier_id {
+					label: "Primary Supplier";
+					data_source: "api/suppliers";
+					option_value: "id";
+					option_label: "company_name";
+					searchable: true;
+					clearable: true;
+				};
+			};
+		};
+	};
+	
+	// Form Actions
+	actions {
+		align: right;
+		
+		button cancel {
+			text: "Cancel";
+			type: secondary;
+			action: "close";
+		};
+		
+		button save_draft {
+			text: "Save Draft";
+			type: tertiary;
+			action: "save_draft";
+			
+			@hotkey: "Ctrl+S";
+		};
+		
+		button save {
+			text: "Save Product";
+			type: primary;
+			action: "save";
+			
+			@validation: "full_form";
+			@confirmation: "Are you sure you want to save this product?";
+			@loading_text: "Saving...";
+		};
+	};
+	
+	// Form-level configurations
+	@auto_save: {
+		enabled: true;
+		interval: 30s;
+		fields: ["name", "description", "cost_price", "selling_price"];
+	};
+	
+	@accessibility: {
+		screen_reader: true;
+		keyboard_navigation: true;
+		high_contrast: true;
+		focus_indicators: true;
+	};
+	
+	@responsive_behavior: {
+		mobile: {
+			sections: {
+				accordion: true;
+				single_column: true;
+			};
+			actions: {
+				sticky: true;
+				full_width: true;
+			};
+		};
+		
+		tablet: {
+			sections: {
+				collapsible: true;
+			};
+		};
+	};
+}
+
+// 6. TESTING CONFIGURATION
+test ProductManagementTests {
+	@framework: pytest + coverage(95%);
+	@parallel: true;
+	@isolation: database_per_test;
+	
+	// Unit tests
+	unit_test "test_stock_reservation" {
+		@mock: {
+			DatabaseConnector: "mock_database";
+			NotificationSystem: "no_op_notifier";
+		};
+		
+		setup: async () => {
+			await create_test_product({
+				id: 1,
+				sku: "TEST-001",
+				stock_quantity: 100,
+				reserved_quantity: 20
+			});
+		};
+		
+		test: async () => {
+			result = await InventoryManagement.reserve_stock(1, 50, "ORDER-123");
+			
+			assert result.success == true;
+			assert result.reservation_id is not null;
+			
+			// Verify stock was reserved
+			product = await InventoryDB.products.get(1);
+			assert product.reserved_quantity == 70;
+		};
+		
+		teardown: async () => {
+			await cleanup_test_data();
+		};
+	};
+	
+	integration_test "test_low_stock_notifications" {
+		@requires: [NotificationSystem, DatabaseConnector];
+		@timeout: 30s;
+		
+		setup: async () => {
+			await seed_low_stock_products();
+		};
+		
+		test: async () => {
+			alerts = await InventoryManagement.check_stock_levels();
+			
+			assert alerts.length > 0;
+			assert any(alert.severity == "critical" for alert in alerts);
+			
+			// Verify notifications were sent
+			sent_notifications = await get_sent_notifications();
+			assert len(sent_notifications) > 0;
+		};
+	};
+	
+	// Performance tests
+	load_test "test_concurrent_stock_reservations" {
+		@concurrent_users: 100;
+		@duration: "2 minutes";
+		@ramp_up: "30 seconds";
+		
+		scenario: async () => {
+			product_id = random_choice([1, 2, 3, 4, 5]);
+			quantity = random_int(1, 10);
+			order_id = f"LOAD-TEST-{random_uuid()}";
+			
+			start_time = time.now();
+			result = await InventoryManagement.reserve_stock(product_id, quantity, order_id);
+			response_time = time.now() - start_time;
+			
+			// Assert response time is acceptable
+			assert response_time < 500ms;
+			
+			// Track success rate
+			track_metric("success_rate", result.success);
+			track_metric("response_time", response_time);
+		};
+		
+		@success_criteria: {
+			success_rate: ">= 99%";
+			avg_response_time: "< 200ms";
+			max_response_time: "< 1s";
+		};
+	};
+}
+
+// 7. NOTIFICATION CONFIGURATION
+notification InventoryAlerts {
+	// Stock level notifications
+	alert low_stock {
+		condition: product.available_quantity <= product.reorder_point;
+		severity: product.available_quantity == 0 ? "critical" : "warning";
+		
+		recipients: {
+			email: ["inventory@company.com"];
+			slack: ["#inventory-alerts"];
+		};
+		
+		template: {
+			subject: "Low Stock Alert: {product.name}";
+			body: """
+			Product: {product.name} ({product.sku})
+			Current Stock: {product.available_quantity}
+			Reorder Point: {product.reorder_point}
+			Recommended Action: Order {product.reorder_quantity} units
+			""";
+		};
+		
+		@rate_limiting: {
+			max_per_product: 1 per hour;
+			max_total: 50 per hour;
+		};
+		
+		@escalation: {
+			if_not_acknowledged_within: 2 hours;
+			escalate_to: ["operations@company.com"];
+			escalation_channel: ["phone", "sms"];
+		};
+	};
+	
+	// Expiry notifications
+	alert expiring_products {
+		condition: product.is_perishable && product.expiry_date <= now() + interval("7 days");
+		severity: "warning";
+		
+		schedule: daily at "09:00";
+		
+		recipients: {
+			email: ["quality@company.com", "warehouse@company.com"];
+		};
+		
+		template: {
+			subject: "Products Expiring Soon - {date}";
+			body_template: "email/expiring_products.html";
+		};
+	};
+	
+	// System health notifications
+	alert system_health {
+		monitors: [
+			{metric: "database_connection_pool", threshold: "> 80%"},
+			{metric: "api_response_time", threshold: "> 1000ms"},
+			{metric: "error_rate", threshold: "> 5%"}
+		];
+		
+		recipients: {
+			email: ["devops@company.com"];
+			slack: ["#alerts"];
+			pager: ["on-call-engineer"];
+		};
+		
+		@smart_grouping: {
+			group_similar_alerts: true;
+			time_window: 5 minutes;
+			max_group_size: 10;
+		};
+	};
+}
+
+// 8. LOGGING AND METRICS
+logger InventoryLogger {
+	level: env("LOG_LEVEL", "INFO");
+	format: structured_json;
+	
+	outputs: [
+		{
+			type: file;
+			path: "/var/log/inventory/app.log";
+			rotation: daily;
+			retention: 30 days;
+			max_size: 100MB;
+		},
+		{
+			type: elasticsearch;
+			index: "inventory-logs-{date}";
+			host: env("ELASTICSEARCH_HOST");
+			auth: {
+				username: env("ES_USERNAME");
+				password: env("ES_PASSWORD");
+			};
+		}
+	];
+	
+	@structured_fields: {
+		service: "inventory-management";
+		version: "2.1.0";
+		environment: env("NODE_ENV");
+		correlation_id: request.correlation_id;
+		user_id: current_user()?.id;
+	};
+	
+	@sensitive_data_filter: {
+		fields: ["password", "api_key", "token", "ssn"];
+		replacement: "[REDACTED]";
+	};
+}
+
+metrics InventoryMetrics {
+	// Business metrics
+	counter stock_reservations_total {
+		labels: ["product_id", "status"];
+		description: "Total number of stock reservation attempts";
+	};
+	
+	gauge current_stock_levels {
+		labels: ["product_id", "sku"];
+		description: "Current stock levels by product";
+	};
+	
+	histogram stock_reservation_duration {
+		labels: ["product_id"];
+		buckets: [0.1, 0.5, 1.0, 2.0, 5.0];
+		description: "Time taken to process stock reservations";
+	};
+	
+	// Technical metrics
+	counter api_requests_total {
+		labels: ["method", "endpoint", "status_code"];
+		description: "Total API requests";
+	};
+	
+	histogram api_request_duration {
+		labels: ["method", "endpoint"];
+		buckets: [0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0];
+		description: "API request duration in seconds";
+	};
+	
+	gauge database_connections_active {
+		description: "Number of active database connections";
+	};
+	
+	@collection_interval: 15s;
+	@export_format: prometheus;
+	@export_endpoint: "/metrics";
+}
+
+// 9. EXPORT DECLARATIONS
+export {
+	// Main entities
+	InventoryDB,
+	InventoryManagement,
+	ProductForm,
+	
+	// Types and interfaces
+	StockAlert,
+	ReservationResult,
+	OptimizationReport,
+	
+	// Configuration
+	InventoryAlerts,
+	InventoryLogger,
+	InventoryMetrics,
+	
+	// Test suites
+	ProductManagementTests
+} as public;
+
+// Private exports (only accessible by dependent modules)
+export {
+	calculate_optimal_reorder_point,
+	calculate_holding_cost_savings
+} as internal;
+
+// 10. MODULE INITIALIZATION AND LIFECYCLE
+@module_lifecycle: {
+	on_load: async () => {
+		log.info("Initializing Inventory Management module");
+		await InventoryDB.migrate();
+		await InventoryDB.seed_initial_data();
+		InventoryMetrics.initialize();
+		log.info("Inventory Management module loaded successfully");
+	};
+	
+	on_unload: async () => {
+		log.info("Shutting down Inventory Management module");
+		await InventoryDB.close_connections();
+		InventoryMetrics.shutdown();
+		log.info("Inventory Management module unloaded");
+	};
+	
+	health_check: async () => {
+		// Verify database connectivity
+		await InventoryDB.ping();
+		
+		// Check critical dependencies
+		await Users.health_check();
+		
+		return {
+			status: "healthy",
+			timestamp: now(),
+			dependencies: {
+				database: "connected",
+				user_service: "available",
+				notification_service: "available"
+			}
+		};
+	};
+}
