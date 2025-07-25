@@ -1,0 +1,14 @@
+# APG Generated Application Requirements
+Flask-AppBuilder>=4.3.0
+Flask>=2.3.0
+Flask-SQLAlchemy>=3.0.0
+SQLAlchemy>=2.0.0
+WTForms>=3.0.0
+Werkzeug>=2.3.0
+
+# Template-specific requirements
+
+# IoT and real-time features
+paho-mqtt>=1.6.0
+redis>=4.0.0
+celery>=5.0.0

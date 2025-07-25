@@ -1,0 +1,44 @@
+{
+  "name": "Basic Authentication",
+  "category": "auth",
+  "description": "Username/password authentication with Flask-AppBuilder",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "WTForms>=3.0.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [],
+  "integration": {
+    "models": [
+      "User",
+      "Role",
+      "Permission"
+    ],
+    "views": [
+      "UserView",
+      "RoleView"
+    ],
+    "apis": [],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {
+      "AUTH_TYPE": "AUTH_DB"
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "User Registration",
+    "Login/Logout",
+    "Password Reset",
+    "User Management"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard",
+    "real_time"
+  ],
+  "incompatible_capabilities": []
+}

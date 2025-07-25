@@ -1,0 +1,67 @@
+# {{project_name}}
+
+{{project_description}}
+
+## Features
+
+- Device Management
+- Data Collection
+- Real-time Analytics
+- Alerts
+
+## Installation
+
+1. Install APG compiler:
+   ```bash
+   pip install apg-language
+   ```
+
+2. Install project dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Compile APG source:
+   ```bash
+   apg compile main.apg
+   ```
+
+4. Run the application:
+   ```bash
+   python app.py
+   ```
+
+5. Access the application:
+   Open http://localhost:8080
+
+## Usage
+
+### Basic Usage
+
+1. **Agent Dashboard**: Monitor agent status and activity
+2. **Method Execution**: Execute agent methods via web interface
+3. **Real-time Updates**: View live status and logs
+4. **Configuration**: Customize agent behavior through settings
+
+
+## Configuration
+
+Edit `config.py` to customize:
+- Database connection
+- Authentication settings
+- Feature flags
+
+## Development
+
+- APG source: `main.apg`
+- Generated code: `generated/`
+- Templates: `templates/`
+- Static files: `static/`
+
+## License
+
+{{license}} - see LICENSE file for details.
+
+---
+
+Generated with APG (Application Programming Generation) language.

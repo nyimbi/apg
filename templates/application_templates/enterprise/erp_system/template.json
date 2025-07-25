@@ -1,0 +1,46 @@
+{
+  "template_id": "enterprise/erp_system",
+  "name": "Enterprise Resource Planning",
+  "description": "Complete ERP system for enterprise resource management",
+  "complexity": "Expert",
+  "domain": "Enterprise Management",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "ERPAgent",
+    "FinanceAgent",
+    "HRAgent",
+    "OperationsAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Financial Management",
+    "Human Resources",
+    "Operations Management",
+    "Reporting"
+  ],
+  "databases": [
+    "financials",
+    "employees",
+    "operations",
+    "reports"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

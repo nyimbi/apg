@@ -1,0 +1,70 @@
+{
+  "name": "Sensor Data Processing",
+  "category": "iot",
+  "description": "Real-time sensor data collection, processing, and analytics",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0",
+    "plotly>=5.15.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store sensor readings and metadata"
+    },
+    {
+      "name": "analytics/basic_analytics",
+      "version": null,
+      "optional": false,
+      "reason": "Data visualization and reporting"
+    }
+  ],
+  "integration": {
+    "models": [
+      "Sensor",
+      "SensorReading",
+      "SensorType",
+      "Alert",
+      "DataStream"
+    ],
+    "views": [
+      "SensorView",
+      "ReadingsView",
+      "AlertsView"
+    ],
+    "apis": [
+      "sensors/data",
+      "sensors/alerts",
+      "sensors/analytics"
+    ],
+    "templates": [
+      "sensor_dashboard.html",
+      "sensor_charts.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Real-time Data Ingestion",
+    "Data Validation",
+    "Anomaly Detection",
+    "Data Aggregation",
+    "Threshold Alerts",
+    "Historical Analysis",
+    "Data Visualization"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard",
+    "real_time"
+  ],
+  "incompatible_capabilities": []
+}

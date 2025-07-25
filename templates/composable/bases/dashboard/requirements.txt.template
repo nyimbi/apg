@@ -1,0 +1,17 @@
+# APG Generated Requirements - Analytics Dashboard
+# Base template requirements
+Flask-AppBuilder>=4.3.0
+plotly>=5.0.0
+pandas>=2.0.0
+
+# Capability-specific requirements
+{% for capability in capabilities %}
+# Requirements for {{capability}} capability
+{% include 'capabilities/' + capability + '/requirements.txt' ignore missing %}
+{% endfor %}
+
+# Development dependencies (optional)
+pytest>=7.4.0
+pytest-flask>=1.2.0
+black>=23.7.0
+flake8>=6.0.0

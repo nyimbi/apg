@@ -1,0 +1,53 @@
+"""
+Data Warehouse Models
+=====================
+
+Database models for Data Warehouse capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class BIBaseModel(AuditMixin, Model):
+    """Base model for BI entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# Add BI-specific models based on capability
+
+class DataSource(BIBaseModel):
+    """Data source configuration"""
+    __tablename__ = 'bi_data_sources'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(256), nullable=False)
+    source_type = Column(String(64))  # database, api, file
+    connection_string = Column(String(512))
+    configuration = Column(JSON)
+    last_sync = Column(DateTime)
+    
+    etl_jobs = relationship("ETLJob", back_populates="data_source")
+
+
+class ETLJob(BIBaseModel):
+    """ETL job tracking"""
+    __tablename__ = 'bi_etl_jobs'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(256), nullable=False)
+    data_source_id = Column(Integer, ForeignKey('bi_data_sources.id'))
+    status = Column(String(32))  # pending, running, completed, failed
+    records_processed = Column(Integer, default=0)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    error_message = Column(Text)
+    
+    data_source = relationship("DataSource", back_populates="etl_jobs")
+

@@ -1,0 +1,34 @@
+module {{project_name}} version {{version}} {
+	description: "{{project_description}}";
+	author: "{{author}}";
+	license: "{{license}}";
+}
+
+agent BasicAgent {
+	name: str = "{{project_name}} Agent";
+	status: str = "inactive";
+	counter: int = 0;
+	
+	initialize: () -> bool = {
+		status = "active";
+		counter = 0;
+		return true;
+	};
+	
+	process: () -> str = {
+		if (status == "active") {
+			counter = counter + 1;
+			return "Processing request #" + str(counter);
+		}
+		return "Agent is inactive";
+	};
+	
+	get_status: () -> dict = {
+		return {
+			"name": name,
+			"status": status,
+			"processed": counter,
+			"timestamp": now()
+		};
+	};
+}

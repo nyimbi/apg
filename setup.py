@@ -24,9 +24,12 @@ install_requires = [
     "Flask-SQLAlchemy>=3.0.0",
     "SQLAlchemy>=2.0.0",
     "click>=8.1.0",
+    "rich>=13.0.0",
     "pydantic>=2.0.0",
     "python-dateutil>=2.8.0",
     "Jinja2>=3.1.0",
+    "watchdog>=3.0.0",
+    "psutil>=5.9.0",
 ]
 
 # Development dependencies
@@ -69,14 +72,28 @@ setup(
     extras_require={
         "dev": dev_requires,
         "docs": doc_requires,
+        "language-server": [
+            "pygls>=1.0.0",
+            "lsprotocol>=2023.0.0"
+        ],
+        "ai": [
+            "openai>=1.0.0",
+            "transformers>=4.30.0",
+            "sentence-transformers>=2.2.0",
+            "numpy>=1.24.0"
+        ],
         "all": dev_requires + doc_requires,
     },
     
     # Entry points for CLI tools
     entry_points={
         "console_scripts": [
-            "apg=apg.cli:main",
-            "apg-compile=apg.compiler.compiler:main",
+            "apg=cli.main:cli",
+            "apg-compile=cli.compile_command:compile_cmd",
+            "apg-run=cli.run_command:run",
+            "apg-create=cli.create_project:create",
+            "apg-validate=cli.validate_command:validate",
+            "apg-language-server=language_server.server:main",
         ],
     },
     
@@ -85,9 +102,13 @@ setup(
         "apg": [
             "spec/*.g4",
             "spec/*.apg",
-            "templates/*.html",
-            "templates/*.json",
+            "templates/templates/**/*.template",
+            "templates/templates/**/*.json",
+            "vscode-extension/**/*",
+            "language_server/**/*.py",
             "compiler/templates/*",
+            "cli/**/*.py",
+            "docs/**/*",
         ],
     },
     include_package_data=True,

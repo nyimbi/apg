@@ -1,0 +1,68 @@
+{
+  "name": "Community Analytics",
+  "category": "analytics",
+  "description": "Analytics and insights for community capability usage and trends",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "pandas>=2.0.0",
+    "plotly>=5.15.0",
+    "scipy>=1.11.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Analytics data source"
+    },
+    {
+      "name": "analytics/basic_analytics",
+      "version": null,
+      "optional": false,
+      "reason": "Base analytics functionality"
+    }
+  ],
+  "integration": {
+    "models": [
+      "UsageMetric",
+      "TrendAnalysis",
+      "CommunityStats",
+      "EcosystemHealth"
+    ],
+    "views": [
+      "AnalyticsView",
+      "TrendsView",
+      "CommunityView"
+    ],
+    "apis": [
+      "analytics/usage",
+      "analytics/trends",
+      "analytics/community"
+    ],
+    "templates": [
+      "community_analytics.html",
+      "trend_dashboard.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Usage Analytics",
+    "Trending Capabilities",
+    "Developer Insights",
+    "Adoption Metrics",
+    "Quality Trends",
+    "Performance Metrics",
+    "Community Growth",
+    "Ecosystem Health"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

@@ -1,0 +1,224 @@
+module {{project_name}} version {{version}} {
+	description: "{{project_description}}";
+	author: "{{author}}";
+	license: "{{license}}";
+}
+
+agent ConversationAgent {
+	conversations: dict = {}; // user_id -> conversation history
+	knowledge_base: list[dict] = [];
+	ai_provider: str = "{{ai_provider}}";
+	
+	start_conversation: (user_id: int) -> dict = {
+		if (user_id not in conversations) {
+			conversations[user_id] = {
+				"messages": [],
+				"context": {},
+				"created_at": now()
+			};
+		}
+		
+		return conversations[user_id];
+	};
+	
+	process_message: (user_id: int, message: str) -> dict = {
+		conversation = conversations.get(user_id, this.start_conversation(user_id));
+		
+		// Add user message to history
+		user_msg = {
+			"role": "user",
+			"content": message,
+			"timestamp": now()
+		};
+		conversation["messages"].append(user_msg);
+		
+		// Process with AI
+		response = this.generate_response(conversation, message);
+		
+		// Add assistant response
+		assistant_msg = {
+			"role": "assistant", 
+			"content": response,
+			"timestamp": now()
+		};
+		conversation["messages"].append(assistant_msg);
+		
+		return {
+			"response": response,
+			"conversation_id": user_id,
+			"message_count": len(conversation["messages"])
+		};
+	};
+	
+	generate_response: (conversation: dict, message: str) -> str = {
+		// Simple rule-based responses (would integrate with actual AI)
+		message_lower = message.lower();
+		
+		if ("hello" in message_lower or "hi" in message_lower) {
+			return "Hello! How can I help you today?";
+		} else if ("help" in message_lower) {
+			return "I'm here to assist you. You can ask me questions or request help with various tasks.";
+		} else if ("weather" in message_lower) {
+			return "I'd be happy to help with weather information. Could you specify your location?";
+		} else if ("time" in message_lower) {
+			return "The current time is " + str(now());
+		}
+		
+		// Search knowledge base
+		relevant_info = this.search_knowledge_base(message);
+		if (relevant_info) {
+			return "Based on my knowledge: " + relevant_info["content"];
+		}
+		
+		return "I understand you're asking about: " + message + ". Let me help you with that.";
+	};
+	
+	search_knowledge_base: (query: str) -> dict = {
+		// Simple keyword matching (would use vector search in production)
+		query_lower = query.lower();
+		
+		for (item in knowledge_base) {
+			if (query_lower in item["title"].lower() or query_lower in item["content"].lower()) {
+				return item;
+			}
+		}
+		
+		return null;
+	};
+	
+	add_knowledge: (title: str, content: str, category: str) -> dict = {
+		knowledge_item = {
+			"id": len(knowledge_base) + 1,
+			"title": title,
+			"content": content,
+			"category": category,
+			"created_at": now(),
+			"usage_count": 0
+		};
+		
+		knowledge_base.append(knowledge_item);
+		return knowledge_item;
+	};
+}
+
+agent IntentClassifierAgent {
+	intents: dict = {
+		"greeting": ["hello", "hi", "hey", "good morning", "good afternoon"],
+		"question": ["what", "how", "when", "where", "why", "who"],
+		"request": ["please", "can you", "could you", "would you"],
+		"complaint": ["problem", "issue", "error", "bug", "wrong"]
+	};
+	
+	classify_intent: (message: str) -> dict = {
+		message_lower = message.lower();
+		scores = {};
+		
+		for (intent, keywords in intents.items()) {
+			score = 0;
+			for (keyword in keywords) {
+				if (keyword in message_lower) {
+					score = score + 1;
+				}
+			}
+			scores[intent] = score;
+		}
+		
+		// Find best match
+		best_intent = "unknown";
+		best_score = 0;
+		
+		for (intent, score in scores.items()) {
+			if (score > best_score) {
+				best_intent = intent;
+				best_score = score;
+			}
+		}
+		
+		return {
+			"intent": best_intent,
+			"confidence": best_score / len(message.split()),
+			"all_scores": scores
+		};
+	};
+}
+
+db AssistantDatabase {
+	url: "postgresql://localhost:5432/{{project_name}}";
+	
+	schema assistant_schema {
+		table users {
+			id serial [pk]
+			username varchar(50) [unique, not null]
+			email varchar(255) [unique, not null]
+			preferences json
+			created_at timestamp [default: now()]
+			last_active timestamp
+		}
+		
+		table conversations {
+			id serial [pk]
+			user_id int [ref: > users.id]
+			title varchar(200)
+			created_at timestamp [default: now()]
+			updated_at timestamp [default: now()]
+			message_count int [default: 0]
+		}
+		
+		table messages {
+			id serial [pk]
+			conversation_id int [ref: > conversations.id]
+			role varchar(20) [not null, note: "user, assistant, system"]
+			content text [not null]
+			intent varchar(50)
+			confidence float
+			created_at timestamp [default: now()]
+			
+			indexes {
+				(conversation_id)
+				(role)
+				(created_at)
+			}
+		}
+		
+		table knowledge_base {
+			id serial [pk]
+			title varchar(200) [not null]
+			content text [not null]
+			category varchar(100)
+			tags varchar(500)
+			
+			{% if enable_nlp %}
+			// Vector embeddings for semantic search
+			content_embedding vector(1536) [dimensions: 1536]
+			title_embedding vector(1536) [dimensions: 1536]
+			{% endif %}
+			
+			usage_count int [default: 0]
+			created_at timestamp [default: now()]
+			updated_at timestamp [default: now()]
+			
+			indexes {
+				(category)
+				(usage_count)
+			}
+			
+			{% if enable_nlp %}
+			vector_index idx_content_search on knowledge_base (content_embedding) [
+				method: hnsw,
+				distance: cosine,
+				dimensions: 1536
+			]
+			{% endif %}
+		}
+		
+		table user_feedback {
+			id serial [pk]
+			user_id int [ref: > users.id]
+			message_id int [ref: > messages.id]
+			feedback_type varchar(20) [note: "helpful, not_helpful, incorrect"]
+			rating int [note: "1-5 scale"]
+			comment text
+			created_at timestamp [default: now()]
+		}
+	}
+}

@@ -1,0 +1,70 @@
+{
+  "name": "Capability Publisher",
+  "category": "business",
+  "description": "Tools for packaging, publishing, and maintaining community capabilities",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "setuptools>=68.0.0",
+    "wheel>=0.41.0",
+    "twine>=4.0.2",
+    "git>=2.40.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "business/capability_validator",
+      "version": null,
+      "optional": false,
+      "reason": "Validate before publishing"
+    },
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store publishing metadata"
+    }
+  ],
+  "integration": {
+    "models": [
+      "PublishingJob",
+      "CapabilityPackage",
+      "ReleaseHistory",
+      "PublisherProfile"
+    ],
+    "views": [
+      "PublisherView",
+      "PackageView",
+      "ReleaseView"
+    ],
+    "apis": [
+      "publish/package",
+      "publish/release",
+      "publish/update"
+    ],
+    "templates": [
+      "publisher_dashboard.html",
+      "package_editor.html",
+      "release_manager.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Capability Packaging",
+    "Automated Publishing",
+    "Version Management",
+    "Documentation Generation",
+    "Test Automation",
+    "CI/CD Integration",
+    "Distribution Management",
+    "Update Notifications"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice"
+  ],
+  "incompatible_capabilities": []
+}

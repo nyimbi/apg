@@ -1,0 +1,120 @@
+"""
+Basic Authentication Views
+===========================
+
+Flask-AppBuilder views for user and role management.
+"""
+
+from flask_appbuilder import ModelView
+from flask_appbuilder.models.sqla.interface import SQLAInterface
+from flask_appbuilder.security.decorators import has_access
+from flask import flash, redirect, url_for
+from ..models import User, Role, Permission
+
+
+class UserView(ModelView):
+    """User management view"""
+    
+    datamodel = SQLAInterface(User)
+    
+    # List view configuration
+    list_columns = ['username', 'first_name', 'last_name', 'email', 'active', 'last_login', 'login_count']
+    search_columns = ['username', 'first_name', 'last_name', 'email']
+    
+    # Add/Edit form configuration
+    add_columns = ['first_name', 'last_name', 'username', 'email', 'active', 'roles']
+    edit_columns = ['first_name', 'last_name', 'username', 'email', 'active', 'roles']
+    show_columns = ['username', 'first_name', 'last_name', 'email', 'active', 'last_login', 'login_count', 'roles']
+    
+    # Security
+    base_permissions = ['can_add', 'can_edit', 'can_delete', 'can_list', 'can_show']
+    
+    # Custom labels
+    label_columns = {
+        'first_name': 'First Name',
+        'last_name': 'Last Name', 
+        'username': 'Username',
+        'email': 'Email',
+        'active': 'Active',
+        'last_login': 'Last Login',
+        'login_count': 'Login Count',
+        'roles': 'Roles'
+    }
+    
+    # Ordering
+    base_order = ('username', 'asc')
+    
+    @has_access
+    def deactivate_user(self, item_id):
+        """Deactivate a user account"""
+        user = self.datamodel.get(item_id)
+        if user:
+            user.active = False
+            self.datamodel.edit(user)
+            flash(f"User {user.username} has been deactivated", "success")
+        return redirect(url_for(f'{self.__class__.__name__}.list'))
+    
+    @has_access  
+    def activate_user(self, item_id):
+        """Activate a user account"""
+        user = self.datamodel.get(item_id)
+        if user:
+            user.active = True
+            self.datamodel.edit(user)
+            flash(f"User {user.username} has been activated", "success")
+        return redirect(url_for(f'{self.__class__.__name__}.list'))
+
+
+class RoleView(ModelView):
+    """Role management view"""
+    
+    datamodel = SQLAInterface(Role)
+    
+    # List view configuration
+    list_columns = ['name']
+    search_columns = ['name']
+    
+    # Add/Edit form configuration
+    add_columns = ['name', 'permissions']
+    edit_columns = ['name', 'permissions'] 
+    show_columns = ['name', 'permissions', 'users']
+    
+    # Security
+    base_permissions = ['can_add', 'can_edit', 'can_delete', 'can_list', 'can_show']
+    
+    # Custom labels
+    label_columns = {
+        'name': 'Role Name',
+        'permissions': 'Permissions',
+        'users': 'Users'
+    }
+    
+    # Ordering
+    base_order = ('name', 'asc')
+
+
+class PermissionView(ModelView):
+    """Permission management view"""
+    
+    datamodel = SQLAInterface(Permission)
+    
+    # List view configuration  
+    list_columns = ['name']
+    search_columns = ['name']
+    
+    # Add/Edit form configuration
+    add_columns = ['name']
+    edit_columns = ['name']
+    show_columns = ['name', 'roles']
+    
+    # Security
+    base_permissions = ['can_add', 'can_edit', 'can_delete', 'can_list', 'can_show']
+    
+    # Custom labels
+    label_columns = {
+        'name': 'Permission Name',
+        'roles': 'Roles'
+    }
+    
+    # Ordering
+    base_order = ('name', 'asc')

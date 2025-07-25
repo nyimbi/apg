@@ -1,0 +1,25 @@
+"""
+WebSocket Communication Capability
+===========================================
+
+Real-time WebSocket communication
+
+Category: communication
+Version: 1.0.0
+Author: APG Team
+"""
+
+from .integration import integrate_websocket_communication
+
+__version__ = "1.0.0"
+__capability_name__ = "WebSocket Communication"
+__category__ = "communication"
+
+# Capability metadata
+CAPABILITY_INFO = {
+    'name': 'WebSocket Communication',
+    'category': 'communication',
+    'version': '1.0.0',
+    'features': ['Real-time Messaging', 'Room Management', 'Event Broadcasting'],
+    'author': 'APG Team'
+}

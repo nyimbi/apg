@@ -1,0 +1,46 @@
+{
+  "template_id": "marketplace/service_marketplace",
+  "name": "Service Marketplace",
+  "description": "Platform for service providers and consumers",
+  "complexity": "Advanced",
+  "domain": "Service Economy",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "ServiceAgent",
+    "BookingAgent",
+    "RatingAgent",
+    "DisputeAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Service Listings",
+    "Booking System",
+    "Rating & Reviews",
+    "Dispute Resolution"
+  ],
+  "databases": [
+    "services",
+    "bookings",
+    "reviews",
+    "disputes"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

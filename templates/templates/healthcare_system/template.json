@@ -1,0 +1,29 @@
+{
+  "name": "Healthcare Management",
+  "description": "Healthcare management system with patient records and scheduling",
+  "complexity": "Expert",
+  "features": [
+    "Patient Management",
+    "Appointment Scheduling",
+    "Medical Records",
+    "HIPAA Compliance"
+  ],
+  "use_cases": [
+    "Hospital Management",
+    "Clinic Operations",
+    "Telemedicine"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

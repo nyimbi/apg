@@ -1,0 +1,35 @@
+{
+  "name": "E-Commerce Platform",
+  "description": "Complete e-commerce solution with products, orders, and payments",
+  "complexity": "Advanced",
+  "features": [
+    "Product Catalog",
+    "Shopping Cart",
+    "Order Management",
+    "Payment Integration"
+  ],
+  "use_cases": [
+    "Online Store",
+    "Marketplace",
+    "B2B Commerce"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}",
+    "enable_payments": "{{enable_payments}}",
+    "enable_shipping": "{{enable_shipping}}",
+    "enable_inventory": "{{enable_inventory}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template",
+    "models/products.apg.template",
+    "models/orders.apg.template",
+    "templates/dashboard.html.template"
+  ]
+}

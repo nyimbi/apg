@@ -1,0 +1,40 @@
+"""
+Serverless Computing Models
+===========================
+
+Database models for Serverless Computing capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CloudBaseModel(AuditMixin, Model):
+	"""Base model for cloud entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add cloud-specific models based on capability
+
+# Generic cloud resource model
+class GenericCloudResource(CloudBaseModel):
+	"""Generic cloud resource model"""
+	__tablename__ = 'cloud_resources'
+	
+	id = Column(Integer, primary_key=True)
+	resource_id = Column(String(256), unique=True, nullable=False)
+	provider = Column(String(32), nullable=False)
+	resource_type = Column(String(64), nullable=False)
+	name = Column(String(256))
+	region_zone = Column(String(64))
+	status = Column(String(32), default='active')
+	metadata = Column(JSON)
+	cost_per_hour = Column(Float)
+

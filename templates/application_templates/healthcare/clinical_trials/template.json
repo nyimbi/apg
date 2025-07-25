@@ -1,0 +1,46 @@
+{
+  "template_id": "healthcare/clinical_trials",
+  "name": "Clinical Trials Management",
+  "description": "Clinical research and trial management system",
+  "complexity": "Expert",
+  "domain": "Clinical Research",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "TrialAgent",
+    "ParticipantAgent",
+    "DataAgent",
+    "ComplianceAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Trial Management",
+    "Participant Tracking",
+    "Data Collection",
+    "Regulatory Compliance"
+  ],
+  "databases": [
+    "trials",
+    "participants",
+    "trial_data",
+    "compliance"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

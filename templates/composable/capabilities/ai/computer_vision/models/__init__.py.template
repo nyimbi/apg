@@ -1,0 +1,55 @@
+"""
+Computer Vision Models
+======================
+
+Database models for Computer Vision capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class AIBaseModel(AuditMixin, Model):
+    """Base model for AI entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# Add AI-specific models based on capability
+
+class Image(AIBaseModel):
+    """Image processing model"""
+    __tablename__ = 'cv_images'
+    
+    id = Column(Integer, primary_key=True)
+    filename = Column(String(256), nullable=False)
+    original_name = Column(String(256))
+    file_path = Column(String(512))
+    file_size = Column(Integer)
+    width = Column(Integer)
+    height = Column(Integer)
+    format = Column(String(32))
+    
+    detections = relationship("DetectionResult", back_populates="image")
+
+
+class DetectionResult(AIBaseModel):
+    """Object detection result"""
+    __tablename__ = 'cv_detections'
+    
+    id = Column(Integer, primary_key=True)
+    image_id = Column(Integer, ForeignKey('cv_images.id'))
+    object_class = Column(String(128))
+    confidence = Column(Float)
+    bbox_x = Column(Float)
+    bbox_y = Column(Float)
+    bbox_width = Column(Float)
+    bbox_height = Column(Float)
+    
+    image = relationship("Image", back_populates="detections")
+

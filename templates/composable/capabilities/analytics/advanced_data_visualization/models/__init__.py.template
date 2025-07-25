@@ -1,0 +1,38 @@
+"""
+Advanced Data Visualization Models
+==================================
+
+Database models for Advanced Data Visualization capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class BIBaseModel(AuditMixin, Model):
+    """Base model for BI entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# Add BI-specific models based on capability
+
+# Generic BI analytics model
+class AnalyticsJob(BIBaseModel):
+    """Generic analytics job"""
+    __tablename__ = 'bi_analytics_jobs'
+    
+    id = Column(Integer, primary_key=True)
+    job_name = Column(String(256), nullable=False)
+    job_type = Column(String(64))
+    parameters = Column(JSON)
+    results = Column(JSON)
+    status = Column(String(32), default='pending')
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+

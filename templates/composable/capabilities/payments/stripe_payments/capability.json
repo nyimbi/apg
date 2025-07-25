@@ -1,0 +1,44 @@
+{
+  "name": "Stripe Payments",
+  "category": "payments",
+  "description": "Stripe payment processing with webhooks",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "stripe>=7.0.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [],
+  "integration": {
+    "models": [
+      "Payment",
+      "Subscription",
+      "Customer"
+    ],
+    "views": [
+      "PaymentView",
+      "SubscriptionView"
+    ],
+    "apis": [
+      "payments/charge",
+      "payments/subscribe",
+      "payments/webhook"
+    ],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Payment Processing",
+    "Subscription Management",
+    "Webhook Handling",
+    "Refunds"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice"
+  ],
+  "incompatible_capabilities": []
+}

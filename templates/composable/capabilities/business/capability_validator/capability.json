@@ -1,0 +1,63 @@
+{
+  "name": "Capability Validator",
+  "category": "business",
+  "description": "Validates community-contributed capabilities for security and compatibility",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "jsonschema>=4.18.0",
+    "bandit>=1.7.5",
+    "ast>=3.11.0",
+    "semver>=3.0.1"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store validation results and metadata"
+    }
+  ],
+  "integration": {
+    "models": [
+      "ValidationReport",
+      "SecurityScan",
+      "QualityMetrics",
+      "ComplianceCheck"
+    ],
+    "views": [
+      "ValidationView",
+      "SecurityView",
+      "QualityView"
+    ],
+    "apis": [
+      "validate/capability",
+      "validate/security",
+      "validate/quality"
+    ],
+    "templates": [
+      "validation_dashboard.html",
+      "validation_report.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "JSON Schema Validation",
+    "Security Scanning",
+    "Dependency Analysis",
+    "Code Quality Checks",
+    "API Compatibility",
+    "Documentation Validation",
+    "Test Coverage Analysis",
+    "License Compliance"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice"
+  ],
+  "incompatible_capabilities": []
+}

@@ -1,0 +1,86 @@
+"""
+Basic Authentication Models
+===========================
+
+Flask-AppBuilder models for basic authentication capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class User(AuditMixin, Model):
+    """Extended User model with additional fields"""
+    
+    __tablename__ = 'ab_user'
+    
+    id = Column(Integer, primary_key=True)
+    first_name = Column(String(64), nullable=False)
+    last_name = Column(String(64), nullable=False) 
+    username = Column(String(64), unique=True, nullable=False)
+    password = Column(String(256))
+    active = Column(Boolean, default=True)
+    email = Column(String(120), unique=True, nullable=False)
+    last_login = Column(DateTime)
+    login_count = Column(Integer, default=0)
+    fail_login_count = Column(Integer, default=0)
+    
+    # Relationships
+    roles = relationship("Role", secondary="ab_user_role", back_populates="users")
+    
+    def __repr__(self):
+        return f'<User {self.username}>'
+
+
+class Role(AuditMixin, Model):
+    """User role model"""
+    
+    __tablename__ = 'ab_role'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(64), unique=True, nullable=False)
+    
+    # Relationships
+    users = relationship("User", secondary="ab_user_role", back_populates="roles")
+    permissions = relationship("Permission", secondary="ab_permission_role", back_populates="roles")
+    
+    def __repr__(self):
+        return f'<Role {self.name}>'
+
+
+class Permission(AuditMixin, Model):
+    """Permission model"""
+    
+    __tablename__ = 'ab_permission'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, nullable=False)
+    
+    # Relationships
+    roles = relationship("Role", secondary="ab_permission_role", back_populates="permissions")
+    
+    def __repr__(self):
+        return f'<Permission {self.name}>'
+
+
+# Association tables
+from sqlalchemy import Table
+
+ab_user_role = Table(
+    'ab_user_role',
+    Model.metadata,
+    Column('id', Integer, primary_key=True),
+    Column('user_id', Integer, ForeignKey('ab_user.id')),
+    Column('role_id', Integer, ForeignKey('ab_role.id'))
+)
+
+ab_permission_role = Table(
+    'ab_permission_role', 
+    Model.metadata,
+    Column('id', Integer, primary_key=True),
+    Column('permission_id', Integer, ForeignKey('ab_permission.id')),
+    Column('role_id', Integer, ForeignKey('ab_role.id'))
+)

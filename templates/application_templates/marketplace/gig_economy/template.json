@@ -1,0 +1,46 @@
+{
+  "template_id": "marketplace/gig_economy",
+  "name": "Gig Economy Platform",
+  "description": "Platform for freelancers and gig workers",
+  "complexity": "Advanced",
+  "domain": "Gig Economy",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "GigAgent",
+    "WorkerAgent",
+    "ClientAgent",
+    "PayoutAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Gig Matching",
+    "Skill Verification",
+    "Project Management",
+    "Automated Payouts"
+  ],
+  "databases": [
+    "gigs",
+    "workers",
+    "clients",
+    "transactions"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

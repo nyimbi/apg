@@ -1,0 +1,40 @@
+{
+  "name": "JWT Authentication",
+  "category": "auth",
+  "description": "JSON Web Token authentication for APIs",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "PyJWT>=2.8.0",
+    "cryptography>=3.0.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [],
+  "integration": {
+    "models": [
+      "JWTToken"
+    ],
+    "views": [],
+    "apis": [
+      "auth/login",
+      "auth/refresh",
+      "auth/logout"
+    ],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Token Generation",
+    "Token Validation",
+    "Token Refresh",
+    "API Authentication"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

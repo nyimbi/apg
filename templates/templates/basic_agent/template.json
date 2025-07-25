@@ -1,0 +1,28 @@
+{
+  "name": "Basic Agent",
+  "description": "Simple agent with basic functionality and Flask-AppBuilder interface",
+  "complexity": "Beginner",
+  "features": [
+    "Agent Runtime",
+    "Basic Methods",
+    "Web Dashboard"
+  ],
+  "use_cases": [
+    "Learning APG",
+    "Simple Automation",
+    "Proof of Concept"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

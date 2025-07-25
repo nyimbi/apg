@@ -1,0 +1,46 @@
+{
+  "template_id": "healthcare/health_analytics",
+  "name": "Health Analytics Platform",
+  "description": "Healthcare data analytics and insights",
+  "complexity": "Advanced",
+  "domain": "Health Analytics",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "AnalyticsAgent",
+    "PopulationAgent",
+    "OutcomeAgent",
+    "PredictiveAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Health Analytics",
+    "Population Health",
+    "Outcome Analysis",
+    "Predictive Modeling"
+  ],
+  "databases": [
+    "health_metrics",
+    "population_data",
+    "outcomes",
+    "predictions"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

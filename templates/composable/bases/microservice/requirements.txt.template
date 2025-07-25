@@ -1,0 +1,18 @@
+# APG Generated Requirements - Microservice
+# Base template requirements
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+sqlalchemy>=2.0.0
+
+# Capability-specific requirements
+{% for capability in capabilities %}
+# Requirements for {{capability}} capability
+{% include 'capabilities/' + capability + '/requirements.txt' ignore missing %}
+{% endfor %}
+
+# Development dependencies (optional)
+pytest>=7.4.0
+pytest-flask>=1.2.0
+black>=23.7.0
+flake8>=6.0.0

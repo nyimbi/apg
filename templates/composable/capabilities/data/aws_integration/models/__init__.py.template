@@ -1,0 +1,65 @@
+"""
+AWS Integration Models
+======================
+
+Database models for AWS Integration capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CloudBaseModel(AuditMixin, Model):
+	"""Base model for cloud entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add cloud-specific models based on capability
+
+class AWSResource(CloudBaseModel):
+	"""AWS resource model"""
+	__tablename__ = 'aws_resources'
+	
+	id = Column(Integer, primary_key=True)
+	resource_id = Column(String(256), unique=True, nullable=False)
+	resource_type = Column(String(64), nullable=False)
+	name = Column(String(256))
+	region = Column(String(32))
+	status = Column(String(32), default='pending')
+	configuration = Column(JSON)
+	cost_estimate = Column(Float)
+
+
+class S3Bucket(CloudBaseModel):
+	"""S3 bucket model"""
+	__tablename__ = 'aws_s3_buckets'
+	
+	id = Column(Integer, primary_key=True)
+	bucket_name = Column(String(256), unique=True, nullable=False)
+	region = Column(String(32))
+	versioning_enabled = Column(Boolean, default=False)
+	encryption_enabled = Column(Boolean, default=True)
+	public_access = Column(Boolean, default=False)
+	storage_class = Column(String(32), default='STANDARD')
+
+
+class LambdaFunction(CloudBaseModel):
+	"""Lambda function model"""
+	__tablename__ = 'aws_lambda_functions'
+	
+	id = Column(Integer, primary_key=True)
+	function_name = Column(String(256), nullable=False)
+	runtime = Column(String(32))
+	handler = Column(String(128))
+	memory_size = Column(Integer, default=128)
+	timeout = Column(Integer, default=3)
+	environment_vars = Column(JSON)
+	last_deployment = Column(DateTime)
+

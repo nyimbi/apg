@@ -1,0 +1,56 @@
+{
+  "name": "Edge Computing",
+  "category": "iot",
+  "description": "Edge computing orchestration and container management",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "docker>=6.1.0",
+    "kubernetes>=27.2.0",
+    "redis>=4.6.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/redis",
+      "version": null,
+      "optional": true,
+      "reason": "Edge caching and message queuing"
+    }
+  ],
+  "integration": {
+    "models": [
+      "EdgeNode",
+      "EdgeContainer",
+      "EdgeJob"
+    ],
+    "views": [],
+    "apis": [
+      "edge/deploy",
+      "edge/monitor",
+      "edge/sync"
+    ],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {
+      "EDGE_REGISTRY_URL": "localhost:5000",
+      "KUBERNETES_CONFIG": "/etc/k8s/config"
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Edge Node Management",
+    "Container Orchestration",
+    "Edge Analytics",
+    "Local Data Processing",
+    "Offline Capability",
+    "Edge-to-Cloud Sync",
+    "Resource Monitoring"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

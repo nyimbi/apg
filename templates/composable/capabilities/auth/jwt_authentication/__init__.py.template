@@ -1,0 +1,25 @@
+"""
+JWT Authentication Capability
+======================================
+
+JSON Web Token authentication for APIs
+
+Category: auth
+Version: 1.0.0
+Author: APG Team
+"""
+
+from .integration import integrate_jwt_authentication
+
+__version__ = "1.0.0"
+__capability_name__ = "JWT Authentication"
+__category__ = "auth"
+
+# Capability metadata
+CAPABILITY_INFO = {
+    'name': 'JWT Authentication',
+    'category': 'auth',
+    'version': '1.0.0',
+    'features': ['Token Generation', 'Token Validation', 'Token Refresh', 'API Authentication'],
+    'author': 'APG Team'
+}

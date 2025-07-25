@@ -1,0 +1,70 @@
+"""
+Data Encryption Models
+======================
+
+Database models for Data Encryption capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class SecurityBaseModel(AuditMixin, Model):
+	"""Base model for security entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add security-specific models based on capability
+
+class EncryptionKey(SecurityBaseModel):
+	"""Encryption key management"""
+	__tablename__ = 'encryption_keys'
+	
+	id = Column(Integer, primary_key=True)
+	key_id = Column(String(128), unique=True, nullable=False)
+	key_type = Column(String(32))  # AES, RSA, etc.
+	key_size = Column(Integer)
+	purpose = Column(String(64))  # database, file, transport
+	algorithm = Column(String(32))
+	created_at = Column(DateTime, default=datetime.utcnow)
+	expires_at = Column(DateTime)
+	rotated_at = Column(DateTime)
+	status = Column(String(32), default='active')
+
+
+class CertificateStore(SecurityBaseModel):
+	"""Certificate storage"""
+	__tablename__ = 'certificate_store'
+	
+	id = Column(Integer, primary_key=True)
+	certificate_id = Column(String(128), unique=True, nullable=False)
+	subject = Column(String(256))
+	issuer = Column(String(256))
+	serial_number = Column(String(64))
+	not_before = Column(DateTime)
+	not_after = Column(DateTime)
+	certificate_pem = Column(Text)
+	private_key_pem = Column(Text)
+	certificate_type = Column(String(32))  # SSL, code_signing, etc.
+
+
+class EncryptedField(SecurityBaseModel):
+	"""Encrypted field tracking"""
+	__tablename__ = 'encrypted_fields'
+	
+	id = Column(Integer, primary_key=True)
+	table_name = Column(String(128), nullable=False)
+	field_name = Column(String(128), nullable=False)
+	key_id = Column(String(128), ForeignKey('encryption_keys.key_id'))
+	encryption_algorithm = Column(String(32))
+	encrypted_at = Column(DateTime, default=datetime.utcnow)
+	
+	key = relationship("EncryptionKey")
+

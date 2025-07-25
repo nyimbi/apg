@@ -1,0 +1,32 @@
+{
+  "name": "Task Management System",
+  "description": "Full-featured task management with assignments and tracking",
+  "complexity": "Intermediate",
+  "features": [
+    "Task Agents",
+    "User Management",
+    "Progress Tracking",
+    "Notifications"
+  ],
+  "use_cases": [
+    "Project Management",
+    "Team Coordination",
+    "Task Tracking"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}",
+    "enable_assignments": "{{enable_assignments}}",
+    "enable_notifications": "{{enable_notifications}}",
+    "enable_deadlines": "{{enable_deadlines}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

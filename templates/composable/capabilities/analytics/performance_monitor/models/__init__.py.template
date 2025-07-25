@@ -1,0 +1,78 @@
+"""
+Performance Monitor Models
+==========================
+
+Database models for Performance Monitor capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class PerformanceBaseModel(AuditMixin, Model):
+	"""Base model for performance entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add performance-specific models based on capability
+
+class PerformanceMetric(PerformanceBaseModel):
+	"""Real-time performance metrics"""
+	__tablename__ = 'performance_metrics'
+	
+	id = Column(Integer, primary_key=True)
+	metric_name = Column(String(128), nullable=False)
+	metric_value = Column(Float, nullable=False)
+	timestamp = Column(DateTime, default=datetime.utcnow)
+	instance_id = Column(String(128))
+	tags = Column(JSON)
+
+
+class Alert(PerformanceBaseModel):
+	"""Performance alerts"""
+	__tablename__ = 'performance_alerts'
+	
+	id = Column(Integer, primary_key=True)
+	alert_name = Column(String(256), nullable=False)
+	metric_name = Column(String(128))
+	threshold_value = Column(Float)
+	current_value = Column(Float)
+	severity = Column(String(32))  # critical, warning, info
+	status = Column(String(32), default='active')
+	triggered_at = Column(DateTime, default=datetime.utcnow)
+	resolved_at = Column(DateTime)
+	message = Column(Text)
+
+
+class SLADefinition(PerformanceBaseModel):
+	"""Service Level Agreement definitions"""
+	__tablename__ = 'sla_definitions'
+	
+	id = Column(Integer, primary_key=True)
+	sla_name = Column(String(256), nullable=False)
+	metric_name = Column(String(128))
+	target_value = Column(Float)
+	comparison_operator = Column(String(16))  # >, <, >=, <=, ==
+	measurement_window = Column(Integer)  # minutes
+	availability_target = Column(Float)  # percentage
+	response_time_target = Column(Float)  # milliseconds
+
+
+class MetricThreshold(PerformanceBaseModel):
+	"""Metric threshold configurations"""
+	__tablename__ = 'metric_thresholds'
+	
+	id = Column(Integer, primary_key=True)
+	metric_name = Column(String(128), nullable=False)
+	warning_threshold = Column(Float)
+	critical_threshold = Column(Float)
+	comparison_operator = Column(String(16))
+	enabled = Column(Boolean, default=True)
+

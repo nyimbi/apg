@@ -1,0 +1,74 @@
+{
+  "name": "Speech Processing",
+  "category": "ai",
+  "description": "Speech-to-text, text-to-speech, and audio processing",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "speech-recognition>=3.10.0",
+    "pydub>=0.25.0",
+    "gTTS>=2.3.0",
+    "whisper-openai>=0.4.1",
+    "librosa>=0.10.0",
+    "pyaudio>=0.2.11"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store audio metadata and transcriptions"
+    }
+  ],
+  "integration": {
+    "models": [
+      "AudioFile",
+      "Transcription",
+      "Speaker",
+      "VoiceCommand"
+    ],
+    "views": [
+      "AudioView",
+      "TranscriptionView",
+      "SpeakerView"
+    ],
+    "apis": [
+      "speech/transcribe",
+      "speech/synthesize",
+      "speech/identify"
+    ],
+    "templates": [
+      "speech_dashboard.html",
+      "audio_player.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "AUDIO_UPLOAD_FOLDER": "/tmp/audio_uploads",
+      "SUPPORTED_AUDIO_FORMATS": [
+        "wav",
+        "mp3",
+        "m4a",
+        "flac"
+      ]
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Speech-to-Text",
+    "Text-to-Speech",
+    "Audio Transcription",
+    "Voice Activity Detection",
+    "Speaker Identification",
+    "Audio Enhancement",
+    "Real-time Processing",
+    "Multiple Language Support"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "real_time"
+  ],
+  "incompatible_capabilities": []
+}

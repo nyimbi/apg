@@ -1,0 +1,39 @@
+"""
+Load Balancer Models
+====================
+
+Database models for Load Balancer capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class PerformanceBaseModel(AuditMixin, Model):
+	"""Base model for performance entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add performance-specific models based on capability
+
+# Generic performance model
+class PerformanceEvent(PerformanceBaseModel):
+	"""Generic performance event tracking"""
+	__tablename__ = 'performance_events'
+	
+	id = Column(Integer, primary_key=True)
+	event_type = Column(String(64), nullable=False)
+	event_name = Column(String(256))
+	duration = Column(Float)
+	resource_usage = Column(JSON)
+	timestamp = Column(DateTime, default=datetime.utcnow)
+	context = Column(JSON)
+	severity = Column(String(32), default='info')
+

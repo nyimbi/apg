@@ -1,0 +1,71 @@
+{
+  "name": "GCP Integration",
+  "category": "data",
+  "description": "Google Cloud Platform services integration (Cloud Storage, BigQuery, Functions, etc.)",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "google-cloud-storage>=2.10.0",
+    "google-cloud-bigquery>=3.11.0",
+    "google-cloud-functions>=1.13.0",
+    "google-cloud-pubsub>=2.18.0",
+    "google-cloud-firestore>=2.11.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": true,
+      "reason": "Local database fallback"
+    }
+  ],
+  "integration": {
+    "models": [
+      "GCPResource",
+      "StorageBucket",
+      "CloudFunction",
+      "PubSubTopic"
+    ],
+    "views": [
+      "GCPView",
+      "StorageView",
+      "BigQueryView"
+    ],
+    "apis": [
+      "gcp/storage",
+      "gcp/bigquery",
+      "gcp/functions",
+      "gcp/pubsub"
+    ],
+    "templates": [
+      "gcp_dashboard.html",
+      "bigquery_console.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "GOOGLE_APPLICATION_CREDENTIALS": "",
+      "GCP_PROJECT_ID": "",
+      "GCP_STORAGE_BUCKET": "",
+      "GCP_BIGQUERY_DATASET": ""
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Cloud Storage Management",
+    "BigQuery Analytics",
+    "Cloud Functions",
+    "Pub/Sub Messaging",
+    "Firestore NoSQL",
+    "Cloud SQL",
+    "IAM Management",
+    "Monitoring & Logging"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

@@ -1,0 +1,47 @@
+{
+  "name": "LLM Integration",
+  "category": "ai",
+  "description": "Large Language Model integration with OpenAI, Anthropic, and local models",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "openai>=1.0.0",
+    "anthropic>=0.3.0",
+    "transformers>=4.30.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [],
+  "integration": {
+    "models": [
+      "LLMModel",
+      "Conversation",
+      "Message"
+    ],
+    "views": [
+      "ChatView",
+      "ModelView"
+    ],
+    "apis": [
+      "ai/chat",
+      "ai/generate",
+      "ai/embed"
+    ],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Text Generation",
+    "Chat Completion",
+    "Embeddings",
+    "Model Management"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

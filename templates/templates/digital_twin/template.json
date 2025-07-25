@@ -1,0 +1,29 @@
+{
+  "name": "Digital Twin System",
+  "description": "IoT-enabled digital twin with real-time monitoring",
+  "complexity": "Advanced",
+  "features": [
+    "Device Modeling",
+    "Real-time Data",
+    "Simulation",
+    "Analytics"
+  ],
+  "use_cases": [
+    "IoT Monitoring",
+    "Predictive Maintenance",
+    "Smart Manufacturing"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

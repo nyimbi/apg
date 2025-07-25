@@ -1,0 +1,69 @@
+{
+  "name": "Capability Installer",
+  "category": "business",
+  "description": "Automated installation and management of community capabilities",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "pip>=23.0.0",
+    "virtualenv>=20.24.0",
+    "docker>=6.1.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "business/capability_validator",
+      "version": null,
+      "optional": false,
+      "reason": "Validate before installation"
+    },
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Track installed capabilities"
+    }
+  ],
+  "integration": {
+    "models": [
+      "InstalledCapability",
+      "InstallationLog",
+      "DependencyGraph",
+      "UpdateHistory"
+    ],
+    "views": [
+      "InstallerView",
+      "InstalledView",
+      "UpdateView"
+    ],
+    "apis": [
+      "install/capability",
+      "install/update",
+      "install/remove"
+    ],
+    "templates": [
+      "installer_dashboard.html",
+      "installation_progress.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "One-click Installation",
+    "Dependency Resolution",
+    "Environment Management",
+    "Rollback Support",
+    "Security Scanning",
+    "Compatibility Checking",
+    "Update Management",
+    "Cleanup Tools"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "cli_tool"
+  ],
+  "incompatible_capabilities": []
+}

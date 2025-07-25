@@ -1,0 +1,38 @@
+"""
+Speech Processing Models
+========================
+
+Database models for Speech Processing capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class AIBaseModel(AuditMixin, Model):
+    """Base model for AI entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# Add AI-specific models based on capability
+
+# Generic AI model
+class AIProcessingJob(AIBaseModel):
+    """Generic AI processing job"""
+    __tablename__ = 'ai_jobs'
+    
+    id = Column(Integer, primary_key=True)
+    job_type = Column(String(64), nullable=False)
+    input_data = Column(JSON)
+    output_data = Column(JSON)
+    status = Column(String(32), default='pending')
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    error_message = Column(Text)
+

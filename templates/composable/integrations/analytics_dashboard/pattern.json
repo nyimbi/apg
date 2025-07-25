@@ -1,0 +1,16 @@
+{
+  "name": "Analytics Dashboard",
+  "description": "Real-time analytics dashboard with data visualization",
+  "base_template": "dashboard",
+  "capabilities": [
+    "auth/basic_authentication",
+    "data/postgresql_database",
+    "analytics/basic_analytics",
+    "communication/websocket_communication"
+  ],
+  "use_cases": [
+    "Business Intelligence",
+    "KPI Dashboards",
+    "Data Visualization"
+  ]
+}

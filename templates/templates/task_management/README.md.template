@@ -1,0 +1,74 @@
+# {{project_name}}
+
+{{project_description}}
+
+## Features
+
+- Task Agents
+- User Management
+- Progress Tracking
+- Notifications
+
+## Installation
+
+1. Install APG compiler:
+   ```bash
+   pip install apg-language
+   ```
+
+2. Install project dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Compile APG source:
+   ```bash
+   apg compile main.apg
+   ```
+
+4. Run the application:
+   ```bash
+   python app.py
+   ```
+
+5. Access the application:
+   Open http://localhost:8080
+
+## Usage
+
+### Task Management
+
+1. **Add Tasks**: Use the web interface or API to create new tasks
+2. **Assign Tasks**: Assign tasks to team members
+3. **Track Progress**: Monitor task completion and statistics
+4. **Notifications**: Receive updates on task changes
+
+### API Endpoints
+
+- `POST /api/tasks` - Create new task
+- `GET /api/tasks` - List all tasks
+- `PUT /api/tasks/{id}` - Update task
+- `DELETE /api/tasks/{id}` - Delete task
+
+
+## Configuration
+
+Edit `config.py` to customize:
+- Database connection
+- Authentication settings
+- Feature flags
+
+## Development
+
+- APG source: `main.apg`
+- Generated code: `generated/`
+- Templates: `templates/`
+- Static files: `static/`
+
+## License
+
+{{license}} - see LICENSE file for details.
+
+---
+
+Generated with APG (Application Programming Generation) language.

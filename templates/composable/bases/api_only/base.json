@@ -1,0 +1,25 @@
+{
+  "name": "API-Only Service",
+  "type": "api_only",
+  "description": "Pure API service without UI",
+  "framework": "FastAPI",
+  "capabilities_supported": [
+    "auth",
+    "ai",
+    "data",
+    "business"
+  ],
+  "default_capabilities": [
+    "auth/jwt_authentication"
+  ],
+  "structure": {
+    "api": {},
+    "models": {},
+    "capabilities": {},
+    "tests": {}
+  },
+  "requirements": [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0"
+  ]
+}

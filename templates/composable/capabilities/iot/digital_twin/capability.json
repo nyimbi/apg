@@ -1,0 +1,67 @@
+{
+  "name": "Digital Twin",
+  "category": "iot",
+  "description": "Digital twin modeling and simulation for IoT systems",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "networkx>=3.1",
+    "matplotlib>=3.7.0",
+    "simpy>=4.0.1",
+    "pydantic>=2.0.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "iot/sensor_data_processing",
+      "version": null,
+      "optional": false,
+      "reason": "Real-time data for twin synchronization"
+    },
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store twin models and state"
+    }
+  ],
+  "integration": {
+    "models": [
+      "DigitalTwin",
+      "TwinModel",
+      "TwinState",
+      "Simulation"
+    ],
+    "views": [
+      "TwinView",
+      "SimulationView"
+    ],
+    "apis": [
+      "twins/create",
+      "twins/simulate",
+      "twins/sync"
+    ],
+    "templates": [
+      "twin_dashboard.html",
+      "twin_3d.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Twin Model Creation",
+    "Real-time Synchronization",
+    "Predictive Simulation",
+    "State Management",
+    "Behavior Modeling",
+    "Performance Optimization",
+    "3D Visualization"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

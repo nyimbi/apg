@@ -1,0 +1,162 @@
+module {{project_name}} version {{version}} {
+	description: "{{project_description}}";
+	author: "{{author}}";
+	license: "{{license}}";
+}
+
+agent TaskManagerAgent {
+	name: str = "Task Manager";
+	tasks: list[dict] = [];
+	total_tasks: int = 0;
+	completed_tasks: int = 0;
+	active: bool = false;
+	
+	add_task: (title: str, priority: str, assignee: str) -> dict = {
+		task = {
+			"id": total_tasks + 1,
+			"title": title,
+			"priority": priority,
+			"assignee": assignee,
+			"status": "pending",
+			"created_at": now(),
+			"due_date": null
+		};
+		
+		tasks.append(task);
+		total_tasks = total_tasks + 1;
+		
+		// Send notification if enabled
+		if ({{enable_notifications}}) {
+			send_notification("task_created", task);
+		}
+		
+		return task;
+	};
+	
+	assign_task: (task_id: int, assignee: str) -> bool = {
+		for (task in tasks) {
+			if (task["id"] == task_id) {
+				task["assignee"] = assignee;
+				task["assigned_at"] = now();
+				
+				if ({{enable_notifications}}) {
+					send_notification("task_assigned", task);
+				}
+				
+				return true;
+			}
+		}
+		return false;
+	};
+	
+	complete_task: (task_id: int) -> bool = {
+		for (task in tasks) {
+			if (task["id"] == task_id) {
+				task["status"] = "completed";
+				task["completed_at"] = now();
+				completed_tasks = completed_tasks + 1;
+				
+				if ({{enable_notifications}}) {
+					send_notification("task_completed", task);
+				}
+				
+				return true;
+			}
+		}
+		return false;
+	};
+	
+	get_task_stats: () -> dict = {
+		return {
+			"total": total_tasks,
+			"completed": completed_tasks,
+			"pending": total_tasks - completed_tasks,
+			"completion_rate": completed_tasks / total_tasks * 100
+		};
+	};
+}
+
+workflow TaskWorkflow {
+	name: str = "Task Processing Workflow";
+	steps: list[str] = ["validate", "assign", "process", "review", "complete"];
+	current_step: int = 0;
+	task_id: int = 0;
+	
+	start_workflow: (task_id: int) -> bool = {
+		this.task_id = task_id;
+		current_step = 0;
+		return true;
+	};
+	
+	execute_next_step: () -> dict = {
+		if (current_step < len(steps)) {
+			step_name = steps[current_step];
+			current_step = current_step + 1;
+			
+			return {
+				"step": step_name,
+				"completed": true,
+				"progress": current_step / len(steps) * 100
+			};
+		}
+		
+		return {
+			"error": "Workflow completed",
+			"progress": 100
+		};
+	};
+}
+
+db TaskDatabase {
+	url: "sqlite:///tasks.db";
+	
+	schema task_schema {
+		table tasks {
+			id serial [pk]
+			title varchar(200) [not null]
+			description text
+			priority varchar(20) [default: "medium"]
+			status varchar(20) [default: "pending"]
+			assignee varchar(100)
+			created_at timestamp [default: now()]
+			due_date timestamp
+			completed_at timestamp
+			
+			indexes {
+				(status)
+				(priority)
+				(assignee)
+				(created_at)
+			}
+		}
+		
+		table users {
+			id serial [pk]
+			username varchar(50) [unique, not null]
+			email varchar(255) [unique, not null]
+			full_name varchar(100)
+			role varchar(50) [default: "user"]
+			created_at timestamp [default: now()]
+		}
+		
+		table task_assignments {
+			id serial [pk]
+			task_id int [ref: > tasks.id]
+			user_id int [ref: > users.id]
+			assigned_at timestamp [default: now()]
+			assigned_by int [ref: > users.id]
+		}
+		
+		{% if enable_notifications %}
+		table notifications {
+			id serial [pk]
+			user_id int [ref: > users.id]
+			type varchar(50) [not null]
+			title varchar(200) [not null]
+			message text [not null]
+			read bool [default: false]
+			created_at timestamp [default: now()]
+		}
+		{% endif %}
+	}
+}

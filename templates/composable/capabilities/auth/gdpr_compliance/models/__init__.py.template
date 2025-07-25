@@ -1,0 +1,70 @@
+"""
+GDPR Compliance Models
+======================
+
+Database models for GDPR Compliance capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class SecurityBaseModel(AuditMixin, Model):
+	"""Base model for security entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add security-specific models based on capability
+
+class ConsentRecord(SecurityBaseModel):
+	"""GDPR consent tracking"""
+	__tablename__ = 'gdpr_consent_records'
+	
+	id = Column(Integer, primary_key=True)
+	user_id = Column(Integer, nullable=False)
+	consent_type = Column(String(64))  # marketing, analytics, etc.
+	consent_given = Column(Boolean, nullable=False)
+	consent_date = Column(DateTime, default=datetime.utcnow)
+	consent_method = Column(String(32))  # web_form, api, etc.
+	consent_version = Column(String(16))
+	withdrawn_date = Column(DateTime)
+	ip_address = Column(String(45))
+	legal_basis = Column(String(64))
+
+
+class DataSubject(SecurityBaseModel):
+	"""Data subject information"""
+	__tablename__ = 'gdpr_data_subjects'
+	
+	id = Column(Integer, primary_key=True)
+	user_id = Column(Integer, nullable=False)
+	subject_id = Column(String(128), unique=True, nullable=False)
+	email = Column(String(256))
+	registration_date = Column(DateTime)
+	last_activity = Column(DateTime)
+	data_retention_period = Column(Integer)  # days
+	anonymization_date = Column(DateTime)
+	deletion_date = Column(DateTime)
+
+
+class PrivacyRequest(SecurityBaseModel):
+	"""GDPR privacy requests"""
+	__tablename__ = 'gdpr_privacy_requests'
+	
+	id = Column(Integer, primary_key=True)
+	request_id = Column(String(128), unique=True, nullable=False)
+	user_id = Column(Integer, nullable=False)
+	request_type = Column(String(32))  # access, portability, deletion, etc.
+	status = Column(String(32), default='pending')
+	submitted_at = Column(DateTime, default=datetime.utcnow)
+	processed_at = Column(DateTime)
+	response_data = Column(JSON)
+	processing_notes = Column(Text)
+

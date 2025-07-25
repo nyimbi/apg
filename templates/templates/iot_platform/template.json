@@ -1,0 +1,32 @@
+{
+  "name": "IoT Platform",
+  "description": "Complete IoT platform with device management and analytics",
+  "complexity": "Expert",
+  "features": [
+    "Device Management",
+    "Data Collection",
+    "Real-time Analytics",
+    "Alerts"
+  ],
+  "use_cases": [
+    "Smart Cities",
+    "Industrial IoT",
+    "Consumer IoT"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template",
+    "devices/sensor_twin.apg.template",
+    "analytics/data_processor.apg.template",
+    "templates/device_dashboard.html.template"
+  ]
+}

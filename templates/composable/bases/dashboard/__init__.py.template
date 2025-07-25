@@ -1,0 +1,6 @@
+# APG Base Template: Analytics Dashboard
+# File: __init__.py.template
+# Framework: Flask-AppBuilder
+#
+# This file is part of the Analytics Dashboard base template.
+# Capabilities will be integrated into this base structure.

@@ -1,0 +1,69 @@
+{
+  "name": "Business Metrics",
+  "category": "business",
+  "description": "Comprehensive business metrics tracking and analysis",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "pandas>=2.0.0",
+    "plotly>=5.15.0",
+    "sqlalchemy>=2.0.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store business data"
+    },
+    {
+      "name": "analytics/basic_analytics",
+      "version": null,
+      "optional": false,
+      "reason": "Data visualization"
+    }
+  ],
+  "integration": {
+    "models": [
+      "Customer",
+      "Sale",
+      "Revenue",
+      "Metric",
+      "Funnel"
+    ],
+    "views": [
+      "BusinessMetricsView",
+      "RevenueView",
+      "CustomerView"
+    ],
+    "apis": [
+      "metrics/revenue",
+      "metrics/customers",
+      "metrics/funnel"
+    ],
+    "templates": [
+      "business_dashboard.html",
+      "revenue_analysis.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Revenue Tracking",
+    "Customer Metrics",
+    "Sales Funnel Analysis",
+    "Churn Analysis",
+    "LTV Calculation",
+    "Unit Economics",
+    "Growth Metrics",
+    "Profitability Analysis"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

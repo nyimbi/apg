@@ -1,0 +1,54 @@
+"""
+ML Model Training Models
+========================
+
+Database models for ML Model Training capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class AIBaseModel(AuditMixin, Model):
+    """Base model for AI entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# Add AI-specific models based on capability
+
+class MLModel(AIBaseModel):
+    """Machine learning model"""
+    __tablename__ = 'ml_models'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(256), nullable=False)
+    model_type = Column(String(64))
+    algorithm = Column(String(128))
+    version = Column(String(32))
+    file_path = Column(String(512))
+    status = Column(String(32), default='training')
+    
+    training_jobs = relationship("TrainingJob", back_populates="model")
+
+
+class TrainingJob(AIBaseModel):
+    """ML model training job"""
+    __tablename__ = 'ml_training_jobs'
+    
+    id = Column(Integer, primary_key=True)
+    model_id = Column(Integer, ForeignKey('ml_models.id'))
+    dataset_path = Column(String(512))
+    hyperparameters = Column(JSON)
+    metrics = Column(JSON)
+    status = Column(String(32), default='pending')
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    
+    model = relationship("MLModel", back_populates="training_jobs")
+

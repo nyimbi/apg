@@ -1,0 +1,73 @@
+{
+  "name": "Natural Language Processing",
+  "category": "ai",
+  "description": "Advanced NLP with sentiment analysis, entity extraction, and text processing",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "spacy>=3.6.0",
+    "nltk>=3.8.0",
+    "transformers>=4.30.0",
+    "textblob>=0.17.0",
+    "wordcloud>=1.9.0",
+    "scikit-learn>=1.3.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store text analysis results"
+    },
+    {
+      "name": "ai/llm_integration",
+      "version": null,
+      "optional": true,
+      "reason": "Enhanced text generation capabilities"
+    }
+  ],
+  "integration": {
+    "models": [
+      "TextDocument",
+      "NLPResult",
+      "Entity",
+      "Sentiment"
+    ],
+    "views": [
+      "TextAnalysisView",
+      "EntityView",
+      "SentimentView"
+    ],
+    "apis": [
+      "nlp/analyze",
+      "nlp/sentiment",
+      "nlp/entities",
+      "nlp/summarize"
+    ],
+    "templates": [
+      "nlp_dashboard.html",
+      "text_analysis.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Sentiment Analysis",
+    "Named Entity Recognition",
+    "Text Classification",
+    "Language Detection",
+    "Text Summarization",
+    "Keyword Extraction",
+    "Topic Modeling",
+    "Text Similarity"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

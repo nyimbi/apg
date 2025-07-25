@@ -1,0 +1,63 @@
+"""
+MQTT Messaging Models
+=====================
+
+Database models for MQTT Messaging capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class IoTBaseModel(AuditMixin, Model):
+    """Base model for IoT entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    active = Column(Boolean, default=True)
+
+
+# Add IoT-specific models based on capability
+
+class MQTTDevice(IoTBaseModel):
+    """MQTT IoT device model"""
+    __tablename__ = 'mqtt_devices'
+    
+    id = Column(Integer, primary_key=True)
+    device_id = Column(String(128), unique=True, nullable=False)
+    name = Column(String(256), nullable=False)
+    device_type = Column(String(64))
+    last_seen = Column(DateTime)
+    status = Column(String(32), default='offline')
+    
+    # MQTT specific fields
+    client_id = Column(String(128))
+    topics = relationship("MQTTTopic", back_populates="device")
+
+
+class MQTTTopic(IoTBaseModel):
+    """MQTT topic subscription model"""
+    __tablename__ = 'mqtt_topics'
+    
+    id = Column(Integer, primary_key=True)
+    topic_name = Column(String(256), nullable=False)
+    qos_level = Column(Integer, default=0)
+    device_id = Column(Integer, ForeignKey('mqtt_devices.id'))
+    
+    device = relationship("MQTTDevice", back_populates="topics")
+
+
+class MQTTMessage(IoTBaseModel):
+    """MQTT message history"""
+    __tablename__ = 'mqtt_messages'
+    
+    id = Column(Integer, primary_key=True)
+    topic = Column(String(256), nullable=False)
+    payload = Column(Text)
+    qos = Column(Integer)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+

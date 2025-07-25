@@ -1,0 +1,37 @@
+"""
+Industrial Protocols Models
+===========================
+
+Database models for Industrial Protocols capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class IoTBaseModel(AuditMixin, Model):
+    """Base model for IoT entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    active = Column(Boolean, default=True)
+
+
+# Add IoT-specific models based on capability
+
+# Generic IoT device model
+class GenericIoTDevice(IoTBaseModel):
+    """Generic IoT device model"""
+    __tablename__ = 'iot_devices'
+    
+    id = Column(Integer, primary_key=True)
+    device_id = Column(String(128), unique=True, nullable=False)
+    name = Column(String(256), nullable=False)
+    device_type = Column(String(64))
+    status = Column(String(32), default='active')
+    metadata = Column(Text)  # JSON metadata
+

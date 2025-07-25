@@ -1,0 +1,17 @@
+{
+  "name": "AI Platform",
+  "description": "Complete AI platform with LLM, vector database, and analytics",
+  "base_template": "flask_webapp",
+  "capabilities": [
+    "auth/basic_authentication",
+    "ai/llm_integration",
+    "data/postgresql_database",
+    "data/vector_database",
+    "analytics/basic_analytics"
+  ],
+  "use_cases": [
+    "AI Applications",
+    "Chatbots",
+    "Knowledge Management"
+  ]
+}

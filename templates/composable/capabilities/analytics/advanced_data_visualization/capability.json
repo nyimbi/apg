@@ -1,0 +1,67 @@
+{
+  "name": "Advanced Data Visualization",
+  "category": "analytics",
+  "description": "Advanced interactive data visualizations and charts",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "plotly>=5.15.0",
+    "bokeh>=3.2.0",
+    "altair>=5.0.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "d3py>=0.2.8"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Data source for visualizations"
+    }
+  ],
+  "integration": {
+    "models": [
+      "Visualization",
+      "Chart",
+      "Dataset"
+    ],
+    "views": [
+      "VisualizationView",
+      "ChartBuilderView"
+    ],
+    "apis": [
+      "viz/create",
+      "viz/data",
+      "viz/export"
+    ],
+    "templates": [
+      "chart_builder.html",
+      "visualization_gallery.html"
+    ],
+    "static_files": [
+      "js/d3.min.js",
+      "js/chart_interactions.js",
+      "css/visualizations.css"
+    ],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Interactive Charts",
+    "3D Visualizations",
+    "Geographic Maps",
+    "Network Graphs",
+    "Animated Charts",
+    "Custom Widgets",
+    "Export Capabilities",
+    "Responsive Design"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

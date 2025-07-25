@@ -1,0 +1,32 @@
+{
+  "name": "Enterprise Dashboard",
+  "description": "Executive dashboard with analytics and reporting",
+  "complexity": "Advanced",
+  "features": [
+    "Real-time Analytics",
+    "Custom Widgets",
+    "Report Generation",
+    "KPI Tracking"
+  ],
+  "use_cases": [
+    "Business Intelligence",
+    "Executive Reporting",
+    "Data Visualization"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template",
+    "models/products.apg.template",
+    "models/orders.apg.template",
+    "templates/dashboard.html.template"
+  ]
+}

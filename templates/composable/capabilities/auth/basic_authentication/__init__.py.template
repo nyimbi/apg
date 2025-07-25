@@ -1,0 +1,25 @@
+"""
+Basic Authentication Capability
+========================================
+
+Username/password authentication with Flask-AppBuilder
+
+Category: auth
+Version: 1.0.0
+Author: APG Team
+"""
+
+from .integration import integrate_basic_authentication
+
+__version__ = "1.0.0"
+__capability_name__ = "Basic Authentication"
+__category__ = "auth"
+
+# Capability metadata
+CAPABILITY_INFO = {
+    'name': 'Basic Authentication',
+    'category': 'auth',
+    'version': '1.0.0',
+    'features': ['User Registration', 'Login/Logout', 'Password Reset', 'User Management'],
+    'author': 'APG Team'
+}

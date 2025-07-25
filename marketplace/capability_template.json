@@ -1,0 +1,46 @@
+{
+  "name": "my_capability_name",
+  "display_name": "My Capability Display Name",
+  "description": "A concise description of what this capability does (minimum 50 characters). This should clearly explain the purpose and main functionality.",
+  "detailed_description": "A comprehensive description of the capability including its features, use cases, and benefits. This can include multiple paragraphs explaining the technical details, integration patterns, and value proposition.",
+  "category": "web_development",
+  "tags": [
+    "tag1",
+    "tag2",
+    "tag3"
+  ],
+  "keywords": [
+    "keyword1",
+    "keyword2",
+    "keyword3",
+    "keyword4"
+  ],
+  "author": "Your Name",
+  "author_email": "your.email@example.com",
+  "organization": "Your Organization (optional)",
+  "license": "mit",
+  "homepage": "https://github.com/yourusername/your-capability",
+  "repository": "https://github.com/yourusername/your-capability.git",
+  "capability_code": "# Your Python code here\n\nclass MyCapability:\n    \"\"\"\n    Your capability implementation.\n    \n    This should be well-documented, secure, and follow best practices.\n    \"\"\"\n    \n    def __init__(self):\n        self.version = \"1.0.0\"\n    \n    def main_function(self, param1: str, param2: int = 10) -> str:\n        \"\"\"\n        Main functionality of your capability.\n        \n        Args:\n            param1: Description of parameter 1\n            param2: Description of parameter 2 with default value\n            \n        Returns:\n            Description of return value\n        \"\"\"\n        # Implementation here\n        return f\"Processed {param1} with value {param2}\"\n    \n    def helper_function(self, data):\n        \"\"\"\n        Helper function for internal processing.\n        \"\"\"\n        # Helper implementation\n        pass\n\n# Capability metadata for APG integration\nCAPABILITY_INFO = {\n    \"name\": \"my_capability_name\",\n    \"version\": \"1.0.0\",\n    \"provides\": [\"MyCapability\"],\n    \"integrates_with\": [\"flask\", \"fastapi\"],\n    \"apg_templates\": [\"web_app\", \"api_service\"]\n}",
+  "example_usage": "# Example usage of your capability\n\nfrom my_capability_name import MyCapability\n\n# Initialize the capability\ncapability = MyCapability()\n\n# Use the main functionality\nresult = capability.main_function(\"test data\", 25)\nprint(result)  # Output: Processed test data with value 25\n\n# Example integration with Flask\nfrom flask import Flask, jsonify\n\napp = Flask(__name__)\ncap = MyCapability()\n\n@app.route('/process/<data>')\ndef process_data(data):\n    result = cap.main_function(data)\n    return jsonify({'result': result})\n\nif __name__ == '__main__':\n    app.run(debug=True)",
+  "documentation": "# My Capability Documentation\n\n## Overview\n\nBrief overview of what this capability does and why it's useful.\n\n## Features\n\n- Feature 1: Description\n- Feature 2: Description\n- Feature 3: Description\n\n## Quick Start\n\n```python\nfrom my_capability_name import MyCapability\n\n# Initialize\ncap = MyCapability()\n\n# Use it\nresult = cap.main_function(\"example\")\n```\n\n## API Reference\n\n### MyCapability\n\n#### `__init__()`\nInitialize the capability.\n\n#### `main_function(param1: str, param2: int = 10) -> str`\nMain functionality description.\n\n**Parameters:**\n- `param1` (str): Description of parameter 1\n- `param2` (int, optional): Description of parameter 2. Defaults to 10.\n\n**Returns:**\n- `str`: Description of return value\n\n**Example:**\n```python\nresult = cap.main_function(\"test\", 20)\n```\n\n## Integration Guide\n\n### Flask Integration\n\n```python\nfrom flask import Flask\nfrom my_capability_name import MyCapability\n\napp = Flask(__name__)\ncap = MyCapability()\n\n# Integration code here\n```\n\n### FastAPI Integration\n\n```python\nfrom fastapi import FastAPI\nfrom my_capability_name import MyCapability\n\napp = FastAPI()\ncap = MyCapability()\n\n# Integration code here\n```\n\n## Configuration\n\nIf your capability requires configuration, document it here:\n\n```python\n# Configuration example\nconfig = {\n    'setting1': 'value1',\n    'setting2': 'value2'\n}\ncap = MyCapability(config)\n```\n\n## Error Handling\n\nDocument common errors and how to handle them:\n\n- **Error Type 1**: Description and solution\n- **Error Type 2**: Description and solution\n\n## Performance Considerations\n\n- Performance tip 1\n- Performance tip 2\n- Memory usage notes\n\n## Security Notes\n\n- Security consideration 1\n- Security consideration 2\n- Best practices\n\n## Contributing\n\nInformation about how others can contribute to your capability.\n\n## License\n\nLicense information and any additional terms.",
+  "dependencies": [
+    {
+      "name": "requests",
+      "version_constraint": ">=2.25.0",
+      "optional": false,
+      "description": "HTTP library for API calls"
+    },
+    {
+      "name": "pandas",
+      "version_constraint": ">=1.3.0",
+      "optional": true,
+      "description": "Data manipulation library (optional for advanced features)"
+    }
+  ],
+  "platforms": [
+    "linux",
+    "windows",
+    "macos"
+  ]
+}

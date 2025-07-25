@@ -1,0 +1,28 @@
+{
+  "name": "Simple Workflow",
+  "description": "Basic workflow automation with step-by-step processing",
+  "complexity": "Beginner",
+  "features": [
+    "Workflow Engine",
+    "Step Management",
+    "Progress Tracking"
+  ],
+  "use_cases": [
+    "Process Automation",
+    "Task Orchestration",
+    "Business Logic"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

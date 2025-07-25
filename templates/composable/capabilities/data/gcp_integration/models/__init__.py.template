@@ -1,0 +1,63 @@
+"""
+GCP Integration Models
+======================
+
+Database models for GCP Integration capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CloudBaseModel(AuditMixin, Model):
+	"""Base model for cloud entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add cloud-specific models based on capability
+
+class GCPResource(CloudBaseModel):
+	"""GCP resource model"""
+	__tablename__ = 'gcp_resources'
+	
+	id = Column(Integer, primary_key=True)
+	resource_id = Column(String(256), unique=True, nullable=False)
+	resource_type = Column(String(64), nullable=False)
+	name = Column(String(256))
+	project_id = Column(String(128))
+	zone = Column(String(64))
+	status = Column(String(32), default='pending')
+	labels = Column(JSON)
+
+
+class StorageBucket(CloudBaseModel):
+	"""GCP Storage bucket model"""
+	__tablename__ = 'gcp_storage_buckets'
+	
+	id = Column(Integer, primary_key=True)
+	bucket_name = Column(String(256), unique=True, nullable=False)
+	location = Column(String(64))
+	storage_class = Column(String(32), default='STANDARD')
+	versioning_enabled = Column(Boolean, default=False)
+	lifecycle_rules = Column(JSON)
+
+
+class CloudFunction(CloudBaseModel):
+	"""GCP Cloud Function model"""
+	__tablename__ = 'gcp_cloud_functions'
+	
+	id = Column(Integer, primary_key=True)
+	function_name = Column(String(256), nullable=False)
+	runtime = Column(String(32))
+	entry_point = Column(String(128))
+	source_location = Column(String(512))
+	trigger_type = Column(String(64))
+	environment_variables = Column(JSON)
+

@@ -1,0 +1,71 @@
+"""
+OAuth2 & SSO Models
+===================
+
+Database models for OAuth2 & SSO capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class SecurityBaseModel(AuditMixin, Model):
+	"""Base model for security entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add security-specific models based on capability
+
+class OAuthProvider(SecurityBaseModel):
+	"""OAuth2 provider configuration"""
+	__tablename__ = 'oauth_providers'
+	
+	id = Column(Integer, primary_key=True)
+	name = Column(String(128), unique=True, nullable=False)
+	provider_type = Column(String(32))  # google, microsoft, saml
+	client_id = Column(String(256))
+	client_secret = Column(Text)
+	authorization_url = Column(String(512))
+	token_url = Column(String(512))
+	user_info_url = Column(String(512))
+	scopes = Column(JSON)
+	enabled = Column(Boolean, default=True)
+
+
+class UserToken(SecurityBaseModel):
+	"""User OAuth tokens"""
+	__tablename__ = 'user_tokens'
+	
+	id = Column(Integer, primary_key=True)
+	user_id = Column(Integer, nullable=False)
+	provider_id = Column(Integer, ForeignKey('oauth_providers.id'))
+	access_token = Column(Text)
+	refresh_token = Column(Text)
+	token_type = Column(String(32), default='Bearer')
+	expires_at = Column(DateTime)
+	
+	provider = relationship("OAuthProvider")
+
+
+class SSOSession(SecurityBaseModel):
+	"""SSO session tracking"""
+	__tablename__ = 'sso_sessions'
+	
+	id = Column(Integer, primary_key=True)
+	session_id = Column(String(256), unique=True, nullable=False)
+	user_id = Column(Integer, nullable=False)
+	provider_id = Column(Integer, ForeignKey('oauth_providers.id'))
+	login_time = Column(DateTime, default=datetime.utcnow)
+	last_activity = Column(DateTime, default=datetime.utcnow)
+	ip_address = Column(String(45))
+	user_agent = Column(Text)
+	
+	provider = relationship("OAuthProvider")
+

@@ -1,0 +1,77 @@
+{
+  "name": "OAuth2 & SSO",
+  "category": "auth",
+  "description": "OAuth2 authentication with Single Sign-On support (Google, Microsoft, SAML)",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "authlib>=1.2.1",
+    "python-jose>=3.3.0",
+    "python-saml>=1.15.0",
+    "requests-oauthlib>=1.3.1"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store user sessions and tokens"
+    },
+    {
+      "name": "auth/basic_authentication",
+      "version": null,
+      "optional": true,
+      "reason": "Fallback authentication"
+    }
+  ],
+  "integration": {
+    "models": [
+      "OAuthProvider",
+      "UserToken",
+      "SSOSession",
+      "TenantConfig"
+    ],
+    "views": [
+      "OAuthView",
+      "SSOView",
+      "TenantView"
+    ],
+    "apis": [
+      "oauth/authorize",
+      "oauth/callback",
+      "oauth/token",
+      "sso/saml"
+    ],
+    "templates": [
+      "oauth_login.html",
+      "sso_dashboard.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "OAUTH2_CLIENT_ID": "",
+      "OAUTH2_CLIENT_SECRET": "",
+      "SAML_ENTITY_ID": "",
+      "SAML_SSO_URL": "",
+      "SAML_X509_CERT": ""
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "OAuth2 Flow Implementation",
+    "Google SSO Integration",
+    "Microsoft Azure AD",
+    "SAML 2.0 Support",
+    "OpenID Connect",
+    "Multi-tenant Authentication",
+    "Session Management",
+    "Token Refresh"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

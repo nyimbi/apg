@@ -1,0 +1,57 @@
+{
+  "name": "Industrial Protocols",
+  "category": "iot",
+  "description": "Support for industrial communication protocols (Modbus, OPC-UA, etc.)",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "pymodbus>=3.4.0",
+    "opcua>=0.98.13",
+    "can-isotp>=2.0.0",
+    "pyserial>=3.5"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "iot/sensor_data_processing",
+      "version": null,
+      "optional": false,
+      "reason": "Process industrial sensor data"
+    }
+  ],
+  "integration": {
+    "models": [
+      "ProtocolConfig",
+      "IndustrialDevice",
+      "DataMap"
+    ],
+    "views": [],
+    "apis": [
+      "protocols/modbus",
+      "protocols/opcua",
+      "protocols/can"
+    ],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {
+      "MODBUS_PORT": 502,
+      "OPCUA_ENDPOINT": "opc.tcp://localhost:4840"
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Modbus TCP/RTU Support",
+    "OPC-UA Client/Server",
+    "CAN Bus Communication",
+    "Serial Communication",
+    "Protocol Translation",
+    "Data Mapping",
+    "Real-time Polling"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "microservice",
+    "real_time"
+  ],
+  "incompatible_capabilities": []
+}

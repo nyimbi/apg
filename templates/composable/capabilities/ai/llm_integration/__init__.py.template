@@ -1,0 +1,25 @@
+"""
+LLM Integration Capability
+===================================
+
+Large Language Model integration with OpenAI, Anthropic, and local models
+
+Category: ai
+Version: 1.0.0
+Author: APG Team
+"""
+
+from .integration import integrate_llm_integration
+
+__version__ = "1.0.0"
+__capability_name__ = "LLM Integration"
+__category__ = "ai"
+
+# Capability metadata
+CAPABILITY_INFO = {
+    'name': 'LLM Integration',
+    'category': 'ai',
+    'version': '1.0.0',
+    'features': ['Text Generation', 'Chat Completion', 'Embeddings', 'Model Management'],
+    'author': 'APG Team'
+}

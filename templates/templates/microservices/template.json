@@ -1,0 +1,33 @@
+{
+  "name": "Microservices Architecture",
+  "description": "Distributed microservices with API gateway and service discovery",
+  "complexity": "Expert",
+  "features": [
+    "Service Mesh",
+    "API Gateway",
+    "Load Balancing",
+    "Health Monitoring"
+  ],
+  "use_cases": [
+    "Enterprise Applications",
+    "Scalable Systems",
+    "Cloud-Native Apps"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template",
+    "services/api_gateway.apg.template",
+    "services/user_service.apg.template",
+    "services/notification_service.apg.template",
+    "docker-compose.yml.template"
+  ]
+}

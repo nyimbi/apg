@@ -1,0 +1,25 @@
+"""
+Stripe Payments Capability
+===================================
+
+Stripe payment processing with webhooks
+
+Category: payments
+Version: 1.0.0
+Author: APG Team
+"""
+
+from .integration import integrate_stripe_payments
+
+__version__ = "1.0.0"
+__capability_name__ = "Stripe Payments"
+__category__ = "payments"
+
+# Capability metadata
+CAPABILITY_INFO = {
+    'name': 'Stripe Payments',
+    'category': 'payments',
+    'version': '1.0.0',
+    'features': ['Payment Processing', 'Subscription Management', 'Webhook Handling', 'Refunds'],
+    'author': 'APG Team'
+}

@@ -1,0 +1,73 @@
+{
+  "name": "Database Optimizer",
+  "category": "data",
+  "description": "Automated database query optimization and performance tuning",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "sqlparse>=0.4.4",
+    "pg_activity>=3.4.2",
+    "sqlalchemy>=2.0.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Database to optimize"
+    },
+    {
+      "name": "analytics/performance_monitor",
+      "version": null,
+      "optional": true,
+      "reason": "Performance metrics integration"
+    }
+  ],
+  "integration": {
+    "models": [
+      "QueryAnalysis",
+      "IndexRecommendation",
+      "SlowQuery",
+      "OptimizationReport"
+    ],
+    "views": [
+      "OptimizerView",
+      "QueryView",
+      "IndexView"
+    ],
+    "apis": [
+      "optimizer/analyze",
+      "optimizer/recommend",
+      "optimizer/apply"
+    ],
+    "templates": [
+      "db_optimizer_dashboard.html",
+      "query_analysis.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "QUERY_ANALYSIS_ENABLED": true,
+      "SLOW_QUERY_THRESHOLD": 1000,
+      "AUTO_INDEX_CREATION": false
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Query Performance Analysis",
+    "Index Recommendations",
+    "Query Plan Analysis",
+    "Slow Query Detection",
+    "Connection Pool Optimization",
+    "Schema Analysis",
+    "Automated Index Creation",
+    "Performance Regression Detection"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

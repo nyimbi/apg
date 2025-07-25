@@ -1,0 +1,62 @@
+"""
+Community Analytics Models
+==========================
+
+Database models for Community Analytics capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CommunityBaseModel(AuditMixin, Model):
+	"""Base model for community entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add community-specific models based on capability
+
+class UsageMetric(CommunityBaseModel):
+	"""Community usage metrics"""
+	__tablename__ = 'usage_metrics'
+	
+	id = Column(Integer, primary_key=True)
+	metric_type = Column(String(64), nullable=False)
+	capability_id = Column(String(256))
+	value = Column(Float, nullable=False)
+	timestamp = Column(DateTime, default=datetime.utcnow)
+	metadata = Column(JSON)
+
+
+class TrendAnalysis(CommunityBaseModel):
+	"""Trend analysis results"""
+	__tablename__ = 'trend_analysis'
+	
+	id = Column(Integer, primary_key=True)
+	analysis_type = Column(String(64))  # popularity, growth, adoption
+	time_period = Column(String(32))  # daily, weekly, monthly
+	trends = Column(JSON)
+	insights = Column(JSON)
+	generated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CommunityStats(CommunityBaseModel):
+	"""Community statistics"""
+	__tablename__ = 'community_stats'
+	
+	id = Column(Integer, primary_key=True)
+	stat_date = Column(DateTime, default=datetime.utcnow)
+	total_capabilities = Column(Integer)
+	active_authors = Column(Integer)
+	total_downloads = Column(Integer)
+	new_capabilities = Column(Integer)
+	avg_rating = Column(Float)
+	growth_rate = Column(Float)
+

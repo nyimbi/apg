@@ -1,0 +1,38 @@
+{
+  "name": "PostgreSQL Database",
+  "category": "data",
+  "description": "PostgreSQL database with SQLAlchemy integration",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "psycopg2-binary>=2.9.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "system_requirements": [
+    "PostgreSQL 12+"
+  ],
+  "dependencies": [],
+  "integration": {
+    "models": [],
+    "views": [],
+    "apis": [],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {
+      "SQLALCHEMY_DATABASE_URI": "postgresql://user:pass@localhost/db"
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Database Connectivity",
+    "Migrations",
+    "Connection Pooling"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

@@ -1,0 +1,123 @@
+"""
+Capability Marketplace Integration
+==================================
+
+Integration logic for the Capability Marketplace capability.
+Handles community contribution system functionality.
+"""
+
+import logging
+from flask import Blueprint
+from flask_appbuilder import BaseView
+
+# Configure logging
+log = logging.getLogger(__name__)
+
+# Create capability blueprint
+capability_marketplace_bp = Blueprint(
+	'capability_marketplace',
+	__name__,
+	url_prefix='/community/capability_marketplace',
+	template_folder='templates',
+	static_folder='static'
+)
+
+
+def integrate_capability_marketplace(app, appbuilder, db):
+	"""
+	Integrate Capability Marketplace capability into the application.
+	
+	Args:
+		app: Flask application instance
+		appbuilder: Flask-AppBuilder instance
+		db: SQLAlchemy database instance
+	"""
+	try:
+		# Register blueprint
+		app.register_blueprint(capability_marketplace_bp)
+		
+		# Import and register models
+		from .models import *  # noqa
+		
+		# Import and register views
+		from .views import *  # noqa
+		
+		# Initialize community service
+		community_service = CapabilityMarketplaceService(app, appbuilder, db)
+		app.extensions['capability_marketplace_service'] = community_service
+		
+		# Register views with AppBuilder
+		appbuilder.add_view(
+			CapabilityMarketplaceView,
+			"Capability Marketplace",
+			icon="fa-users",
+			category="Community",
+			category_icon="fa-heart"
+		)
+		
+		log.info(f"Successfully integrated Capability Marketplace capability")
+		
+	except Exception as e:
+		log.error(f"Failed to integrate Capability Marketplace capability: {e}")
+		raise
+
+
+class CapabilityMarketplaceService:
+	"""
+	Main service class for Capability Marketplace.
+	
+	Handles community contribution system operations.
+	"""
+	
+	def __init__(self, app, appbuilder, db):
+		self.app = app
+		self.appbuilder = appbuilder
+		self.db = db
+		self.initialize_service()
+	
+	def initialize_service(self):
+		"""Initialize community service"""
+		log.info(f"Initializing Capability Marketplace service")
+		
+		try:
+			# Setup community components
+			self.setup_community_features()
+			
+			# Initialize monitoring
+			self.setup_monitoring()
+			
+		except Exception as e:
+			log.error(f"Error initializing community service: {e}")
+	
+	def setup_community_features(self):
+		"""Setup community-specific features"""
+		# Community feature setup logic
+		pass
+	
+	def setup_monitoring(self):
+		"""Setup community monitoring"""
+		# Monitoring setup logic
+		pass
+	
+	def process_contribution(self, contribution_data):
+		"""Process community contribution"""
+		# Contribution processing logic
+		return {"status": "processed", "contribution_id": None}
+
+
+class CapabilityMarketplaceView(BaseView):
+	"""
+	Main view for Capability Marketplace capability.
+	"""
+	
+	route_base = "/capability_marketplace"
+	
+	@expose("/")
+	def index(self):
+		"""Main community dashboard view"""
+		return self.render_template("capability_marketplace_dashboard.html")
+	
+	@expose("/contribute")
+	def contribute(self):
+		"""Community contribution view"""
+		return self.render_template("capability_marketplace_contribute.html")

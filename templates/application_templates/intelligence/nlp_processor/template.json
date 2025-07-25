@@ -1,0 +1,43 @@
+{
+  "template_id": "intelligence/nlp_processor",
+  "name": "NLP Processing Pipeline",
+  "description": "Complete natural language processing pipeline",
+  "complexity": "Advanced",
+  "domain": "Natural Language Processing",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "NLPAgent",
+    "TextAnalyzer",
+    "SentimentAnalyzer"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Text Processing",
+    "Sentiment Analysis",
+    "Entity Recognition"
+  ],
+  "databases": [
+    "text_corpus",
+    "processing_results",
+    "models"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

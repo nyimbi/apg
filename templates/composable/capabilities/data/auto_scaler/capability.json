@@ -1,0 +1,73 @@
+{
+  "name": "Auto Scaler",
+  "category": "data",
+  "description": "Automatic horizontal and vertical scaling based on performance metrics",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "kubernetes>=27.2.0",
+    "docker>=6.1.0",
+    "boto3>=1.28.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "analytics/performance_monitor",
+      "version": null,
+      "optional": false,
+      "reason": "Scaling metrics"
+    },
+    {
+      "name": "data/kubernetes_orchestration",
+      "version": null,
+      "optional": true,
+      "reason": "Container orchestration"
+    }
+  ],
+  "integration": {
+    "models": [
+      "ScalingPolicy",
+      "ScalingEvent",
+      "MetricTarget",
+      "ScalingHistory"
+    ],
+    "views": [
+      "ScalerView",
+      "PolicyView",
+      "EventView"
+    ],
+    "apis": [
+      "scaler/policy",
+      "scaler/scale",
+      "scaler/history"
+    ],
+    "templates": [
+      "auto_scaler_dashboard.html",
+      "scaling_history.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "SCALING_ENABLED": true,
+      "MIN_REPLICAS": 1,
+      "MAX_REPLICAS": 10,
+      "TARGET_CPU_UTILIZATION": 70
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Horizontal Pod Autoscaling",
+    "Vertical Pod Autoscaling",
+    "Custom Metrics Scaling",
+    "Predictive Scaling",
+    "Cost-aware Scaling",
+    "Multi-cloud Scaling",
+    "Scaling History",
+    "Performance-based Triggers"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

@@ -1,0 +1,266 @@
+module {{project_name}} version {{version}} {
+	description: "{{project_description}}";
+	author: "{{author}}";
+	license: "{{license}}";
+}
+
+agent ProductCatalogAgent {
+	products: list[dict] = [];
+	categories: list[dict] = [];
+	total_products: int = 0;
+	
+	add_product: (name: str, description: str, price: float, category_id: int) -> dict = {
+		product = {
+			"id": total_products + 1,
+			"name": name,
+			"description": description,
+			"price": price,
+			"category_id": category_id,
+			"stock": 0,
+			"active": true,
+			"created_at": now()
+		};
+		
+		products.append(product);
+		total_products = total_products + 1;
+		
+		return product;
+	};
+	
+	update_stock: (product_id: int, quantity: int) -> bool = {
+		for (product in products) {
+			if (product["id"] == product_id) {
+				product["stock"] = quantity;
+				product["updated_at"] = now();
+				return true;
+			}
+		}
+		return false;
+	};
+	
+	search_products: (query: str, category_id: int) -> list[dict] = {
+		results = [];
+		
+		for (product in products) {
+			if (product["active"]) {
+				// Simple text search
+				if (query == "" or query in product["name"] or query in product["description"]) {
+					if (category_id == 0 or product["category_id"] == category_id) {
+						results.append(product);
+					}
+				}
+			}
+		}
+		
+		return results;
+	};
+}
+
+agent ShoppingCartAgent {
+	carts: dict = {}; // user_id -> cart
+	
+	add_to_cart: (user_id: int, product_id: int, quantity: int) -> dict = {
+		if (user_id not in carts) {
+			carts[user_id] = {
+				"items": [],
+				"total": 0.0,
+				"created_at": now()
+			};
+		}
+		
+		cart = carts[user_id];
+		
+		// Check if item already exists
+		for (item in cart["items"]) {
+			if (item["product_id"] == product_id) {
+				item["quantity"] = item["quantity"] + quantity;
+				return cart;
+			}
+		}
+		
+		// Add new item
+		item = {
+			"product_id": product_id,
+			"quantity": quantity,
+			"added_at": now()
+		};
+		
+		cart["items"].append(item);
+		cart["updated_at"] = now();
+		
+		return cart;
+	};
+	
+	remove_from_cart: (user_id: int, product_id: int) -> bool = {
+		if (user_id in carts) {
+			cart = carts[user_id];
+			cart["items"] = [item for item in cart["items"] if item["product_id"] != product_id];
+			cart["updated_at"] = now();
+			return true;
+		}
+		return false;
+	};
+	
+	get_cart: (user_id: int) -> dict = {
+		return carts.get(user_id, {"items": [], "total": 0.0});
+	};
+}
+
+agent OrderProcessingAgent {
+	orders: list[dict] = [];
+	order_counter: int = 0;
+	
+	create_order: (user_id: int, cart_items: list[dict], shipping_address: dict) -> dict = {
+		order = {
+			"id": order_counter + 1,
+			"user_id": user_id,
+			"items": cart_items,
+			"shipping_address": shipping_address,
+			"status": "pending",
+			"total_amount": 0.0,
+			"created_at": now(),
+			"estimated_delivery": null
+		};
+		
+		// Calculate total
+		total = 0.0;
+		for (item in cart_items) {
+			total = total + (item["price"] * item["quantity"]);
+		}
+		order["total_amount"] = total;
+		
+		orders.append(order);
+		order_counter = order_counter + 1;
+		
+		return order;
+	};
+	
+	update_order_status: (order_id: int, status: str) -> bool = {
+		for (order in orders) {
+			if (order["id"] == order_id) {
+				order["status"] = status;
+				order["updated_at"] = now();
+				
+				if (status == "shipped") {
+					order["shipped_at"] = now();
+				} else if (status == "delivered") {
+					order["delivered_at"] = now();
+				}
+				
+				return true;
+			}
+		}
+		return false;
+	};
+	
+	get_order_history: (user_id: int) -> list[dict] = {
+		user_orders = [];
+		for (order in orders) {
+			if (order["user_id"] == user_id) {
+				user_orders.append(order);
+			}
+		}
+		return user_orders;
+	};
+}
+
+db ECommerceDatabase {
+	url: "postgresql://localhost:5432/{{project_name}}";
+	
+	schema ecommerce_schema {
+		table categories {
+			id serial [pk]
+			name varchar(100) [not null]
+			description text
+			parent_id int [ref: > categories.id]
+			active bool [default: true]
+			created_at timestamp [default: now()]
+		}
+		
+		table products {
+			id serial [pk]
+			name varchar(200) [not null]
+			description text
+			price decimal(10,2) [not null]
+			category_id int [ref: > categories.id]
+			stock int [default: 0]
+			sku varchar(50) [unique]
+			weight decimal(8,2)
+			dimensions varchar(50)
+			active bool [default: true]
+			created_at timestamp [default: now()]
+			updated_at timestamp [default: now()]
+			
+			indexes {
+				(category_id)
+				(sku) [unique]
+				(active)
+				(price)
+			}
+		}
+		
+		table customers {
+			id serial [pk]
+			email varchar(255) [unique, not null]
+			password_hash varchar(255) [not null]
+			first_name varchar(100)
+			last_name varchar(100)
+			phone varchar(20)
+			created_at timestamp [default: now()]
+			last_login timestamp
+		}
+		
+		table addresses {
+			id serial [pk]
+			customer_id int [ref: > customers.id]
+			type varchar(20) [note: "billing, shipping"]
+			street_address varchar(255) [not null]
+			city varchar(100) [not null]
+			state varchar(100)
+			postal_code varchar(20)
+			country varchar(100) [not null]
+			is_default bool [default: false]
+		}
+		
+		table orders {
+			id serial [pk]
+			customer_id int [ref: > customers.id]
+			status varchar(20) [default: "pending"]
+			total_amount decimal(10,2) [not null]
+			shipping_address_id int [ref: > addresses.id]
+			billing_address_id int [ref: > addresses.id]
+			payment_method varchar(50)
+			payment_status varchar(20) [default: "pending"]
+			created_at timestamp [default: now()]
+			shipped_at timestamp
+			delivered_at timestamp
+			
+			indexes {
+				(customer_id)
+				(status)
+				(created_at)
+			}
+		}
+		
+		table order_items {
+			id serial [pk]
+			order_id int [ref: > orders.id]
+			product_id int [ref: > products.id]
+			quantity int [not null]
+			unit_price decimal(10,2) [not null]
+			total_price decimal(10,2) [not null]
+		}
+		
+		{% if enable_inventory %}
+		table inventory_transactions {
+			id serial [pk]
+			product_id int [ref: > products.id]
+			type varchar(20) [note: "in, out, adjustment"]
+			quantity int [not null]
+			reference_id int [note: "order_id or other reference"]
+			notes text
+			created_at timestamp [default: now()]
+		}
+		{% endif %}
+	}
+}

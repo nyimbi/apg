@@ -1,0 +1,16 @@
+# APG Generated Requirements - Real-Time Application
+# Base template requirements
+Flask-SocketIO>=5.0.0
+eventlet>=0.33.0
+
+# Capability-specific requirements
+{% for capability in capabilities %}
+# Requirements for {{capability}} capability
+{% include 'capabilities/' + capability + '/requirements.txt' ignore missing %}
+{% endfor %}
+
+# Development dependencies (optional)
+pytest>=7.4.0
+pytest-flask>=1.2.0
+black>=23.7.0
+flake8>=6.0.0

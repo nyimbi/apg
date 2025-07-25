@@ -1,0 +1,70 @@
+{
+  "name": "Device Management",
+  "category": "iot",
+  "description": "Comprehensive IoT device lifecycle management",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "requests>=2.31.0",
+    "cryptography>=41.0.0",
+    "schedule>=1.2.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store device information and configurations"
+    },
+    {
+      "name": "auth/basic_authentication",
+      "version": null,
+      "optional": false,
+      "reason": "Secure device management access"
+    }
+  ],
+  "integration": {
+    "models": [
+      "IoTDevice",
+      "DeviceType",
+      "DeviceGroup",
+      "FirmwareVersion",
+      "DeviceConfig"
+    ],
+    "views": [
+      "DeviceManagementView",
+      "DeviceGroupView",
+      "FirmwareView"
+    ],
+    "apis": [
+      "devices/register",
+      "devices/provision",
+      "devices/update",
+      "devices/control"
+    ],
+    "templates": [
+      "device_dashboard.html",
+      "device_detail.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Device Registration",
+    "Device Provisioning",
+    "Firmware Updates",
+    "Configuration Management",
+    "Device Health Monitoring",
+    "Remote Control",
+    "Device Groups"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard",
+    "microservice"
+  ],
+  "incompatible_capabilities": []
+}

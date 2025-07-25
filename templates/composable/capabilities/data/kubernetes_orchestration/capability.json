@@ -1,0 +1,81 @@
+{
+  "name": "Kubernetes Orchestration",
+  "category": "data",
+  "description": "Kubernetes cluster management and application deployment",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "kubernetes>=27.2.0",
+    "pyyaml>=6.0",
+    "jinja2>=3.1.0",
+    "helm>=3.12.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/aws_integration",
+      "version": null,
+      "optional": true,
+      "reason": "EKS support"
+    },
+    {
+      "name": "data/azure_integration",
+      "version": null,
+      "optional": true,
+      "reason": "AKS support"
+    },
+    {
+      "name": "data/gcp_integration",
+      "version": null,
+      "optional": true,
+      "reason": "GKE support"
+    }
+  ],
+  "integration": {
+    "models": [
+      "KubernetesCluster",
+      "Pod",
+      "Service",
+      "Deployment",
+      "ConfigMap"
+    ],
+    "views": [
+      "KubernetesView",
+      "PodView",
+      "ServiceView"
+    ],
+    "apis": [
+      "k8s/clusters",
+      "k8s/pods",
+      "k8s/services",
+      "k8s/deploy"
+    ],
+    "templates": [
+      "k8s_dashboard.html",
+      "pod_logs.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "KUBECONFIG": "/etc/kubernetes/config",
+      "K8S_NAMESPACE": "default",
+      "HELM_CHARTS_REPO": "https://charts.helm.sh/stable"
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Cluster Management",
+    "Pod Orchestration",
+    "Service Discovery",
+    "ConfigMap Management",
+    "Secret Management",
+    "Ingress Configuration",
+    "Helm Chart Deployment",
+    "Auto-scaling"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

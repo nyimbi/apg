@@ -1,0 +1,50 @@
+"""
+Digital Twin Models
+===================
+
+Database models for Digital Twin capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class IoTBaseModel(AuditMixin, Model):
+    """Base model for IoT entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    active = Column(Boolean, default=True)
+
+
+# Add IoT-specific models based on capability
+
+class DigitalTwin(IoTBaseModel):
+    """Digital twin model"""
+    __tablename__ = 'digital_twins'
+    
+    id = Column(Integer, primary_key=True)
+    twin_id = Column(String(128), unique=True, nullable=False)
+    name = Column(String(256), nullable=False)
+    description = Column(Text)
+    model_version = Column(String(32))
+    last_sync = Column(DateTime)
+    
+    states = relationship("TwinState", back_populates="twin")
+
+
+class TwinState(IoTBaseModel):
+    """Digital twin state snapshot"""
+    __tablename__ = 'twin_states'
+    
+    id = Column(Integer, primary_key=True)
+    twin_id = Column(Integer, ForeignKey('digital_twins.id'))
+    state_data = Column(Text)  # JSON data
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    twin = relationship("DigitalTwin", back_populates="states")
+

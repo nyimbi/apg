@@ -1,0 +1,25 @@
+"""
+Inventory Management Capability
+========================================
+
+Inventory tracking and management system
+
+Category: business
+Version: 1.0.0
+Author: APG Team
+"""
+
+from .integration import integrate_inventory_management
+
+__version__ = "1.0.0"
+__capability_name__ = "Inventory Management"
+__category__ = "business"
+
+# Capability metadata
+CAPABILITY_INFO = {
+    'name': 'Inventory Management',
+    'category': 'business',
+    'version': '1.0.0',
+    'features': ['Stock Tracking', 'Low Stock Alerts', 'Inventory Reports', 'Supplier Management'],
+    'author': 'APG Team'
+}

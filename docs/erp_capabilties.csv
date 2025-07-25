@@ -1,0 +1,79 @@
+Category,Module,Description,Industry Focus
+Core Financials,General Ledger (GL),"Central repository for all financial transactions, providing a complete financial picture.",All
+,Accounts Payable (AP),"Manages vendor invoices, payments, and expenses, optimizing cash outflow.",All
+,Accounts Receivable (AR),"Manages customer invoices, payments, and collections, accelerating cash inflow.",All
+,Cash Management,"Tracks cash flow, bank reconciliations, and liquidity, ensuring financial stability.",All
+,Fixed Asset Management,"Manages the lifecycle of company assets (acquisition, depreciation, disposal, maintenance).",All
+,Budgeting & Forecasting,"Tools for financial planning, creating budgets, and predicting future financial performance.",All
+,Financial Reporting,"Generates comprehensive financial statements (Income Statement, Balance Sheet, Cash Flow) and other analytical reports.",All
+,Cost Accounting,"Tracks and analyzes costs associated with products, services, and operations for better profitability insights.",All
+Human Resources (HR),Payroll,"Processes employee salaries, wages, deductions, and taxes accurately and compliantly.",All
+,Time & Attendance,"Tracks employee work hours, overtime, and absenteeism for accurate payroll and resource planning.",All
+,Employee Data Management,"Centralized database for employee information (personal, employment history, skills, certifications).",All
+,Recruitment & Onboarding,"Manages the hiring process from job posting, applicant tracking, to new hire integration and documentation.",All
+,Performance Management,"Tracks employee goals, conducts performance reviews, and manages appraisals for talent development.",All
+,Benefits Administration,"Manages employee benefits plans (health, retirement, leave, etc.).",All
+,Learning & Development (L&D),"Manages training programs, certifications, and skill development for workforce enhancement.",All
+Procurement / Purchasing,Requisitioning,Employees formally request goods or services required for operations.,All
+,Purchase Order (PO) Management,"Creates, tracks, and manages purchase orders with vendors, ensuring efficient sourcing.",All
+,Vendor Management,"Maintains vendor information, performance, and relationship history.",All
+,Sourcing & Supplier Selection,"Helps identify, evaluate, and select suppliers based on various criteria (cost, quality, reliability).",All
+,Contract Management,"Manages vendor contracts, terms, and compliance, ensuring adherence to agreements.",All
+Inventory Management,Stock Tracking & Control,"Monitors inventory levels, locations, and movements in real-time.","All (esp. Mfg, Pharma, Retail)"
+,Replenishment & Reordering,Automates or assists in reordering stock based on demand forecasts and minimum levels.,"All (esp. Mfg, Pharma, Retail)"
+,Batch & Lot Tracking,"Manages specific batches or lots of products for traceability, crucial for recalls and quality control.","Mfg, Pharma, Food & Bev"
+,Expiry Date Management,Tracks product expiration dates to minimize waste and ensure product freshness/safety.,"Pharma, Food & Bev, Retail"
+Sales & Order Management,Order Entry,Records customer orders accurately and efficiently.,All
+,Order Processing,"Manages the workflow from order receipt, fulfillment, to invoicing.",All
+,Pricing & Discounts,"Manages product/service pricing, special offers, and discount structures.",All
+,Quotations,Generates and manages price quotes for customers.,All
+,Sales Forecasting,"Predicts future sales based on historical data, market trends, and seasonal variations.",All
+Manufacturing,Production Planning,"Schedules and plans manufacturing activities, optimizing resource utilization.",Manufacturing
+,Material Requirements Planning (MRP),Calculates the exact materials and components needed for production based on the master schedule.,Manufacturing
+,Shop Floor Control,"Monitors and manages activities on the production floor, including work orders, machine status, and labor tracking.",Manufacturing
+,Bill of Materials (BOM) Management,"Manages structured lists of raw materials, assemblies, and components required for each product.",Manufacturing
+,Capacity Planning,"Determines the production capacity needed to meet demand, considering machines, labor, and shifts.",Manufacturing
+,Quality Management (QA/QC),"Ensures products meet quality standards through inspections, testing, non-conformance management, and corrective actions.","Manufacturing, Pharma"
+,Recipe & Formula Management,"Manages precise recipes and formulas for process manufacturing, ensuring consistency and regulatory compliance.","Pharma, Food & Bev"
+,Manufacturing Execution System (MES),"Real-time monitoring and control of manufacturing operations, bridging planning and execution.",Manufacturing
+Supply Chain Management,Demand Planning,Forecasts customer demand for products to optimize inventory and production.,All
+,Logistics & Transportation Management,"Plans and optimizes the movement of goods, including freight, routes, and carriers.",All
+,Warehouse Management System (WMS),"Manages warehouse operations: receiving, putaway, picking, packing, shipping, and inventory accuracy.",All
+,Supplier Relationship Management (SRM),"Manages all aspects of interactions with suppliers, fostering collaboration and performance.",All
+Service Specific,Project Management,"Plans, tracks, and manages projects from initiation to completion, including tasks, timelines, and resources.","Service, Consulting"
+,Resource Scheduling,Optimizes the allocation and scheduling of human and equipment resources for projects and tasks.,"Service, Consulting"
+,Time & Expense Tracking,Records and tracks billable and non-billable time and expenses for projects and client invoicing.,"Service, Consulting"
+,Service Contract Management,"Manages service agreements, warranties, and recurring service schedules.","Service, Field Svc"
+,Field Service Management,"Manages mobile workforce, dispatching technicians, tracking service calls, and managing parts/equipment in the field.","Service, Field Svc"
+,Professional Services Automation (PSA),"Integrated suite for professional service firms covering project management, time/expense, billing, and resource management.","Service, Consulting"
+Pharmaceutical Specific,Regulatory Compliance,"Manages adherence to industry-specific regulations (e.g., FDA, GMP, GxP), including documentation, audits, and reporting.",Pharmaceutical
+,Product Serialization & Tracking,"Assigns unique identifiers to products for end-to-end traceability, crucial for anti-counterfeiting and recalls.",Pharmaceutical
+,Clinical Trials Management,"Manages the phases, data, and documentation of clinical trials.",Pharmaceutical
+,R&D Management,"Manages research and development projects, formulations, intellectual property, and experimental data.",Pharmaceutical
+,Batch Release Management,"Manages the process of reviewing and approving pharmaceutical product batches for release, ensuring compliance and quality.",Pharmaceutical
+Mining Specific,Mine Planning & Optimization,"Tools for geological modeling, resource estimation, pit/underground design, and mine scheduling to optimize extraction.",Mining
+,Equipment & Fleet Management,"Tracks, maintains, and optimizes heavy equipment and vehicle fleets, including maintenance schedules and fuel consumption.","Mining, Construction"
+,Grade Control & Blending,"Manages the quality of extracted ore, ensuring optimal blending to meet processing requirements.",Mining
+,Tenement Management System (TMS),"Manages mining leases, licenses, permits, and associated compliance obligations and reporting.",Mining
+,Weighbridge Integration,"Integrates with weighbridges to accurately record and track material movements (ore, waste, supplies).",Mining
+,Production Reporting,"Generates specific reports on extracted tonnage, grades, equipment utilization, and operational efficiency.",Mining
+Platform Services (E-commerce & Marketplaces),Digital Storefront Management,"Manages the front-end user experience, product display, branding, and content of an e-commerce site or marketplace.","E-commerce, Marketplaces"
+,Product Catalog Management,"Centralized management of product information (SKUs, descriptions, images, pricing) across multiple channels/sellers.","E-commerce, Marketplaces"
+,Customer User Accounts,"Manages customer profiles, purchase history, preferences, and communication for personalized experiences.","E-commerce, Marketplaces"
+,Payment Gateway Integration,Connects to various payment processors to handle secure online transactions and multiple payment methods.,"E-commerce, Marketplaces"
+,Seller/Vendor Management,"Onboarding, management, and performance tracking of third-party sellers/vendors on a marketplace.",Marketplaces
+,Commission Management,"Calculates and tracks commissions for marketplace transactions, ensuring accurate payouts to the platform and sellers.",Marketplaces
+,Multi-Vendor Order Fulfillment,Coordinates and tracks orders that involve multiple sellers/vendors and diverse fulfillment processes.,Marketplaces
+,Ratings & Reviews Management,"Collects, moderates, and displays customer ratings and reviews for products and sellers.","E-commerce, Marketplaces"
+,Dispute Resolution,"Manages conflicts, returns, and refunds between buyers and sellers on a platform.",Marketplaces
+,Search & Discovery Optimization,"Enhances search functionality, recommendations, and filtering to improve product/service discoverability.","E-commerce, Marketplaces"
+,Advertising & Promotion Mgmt.,"Manages internal platform advertising (e.g., sponsored listings) and promotional campaigns.","E-commerce, Marketplaces"
+General Cross-Functional,Customer Relationship Management (CRM),"Manages customer interactions, sales pipeline, marketing campaigns, and customer service.",All
+,Business Intelligence (BI) / Analytics,"Provides real-time insights through customizable reports, dashboards, and data analysis for informed decision-making.",All
+,Enterprise Asset Management (EAM),"Manages the entire lifecycle of physical assets (maintenance, repair, operations, and asset performance).","All (heavy in Mfg, Mining)"
+,Product Lifecycle Management (PLM),"Manages a product's entire lifecycle from conception, design, and manufacturing to service and disposal.","Mfg, Pharma"
+,E-commerce (B2B/B2C),"Integrates online sales channels with back-end inventory, order, and financial management (for single-party operations).","Retail, Wholesale"
+,Document Management,"Manages and stores electronic documents, ensuring version control, security, and accessibility.",All
+,Workflow Management / Business Process Mgmt (BPM),Automates and optimizes business processes for efficiency and standardization.,All
+,"Governance, Risk, & Compliance (GRC)","Identifies, assesses, and mitigates business risks, and ensures compliance with internal policies and external regulations.",All
+,Environmental Health & Safety (EHS),"Manages safety protocols, incident reporting, environmental impact, and compliance with regulations.","All (esp. Mining, Mfg, Pharma)"

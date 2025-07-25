@@ -1,0 +1,64 @@
+{
+  "name": "Capability Documentation",
+  "category": "business",
+  "description": "Automated documentation generation and hosting for capabilities",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "sphinx>=7.1.0",
+    "mkdocs>=1.5.0",
+    "jinja2>=3.1.0",
+    "markdown>=3.4.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store documentation metadata"
+    }
+  ],
+  "integration": {
+    "models": [
+      "DocumentationProject",
+      "DocPage",
+      "Example",
+      "Tutorial"
+    ],
+    "views": [
+      "DocumentationView",
+      "ExampleView",
+      "TutorialView"
+    ],
+    "apis": [
+      "docs/generate",
+      "docs/publish",
+      "docs/search"
+    ],
+    "templates": [
+      "docs_dashboard.html",
+      "doc_viewer.html",
+      "tutorial_player.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Auto-generated Documentation",
+    "API Documentation",
+    "Usage Examples",
+    "Integration Guides",
+    "Video Tutorials",
+    "Interactive Examples",
+    "Multi-format Export",
+    "Version History"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

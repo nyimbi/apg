@@ -1,0 +1,79 @@
+{
+  "name": "Serverless Computing",
+  "category": "data",
+  "description": "Serverless function deployment and management across cloud providers",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "serverless-framework>=3.33.0",
+    "chalice>=1.29.0",
+    "zappa>=0.57.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/aws_integration",
+      "version": null,
+      "optional": true,
+      "reason": "AWS Lambda support"
+    },
+    {
+      "name": "data/azure_integration",
+      "version": null,
+      "optional": true,
+      "reason": "Azure Functions support"
+    },
+    {
+      "name": "data/gcp_integration",
+      "version": null,
+      "optional": true,
+      "reason": "Cloud Functions support"
+    }
+  ],
+  "integration": {
+    "models": [
+      "ServerlessFunction",
+      "FunctionDeployment",
+      "EventTrigger",
+      "FunctionMetrics"
+    ],
+    "views": [
+      "ServerlessView",
+      "FunctionView",
+      "MetricsView"
+    ],
+    "apis": [
+      "serverless/deploy",
+      "serverless/invoke",
+      "serverless/metrics"
+    ],
+    "templates": [
+      "serverless_dashboard.html",
+      "function_editor.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "SERVERLESS_STAGE": "dev",
+      "SERVERLESS_REGION": "us-east-1",
+      "FUNCTION_TIMEOUT": 300,
+      "FUNCTION_MEMORY": 128
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Function-as-a-Service Deployment",
+    "Event-driven Architecture",
+    "Auto-scaling Functions",
+    "Cold Start Optimization",
+    "API Gateway Integration",
+    "Function Monitoring",
+    "Cost Optimization",
+    "Multi-provider Support"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

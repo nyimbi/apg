@@ -1,0 +1,69 @@
+{
+  "name": "Cache Optimizer",
+  "category": "data",
+  "description": "Intelligent caching strategies and cache performance optimization",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "redis>=4.6.0",
+    "memcached>=1.62",
+    "cachetools>=5.3.1",
+    "pymemcache>=4.0.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Cache metadata storage"
+    }
+  ],
+  "integration": {
+    "models": [
+      "CacheInstance",
+      "CacheMetrics",
+      "CachePolicy",
+      "CacheInvalidation"
+    ],
+    "views": [
+      "CacheView",
+      "MetricsView",
+      "PolicyView"
+    ],
+    "apis": [
+      "cache/stats",
+      "cache/invalidate",
+      "cache/optimize"
+    ],
+    "templates": [
+      "cache_dashboard.html",
+      "cache_metrics.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "CACHE_TYPE": "redis",
+      "CACHE_REDIS_URL": "redis://localhost:6379/0",
+      "CACHE_DEFAULT_TIMEOUT": 300,
+      "CACHE_KEY_PREFIX": "apg:"
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Multi-level Caching",
+    "Cache Hit Rate Analysis",
+    "Eviction Policy Optimization",
+    "Cache Warming",
+    "Distributed Cache Management",
+    "Cache Invalidation Strategies",
+    "Memory Usage Optimization",
+    "Performance Benchmarking"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

@@ -1,0 +1,40 @@
+{
+  "name": "Inventory Management",
+  "category": "business",
+  "description": "Inventory tracking and management system",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [],
+  "system_requirements": [],
+  "dependencies": [],
+  "integration": {
+    "models": [
+      "Product",
+      "Inventory",
+      "Supplier",
+      "StockMovement"
+    ],
+    "views": [
+      "InventoryView",
+      "ProductView",
+      "SupplierView"
+    ],
+    "apis": [],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Stock Tracking",
+    "Low Stock Alerts",
+    "Inventory Reports",
+    "Supplier Management"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

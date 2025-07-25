@@ -1,0 +1,3 @@
+[submodule "fab"]
+	path = fab
+	url = https://github.com/nyimbi/Flask-AppBuilder.git

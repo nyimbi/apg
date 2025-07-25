@@ -1,0 +1,65 @@
+{
+  "name": "Data Warehouse",
+  "category": "analytics",
+  "description": "Data warehousing with ETL pipelines and dimensional modeling",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.11.0",
+    "apache-airflow>=2.6.0",
+    "great-expectations>=0.17.0",
+    "dbt-core>=1.5.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Primary data storage"
+    }
+  ],
+  "integration": {
+    "models": [
+      "DataSource",
+      "ETLJob",
+      "DimensionTable",
+      "FactTable",
+      "DataQualityCheck"
+    ],
+    "views": [
+      "ETLView",
+      "DataQualityView",
+      "LineageView"
+    ],
+    "apis": [
+      "etl/run",
+      "etl/status",
+      "warehouse/query"
+    ],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {
+      "AIRFLOW_HOME": "/opt/airflow",
+      "DBT_PROFILES_DIR": "/opt/dbt"
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "ETL Pipeline Management",
+    "Dimensional Modeling",
+    "Data Quality Checks",
+    "Incremental Loading",
+    "Change Data Capture",
+    "Data Lineage Tracking",
+    "Automated Documentation",
+    "Performance Optimization"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

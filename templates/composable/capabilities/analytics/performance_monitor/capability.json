@@ -1,0 +1,75 @@
+{
+  "name": "Performance Monitor",
+  "category": "analytics",
+  "description": "Comprehensive application performance monitoring with alerts and dashboards",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "prometheus-client>=0.17.1",
+    "psutil>=5.9.5",
+    "py-cpuinfo>=9.0.0",
+    "GPUtil>=1.4.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store performance metrics"
+    },
+    {
+      "name": "communication/websocket_communication",
+      "version": null,
+      "optional": true,
+      "reason": "Real-time metric updates"
+    }
+  ],
+  "integration": {
+    "models": [
+      "PerformanceMetric",
+      "Alert",
+      "SLADefinition",
+      "MetricThreshold"
+    ],
+    "views": [
+      "MonitorView",
+      "AlertView",
+      "SLAView"
+    ],
+    "apis": [
+      "monitor/metrics",
+      "monitor/alerts",
+      "monitor/sla"
+    ],
+    "templates": [
+      "performance_dashboard.html",
+      "metrics_charts.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "MONITORING_ENABLED": true,
+      "METRIC_RETENTION_DAYS": 30,
+      "ALERT_COOLDOWN_MINUTES": 5
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Real-time Metrics Collection",
+    "Custom Metrics Definition",
+    "Performance Alerts",
+    "SLA Monitoring",
+    "Resource Utilization Tracking",
+    "Database Performance",
+    "API Response Times",
+    "Error Rate Monitoring"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

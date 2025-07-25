@@ -1,0 +1,29 @@
+{
+  "name": "FinTech Platform",
+  "description": "Financial services platform with transactions and compliance",
+  "complexity": "Expert",
+  "features": [
+    "Transaction Processing",
+    "Compliance Tools",
+    "Risk Management",
+    "Reporting"
+  ],
+  "use_cases": [
+    "Digital Banking",
+    "Payment Processing",
+    "Financial Services"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

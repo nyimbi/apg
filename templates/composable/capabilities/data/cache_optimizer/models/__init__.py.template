@@ -1,0 +1,79 @@
+"""
+Cache Optimizer Models
+======================
+
+Database models for Cache Optimizer capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class PerformanceBaseModel(AuditMixin, Model):
+	"""Base model for performance entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add performance-specific models based on capability
+
+class CacheInstance(PerformanceBaseModel):
+	"""Cache instance configuration"""
+	__tablename__ = 'cache_instances'
+	
+	id = Column(Integer, primary_key=True)
+	instance_name = Column(String(128), nullable=False)
+	cache_type = Column(String(32))  # redis, memcached, in-memory
+	host = Column(String(256))
+	port = Column(Integer)
+	max_memory = Column(Integer)
+	eviction_policy = Column(String(32))
+	status = Column(String(32), default='active')
+
+
+class CacheMetrics(PerformanceBaseModel):
+	"""Cache performance metrics"""
+	__tablename__ = 'cache_metrics'
+	
+	id = Column(Integer, primary_key=True)
+	instance_id = Column(Integer, ForeignKey('cache_instances.id'))
+	hit_rate = Column(Float)
+	miss_rate = Column(Float)
+	eviction_rate = Column(Float)
+	memory_usage = Column(Float)
+	total_operations = Column(Integer)
+	timestamp = Column(DateTime, default=datetime.utcnow)
+	
+	instance = relationship("CacheInstance")
+
+
+class CachePolicy(PerformanceBaseModel):
+	"""Cache policies and configurations"""
+	__tablename__ = 'cache_policies'
+	
+	id = Column(Integer, primary_key=True)
+	policy_name = Column(String(128), nullable=False)
+	cache_pattern = Column(String(256))  # key pattern
+	ttl = Column(Integer)  # time to live in seconds
+	max_size = Column(Integer)
+	compression = Column(Boolean, default=False)
+	enabled = Column(Boolean, default=True)
+
+
+class CacheInvalidation(PerformanceBaseModel):
+	"""Cache invalidation tracking"""
+	__tablename__ = 'cache_invalidations'
+	
+	id = Column(Integer, primary_key=True)
+	cache_key = Column(String(512), nullable=False)
+	invalidation_reason = Column(String(128))
+	invalidated_at = Column(DateTime, default=datetime.utcnow)
+	invalidated_by = Column(String(128))
+	affected_operations = Column(Integer)
+

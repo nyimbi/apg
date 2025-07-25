@@ -1,0 +1,49 @@
+{
+  "template_id": "iot/fleet_management",
+  "name": "Fleet Management System",
+  "description": "Vehicle fleet tracking and management platform",
+  "complexity": "Advanced",
+  "domain": "Fleet Management",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "VehicleAgent",
+    "RoutingAgent",
+    "MaintenanceAgent",
+    "FuelAgent"
+  ],
+  "digital_twins": [
+    "VehicleTwin",
+    "FleetTwin"
+  ],
+  "features": [
+    "GPS Tracking",
+    "Route Optimization",
+    "Maintenance Scheduling",
+    "Fuel Management"
+  ],
+  "databases": [
+    "vehicles",
+    "routes",
+    "maintenance",
+    "fuel_data"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

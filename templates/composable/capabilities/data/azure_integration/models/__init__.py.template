@@ -1,0 +1,61 @@
+"""
+Azure Integration Models
+========================
+
+Database models for Azure Integration capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CloudBaseModel(AuditMixin, Model):
+	"""Base model for cloud entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add cloud-specific models based on capability
+
+class AzureResource(CloudBaseModel):
+	"""Azure resource model"""
+	__tablename__ = 'azure_resources'
+	
+	id = Column(Integer, primary_key=True)
+	resource_id = Column(String(256), unique=True, nullable=False)
+	resource_type = Column(String(64), nullable=False)
+	name = Column(String(256))
+	resource_group = Column(String(128))
+	location = Column(String(64))
+	status = Column(String(32), default='pending')
+	tags = Column(JSON)
+
+
+class BlobContainer(CloudBaseModel):
+	"""Azure Blob container model"""
+	__tablename__ = 'azure_blob_containers'
+	
+	id = Column(Integer, primary_key=True)
+	container_name = Column(String(256), unique=True, nullable=False)
+	storage_account = Column(String(128))
+	access_level = Column(String(32), default='private')
+	metadata = Column(JSON)
+
+
+class AzureFunction(CloudBaseModel):
+	"""Azure Function model"""
+	__tablename__ = 'azure_functions'
+	
+	id = Column(Integer, primary_key=True)
+	function_name = Column(String(256), nullable=False)
+	function_app = Column(String(128))
+	trigger_type = Column(String(64))
+	runtime_stack = Column(String(32))
+	app_settings = Column(JSON)
+

@@ -1,0 +1,75 @@
+{
+  "name": "GDPR Compliance",
+  "category": "auth",
+  "description": "GDPR compliance tools for data privacy and user rights management",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "pii-anonymizer>=1.0.0",
+    "faker>=19.3.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store consent and privacy data"
+    },
+    {
+      "name": "auth/audit_logging",
+      "version": null,
+      "optional": true,
+      "reason": "Track data access for compliance"
+    }
+  ],
+  "integration": {
+    "models": [
+      "ConsentRecord",
+      "DataSubject",
+      "PrivacyRequest",
+      "DataProcessingActivity"
+    ],
+    "views": [
+      "GDPRView",
+      "ConsentView",
+      "PrivacyView",
+      "DataSubjectView"
+    ],
+    "apis": [
+      "gdpr/consent",
+      "gdpr/request",
+      "gdpr/export",
+      "gdpr/delete"
+    ],
+    "templates": [
+      "gdpr_dashboard.html",
+      "consent_form.html",
+      "privacy_request.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "GDPR_RETENTION_PERIOD": 2555,
+      "ANONYMIZATION_ALGORITHM": "k-anonymity",
+      "CONSENT_EXPIRY_DAYS": 365
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Data Subject Rights Management",
+    "Consent Management",
+    "Data Anonymization",
+    "Right to be Forgotten",
+    "Data Portability",
+    "Privacy Impact Assessment",
+    "Cookie Consent",
+    "Breach Notification"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

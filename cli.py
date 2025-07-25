@@ -19,9 +19,21 @@ import shutil
 from datetime import datetime
 
 # Import APG compiler components
-from .compiler.compiler import APGCompiler, CodeGenConfig, CompilationResult
-from .compiler.parser import APGParser
-from .compiler.semantic_analyzer import SemanticAnalyzer
+try:
+    from .compiler.compiler import APGCompiler, CodeGenConfig, CompilationResult
+    from .compiler.parser import APGParser
+    from .compiler.semantic_analyzer import SemanticAnalyzer
+    from .templates.composable.composition_engine import CompositionEngine
+    from .templates.composable.base_template import BaseTemplateType
+    from .templates.composable.capability import CapabilityCategory
+except ImportError:
+    # Handle direct execution
+    from compiler.compiler import APGCompiler, CodeGenConfig, CompilationResult
+    from compiler.parser import APGParser
+    from compiler.semantic_analyzer import SemanticAnalyzer
+    from templates.composable.composition_engine import CompositionEngine
+    from templates.composable.base_template import BaseTemplateType
+    from templates.composable.capability import CapabilityCategory
 
 
 # ========================================
@@ -65,6 +77,17 @@ class APGProject:
 				"host": "0.0.0.0",
 				"port": 8080,
 				"debug": True
+			},
+			"composable_templates": {
+				"enabled": True,
+				"base_template": "auto",  # "auto", "flask_webapp", "microservice", "api_only", "dashboard", "real_time"
+				"capabilities": {
+					"additional": [],  # Additional capabilities to include
+					"exclude": [],    # Capabilities to exclude
+					"auto_detect": True  # Automatically detect capabilities from code
+				},
+				"output_mode": "complete_app",  # "complete_app", "models_only", "hybrid"
+				"integration_patterns": []  # Pre-defined patterns: ai_platform, ecommerce_complete, etc.
 			}
 		}
 	
@@ -428,6 +451,272 @@ class APGCLICommands:
 		return True
 	
 	# ========================================
+	# Composable Template System Commands
+	# ========================================
+	
+	def list_capabilities(self, category: Optional[str] = None) -> bool:
+		"""List available capabilities"""
+		try:
+			composable_root = Path(__file__).parent / 'templates' / 'composable'
+			engine = CompositionEngine(composable_root)
+			
+			available_caps = engine.capability_manager.get_available_capabilities()
+			
+			if not available_caps:
+				print("No capabilities found")
+				return True
+			
+			# Group by category
+			by_category = {}
+			for cap_name in available_caps:
+				capability = engine.capability_manager.get_capability(cap_name)
+				if capability:
+					cat = capability.category.value
+					if category and cat != category:
+						continue
+					if cat not in by_category:
+						by_category[cat] = []
+					by_category[cat].append(capability)
+			
+			if category:
+				print(f"Capabilities in '{category}' category:")
+			else:
+				print("Available capabilities:")
+			
+			for cat, caps in sorted(by_category.items()):
+				print(f"\n📂 {cat.upper()} ({len(caps)} capabilities)")
+				for cap in caps:
+					print(f"   {cap.name:<25} - {cap.description}")
+			
+			return True
+			
+		except Exception as e:
+			print(f"Error listing capabilities: {e}")
+			return False
+	
+	def show_capability_info(self, capability_name: str) -> bool:
+		"""Show detailed information about a capability"""
+		try:
+			composable_root = Path(__file__).parent / 'templates' / 'composable'
+			engine = CompositionEngine(composable_root)
+			
+			capability = engine.capability_manager.get_capability(capability_name)
+			if not capability:
+				print(f"Capability '{capability_name}' not found")
+				return False
+			
+			print(f"Capability: {capability.name}")
+			print(f"Category: {capability.category.value}")
+			print(f"Version: {capability.version}")
+			print(f"Author: {capability.author}")
+			print(f"Description: {capability.description}")
+			
+			if capability.features:
+				print(f"\nFeatures:")
+				for feature in capability.features:
+					print(f"  • {feature}")
+			
+			if capability.python_requirements:
+				print(f"\nPython Requirements:")
+				for req in capability.python_requirements:
+					print(f"  • {req}")
+			
+			if capability.dependencies:
+				print(f"\nDependencies:")
+				for dep in capability.dependencies:
+					print(f"  • {dep.name} - {dep.reason}")
+			
+			if capability.compatible_bases:
+				print(f"\nCompatible Base Templates:")
+				for base in capability.compatible_bases:
+					print(f"  • {base}")
+			
+			return True
+			
+		except Exception as e:
+			print(f"Error getting capability info: {e}")
+			return False
+	
+	def add_capability(self, capability_name: str) -> bool:
+		"""Add a capability to the current project"""
+		project = APGProject(Path.cwd())
+		
+		if not project.config_file.exists():
+			print("✗ No APG project found in current directory")
+			return False
+		
+		# Verify capability exists
+		try:
+			composable_root = Path(__file__).parent / 'templates' / 'composable'
+			engine = CompositionEngine(composable_root)
+			capability = engine.capability_manager.get_capability(capability_name)
+			
+			if not capability:
+				print(f"Capability '{capability_name}' not found")
+				return False
+			
+		except Exception as e:
+			print(f"Error verifying capability: {e}")
+			return False
+		
+		# Add to project config
+		if capability_name not in project.config["composable_templates"]["capabilities"]["additional"]:
+			project.config["composable_templates"]["capabilities"]["additional"].append(capability_name)
+			project.save_config()
+			print(f"✓ Added capability '{capability.name}' to project")
+		else:
+			print(f"Capability '{capability.name}' already added to project")
+		
+		return True
+	
+	def remove_capability(self, capability_name: str) -> bool:
+		"""Remove a capability from the current project"""
+		project = APGProject(Path.cwd())
+		
+		if not project.config_file.exists():
+			print("✗ No APG project found in current directory")
+			return False
+		
+		# Remove from project config
+		additional_caps = project.config["composable_templates"]["capabilities"]["additional"]
+		if capability_name in additional_caps:
+			additional_caps.remove(capability_name)
+			project.save_config()
+			print(f"✓ Removed capability '{capability_name}' from project")
+		else:
+			print(f"Capability '{capability_name}' not found in project")
+		
+		return True
+	
+	def list_base_templates(self) -> bool:
+		"""List available base templates"""
+		try:
+			composable_root = Path(__file__).parent / 'templates' / 'composable'
+			engine = CompositionEngine(composable_root)
+			
+			available_bases = engine.base_manager.get_available_bases()
+			
+			print("Available base templates:")
+			for base_type in available_bases:
+				template = engine.base_manager.get_base_template(base_type)
+				if template:
+					print(f"  {base_type.value:<15} - {template.description}")
+			
+			return True
+			
+		except Exception as e:
+			print(f"Error listing base templates: {e}")
+			return False
+	
+	def set_base_template(self, template_name: str) -> bool:
+		"""Set the base template for the current project"""
+		project = APGProject(Path.cwd())
+		
+		if not project.config_file.exists():
+			print("✗ No APG project found in current directory")
+			return False
+		
+		# Verify template exists
+		try:
+			base_type = BaseTemplateType(template_name)
+		except ValueError:
+			print(f"Base template '{template_name}' not found")
+			print("Available templates:")
+			self.list_base_templates()
+			return False
+		
+		# Update project config
+		project.config["composable_templates"]["base_template"] = template_name
+		project.save_config()
+		print(f"✓ Set base template to '{template_name}'")
+		
+		return True
+	
+	def list_integration_patterns(self) -> bool:
+		"""List available integration patterns"""
+		try:
+			composable_root = Path(__file__).parent / 'templates' / 'composable'
+			integrations_dir = composable_root / 'integrations'
+			
+			if not integrations_dir.exists():
+				print("No integration patterns found")
+				return True
+			
+			patterns = []
+			for pattern_dir in integrations_dir.iterdir():
+				if pattern_dir.is_dir():
+					pattern_file = pattern_dir / 'pattern.json'
+					if pattern_file.exists():
+						with open(pattern_file, 'r') as f:
+							pattern_data = json.load(f)
+							patterns.append((pattern_dir.name, pattern_data))
+			
+			if not patterns:
+				print("No integration patterns found")
+				return True
+			
+			print("Available integration patterns:")
+			for pattern_id, pattern_data in patterns:
+				print(f"  {pattern_id:<20} - {pattern_data.get('description', 'No description')}")
+				
+				use_cases = pattern_data.get('use_cases', [])
+				if use_cases:
+					print(f"    Use cases: {', '.join(use_cases)}")
+			
+			return True
+			
+		except Exception as e:
+			print(f"Error listing integration patterns: {e}")
+			return False
+	
+	def apply_integration_pattern(self, pattern_name: str) -> bool:
+		"""Apply an integration pattern to the current project"""
+		project = APGProject(Path.cwd())
+		
+		if not project.config_file.exists():
+			print("✗ No APG project found in current directory")
+			return False
+		
+		try:
+			composable_root = Path(__file__).parent / 'templates' / 'composable'
+			pattern_file = composable_root / 'integrations' / pattern_name / 'pattern.json'
+			
+			if not pattern_file.exists():
+				print(f"Integration pattern '{pattern_name}' not found")
+				return False
+			
+			with open(pattern_file, 'r') as f:
+				pattern_data = json.load(f)
+			
+			# Apply pattern to project config
+			config = project.config["composable_templates"]
+			
+			# Set base template
+			if 'base_template' in pattern_data:
+				config["base_template"] = pattern_data["base_template"]
+			
+			# Add capabilities
+			if 'capabilities' in pattern_data:
+				for cap in pattern_data["capabilities"]:
+					if cap not in config["capabilities"]["additional"]:
+						config["capabilities"]["additional"].append(cap)
+			
+			# Add pattern to applied patterns
+			if pattern_name not in config["integration_patterns"]:
+				config["integration_patterns"].append(pattern_name)
+			
+			project.save_config()
+			print(f"✓ Applied integration pattern '{pattern_data.get('name', pattern_name)}'")
+			print(f"  Base template: {pattern_data.get('base_template', 'unchanged')}")
+			print(f"  Capabilities: {len(pattern_data.get('capabilities', []))} added")
+			
+			return True
+			
+		except Exception as e:
+			print(f"Error applying integration pattern: {e}")
+			return False
+	
+	# ========================================
 	# Helper Methods
 	# ========================================
 	
@@ -655,6 +944,48 @@ For more help on specific commands, use:
 	# Templates command
 	templates_parser = subparsers.add_parser('templates', help='List available templates')
 	
+	# Capabilities command group
+	capabilities_parser = subparsers.add_parser('capabilities', help='Manage composable capabilities')
+	cap_subparsers = capabilities_parser.add_subparsers(dest='capability_action', help='Capability actions')
+	
+	# List capabilities
+	cap_list_parser = cap_subparsers.add_parser('list', help='List available capabilities')
+	cap_list_parser.add_argument('--category', '-c', help='Filter by category')
+	
+	# Show capability info
+	cap_info_parser = cap_subparsers.add_parser('info', help='Show capability information')
+	cap_info_parser.add_argument('name', help='Capability name (category/name)')
+	
+	# Add capability to project
+	cap_add_parser = cap_subparsers.add_parser('add', help='Add capability to project')
+	cap_add_parser.add_argument('name', help='Capability name (category/name)')
+	
+	# Remove capability from project
+	cap_remove_parser = cap_subparsers.add_parser('remove', help='Remove capability from project')
+	cap_remove_parser.add_argument('name', help='Capability name (category/name)')
+	
+	# Base templates command group
+	bases_parser = subparsers.add_parser('bases', help='Manage base templates')
+	bases_subparsers = bases_parser.add_subparsers(dest='bases_action', help='Base template actions')
+	
+	# List base templates
+	bases_list_parser = bases_subparsers.add_parser('list', help='List available base templates')
+	
+	# Set base template
+	bases_set_parser = bases_subparsers.add_parser('set', help='Set project base template')
+	bases_set_parser.add_argument('name', help='Base template name')
+	
+	# Integration patterns command group
+	patterns_parser = subparsers.add_parser('patterns', help='Manage integration patterns')
+	patterns_subparsers = patterns_parser.add_subparsers(dest='patterns_action', help='Pattern actions')
+	
+	# List patterns
+	patterns_list_parser = patterns_subparsers.add_parser('list', help='List available integration patterns')
+	
+	# Apply pattern
+	patterns_apply_parser = patterns_subparsers.add_parser('apply', help='Apply integration pattern')
+	patterns_apply_parser.add_argument('name', help='Pattern name')
+	
 	return parser
 
 
@@ -690,6 +1021,37 @@ def main():
 	
 	elif args.command == 'templates':
 		success = cli.list_templates()
+	
+	elif args.command == 'capabilities':
+		if args.capability_action == 'list':
+			success = cli.list_capabilities(category=getattr(args, 'category', None))
+		elif args.capability_action == 'info':
+			success = cli.show_capability_info(args.name)
+		elif args.capability_action == 'add':
+			success = cli.add_capability(args.name)
+		elif args.capability_action == 'remove':
+			success = cli.remove_capability(args.name)
+		else:
+			print("Usage: apg capabilities {list|info|add|remove}")
+			success = False
+	
+	elif args.command == 'bases':
+		if args.bases_action == 'list':
+			success = cli.list_base_templates()
+		elif args.bases_action == 'set':
+			success = cli.set_base_template(args.name)
+		else:
+			print("Usage: apg bases {list|set}")
+			success = False
+	
+	elif args.command == 'patterns':
+		if args.patterns_action == 'list':
+			success = cli.list_integration_patterns()
+		elif args.patterns_action == 'apply':
+			success = cli.apply_integration_pattern(args.name)
+		else:
+			print("Usage: apg patterns {list|apply}")
+			success = False
 	
 	else:
 		parser.print_help()

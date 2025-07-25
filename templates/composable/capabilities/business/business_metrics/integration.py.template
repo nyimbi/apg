@@ -1,0 +1,128 @@
+"""
+Business Metrics Integration
+============================
+
+Integration logic for the Business Metrics capability.
+Handles BI/analytics-specific setup and configuration.
+"""
+
+import logging
+from flask import Blueprint
+from flask_appbuilder import BaseView
+
+# Configure logging
+log = logging.getLogger(__name__)
+
+# Create capability blueprint
+business_metrics_bp = Blueprint(
+    'business_metrics',
+    __name__,
+    url_prefix='/business/business_metrics',
+    template_folder='templates',
+    static_folder='static'
+)
+
+
+def integrate_business_metrics(app, appbuilder, db):
+    """
+    Integrate Business Metrics capability into the application.
+    
+    Args:
+        app: Flask application instance
+        appbuilder: Flask-AppBuilder instance
+        db: SQLAlchemy database instance
+    """
+    try:
+        # Register blueprint
+        app.register_blueprint(business_metrics_bp)
+        
+        # Import and register models
+        from .models import *  # noqa
+        
+        # Import and register views
+        from .views import *  # noqa
+        
+        # Apply BI-specific configuration
+        config_additions = {}
+        for key, value in config_additions.items():
+            app.config[key] = value
+        
+        # Initialize BI service
+        bi_service = BusinessMetricsService(app, appbuilder, db)
+        app.extensions['business_metrics_service'] = bi_service
+        
+        # Register views with AppBuilder
+        appbuilder.add_view(
+            BusinessMetricsView,
+            "Business Metrics",
+            icon="fa-chart-bar",
+            category="Analytics",
+            category_icon="fa-analytics"
+        )
+        
+        log.info(f"Successfully integrated Business Metrics capability")
+        
+    except Exception as e:
+        log.error(f"Failed to integrate Business Metrics capability: {e}")
+        raise
+
+
+class BusinessMetricsService:
+    """
+    Main service class for Business Metrics.
+    
+    Handles BI/analytics processing and data operations.
+    """
+    
+    def __init__(self, app, appbuilder, db):
+        self.app = app
+        self.appbuilder = appbuilder
+        self.db = db
+        self.initialize_service()
+    
+    def initialize_service(self):
+        """Initialize BI service"""
+        log.info(f"Initializing Business Metrics service")
+        
+        try:
+            # Setup BI-specific components
+            self.setup_analytics_engine()
+            
+            # Initialize data connections
+            self.setup_data_connections()
+            
+        except Exception as e:
+            log.error(f"Error initializing BI service: {e}")
+    
+    def setup_analytics_engine(self):
+        """Setup analytics processing engine"""
+        # Analytics engine setup logic
+        pass
+    
+    def setup_data_connections(self):
+        """Setup data source connections"""
+        # Data connection setup logic
+        pass
+    
+    def generate_insights(self, data):
+        """Generate business insights from data"""
+        # Insight generation logic
+        return {"insights": [], "recommendations": []}
+
+
+class BusinessMetricsView(BaseView):
+    """
+    Main view for Business Metrics capability.
+    """
+    
+    route_base = "/business_metrics"
+    
+    @expose("/")
+    def index(self):
+        """Main dashboard view"""
+        return self.render_template("business_metrics_dashboard.html")
+    
+    @expose("/analytics")
+    def analytics(self):
+        """Analytics view"""
+        return self.render_template("business_metrics_analytics.html")

@@ -1,0 +1,72 @@
+{
+  "name": "Azure Integration",
+  "category": "data",
+  "description": "Microsoft Azure services integration (Blob Storage, SQL Database, Functions, etc.)",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "azure-storage-blob>=12.17.0",
+    "azure-identity>=1.13.0",
+    "azure-cosmos>=4.5.0",
+    "azure-functions>=1.15.0",
+    "azure-servicebus>=7.11.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": true,
+      "reason": "Local database fallback"
+    }
+  ],
+  "integration": {
+    "models": [
+      "AzureResource",
+      "BlobContainer",
+      "AzureFunction",
+      "ServiceBusQueue"
+    ],
+    "views": [
+      "AzureView",
+      "BlobView",
+      "FunctionView"
+    ],
+    "apis": [
+      "azure/blob",
+      "azure/functions",
+      "azure/servicebus",
+      "azure/sql"
+    ],
+    "templates": [
+      "azure_dashboard.html",
+      "blob_browser.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "AZURE_STORAGE_CONNECTION_STRING": "",
+      "AZURE_TENANT_ID": "",
+      "AZURE_CLIENT_ID": "",
+      "AZURE_CLIENT_SECRET": "",
+      "AZURE_SUBSCRIPTION_ID": ""
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Blob Storage Management",
+    "Azure SQL Database",
+    "Azure Functions",
+    "Service Bus Messaging",
+    "Cosmos DB NoSQL",
+    "Key Vault Secrets",
+    "Application Insights",
+    "Resource Management"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

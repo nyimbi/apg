@@ -1,0 +1,41 @@
+{
+  "name": "Basic Analytics",
+  "category": "analytics",
+  "description": "Basic analytics and reporting with charts",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "plotly>=5.0.0",
+    "pandas>=2.0.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [],
+  "integration": {
+    "models": [],
+    "views": [
+      "AnalyticsView",
+      "ChartsView",
+      "ReportsView"
+    ],
+    "apis": [],
+    "templates": [
+      "analytics_dashboard.html",
+      "charts.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Dashboard Charts",
+    "Data Visualization",
+    "Report Generation",
+    "KPI Tracking"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

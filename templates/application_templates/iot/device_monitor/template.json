@@ -1,0 +1,47 @@
+{
+  "template_id": "iot/device_monitor",
+  "name": "IoT Device Monitor",
+  "description": "Monitor and manage IoT devices with real-time data",
+  "complexity": "Intermediate",
+  "domain": "Internet of Things",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "DeviceAgent",
+    "MonitoringAgent",
+    "AlertAgent"
+  ],
+  "digital_twins": [
+    "SensorTwin",
+    "DeviceTwin"
+  ],
+  "features": [
+    "Device Management",
+    "Real-time Monitoring",
+    "Alert System",
+    "Data Visualization"
+  ],
+  "databases": [
+    "devices",
+    "sensor_data",
+    "alerts"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

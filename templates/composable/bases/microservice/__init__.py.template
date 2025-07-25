@@ -1,0 +1,6 @@
+# APG Base Template: Microservice
+# File: __init__.py.template
+# Framework: FastAPI
+#
+# This file is part of the Microservice base template.
+# Capabilities will be integrated into this base structure.

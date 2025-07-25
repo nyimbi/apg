@@ -1,0 +1,66 @@
+{
+  "name": "Load Balancer",
+  "category": "data",
+  "description": "Intelligent load balancing and traffic distribution with health checks",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "haproxy>=2.8.0",
+    "nginx>=1.24.0",
+    "requests>=2.31.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "analytics/performance_monitor",
+      "version": null,
+      "optional": true,
+      "reason": "Health monitoring integration"
+    }
+  ],
+  "integration": {
+    "models": [
+      "LoadBalancerConfig",
+      "Backend",
+      "HealthCheck",
+      "TrafficStats"
+    ],
+    "views": [
+      "LoadBalancerView",
+      "BackendView",
+      "HealthView"
+    ],
+    "apis": [
+      "lb/config",
+      "lb/health",
+      "lb/stats"
+    ],
+    "templates": [
+      "load_balancer_dashboard.html",
+      "backend_status.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "LB_ALGORITHM": "round_robin",
+      "HEALTH_CHECK_INTERVAL": 30,
+      "HEALTH_CHECK_TIMEOUT": 5
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Round Robin Load Balancing",
+    "Weighted Load Distribution",
+    "Health Check Monitoring",
+    "Circuit Breaker Pattern",
+    "SSL Termination",
+    "Rate Limiting",
+    "Failover Management",
+    "Traffic Analytics"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

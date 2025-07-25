@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "APG Capability Schema",
+  "type": "object",
+  "required": [
+    "name",
+    "category",
+    "description",
+    "version"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9\\s\\-_&/]+$"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "ai",
+        "auth",
+        "data",
+        "iot",
+        "analytics",
+        "business",
+        "communication",
+        "payments"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 512
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-(alpha|beta|rc)\\d*)?$"
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "python_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9\\-_]+>=?\\d+(\\.\\d+)*$"
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 128
+      },
+      "minItems": 1,
+      "maxItems": 20
+    },
+    "compatible_bases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "flask_webapp",
+          "microservice",
+          "api_only",
+          "dashboard",
+          "real_time",
+          "cli_tool"
+        ]
+      },
+      "minItems": 1
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "capability",
+          "reason"
+        ],
+        "properties": {
+          "capability": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "optional": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "integration": {
+      "type": "object",
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "apis": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "templates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "static_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "config_additions": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

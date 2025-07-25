@@ -1,0 +1,47 @@
+{
+  "name": "Vector Database",
+  "category": "data",
+  "description": "Vector database for AI/ML applications with similarity search",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "pgvector>=0.2.0",
+    "numpy>=1.24.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql",
+      "version": null,
+      "optional": false,
+      "reason": "Requires PostgreSQL with pgvector extension"
+    }
+  ],
+  "integration": {
+    "models": [
+      "VectorDocument",
+      "Embedding"
+    ],
+    "views": [],
+    "apis": [
+      "vector/search",
+      "vector/store",
+      "vector/similarity"
+    ],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Vector Storage",
+    "Similarity Search",
+    "Embeddings Management"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice"
+  ],
+  "incompatible_capabilities": []
+}

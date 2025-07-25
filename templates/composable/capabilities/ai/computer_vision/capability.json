@@ -1,0 +1,83 @@
+{
+  "name": "Computer Vision",
+  "category": "ai",
+  "description": "Computer vision and image processing with OpenCV and deep learning",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "opencv-python>=4.8.0",
+    "pillow>=10.0.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "ultralytics>=8.0.0",
+    "face-recognition>=1.3.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store image metadata and results"
+    },
+    {
+      "name": "data/vector_database",
+      "version": null,
+      "optional": true,
+      "reason": "Store image embeddings for similarity search"
+    }
+  ],
+  "integration": {
+    "models": [
+      "Image",
+      "DetectionResult",
+      "CVModel",
+      "ProcessingJob"
+    ],
+    "views": [
+      "ImageView",
+      "DetectionView",
+      "ModelView"
+    ],
+    "apis": [
+      "cv/upload",
+      "cv/detect",
+      "cv/classify",
+      "cv/ocr"
+    ],
+    "templates": [
+      "cv_dashboard.html",
+      "image_gallery.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "CV_UPLOAD_FOLDER": "/tmp/cv_uploads",
+      "CV_MAX_FILE_SIZE": 16777216,
+      "CV_ALLOWED_EXTENSIONS": [
+        "jpg",
+        "jpeg",
+        "png",
+        "bmp",
+        "tiff"
+      ]
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "Image Classification",
+    "Object Detection",
+    "Face Recognition",
+    "Image Segmentation",
+    "OCR Text Extraction",
+    "Video Processing",
+    "Real-time Analysis",
+    "Custom Model Training"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

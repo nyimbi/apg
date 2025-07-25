@@ -1,0 +1,73 @@
+{
+  "name": "Role-Based Access Control",
+  "category": "auth",
+  "description": "Advanced RBAC with fine-grained permissions and hierarchical roles",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "flask-principal>=0.4.0",
+    "casbin>=1.17.0",
+    "pycasbin-sqlalchemy-adapter>=0.5.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store roles, permissions, and policies"
+    },
+    {
+      "name": "auth/basic_authentication",
+      "version": null,
+      "optional": false,
+      "reason": "Base authentication system"
+    }
+  ],
+  "integration": {
+    "models": [
+      "Role",
+      "Permission",
+      "Policy",
+      "RoleAssignment",
+      "PermissionGroup"
+    ],
+    "views": [
+      "RoleView",
+      "PermissionView",
+      "PolicyView",
+      "UserRoleView"
+    ],
+    "apis": [
+      "rbac/roles",
+      "rbac/permissions",
+      "rbac/check",
+      "rbac/assign"
+    ],
+    "templates": [
+      "rbac_dashboard.html",
+      "role_editor.html",
+      "permission_matrix.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Hierarchical Role Management",
+    "Fine-grained Permissions",
+    "Resource-based Authorization",
+    "Dynamic Permission Evaluation",
+    "Role Inheritance",
+    "Policy-based Access Control",
+    "Audit Trail",
+    "Bulk Permission Management"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

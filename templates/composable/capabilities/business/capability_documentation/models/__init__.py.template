@@ -1,0 +1,41 @@
+"""
+Capability Documentation Models
+===============================
+
+Database models for Capability Documentation capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CommunityBaseModel(AuditMixin, Model):
+	"""Base model for community entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add community-specific models based on capability
+
+# Generic community model
+class CommunityContribution(CommunityBaseModel):
+	"""Generic community contribution"""
+	__tablename__ = 'community_contributions'
+	
+	id = Column(Integer, primary_key=True)
+	contribution_type = Column(String(64), nullable=False)
+	contributor_id = Column(Integer, nullable=False)
+	title = Column(String(256))
+	description = Column(Text)
+	status = Column(String(32), default='pending')
+	metadata = Column(JSON)
+	submitted_at = Column(DateTime, default=datetime.utcnow)
+	reviewed_at = Column(DateTime)
+	reviewer_id = Column(Integer)
+

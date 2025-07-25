@@ -1,0 +1,35 @@
+{
+  "name": "Analytics Dashboard",
+  "type": "dashboard",
+  "description": "Real-time dashboard with analytics",
+  "framework": "Flask-AppBuilder",
+  "capabilities_supported": [
+    "analytics",
+    "data",
+    "auth"
+  ],
+  "default_capabilities": [
+    "analytics/basic_analytics",
+    "data/postgresql_database",
+    "auth/basic_authentication"
+  ],
+  "structure": {
+    "dashboards": {},
+    "charts": {},
+    "data": {},
+    "capabilities": {},
+    "templates": {
+      "dashboards": {}
+    },
+    "static": {
+      "css": {},
+      "js": {}
+    },
+    "tests": {}
+  },
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "plotly>=5.0.0",
+    "pandas>=2.0.0"
+  ]
+}

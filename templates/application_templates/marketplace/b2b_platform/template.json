@@ -1,0 +1,46 @@
+{
+  "template_id": "marketplace/b2b_platform",
+  "name": "B2B Trading Platform",
+  "description": "Business-to-business marketplace with advanced trading features",
+  "complexity": "Expert",
+  "domain": "B2B Commerce",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "TradingAgent",
+    "MatchingAgent",
+    "ContractAgent",
+    "ComplianceAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Business Matching",
+    "Contract Management",
+    "Bulk Trading",
+    "Compliance Tracking"
+  ],
+  "databases": [
+    "businesses",
+    "trades",
+    "contracts",
+    "compliance_records"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

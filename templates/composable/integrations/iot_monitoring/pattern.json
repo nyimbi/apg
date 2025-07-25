@@ -1,0 +1,16 @@
+{
+  "name": "IoT Monitoring Platform",
+  "description": "IoT device monitoring with real-time data and analytics",
+  "base_template": "dashboard",
+  "capabilities": [
+    "auth/basic_authentication",
+    "data/postgresql_database",
+    "communication/websocket_communication",
+    "analytics/basic_analytics"
+  ],
+  "use_cases": [
+    "Smart Cities",
+    "Industrial IoT",
+    "Environmental Monitoring"
+  ]
+}

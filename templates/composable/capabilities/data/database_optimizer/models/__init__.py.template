@@ -1,0 +1,87 @@
+"""
+Database Optimizer Models
+=========================
+
+Database models for Database Optimizer capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class PerformanceBaseModel(AuditMixin, Model):
+	"""Base model for performance entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add performance-specific models based on capability
+
+class QueryAnalysis(PerformanceBaseModel):
+	"""Database query analysis results"""
+	__tablename__ = 'query_analyses'
+	
+	id = Column(Integer, primary_key=True)
+	query_hash = Column(String(128), nullable=False)
+	query_text = Column(Text, nullable=False)
+	execution_time = Column(Float)
+	rows_examined = Column(Integer)
+	rows_returned = Column(Integer)
+	index_usage = Column(JSON)
+	query_plan = Column(JSON)
+	optimization_score = Column(Float)
+	analyzed_at = Column(DateTime, default=datetime.utcnow)
+
+
+class IndexRecommendation(PerformanceBaseModel):
+	"""Database index recommendations"""
+	__tablename__ = 'index_recommendations'
+	
+	id = Column(Integer, primary_key=True)
+	table_name = Column(String(128), nullable=False)
+	column_names = Column(JSON, nullable=False)
+	index_type = Column(String(32))  # btree, hash, gin, gist
+	estimated_improvement = Column(Float)
+	creation_cost = Column(Float)
+	maintenance_cost = Column(Float)
+	priority = Column(String(32))
+	status = Column(String(32), default='pending')
+	created_at = Column(DateTime, default=datetime.utcnow)
+	applied_at = Column(DateTime)
+
+
+class SlowQuery(PerformanceBaseModel):
+	"""Slow query tracking"""
+	__tablename__ = 'slow_queries'
+	
+	id = Column(Integer, primary_key=True)
+	query_hash = Column(String(128), nullable=False)
+	query_text = Column(Text, nullable=False)
+	execution_time = Column(Float, nullable=False)
+	database_name = Column(String(128))
+	user_name = Column(String(128))
+	timestamp = Column(DateTime, default=datetime.utcnow)
+	frequency = Column(Integer, default=1)
+	last_seen = Column(DateTime, default=datetime.utcnow)
+
+
+class OptimizationReport(PerformanceBaseModel):
+	"""Database optimization reports"""
+	__tablename__ = 'optimization_reports'
+	
+	id = Column(Integer, primary_key=True)
+	report_name = Column(String(256), nullable=False)
+	database_name = Column(String(128))
+	analysis_period = Column(String(32))
+	total_queries = Column(Integer)
+	slow_queries = Column(Integer)
+	recommendations = Column(JSON)
+	estimated_improvement = Column(Float)
+	generated_at = Column(DateTime, default=datetime.utcnow)
+

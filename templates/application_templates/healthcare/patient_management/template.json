@@ -1,0 +1,46 @@
+{
+  "template_id": "healthcare/patient_management",
+  "name": "Patient Management System",
+  "description": "Complete electronic health records and patient management",
+  "complexity": "Expert",
+  "domain": "Healthcare",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "PatientAgent",
+    "AppointmentAgent",
+    "MedicalRecordsAgent",
+    "BillingAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Electronic Health Records",
+    "Appointment Scheduling",
+    "Medical History",
+    "Billing Integration"
+  ],
+  "databases": [
+    "patients",
+    "appointments",
+    "medical_records",
+    "billing"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

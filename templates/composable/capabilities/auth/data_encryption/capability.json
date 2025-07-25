@@ -1,0 +1,68 @@
+{
+  "name": "Data Encryption",
+  "category": "auth",
+  "description": "Comprehensive data encryption at rest and in transit with key management",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "cryptography>=41.0.0",
+    "pynacl>=1.5.0",
+    "keyring>=24.2.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store encrypted data and key metadata"
+    }
+  ],
+  "integration": {
+    "models": [
+      "EncryptionKey",
+      "CertificateStore",
+      "EncryptedField",
+      "KeyRotationLog"
+    ],
+    "views": [
+      "EncryptionView",
+      "KeyManagementView",
+      "CertificateView"
+    ],
+    "apis": [
+      "encryption/encrypt",
+      "encryption/decrypt",
+      "encryption/keys",
+      "encryption/rotate"
+    ],
+    "templates": [
+      "encryption_dashboard.html",
+      "key_management.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "ENCRYPTION_KEY_SIZE": 256,
+      "KEY_ROTATION_DAYS": 90,
+      "HSM_ENABLED": false
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "AES-256 Encryption",
+    "RSA Key Pair Generation",
+    "Database Field Encryption",
+    "File Encryption",
+    "Key Rotation",
+    "Hardware Security Module",
+    "Certificate Management",
+    "Digital Signatures"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

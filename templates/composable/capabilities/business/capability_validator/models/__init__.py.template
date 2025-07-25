@@ -1,0 +1,66 @@
+"""
+Capability Validator Models
+===========================
+
+Database models for Capability Validator capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CommunityBaseModel(AuditMixin, Model):
+	"""Base model for community entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add community-specific models based on capability
+
+class ValidationReport(CommunityBaseModel):
+	"""Capability validation report"""
+	__tablename__ = 'validation_reports'
+	
+	id = Column(Integer, primary_key=True)
+	capability_id = Column(String(256), nullable=False)
+	validation_type = Column(String(64))  # security, quality, compatibility
+	status = Column(String(32), default='pending')
+	score = Column(Float)
+	findings = Column(JSON)
+	recommendations = Column(JSON)
+	validated_at = Column(DateTime, default=datetime.utcnow)
+	validator_version = Column(String(32))
+
+
+class SecurityScan(CommunityBaseModel):
+	"""Security scan results"""
+	__tablename__ = 'security_scans'
+	
+	id = Column(Integer, primary_key=True)
+	capability_id = Column(String(256), nullable=False)
+	scan_type = Column(String(64))  # bandit, safety, semgrep
+	vulnerabilities = Column(JSON)
+	severity_counts = Column(JSON)
+	scan_duration = Column(Float)
+	false_positives = Column(JSON)
+
+
+class QualityMetrics(CommunityBaseModel):
+	"""Code quality metrics"""
+	__tablename__ = 'quality_metrics'
+	
+	id = Column(Integer, primary_key=True)
+	capability_id = Column(String(256), nullable=False)
+	cyclomatic_complexity = Column(Float)
+	test_coverage = Column(Float)
+	documentation_coverage = Column(Float)
+	maintainability_index = Column(Float)
+	code_lines = Column(Integer)
+	comment_ratio = Column(Float)
+

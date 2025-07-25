@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Set, TextIO
 from dataclasses import dataclass
 from pathlib import Path
 import re
+import sys
 
 # Import AST nodes
 from .ast_builder import (
@@ -20,6 +21,11 @@ from .ast_builder import (
 	AssignmentStatement, ReturnStatement, BlockStatement, EntityType,
 	DatabaseDeclaration, DatabaseSchema, TableDeclaration
 )
+
+# Import composable template system
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from templates.composable.composition_engine import CompositionEngine
+from templates.composable.base_template import BaseTemplateType
 
 
 # ========================================
@@ -37,6 +43,19 @@ class CodeGenConfig:
 	output_directory: str = "generated"
 	package_name: str = "apg_generated"
 	include_runtime: bool = True
+	
+	# Composable template system configuration
+	use_composable_templates: bool = True
+	preferred_base_template: Optional[str] = None
+	additional_capabilities: List[str] = None
+	exclude_capabilities: List[str] = None
+	template_output_mode: str = "complete_app"  # "complete_app", "models_only", "hybrid"
+	
+	def __post_init__(self):
+		if self.additional_capabilities is None:
+			self.additional_capabilities = []
+		if self.exclude_capabilities is None:
+			self.exclude_capabilities = []
 
 
 # ========================================
@@ -69,7 +88,7 @@ class PythonCodeGenerator:
 	
 	def generate(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""
-		Generate Flask-AppBuilder application from APG AST.
+		Generate application from APG AST using composable template system.
 		
 		Args:
 			ast: Root AST node (ModuleDeclaration)
@@ -78,6 +97,83 @@ class PythonCodeGenerator:
 			Dictionary mapping file names to generated code content
 		"""
 		self.current_module = ast
+		
+		# Use composable template system if enabled
+		if self.config.use_composable_templates:
+			return self._generate_with_composable_templates(ast)
+		else:
+			# Fall back to legacy generation method
+			return self._generate_legacy_flask_app(ast)
+	
+	def _generate_with_composable_templates(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Generate application using the composable template system"""
+		try:
+			# Initialize composition engine
+			composable_root = Path(__file__).parent.parent / 'templates' / 'composable'
+			engine = CompositionEngine(composable_root)
+			
+			# Extract project information from AST
+			project_name = ast.module_name or "APGGeneratedApp"
+			project_description = f"APG generated application with {len(ast.entities)} entities"
+			
+			# Compose the application
+			context = engine.compose_application(
+				ast,
+				project_name=project_name,
+				project_description=project_description,
+				author="APG Code Generator"
+			)
+			
+			# Apply user preferences from config
+			if self.config.preferred_base_template:
+				# Override base template if specified
+				try:
+					base_type = BaseTemplateType(self.config.preferred_base_template)
+					context.base_template = engine.base_manager.get_base_template(base_type)
+				except ValueError:
+					print(f"Warning: Unknown base template '{self.config.preferred_base_template}', using detected template")
+			
+			# Add additional capabilities
+			for cap_name in self.config.additional_capabilities:
+				capability = engine.capability_manager.get_capability(cap_name)
+				if capability and capability not in context.capabilities:
+					context.capabilities.append(capability)
+			
+			# Remove excluded capabilities
+			context.capabilities = [
+				cap for cap in context.capabilities 
+				if f"{cap.category.value}/{cap.name.lower().replace(' ', '_')}" not in self.config.exclude_capabilities
+			]
+			
+			# Validate composition
+			validation = engine.validate_composition(context)
+			if validation['errors']:
+				raise ValueError(f"Composition validation failed: {'; '.join(validation['errors'])}")
+			
+			# Generate application files
+			generated_files = engine.generate_application_files(context)
+			
+			# Handle different output modes
+			if self.config.template_output_mode == "models_only":
+				# Return only model files for integration with existing apps
+				return {k: v for k, v in generated_files.items() if 'model' in k.lower()}
+			elif self.config.template_output_mode == "hybrid":
+				# Combine template system with legacy entity generation
+				template_files = generated_files
+				legacy_files = self._generate_legacy_entities(ast)
+				template_files.update(legacy_files)
+				return template_files
+			else:
+				# Return complete application
+				return generated_files
+				
+		except Exception as e:
+			print(f"Error in composable template generation: {e}")
+			print("Falling back to legacy generation...")
+			return self._generate_legacy_flask_app(ast)
+	
+	def _generate_legacy_flask_app(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Legacy Flask-AppBuilder generation method"""
 		files = {}
 		
 		# Generate Flask-AppBuilder app.py (main application)

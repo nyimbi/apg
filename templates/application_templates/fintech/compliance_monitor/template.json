@@ -1,0 +1,46 @@
+{
+  "template_id": "fintech/compliance_monitor",
+  "name": "Financial Compliance Monitor",
+  "description": "Regulatory compliance monitoring and reporting",
+  "complexity": "Expert",
+  "domain": "Financial Compliance",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "ComplianceAgent",
+    "AuditAgent",
+    "ReportingAgent",
+    "AlertAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Compliance Monitoring",
+    "Audit Trails",
+    "Regulatory Reporting",
+    "Risk Alerts"
+  ],
+  "databases": [
+    "compliance_rules",
+    "audit_logs",
+    "reports",
+    "violations"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

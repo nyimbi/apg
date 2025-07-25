@@ -1,0 +1,71 @@
+{
+  "name": "AWS Integration",
+  "category": "data",
+  "description": "Comprehensive AWS services integration (S3, RDS, Lambda, SQS, etc.)",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "boto3>=1.28.0",
+    "botocore>=1.31.0",
+    "aws-lambda-powertools>=2.20.0",
+    "s3fs>=2023.6.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": true,
+      "reason": "Local database fallback"
+    }
+  ],
+  "integration": {
+    "models": [
+      "AWSResource",
+      "S3Bucket",
+      "LambdaFunction",
+      "SQSQueue"
+    ],
+    "views": [
+      "AWSView",
+      "S3View",
+      "LambdaView"
+    ],
+    "apis": [
+      "aws/s3",
+      "aws/lambda",
+      "aws/sqs",
+      "aws/rds"
+    ],
+    "templates": [
+      "aws_dashboard.html",
+      "s3_browser.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "AWS_ACCESS_KEY_ID": "",
+      "AWS_SECRET_ACCESS_KEY": "",
+      "AWS_DEFAULT_REGION": "us-east-1",
+      "AWS_S3_BUCKET": "",
+      "AWS_RDS_ENDPOINT": ""
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "S3 Storage Management",
+    "RDS Database Integration",
+    "Lambda Function Deployment",
+    "SQS Message Queuing",
+    "SNS Notifications",
+    "CloudWatch Monitoring",
+    "IAM Role Management",
+    "Auto-scaling Configuration"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

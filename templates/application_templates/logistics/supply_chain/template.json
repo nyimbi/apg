@@ -1,0 +1,46 @@
+{
+  "template_id": "logistics/supply_chain",
+  "name": "Supply Chain Management",
+  "description": "End-to-end supply chain visibility and optimization",
+  "complexity": "Expert",
+  "domain": "Supply Chain",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "SupplyAgent",
+    "DemandAgent",
+    "LogisticsAgent",
+    "OptimizationAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Supply Planning",
+    "Demand Forecasting",
+    "Logistics Optimization",
+    "Supply Chain Visibility"
+  ],
+  "databases": [
+    "suppliers",
+    "inventory",
+    "shipments",
+    "demand_forecasts"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

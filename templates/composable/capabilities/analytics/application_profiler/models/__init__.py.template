@@ -1,0 +1,88 @@
+"""
+Application Profiler Models
+===========================
+
+Database models for Application Profiler capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class PerformanceBaseModel(AuditMixin, Model):
+	"""Base model for performance entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add performance-specific models based on capability
+
+class ProfilingSession(PerformanceBaseModel):
+	"""Application profiling session"""
+	__tablename__ = 'profiling_sessions'
+	
+	id = Column(Integer, primary_key=True)
+	session_id = Column(String(128), unique=True, nullable=False)
+	session_name = Column(String(256))
+	profiling_type = Column(String(32))  # cpu, memory, io
+	started_at = Column(DateTime, default=datetime.utcnow)
+	ended_at = Column(DateTime)
+	duration = Column(Float)
+	status = Column(String(32), default='running')
+	
+	metrics = relationship("PerformanceMetric", back_populates="session")
+
+
+class PerformanceMetric(PerformanceBaseModel):
+	"""Performance metrics collected during profiling"""
+	__tablename__ = 'performance_metrics'
+	
+	id = Column(Integer, primary_key=True)
+	session_id = Column(Integer, ForeignKey('profiling_sessions.id'))
+	metric_name = Column(String(128), nullable=False)
+	metric_value = Column(Float, nullable=False)
+	timestamp = Column(DateTime, default=datetime.utcnow)
+	context = Column(JSON)  # function name, line number, etc.
+	
+	session = relationship("ProfilingSession", back_populates="metrics")
+
+
+class Bottleneck(PerformanceBaseModel):
+	"""Identified performance bottlenecks"""
+	__tablename__ = 'performance_bottlenecks'
+	
+	id = Column(Integer, primary_key=True)
+	session_id = Column(Integer, ForeignKey('profiling_sessions.id'))
+	bottleneck_type = Column(String(64))  # cpu, memory, io, db
+	severity = Column(String(32))  # critical, high, medium, low
+	function_name = Column(String(256))
+	file_path = Column(String(512))
+	line_number = Column(Integer)
+	time_spent = Column(Float)
+	memory_used = Column(Integer)
+	call_count = Column(Integer)
+	description = Column(Text)
+
+
+class OptimizationSuggestion(PerformanceBaseModel):
+	"""Optimization suggestions based on profiling"""
+	__tablename__ = 'optimization_suggestions'
+	
+	id = Column(Integer, primary_key=True)
+	bottleneck_id = Column(Integer, ForeignKey('performance_bottlenecks.id'))
+	suggestion_type = Column(String(64))
+	priority = Column(String(32))
+	description = Column(Text)
+	implementation_effort = Column(String(32))  # low, medium, high
+	expected_improvement = Column(Float)
+	code_example = Column(Text)
+	applied = Column(Boolean, default=False)
+	
+	bottleneck = relationship("Bottleneck")
+

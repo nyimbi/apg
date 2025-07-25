@@ -1,0 +1,73 @@
+{
+  "name": "KPI Dashboard",
+  "category": "analytics",
+  "description": "Key Performance Indicator dashboards with real-time monitoring",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "plotly>=5.15.0",
+    "dash>=2.11.0",
+    "dash-bootstrap-components>=1.4.0",
+    "pandas>=2.0.0",
+    "redis>=4.6.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store KPI data and configurations"
+    },
+    {
+      "name": "communication/websocket_communication",
+      "version": null,
+      "optional": true,
+      "reason": "Real-time updates"
+    }
+  ],
+  "integration": {
+    "models": [
+      "KPI",
+      "KPITarget",
+      "KPIValue",
+      "Dashboard",
+      "Widget"
+    ],
+    "views": [
+      "KPIDashboardView",
+      "KPIConfigView"
+    ],
+    "apis": [
+      "kpi/current",
+      "kpi/historical",
+      "kpi/alert"
+    ],
+    "templates": [
+      "kpi_dashboard.html",
+      "kpi_widget.html"
+    ],
+    "static_files": [
+      "css/kpi.css",
+      "js/kpi_realtime.js"
+    ],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Real-time KPI Monitoring",
+    "Custom KPI Definitions",
+    "Threshold Alerts",
+    "Trend Analysis",
+    "Goal Tracking",
+    "Executive Dashboards",
+    "Mobile Responsive",
+    "Drill-down Capabilities"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "dashboard",
+    "flask_webapp"
+  ],
+  "incompatible_capabilities": []
+}

@@ -1,0 +1,65 @@
+"""
+Kubernetes Orchestration Models
+===============================
+
+Database models for Kubernetes Orchestration capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CloudBaseModel(AuditMixin, Model):
+	"""Base model for cloud entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add cloud-specific models based on capability
+
+class KubernetesCluster(CloudBaseModel):
+	"""Kubernetes cluster model"""
+	__tablename__ = 'k8s_clusters'
+	
+	id = Column(Integer, primary_key=True)
+	cluster_name = Column(String(256), unique=True, nullable=False)
+	cluster_endpoint = Column(String(512))
+	version = Column(String(32))
+	node_count = Column(Integer)
+	status = Column(String(32), default='pending')
+	
+	pods = relationship("Pod", back_populates="cluster")
+
+
+class Pod(CloudBaseModel):
+	"""Kubernetes pod model"""
+	__tablename__ = 'k8s_pods'
+	
+	id = Column(Integer, primary_key=True)
+	pod_name = Column(String(256), nullable=False)
+	namespace = Column(String(128), default='default')
+	cluster_id = Column(Integer, ForeignKey('k8s_clusters.id'))
+	image = Column(String(256))
+	status = Column(String(32), default='pending')
+	restart_count = Column(Integer, default=0)
+	
+	cluster = relationship("KubernetesCluster", back_populates="pods")
+
+
+class Service(CloudBaseModel):
+	"""Kubernetes service model"""
+	__tablename__ = 'k8s_services'
+	
+	id = Column(Integer, primary_key=True)
+	service_name = Column(String(256), nullable=False)
+	namespace = Column(String(128), default='default')
+	service_type = Column(String(32), default='ClusterIP')
+	ports = Column(JSON)
+	selector = Column(JSON)
+

@@ -1,0 +1,51 @@
+"""
+KPI Dashboard Models
+====================
+
+Database models for KPI Dashboard capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class BIBaseModel(AuditMixin, Model):
+    """Base model for BI entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# Add BI-specific models based on capability
+
+class KPI(BIBaseModel):
+    """Key Performance Indicator model"""
+    __tablename__ = 'bi_kpis'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(256), nullable=False)
+    description = Column(Text)
+    formula = Column(Text)
+    unit = Column(String(32))
+    target_value = Column(Float)
+    current_value = Column(Float)
+    status = Column(String(32))  # green, yellow, red
+    
+    values = relationship("KPIValue", back_populates="kpi")
+
+
+class KPIValue(BIBaseModel):
+    """KPI historical values"""
+    __tablename__ = 'bi_kpi_values'
+    
+    id = Column(Integer, primary_key=True)
+    kpi_id = Column(Integer, ForeignKey('bi_kpis.id'))
+    value = Column(Float, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    kpi = relationship("KPI", back_populates="values")
+

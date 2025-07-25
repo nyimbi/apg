@@ -1,0 +1,67 @@
+"""
+Capability Publisher Models
+===========================
+
+Database models for Capability Publisher capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CommunityBaseModel(AuditMixin, Model):
+	"""Base model for community entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add community-specific models based on capability
+
+class PublishingJob(CommunityBaseModel):
+	"""Capability publishing job"""
+	__tablename__ = 'publishing_jobs'
+	
+	id = Column(Integer, primary_key=True)
+	job_id = Column(String(128), unique=True, nullable=False)
+	capability_id = Column(String(256), nullable=False)
+	author_id = Column(Integer, ForeignKey('authors.id'))
+	status = Column(String(32), default='pending')
+	build_log = Column(Text)
+	error_message = Column(Text)
+	started_at = Column(DateTime, default=datetime.utcnow)
+	completed_at = Column(DateTime)
+
+
+class CapabilityPackage(CommunityBaseModel):
+	"""Packaged capability metadata"""
+	__tablename__ = 'capability_packages'
+	
+	id = Column(Integer, primary_key=True)
+	package_id = Column(String(256), unique=True, nullable=False)
+	capability_id = Column(String(256), nullable=False)
+	version = Column(String(32), nullable=False)
+	package_size = Column(Integer)
+	checksum = Column(String(128))
+	dependencies = Column(JSON)
+	assets = Column(JSON)
+
+
+class ReleaseHistory(CommunityBaseModel):
+	"""Release history tracking"""
+	__tablename__ = 'release_history'
+	
+	id = Column(Integer, primary_key=True)
+	capability_id = Column(String(256), nullable=False)
+	version = Column(String(32), nullable=False)
+	release_notes = Column(Text)
+	breaking_changes = Column(Boolean, default=False)
+	migration_guide = Column(Text)
+	released_at = Column(DateTime, default=datetime.utcnow)
+	downloads = Column(Integer, default=0)
+

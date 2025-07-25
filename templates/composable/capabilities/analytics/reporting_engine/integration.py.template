@@ -1,0 +1,128 @@
+"""
+Reporting Engine Integration
+============================
+
+Integration logic for the Reporting Engine capability.
+Handles BI/analytics-specific setup and configuration.
+"""
+
+import logging
+from flask import Blueprint
+from flask_appbuilder import BaseView
+
+# Configure logging
+log = logging.getLogger(__name__)
+
+# Create capability blueprint
+reporting_engine_bp = Blueprint(
+    'reporting_engine',
+    __name__,
+    url_prefix='/analytics/reporting_engine',
+    template_folder='templates',
+    static_folder='static'
+)
+
+
+def integrate_reporting_engine(app, appbuilder, db):
+    """
+    Integrate Reporting Engine capability into the application.
+    
+    Args:
+        app: Flask application instance
+        appbuilder: Flask-AppBuilder instance
+        db: SQLAlchemy database instance
+    """
+    try:
+        # Register blueprint
+        app.register_blueprint(reporting_engine_bp)
+        
+        # Import and register models
+        from .models import *  # noqa
+        
+        # Import and register views
+        from .views import *  # noqa
+        
+        # Apply BI-specific configuration
+        config_additions = {'REPORTS_OUTPUT_DIR': '/var/reports', 'CELERY_BROKER_URL': 'redis://localhost:6379/0'}
+        for key, value in config_additions.items():
+            app.config[key] = value
+        
+        # Initialize BI service
+        bi_service = ReportingEngineService(app, appbuilder, db)
+        app.extensions['reporting_engine_service'] = bi_service
+        
+        # Register views with AppBuilder
+        appbuilder.add_view(
+            ReportingEngineView,
+            "Reporting Engine",
+            icon="fa-chart-bar",
+            category="Analytics",
+            category_icon="fa-analytics"
+        )
+        
+        log.info(f"Successfully integrated Reporting Engine capability")
+        
+    except Exception as e:
+        log.error(f"Failed to integrate Reporting Engine capability: {e}")
+        raise
+
+
+class ReportingEngineService:
+    """
+    Main service class for Reporting Engine.
+    
+    Handles BI/analytics processing and data operations.
+    """
+    
+    def __init__(self, app, appbuilder, db):
+        self.app = app
+        self.appbuilder = appbuilder
+        self.db = db
+        self.initialize_service()
+    
+    def initialize_service(self):
+        """Initialize BI service"""
+        log.info(f"Initializing Reporting Engine service")
+        
+        try:
+            # Setup BI-specific components
+            self.setup_analytics_engine()
+            
+            # Initialize data connections
+            self.setup_data_connections()
+            
+        except Exception as e:
+            log.error(f"Error initializing BI service: {e}")
+    
+    def setup_analytics_engine(self):
+        """Setup analytics processing engine"""
+        # Analytics engine setup logic
+        pass
+    
+    def setup_data_connections(self):
+        """Setup data source connections"""
+        # Data connection setup logic
+        pass
+    
+    def generate_insights(self, data):
+        """Generate business insights from data"""
+        # Insight generation logic
+        return {"insights": [], "recommendations": []}
+
+
+class ReportingEngineView(BaseView):
+    """
+    Main view for Reporting Engine capability.
+    """
+    
+    route_base = "/reporting_engine"
+    
+    @expose("/")
+    def index(self):
+        """Main dashboard view"""
+        return self.render_template("reporting_engine_dashboard.html")
+    
+    @expose("/analytics")
+    def analytics(self):
+        """Analytics view"""
+        return self.render_template("reporting_engine_analytics.html")

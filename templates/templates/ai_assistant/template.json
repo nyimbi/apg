@@ -1,0 +1,32 @@
+{
+  "name": "AI Assistant",
+  "description": "Intelligent assistant with natural language processing",
+  "complexity": "Advanced",
+  "features": [
+    "NLP Processing",
+    "Knowledge Base",
+    "Chat Interface",
+    "AI Integration"
+  ],
+  "use_cases": [
+    "Customer Support",
+    "Personal Assistant",
+    "Knowledge Management"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}",
+    "ai_provider": "{{ai_provider}}",
+    "enable_nlp": "{{enable_nlp}}",
+    "knowledge_base": "{{knowledge_base}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "template_id": "marketplace/ecommerce",
+  "name": "E-Commerce Platform",
+  "description": "Complete online marketplace with products, orders, and payments",
+  "complexity": "Advanced",
+  "domain": "E-Commerce",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "ProductAgent",
+    "OrderAgent",
+    "PaymentAgent",
+    "InventoryAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Product Catalog",
+    "Shopping Cart",
+    "Order Management",
+    "Payment Processing"
+  ],
+  "databases": [
+    "products",
+    "orders",
+    "customers",
+    "inventory"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

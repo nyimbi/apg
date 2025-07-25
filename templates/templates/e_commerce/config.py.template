@@ -1,0 +1,29 @@
+"""
+Application Configuration
+========================
+
+Configuration for {{project_name}} Flask-AppBuilder application.
+"""
+
+import os
+from flask_appbuilder.security.manager import AUTH_DB
+
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+# Security
+SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+
+# Database
+SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(basedir, 'app.db')
+
+# Flask-AppBuilder
+APP_NAME = "{{project_name}}"
+AUTH_TYPE = AUTH_DB
+
+# Template-specific configuration
+
+# E-Commerce Configuration
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY')
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY')
+ENABLE_PAYMENTS = {{enable_payments}}
+ENABLE_INVENTORY = {{enable_inventory}}

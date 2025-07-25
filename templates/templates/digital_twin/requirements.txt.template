@@ -1,0 +1,12 @@
+# APG Generated Application Requirements
+Flask-AppBuilder>=4.3.0
+Flask>=2.3.0
+Flask-SQLAlchemy>=3.0.0
+SQLAlchemy>=2.0.0
+WTForms>=3.0.0
+Werkzeug>=2.3.0
+
+# Template-specific requirements
+
+# Basic web application requirements
+requests>=2.28.0

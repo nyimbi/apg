@@ -1,0 +1,69 @@
+{
+  "name": "Application Profiler",
+  "category": "analytics",
+  "description": "Real-time application performance profiling and bottleneck detection",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "py-spy>=0.3.14",
+    "memory-profiler>=0.61.0",
+    "psutil>=5.9.5",
+    "cprofilev>=1.2.0",
+    "line-profiler>=4.1.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store profiling data and metrics"
+    }
+  ],
+  "integration": {
+    "models": [
+      "ProfilingSession",
+      "PerformanceMetric",
+      "Bottleneck",
+      "OptimizationSuggestion"
+    ],
+    "views": [
+      "ProfilerView",
+      "MetricsView",
+      "BottleneckView"
+    ],
+    "apis": [
+      "profiler/start",
+      "profiler/stop",
+      "profiler/report"
+    ],
+    "templates": [
+      "profiler_dashboard.html",
+      "flame_graph.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "PROFILER_ENABLED": true,
+      "PROFILER_SAMPLE_RATE": 100,
+      "PROFILER_OUTPUT_DIR": "/tmp/profiling"
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "CPU Profiling",
+    "Memory Profiling",
+    "I/O Monitoring",
+    "Function Call Analysis",
+    "Line-by-line Profiling",
+    "Flame Graphs",
+    "Performance Regression Detection",
+    "Real-time Monitoring"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only"
+  ],
+  "incompatible_capabilities": []
+}

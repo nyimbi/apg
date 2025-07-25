@@ -1,0 +1,69 @@
+{
+  "name": "Capability Marketplace",
+  "category": "business",
+  "description": "Community marketplace for discovering, rating, and installing capabilities",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "requests>=2.31.0",
+    "packaging>=23.1",
+    "gitpython>=3.1.32"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store marketplace data"
+    },
+    {
+      "name": "auth/basic_authentication",
+      "version": null,
+      "optional": false,
+      "reason": "User authentication for ratings"
+    }
+  ],
+  "integration": {
+    "models": [
+      "MarketplaceCapability",
+      "CapabilityRating",
+      "Author",
+      "DownloadStats"
+    ],
+    "views": [
+      "MarketplaceView",
+      "DiscoveryView",
+      "AuthorView"
+    ],
+    "apis": [
+      "marketplace/search",
+      "marketplace/install",
+      "marketplace/rate"
+    ],
+    "templates": [
+      "marketplace_dashboard.html",
+      "capability_details.html",
+      "author_profile.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Capability Discovery",
+    "Search and Filtering",
+    "Rating and Reviews",
+    "Download Statistics",
+    "Version Management",
+    "Author Profiles",
+    "Category Browsing",
+    "Installation Management"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

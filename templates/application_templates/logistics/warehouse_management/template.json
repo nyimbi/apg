@@ -1,0 +1,46 @@
+{
+  "template_id": "logistics/warehouse_management",
+  "name": "Warehouse Management System",
+  "description": "Advanced warehouse operations and inventory management",
+  "complexity": "Advanced",
+  "domain": "Warehouse Management",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "InventoryAgent",
+    "PickingAgent",
+    "ShippingAgent",
+    "OptimizationAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Inventory Management",
+    "Order Picking",
+    "Shipping Management",
+    "Layout Optimization"
+  ],
+  "databases": [
+    "inventory",
+    "orders",
+    "shipments",
+    "warehouse_layout"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

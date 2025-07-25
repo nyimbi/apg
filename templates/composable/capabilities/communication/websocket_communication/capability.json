@@ -1,0 +1,37 @@
+{
+  "name": "WebSocket Communication",
+  "category": "communication",
+  "description": "Real-time WebSocket communication",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "Flask-SocketIO>=5.3.0",
+    "eventlet>=0.33.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [],
+  "integration": {
+    "models": [],
+    "views": [],
+    "apis": [],
+    "templates": [
+      "websocket_client.html"
+    ],
+    "static_files": [
+      "js/websocket.js"
+    ],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Real-time Messaging",
+    "Room Management",
+    "Event Broadcasting"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "real_time",
+    "flask_webapp"
+  ],
+  "incompatible_capabilities": []
+}

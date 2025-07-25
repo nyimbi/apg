@@ -1,0 +1,29 @@
+{
+  "name": "Social Network",
+  "description": "Social networking platform with posts, connections, and messaging",
+  "complexity": "Advanced",
+  "features": [
+    "User Profiles",
+    "Social Feed",
+    "Messaging",
+    "Content Moderation"
+  ],
+  "use_cases": [
+    "Social Media",
+    "Community Platform",
+    "Professional Networks"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

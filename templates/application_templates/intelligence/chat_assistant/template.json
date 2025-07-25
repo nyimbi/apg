@@ -1,0 +1,43 @@
+{
+  "template_id": "intelligence/chat_assistant",
+  "name": "Conversational AI Assistant",
+  "description": "Advanced chatbot with context awareness and learning",
+  "complexity": "Advanced",
+  "domain": "Conversational AI",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "ChatAgent",
+    "ContextManager",
+    "LearningAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Natural Language Processing",
+    "Context Awareness",
+    "Multi-turn Conversations"
+  ],
+  "databases": [
+    "conversations",
+    "context_memory",
+    "user_profiles"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

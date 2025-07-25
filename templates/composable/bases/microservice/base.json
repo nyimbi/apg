@@ -1,0 +1,29 @@
+{
+  "name": "Microservice",
+  "type": "microservice",
+  "description": "Lightweight microservice with FastAPI",
+  "framework": "FastAPI",
+  "capabilities_supported": [
+    "auth",
+    "ai",
+    "data",
+    "business"
+  ],
+  "default_capabilities": [
+    "auth/jwt_authentication"
+  ],
+  "structure": {
+    "api": {
+      "v1": {}
+    },
+    "models": {},
+    "capabilities": {},
+    "tests": {}
+  },
+  "requirements": [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.0.0",
+    "sqlalchemy>=2.0.0"
+  ]
+}

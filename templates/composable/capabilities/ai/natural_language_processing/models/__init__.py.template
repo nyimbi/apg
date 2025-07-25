@@ -1,0 +1,49 @@
+"""
+Natural Language Processing Models
+==================================
+
+Database models for Natural Language Processing capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class AIBaseModel(AuditMixin, Model):
+    """Base model for AI entities"""
+    __abstract__ = True
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# Add AI-specific models based on capability
+
+class TextDocument(AIBaseModel):
+    """Text document model"""
+    __tablename__ = 'nlp_documents'
+    
+    id = Column(Integer, primary_key=True)
+    title = Column(String(256))
+    content = Column(Text, nullable=False)
+    language = Column(String(32))
+    word_count = Column(Integer)
+    
+    results = relationship("NLPResult", back_populates="document")
+
+
+class NLPResult(AIBaseModel):
+    """NLP analysis result"""
+    __tablename__ = 'nlp_results'
+    
+    id = Column(Integer, primary_key=True)
+    document_id = Column(Integer, ForeignKey('nlp_documents.id'))
+    analysis_type = Column(String(64))
+    result_data = Column(JSON)
+    confidence = Column(Float)
+    
+    document = relationship("TextDocument", back_populates="results")
+

@@ -1,0 +1,46 @@
+{
+  "template_id": "enterprise/business_intelligence",
+  "name": "Business Intelligence Platform",
+  "description": "Enterprise BI platform with advanced analytics",
+  "complexity": "Expert",
+  "domain": "Business Intelligence",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "BIAgent",
+    "AnalyticsAgent",
+    "ReportingAgent",
+    "DashboardAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Data Analytics",
+    "Interactive Dashboards",
+    "Automated Reporting",
+    "Predictive Analytics"
+  ],
+  "databases": [
+    "business_data",
+    "analytics_results",
+    "reports",
+    "dashboards"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "template_id": "logistics/shipping_tracker",
+  "name": "Shipping Tracker",
+  "description": "Real-time package tracking and delivery management",
+  "complexity": "Intermediate",
+  "domain": "Shipping & Delivery",
+  "version": "1.0.0",
+  "apg_version": ">=1.0.0",
+  "agents": [
+    "TrackingAgent",
+    "DeliveryAgent",
+    "RouteAgent",
+    "NotificationAgent"
+  ],
+  "digital_twins": [],
+  "features": [
+    "Package Tracking",
+    "Delivery Management",
+    "Route Optimization",
+    "Customer Notifications"
+  ],
+  "databases": [
+    "packages",
+    "deliveries",
+    "routes",
+    "tracking_events"
+  ],
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "database_url": "{{database_url}}",
+    "secret_key": "{{secret_key}}"
+  },
+  "files": [
+    "app.py.template",
+    "config.py.template",
+    "requirements.txt.template",
+    "README.md.template"
+  ]
+}

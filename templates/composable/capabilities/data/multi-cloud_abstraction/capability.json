@@ -1,0 +1,73 @@
+{
+  "name": "Multi-Cloud Abstraction",
+  "category": "data",
+  "description": "Unified API for multi-cloud operations across AWS, Azure, and GCP",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "apache-libcloud>=3.8.0",
+    "cloudsplaining>=0.6.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/aws_integration",
+      "version": null,
+      "optional": true,
+      "reason": "AWS provider"
+    },
+    {
+      "name": "data/azure_integration",
+      "version": null,
+      "optional": true,
+      "reason": "Azure provider"
+    },
+    {
+      "name": "data/gcp_integration",
+      "version": null,
+      "optional": true,
+      "reason": "GCP provider"
+    }
+  ],
+  "integration": {
+    "models": [
+      "CloudProvider",
+      "CloudResource",
+      "CloudOperation",
+      "MigrationJob"
+    ],
+    "views": [
+      "MultiCloudView",
+      "ProviderComparisonView",
+      "MigrationView"
+    ],
+    "apis": [
+      "multicloud/storage",
+      "multicloud/compute",
+      "multicloud/migrate"
+    ],
+    "templates": [
+      "multicloud_dashboard.html",
+      "provider_comparison.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Cloud-agnostic Storage API",
+    "Universal Database Interface",
+    "Cross-cloud Resource Management",
+    "Cost Optimization",
+    "Migration Tools",
+    "Disaster Recovery",
+    "Performance Comparison",
+    "Vendor Lock-in Prevention"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice"
+  ],
+  "incompatible_capabilities": []
+}

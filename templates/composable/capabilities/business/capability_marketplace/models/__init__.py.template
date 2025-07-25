@@ -1,0 +1,86 @@
+"""
+Capability Marketplace Models
+=============================
+
+Database models for Capability Marketplace capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class CommunityBaseModel(AuditMixin, Model):
+	"""Base model for community entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add community-specific models based on capability
+
+class MarketplaceCapability(CommunityBaseModel):
+	"""Capability in marketplace"""
+	__tablename__ = 'marketplace_capabilities'
+	
+	id = Column(Integer, primary_key=True)
+	capability_id = Column(String(256), unique=True, nullable=False)
+	name = Column(String(256), nullable=False)
+	description = Column(Text)
+	category = Column(String(64))
+	version = Column(String(32))
+	author_id = Column(Integer, ForeignKey('authors.id'))
+	downloads = Column(Integer, default=0)
+	rating = Column(Float, default=0.0)
+	status = Column(String(32), default='pending')  # pending, approved, rejected
+	
+	author = relationship("Author", back_populates="capabilities")
+	ratings = relationship("CapabilityRating", back_populates="capability")
+
+
+class CapabilityRating(CommunityBaseModel):
+	"""User ratings for capabilities"""
+	__tablename__ = 'capability_ratings'
+	
+	id = Column(Integer, primary_key=True)
+	capability_id = Column(Integer, ForeignKey('marketplace_capabilities.id'))
+	user_id = Column(Integer, nullable=False)
+	rating = Column(Integer, nullable=False)  # 1-5 stars
+	review = Column(Text)
+	helpful_votes = Column(Integer, default=0)
+	
+	capability = relationship("MarketplaceCapability", back_populates="ratings")
+
+
+class Author(CommunityBaseModel):
+	"""Capability author profile"""
+	__tablename__ = 'authors'
+	
+	id = Column(Integer, primary_key=True)
+	username = Column(String(128), unique=True, nullable=False)
+	email = Column(String(256))
+	name = Column(String(256))
+	bio = Column(Text)
+	website = Column(String(512))
+	github_username = Column(String(128))
+	reputation_score = Column(Integer, default=0)
+	
+	capabilities = relationship("MarketplaceCapability", back_populates="author")
+
+
+class DownloadStats(CommunityBaseModel):
+	"""Download statistics"""
+	__tablename__ = 'download_stats'
+	
+	id = Column(Integer, primary_key=True)
+	capability_id = Column(Integer, ForeignKey('marketplace_capabilities.id'))
+	download_date = Column(DateTime, default=datetime.utcnow)
+	user_id = Column(Integer)
+	version = Column(String(32))
+	ip_address = Column(String(45))
+	user_agent = Column(Text)
+

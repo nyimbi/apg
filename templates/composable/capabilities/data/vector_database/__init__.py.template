@@ -1,0 +1,25 @@
+"""
+Vector Database Capability
+===================================
+
+Vector database for AI/ML applications with similarity search
+
+Category: data
+Version: 1.0.0
+Author: APG Team
+"""
+
+from .integration import integrate_vector_database
+
+__version__ = "1.0.0"
+__capability_name__ = "Vector Database"
+__category__ = "data"
+
+# Capability metadata
+CAPABILITY_INFO = {
+    'name': 'Vector Database',
+    'category': 'data',
+    'version': '1.0.0',
+    'features': ['Vector Storage', 'Similarity Search', 'Embeddings Management'],
+    'author': 'APG Team'
+}

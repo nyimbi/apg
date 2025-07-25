@@ -1,0 +1,69 @@
+{
+  "name": "Recommendation Engine",
+  "category": "ai",
+  "description": "Collaborative and content-based recommendation system",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "scikit-learn>=1.3.0",
+    "surprise>=1.1.3",
+    "implicit>=0.7.0",
+    "pandas>=2.0.0",
+    "scipy>=1.11.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store user interactions and recommendations"
+    },
+    {
+      "name": "analytics/basic_analytics",
+      "version": null,
+      "optional": false,
+      "reason": "Recommendation performance analysis"
+    }
+  ],
+  "integration": {
+    "models": [
+      "User",
+      "Item",
+      "Interaction",
+      "Recommendation",
+      "RecommendationModel"
+    ],
+    "views": [
+      "RecommendationView",
+      "InteractionView"
+    ],
+    "apis": [
+      "recommendations/get",
+      "recommendations/feedback",
+      "recommendations/similar"
+    ],
+    "templates": [
+      "recommendations_dashboard.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "Collaborative Filtering",
+    "Content-based Filtering",
+    "Hybrid Recommendations",
+    "Real-time Scoring",
+    "A/B Testing",
+    "Cold Start Handling",
+    "Popularity-based Fallback",
+    "Recommendation Explanation"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice"
+  ],
+  "incompatible_capabilities": []
+}

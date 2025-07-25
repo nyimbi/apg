@@ -1,0 +1,61 @@
+{
+  "name": "MQTT Messaging",
+  "category": "iot",
+  "description": "MQTT pub/sub messaging for IoT device communication",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "paho-mqtt>=1.6.1",
+    "json-logging>=1.3.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store device data and message history"
+    }
+  ],
+  "integration": {
+    "models": [
+      "MQTTDevice",
+      "MQTTTopic",
+      "MQTTMessage"
+    ],
+    "views": [
+      "DeviceView",
+      "TopicView",
+      "MessageView"
+    ],
+    "apis": [
+      "mqtt/publish",
+      "mqtt/subscribe",
+      "mqtt/devices"
+    ],
+    "templates": [],
+    "static_files": [],
+    "config_additions": {
+      "MQTT_BROKER_HOST": "localhost",
+      "MQTT_BROKER_PORT": 1883,
+      "MQTT_KEEPALIVE": 60
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "MQTT Broker Connection",
+    "Topic Subscription Management",
+    "Message Publishing",
+    "Device Status Monitoring",
+    "Retained Messages",
+    "QoS Level Support"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "real_time",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

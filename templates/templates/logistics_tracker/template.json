@@ -1,0 +1,29 @@
+{
+  "name": "Logistics Tracker",
+  "description": "Supply chain and logistics management with real-time tracking",
+  "complexity": "Advanced",
+  "features": [
+    "Shipment Tracking",
+    "Route Optimization",
+    "Inventory Management",
+    "Analytics"
+  ],
+  "use_cases": [
+    "Supply Chain",
+    "Delivery Services",
+    "Warehouse Management"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

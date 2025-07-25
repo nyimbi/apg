@@ -1,0 +1,28 @@
+{
+  "name": "Database CRUD",
+  "description": "Complete database management with CRUD operations",
+  "complexity": "Intermediate",
+  "features": [
+    "Database Models",
+    "CRUD Operations",
+    "Admin Interface"
+  ],
+  "use_cases": [
+    "Data Management",
+    "Content Management",
+    "Record Keeping"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

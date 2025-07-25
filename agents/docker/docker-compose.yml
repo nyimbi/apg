@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  # APG Agent Orchestrator
+  apg-orchestrator:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: apg-orchestrator
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://apg_user:apg_password@postgres:5432/apg_agents
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    volumes:
+      - agent_data:/app/data
+    networks:
+      - apg_network
+    command: ["python", "-m", "agents.cli", "deploy", "--environment", "production"]
+
+  # APG Agent Web Interface
+  apg-web:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    container_name: apg-web
+    environment:
+      - API_URL=http://apg-orchestrator:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - apg-orchestrator
+    restart: unless-stopped
+    networks:
+      - apg_network
+
+  # Redis for agent communication and caching
+  redis:
+    image: redis:7-alpine
+    container_name: apg-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - apg_network
+    command: redis-server --appendonly yes
+
+  # PostgreSQL for agent state and learning data
+  postgres:
+    image: postgres:15
+    container_name: apg-postgres
+    environment:
+      - POSTGRES_DB=apg_agents
+      - POSTGRES_USER=apg_user
+      - POSTGRES_PASSWORD=apg_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    networks:
+      - apg_network
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: apg-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    restart: unless-stopped
+    networks:
+      - apg_network
+
+  # Grafana for monitoring dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: apg-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    restart: unless-stopped
+    networks:
+      - apg_network
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: apg-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - apg-orchestrator
+      - apg-web
+      - grafana
+    restart: unless-stopped
+    networks:
+      - apg_network
+
+volumes:
+  agent_data:
+  redis_data:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  apg_network:
+    driver: bridge

@@ -1,0 +1,71 @@
+{
+  "name": "Time Series Forecasting",
+  "category": "ai",
+  "description": "Time series analysis and forecasting with multiple algorithms",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "statsmodels>=0.14.0",
+    "prophet>=1.1.4",
+    "plotly>=5.15.0",
+    "scikit-learn>=1.3.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store time series data"
+    },
+    {
+      "name": "analytics/basic_analytics",
+      "version": null,
+      "optional": false,
+      "reason": "Time series visualization"
+    }
+  ],
+  "integration": {
+    "models": [
+      "TimeSeries",
+      "Forecast",
+      "ForecastModel",
+      "Anomaly"
+    ],
+    "views": [
+      "TimeSeriesView",
+      "ForecastView",
+      "AnomalyView"
+    ],
+    "apis": [
+      "timeseries/forecast",
+      "timeseries/detect_anomalies",
+      "timeseries/analyze"
+    ],
+    "templates": [
+      "timeseries_dashboard.html",
+      "forecast_charts.html"
+    ],
+    "static_files": [],
+    "config_additions": {},
+    "database_migrations": []
+  },
+  "features": [
+    "ARIMA Modeling",
+    "Prophet Forecasting",
+    "Seasonal Decomposition",
+    "Anomaly Detection",
+    "Multiple Forecasts",
+    "Confidence Intervals",
+    "Model Comparison",
+    "Interactive Visualizations"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

@@ -1,0 +1,73 @@
+"""
+Audit Logging Models
+====================
+
+Database models for Audit Logging capability.
+"""
+
+from flask_appbuilder import Model
+from flask_appbuilder.models.mixins import AuditMixin
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from datetime import datetime
+
+
+class SecurityBaseModel(AuditMixin, Model):
+	"""Base model for security entities"""
+	__abstract__ = True
+	
+	created_at = Column(DateTime, default=datetime.utcnow)
+	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+	active = Column(Boolean, default=True)
+
+
+# Add security-specific models based on capability
+
+class AuditLog(SecurityBaseModel):
+	"""Comprehensive audit log"""
+	__tablename__ = 'audit_logs'
+	
+	id = Column(Integer, primary_key=True)
+	event_id = Column(String(128), unique=True, nullable=False)
+	user_id = Column(Integer)
+	session_id = Column(String(256))
+	event_type = Column(String(64))  # login, logout, data_access, etc.
+	resource = Column(String(256))
+	action = Column(String(64))
+	result = Column(String(32))  # success, failure, error
+	timestamp = Column(DateTime, default=datetime.utcnow)
+	ip_address = Column(String(45))
+	user_agent = Column(Text)
+	details = Column(JSON)
+	risk_score = Column(Integer)
+
+
+class UserActivity(SecurityBaseModel):
+	"""User activity tracking"""
+	__tablename__ = 'user_activities'
+	
+	id = Column(Integer, primary_key=True)
+	user_id = Column(Integer, nullable=False)
+	activity_type = Column(String(64))
+	description = Column(Text)
+	timestamp = Column(DateTime, default=datetime.utcnow)
+	ip_address = Column(String(45))
+	session_duration = Column(Integer)
+	pages_visited = Column(Integer)
+	actions_performed = Column(Integer)
+
+
+class ComplianceReport(SecurityBaseModel):
+	"""Compliance reporting"""
+	__tablename__ = 'compliance_reports'
+	
+	id = Column(Integer, primary_key=True)
+	report_id = Column(String(128), unique=True, nullable=False)
+	report_type = Column(String(64))  # GDPR, HIPAA, SOX, etc.
+	generated_at = Column(DateTime, default=datetime.utcnow)
+	period_start = Column(DateTime)
+	period_end = Column(DateTime)
+	findings = Column(JSON)
+	compliance_score = Column(Float)
+	recommendations = Column(JSON)
+

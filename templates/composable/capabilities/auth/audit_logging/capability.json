@@ -1,0 +1,76 @@
+{
+  "name": "Audit Logging",
+  "category": "auth",
+  "description": "Comprehensive audit logging and compliance reporting",
+  "version": "1.0.0",
+  "author": "APG Team",
+  "python_requirements": [
+    "structlog>=23.1.0",
+    "python-json-logger>=2.0.7",
+    "elasticsearch>=8.8.0"
+  ],
+  "system_requirements": [],
+  "dependencies": [
+    {
+      "name": "data/postgresql_database",
+      "version": null,
+      "optional": false,
+      "reason": "Store audit logs and metadata"
+    },
+    {
+      "name": "auth/basic_authentication",
+      "version": null,
+      "optional": false,
+      "reason": "User context for audit logs"
+    }
+  ],
+  "integration": {
+    "models": [
+      "AuditLog",
+      "UserActivity",
+      "SystemEvent",
+      "ComplianceReport"
+    ],
+    "views": [
+      "AuditView",
+      "ActivityView",
+      "ComplianceView"
+    ],
+    "apis": [
+      "audit/logs",
+      "audit/search",
+      "audit/report",
+      "audit/export"
+    ],
+    "templates": [
+      "audit_dashboard.html",
+      "activity_timeline.html",
+      "compliance_report.html"
+    ],
+    "static_files": [],
+    "config_additions": {
+      "AUDIT_LOG_RETENTION_DAYS": 2555,
+      "ELASTICSEARCH_URL": "http://localhost:9200",
+      "LOG_INTEGRITY_CHECK": true
+    },
+    "database_migrations": []
+  },
+  "features": [
+    "User Activity Tracking",
+    "Data Access Logging",
+    "System Event Logging",
+    "Compliance Reporting",
+    "Log Integrity Protection",
+    "Real-time Monitoring",
+    "Log Search & Analytics",
+    "Export Capabilities"
+  ],
+  "configuration": {},
+  "compatible_bases": [
+    "flask_webapp",
+    "microservice",
+    "api_only",
+    "dashboard"
+  ],
+  "incompatible_capabilities": []
+}

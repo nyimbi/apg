@@ -1,0 +1,14 @@
+{
+  "name": "Microservice API",
+  "description": "Lightweight microservice with JWT authentication",
+  "base_template": "microservice",
+  "capabilities": [
+    "auth/jwt_authentication",
+    "data/postgresql_database"
+  ],
+  "use_cases": [
+    "API Services",
+    "Microservices Architecture",
+    "Backend Services"
+  ]
+}

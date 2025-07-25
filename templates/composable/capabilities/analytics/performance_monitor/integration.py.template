@@ -1,0 +1,150 @@
+"""
+Performance Monitor Integration
+===============================
+
+Integration logic for the Performance Monitor capability.
+Handles performance monitoring and optimization functionality.
+"""
+
+import logging
+from flask import Blueprint
+from flask_appbuilder import BaseView
+
+# Configure logging
+log = logging.getLogger(__name__)
+
+# Create capability blueprint
+performance_monitor_bp = Blueprint(
+	'performance_monitor',
+	__name__,
+	url_prefix='/performance/performance_monitor',
+	template_folder='templates',
+	static_folder='static'
+)
+
+
+def integrate_performance_monitor(app, appbuilder, db):
+	"""
+	Integrate Performance Monitor capability into the application.
+	
+	Args:
+		app: Flask application instance
+		appbuilder: Flask-AppBuilder instance
+		db: SQLAlchemy database instance
+	"""
+	try:
+		# Register blueprint
+		app.register_blueprint(performance_monitor_bp)
+		
+		# Import and register models
+		from .models import *  # noqa
+		
+		# Import and register views
+		from .views import *  # noqa
+		
+		# Apply performance-specific configuration
+		config_additions = {'MONITORING_ENABLED': True, 'METRIC_RETENTION_DAYS': 30, 'ALERT_COOLDOWN_MINUTES': 5}
+		for key, value in config_additions.items():
+			if key not in app.config or not app.config[key]:
+				app.config[key] = value
+		
+		# Initialize performance service
+		performance_service = PerformanceMonitorService(app, appbuilder, db)
+		app.extensions['performance_monitor_service'] = performance_service
+		
+		# Register views with AppBuilder
+		appbuilder.add_view(
+			PerformanceMonitorView,
+			"Performance Monitor",
+			icon="fa-tachometer-alt",
+			category="Performance",
+			category_icon="fa-chart-line"
+		)
+		
+		log.info(f"Successfully integrated Performance Monitor capability")
+		
+	except Exception as e:
+		log.error(f"Failed to integrate Performance Monitor capability: {e}")
+		raise
+
+
+class PerformanceMonitorService:
+	"""
+	Main service class for Performance Monitor.
+	
+	Handles performance monitoring and optimization operations.
+	"""
+	
+	def __init__(self, app, appbuilder, db):
+		self.app = app
+		self.appbuilder = appbuilder
+		self.db = db
+		self.monitoring_active = False
+		self.initialize_service()
+	
+	def initialize_service(self):
+		"""Initialize performance service"""
+		log.info(f"Initializing Performance Monitor service")
+		
+		try:
+			# Setup performance monitoring
+			self.setup_monitoring()
+			
+			# Initialize optimization components
+			self.setup_optimization()
+			
+		except Exception as e:
+			log.error(f"Error initializing performance service: {e}")
+	
+	def setup_monitoring(self):
+		"""Setup performance monitoring"""
+		# Monitoring setup logic specific to capability
+		pass
+	
+	def setup_optimization(self):
+		"""Setup optimization components"""
+		# Optimization setup logic
+		pass
+	
+	def start_monitoring(self):
+		"""Start performance monitoring"""
+		self.monitoring_active = True
+		return {"status": "monitoring_started"}
+	
+	def stop_monitoring(self):
+		"""Stop performance monitoring"""
+		self.monitoring_active = False
+		return {"status": "monitoring_stopped"}
+	
+	def get_metrics(self):
+		"""Get current performance metrics"""
+		# Metrics collection logic
+		return {"cpu_usage": 0.0, "memory_usage": 0.0, "response_time": 0.0}
+	
+	def optimize(self):
+		"""Perform optimization"""
+		# Optimization logic
+		return {"status": "optimized", "improvements": []}
+
+
+class PerformanceMonitorView(BaseView):
+	"""
+	Main view for Performance Monitor capability.
+	"""
+	
+	route_base = "/performance_monitor"
+	
+	@expose("/")
+	def index(self):
+		"""Main performance dashboard view"""
+		return self.render_template("performance_monitor_dashboard.html")
+	
+	@expose("/metrics")
+	def metrics(self):
+		"""Performance metrics view"""
+		return self.render_template("performance_monitor_metrics.html")
+	
+	@expose("/optimize")
+	def optimize(self):
+		"""Optimization control view"""
+		return self.render_template("performance_monitor_optimize.html")

@@ -1,0 +1,29 @@
+{
+  "name": "Data Pipeline",
+  "description": "ETL pipeline for data processing and analytics",
+  "complexity": "Advanced",
+  "features": [
+    "Data Ingestion",
+    "Transformation Engine",
+    "Analytics",
+    "Scheduling"
+  ],
+  "use_cases": [
+    "Data Processing",
+    "Analytics Workflows",
+    "Business Intelligence"
+  ],
+  "variables": {
+    "project_name": "{{project_name}}",
+    "project_description": "{{project_description}}",
+    "author": "{{author}}",
+    "version": "{{version}}",
+    "license": "{{license}}"
+  },
+  "files": [
+    "main.apg.template",
+    "README.md.template",
+    "requirements.txt.template",
+    "config.py.template"
+  ]
+}

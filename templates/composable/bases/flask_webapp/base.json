@@ -1,0 +1,38 @@
+{
+  "name": "Flask Web Application",
+  "type": "flask_webapp",
+  "description": "Full-featured web application with Flask-AppBuilder",
+  "framework": "Flask-AppBuilder",
+  "capabilities_supported": [
+    "auth",
+    "ai",
+    "data",
+    "payments",
+    "business",
+    "analytics"
+  ],
+  "default_capabilities": [
+    "auth/basic_authentication",
+    "data/postgresql_database"
+  ],
+  "structure": {
+    "models": {},
+    "views": {},
+    "templates": {
+      "html": {}
+    },
+    "static": {
+      "css": {},
+      "js": {},
+      "img": {}
+    },
+    "capabilities": {},
+    "tests": {}
+  },
+  "requirements": [
+    "Flask-AppBuilder>=4.3.0",
+    "Flask>=2.3.0",
+    "SQLAlchemy>=2.0.0",
+    "WTForms>=3.0.0"
+  ]
+}

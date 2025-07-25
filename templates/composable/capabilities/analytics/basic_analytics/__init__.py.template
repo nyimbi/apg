@@ -1,0 +1,25 @@
+"""
+Basic Analytics Capability
+===================================
+
+Basic analytics and reporting with charts
+
+Category: analytics
+Version: 1.0.0
+Author: APG Team
+"""
+
+from .integration import integrate_basic_analytics
+
+__version__ = "1.0.0"
+__capability_name__ = "Basic Analytics"
+__category__ = "analytics"
+
+# Capability metadata
+CAPABILITY_INFO = {
+    'name': 'Basic Analytics',
+    'category': 'analytics',
+    'version': '1.0.0',
+    'features': ['Dashboard Charts', 'Data Visualization', 'Report Generation', 'KPI Tracking'],
+    'author': 'APG Team'
+}
