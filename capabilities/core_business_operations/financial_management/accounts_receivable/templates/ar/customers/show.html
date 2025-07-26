@@ -1,0 +1,508 @@
+{% extends "appbuilder/general/model/show.html" %}
+
+{% block show_title %}
+<h3>
+    <i class="fa fa-user"></i> 
+    {{ _("Customer Details") }}: {{ item.legal_name }}
+    <small class="text-muted">{{ item.customer_code }}</small>
+</h3>
+{% endblock %}
+
+{% block show_actions %}
+{{ super() }}
+<div class="btn-group" role="group">
+    <a href="{{ url_for('ARCustomerModelView.edit', pk=item.id) }}" 
+       class="btn btn-warning">
+        <i class="fa fa-pencil"></i> {{ _("Edit Customer") }}
+    </a>
+    <button type="button" class="btn btn-info" id="credit-assessment-btn" 
+            data-customer-id="{{ item.id }}">
+        <i class="fa fa-calculator"></i> {{ _("AI Credit Assessment") }}
+    </button>
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+            <i class="fa fa-cogs"></i> {{ _("More Actions") }} <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu">
+            <li><a href="#" id="generate-statement">
+                <i class="fa fa-file-text"></i> {{ _("Generate Statement") }}
+            </a></li>
+            <li><a href="#" id="view-payment-history">
+                <i class="fa fa-history"></i> {{ _("Payment History") }}
+            </a></li>
+            <li><a href="#" id="collections-review">
+                <i class="fa fa-phone"></i> {{ _("Collections Review") }}
+            </a></li>
+            <li class="divider"></li>
+            <li><a href="#" id="export-customer-data">
+                <i class="fa fa-download"></i> {{ _("Export Data") }}
+            </a></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block show_form %}
+<div class="row">
+    <!-- Customer Information Column -->
+    <div class="col-md-8">
+        {{ super() }}
+        
+        <!-- Recent Invoices Section -->
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4><i class="fa fa-file-text"></i> {{ _("Recent Invoices") }}</h4>
+            </div>
+            <div class="panel-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="recent-invoices-table">
+                        <thead>
+                            <tr>
+                                <th>{{ _("Invoice #") }}</th>
+                                <th>{{ _("Date") }}</th>
+                                <th>{{ _("Due Date") }}</th>
+                                <th>{{ _("Amount") }}</th>
+                                <th>{{ _("Outstanding") }}</th>
+                                <th>{{ _("Status") }}</th>
+                                <th>{{ _("Actions") }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-invoices-body">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center">
+                    <a href="{{ url_for('ARInvoiceModelView.list') }}?customer_id={{ item.id }}" 
+                       class="btn btn-default">
+                        {{ _("View All Invoices") }}
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Payments Section -->
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4><i class="fa fa-money"></i> {{ _("Recent Payments") }}</h4>
+            </div>
+            <div class="panel-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="recent-payments-table">
+                        <thead>
+                            <tr>
+                                <th>{{ _("Payment #") }}</th>
+                                <th>{{ _("Date") }}</th>
+                                <th>{{ _("Amount") }}</th>
+                                <th>{{ _("Method") }}</th>
+                                <th>{{ _("Status") }}</th>
+                                <th>{{ _("Actions") }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-payments-body">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center">
+                    <a href="{{ url_for('ARPaymentModelView.list') }}?customer_id={{ item.id }}" 
+                       class="btn btn-default">
+                        {{ _("View All Payments") }}
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collection Activities Section -->
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4><i class="fa fa-phone"></i> {{ _("Collection Activities") }}</h4>
+            </div>
+            <div class="panel-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="collection-activities-table">
+                        <thead>
+                            <tr>
+                                <th>{{ _("Date") }}</th>
+                                <th>{{ _("Type") }}</th>
+                                <th>{{ _("Contact Method") }}</th>
+                                <th>{{ _("Outcome") }}</th>
+                                <th>{{ _("Priority") }}</th>
+                                <th>{{ _("Notes") }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="collection-activities-body">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center">
+                    <a href="{{ url_for('ARCollectionActivityModelView.list') }}?customer_id={{ item.id }}" 
+                       class="btn btn-default">
+                        {{ _("View All Activities") }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Column -->
+    <div class="col-md-4">
+        <!-- Customer Summary Card -->
+        <div class="panel panel-primary">
+            <div class="panel-heading">
+                <h4><i class="fa fa-info-circle"></i> {{ _("Customer Summary") }}</h4>
+            </div>
+            <div class="panel-body">
+                <div class="row">
+                    <div class="col-xs-6">
+                        <h5>{{ _("Credit Limit") }}</h5>
+                        <h3 class="text-primary">${{ "{:,.2f}".format(item.credit_limit|float) }}</h3>
+                    </div>
+                    <div class="col-xs-6">
+                        <h5>{{ _("Outstanding") }}</h5>
+                        <h3 class="{% if item.total_outstanding > 0 %}text-warning{% else %}text-success{% endif %}">
+                            ${{ "{:,.2f}".format(item.total_outstanding|float) }}
+                        </h3>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-6">
+                        <h5>{{ _("Available Credit") }}</h5>
+                        {% set available_credit = item.credit_limit - item.total_outstanding %}
+                        <h4 class="{% if available_credit > 0 %}text-success{% else %}text-danger{% endif %}">
+                            ${{ "{:,.2f}".format(available_credit|float) }}
+                        </h4>
+                    </div>
+                    <div class="col-xs-6">
+                        <h5>{{ _("Overdue Amount") }}</h5>
+                        <h4 class="{% if item.overdue_amount > 0 %}text-danger{% else %}text-success{% endif %}">
+                            ${{ "{:,.2f}".format(item.overdue_amount|float) }}
+                        </h4>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <!-- Credit Health Indicator -->
+                <div class="text-center">
+                    <h5>{{ _("Credit Health") }}</h5>
+                    {% if item.overdue_amount == 0 and item.total_outstanding < item.credit_limit * 0.8 %}
+                        <span class="label label-success label-lg">{{ _("Excellent") }}</span>
+                    {% elif item.overdue_amount == 0 %}
+                        <span class="label label-info label-lg">{{ _("Good") }}</span>
+                    {% elif item.overdue_amount < item.total_outstanding * 0.3 %}
+                        <span class="label label-warning label-lg">{{ _("Caution") }}</span>
+                    {% else %}
+                        <span class="label label-danger label-lg">{{ _("Risk") }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Insights Card -->
+        <div class="panel panel-info">
+            <div class="panel-heading">
+                <h4><i class="fa fa-lightbulb-o"></i> {{ _("AI Insights") }}</h4>
+            </div>
+            <div class="panel-body" id="ai-insights-panel">
+                <div class="text-center">
+                    <i class="fa fa-spinner fa-spin fa-2x"></i>
+                    <p>{{ _("Loading AI insights...") }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Pattern Card -->
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4><i class="fa fa-line-chart"></i> {{ _("Payment Pattern") }}</h4>
+            </div>
+            <div class="panel-body">
+                <canvas id="payment-pattern-chart" width="300" height="200"></canvas>
+                <div class="row text-center" style="margin-top: 15px;">
+                    <div class="col-xs-6">
+                        <h5 id="avg-payment-days">--</h5>
+                        <small>{{ _("Avg Pay Days") }}</small>
+                    </div>
+                    <div class="col-xs-6">
+                        <h5 id="payment-reliability">--%</h5>
+                        <small>{{ _("Reliability") }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Card -->
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4><i class="fa fa-flash"></i> {{ _("Quick Actions") }}</h4>
+            </div>
+            <div class="panel-body">
+                <div class="list-group">
+                    <a href="#" class="list-group-item" id="create-invoice-btn">
+                        <i class="fa fa-plus"></i> {{ _("Create Invoice") }}
+                    </a>
+                    <a href="#" class="list-group-item" id="record-payment-btn">
+                        <i class="fa fa-money"></i> {{ _("Record Payment") }}
+                    </a>
+                    <a href="#" class="list-group-item" id="send-reminder-btn">
+                        <i class="fa fa-envelope"></i> {{ _("Send Reminder") }}
+                    </a>
+                    <a href="#" class="list-group-item" id="schedule-call-btn">
+                        <i class="fa fa-phone"></i> {{ _("Schedule Call") }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+var customerId = '{{ item.id }}';
+var paymentPatternChart;
+
+$(document).ready(function() {
+    loadRecentInvoices();
+    loadRecentPayments();
+    loadCollectionActivities();
+    loadAIInsights();
+    loadPaymentPattern();
+    
+    // Event handlers
+    $('#credit-assessment-btn').click(function() {
+        launchCreditAssessment(customerId);
+    });
+    
+    $('#generate-statement').click(function() {
+        generateStatement(customerId);
+    });
+    
+    $('#create-invoice-btn').click(function() {
+        window.location.href = '{{ url_for("ARInvoiceModelView.add") }}?customer_id=' + customerId;
+    });
+    
+    $('#record-payment-btn').click(function() {
+        window.location.href = '{{ url_for("ARPaymentModelView.add") }}?customer_id=' + customerId;
+    });
+});
+
+function loadRecentInvoices() {
+    $.ajax({
+        url: '/api/ar/invoices?customer_id=' + customerId + '&limit=5',
+        method: 'GET',
+        success: function(response) {
+            var html = '';
+            response.forEach(function(invoice) {
+                html += '<tr>';
+                html += '<td><a href="/ar/invoices/' + invoice.id + '">' + invoice.invoice_number + '</a></td>';
+                html += '<td>' + formatDate(invoice.invoice_date) + '</td>';
+                html += '<td>' + formatDate(invoice.due_date) + '</td>';
+                html += '<td class="text-right">$' + formatCurrency(invoice.total_amount) + '</td>';
+                html += '<td class="text-right">$' + formatCurrency(invoice.outstanding_amount) + '</td>';
+                html += '<td><span class="label label-' + getStatusClass(invoice.status) + '">' + invoice.status + '</span></td>';
+                html += '<td>';
+                html += '<a href="/ar/invoices/' + invoice.id + '" class="btn btn-xs btn-primary"><i class="fa fa-eye"></i></a>';
+                html += '</td>';
+                html += '</tr>';
+            });
+            $('#recent-invoices-body').html(html);
+        }
+    });
+}
+
+function loadRecentPayments() {
+    $.ajax({
+        url: '/api/ar/payments?customer_id=' + customerId + '&limit=5',
+        method: 'GET',
+        success: function(response) {
+            var html = '';
+            response.forEach(function(payment) {
+                html += '<tr>';
+                html += '<td><a href="/ar/payments/' + payment.id + '">' + payment.payment_reference + '</a></td>';
+                html += '<td>' + formatDate(payment.payment_date) + '</td>';
+                html += '<td class="text-right">$' + formatCurrency(payment.payment_amount) + '</td>';
+                html += '<td>' + payment.payment_method + '</td>';
+                html += '<td><span class="label label-' + getStatusClass(payment.status) + '">' + payment.status + '</span></td>';
+                html += '<td>';
+                html += '<a href="/ar/payments/' + payment.id + '" class="btn btn-xs btn-primary"><i class="fa fa-eye"></i></a>';
+                html += '</td>';
+                html += '</tr>';
+            });
+            $('#recent-payments-body').html(html);
+        }
+    });
+}
+
+function loadCollectionActivities() {
+    $.ajax({
+        url: '/api/ar/collections?customer_id=' + customerId + '&limit=5',
+        method: 'GET',
+        success: function(response) {
+            var html = '';
+            response.forEach(function(activity) {
+                html += '<tr>';
+                html += '<td>' + formatDate(activity.activity_date) + '</td>';
+                html += '<td>' + activity.activity_type + '</td>';
+                html += '<td>' + activity.contact_method + '</td>';
+                html += '<td>' + activity.outcome + '</td>';
+                html += '<td><span class="label label-' + getPriorityClass(activity.priority) + '">' + activity.priority + '</span></td>';
+                html += '<td><small>' + (activity.notes || '') + '</small></td>';
+                html += '</tr>';
+            });
+            $('#collection-activities-body').html(html);
+        }
+    });
+}
+
+function loadAIInsights() {
+    $.ajax({
+        url: '/api/ar/customers/' + customerId + '/credit-assessment',
+        method: 'POST',
+        data: JSON.stringify({
+            assessment_type: 'monitoring',
+            include_explanations: true,
+            generate_recommendations: true
+        }),
+        contentType: 'application/json',
+        success: function(response) {
+            var insights = response.data;
+            var html = '';
+            
+            html += '<div class="row text-center">';
+            html += '<div class="col-xs-6">';
+            html += '<h4>' + Math.round(insights.credit_score) + '</h4>';
+            html += '<small>{{ _("Credit Score") }}</small>';
+            html += '</div>';
+            html += '<div class="col-xs-6">';
+            html += '<h4>' + insights.risk_level + '</h4>';
+            html += '<small>{{ _("Risk Level") }}</small>';
+            html += '</div>';
+            html += '</div>';
+            
+            html += '<hr>';
+            
+            html += '<h5>{{ _("Key Insights") }}</h5>';
+            html += '<ul class="list-unstyled">';
+            insights.key_factors.forEach(function(factor) {
+                html += '<li><i class="fa fa-arrow-right"></i> ' + factor + '</li>';
+            });
+            html += '</ul>';
+            
+            if (insights.recommendations.length > 0) {
+                html += '<h5>{{ _("Recommendations") }}</h5>';
+                html += '<ul class="list-unstyled">';
+                insights.recommendations.forEach(function(rec) {
+                    html += '<li><i class="fa fa-lightbulb-o"></i> ' + rec + '</li>';
+                });
+                html += '</ul>';
+            }
+            
+            $('#ai-insights-panel').html(html);
+        },
+        error: function() {
+            $('#ai-insights-panel').html('<p class="text-muted">{{ _("AI insights unavailable") }}</p>');
+        }
+    });
+}
+
+function loadPaymentPattern() {
+    $.ajax({
+        url: '/api/ar/customers/' + customerId + '/payment-pattern',
+        method: 'GET',
+        success: function(response) {
+            var data = response.data;
+            
+            $('#avg-payment-days').text(data.average_payment_days + ' days');
+            $('#payment-reliability').text(data.payment_reliability + '%');
+            
+            var ctx = document.getElementById('payment-pattern-chart').getContext('2d');
+            paymentPatternChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['{{ _("On Time") }}', '{{ _("Late") }}', '{{ _("Very Late") }}'],
+                    datasets: [{
+                        data: [data.on_time_percent, data.late_percent, data.very_late_percent],
+                        backgroundColor: ['#5cb85c', '#f0ad4e', '#d9534f']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+    });
+}
+
+function launchCreditAssessment(customerId) {
+    window.open('/ar/credit-assessment/' + customerId, '_blank', 
+                'width=800,height=600,scrollbars=yes,resizable=yes');
+}
+
+function generateStatement(customerId) {
+    if (confirm('{{ _("Generate statement for this customer?") }}')) {
+        $.ajax({
+            url: '/api/ar/statements',
+            method: 'POST',
+            data: JSON.stringify({
+                customer_id: customerId,
+                statement_date: new Date().toISOString().split('T')[0]
+            }),
+            contentType: 'application/json',
+            success: function(response) {
+                alert('{{ _("Statement generated successfully") }}');
+                // Open statement in new window
+                window.open('/ar/statements/' + response.data.statement_id, '_blank');
+            },
+            error: function(xhr) {
+                alert('{{ _("Error generating statement") }}: ' + xhr.responseJSON.detail);
+            }
+        });
+    }
+}
+
+// Utility functions
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(amount);
+}
+
+function formatDate(dateStr) {
+    return new Date(dateStr).toLocaleDateString();
+}
+
+function getStatusClass(status) {
+    var classes = {
+        'ACTIVE': 'success',
+        'PAID': 'success',
+        'SENT': 'info',
+        'DRAFT': 'default',
+        'OVERDUE': 'danger',
+        'CANCELLED': 'warning',
+        'PROCESSING': 'info',
+        'PROCESSED': 'success'
+    };
+    return classes[status] || 'default';
+}
+
+function getPriorityClass(priority) {
+    var classes = {
+        'HIGH': 'danger',
+        'MEDIUM': 'warning',
+        'LOW': 'info'
+    };
+    return classes[priority] || 'default';
+}
+</script>
+{% endblock %}

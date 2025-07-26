@@ -1,0 +1,378 @@
+{% extends "appbuilder/base.html" %}
+
+{% block title %}{{ title }} - APG Event Streaming Bus{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+#topology-container {
+    width: 100%;
+    height: 600px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.topology-legend {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.legend-item {
+    display: inline-block;
+    margin-right: 20px;
+    margin-bottom: 10px;
+}
+
+.legend-color {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.stream-node { background-color: #007bff; }
+.consumer-node { background-color: #28a745; }
+.active-edge { background-color: #28a745; }
+.paused-edge { background-color: #ffc107; }
+.error-edge { background-color: #dc3545; }
+
+.topology-controls {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.node-info {
+    position: absolute;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    display: none;
+    max-width: 300px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row">
+        <div class="col-12">
+            <h1 class="page-header">
+                <i class="fa fa-project-diagram"></i> {{ title }}
+                <small class="pull-right">
+                    <a href="/dashboard/" class="btn btn-sm btn-secondary">
+                        <i class="fa fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </small>
+            </h1>
+        </div>
+    </div>
+
+    <!-- Topology Controls -->
+    <div class="row">
+        <div class="col-12">
+            <div class="topology-controls">
+                <h5><i class="fa fa-cogs"></i> Topology Controls</h5>
+                <div class="form-inline">
+                    <div class="form-group mr-3">
+                        <label for="layout-select" class="mr-2">Layout:</label>
+                        <select id="layout-select" class="form-control">
+                            <option value="hierarchical">Hierarchical</option>
+                            <option value="spring">Spring</option>
+                            <option value="circle">Circle</option>
+                            <option value="random">Random</option>
+                        </select>
+                    </div>
+                    <div class="form-group mr-3">
+                        <label for="filter-capability" class="mr-2">Filter by Capability:</label>
+                        <select id="filter-capability" class="form-control">
+                            <option value="">All Capabilities</option>
+                            {% for capability in topology.nodes|map(attribute='group')|unique %}
+                            <option value="{{ capability }}">{{ capability }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button id="refresh-topology" class="btn btn-primary">
+                        <i class="fa fa-refresh"></i> Refresh
+                    </button>
+                    <button id="export-topology" class="btn btn-success">
+                        <i class="fa fa-download"></i> Export PNG
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="row">
+        <div class="col-12">
+            <div class="topology-legend">
+                <h5><i class="fa fa-info-circle"></i> Legend</h5>
+                <div class="legend-item">
+                    <span class="legend-color stream-node"></span>
+                    <span>Event Stream</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color consumer-node"></span>
+                    <span>Consumer Group</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color active-edge"></span>
+                    <span>Active Subscription</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color paused-edge"></span>
+                    <span>Paused Subscription</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color error-edge"></span>
+                    <span>Error Subscription</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Topology Visualization -->
+    <div class="row">
+        <div class="col-12">
+            <div id="topology-container"></div>
+        </div>
+    </div>
+
+    <!-- Node Information Panel -->
+    <div id="node-info" class="node-info">
+        <div id="node-info-content"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script>
+// Topology data from backend
+const topologyData = {{ topology|tojson }};
+
+// Create vis.js network
+let network;
+let nodes, edges;
+
+function initializeTopology() {
+    // Prepare nodes
+    nodes = new vis.DataSet(topologyData.nodes.map(node => ({
+        id: node.id,
+        label: node.label,
+        group: node.group,
+        title: `${node.type}: ${node.label}\nStatus: ${node.status}\nCapability: ${node.group}`,
+        color: {
+            background: node.type === 'stream' ? '#007bff' : '#28a745',
+            border: getStatusColor(node.status),
+            borderWidth: 3
+        },
+        shape: node.type === 'stream' ? 'box' : 'ellipse',
+        font: { color: 'white', size: 12 }
+    })));
+
+    // Prepare edges
+    edges = new vis.DataSet(topologyData.edges.map(edge => ({
+        from: edge.from,
+        to: edge.to,
+        label: edge.label,
+        title: `Subscription: ${edge.label}\nStatus: ${edge.status}`,
+        color: {
+            color: getStatusColor(edge.status)
+        },
+        arrows: 'to',
+        width: 2
+    })));
+
+    // Network options
+    const options = {
+        layout: {
+            hierarchical: {
+                direction: 'LR',
+                sortMethod: 'directed'
+            }
+        },
+        physics: {
+            enabled: false
+        },
+        interaction: {
+            hover: true,
+            selectConnectedEdges: false
+        },
+        nodes: {
+            borderWidth: 2,
+            shadow: true,
+            font: { color: 'white' }
+        },
+        edges: {
+            smooth: {
+                type: 'cubicBezier',
+                forceDirection: 'horizontal',
+                roundness: 0.4
+            }
+        }
+    };
+
+    // Create network
+    const container = document.getElementById('topology-container');
+    network = new vis.Network(container, { nodes, edges }, options);
+
+    // Event handlers
+    network.on('click', function(params) {
+        if (params.nodes.length > 0) {
+            showNodeInfo(params.nodes[0], params.pointer.DOM);
+        } else {
+            hideNodeInfo();
+        }
+    });
+
+    network.on('hoverNode', function(params) {
+        network.canvas.body.container.style.cursor = 'pointer';
+    });
+
+    network.on('blurNode', function(params) {
+        network.canvas.body.container.style.cursor = 'default';
+    });
+}
+
+function getStatusColor(status) {
+    switch (status) {
+        case 'active': return '#28a745';
+        case 'paused': return '#ffc107';
+        case 'error': return '#dc3545';
+        default: return '#6c757d';
+    }
+}
+
+function showNodeInfo(nodeId, position) {
+    const node = topologyData.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    const infoPanel = document.getElementById('node-info');
+    const content = document.getElementById('node-info-content');
+    
+    let html = `
+        <h6><i class="fa fa-info-circle"></i> ${node.type === 'stream' ? 'Stream' : 'Consumer Group'} Details</h6>
+        <table class="table table-sm">
+            <tr><td><strong>Name:</strong></td><td>${node.label}</td></tr>
+            <tr><td><strong>ID:</strong></td><td>${node.id}</td></tr>
+            <tr><td><strong>Status:</strong></td><td>
+                <span class="badge badge-${node.status === 'active' ? 'success' : node.status === 'paused' ? 'warning' : 'danger'}">
+                    ${node.status}
+                </span>
+            </td></tr>
+            <tr><td><strong>Capability:</strong></td><td>${node.group}</td></tr>
+        </table>
+    `;
+
+    if (node.type === 'stream') {
+        html += `
+            <div class="mt-2">
+                <a href="/eventstreamview/show/${node.id}" class="btn btn-sm btn-primary">
+                    <i class="fa fa-eye"></i> View Details
+                </a>
+                <a href="/dashboard/stream_metrics/${node.id}" class="btn btn-sm btn-info">
+                    <i class="fa fa-chart-line"></i> Metrics
+                </a>
+            </div>
+        `;
+    }
+
+    content.innerHTML = html;
+    
+    infoPanel.style.left = position.x + 'px';
+    infoPanel.style.top = position.y + 'px';
+    infoPanel.style.display = 'block';
+}
+
+function hideNodeInfo() {
+    document.getElementById('node-info').style.display = 'none';
+}
+
+// Layout change handler
+document.getElementById('layout-select').addEventListener('change', function() {
+    const layout = this.value;
+    const options = {};
+    
+    if (layout === 'hierarchical') {
+        options.layout = {
+            hierarchical: {
+                direction: 'LR',
+                sortMethod: 'directed'
+            }
+        };
+        options.physics = { enabled: false };
+    } else if (layout === 'spring') {
+        options.layout = { randomSeed: 2 };
+        options.physics = {
+            enabled: true,
+            stabilization: { iterations: 100 }
+        };
+    } else if (layout === 'circle') {
+        options.layout = { randomSeed: undefined };
+        options.physics = { enabled: false };
+    } else {
+        options.layout = { randomSeed: Math.random() };
+        options.physics = { enabled: false };
+    }
+    
+    network.setOptions(options);
+});
+
+// Capability filter handler
+document.getElementById('filter-capability').addEventListener('change', function() {
+    const capability = this.value;
+    
+    if (capability === '') {
+        // Show all nodes
+        nodes.forEach(node => {
+            nodes.update({ id: node.id, hidden: false });
+        });
+    } else {
+        // Filter by capability
+        topologyData.nodes.forEach(node => {
+            const shouldHide = node.group !== capability;
+            nodes.update({ id: node.id, hidden: shouldHide });
+        });
+    }
+});
+
+// Refresh topology
+document.getElementById('refresh-topology').addEventListener('click', function() {
+    location.reload();
+});
+
+// Export topology
+document.getElementById('export-topology').addEventListener('click', function() {
+    const canvas = network.canvas.frame.canvas;
+    const link = document.createElement('a');
+    link.download = 'stream-topology.png';
+    link.href = canvas.toDataURL();
+    link.click();
+});
+
+// Initialize topology on page load
+initializeTopology();
+
+// Hide node info when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('#node-info') && !event.target.closest('#topology-container')) {
+        hideNodeInfo();
+    }
+});
+</script>
+{% endblock %}

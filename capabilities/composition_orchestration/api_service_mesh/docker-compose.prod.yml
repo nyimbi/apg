@@ -1,0 +1,459 @@
+# APG API Service Mesh - Production Docker Compose
+#
+# Production-ready deployment configuration with high availability,
+# security, monitoring, and backup strategies.
+#
+# © 2025 Datacraft. All rights reserved.
+# Author: Nyimbi Odero <nyimbi@gmail.com>
+
+version: '3.9'
+
+services:
+  # =============================================================================
+  # Application Services (High Availability)
+  # =============================================================================
+  
+  api-service-mesh-1:
+    image: datacraft/apg-service-mesh:latest
+    ports:
+      - "8001:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - LOG_LEVEL=WARNING
+      - WORKERS=4
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - METRICS_ENABLED=true
+      - TRACING_ENABLED=true
+      - SENTRY_DSN=${SENTRY_DSN}
+      - APG_REGISTRY_URL=${APG_REGISTRY_URL}
+      - APG_EVENT_BUS_URL=${APG_EVENT_BUS_URL}
+    volumes:
+      - api_logs:/app/logs
+      - api_data:/app/data
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-cluster-1:
+        condition: service_healthy
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  api-service-mesh-2:
+    image: datacraft/apg-service-mesh:latest
+    ports:
+      - "8002:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - LOG_LEVEL=WARNING
+      - WORKERS=4
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - METRICS_ENABLED=true
+      - TRACING_ENABLED=true
+      - SENTRY_DSN=${SENTRY_DSN}
+      - APG_REGISTRY_URL=${APG_REGISTRY_URL}
+      - APG_EVENT_BUS_URL=${APG_EVENT_BUS_URL}
+    volumes:
+      - api_logs:/app/logs
+      - api_data:/app/data
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-cluster-1:
+        condition: service_healthy
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  api-service-mesh-3:
+    image: datacraft/apg-service-mesh:latest
+    ports:
+      - "8003:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - LOG_LEVEL=WARNING
+      - WORKERS=4
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - METRICS_ENABLED=true
+      - TRACING_ENABLED=true
+      - SENTRY_DSN=${SENTRY_DSN}
+      - APG_REGISTRY_URL=${APG_REGISTRY_URL}
+      - APG_EVENT_BUS_URL=${APG_EVENT_BUS_URL}
+    volumes:
+      - api_logs:/app/logs
+      - api_data:/app/data
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-cluster-1:
+        condition: service_healthy
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # =============================================================================
+  # Load Balancer
+  # =============================================================================
+  
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - api-service-mesh-1
+      - api-service-mesh-2
+      - api-service-mesh-3
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+
+  # =============================================================================
+  # Database Services (Primary/Replica)
+  # =============================================================================
+  
+  postgres-primary:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_REPLICATION_USER=${POSTGRES_REPLICATION_USER}
+      - POSTGRES_REPLICATION_PASSWORD=${POSTGRES_REPLICATION_PASSWORD}
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./docker/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
+      - postgres_backups:/backups
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-replica:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGUSER=${POSTGRES_REPLICATION_USER}
+      - PGPASSWORD=${POSTGRES_REPLICATION_PASSWORD}
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./docker/postgres/setup-replica.sh:/docker-entrypoint-initdb.d/setup-replica.sh
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  # =============================================================================
+  # Redis Cluster
+  # =============================================================================
+  
+  redis-cluster-1:
+    image: redis:7-alpine
+    command: redis-server /usr/local/etc/redis/redis.conf --cluster-enabled yes --cluster-config-file nodes-6379.conf --cluster-node-timeout 5000 --appendonly yes
+    volumes:
+      - redis_cluster_1_data:/data
+      - ./docker/redis/redis-cluster.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-cluster-2:
+    image: redis:7-alpine
+    command: redis-server /usr/local/etc/redis/redis.conf --cluster-enabled yes --cluster-config-file nodes-6379.conf --cluster-node-timeout 5000 --appendonly yes
+    volumes:
+      - redis_cluster_2_data:/data
+      - ./docker/redis/redis-cluster.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-cluster-3:
+    image: redis:7-alpine
+    command: redis-server /usr/local/etc/redis/redis.conf --cluster-enabled yes --cluster-config-file nodes-6379.conf --cluster-node-timeout 5000 --appendonly yes
+    volumes:
+      - redis_cluster_3_data:/data
+      - ./docker/redis/redis-cluster.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # Monitoring Stack
+  # =============================================================================
+  
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus-prod.yml:/etc/prometheus/prometheus.yml
+      - ./docker/prometheus/rules-prod.yml:/etc/prometheus/rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=https://monitoring.datacraft.co.ke/grafana
+      - GF_DATABASE_TYPE=postgres
+      - GF_DATABASE_HOST=postgres-primary:5432
+      - GF_DATABASE_NAME=grafana
+      - GF_DATABASE_USER=${GRAFANA_DB_USER}
+      - GF_DATABASE_PASSWORD=${GRAFANA_DB_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/dashboards-prod:/var/lib/grafana/dashboards
+      - ./docker/grafana/provisioning-prod:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+      - postgres-primary
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # =============================================================================
+  # Log Aggregation
+  # =============================================================================
+  
+  fluentd:
+    image: fluent/fluentd:latest
+    volumes:
+      - ./docker/fluentd/fluent.conf:/fluentd/etc/fluent.conf
+      - api_logs:/var/log/app
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - elasticsearch
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Backup Services
+  # =============================================================================
+  
+  backup-service:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-"0 2 * * *"}
+      - S3_BUCKET=${BACKUP_S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - ./docker/backup/backup.sh:/backup.sh
+      - postgres_backups:/backups
+    depends_on:
+      - postgres-primary
+    networks:
+      - asm_prod_network
+    restart: unless-stopped
+    profiles:
+      - backup
+
+# =============================================================================
+# Volumes
+# =============================================================================
+
+volumes:
+  postgres_primary_data:
+    driver: local
+  postgres_replica_data:
+    driver: local
+  postgres_backups:
+    driver: local
+  redis_cluster_1_data:
+    driver: local
+  redis_cluster_2_data:
+    driver: local
+  redis_cluster_3_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  api_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+  api_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+
+networks:
+  asm_prod_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16

@@ -1,0 +1,112 @@
+# APG Capability Registry - Core Dependencies
+# Production-ready dependencies for the capability registry service
+
+# FastAPI and ASGI
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database
+sqlalchemy[asyncio]==2.0.23
+alembic==1.13.1
+asyncpg==0.29.0  # PostgreSQL async driver
+psycopg2-binary==2.9.9  # PostgreSQL sync driver (for migrations)
+
+# Caching and Message Broker
+redis[hiredis]==5.0.1
+aioredis==2.0.1
+
+# Data Validation and Serialization
+pydantic==2.5.2
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# UUID and Time
+uuid-extensions==0.1.2
+python-dateutil==2.8.2
+
+# HTTP Client
+httpx==0.25.2
+aiohttp==3.9.1
+
+# Authentication and Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==41.0.8
+python-multipart==0.0.6
+
+# Configuration and Environment
+python-dotenv==1.0.0
+dynaconf==3.2.4
+
+# Logging and Monitoring
+structlog==23.2.0
+pythonjsonlogger==2.0.7
+prometheus-client==0.19.0
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-sqlalchemy==0.42b0
+opentelemetry-instrumentation-redis==0.42b0
+opentelemetry-exporter-prometheus==1.12.0rc1
+
+# Flask-AppBuilder (for UI components)
+Flask-AppBuilder==4.3.10
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+Flask-Login==0.6.3
+Flask-WTF==1.2.1
+WTForms==3.1.1
+
+# Task Queue (for background processing)
+celery[redis]==5.3.4
+flower==2.0.1
+
+# Search and Analytics
+elasticsearch[async]==8.11.0
+pandas==2.1.4
+numpy==1.25.2
+
+# File Handling and Storage
+boto3==1.34.0  # AWS S3
+botocore==1.34.0
+Pillow==10.1.0
+python-magic==0.4.27
+
+# API Documentation
+swagger-ui-bundle==0.0.9
+
+# Utilities
+click==8.1.7
+jinja2==3.1.2
+markupsafe==2.1.3
+rich==13.7.0
+typer==0.9.0
+
+# Testing (included for completeness)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-httpserver==1.0.8
+factory-boy==3.3.0
+faker==20.1.0
+
+# Type Checking
+mypy==1.7.1
+types-redis==4.6.0.11
+types-requests==2.31.0.10
+
+# Code Quality
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+pre-commit==3.6.0
+
+# Performance
+cachetools==5.3.2
+aiofiles==23.2.1
+orjson==3.9.10
+
+# WebSocket Support
+websockets==12.0

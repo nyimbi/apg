@@ -1,0 +1,87 @@
+# APG API Service Mesh - Production Dependencies
+#
+# Optimized production dependencies with specific versions for
+# stability, security, and performance in production environments.
+#
+# © 2025 Datacraft. All rights reserved.
+# Author: Nyimbi Odero <nyimbi@gmail.com>
+
+# Web Framework and ASGI Server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+gunicorn==21.2.0
+
+# Flask for UI Components
+flask==3.0.0
+flask-appbuilder==4.3.10
+flask-cors==4.0.0
+
+# Database and ORM
+sqlalchemy[asyncio]==2.0.23
+alembic==1.12.1
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# Caching and Message Queue
+redis[hiredis]==5.0.1
+celery[redis]==5.3.4
+
+# HTTP Client
+httpx==0.25.2
+aiofiles==23.2.1
+
+# Data Validation
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Unique ID Generation
+uuid-extensions==1.1.0
+
+# Datetime Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Configuration
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Logging and Error Tracking
+structlog==23.2.0
+sentry-sdk[fastapi,flask]==1.38.0
+
+# Metrics and Monitoring
+prometheus-client==0.19.0
+prometheus-fastapi-instrumentator==6.1.0
+
+# Distributed Tracing
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-exporter-jaeger==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-sqlalchemy==0.42b0
+opentelemetry-instrumentation-redis==0.42b0
+
+# Security
+cryptography==41.0.7
+bcrypt==4.1.2
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# WebSocket Support
+websockets==12.0
+
+# JSON Processing
+orjson==3.9.10
+
+# Background Tasks and Scheduling
+apscheduler==3.10.4
+
+# Resilience and Circuit Breaker
+tenacity==8.2.3
+
+# Performance
+async-timeout==4.0.3
+
+# CLI Utilities
+click==8.1.7
+rich==13.7.0

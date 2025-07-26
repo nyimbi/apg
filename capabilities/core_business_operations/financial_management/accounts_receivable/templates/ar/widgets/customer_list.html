@@ -1,0 +1,218 @@
+{% extends "appbuilder/general/widgets/list.html" %}
+
+{% block list_title %}
+<h3>
+    <i class="fa fa-users"></i> 
+    {{ _("AR Customers") }}
+    <small class="text-muted">{{ _("Manage customer accounts receivable") }}</small>
+</h3>
+{% endblock %}
+
+{% block list_search %}
+{{ super() }}
+<div class="row search-widget">
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="customer_type_filter">{{ _("Customer Type") }}</label>
+            <select id="customer_type_filter" class="form-control" name="customer_type">
+                <option value="">{{ _("All Types") }}</option>
+                <option value="INDIVIDUAL">{{ _("Individual") }}</option>
+                <option value="CORPORATION">{{ _("Corporation") }}</option>
+                <option value="PARTNERSHIP">{{ _("Partnership") }}</option>
+                <option value="GOVERNMENT">{{ _("Government") }}</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="status_filter">{{ _("Status") }}</label>
+            <select id="status_filter" class="form-control" name="status">
+                <option value="">{{ _("All Status") }}</option>
+                <option value="ACTIVE">{{ _("Active") }}</option>
+                <option value="INACTIVE">{{ _("Inactive") }}</option>
+                <option value="SUSPENDED">{{ _("Suspended") }}</option>
+                <option value="CLOSED">{{ _("Closed") }}</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="min_outstanding">{{ _("Min Outstanding") }}</label>
+            <input type="number" id="min_outstanding" class="form-control" name="min_outstanding" 
+                   placeholder="0.00" step="0.01">
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="max_outstanding">{{ _("Max Outstanding") }}</label>
+            <input type="number" id="max_outstanding" class="form-control" name="max_outstanding" 
+                   placeholder="999999.99" step="0.01">
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>&nbsp;</label><br>
+            <button type="button" id="apply_filters" class="btn btn-primary">
+                <i class="fa fa-filter"></i> {{ _("Apply Filters") }}
+            </button>
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>&nbsp;</label><br>
+            <button type="button" id="clear_filters" class="btn btn-default">
+                <i class="fa fa-times"></i> {{ _("Clear") }}
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block list_add_actions %}
+{{ super() }}
+<div class="btn-group" role="group">
+    <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown">
+        <i class="fa fa-cogs"></i> {{ _("Bulk Actions") }} <span class="caret"></span>
+    </button>
+    <ul class="dropdown-menu">
+        <li><a href="#" id="bulk_credit_assessment">
+            <i class="fa fa-calculator"></i> {{ _("AI Credit Assessment") }}
+        </a></li>
+        <li><a href="#" id="bulk_generate_statements">
+            <i class="fa fa-file-text"></i> {{ _("Generate Statements") }}
+        </a></li>
+        <li><a href="#" id="bulk_collections_review">
+            <i class="fa fa-phone"></i> {{ _("Collections Review") }}
+        </a></li>
+        <li class="divider"></li>
+        <li><a href="#" id="export_customer_data">
+            <i class="fa fa-download"></i> {{ _("Export Data") }}
+        </a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block list_rows %}
+{% for item in items %}
+<tr>
+    <td>
+        <input type="checkbox" class="customer-checkbox" value="{{ item.id }}">
+    </td>
+    <td>
+        <a href="{{ url_for('ARCustomerModelView.show', pk=item.id) }}">
+            <strong>{{ item.customer_code }}</strong>
+        </a>
+    </td>
+    <td>{{ item.legal_name }}</td>
+    <td>
+        <span class="label label-{% if item.customer_type == 'CORPORATION' %}primary{% elif item.customer_type == 'INDIVIDUAL' %}info{% else %}default{% endif %}">
+            {{ item.customer_type }}
+        </span>
+    </td>
+    <td>
+        <span class="label label-{% if item.status == 'ACTIVE' %}success{% elif item.status == 'INACTIVE' %}warning{% else %}danger{% endif %}">
+            {{ item.status }}
+        </span>
+    </td>
+    <td class="text-right">
+        ${{ "{:,.2f}".format(item.credit_limit|float) }}
+    </td>
+    <td class="text-right">
+        {% if item.total_outstanding > 0 %}
+        <span class="{% if item.overdue_amount > 0 %}text-danger{% else %}text-info{% endif %}">
+            ${{ "{:,.2f}".format(item.total_outstanding|float) }}
+        </span>
+        {% else %}
+        <span class="text-muted">$0.00</span>
+        {% endif %}
+    </td>
+    <td class="text-right">
+        {% if item.overdue_amount > 0 %}
+        <span class="text-danger">
+            <i class="fa fa-exclamation-triangle"></i>
+            ${{ "{:,.2f}".format(item.overdue_amount|float) }}
+        </span>
+        {% else %}
+        <span class="text-muted">$0.00</span>
+        {% endif %}
+    </td>
+    <td>{{ item.created_at.strftime('%Y-%m-%d') }}</td>
+    <td>
+        <div class="btn-group btn-group-sm">
+            <a href="{{ url_for('ARCustomerModelView.show', pk=item.id) }}" 
+               class="btn btn-primary btn-xs" title="{{ _('View Details') }}">
+                <i class="fa fa-eye"></i>
+            </a>
+            <a href="{{ url_for('ARCustomerModelView.edit', pk=item.id) }}" 
+               class="btn btn-warning btn-xs" title="{{ _('Edit') }}">
+                <i class="fa fa-pencil"></i>
+            </a>
+            <button type="button" class="btn btn-info btn-xs credit-assess-btn" 
+                    data-customer-id="{{ item.id }}" title="{{ _('AI Credit Assessment') }}">
+                <i class="fa fa-calculator"></i>
+            </button>
+        </div>
+    </td>
+</tr>
+{% endfor %}
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+$(document).ready(function() {
+    // Initialize filters
+    $('#apply_filters').click(function() {
+        var filters = {
+            customer_type: $('#customer_type_filter').val(),
+            status: $('#status_filter').val(),
+            min_outstanding: $('#min_outstanding').val(),
+            max_outstanding: $('#max_outstanding').val()
+        };
+        
+        // Apply filters to table (implementation depends on your filtering system)
+        window.location.search = $.param(filters);
+    });
+    
+    $('#clear_filters').click(function() {
+        $('#customer_type_filter, #status_filter').val('');
+        $('#min_outstanding, #max_outstanding').val('');
+        window.location.search = '';
+    });
+    
+    // Bulk actions
+    $('#bulk_credit_assessment').click(function() {
+        var selectedCustomers = $('.customer-checkbox:checked').map(function() {
+            return $(this).val();
+        }).get();
+        
+        if (selectedCustomers.length === 0) {
+            alert('{{ _("Please select customers for credit assessment") }}');
+            return;
+        }
+        
+        // Launch bulk credit assessment modal
+        launchBulkCreditAssessment(selectedCustomers);
+    });
+    
+    // Individual credit assessment
+    $('.credit-assess-btn').click(function() {
+        var customerId = $(this).data('customer-id');
+        launchCreditAssessment(customerId);
+    });
+});
+
+function launchCreditAssessment(customerId) {
+    // Implementation for single customer credit assessment
+    window.open('/ar/credit-assessment/' + customerId, '_blank', 
+                'width=800,height=600,scrollbars=yes,resizable=yes');
+}
+
+function launchBulkCreditAssessment(customerIds) {
+    // Implementation for bulk credit assessment
+    var params = 'customer_ids=' + customerIds.join(',');
+    window.open('/ar/bulk-credit-assessment?' + params, '_blank',
+                'width=1000,height=700,scrollbars=yes,resizable=yes');
+}
+</script>
+{% endblock %}

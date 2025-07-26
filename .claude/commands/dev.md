@@ -9,7 +9,7 @@ You are an expert APG (Application Programming Generation) platform architect an
 When this command is issued, you must execute a comprehensive development lifecycle to create a world-class, industry-leading capability or sub-capability that:
 
 1. **Integrates seamlessly with the APG platform architecture**
-2. **Leverages existing APG capabilities and infrastructure** 
+2. **Leverages existing APG capabilities and infrastructure**
 3. **Follows APG coding standards and patterns from CLAUDE.md**
 4. **Registers with APG's composition engine for orchestration**
 5. **Uses APG's existing auth, security, and compliance systems**
@@ -111,9 +111,28 @@ When this command is issued, you must execute a comprehensive development lifecy
    - **THIS BECOMES YOUR DEFINITIVE APG-INTEGRATED ROADMAP - FOLLOW IT EXACTLY**
 
 ### Phase 2-10: FOLLOW TODO.MD EXACTLY
-**CRITICAL**: Once todo.md is created, you MUST follow its exact phase structure, tasks, and acceptance criteria. The todo.md file contains the authoritative development plan that overrides the generic phases below.
+**CRITICAL**: Once todo.md is created, you MUST follow its exact phase structure, tasks, and acceptance criteria. The todo.md file contains the authoritative development plan that overrides the generic phases below. When there is text to generate, use an open-weights or open source model running on Ollama.
 
 **Use the TodoWrite tool to track progress and mark tasks as completed as you work through the todo.md plan.**
+
+### FINAL PHASE: World-Class Improvement Identification
+**MANDATORY**: After all development phases are complete, you MUST execute a final phase:
+
+**Identify and justify and implement 10 high impact functionality improvements that would make the solution better than world-class**
+
+Requirements for this phase:
+- Create `WORLD_CLASS_IMPROVEMENTS.md` in the capability directory
+- Identify 10 specific improvements that would surpass industry leaders
+- **EXCLUSIONS**: Do NOT include Virtual Reality,blockchain or quantum oriented or quntum resistant encryption solutions
+- For each improvement, provide:
+  - Technical implementation details with code examples
+  - Business justification and ROI analysis
+  - Competitive advantage explanation
+  - Implementation complexity assessment
+- Focus on emerging technologies like AI, ML, neuromorphic computing, etc.
+- Ensure improvements integrate with existing APG platform capabilities
+- Target revolutionary capabilities that would create generational leaps over competitors
+- Carefully and meticulously plan and fully implement each improvement
 
 ### APG-Integrated Phase Structure (Override with todo.md specifics):
 
@@ -122,7 +141,6 @@ When this command is issued, you must execute a comprehensive development lifecy
   - **MANDATORY**: Use async Python following CLAUDE.md standards
   - **MANDATORY**: Use tabs for indentation (not spaces)
   - **MANDATORY**: Use modern Python 3.12+ typing (`str | None`, `list[str]`, `dict[str, Any]`)
-  - **MANDATORY**: Use `uuid7str` for all ID fields from `uuid_extensions`
   - **MANDATORY**: Include APG's multi-tenancy patterns
   - Design normalized database schema compatible with APG's existing models
   - Include advanced features: audit trails, versioning, soft deletes following APG patterns
@@ -132,7 +150,7 @@ When this command is issued, you must execute a comprehensive development lifecy
   - Implement Pydantic v2 validation following APG standards
   - Add support for APG's event sourcing and real-time updates
 
-#### APG Business Logic Implementation  
+#### APG Business Logic Implementation
 - **Implement APG-integrated business logic** (`service.py`)
   - **MANDATORY**: Use async Python with proper async/await patterns
   - **MANDATORY**: Include `_log_` prefixed methods for console logging
@@ -192,12 +210,12 @@ When this command is issued, you must execute a comprehensive development lifecy
   - Integration with APG's existing capabilities and services
 
 #### APG Testing & Quality Assurance
-- **Create APG-compatible test suite** (`tests/ci/`)
-  - **MANDATORY**: Place tests in `tests/ci/` directory for APG's CI automation
+- **Create APG-compatible test suite** (`tests/`)
+  - **MANDATORY**: Place tests in `tests/` directory following APG capability structure
   - **MANDATORY**: Use modern pytest-asyncio patterns (no `@pytest.mark.asyncio` decorators)
   - **MANDATORY**: Use real objects with pytest fixtures (no mocks except LLM)
   - **MANDATORY**: Use `pytest-httpserver` for API testing
-  - **MANDATORY**: Run tests with `uv run pytest -vxs tests/ci`
+  - **MANDATORY**: Run tests with `uv run pytest -vxs tests/`
   - **MANDATORY**: Run type checking with `uv run pyright`
   - Unit tests for all models and business logic following APG async patterns
   - Integration tests with existing APG capabilities and workflows
@@ -209,11 +227,12 @@ When this command is issued, you must execute a comprehensive development lifecy
   - Test automation integrated with APG's CI/CD pipeline
 
 #### APG Documentation
-- **Create APG-integrated documentation** (in capability directory)
+- **Create APG-integrated documentation** (`docs/` directory)
+  - **MANDATORY**: Place all documentation in `docs/` directory following APG standards
   - **MANDATORY**: Reference existing APG capabilities and integration patterns
   - **MANDATORY**: Include APG platform context in all documentation
-  - User guide with APG platform screenshots and capability cross-references
-  - Developer guide with APG architecture examples and integration patterns
+  - **MANDATORY**: Generate `user_guide.md` - User guide with APG platform screenshots and capability cross-references
+  - **MANDATORY**: Generate `developer_guide.md` - Developer guide with APG architecture examples and integration patterns
   - API documentation with APG authentication and authorization examples
   - Deployment guides for APG's containerized infrastructure
   - Troubleshooting guides with APG-specific solutions and capability interactions
@@ -282,21 +301,21 @@ capabilities/{capability}/{sub_capability}/
 ├── views.py                 # APG Flask-AppBuilder views (Pydantic v2 models here)
 ├── api.py                   # APG-compatible REST API (async endpoints)
 ├── blueprint.py             # APG composition engine integrated blueprint
-├── user_guide.md            # APG-aware end-user documentation
-├── developer_guide.md       # APG integration developer documentation
-├── api_reference.md         # APG authentication-aware API documentation
-├── installation_guide.md    # APG infrastructure deployment guide
-├── troubleshooting_guide.md # APG capability troubleshooting guide
+├── docs/                    # APG documentation directory
+│   ├── user_guide.md        # APG-aware end-user documentation
+│   ├── developer_guide.md   # APG integration developer documentation
+│   ├── api_reference.md     # APG authentication-aware API documentation
+│   ├── installation_guide.md # APG infrastructure deployment guide
+│   └── troubleshooting_guide.md # APG capability troubleshooting guide
 ├── tests/                   # APG-compatible test suite
-│   ├── ci/                  # APG CI/CD integrated tests
-│   │   ├── __init__.py
-│   │   ├── test_models.py   # Async model tests (no @pytest.mark.asyncio)
-│   │   ├── test_service.py  # APG service integration tests
-│   │   ├── test_api.py      # pytest-httpserver API tests
-│   │   ├── test_views.py    # APG Flask-AppBuilder UI tests
-│   │   ├── test_performance.py # APG multi-tenant performance tests
-│   │   ├── test_security.py # APG auth_rbac security tests
-│   │   └── test_integration.py # APG capability integration tests
+│   ├── __init__.py
+│   ├── test_models.py       # Async model tests (no @pytest.mark.asyncio)
+│   ├── test_service.py      # APG service integration tests
+│   ├── test_api.py          # pytest-httpserver API tests
+│   ├── test_views.py        # APG Flask-AppBuilder UI tests
+│   ├── test_performance.py  # APG multi-tenant performance tests
+│   ├── test_security.py     # APG auth_rbac security tests
+│   ├── test_integration.py  # APG capability integration tests
 │   ├── fixtures/            # APG-compatible test data
 │   ├── test_data/           # APG sample data patterns
 │   └── conftest.py          # APG test configuration
@@ -313,7 +332,7 @@ capabilities/{capability}/{sub_capability}/
 **CRITICAL**: This structure MUST integrate with APG's existing `capabilities/` hierarchy and composition system!
 
 ## APG Success Criteria
-- **MANDATORY**: All tests pass with >95% code coverage using `uv run pytest -vxs tests/ci`
+- **MANDATORY**: All tests pass with >95% code coverage using `uv run pytest -vxs tests/`
 - **MANDATORY**: Type checking passes with `uv run pyright`
 - **MANDATORY**: Code follows CLAUDE.md standards exactly (async, tabs, modern typing)
 - **MANDATORY**: Capability registers successfully with APG's composition engine
@@ -321,9 +340,9 @@ capabilities/{capability}/{sub_capability}/
 - **MANDATORY**: Performance benchmarks meet APG's multi-tenant standards
 - **MANDATORY**: Security integration with APG's security infrastructure works
 - **MANDATORY**: Accessibility compliance integrated with APG's standards
-- **MANDATORY**: Complete APG-aware documentation suite created:
-  - User guide with APG platform context and capability cross-references
-  - Developer guide with APG integration examples and architecture patterns
+- **MANDATORY**: Complete APG-aware documentation suite created in `docs/` directory:
+  - `user_guide.md` with APG platform context and capability cross-references
+  - `developer_guide.md` with APG integration examples and architecture patterns
   - API reference with APG authentication and authorization examples
   - Installation guide for APG infrastructure deployment
   - Troubleshooting guide with APG-specific solutions and capability interactions
@@ -331,8 +350,9 @@ capabilities/{capability}/{sub_capability}/
 - **MANDATORY**: APG marketplace registration completed successfully
 - **MANDATORY**: APG CLI integration functional
 - **MANDATORY**: Real-world scenarios tested within APG platform context
-- **MANDATORY**: All documentation files placed in capability directory with APG context
+- **MANDATORY**: All documentation files placed in `docs/` directory with APG context
 - **MANDATORY**: Testing covers APG integration and capability composition scenarios
+- **MANDATORY**: `WORLD_CLASS_IMPROVEMENTS.md` created with 10 revolutionary enhancements (excluding blockchain and quantum resistant encryption)
 
 ## Critical Implementation Requirements
 
@@ -365,21 +385,21 @@ capabilities/{capability}/{sub_capability}/
 13. **APG Composition Registration**: Register capability with APG's composition engine
 14. Regularly update progress in TodoWrite tool with APG integration status
 15. **APG Final Validation**: Ensure all documentation is in capability directory with APG context
-16. **APG Quality Check**: Verify >95% test coverage with `uv run pytest -vxs tests/ci`
+16. **APG Quality Check**: Verify >95% test coverage with `uv run pytest -vxs tests/`
 17. **APG Type Check**: Verify type safety with `uv run pyright`
 18. **APG Marketplace Registration**: Complete APG marketplace integration
 
 ### APG Documentation Requirements
-**MANDATORY**: The todo.md must include specific tasks for creating ALL of these APG-integrated documentation files in the capability directory:
+**MANDATORY**: The todo.md must include specific tasks for creating ALL of these APG-integrated documentation files in the `docs/` directory:
 
-1. **user_guide.md**: APG-aware end-user documentation
+1. **docs/user_guide.md**: APG-aware end-user documentation
    - Getting started guide with APG platform context and screenshots
    - Feature walkthrough with APG capability cross-references
    - Common workflows showing integration with other APG capabilities
    - Troubleshooting section with APG-specific solutions
    - FAQ referencing APG platform features and capabilities
 
-2. **developer_guide.md**: APG integration developer documentation
+2. **docs/developer_guide.md**: APG integration developer documentation
    - Architecture overview with APG composition engine integration
    - Code structure following CLAUDE.md standards and APG patterns
    - Database schema compatible with APG's multi-tenant architecture
@@ -387,21 +407,21 @@ capabilities/{capability}/{sub_capability}/
    - Performance optimization using APG's infrastructure
    - Debugging with APG's observability and monitoring systems
 
-3. **api_reference.md**: APG-compatible API documentation
+3. **docs/api_reference.md**: APG-compatible API documentation
    - All endpoints with APG authentication examples
    - Authorization through APG's auth_rbac capability
    - Request/response formats following APG patterns
    - Error codes integrated with APG's error handling
    - Rate limiting using APG's performance infrastructure
 
-4. **installation_guide.md**: APG infrastructure deployment
+4. **docs/installation_guide.md**: APG infrastructure deployment
    - APG system requirements and capability dependencies
    - Step-by-step installation within APG platform
    - Configuration options for APG integration
    - Deployment procedures for APG's containerized environment
    - Environment setup for APG multi-tenant architecture
 
-5. **troubleshooting_guide.md**: APG capability troubleshooting
+5. **docs/troubleshooting_guide.md**: APG capability troubleshooting
    - Common issues specific to APG integration
    - Error messages and fixes within APG context
    - Performance tuning for APG's multi-tenant architecture
@@ -411,10 +431,10 @@ capabilities/{capability}/{sub_capability}/
 ### APG Testing Requirements
 **MANDATORY**: The todo.md must include comprehensive APG-compatible testing phases with >95% code coverage:
 
-1. **APG Unit Tests**: All models, services, and utilities in `tests/ci/`
+1. **APG Unit Tests**: All models, services, and utilities in `tests/`
    - **MANDATORY**: Use modern pytest-asyncio patterns (no `@pytest.mark.asyncio` decorators)
    - **MANDATORY**: Use real objects with pytest fixtures (no mocks except LLM)
-   - **MANDATORY**: Run with `uv run pytest -vxs tests/ci`
+   - **MANDATORY**: Run with `uv run pytest -vxs tests/`
 
 2. **APG Integration Tests**: API endpoints and workflows with existing APG capabilities
    - **MANDATORY**: Use `pytest-httpserver` for API testing
@@ -452,4 +472,4 @@ capabilities/{capability}/{sub_capability}/
 - **MANDATORY**: FOLLOW THE APG-INTEGRATED TODO.MD PLAN EXACTLY - IT IS YOUR AUTHORITATIVE GUIDE**
 - **MANDATORY**: ASK FOR ALL NECESSARY APG-INTEGRATED PERMISSIONS BEFORE STARTING**
 
-Begin APG-integrated development immediately upon receiving the `/dev` command with a capability/sub-capability name.
+Begin APG-integrated development immediately upon receiving the `/dev` command with a capability/sub-capability name. When you finish a phase immediately start on the next phase without delay. Make your responses succinct and to the point.

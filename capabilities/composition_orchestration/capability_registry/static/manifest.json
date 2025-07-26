@@ -1,0 +1,141 @@
+{
+  "name": "APG Capability Registry",
+  "short_name": "APG Registry",
+  "description": "APG Capability Registry Mobile App - Manage and compose capabilities on the go",
+  "start_url": "/capability-registry/mobile",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "scope": "/capability-registry/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/static/capability_registry/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/capability_registry/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/capability_registry/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/capability_registry/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/capability_registry/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/capability_registry/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/capability_registry/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/capability_registry/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse Capabilities",
+      "short_name": "Capabilities",
+      "description": "Browse available capabilities",
+      "url": "/capability-registry/mobile#capabilities",
+      "icons": [
+        {
+          "src": "/static/capability_registry/icons/shortcut-capabilities.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Create Composition",
+      "short_name": "Compose",
+      "description": "Create new capability composition",
+      "url": "/capability-registry/mobile#compose",
+      "icons": [
+        {
+          "src": "/static/capability_registry/icons/shortcut-compose.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View registry dashboard",
+      "url": "/capability-registry/mobile#dashboard",
+      "icons": [
+        {
+          "src": "/static/capability_registry/icons/shortcut-dashboard.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/static/capability_registry/screenshots/mobile-capabilities.png",
+      "sizes": "375x812",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Capabilities view on mobile"
+    },
+    {
+      "src": "/static/capability_registry/screenshots/mobile-compose.png",
+      "sizes": "375x812",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Composition designer on mobile"
+    },
+    {
+      "src": "/static/capability_registry/screenshots/tablet-dashboard.png",
+      "sizes": "768x1024",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard view on tablet"
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://marketplace.apg.platform/capability-registry"
+    }
+  ],
+  "prefer_related_applications": false,
+  "features": [
+    "offline-capable",
+    "background-sync",
+    "responsive-design",
+    "touch-optimized"
+  ],
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
+}

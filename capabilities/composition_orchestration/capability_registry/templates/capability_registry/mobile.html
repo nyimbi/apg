@@ -1,0 +1,1094 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<link rel="manifest" href="{{ url_for('capability_registry.pwa_manifest') }}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="APG Registry">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2563eb">
+
+<style>
+  /* Mobile-First Responsive Design */
+  .mobile-container {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #f8fafc;
+    min-height: 100vh;
+  }
+  
+  .mobile-header {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: white;
+    padding: 12px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .mobile-header h1 {
+    font-size: 1.2rem;
+    margin: 0;
+    font-weight: 600;
+  }
+  
+  .mobile-nav {
+    display: flex;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .mobile-nav-item {
+    flex: 0 0 auto;
+    padding: 12px 16px;
+    text-decoration: none;
+    color: #64748b;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  
+  .mobile-nav-item.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+  }
+  
+  .mobile-content {
+    padding: 16px;
+  }
+  
+  .mobile-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e5e7eb;
+  }
+  
+  .capability-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: white;
+    transition: all 0.2s;
+  }
+  
+  .capability-card:active {
+    background: #f8fafc;
+    transform: scale(0.98);
+  }
+  
+  .capability-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+  
+  .capability-content {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .capability-name {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .capability-description {
+    font-size: 0.85rem;
+    color: #6b7280;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .capability-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  
+  .capability-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  
+  .badge-foundation { background: #dbeafe; color: #1d4ed8; }
+  .badge-business { background: #dcfce7; color: #16a34a; }
+  .badge-analytics { background: #fed7aa; color: #ea580c; }
+  .badge-manufacturing { background: #e9d5ff; color: #7c3aed; }
+  
+  .quality-score {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #f0fdf4;
+    color: #16a34a;
+  }
+  
+  .search-container {
+    position: sticky;
+    top: 0;
+    background: white;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    z-index: 50;
+  }
+  
+  .search-box {
+    position: relative;
+    width: 100%;
+  }
+  
+  .search-input {
+    width: 100%;
+    padding: 10px 16px 10px 40px;
+    border: 1px solid #d1d5db;
+    border-radius: 25px;
+    font-size: 1rem;
+    background: #f9fafb;
+  }
+  
+  .search-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+  
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+  }
+  
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+  }
+  
+  .status-online {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+  }
+  
+  .status-offline {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+  }
+  
+  .status-syncing {
+    background: #fffbeb;
+    color: #d97706;
+    border: 1px solid #fed7aa;
+  }
+  
+  .floating-action {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    z-index: 200;
+    transition: all 0.3s;
+  }
+  
+  .floating-action:active {
+    transform: scale(0.95);
+  }
+  
+  .pull-to-refresh {
+    padding: 20px;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.9rem;
+  }
+  
+  .loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #e5e7eb;
+    border-radius: 50%;
+    border-top-color: #2563eb;
+    animation: spin 1s ease-in-out infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+  }
+  
+  .empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+  
+  .bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    max-height: 70vh;
+    overflow: hidden;
+  }
+  
+  .bottom-sheet.open {
+    transform: translateY(0);
+  }
+  
+  .bottom-sheet-header {
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: center;
+    position: relative;
+  }
+  
+  .bottom-sheet-handle {
+    width: 32px;
+    height: 4px;
+    background: #d1d5db;
+    border-radius: 2px;
+    margin: 0 auto 12px;
+  }
+  
+  .bottom-sheet-content {
+    padding: 16px;
+    max-height: calc(70vh - 80px);
+    overflow-y: auto;
+  }
+  
+  .composition-builder {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .selected-capabilities {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    min-height: 48px;
+    border: 2px dashed #d1d5db;
+  }
+  
+  .selected-capability {
+    background: #2563eb;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .remove-capability {
+    background: rgba(255,255,255,0.3);
+    border: none;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Dark mode support */
+  @media (prefers-color-scheme: dark) {
+    .mobile-container { background: #111827; }
+    .mobile-card { background: #1f2937; border-color: #374151; }
+    .capability-card { background: #1f2937; border-color: #374151; }
+    .capability-name { color: #f9fafb; }
+    .capability-description { color: #d1d5db; }
+    .search-input { background: #374151; border-color: #4b5563; color: #f9fafb; }
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 640px) {
+    .mobile-content { padding: 12px; }
+    .mobile-card { padding: 12px; margin-bottom: 12px; }
+    .capability-card { padding: 10px; }
+    .capability-icon { width: 36px; height: 36px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+  <!-- Mobile Header -->
+  <div class="mobile-header">
+    <div class="d-flex justify-content-between align-items-center">
+      <h1>
+        <i class="fa fa-database"></i>
+        APG Registry
+      </h1>
+      <div class="d-flex align-items-center gap-2">
+        <div id="connection-status" class="status-indicator status-online">
+          <div class="loading-spinner" style="display: none;"></div>
+          <i class="fa fa-wifi"></i>
+          <span>Online</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Navigation -->
+  <div class="mobile-nav">
+    <a href="#capabilities" class="mobile-nav-item active" data-tab="capabilities">
+      <i class="fa fa-cogs"></i> Capabilities
+    </a>
+    <a href="#compositions" class="mobile-nav-item" data-tab="compositions">
+      <i class="fa fa-cubes"></i> Compositions
+    </a>
+    <a href="#dashboard" class="mobile-nav-item" data-tab="dashboard">
+      <i class="fa fa-dashboard"></i> Dashboard
+    </a>
+    <a href="#settings" class="mobile-nav-item" data-tab="settings">
+      <i class="fa fa-cog"></i> Settings
+    </a>
+  </div>
+
+  <!-- Tab Content -->
+  <div id="tab-content">
+    <!-- Capabilities Tab -->
+    <div id="capabilities-tab" class="tab-pane active">
+      <!-- Search -->
+      <div class="search-container">
+        <div class="search-box">
+          <input type="text" class="search-input" id="capability-search" placeholder="Search capabilities...">
+          <i class="fa fa-search search-icon"></i>
+        </div>
+      </div>
+
+      <!-- Pull to Refresh -->
+      <div class="pull-to-refresh" id="pull-to-refresh">
+        <i class="fa fa-arrow-down"></i>
+        Pull to refresh
+      </div>
+
+      <!-- Capabilities List -->
+      <div class="mobile-content">
+        <div id="capabilities-list">
+          <!-- Capabilities will be loaded here -->
+        </div>
+        
+        <div class="empty-state" id="empty-capabilities" style="display: none;">
+          <div class="empty-state-icon">
+            <i class="fa fa-search"></i>
+          </div>
+          <h3>No Capabilities Found</h3>
+          <p>Try adjusting your search or pull to refresh.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compositions Tab -->
+    <div id="compositions-tab" class="tab-pane">
+      <div class="mobile-content">
+        <div id="compositions-list">
+          <!-- Compositions will be loaded here -->
+        </div>
+        
+        <div class="empty-state" id="empty-compositions" style="display: none;">
+          <div class="empty-state-icon">
+            <i class="fa fa-cubes"></i>
+          </div>
+          <h3>No Compositions</h3>
+          <p>Create your first composition by selecting capabilities.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard Tab -->
+    <div id="dashboard-tab" class="tab-pane">
+      <div class="mobile-content">
+        <div class="mobile-card">
+          <h3><i class="fa fa-tachometer"></i> Quick Stats</h3>
+          <div class="row">
+            <div class="col-6">
+              <div class="text-center">
+                <div class="metric-value" id="capabilities-count">-</div>
+                <div class="metric-label">Capabilities</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="text-center">
+                <div class="metric-value" id="compositions-count">-</div>
+                <div class="metric-label">Compositions</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mobile-card">
+          <h3><i class="fa fa-clock-o"></i> Sync Status</h3>
+          <div id="sync-status">
+            <p>Last sync: <span id="last-sync-time">Never</span></p>
+            <p>Pending actions: <span id="pending-actions">0</span></p>
+            <button class="btn btn-primary btn-sm" id="manual-sync">
+              <i class="fa fa-refresh"></i> Sync Now
+            </button>
+          </div>
+        </div>
+
+        <div class="mobile-card">
+          <h3><i class="fa fa-hdd-o"></i> Storage</h3>
+          <div id="storage-info">
+            <p>Offline database: <span id="db-size">-</span></p>
+            <button class="btn btn-outline-secondary btn-sm" id="cleanup-data">
+              <i class="fa fa-trash"></i> Cleanup Old Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="settings-tab" class="tab-pane">
+      <div class="mobile-content">
+        <div class="mobile-card">
+          <h3><i class="fa fa-cog"></i> App Settings</h3>
+          
+          <div class="form-group">
+            <label class="form-check-label">
+              <input type="checkbox" class="form-check-input" id="offline-mode">
+              Offline Mode
+            </label>
+            <small class="form-text text-muted">Enable offline capabilities</small>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-check-label">
+              <input type="checkbox" class="form-check-input" id="auto-sync">
+              Auto Sync
+            </label>
+            <small class="form-text text-muted">Automatically sync when online</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="sync-interval">Sync Interval</label>
+            <select class="form-control" id="sync-interval">
+              <option value="5">5 minutes</option>
+              <option value="15" selected>15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">1 hour</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mobile-card">
+          <h3><i class="fa fa-info-circle"></i> App Info</h3>
+          <p><strong>Version:</strong> 1.0.0</p>
+          <p><strong>Build:</strong> 2025.01.26</p>
+          <p><strong>Cache Version:</strong> v1</p>
+          
+          <button class="btn btn-outline-primary btn-sm" id="check-updates">
+            <i class="fa fa-download"></i> Check for Updates
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Action Button -->
+  <button class="floating-action" id="fab-compose">
+    <i class="fa fa-plus"></i>
+  </button>
+
+  <!-- Composition Builder Bottom Sheet -->
+  <div class="bottom-sheet" id="compose-sheet">
+    <div class="bottom-sheet-header">
+      <div class="bottom-sheet-handle"></div>
+      <h4>Create Composition</h4>
+      <button class="btn btn-sm btn-outline-secondary" id="close-compose" style="position: absolute; right: 16px; top: 16px;">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+    <div class="bottom-sheet-content">
+      <div class="composition-builder">
+        <div class="form-group">
+          <label for="composition-name">Composition Name</label>
+          <input type="text" class="form-control" id="composition-name" placeholder="Enter name...">
+        </div>
+        
+        <div class="form-group">
+          <label for="composition-description">Description</label>
+          <textarea class="form-control" id="composition-description" rows="3" placeholder="Describe your composition..."></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>Selected Capabilities</label>
+          <div class="selected-capabilities" id="selected-capabilities">
+            <p class="text-muted m-0">Tap capabilities to add them</p>
+          </div>
+        </div>
+        
+        <button class="btn btn-primary" id="create-composition" disabled>
+          <i class="fa fa-save"></i> Create Composition
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+class MobileRegistry {
+    constructor() {
+        this.isOnline = navigator.onLine;
+        this.selectedCapabilities = new Set();
+        this.currentTab = 'capabilities';
+        this.capabilities = [];
+        this.compositions = [];
+        
+        this.init();
+    }
+    
+    init() {
+        this.setupEventListeners();
+        this.setupServiceWorker();
+        this.loadInitialData();
+        this.updateConnectionStatus();
+    }
+    
+    setupEventListeners() {
+        // Tab navigation
+        document.querySelectorAll('.mobile-nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tab = e.currentTarget.dataset.tab;
+                this.switchTab(tab);
+            });
+        });
+        
+        // Search
+        document.getElementById('capability-search').addEventListener('input', (e) => {
+            this.searchCapabilities(e.target.value);
+        });
+        
+        // Connection status
+        window.addEventListener('online', () => {
+            this.isOnline = true;
+            this.updateConnectionStatus();
+            this.syncData();
+        });
+        
+        window.addEventListener('offline', () => {
+            this.isOnline = false;
+            this.updateConnectionStatus();
+        });
+        
+        // FAB and bottom sheet
+        document.getElementById('fab-compose').addEventListener('click', () => {
+            this.openComposeSheet();
+        });
+        
+        document.getElementById('close-compose').addEventListener('click', () => {
+            this.closeComposeSheet();
+        });
+        
+        // Composition creation
+        document.getElementById('create-composition').addEventListener('click', () => {
+            this.createComposition();
+        });
+        
+        // Pull to refresh
+        this.setupPullToRefresh();
+        
+        // Settings
+        document.getElementById('manual-sync').addEventListener('click', () => {
+            this.syncData();
+        });
+        
+        document.getElementById('cleanup-data').addEventListener('click', () => {
+            this.cleanupData();
+        });
+    }
+    
+    setupServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(registration => {
+                    console.log('Service Worker registered:', registration);
+                })
+                .catch(error => {
+                    console.log('Service Worker registration failed:', error);
+                });
+        }
+    }
+    
+    setupPullToRefresh() {
+        let startY = 0;
+        let currentY = 0;
+        let pulling = false;
+        
+        const pullElement = document.getElementById('pull-to-refresh');
+        const tabContent = document.getElementById('tab-content');
+        
+        tabContent.addEventListener('touchstart', (e) => {
+            if (tabContent.scrollTop === 0) {
+                startY = e.touches[0].pageY;
+                pulling = true;
+            }
+        });
+        
+        tabContent.addEventListener('touchmove', (e) => {
+            if (!pulling) return;
+            
+            currentY = e.touches[0].pageY;
+            const pullDistance = currentY - startY;
+            
+            if (pullDistance > 0 && pullDistance < 100) {
+                pullElement.style.transform = `translateY(${pullDistance}px)`;
+                pullElement.style.opacity = pullDistance / 100;
+            }
+        });
+        
+        tabContent.addEventListener('touchend', () => {
+            if (pulling && currentY - startY > 60) {
+                this.refreshData();
+            }
+            
+            pullElement.style.transform = '';
+            pullElement.style.opacity = '';
+            pulling = false;
+        });
+    }
+    
+    switchTab(tab) {
+        // Update navigation
+        document.querySelectorAll('.mobile-nav-item').forEach(item => {
+            item.classList.toggle('active', item.dataset.tab === tab);
+        });
+        
+        // Update content
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.toggle('active', pane.id === `${tab}-tab`);
+        });
+        
+        this.currentTab = tab;
+        
+        // Load tab-specific data
+        if (tab === 'dashboard') {
+            this.loadDashboardData();
+        } else if (tab === 'compositions') {
+            this.loadCompositions();
+        }
+    }
+    
+    updateConnectionStatus() {
+        const statusElement = document.getElementById('connection-status');
+        const spinner = statusElement.querySelector('.loading-spinner');
+        const icon = statusElement.querySelector('.fa');
+        const text = statusElement.querySelector('span');
+        
+        if (this.isOnline) {
+            statusElement.className = 'status-indicator status-online';
+            icon.className = 'fa fa-wifi';
+            text.textContent = 'Online';
+            spinner.style.display = 'none';
+        } else {
+            statusElement.className = 'status-indicator status-offline';
+            icon.className = 'fa fa-wifi-off';
+            text.textContent = 'Offline';
+            spinner.style.display = 'none';
+        }
+    }
+    
+    async loadInitialData() {
+        try {
+            // Load capabilities
+            this.capabilities = await this.fetchCapabilities();
+            this.renderCapabilities(this.capabilities);
+            
+            // Load dashboard data
+            if (this.currentTab === 'dashboard') {
+                this.loadDashboardData();
+            }
+        } catch (error) {
+            console.error('Failed to load initial data:', error);
+        }
+    }
+    
+    async fetchCapabilities() {
+        // Mock data - in real app would fetch from API or IndexedDB
+        return [
+            {
+                capability_id: 'cap_001',
+                code: 'USER_MGMT',
+                name: 'User Management',
+                description: 'Complete user management system with authentication and profile management',
+                category: 'foundation_infrastructure',
+                version: '1.0.0',
+                quality_score: 0.95,
+                status: 'active'
+            },
+            {
+                capability_id: 'cap_002',
+                code: 'AUTH_RBAC',
+                name: 'Authentication & RBAC',
+                description: 'Role-based access control with multi-factor authentication support',
+                category: 'foundation_infrastructure',
+                version: '1.2.0',
+                quality_score: 0.92,
+                status: 'active'
+            },
+            {
+                capability_id: 'cap_003',
+                code: 'ANALYTICS',
+                name: 'Analytics Platform',
+                description: 'Real-time analytics and reporting dashboard with data visualization',
+                category: 'analytics_intelligence',
+                version: '2.1.0',
+                quality_score: 0.88,
+                status: 'active'
+            }
+        ];
+    }
+    
+    renderCapabilities(capabilities) {
+        const container = document.getElementById('capabilities-list');
+        const emptyState = document.getElementById('empty-capabilities');
+        
+        if (capabilities.length === 0) {
+            container.innerHTML = '';
+            emptyState.style.display = 'block';
+            return;
+        }
+        
+        emptyState.style.display = 'none';
+        
+        container.innerHTML = capabilities.map(cap => `
+            <div class="capability-card" data-id="${cap.capability_id}">
+                <div class="capability-icon">
+                    ${cap.code.substring(0, 2)}
+                </div>
+                <div class="capability-content">
+                    <div class="capability-name">${cap.name}</div>
+                    <div class="capability-description">${cap.description}</div>
+                    <div class="capability-meta">
+                        <span class="capability-badge badge-${this.getCategoryClass(cap.category)}">
+                            ${this.formatCategory(cap.category)}
+                        </span>
+                        <span class="quality-score">${Math.round(cap.quality_score * 100)}%</span>
+                        <span style="font-size: 0.7rem; color: #9ca3af;">v${cap.version}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add click handlers
+        container.querySelectorAll('.capability-card').forEach(card => {
+            card.addEventListener('click', () => {
+                this.selectCapability(card.dataset.id);
+            });
+        });
+    }
+    
+    searchCapabilities(query) {
+        if (!query.trim()) {
+            this.renderCapabilities(this.capabilities);
+            return;
+        }
+        
+        const filtered = this.capabilities.filter(cap => 
+            cap.name.toLowerCase().includes(query.toLowerCase()) ||
+            cap.code.toLowerCase().includes(query.toLowerCase()) ||
+            cap.description.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        this.renderCapabilities(filtered);
+    }
+    
+    selectCapability(capabilityId) {
+        const capability = this.capabilities.find(c => c.capability_id === capabilityId);
+        if (!capability) return;
+        
+        if (this.selectedCapabilities.has(capabilityId)) {
+            this.selectedCapabilities.delete(capabilityId);
+        } else {
+            this.selectedCapabilities.add(capabilityId);
+        }
+        
+        this.updateSelectedCapabilities();
+        
+        // Visual feedback
+        const card = document.querySelector(`[data-id="${capabilityId}"]`);
+        card.style.background = this.selectedCapabilities.has(capabilityId) ? '#f0f9ff' : '';
+        card.style.borderColor = this.selectedCapabilities.has(capabilityId) ? '#2563eb' : '';
+    }
+    
+    updateSelectedCapabilities() {
+        const container = document.getElementById('selected-capabilities');
+        const createBtn = document.getElementById('create-composition');
+        
+        if (this.selectedCapabilities.size === 0) {
+            container.innerHTML = '<p class="text-muted m-0">Tap capabilities to add them</p>';
+            createBtn.disabled = true;
+        } else {
+            container.innerHTML = Array.from(this.selectedCapabilities).map(id => {
+                const cap = this.capabilities.find(c => c.capability_id === id);
+                return `
+                    <div class="selected-capability">
+                        ${cap.name}
+                        <button class="remove-capability" onclick="mobileRegistry.removeCapability('${id}')">
+                            ×
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            createBtn.disabled = false;
+        }
+    }
+    
+    removeCapability(capabilityId) {
+        this.selectedCapabilities.delete(capabilityId);
+        this.updateSelectedCapabilities();
+        
+        // Update visual state
+        const card = document.querySelector(`[data-id="${capabilityId}"]`);
+        if (card) {
+            card.style.background = '';
+            card.style.borderColor = '';
+        }
+    }
+    
+    openComposeSheet() {
+        document.getElementById('compose-sheet').classList.add('open');
+    }
+    
+    closeComposeSheet() {
+        document.getElementById('compose-sheet').classList.remove('open');
+        this.selectedCapabilities.clear();
+        this.updateSelectedCapabilities();
+        
+        // Clear form
+        document.getElementById('composition-name').value = '';
+        document.getElementById('composition-description').value = '';
+    }
+    
+    async createComposition() {
+        const name = document.getElementById('composition-name').value.trim();
+        const description = document.getElementById('composition-description').value.trim();
+        
+        if (!name || this.selectedCapabilities.size === 0) {
+            alert('Please provide a name and select at least one capability');
+            return;
+        }
+        
+        try {
+            // Create composition via API or store offline
+            const compositionData = {
+                name,
+                description,
+                capability_ids: Array.from(this.selectedCapabilities),
+                composition_type: 'mobile'
+            };
+            
+            // Show success message
+            alert('Composition created successfully!');
+            
+            this.closeComposeSheet();
+            
+            // Switch to compositions tab
+            this.switchTab('compositions');
+            
+        } catch (error) {
+            console.error('Failed to create composition:', error);
+            alert('Failed to create composition. Please try again.');
+        }
+    }
+    
+    async loadCompositions() {
+        // Mock data
+        this.compositions = [
+            {
+                composition_id: 'comp_001',
+                name: 'Basic ERP',
+                description: 'Basic ERP system with user management and analytics',
+                type: 'erp_enterprise',
+                capability_count: 3,
+                validation_score: 0.85
+            }
+        ];
+        
+        this.renderCompositions(this.compositions);
+    }
+    
+    renderCompositions(compositions) {
+        const container = document.getElementById('compositions-list');
+        const emptyState = document.getElementById('empty-compositions');
+        
+        if (compositions.length === 0) {
+            container.innerHTML = '';
+            emptyState.style.display = 'block';
+            return;
+        }
+        
+        emptyState.style.display = 'none';
+        
+        container.innerHTML = compositions.map(comp => `
+            <div class="mobile-card">
+                <h4>${comp.name}</h4>
+                <p class="text-muted">${comp.description}</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">${comp.capability_count} capabilities</small>
+                    <span class="quality-score">${Math.round(comp.validation_score * 100)}%</span>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    async loadDashboardData() {
+        // Mock dashboard data
+        document.getElementById('capabilities-count').textContent = this.capabilities.length;
+        document.getElementById('compositions-count').textContent = this.compositions.length;
+        document.getElementById('last-sync-time').textContent = 'Just now';
+        document.getElementById('pending-actions').textContent = '0';
+        document.getElementById('db-size').textContent = '2.1 MB';
+    }
+    
+    async syncData() {
+        const statusElement = document.getElementById('connection-status');
+        const spinner = statusElement.querySelector('.loading-spinner');
+        
+        statusElement.className = 'status-indicator status-syncing';
+        statusElement.querySelector('.fa').className = 'fa fa-refresh fa-spin';
+        statusElement.querySelector('span').textContent = 'Syncing...';
+        spinner.style.display = 'inline-block';
+        
+        try {
+            // Simulate sync
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            this.updateConnectionStatus();
+            document.getElementById('last-sync-time').textContent = 'Just now';
+            
+        } catch (error) {
+            console.error('Sync failed:', error);
+        }
+    }
+    
+    async refreshData() {
+        await this.syncData();
+        await this.loadInitialData();
+    }
+    
+    async cleanupData() {
+        if (confirm('Clean up old offline data? This cannot be undone.')) {
+            // Simulate cleanup
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            alert('Cleanup completed');
+            this.loadDashboardData();
+        }
+    }
+    
+    getCategoryClass(category) {
+        const map = {
+            'foundation_infrastructure': 'foundation',
+            'business_operations': 'business',
+            'analytics_intelligence': 'analytics',
+            'manufacturing_operations': 'manufacturing'
+        };
+        return map[category] || 'foundation';
+    }
+    
+    formatCategory(category) {
+        return category.split('_').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+    }
+}
+
+// Initialize mobile registry
+const mobileRegistry = new MobileRegistry();
+
+// PWA install prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Show install button if needed
+    const installBtn = document.createElement('button');
+    installBtn.textContent = 'Install App';
+    installBtn.className = 'btn btn-outline-primary btn-sm';
+    installBtn.onclick = () => {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+            deferredPrompt = null;
+            installBtn.remove();
+        });
+    };
+    
+    document.querySelector('.mobile-header').appendChild(installBtn);
+});
+</script>
+{% endblock %}

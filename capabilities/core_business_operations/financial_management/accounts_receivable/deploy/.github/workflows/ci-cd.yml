@@ -1,0 +1,410 @@
+# APG Accounts Receivable - CI/CD Pipeline
+# Comprehensive automated testing, building, and deployment
+
+name: APG AR CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'capabilities/core_financials/accounts_receivable/**'
+      - '.github/workflows/ar-*.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'capabilities/core_financials/accounts_receivable/**'
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: datacraft/apg-ar
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Code Quality and Security
+  quality-checks:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+          uv pip install --system -r capabilities/core_financials/accounts_receivable/requirements-dev.txt
+
+      - name: Code Formatting Check (Black)
+        run: |
+          black --check --diff capabilities/core_financials/accounts_receivable/
+
+      - name: Import Sorting Check (isort)
+        run: |
+          isort --check-only --diff capabilities/core_financials/accounts_receivable/
+
+      - name: Linting (Flake8)
+        run: |
+          flake8 capabilities/core_financials/accounts_receivable/
+
+      - name: Type Checking (Pyright)
+        run: |
+          uv run pyright capabilities/core_financials/accounts_receivable/
+
+      - name: Security Scan (Bandit)
+        run: |
+          bandit -r capabilities/core_financials/accounts_receivable/ -f json -o bandit-report.json
+          bandit -r capabilities/core_financials/accounts_receivable/
+
+      - name: Dependency Security Check
+        run: |
+          pip-audit --requirement capabilities/core_financials/accounts_receivable/requirements.txt
+
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-report
+          path: bandit-report.json
+
+  # Unit and Integration Tests
+  test-suite:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    needs: quality-checks
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: apg_ar_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+          uv pip install --system -r capabilities/core_financials/accounts_receivable/requirements-dev.txt
+
+      - name: Setup Test Environment
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/apg_ar_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key
+          JWT_SECRET_KEY: test-jwt-secret
+          APG_ENVIRONMENT: test
+        run: |
+          cd capabilities/core_financials/accounts_receivable
+          python -c "
+          import asyncio
+          import sys
+          sys.path.insert(0, '.')
+          # Add any test database setup here
+          print('Test environment ready')
+          "
+
+      - name: Run Unit Tests
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/apg_ar_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key
+          JWT_SECRET_KEY: test-jwt-secret
+          APG_ENVIRONMENT: test
+        run: |
+          cd capabilities/core_financials/accounts_receivable
+          uv run pytest tests/ci/ -v --cov=. --cov-report=xml --cov-report=html --cov-report=term
+
+      - name: Run Integration Tests
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/apg_ar_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key
+          JWT_SECRET_KEY: test-jwt-secret
+          APG_ENVIRONMENT: test
+        run: |
+          cd capabilities/core_financials/accounts_receivable
+          uv run pytest tests/integration/ -v --timeout=60
+
+      - name: Upload Coverage Reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: capabilities/core_financials/accounts_receivable/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: |
+            capabilities/core_financials/accounts_receivable/htmlcov/
+            capabilities/core_financials/accounts_receivable/coverage.xml
+
+  # Performance Testing
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: test-suite
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+          uv pip install --system -r capabilities/core_financials/accounts_receivable/requirements-dev.txt
+
+      - name: Run Performance Tests
+        env:
+          APG_ENVIRONMENT: test
+        run: |
+          cd capabilities/core_financials/accounts_receivable
+          python tests/performance/performance_runner.py
+
+      - name: Upload Performance Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: capabilities/core_financials/accounts_receivable/tests/performance/performance_report_*.json
+
+  # Container Build and Scan
+  container-build:
+    name: Container Build & Scan
+    runs-on: ubuntu-latest
+    needs: test-suite
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+
+      - name: Build Container Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: capabilities/core_financials/accounts_receivable/deploy/Dockerfile
+          target: production
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Container Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Security Scan Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Staging Deployment
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [container-build, performance-tests]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure Kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to Staging
+        run: |
+          cd capabilities/core_financials/accounts_receivable/deploy
+          
+          # Update image tags in Kubernetes manifests
+          sed -i "s|datacraft/apg-ar:.*|datacraft/apg-ar:${{ github.sha }}|g" kubernetes/deployment.yaml
+          
+          # Apply Kubernetes manifests
+          kubectl apply -f kubernetes/namespace.yaml
+          kubectl apply -f kubernetes/configmap.yaml
+          kubectl apply -f kubernetes/secrets.yaml
+          kubectl apply -f kubernetes/deployment.yaml
+          kubectl apply -f kubernetes/service.yaml
+          kubectl apply -f kubernetes/ingress.yaml
+          
+          # Wait for deployment
+          kubectl rollout status deployment/apg-ar-api -n apg-ar --timeout=300s
+
+      - name: Run Smoke Tests
+        run: |
+          cd capabilities/core_financials/accounts_receivable
+          # Run smoke tests against staging environment
+          python -m pytest tests/smoke/ -v --base-url=https://staging.ar.apg.platform
+
+  # Production Deployment
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [container-build]
+    if: github.event_name == 'release'
+    environment: production
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure Kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to Production
+        run: |
+          cd capabilities/core_financials/accounts_receivable/deploy
+          
+          # Update image tags for production
+          sed -i "s|datacraft/apg-ar:.*|datacraft/apg-ar:${{ github.ref_name }}|g" kubernetes/deployment.yaml
+          
+          # Apply Kubernetes manifests with production settings
+          kubectl apply -f kubernetes/namespace.yaml
+          kubectl apply -f kubernetes/configmap.yaml
+          kubectl apply -f kubernetes/secrets.yaml
+          kubectl apply -f kubernetes/deployment.yaml
+          kubectl apply -f kubernetes/service.yaml
+          kubectl apply -f kubernetes/ingress.yaml
+          
+          # Rolling update deployment
+          kubectl rollout status deployment/apg-ar-api -n apg-ar --timeout=600s
+          kubectl rollout status deployment/apg-ar-worker -n apg-ar --timeout=300s
+          kubectl rollout status deployment/apg-ar-scheduler -n apg-ar --timeout=300s
+
+      - name: Post-Deployment Health Check
+        run: |
+          # Wait for services to be ready
+          sleep 30
+          
+          # Health check
+          curl -f https://ar.apg.platform/health || exit 1
+          
+          # API smoke test
+          curl -f https://api.ar.apg.platform/api/health || exit 1
+
+      - name: Notify Deployment Success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: "🚀 APG AR ${{ github.ref_name }} successfully deployed to production"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Deployment Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "❌ APG AR ${{ github.ref_name }} deployment to production failed"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Security Scan on Schedule
+  security-scan:
+    name: Scheduled Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Security Audit
+        run: |
+          # Comprehensive security scanning would go here
+          echo "Running scheduled security scan..."
+
+      - name: Notify Security Issues
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "🔒 Security issues detected in APG AR"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

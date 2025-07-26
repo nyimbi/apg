@@ -1,0 +1,774 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.topology-container {
+  padding: 20px;
+}
+
+.topology-controls {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.topology-graph {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: relative;
+  min-height: 600px;
+}
+
+#topologyNetwork {
+  width: 100%;
+  height: 600px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.topology-sidebar {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 20px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.service-node {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.service-node:hover {
+  background-color: #f8f9fa;
+  border-color: #3498db;
+}
+
+.service-node.selected {
+  background-color: #e3f2fd;
+  border-color: #2196f3;
+}
+
+.service-status-icon {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-healthy { background-color: #28a745; }
+.status-unhealthy { background-color: #dc3545; }
+.status-degraded { background-color: #ffc107; }
+.status-unknown { background-color: #6c757d; }
+
+.connection-info {
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.metric-badge {
+  display: inline-block;
+  background: #e9ecef;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 0.8em;
+  margin: 2px;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.legend {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 0.9em;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.layout-controls {
+  display: inline-block;
+  margin-left: 15px;
+}
+
+.layout-controls .btn {
+  margin-right: 5px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="topology-container">
+  <div class="row">
+    <div class="col-md-12">
+      <h1>
+        <i class="fa fa-project-diagram"></i> Service Topology
+        <small class="pull-right">
+          <i class="fa fa-sync refresh-indicator" id="refreshIndicator"></i>
+          Last updated: <span id="lastUpdated">{{ moment().format('HH:mm:ss') }}</span>
+        </small>
+      </h1>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="row">
+    <div class="col-md-12">
+      <div class="topology-controls">
+        <div class="btn-group" role="group">
+          <button type="button" class="btn btn-default" onclick="refreshTopology()">
+            <i class="fa fa-refresh"></i> Refresh
+          </button>
+          <button type="button" class="btn btn-default" onclick="fitNetwork()">
+            <i class="fa fa-expand"></i> Fit to Screen
+          </button>
+          <button type="button" class="btn btn-default" onclick="exportTopology()">
+            <i class="fa fa-download"></i> Export
+          </button>
+        </div>
+        
+        <div class="layout-controls">
+          <label>Layout:</label>
+          <button type="button" class="btn btn-sm btn-default active" onclick="setLayout('hierarchical')">
+            Hierarchical
+          </button>
+          <button type="button" class="btn btn-sm btn-default" onclick="setLayout('force')">
+            Force-Directed
+          </button>
+          <button type="button" class="btn btn-sm btn-default" onclick="setLayout('circular')">
+            Circular
+          </button>
+        </div>
+
+        <div class="pull-right">
+          <div class="form-group" style="margin: 0; display: inline-block;">
+            <label for="filterInput" style="margin-right: 10px;">Filter:</label>
+            <input type="text" id="filterInput" class="form-control" style="width: 200px; display: inline-block;" 
+                   placeholder="Filter services..." onkeyup="filterServices()">
+          </div>
+          <div class="form-group" style="margin: 0; display: inline-block; margin-left: 15px;">
+            <label for="namespaceFilter" style="margin-right: 10px;">Namespace:</label>
+            <select id="namespaceFilter" class="form-control" style="width: 150px; display: inline-block;" 
+                    onchange="filterByNamespace()">
+              <option value="">All Namespaces</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="row">
+    <div class="col-md-9">
+      <div class="topology-graph">
+        <div id="topologyNetwork"></div>
+        <div class="loading-overlay" id="loadingOverlay">
+          <div class="text-center">
+            <i class="fa fa-spinner fa-spin fa-2x"></i>
+            <p>Loading topology...</p>
+          </div>
+        </div>
+        <div class="legend">
+          <h5 style="margin-top: 0;">Service Status</h5>
+          <div class="legend-item">
+            <div class="legend-color status-healthy"></div>
+            <span>Healthy</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color status-degraded"></div>
+            <span>Degraded</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color status-unhealthy"></div>
+            <span>Unhealthy</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color status-unknown"></div>
+            <span>Unknown</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="topology-sidebar">
+        <h4>Service Details</h4>
+        <div id="serviceDetails">
+          <div class="text-muted text-center">
+            <i class="fa fa-info-circle fa-2x"></i>
+            <p>Select a service to view details</p>
+          </div>
+        </div>
+        
+        <hr>
+        
+        <h4>Connection Details</h4>
+        <div id="connectionDetails">
+          <div class="text-muted text-center">
+            <i class="fa fa-info-circle fa-2x"></i>
+            <p>Select a connection to view details</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script>
+// Topology state
+let network;
+let nodes;
+let edges;
+let topologyData;
+let currentLayout = 'hierarchical';
+let selectedService = null;
+let selectedConnection = null;
+
+// Initialize topology
+$(document).ready(function() {
+  initializeNetwork();
+  loadTopologyData();
+});
+
+// Initialize vis.js network
+function initializeNetwork() {
+  const container = document.getElementById('topologyNetwork');
+  
+  // Initialize empty datasets
+  nodes = new vis.DataSet([]);
+  edges = new vis.DataSet([]);
+  
+  const data = { nodes: nodes, edges: edges };
+  
+  const options = {
+    layout: {
+      hierarchical: {
+        enabled: true,
+        direction: 'LR',
+        sortMethod: 'directed',
+        levelSeparation: 200,
+        nodeSpacing: 150
+      }
+    },
+    physics: {
+      enabled: false
+    },
+    nodes: {
+      shape: 'box',
+      margin: 10,
+      widthConstraint: { minimum: 120, maximum: 200 },
+      heightConstraint: { minimum: 60 },
+      font: { size: 14, face: 'Arial' },
+      borderWidth: 2,
+      shadow: true
+    },
+    edges: {
+      arrows: { to: { enabled: true, scaleFactor: 0.8 } },
+      color: { inherit: false, color: '#848484' },
+      width: 2,
+      smooth: { type: 'continuous' }
+    },
+    interaction: {
+      hover: true,
+      selectConnectedEdges: false
+    }
+  };
+  
+  network = new vis.Network(container, data, options);
+  
+  // Event handlers
+  network.on('selectNode', function(event) {
+    const nodeId = event.nodes[0];
+    selectService(nodeId);
+  });
+  
+  network.on('selectEdge', function(event) {
+    const edgeId = event.edges[0];
+    selectConnection(edgeId);
+  });
+  
+  network.on('deselectNode', function(event) {
+    clearServiceSelection();
+  });
+  
+  network.on('deselectEdge', function(event) {
+    clearConnectionSelection();
+  });
+}
+
+// Load topology data
+function loadTopologyData() {
+  $('#loadingOverlay').show();
+  $('#refreshIndicator').addClass('active');
+  
+  $.ajax({
+    url: '{{ url_for("ServiceMeshDashboardView.topology_data") }}',
+    method: 'GET',
+    success: function(data) {
+      topologyData = data;
+      updateTopology(data);
+      populateNamespaceFilter(data.nodes);
+      $('#lastUpdated').text(new Date().toLocaleTimeString());
+    },
+    error: function(xhr, status, error) {
+      console.error('Failed to load topology data:', error);
+      showNotification('Error loading topology data', 'error');
+    },
+    complete: function() {
+      $('#loadingOverlay').hide();
+      $('#refreshIndicator').removeClass('active');
+    }
+  });
+}
+
+// Update topology visualization
+function updateTopology(data) {
+  // Clear existing data
+  nodes.clear();
+  edges.clear();
+  
+  if (!data.nodes || data.nodes.length === 0) {
+    return;
+  }
+  
+  // Add nodes
+  const nodeData = data.nodes.map(service => ({
+    id: service.service_id,
+    label: `${service.service_name}\nv${service.service_version}`,
+    title: getServiceTooltip(service),
+    color: getServiceColor(service.health_status),
+    font: { color: getServiceFontColor(service.health_status) },
+    service: service
+  }));
+  
+  nodes.add(nodeData);
+  
+  // Add edges
+  if (data.edges && data.edges.length > 0) {
+    const edgeData = data.edges.map(connection => ({
+      id: `${connection.source}_${connection.target}`,
+      from: connection.source,
+      to: connection.target,
+      label: connection.protocol ? connection.protocol.toUpperCase() : '',
+      title: getConnectionTooltip(connection),
+      width: Math.max(1, Math.min(5, connection.request_count / 1000)),
+      color: getConnectionColor(connection.error_count, connection.request_count),
+      connection: connection
+    }));
+    
+    edges.add(edgeData);
+  }
+  
+  // Fit the network
+  setTimeout(() => {
+    network.fit({ animation: true });
+  }, 500);
+}
+
+// Service selection
+function selectService(serviceId) {
+  selectedService = serviceId;
+  const service = topologyData.nodes.find(s => s.service_id === serviceId);
+  
+  if (service) {
+    displayServiceDetails(service);
+    highlightServiceConnections(serviceId);
+  }
+}
+
+function clearServiceSelection() {
+  selectedService = null;
+  $('#serviceDetails').html(`
+    <div class="text-muted text-center">
+      <i class="fa fa-info-circle fa-2x"></i>
+      <p>Select a service to view details</p>
+    </div>
+  `);
+  clearHighlights();
+}
+
+// Connection selection
+function selectConnection(edgeId) {
+  selectedConnection = edgeId;
+  const edge = edges.get(edgeId);
+  
+  if (edge && edge.connection) {
+    displayConnectionDetails(edge.connection);
+  }
+}
+
+function clearConnectionSelection() {
+  selectedConnection = null;
+  $('#connectionDetails').html(`
+    <div class="text-muted text-center">
+      <i class="fa fa-info-circle fa-2x"></i>
+      <p>Select a connection to view details</p>
+    </div>
+  `);
+}
+
+// Display service details
+function displayServiceDetails(service) {
+  const html = `
+    <div class="service-node">
+      <h5>
+        <span class="service-status-icon status-${service.health_status}"></span>
+        ${service.service_name}
+      </h5>
+      <p><strong>Version:</strong> ${service.service_version}</p>
+      <p><strong>Namespace:</strong> ${service.namespace || 'default'}</p>
+      <p><strong>Status:</strong> 
+        <span class="label label-${getStatusLabelClass(service.status)}">${service.status}</span>
+      </p>
+      <p><strong>Health:</strong> 
+        <span class="label label-${getHealthLabelClass(service.health_status)}">${service.health_status}</span>
+      </p>
+      
+      <div class="connection-info">
+        <h6>Connections</h6>
+        <div id="serviceConnections">Loading...</div>
+      </div>
+      
+      <div style="margin-top: 10px;">
+        <a href="/smserviceview/show/${service.service_id}" class="btn btn-sm btn-primary">
+          <i class="fa fa-eye"></i> View Details
+        </a>
+        <a href="/smserviceview/edit/${service.service_id}" class="btn btn-sm btn-default">
+          <i class="fa fa-edit"></i> Edit
+        </a>
+      </div>
+    </div>
+  `;
+  
+  $('#serviceDetails').html(html);
+  
+  // Load service connections
+  loadServiceConnections(service.service_id);
+}
+
+// Display connection details
+function displayConnectionDetails(connection) {
+  const sourceService = topologyData.nodes.find(s => s.service_id === connection.source);
+  const targetService = topologyData.nodes.find(s => s.service_id === connection.target);
+  
+  const html = `
+    <div class="connection-info">
+      <h5>Connection Details</h5>
+      <p><strong>From:</strong> ${sourceService ? sourceService.service_name : connection.source}</p>
+      <p><strong>To:</strong> ${targetService ? targetService.service_name : connection.target}</p>
+      <p><strong>Protocol:</strong> ${connection.protocol || 'Unknown'}</p>
+      <p><strong>Port:</strong> ${connection.port || 'N/A'}</p>
+      
+      <h6>Metrics</h6>
+      <div class="metric-badge">Requests: ${connection.request_count || 0}</div>
+      <div class="metric-badge">Errors: ${connection.error_count || 0}</div>
+      <div class="metric-badge">Avg Response: ${Math.round(connection.avg_response_time_ms || 0)}ms</div>
+      
+      <div style="margin-top: 10px;">
+        <small class="text-muted">
+          Last communication: ${connection.last_communication_at ? 
+            new Date(connection.last_communication_at).toLocaleString() : 'Unknown'}
+        </small>
+      </div>
+    </div>
+  `;
+  
+  $('#connectionDetails').html(html);
+}
+
+// Load service connections
+function loadServiceConnections(serviceId) {
+  const connections = topologyData.edges.filter(e => 
+    e.source === serviceId || e.target === serviceId
+  );
+  
+  let html = '';
+  if (connections.length === 0) {
+    html = '<small class="text-muted">No connections found</small>';
+  } else {
+    connections.forEach(conn => {
+      const isOutgoing = conn.source === serviceId;
+      const otherServiceId = isOutgoing ? conn.target : conn.source;
+      const otherService = topologyData.nodes.find(s => s.service_id === otherServiceId);
+      const direction = isOutgoing ? '→' : '←';
+      
+      html += `
+        <div style="margin-bottom: 5px;">
+          <small>
+            ${direction} ${otherService ? otherService.service_name : otherServiceId}
+            <span class="metric-badge">${conn.request_count || 0} req</span>
+          </small>
+        </div>
+      `;
+    });
+  }
+  
+  $('#serviceConnections').html(html);
+}
+
+// Highlight service connections
+function highlightServiceConnections(serviceId) {
+  // Reset all nodes and edges
+  clearHighlights();
+  
+  // Highlight connected nodes and edges
+  const connectedEdges = edges.get({
+    filter: function(edge) {
+      return edge.from === serviceId || edge.to === serviceId;
+    }
+  });
+  
+  const connectedNodes = new Set([serviceId]);
+  connectedEdges.forEach(edge => {
+    connectedNodes.add(edge.from);
+    connectedNodes.add(edge.to);
+  });
+  
+  // Update node colors
+  const allNodes = nodes.get();
+  allNodes.forEach(node => {
+    if (connectedNodes.has(node.id)) {
+      node.color = {
+        border: '#2196f3',
+        background: node.color.background,
+        highlight: { border: '#1976d2', background: node.color.background }
+      };
+    } else {
+      node.color = {
+        border: '#cccccc',
+        background: '#f5f5f5',
+        highlight: { border: '#cccccc', background: '#f5f5f5' }
+      };
+    }
+  });
+  
+  nodes.update(allNodes);
+  
+  // Update edge colors
+  const allEdges = edges.get();
+  allEdges.forEach(edge => {
+    if (edge.from === serviceId || edge.to === serviceId) {
+      edge.color = { color: '#2196f3', highlight: '#1976d2' };
+      edge.width = Math.max(3, edge.width);
+    } else {
+      edge.color = { color: '#cccccc', highlight: '#cccccc' };
+    }
+  });
+  
+  edges.update(allEdges);
+}
+
+// Clear highlights
+function clearHighlights() {
+  const allNodes = nodes.get();
+  allNodes.forEach(node => {
+    node.color = getServiceColor(node.service.health_status);
+  });
+  nodes.update(allNodes);
+  
+  const allEdges = edges.get();
+  allEdges.forEach(edge => {
+    edge.color = getConnectionColor(edge.connection.error_count, edge.connection.request_count);
+    edge.width = Math.max(1, Math.min(5, edge.connection.request_count / 1000));
+  });
+  edges.update(allEdges);
+}
+
+// Set layout
+function setLayout(layoutType) {
+  currentLayout = layoutType;
+  $('.layout-controls .btn').removeClass('active');
+  $(`button[onclick="setLayout('${layoutType}')"]`).addClass('active');
+  
+  const options = {
+    layout: {
+      hierarchical: { enabled: false }
+    },
+    physics: { enabled: true }
+  };
+  
+  switch (layoutType) {
+    case 'hierarchical':
+      options.layout.hierarchical = {
+        enabled: true,
+        direction: 'LR',
+        sortMethod: 'directed',
+        levelSeparation: 200,
+        nodeSpacing: 150
+      };
+      options.physics.enabled = false;
+      break;
+    case 'force':
+      options.physics = {
+        enabled: true,
+        barnesHut: {
+          gravitationalConstant: -8000,
+          centralGravity: 0.3,
+          springLength: 200,
+          springConstant: 0.04
+        }
+      };
+      break;
+    case 'circular':
+      // Will need custom implementation for circular layout
+      break;
+  }
+  
+  network.setOptions(options);
+  setTimeout(() => {
+    network.fit({ animation: true });
+  }, 1000);
+}
+
+// Filter functions
+function filterServices() {
+  const filter = $('#filterInput').val().toLowerCase();
+  // Implementation for filtering services
+}
+
+function filterByNamespace() {
+  const namespace = $('#namespaceFilter').val();
+  // Implementation for namespace filtering
+}
+
+function populateNamespaceFilter(services) {
+  const namespaces = [...new Set(services.map(s => s.namespace || 'default'))];
+  const select = $('#namespaceFilter');
+  
+  namespaces.forEach(ns => {
+    select.append(`<option value="${ns}">${ns}</option>`);
+  });
+}
+
+// Utility functions
+function getServiceColor(healthStatus) {
+  const colors = {
+    healthy: { background: '#c8e6c9', border: '#4caf50' },
+    unhealthy: { background: '#ffcdd2', border: '#f44336' },
+    degraded: { background: '#ffe0b2', border: '#ff9800' },
+    unknown: { background: '#e0e0e0', border: '#757575' }
+  };
+  return colors[healthStatus] || colors.unknown;
+}
+
+function getServiceFontColor(healthStatus) {
+  const colors = {
+    healthy: '#1b5e20',
+    unhealthy: '#b71c1c',
+    degraded: '#e65100',
+    unknown: '#424242'
+  };
+  return colors[healthStatus] || colors.unknown;
+}
+
+function getConnectionColor(errorCount, requestCount) {
+  if (!requestCount || requestCount === 0) return '#cccccc';
+  
+  const errorRate = errorCount / requestCount;
+  if (errorRate > 0.1) return '#f44336';  // High error rate - red
+  if (errorRate > 0.05) return '#ff9800'; // Medium error rate - orange
+  return '#4caf50';  // Low error rate - green
+}
+
+function getServiceTooltip(service) {
+  return `${service.service_name} v${service.service_version}
+Status: ${service.status}
+Health: ${service.health_status}
+Namespace: ${service.namespace || 'default'}`;
+}
+
+function getConnectionTooltip(connection) {
+  return `Protocol: ${connection.protocol || 'Unknown'}
+Requests: ${connection.request_count || 0}
+Errors: ${connection.error_count || 0}
+Avg Response Time: ${Math.round(connection.avg_response_time_ms || 0)}ms`;
+}
+
+function getStatusLabelClass(status) {
+  const classes = {
+    healthy: 'success',
+    unhealthy: 'danger',
+    degraded: 'warning',
+    maintenance: 'info'
+  };
+  return classes[status] || 'default';
+}
+
+function getHealthLabelClass(healthStatus) {
+  const classes = {
+    healthy: 'success',
+    unhealthy: 'danger',
+    timeout: 'warning',
+    connection_failed: 'danger',
+    unknown: 'default'
+  };
+  return classes[healthStatus] || 'default';
+}
+
+// Control functions
+function refreshTopology() {
+  loadTopologyData();
+}
+
+function fitNetwork() {
+  network.fit({ animation: true });
+}
+
+function exportTopology() {
+  // Implementation for exporting topology
+  const canvas = network.getCanvas();
+  const dataURL = canvas.toDataURL();
+  const link = document.createElement('a');
+  link.download = 'service-topology.png';
+  link.href = dataURL;
+  link.click();
+}
+
+function showNotification(message, type = 'info') {
+  console.log(`${type.toUpperCase()}: ${message}`);
+}
+</script>
+{% endblock %}

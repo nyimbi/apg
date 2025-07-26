@@ -1,0 +1,476 @@
+#
+# APG Accounts Receivable - AI Credit Scoring Configuration
+# Configuration for AI-powered credit scoring integration with APG federated learning
+#
+# © 2025 Datacraft. All rights reserved.
+# Author: Nyimbi Odero <nyimbi@gmail.com>
+#
+
+# =============================================================================
+# APG Federated Learning Integration
+# =============================================================================
+
+federated_learning:
+  # APG federated learning service endpoint
+  endpoint: "${APG_FL_ENDPOINT:https://fl.apg.company.com/v1}"
+  
+  # Authentication and security
+  authentication:
+    method: "oauth2"
+    client_id: "${APG_FL_CLIENT_ID}"
+    client_secret: "${APG_FL_CLIENT_SECRET}"
+    token_endpoint: "${APG_FL_TOKEN_ENDPOINT:https://auth.apg.company.com/oauth/token}"
+  
+  # Service discovery and load balancing
+  service_discovery:
+    enabled: true
+    consul_endpoint: "${APG_CONSUL_ENDPOINT:http://consul.apg.company.com:8500}"
+    service_name: "apg-federated-learning"
+    health_check_interval: 30  # seconds
+  
+  # Circuit breaker configuration
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    recovery_timeout: 60  # seconds
+    half_open_max_calls: 3
+
+# =============================================================================
+# Credit Scoring Model Configuration
+# =============================================================================
+
+credit_scoring_model:
+  # Model identification
+  model_name: "ar_credit_scoring_v2"
+  model_version: "2.1.0"
+  model_type: "ensemble"
+  
+  # Model performance targets
+  performance_targets:
+    accuracy: 0.87
+    precision: 0.85
+    recall: 0.82
+    f1_score: 0.84
+    auc_roc: 0.90
+  
+  # Feature engineering
+  feature_config:
+    # Minimum data requirements
+    min_invoices_required: 3
+    min_payment_history_months: 6
+    min_relationship_days: 30
+    
+    # Feature weights (for interpretability)
+    feature_weights:
+      payment_history: 0.35
+      credit_utilization: 0.30
+      payment_consistency: 0.20
+      customer_age: 0.10
+      external_factors: 0.05
+    
+    # Feature normalization
+    normalization:
+      method: "standard_scaler"
+      handle_outliers: true
+      outlier_threshold: 3.0  # standard deviations
+  
+  # Model training parameters
+  training:
+    # Federated learning parameters
+    federated_rounds: 100
+    local_epochs: 5
+    learning_rate: 0.001
+    batch_size: 32
+    
+    # Privacy-preserving parameters
+    differential_privacy:
+      enabled: true
+      epsilon: 1.0
+      delta: 1e-5
+      noise_multiplier: 1.1
+    
+    # Model validation
+    validation:
+      method: "k_fold"
+      k_folds: 5
+      test_split: 0.2
+      stratify: true
+
+# =============================================================================
+# Credit Scoring Thresholds and Rules
+# =============================================================================
+
+scoring_thresholds:
+  # Confidence thresholds
+  min_confidence_auto_approve: 0.85
+  manual_review_threshold: 0.70
+  insufficient_data_threshold: 0.50
+  
+  # Risk thresholds
+  high_risk_probability: 0.40
+  medium_risk_probability: 0.20
+  low_risk_probability: 0.10
+  
+  # Credit score ranges and mappings
+  credit_score_ranges:
+    AAA: [750, 850]
+    AA: [700, 749]
+    A: [650, 699]
+    BBB: [600, 649]
+    BB: [550, 599]
+    B: [500, 549]
+    CCC: [450, 499]
+    CC: [400, 449]
+    C: [350, 399]
+    D: [300, 349]
+  
+  # Default credit limits by rating
+  default_credit_limits:
+    AAA: 100000.00
+    AA: 75000.00
+    A: 50000.00
+    BBB: 25000.00
+    BB: 15000.00
+    B: 10000.00
+    CCC: 5000.00
+    CC: 2500.00
+    C: 1000.00
+    D: 500.00
+  
+  # Payment terms by rating (in days)
+  payment_terms:
+    AAA: 45
+    AA: 30
+    A: 30
+    BBB: 30
+    BB: 21
+    B: 14
+    CCC: 10
+    CC: 7
+    C: 5
+    D: 0  # Cash on delivery
+
+# =============================================================================
+# Risk Assessment Configuration
+# =============================================================================
+
+risk_assessment:
+  # Risk factor identification
+  risk_factors:
+    # Payment behavior factors
+    high_late_payment_rate_threshold: 0.20  # 20% late payment rate
+    payment_consistency_low_threshold: 0.70
+    avg_payment_days_high_threshold: 45
+    
+    # Credit utilization factors
+    high_credit_utilization_threshold: 0.80  # 80% utilization
+    credit_limit_exceeded_factor: 2.0
+    
+    # Customer profile factors
+    new_customer_months_threshold: 12
+    frequent_disputes_threshold: 3  # disputes per year
+    
+    # Industry and external factors
+    high_industry_risk_threshold: 0.50
+    economic_downturn_multiplier: 1.2
+  
+  # Positive factor identification
+  positive_factors:
+    excellent_payment_consistency_threshold: 0.95
+    established_relationship_months: 24
+    low_credit_utilization_threshold: 0.30
+    fast_payment_days_threshold: 20
+    excellent_payment_rate_threshold: 0.95
+  
+  # Risk monitoring
+  monitoring:
+    # Automated monitoring triggers
+    significant_risk_change_threshold: 0.15  # 15% change in default probability
+    credit_utilization_spike_threshold: 0.20  # 20% increase
+    payment_behavior_change_days: 30
+    
+    # Review frequencies by risk level (in days)
+    review_frequencies:
+      AAA: 365  # Annual
+      AA: 365
+      A: 180   # Semi-annual
+      BBB: 180
+      BB: 90   # Quarterly
+      B: 90
+      CCC: 30  # Monthly
+      CC: 30
+      C: 14    # Bi-weekly
+      D: 7     # Weekly
+
+# =============================================================================
+# Batch Processing Configuration
+# =============================================================================
+
+batch_processing:
+  # Batch assessment configuration
+  max_concurrent_assessments: 5
+  batch_size_limit: 100
+  processing_timeout_minutes: 30
+  
+  # Retry configuration
+  retry_policy:
+    max_retries: 3
+    base_delay_seconds: 1
+    max_delay_seconds: 60
+    exponential_backoff: true
+  
+  # Queue management
+  queue:
+    priority_levels: ["high", "medium", "low"]
+    max_queue_size: 1000
+    processing_interval_seconds: 30
+  
+  # Scheduling
+  automated_scheduling:
+    enabled: true
+    # Run comprehensive assessment monthly
+    monthly_full_assessment:
+      cron: "0 2 1 * *"  # 2 AM on 1st of each month
+      include_all_customers: true
+    
+    # Daily risk monitoring
+    daily_risk_monitoring:
+      cron: "0 6 * * *"  # 6 AM daily
+      high_risk_customers_only: true
+    
+    # Weekly trend analysis
+    weekly_trend_analysis:
+      cron: "0 8 * * 1"  # 8 AM on Mondays
+      lookback_days: 7
+
+# =============================================================================
+# Integration with APG Capabilities
+# =============================================================================
+
+apg_integrations:
+  # Customer Relationship Management
+  customer_relationship_management:
+    enabled: true
+    sync_customer_data: true
+    industry_classification_mapping: true
+    
+  # Audit Compliance
+  audit_compliance:
+    enabled: true
+    log_all_assessments: true
+    compliance_reporting: true
+    retention_years: 7
+    
+  # AI Orchestration
+  ai_orchestration:
+    enabled: true
+    workflow_automation: true
+    decision_orchestration: true
+    
+  # Notification Engine
+  notification_engine:
+    enabled: true
+    risk_alert_notifications: true
+    assessment_completion_notifications: true
+    
+    # Notification channels
+    channels:
+      email: true
+      sms: false
+      slack: true
+      dashboard: true
+    
+    # Notification rules
+    notification_rules:
+      high_risk_immediate: true
+      manual_review_required: true
+      batch_completion_summary: true
+
+# =============================================================================
+# Performance and Optimization
+# =============================================================================
+
+performance:
+  # Caching configuration
+  caching:
+    enabled: true
+    redis_url: "${REDIS_URL:redis://localhost:6379/0}"
+    ttl_seconds: 3600  # 1 hour
+    
+    # Cache keys
+    cache_keys:
+      customer_features: "ar:credit:features:{customer_id}"
+      assessment_results: "ar:credit:assessment:{customer_id}"
+      model_metadata: "ar:credit:model:{model_version}"
+  
+  # Database optimization
+  database:
+    connection_pool_size: 10
+    max_overflow: 20
+    query_timeout_seconds: 30
+    
+    # Index usage hints
+    use_covering_indexes: true
+    parallel_query_execution: true
+  
+  # API rate limiting
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 60
+    burst_limit: 10
+    
+  # Resource limits
+  resource_limits:
+    max_memory_mb: 512
+    max_cpu_percent: 80
+    max_processing_time_seconds: 300
+
+# =============================================================================
+# Security and Privacy
+# =============================================================================
+
+security:
+  # Data encryption
+  encryption:
+    encrypt_sensitive_features: true
+    encryption_algorithm: "AES-256-GCM"
+    key_rotation_days: 90
+  
+  # Data anonymization
+  anonymization:
+    anonymize_training_data: true
+    hash_customer_identifiers: true
+    remove_pii_from_logs: true
+  
+  # Access control
+  access_control:
+    require_explicit_permissions: true
+    log_all_access_attempts: true
+    session_timeout_minutes: 60
+  
+  # Privacy compliance
+  privacy:
+    gdpr_compliance: true
+    data_retention_days: 2555  # 7 years
+    right_to_be_forgotten: true
+    
+    # Data usage consent
+    consent_requirements:
+      ai_model_training: true
+      cross_tenant_insights: false
+      external_data_enrichment: false
+
+# =============================================================================
+# Monitoring and Alerting
+# =============================================================================
+
+monitoring:
+  # Metrics collection
+  metrics:
+    enabled: true
+    collection_interval_seconds: 30
+    
+    # Custom metrics
+    custom_metrics:
+      - name: "credit_assessments_per_minute"
+        type: "counter"
+      - name: "model_confidence_distribution"
+        type: "histogram"
+      - name: "risk_alert_count"
+        type: "gauge"
+  
+  # Health checks
+  health_checks:
+    model_availability: true
+    data_quality_checks: true
+    performance_benchmarks: true
+    
+    # Health check intervals
+    intervals:
+      model_health: 300  # 5 minutes
+      data_quality: 3600  # 1 hour
+      performance: 900   # 15 minutes
+  
+  # Alerting
+  alerting:
+    enabled: true
+    
+    # Alert conditions
+    alerts:
+      model_accuracy_degradation:
+        threshold: 0.05  # 5% drop in accuracy
+        severity: "high"
+      
+      high_manual_review_rate:
+        threshold: 0.30  # 30% requiring manual review
+        severity: "medium"
+      
+      api_response_time_high:
+        threshold_ms: 5000
+        severity: "medium"
+      
+      failed_assessments_high:
+        threshold_percent: 0.10  # 10% failure rate
+        severity: "high"
+
+# =============================================================================
+# Development and Testing
+# =============================================================================
+
+development:
+  # Testing configuration
+  testing:
+    use_mock_federated_learning: false
+    synthetic_data_generation: true
+    test_data_size: 1000
+    
+    # Model testing
+    model_testing:
+      a_b_testing_enabled: true
+      champion_challenger_setup: true
+      shadow_mode_duration_days: 30
+  
+  # Debugging
+  debugging:
+    verbose_logging: false
+    feature_importance_logging: true
+    model_explanation_details: true
+    
+  # Feature flags
+  feature_flags:
+    experimental_features: false
+    beta_model_versions: false
+    advanced_risk_factors: true
+
+# =============================================================================
+# Environment-Specific Overrides
+# =============================================================================
+
+environments:
+  development:
+    federated_learning:
+      endpoint: "https://dev.fl.apg.company.com/v1"
+    performance:
+      caching:
+        ttl_seconds: 300  # 5 minutes
+    development:
+      testing:
+        use_mock_federated_learning: true
+  
+  staging:
+    federated_learning:
+      endpoint: "https://staging.fl.apg.company.com/v1"
+    batch_processing:
+      max_concurrent_assessments: 3
+  
+  production:
+    monitoring:
+      metrics:
+        collection_interval_seconds: 15
+    security:
+      access_control:
+        session_timeout_minutes: 30
+    performance:
+      resource_limits:
+        max_memory_mb: 1024
+        max_cpu_percent: 70

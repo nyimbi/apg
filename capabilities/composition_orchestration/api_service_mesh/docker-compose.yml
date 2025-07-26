@@ -1,0 +1,225 @@
+# APG API Service Mesh - Development Docker Compose
+#
+# Complete development environment with all dependencies, monitoring,
+# and development tools for local development and testing.
+#
+# © 2025 Datacraft. All rights reserved.
+# Author: Nyimbi Odero <nyimbi@gmail.com>
+
+version: '3.9'
+
+services:
+  # =============================================================================
+  # Core Application Services
+  # =============================================================================
+  
+  api-service-mesh:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debug port
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://asm_user:asm_password@postgres:5432/api_service_mesh_dev
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=DEBUG
+      - CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
+      - METRICS_ENABLED=true
+      - TRACING_ENABLED=true
+      - APG_REGISTRY_URL=http://capability-registry:8001
+      - APG_EVENT_BUS_URL=redis://redis:6379/1
+    volumes:
+      - .:/app
+      - api_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - asm_network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Database Services
+  # =============================================================================
+  
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=api_service_mesh_dev
+      - POSTGRES_USER=asm_user
+      - POSTGRES_PASSWORD=asm_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asm_user -d api_service_mesh_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asm_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asm_network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Monitoring Stack
+  # =============================================================================
+  
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./docker/prometheus/rules.yml:/etc/prometheus/rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - asm_network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - asm_network
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger HTTP
+      - "6831:6831/udp"  # Jaeger Agent
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - asm_network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Testing and Development Tools
+  # =============================================================================
+  
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - asm_network
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@datacraft.co.ke
+      - PGADMIN_DEFAULT_PASSWORD=admin
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json
+    depends_on:
+      - postgres
+    networks:
+      - asm_network
+    restart: unless-stopped
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - asm_network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Load Testing
+  # =============================================================================
+  
+  locust:
+    image: locustio/locust:latest
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./tests/load:/mnt/locust
+    command: -f /mnt/locust/locustfile.py --host=http://api-service-mesh:8000
+    networks:
+      - asm_network
+    profiles:
+      - testing
+
+# =============================================================================
+# Volumes
+# =============================================================================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  api_logs:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+
+networks:
+  asm_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

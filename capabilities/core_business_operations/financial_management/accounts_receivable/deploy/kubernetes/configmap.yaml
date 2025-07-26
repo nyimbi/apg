@@ -1,0 +1,184 @@
+# APG Accounts Receivable - Configuration Maps
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apg-ar-config
+  namespace: apg-ar
+  labels:
+    app.kubernetes.io/name: apg-accounts-receivable
+    app.kubernetes.io/component: config
+data:
+  # APG AR Configuration
+  ar_config.yaml: |
+    # APG Accounts Receivable Configuration
+    accounts_receivable:
+      # Database configuration
+      database:
+        host: postgres-service
+        port: 5432
+        name: apg_ar
+        schema_per_tenant: true
+        connection_pool_size: 20
+        max_overflow: 30
+        
+      # Performance settings
+      performance:
+        max_concurrent_requests: 1000
+        request_timeout: 30
+        bulk_operation_batch_size: 1000
+        cache_ttl: 3600
+        
+      # AI service configuration
+      ai_services:
+        credit_scoring:
+          enabled: true
+          model_version: "v2.1"
+          confidence_threshold: 0.75
+          batch_size: 100
+          
+        collections_optimization:
+          enabled: true
+          strategy_refresh_interval: 24h
+          success_probability_threshold: 0.6
+          
+        cash_flow_forecasting:
+          enabled: true
+          max_forecast_days: 365
+          accuracy_target: 0.90
+          
+      # Business rules
+      business_rules:
+        credit_limit_check: true
+        auto_overdue_marking: true
+        auto_collections_trigger: true
+        payment_application_auto_match: true
+        
+      # Security settings
+      security:
+        encryption_at_rest: true
+        audit_all_changes: true
+        sensitive_data_masking: true
+        session_timeout: 8h
+
+  # Logging configuration
+  logging.yaml: |
+    version: 1
+    disable_existing_loggers: false
+    
+    formatters:
+      default:
+        format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+      json:
+        format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}'
+    
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: default
+        stream: ext://sys.stdout
+        
+      file:
+        class: logging.handlers.RotatingFileHandler
+        level: DEBUG
+        formatter: json
+        filename: /var/log/ar/application.log
+        maxBytes: 10485760  # 10MB
+        backupCount: 5
+    
+    loggers:
+      apg.ar:
+        level: DEBUG
+        handlers: [console, file]
+        propagate: false
+        
+      uvicorn:
+        level: INFO
+        handlers: [console]
+        propagate: false
+    
+    root:
+      level: INFO
+      handlers: [console]
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apg-ar-nginx-config
+  namespace: apg-ar
+  labels:
+    app.kubernetes.io/name: apg-accounts-receivable
+    app.kubernetes.io/component: nginx
+data:
+  nginx.conf: |
+    upstream apg_ar_backend {
+        least_conn;
+        server apg-ar-api-service:8000 max_fails=3 fail_timeout=30s;
+    }
+    
+    server {
+        listen 80;
+        server_name ar.apg.platform;
+        
+        # Security headers
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req zone=api burst=20 nodelay;
+        
+        # Health check endpoint
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+        }
+        
+        # Static files
+        location /static/ {
+            alias /opt/apg/static/;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # API endpoints
+        location /api/ {
+            proxy_pass http://apg_ar_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Timeout settings
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+            
+            # Buffer settings
+            proxy_buffering on;
+            proxy_buffer_size 8k;
+            proxy_buffers 8 8k;
+        }
+        
+        # WebSocket support
+        location /ws/ {
+            proxy_pass http://apg_ar_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+        }
+        
+        # Default location
+        location / {
+            proxy_pass http://apg_ar_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }

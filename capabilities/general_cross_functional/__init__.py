@@ -1,109 +1,146 @@
 """
-General Cross-Functional Capability
+APG Enhanced General Cross-Functional Capabilities
 
-Cross-cutting capabilities that span multiple business functions including
-CRM, analytics, document management, and governance systems.
+Comprehensive cross-cutting capabilities that provide foundational services
+across all business functions and industry verticals.
+
+© 2025 Datacraft. All rights reserved.
+Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
-from typing import Dict, List, Any
+from typing import List, Dict, Any
 
-# Capability metadata
-CAPABILITY_META = {
-	'name': 'General Cross-Functional',
-	'code': 'GC',
-	'version': '1.0.0',
-	'description': 'Cross-cutting capabilities spanning multiple business functions including CRM, analytics, and governance',
-	'industry_focus': 'All Industries',
-	'subcapabilities': [
-		'customer_relationship_management',
-		'business_intelligence_analytics',
-		'enterprise_asset_management',
-		'product_lifecycle_management',
-		'ecommerce_b2b_b2c',
-		'document_management',
-		'workflow_business_process_mgmt',
-		'governance_risk_compliance'
-	],
-	'implemented_subcapabilities': [
-		'customer_relationship_management',
-		'business_intelligence_analytics',
-		'enterprise_asset_management',
-		'product_lifecycle_management',
-		'ecommerce_b2b_b2c',
-		'document_management',
-		'workflow_business_process_mgmt',
-		'governance_risk_compliance'
-	],
-	'database_prefix': 'gc_',
-	'menu_category': 'Cross-Functional',
-	'menu_icon': 'fa-sitemap'
+# Enhanced General Cross-Functional Metadata
+__version__ = "2.0.0"
+__category__ = "general_cross_functional"
+__description__ = "Enhanced cross-cutting capabilities for enterprise-wide functionality"
+
+# Enhanced Sub-capability Registry
+SUBCAPABILITIES = [
+	"customer_relationship_management",
+	"enterprise_asset_management", 
+	"workflow_business_process_mgmt",
+	"document_content_management",
+	"business_intelligence_analytics",
+	"governance_risk_compliance",
+	"geographical_location_services",
+	"advanced_analytics_platform",
+	"integration_api_management",
+	"sustainability_esg_management",
+	"knowledge_learning_management",
+	"mobile_device_management",
+	"multi_language_localization",
+	"product_lifecycle_management"
+]
+
+# New Capabilities Overview
+NEW_CAPABILITIES = {
+	"geographical_location_services": {
+		"description": "Comprehensive geofencing and location intelligence",
+		"key_features": ["Geofencing", "Territory Management", "Location Analytics", "Compliance"],
+		"integration_points": ["CRM", "Asset Management", "Workflow", "Analytics"]
+	},
+	"advanced_analytics_platform": {
+		"description": "Self-service analytics and data science workbench",
+		"key_features": ["Data Discovery", "ML Workbench", "Visual Analytics", "Predictive Models"],
+		"integration_points": ["All Capabilities", "External Data Sources", "BI Tools"]
+	},
+	"integration_api_management": {
+		"description": "Enterprise integration hub and API management",
+		"key_features": ["API Gateway", "Integration Hub", "Connector Marketplace", "Event Streaming"],
+		"integration_points": ["External Systems", "Legacy Applications", "Cloud Services"]
+	},
+	"sustainability_esg_management": {
+		"description": "ESG reporting and sustainability management",
+		"key_features": ["Carbon Tracking", "ESG Reporting", "Sustainability KPIs", "Compliance"],
+		"integration_points": ["Asset Management", "Financial Management", "Reporting"]
+	},
+	"knowledge_learning_management": {
+		"description": "Corporate knowledge base and learning platform",
+		"key_features": ["Knowledge Base", "Learning Paths", "Expert Networks", "AI Search"],
+		"integration_points": ["Document Management", "HR", "Collaboration"]
+	},
+	"mobile_device_management": {
+		"description": "Enterprise mobile applications and device management",
+		"key_features": ["Mobile Apps", "Device Policies", "Offline Sync", "Security"],
+		"integration_points": ["All Capabilities", "Authentication", "Sync Services"]
+	},
+	"multi_language_localization": {
+		"description": "Internationalization and localization management",
+		"key_features": ["Translation Management", "Cultural Adaptation", "Regional Compliance"],
+		"integration_points": ["All UI Components", "Documentation", "Workflows"]
+	}
 }
 
-# Import implemented sub-capabilities for discovery
-from . import customer_relationship_management
-from . import business_intelligence_analytics
-from . import enterprise_asset_management
-from . import product_lifecycle_management
-from . import ecommerce_b2b_b2c
-from . import document_management
-from . import workflow_business_process_mgmt
-from . import governance_risk_compliance
+# APG Composition Engine Registration
+CAPABILITY_METADATA = {
+	"capability_id": "general_cross_functional",
+	"version": __version__,
+	"category": "cross_functional",
+	"subcapabilities": SUBCAPABILITIES,
+	"dependencies": [
+		"auth_rbac",
+		"audit_compliance",
+		"notification_engine"
+	],
+	"provides_services": [
+		"customer_relationship_services",
+		"asset_management_services",
+		"workflow_automation_services",
+		"document_content_services",
+		"business_intelligence_services", 
+		"governance_compliance_services",
+		"location_intelligence_services",
+		"advanced_analytics_services",
+		"integration_management_services",
+		"sustainability_reporting_services",
+		"knowledge_learning_services",
+		"mobile_platform_services",
+		"localization_services",
+		"product_lifecycle_services"
+	],
+	"composition_priority": 1,  # High priority - foundational
+	"new_capabilities": list(NEW_CAPABILITIES.keys())
+}
 
 def get_capability_info() -> Dict[str, Any]:
-	"""Get capability information"""
-	return CAPABILITY_META
+	"""Get enhanced general cross-functional capability information."""
+	return CAPABILITY_METADATA
 
-def get_subcapabilities() -> List[str]:
-	"""Get list of available sub-capabilities"""
-	return CAPABILITY_META['subcapabilities']
+def list_subcapabilities() -> List[str]:
+	"""List all available subcapabilities."""
+	return SUBCAPABILITIES.copy()
 
-def get_implemented_subcapabilities() -> List[str]:
-	"""Get list of currently implemented sub-capabilities"""
-	return CAPABILITY_META['implemented_subcapabilities']
+def get_new_capabilities() -> Dict[str, Any]:
+	"""Get information about new capabilities."""
+	return NEW_CAPABILITIES.copy()
 
-def validate_composition(subcapabilities: List[str]) -> Dict[str, Any]:
-	"""Validate a composition of sub-capabilities"""
-	errors = []
-	warnings = []
-	
-	# Check if requested sub-capabilities are implemented
-	implemented = get_implemented_subcapabilities()
-	for subcap in subcapabilities:
-		if subcap not in CAPABILITY_META['subcapabilities']:
-			errors.append(f"Unknown sub-capability: {subcap}")
-		elif subcap not in implemented:
-			warnings.append(f"Sub-capability '{subcap}' is not yet implemented")
-	
-	# Check for recommended combinations
-	if 'business_intelligence_analytics' in subcapabilities and 'document_management' not in subcapabilities:
-		warnings.append("Document Management is recommended for BI report storage and sharing")
-	
-	if 'workflow_business_process_mgmt' in subcapabilities and 'document_management' not in subcapabilities:
-		warnings.append("Document Management is recommended for workflow document handling")
-	
-	if 'governance_risk_compliance' in subcapabilities:
-		if 'document_management' not in subcapabilities:
-			warnings.append("Document Management is strongly recommended for GRC policy and audit documentation")
-		if 'workflow_business_process_mgmt' not in subcapabilities:
-			warnings.append("Workflow/BPM is recommended for automated compliance processes")
-	
-	if 'enterprise_asset_management' in subcapabilities and 'workflow_business_process_mgmt' not in subcapabilities:
-		warnings.append("Workflow/BPM is recommended for asset maintenance approval processes")
-	
-	if 'customer_relationship_management' in subcapabilities and 'business_intelligence_analytics' not in subcapabilities:
-		warnings.append("Business Intelligence is recommended for CRM analytics and reporting")
-	
-	return {
-		'valid': len(errors) == 0,
-		'errors': errors,
-		'warnings': warnings
-	}
+def list_legacy_capabilities() -> List[str]:
+	"""List capabilities that existed in previous version."""
+	return [
+		"customer_relationship_management",
+		"enterprise_asset_management",
+		"workflow_business_process_mgmt", 
+		"document_content_management",
+		"business_intelligence_analytics",
+		"governance_risk_compliance",
+		"product_lifecycle_management"
+	]
 
-def init_capability(appbuilder, subcapabilities: List[str] = None):
-	"""Initialize General Cross-Functional capability with Flask-AppBuilder"""
-	if subcapabilities is None:
-		subcapabilities = get_implemented_subcapabilities()
-	
-	# Import and use blueprint initialization
-	from .blueprint import init_capability
-	return init_capability(appbuilder, subcapabilities)
+def list_enhanced_capabilities() -> List[str]:
+	"""List capabilities that have been enhanced."""
+	return [
+		"document_content_management",  # Enhanced from document_management
+		"business_intelligence_analytics"  # Enhanced with advanced features
+	]
+
+__all__ = [
+	"SUBCAPABILITIES",
+	"NEW_CAPABILITIES",
+	"CAPABILITY_METADATA",
+	"get_capability_info",
+	"list_subcapabilities",
+	"get_new_capabilities",
+	"list_legacy_capabilities",
+	"list_enhanced_capabilities"
+]

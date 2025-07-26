@@ -1,0 +1,66 @@
+# APG Capability Registry - Development Dockerfile
+# Optimized for development with hot reloading and debugging tools
+
+FROM python:3.11-slim
+
+# Set metadata
+LABEL maintainer="Nyimbi Odero <nyimbi@gmail.com>"
+LABEL description="APG Capability Registry - Development Environment"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    libffi-dev \
+    libssl-dev \
+    curl \
+    git \
+    vim \
+    htop \
+    postgresql-client \
+    redis-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for development
+RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements files
+COPY requirements.txt .
+COPY requirements-dev.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/tmp \
+    && chown -R appuser:appuser /app \
+    && chmod -R 755 /app
+
+# Copy application code (will be overridden by volume mount)
+COPY . .
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Set environment variables for development
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    ENVIRONMENT=development \
+    DEBUG=True \
+    LOG_LEVEL=DEBUG
+
+# Expose ports
+EXPOSE 8000 5555
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+# Default command for development (with hot reloading)
+CMD ["uvicorn", "capability_registry.api:api_app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]

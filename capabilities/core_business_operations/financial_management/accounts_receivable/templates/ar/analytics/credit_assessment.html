@@ -1,0 +1,618 @@
+{% extends "appbuilder/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="page-header">
+                <h1>
+                    <i class="fa fa-calculator"></i> {{ _("AI Credit Assessment") }}
+                    <small>{{ _("Powered by APG Federated Learning") }}</small>
+                </h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assessment Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-cogs"></i> {{ _("Assessment Configuration") }}</h4>
+                </div>
+                <div class="panel-body">
+                    <form id="credit-assessment-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="customer_id">{{ _("Customer") }} <span class="text-danger">*</span></label>
+                                    <select id="customer_id" name="customer_id" class="form-control select2" required>
+                                        <option value="">{{ _("Select Customer") }}</option>
+                                        {% for customer in customers %}
+                                        <option value="{{ customer.id }}" {% if selected_customer == customer.id %}selected{% endif %}>
+                                            {{ customer.customer_code }} - {{ customer.legal_name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="assessment_type">{{ _("Assessment Type") }}</label>
+                                    <select id="assessment_type" name="assessment_type" class="form-control">
+                                        <option value="standard">{{ _("Standard Assessment") }}</option>
+                                        <option value="comprehensive">{{ _("Comprehensive Assessment") }}</option>
+                                        <option value="monitoring">{{ _("Risk Monitoring") }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="include_explanations" name="include_explanations" checked>
+                                        {{ _("Include AI Explanations") }}
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="generate_recommendations" name="generate_recommendations" checked>
+                                        {{ _("Generate Recommendations") }}
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="update_customer_record" name="update_customer_record">
+                                        {{ _("Update Customer Record") }}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="notes">{{ _("Assessment Notes") }}</label>
+                            <textarea id="notes" name="notes" class="form-control" rows="3" 
+                                      placeholder="{{ _('Optional notes for this assessment...') }}"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary btn-lg" id="run-assessment-btn">
+                                <i class="fa fa-play"></i> {{ _("Run AI Assessment") }}
+                            </button>
+                            <button type="button" class="btn btn-info" id="batch-assessment-btn">
+                                <i class="fa fa-users"></i> {{ _("Batch Assessment") }}
+                            </button>
+                            <button type="button" class="btn btn-default" id="clear-form-btn">
+                                <i class="fa fa-refresh"></i> {{ _("Clear Form") }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Assessment History -->
+        <div class="col-lg-4">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-history"></i> {{ _("Recent Assessments") }}</h4>
+                </div>
+                <div class="panel-body">
+                    <div id="recent-assessments">
+                        <div class="text-center">
+                            <i class="fa fa-spinner fa-spin"></i>
+                            <p>{{ _("Loading recent assessments...") }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assessment Results -->
+    <div class="row" id="results-section" style="display: none;">
+        <div class="col-lg-12">
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-check-circle"></i> {{ _("Assessment Results") }}</h4>
+                    <div class="pull-right">
+                        <span id="assessment-timestamp" class="text-muted"></span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <!-- Credit Score Display -->
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <canvas id="credit-score-gauge" width="150" height="150"></canvas>
+                                <h3 id="credit-score-value">--</h3>
+                                <p class="text-muted">{{ _("Credit Score") }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h2 id="risk-level-badge" class="label label-lg">--</h2>
+                                <p class="text-muted">{{ _("Risk Level") }}</p>
+                                <div id="confidence-level">
+                                    <small>{{ _("Confidence") }}: <span id="confidence-score">--%</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 id="recommended-limit">$--</h3>
+                                <p class="text-muted">{{ _("Recommended Credit Limit") }}</p>
+                                <div id="current-vs-recommended">
+                                    <small>{{ _("Current") }}: $<span id="current-limit">--</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 id="days-to-pay">-- {{ _("days") }}</h3>
+                                <p class="text-muted">{{ _("Predicted Payment Days") }}</p>
+                                <div id="payment-reliability">
+                                    <small>{{ _("Reliability") }}: <span id="reliability-score">--%</span></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Key Factors -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4><i class="fa fa-thumbs-up text-success"></i> {{ _("Positive Factors") }}</h4>
+                            <ul id="positive-factors" class="list-unstyled">
+                                <!-- Dynamic content -->
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h4><i class="fa fa-exclamation-triangle text-warning"></i> {{ _("Risk Factors") }}</h4>
+                            <ul id="risk-factors" class="list-unstyled">
+                                <!-- Dynamic content -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- AI Explanations -->
+                    <div id="ai-explanations-section">
+                        <h4><i class="fa fa-lightbulb-o"></i> {{ _("AI Explanations") }}</h4>
+                        <div id="ai-explanations">
+                            <!-- Dynamic content -->
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Recommendations -->
+                    <div id="recommendations-section">
+                        <h4><i class="fa fa-list-alt"></i> {{ _("Recommendations") }}</h4>
+                        <div id="recommendations-list">
+                            <!-- Dynamic content -->
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="text-center" style="margin-top: 30px;">
+                        <button type="button" class="btn btn-success" id="accept-recommendations-btn">
+                            <i class="fa fa-check"></i> {{ _("Accept Recommendations") }}
+                        </button>
+                        <button type="button" class="btn btn-info" id="export-assessment-btn">
+                            <i class="fa fa-download"></i> {{ _("Export Assessment") }}
+                        </button>
+                        <button type="button" class="btn btn-warning" id="schedule-review-btn">
+                            <i class="fa fa-calendar"></i> {{ _("Schedule Review") }}
+                        </button>
+                        <button type="button" class="btn btn-default" id="new-assessment-btn">
+                            <i class="fa fa-plus"></i> {{ _("New Assessment") }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Assessment Modal -->
+    <div class="modal fade" id="batch-assessment-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">
+                        <i class="fa fa-users"></i> {{ _("Batch Credit Assessment") }}
+                    </h4>
+                </div>
+                <div class="modal-body">
+                    <form id="batch-assessment-form">
+                        <div class="form-group">
+                            <label>{{ _("Select Customers") }}</label>
+                            <select id="batch-customers" name="customer_ids" class="form-control select2" multiple>
+                                {% for customer in customers %}
+                                <option value="{{ customer.id }}">
+                                    {{ customer.customer_code }} - {{ customer.legal_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>{{ _("Assessment Type") }}</label>
+                                    <select name="assessment_type" class="form-control">
+                                        <option value="standard">{{ _("Standard Assessment") }}</option>
+                                        <option value="comprehensive">{{ _("Comprehensive Assessment") }}</option>
+                                        <option value="monitoring">{{ _("Risk Monitoring") }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>{{ _("Priority") }}</label>
+                                    <select name="priority" class="form-control">
+                                        <option value="normal">{{ _("Normal") }}</option>
+                                        <option value="high">{{ _("High Priority") }}</option>
+                                        <option value="urgent">{{ _("Urgent") }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="checkbox">
+                            <label>
+                                <input type="checkbox" name="email_results" checked>
+                                {{ _("Email results when complete") }}
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ _("Cancel") }}</button>
+                    <button type="button" class="btn btn-primary" id="run-batch-assessment">
+                        <i class="fa fa-play"></i> {{ _("Run Batch Assessment") }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+var creditScoreGauge;
+
+$(document).ready(function() {
+    // Initialize Select2
+    $('.select2').select2({
+        placeholder: '{{ _("Select...") }}',
+        allowClear: true
+    });
+    
+    // Load recent assessments
+    loadRecentAssessments();
+    
+    // Form submission
+    $('#credit-assessment-form').submit(function(e) {
+        e.preventDefault();
+        runCreditAssessment();
+    });
+    
+    // Event handlers
+    $('#batch-assessment-btn').click(function() {
+        $('#batch-assessment-modal').modal('show');
+    });
+    
+    $('#clear-form-btn').click(function() {
+        clearForm();
+    });
+    
+    $('#run-batch-assessment').click(function() {
+        runBatchAssessment();
+    });
+    
+    $('#new-assessment-btn').click(function() {
+        clearForm();
+        $('#results-section').hide();
+    });
+    
+    $('#accept-recommendations-btn').click(function() {
+        acceptRecommendations();
+    });
+    
+    $('#export-assessment-btn').click(function() {
+        exportAssessment();
+    });
+    
+    // Check for pre-selected customer from URL
+    var urlParams = new URLSearchParams(window.location.search);
+    var customerId = urlParams.get('customer_id');
+    if (customerId) {
+        $('#customer_id').val(customerId).trigger('change');
+    }
+});
+
+function runCreditAssessment() {
+    var formData = {
+        customer_id: $('#customer_id').val(),
+        assessment_type: $('#assessment_type').val(),
+        include_explanations: $('#include_explanations').is(':checked'),
+        generate_recommendations: $('#generate_recommendations').is(':checked'),
+        update_customer_record: $('#update_customer_record').is(':checked'),
+        notes: $('#notes').val()
+    };
+    
+    if (!formData.customer_id) {
+        alert('{{ _("Please select a customer") }}');
+        return;
+    }
+    
+    // Show loading state
+    $('#run-assessment-btn').prop('disabled', true).html(
+        '<i class="fa fa-spinner fa-spin"></i> {{ _("Running Assessment...") }}'
+    );
+    
+    $.ajax({
+        url: '/api/ar/customers/' + formData.customer_id + '/credit-assessment',
+        method: 'POST',
+        data: JSON.stringify(formData),
+        contentType: 'application/json',
+        success: function(response) {
+            displayAssessmentResults(response.data);
+            loadRecentAssessments(); // Refresh recent assessments
+        },
+        error: function(xhr) {
+            alert('{{ _("Assessment failed") }}: ' + xhr.responseJSON.detail);
+        },
+        complete: function() {
+            $('#run-assessment-btn').prop('disabled', false).html(
+                '<i class="fa fa-play"></i> {{ _("Run AI Assessment") }}'
+            );
+        }
+    });
+}
+
+function displayAssessmentResults(results) {
+    // Show results section
+    $('#results-section').show();
+    $('#assessment-timestamp').text('{{ _("Assessed") }}: ' + new Date().toLocaleString());
+    
+    // Credit score
+    $('#credit-score-value').text(Math.round(results.credit_score));
+    
+    // Risk level with appropriate styling
+    var riskClass = getRiskLevelClass(results.risk_level);
+    $('#risk-level-badge').removeClass().addClass('label label-lg label-' + riskClass).text(results.risk_level);
+    
+    // Confidence
+    $('#confidence-score').text(Math.round(results.confidence_score * 100) + '%');
+    
+    // Credit limit recommendations
+    $('#recommended-limit').text('$' + formatCurrency(results.recommended_credit_limit));
+    $('#current-limit').text(formatCurrency(results.current_credit_limit));
+    
+    // Payment predictions
+    $('#days-to-pay').html(Math.round(results.predicted_payment_days) + ' <small>{{ _("days") }}</small>');
+    $('#reliability-score').text(Math.round(results.payment_reliability * 100) + '%');
+    
+    // Positive factors
+    var positiveHtml = '';
+    results.positive_factors.forEach(function(factor) {
+        positiveHtml += '<li><i class="fa fa-check text-success"></i> ' + factor + '</li>';
+    });
+    $('#positive-factors').html(positiveHtml);
+    
+    // Risk factors
+    var riskHtml = '';
+    results.risk_factors.forEach(function(factor) {
+        riskHtml += '<li><i class="fa fa-warning text-warning"></i> ' + factor + '</li>';
+    });
+    $('#risk-factors').html(riskHtml);
+    
+    // AI explanations
+    if (results.explanations && results.explanations.length > 0) {
+        var explanationsHtml = '';
+        results.explanations.forEach(function(explanation) {
+            explanationsHtml += '<div class="alert alert-info">';
+            explanationsHtml += '<i class="fa fa-info-circle"></i> ' + explanation;
+            explanationsHtml += '</div>';
+        });
+        $('#ai-explanations').html(explanationsHtml);
+        $('#ai-explanations-section').show();
+    } else {
+        $('#ai-explanations-section').hide();
+    }
+    
+    // Recommendations
+    if (results.recommendations && results.recommendations.length > 0) {
+        var recHtml = '';
+        results.recommendations.forEach(function(rec, index) {
+            recHtml += '<div class="panel panel-default">';
+            recHtml += '<div class="panel-body">';
+            recHtml += '<div class="checkbox">';
+            recHtml += '<label>';
+            recHtml += '<input type="checkbox" class="recommendation-checkbox" data-index="' + index + '" checked> ';
+            recHtml += rec;
+            recHtml += '</label>';
+            recHtml += '</div>';
+            recHtml += '</div>';
+            recHtml += '</div>';
+        });
+        $('#recommendations-list').html(recHtml);
+        $('#recommendations-section').show();
+    } else {
+        $('#recommendations-section').hide();
+    }
+    
+    // Create credit score gauge
+    createCreditScoreGauge(results.credit_score);
+    
+    // Scroll to results
+    $('html, body').animate({
+        scrollTop: $('#results-section').offset().top - 20
+    }, 500);
+}
+
+function createCreditScoreGauge(score) {
+    var ctx = document.getElementById('credit-score-gauge').getContext('2d');
+    
+    // Destroy existing chart if it exists
+    if (creditScoreGauge) {
+        creditScoreGauge.destroy();
+    }
+    
+    creditScoreGauge = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [score, 850 - score],
+                backgroundColor: [
+                    score >= 700 ? '#5cb85c' : score >= 600 ? '#f0ad4e' : '#d9534f',
+                    '#f5f5f5'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            circumference: Math.PI,
+            rotation: Math.PI,
+            cutout: '75%',
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    enabled: false
+                }
+            }
+        }
+    });
+}
+
+function loadRecentAssessments() {
+    $.ajax({
+        url: '/api/ar/analytics/recent-credit-assessments',
+        method: 'GET',
+        success: function(response) {
+            var html = '';
+            response.data.forEach(function(assessment) {
+                var riskClass = getRiskLevelClass(assessment.risk_level);
+                html += '<div class="media">';
+                html += '<div class="media-left">';
+                html += '<span class="label label-' + riskClass + '">' + Math.round(assessment.credit_score) + '</span>';
+                html += '</div>';
+                html += '<div class="media-body">';
+                html += '<h6 class="media-heading">' + assessment.customer_name + '</h6>';
+                html += '<small class="text-muted">' + moment(assessment.assessed_at).fromNow() + '</small>';
+                html += '</div>';
+                html += '</div>';
+                html += '<hr>';
+            });
+            $('#recent-assessments').html(html);
+        },
+        error: function() {
+            $('#recent-assessments').html('<p class="text-muted">{{ _("No recent assessments") }}</p>');
+        }
+    });
+}
+
+function runBatchAssessment() {
+    var customerIds = $('#batch-customers').val();
+    
+    if (!customerIds || customerIds.length === 0) {
+        alert('{{ _("Please select at least one customer") }}');
+        return;
+    }
+    
+    var formData = {
+        customer_ids: customerIds,
+        assessment_type: $('#batch-assessment-form select[name="assessment_type"]').val(),
+        priority: $('#batch-assessment-form select[name="priority"]').val(),
+        email_results: $('#batch-assessment-form input[name="email_results"]').is(':checked')
+    };
+    
+    $.ajax({
+        url: '/api/ar/analytics/batch-credit-assessment',
+        method: 'POST',
+        data: JSON.stringify(formData),
+        contentType: 'application/json',
+        success: function(response) {
+            alert('{{ _("Batch assessment started. Results will be available shortly.") }}');
+            $('#batch-assessment-modal').modal('hide');
+            loadRecentAssessments();
+        },
+        error: function(xhr) {
+            alert('{{ _("Batch assessment failed") }}: ' + xhr.responseJSON.detail);
+        }
+    });
+}
+
+function acceptRecommendations() {
+    var selectedRecs = [];
+    $('.recommendation-checkbox:checked').each(function() {
+        selectedRecs.push($(this).data('index'));
+    });
+    
+    if (selectedRecs.length === 0) {
+        alert('{{ _("Please select recommendations to accept") }}');
+        return;
+    }
+    
+    var customerId = $('#customer_id').val();
+    
+    $.ajax({
+        url: '/api/ar/customers/' + customerId + '/accept-recommendations',
+        method: 'POST',
+        data: JSON.stringify({
+            recommendation_indices: selectedRecs
+        }),
+        contentType: 'application/json',
+        success: function(response) {
+            alert('{{ _("Recommendations accepted and applied") }}');
+        },
+        error: function(xhr) {
+            alert('{{ _("Failed to apply recommendations") }}: ' + xhr.responseJSON.detail);
+        }
+    });
+}
+
+function exportAssessment() {
+    var customerId = $('#customer_id').val();
+    window.open('/api/ar/customers/' + customerId + '/export-assessment', '_blank');
+}
+
+function clearForm() {
+    $('#credit-assessment-form')[0].reset();
+    $('#customer_id').val('').trigger('change');
+    $('#include_explanations, #generate_recommendations').prop('checked', true);
+    $('#update_customer_record').prop('checked', false);
+}
+
+function getRiskLevelClass(riskLevel) {
+    var classes = {
+        'LOW': 'success',
+        'MEDIUM': 'warning',
+        'HIGH': 'danger',
+        'VERY_HIGH': 'danger'
+    };
+    return classes[riskLevel] || 'default';
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(amount);
+}
+</script>
+{% endblock %}

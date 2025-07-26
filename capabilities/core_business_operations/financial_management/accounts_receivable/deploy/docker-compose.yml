@@ -1,0 +1,232 @@
+# APG Accounts Receivable - Docker Compose Configuration
+# Complete development and testing environment
+
+version: '3.8'
+
+services:
+  # APG AR API Service
+  ar-api:
+    build:
+      context: ../../../..
+      dockerfile: capabilities/core_financials/accounts_receivable/deploy/Dockerfile
+      target: production
+    container_name: apg-ar-api
+    restart: unless-stopped
+    environment:
+      - APG_ENVIRONMENT=production
+      - DATABASE_URL=postgresql://ar_user:ar_password@postgres:5432/apg_ar
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-default-secret-key}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-default-jwt-secret}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-default-encryption-key}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ar_logs:/var/log/ar
+      - ar_data:/opt/apg/data
+      - ./config:/etc/apg/ar:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - apg-network
+    healthcheck:
+      test: ["CMD", "python", "/opt/apg/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # APG AR Worker Service (background tasks)
+  ar-worker:
+    build:
+      context: ../../../..
+      dockerfile: capabilities/core_financials/accounts_receivable/deploy/Dockerfile
+      target: production
+    container_name: apg-ar-worker
+    restart: unless-stopped
+    command: ["/opt/apg/scripts/worker.sh"]
+    environment:
+      - APG_ENVIRONMENT=production
+      - DATABASE_URL=postgresql://ar_user:ar_password@postgres:5432/apg_ar
+      - REDIS_URL=redis://redis:6379/0
+      - WORKER_CONCURRENCY=4
+    volumes:
+      - ar_logs:/var/log/ar
+      - ar_data:/opt/apg/data
+      - ./config:/etc/apg/ar:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - apg-network
+
+  # APG AR Scheduler Service (cron jobs)
+  ar-scheduler:
+    build:
+      context: ../../../..
+      dockerfile: capabilities/core_financials/accounts_receivable/deploy/Dockerfile
+      target: production
+    container_name: apg-ar-scheduler
+    restart: unless-stopped
+    command: ["/opt/apg/scripts/scheduler.sh"]
+    environment:
+      - APG_ENVIRONMENT=production
+      - DATABASE_URL=postgresql://ar_user:ar_password@postgres:5432/apg_ar
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ar_logs:/var/log/ar
+      - ar_data:/opt/apg/data
+      - ./config:/etc/apg/ar:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - apg-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: apg-ar-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=apg_ar
+      - POSTGRES_USER=ar_user
+      - POSTGRES_PASSWORD=ar_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+    networks:
+      - apg-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ar_user -d apg_ar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: apg-ar-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass redis_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - apg-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # NGINX Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: apg-ar-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ar_logs:/var/log/nginx
+    depends_on:
+      - ar-api
+    networks:
+      - apg-network
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: apg-ar-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - apg-network
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: apg-ar-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - apg-network
+
+  # Development Database (for testing)
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: apg-ar-postgres-dev
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=apg_ar_dev
+      - POSTGRES_USER=ar_dev_user
+      - POSTGRES_PASSWORD=ar_dev_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - apg-network
+    profiles:
+      - dev
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+  postgres_dev_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  ar_logs:
+    driver: local
+  ar_data:
+    driver: local
+
+# Networks
+networks:
+  apg-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

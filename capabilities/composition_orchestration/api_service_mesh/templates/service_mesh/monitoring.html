@@ -1,0 +1,861 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.monitoring-container {
+  padding: 20px;
+}
+
+.metric-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.metric-card h4 {
+  margin-top: 0;
+  color: #333;
+}
+
+.real-time-value {
+  font-size: 2em;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.real-time-chart {
+  height: 200px;
+  margin-top: 15px;
+}
+
+.service-grid {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.service-item {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.service-item.healthy { border-left: 4px solid #28a745; }
+.service-item.unhealthy { border-left: 4px solid #dc3545; }
+.service-item.degraded { border-left: 4px solid #ffc107; }
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.status-healthy { background-color: #28a745; }
+.status-unhealthy { background-color: #dc3545; }
+.status-degraded { background-color: #ffc107; }
+
+.alerts-panel {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.alert-item {
+  border-left: 4px solid;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #f8f9fa;
+}
+
+.alert-critical { border-left-color: #dc3545; }
+.alert-warning { border-left-color: #ffc107; }
+.alert-info { border-left-color: #17a2b8; }
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.traffic-flow {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 20px;
+  min-height: 400px;
+}
+
+.controls-panel {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.auto-refresh-indicator {
+  color: #28a745;
+  margin-left: 10px;
+}
+
+.connection-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.connected { background-color: #28a745; }
+.disconnected { background-color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="monitoring-container">
+  <div class="row">
+    <div class="col-md-12">
+      <h1>
+        <i class="fa fa-monitor"></i> Real-time Monitoring
+        <small class="pull-right">
+          <span class="connection-indicator" id="connectionStatus"></span>
+          <span id="connectionText">Connecting...</span>
+          <span class="auto-refresh-indicator" id="autoRefreshIndicator">
+            <i class="fa fa-circle"></i> Live
+          </span>
+        </small>
+      </h1>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="row">
+    <div class="col-md-12">
+      <div class="controls-panel">
+        <div class="btn-group" role="group">
+          <button type="button" class="btn btn-success" id="startMonitoring">
+            <i class="fa fa-play"></i> Start
+          </button>
+          <button type="button" class="btn btn-warning" id="pauseMonitoring" disabled>
+            <i class="fa fa-pause"></i> Pause
+          </button>
+          <button type="button" class="btn btn-default" id="clearCharts">
+            <i class="fa fa-trash"></i> Clear
+          </button>
+        </div>
+        
+        <div class="pull-right">
+          <div class="form-group" style="margin: 0; display: inline-block;">
+            <label for="refreshInterval" style="margin-right: 10px;">Refresh Interval:</label>
+            <select id="refreshInterval" class="form-control" style="width: 120px; display: inline-block;">
+              <option value="1000">1 second</option>
+              <option value="5000" selected>5 seconds</option>
+              <option value="10000">10 seconds</option>
+              <option value="30000">30 seconds</option>
+            </select>
+          </div>
+          
+          <div class="form-group" style="margin: 0; display: inline-block; margin-left: 15px;">
+            <label for="timeWindow" style="margin-right: 10px;">Time Window:</label>
+            <select id="timeWindow" class="form-control" style="width: 100px; display: inline-block;">
+              <option value="60">1 min</option>
+              <option value="300" selected>5 min</option>
+              <option value="600">10 min</option>
+              <option value="1800">30 min</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Metrics -->
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <h4><i class="fa fa-tachometer-alt"></i> Requests/Second</h4>
+      <div class="real-time-value" id="currentRPS">0</div>
+      <div class="real-time-chart">
+        <canvas id="rpsChart"></canvas>
+      </div>
+    </div>
+    
+    <div class="metric-card">
+      <h4><i class="fa fa-clock"></i> Response Time</h4>
+      <div class="real-time-value" id="currentResponseTime">0ms</div>
+      <div class="real-time-chart">
+        <canvas id="responseTimeChart"></canvas>
+      </div>
+    </div>
+    
+    <div class="metric-card">
+      <h4><i class="fa fa-exclamation-triangle"></i> Error Rate</h4>
+      <div class="real-time-value" id="currentErrorRate">0%</div>
+      <div class="real-time-chart">
+        <canvas id="errorRateChart"></canvas>
+      </div>
+    </div>
+    
+    <div class="metric-card">
+      <h4><i class="fa fa-server"></i> Active Services</h4>
+      <div class="real-time-value" id="activeServices">0</div>
+      <div class="real-time-chart">
+        <canvas id="servicesChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Monitoring -->
+  <div class="row">
+    <div class="col-md-6">
+      <div class="traffic-flow">
+        <h4><i class="fa fa-exchange-alt"></i> Live Traffic Flow</h4>
+        <div id="trafficFlowContainer" style="height: 350px;">
+          <canvas id="trafficFlowChart"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6">
+      <div class="metric-card">
+        <h4><i class="fa fa-heartbeat"></i> Service Health Status</h4>
+        <div class="service-grid" id="serviceHealthGrid">
+          <div class="text-center">
+            <i class="fa fa-spinner fa-spin"></i> Loading services...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alerts and Events -->
+  <div class="row">
+    <div class="col-md-6">
+      <div class="metric-card">
+        <h4><i class="fa fa-bell"></i> Real-time Alerts</h4>
+        <div class="alerts-panel" id="realTimeAlerts">
+          <div class="text-muted text-center">
+            <i class="fa fa-check-circle fa-2x"></i>
+            <p>No active alerts</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6">
+      <div class="metric-card">
+        <h4><i class="fa fa-list"></i> Recent Events</h4>
+        <div class="alerts-panel" id="recentEvents">
+          <div class="text-center">
+            <i class="fa fa-spinner fa-spin"></i> Loading events...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Network Performance -->
+  <div class="row">
+    <div class="col-md-12">
+      <div class="metric-card">
+        <h4><i class="fa fa-network-wired"></i> Network Performance</h4>
+        <div style="height: 300px;">
+          <canvas id="networkPerformanceChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Monitoring state
+let isMonitoring = false;
+let websocket = null;
+let refreshInterval = 5000;
+let timeWindow = 300; // 5 minutes
+let charts = {};
+let monitoringData = {
+  timestamps: [],
+  rps: [],
+  responseTime: [],
+  errorRate: [],
+  activeServices: []
+};
+
+// Initialize monitoring
+$(document).ready(function() {
+  initializeCharts();
+  setupEventHandlers();
+  connectWebSocket();
+});
+
+// Initialize all charts
+function initializeCharts() {
+  // RPS Chart
+  charts.rps = new Chart(document.getElementById('rpsChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'RPS',
+        data: [],
+        borderColor: '#3498db',
+        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: getChartOptions('Requests/Second')
+  });
+
+  // Response Time Chart
+  charts.responseTime = new Chart(document.getElementById('responseTimeChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Avg Response Time',
+        data: [],
+        borderColor: '#e74c3c',
+        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+        tension: 0.4,
+        fill: true
+      }, {
+        label: 'P95 Response Time',
+        data: [],
+        borderColor: '#f39c12',
+        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+        tension: 0.4,
+        fill: false
+      }]
+    },
+    options: getChartOptions('Milliseconds')
+  });
+
+  // Error Rate Chart
+  charts.errorRate = new Chart(document.getElementById('errorRateChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Error Rate %',
+        data: [],
+        borderColor: '#e74c3c',
+        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: getChartOptions('Percentage')
+  });
+
+  // Services Chart
+  charts.services = new Chart(document.getElementById('servicesChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Healthy',
+        data: [],
+        borderColor: '#27ae60',
+        backgroundColor: 'rgba(39, 174, 96, 0.1)',
+        tension: 0.4,
+        fill: true
+      }, {
+        label: 'Unhealthy',
+        data: [],
+        borderColor: '#e74c3c',
+        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: getChartOptions('Count')
+  });
+
+  // Traffic Flow Chart
+  charts.trafficFlow = new Chart(document.getElementById('trafficFlowChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Successful', 'Client Errors', 'Server Errors'],
+      datasets: [{
+        data: [0, 0, 0],
+        backgroundColor: ['#27ae60', '#f39c12', '#e74c3c'],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom'
+        }
+      }
+    }
+  });
+
+  // Network Performance Chart
+  charts.networkPerformance = new Chart(document.getElementById('networkPerformanceChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Throughput (Mbps)',
+        data: [],
+        borderColor: '#9b59b6',
+        backgroundColor: 'rgba(155, 89, 182, 0.1)',
+        tension: 0.4,
+        yAxisID: 'y'
+      }, {
+        label: 'Latency (ms)',
+        data: [],
+        borderColor: '#34495e',
+        backgroundColor: 'rgba(52, 73, 94, 0.1)',
+        tension: 0.4,
+        yAxisID: 'y1'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: { display: true, text: 'Throughput (Mbps)' }
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: { display: true, text: 'Latency (ms)' },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+}
+
+// Get common chart options
+function getChartOptions(yAxisLabel) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: yAxisLabel
+        }
+      },
+      x: {
+        display: false
+      }
+    },
+    plugins: {
+      legend: {
+        display: false
+      }
+    },
+    elements: {
+      point: {
+        radius: 0
+      }
+    },
+    animation: {
+      duration: 0
+    }
+  };
+}
+
+// Setup event handlers
+function setupEventHandlers() {
+  $('#startMonitoring').click(startMonitoring);
+  $('#pauseMonitoring').click(pauseMonitoring);
+  $('#clearCharts').click(clearCharts);
+  
+  $('#refreshInterval').change(function() {
+    refreshInterval = parseInt($(this).val());
+    if (isMonitoring) {
+      restartMonitoring();
+    }
+  });
+  
+  $('#timeWindow').change(function() {
+    timeWindow = parseInt($(this).val());
+    trimData();
+  });
+}
+
+// WebSocket connection
+function connectWebSocket() {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws/service-mesh/monitoring`;
+  
+  try {
+    websocket = new WebSocket(wsUrl);
+    
+    websocket.onopen = function(event) {
+      updateConnectionStatus(true);
+      console.log('WebSocket connected');
+    };
+    
+    websocket.onmessage = function(event) {
+      const data = JSON.parse(event.data);
+      handleRealtimeData(data);
+    };
+    
+    websocket.onclose = function(event) {
+      updateConnectionStatus(false);
+      console.log('WebSocket disconnected');
+      
+      // Attempt to reconnect after 5 seconds
+      setTimeout(connectWebSocket, 5000);
+    };
+    
+    websocket.onerror = function(error) {
+      console.error('WebSocket error:', error);
+      updateConnectionStatus(false);
+    };
+    
+  } catch (error) {
+    console.error('Failed to create WebSocket:', error);
+    updateConnectionStatus(false);
+    
+    // Fallback to polling
+    startPolling();
+  }
+}
+
+// Handle real-time data
+function handleRealtimeData(data) {
+  const timestamp = new Date().toLocaleTimeString();
+  
+  // Update current values
+  $('#currentRPS').text(Math.round(data.traffic.requests_per_second));
+  $('#currentResponseTime').text(Math.round(data.traffic.avg_response_time) + 'ms');
+  $('#currentErrorRate').text(data.traffic.error_rate.toFixed(2) + '%');
+  $('#activeServices').text(data.services.healthy);
+  
+  // Add to monitoring data
+  monitoringData.timestamps.push(timestamp);
+  monitoringData.rps.push(data.traffic.requests_per_second);
+  monitoringData.responseTime.push(data.traffic.avg_response_time);
+  monitoringData.errorRate.push(data.traffic.error_rate);
+  monitoringData.activeServices.push(data.services.healthy);
+  
+  // Trim data to time window
+  trimData();
+  
+  // Update charts
+  updateCharts();
+  
+  // Update service health grid
+  updateServiceHealthGrid(data.services.details);
+  
+  // Update alerts
+  updateRealTimeAlerts(data.alerts);
+  
+  // Update events
+  updateRecentEvents(data.events);
+  
+  // Update traffic flow
+  updateTrafficFlow(data.traffic);
+  
+  // Update network performance
+  updateNetworkPerformance(data.network);
+}
+
+// Update charts with new data
+function updateCharts() {
+  // RPS Chart
+  charts.rps.data.labels = monitoringData.timestamps;
+  charts.rps.data.datasets[0].data = monitoringData.rps;
+  charts.rps.update('none');
+  
+  // Response Time Chart
+  charts.responseTime.data.labels = monitoringData.timestamps;
+  charts.responseTime.data.datasets[0].data = monitoringData.responseTime;
+  charts.responseTime.update('none');
+  
+  // Error Rate Chart
+  charts.errorRate.data.labels = monitoringData.timestamps;
+  charts.errorRate.data.datasets[0].data = monitoringData.errorRate;
+  charts.errorRate.update('none');
+  
+  // Services Chart
+  charts.services.data.labels = monitoringData.timestamps;
+  charts.services.data.datasets[0].data = monitoringData.activeServices;
+  charts.services.update('none');
+}
+
+// Update service health grid
+function updateServiceHealthGrid(services) {
+  if (!services || services.length === 0) {
+    $('#serviceHealthGrid').html('<div class="text-muted text-center">No services found</div>');
+    return;
+  }
+  
+  let html = '';
+  services.forEach(service => {
+    const statusClass = getServiceStatusClass(service.health_status);
+    html += `
+      <div class="service-item ${statusClass}">
+        <div>
+          <span class="status-indicator status-${statusClass}"></span>
+          <strong>${service.service_name}</strong>
+          <small class="text-muted">${service.service_version}</small>
+        </div>
+        <div>
+          <small>${service.health_status}</small>
+        </div>
+      </div>
+    `;
+  });
+  
+  $('#serviceHealthGrid').html(html);
+}
+
+// Update real-time alerts
+function updateRealTimeAlerts(alerts) {
+  if (!alerts || alerts.length === 0) {
+    $('#realTimeAlerts').html(`
+      <div class="text-muted text-center">
+        <i class="fa fa-check-circle fa-2x"></i>
+        <p>No active alerts</p>
+      </div>
+    `);
+    return;
+  }
+  
+  let html = '';
+  alerts.forEach(alert => {
+    html += `
+      <div class="alert-item alert-${alert.severity}">
+        <strong>${alert.title}</strong>
+        <small class="pull-right">${new Date(alert.timestamp).toLocaleTimeString()}</small>
+        <p>${alert.message}</p>
+      </div>
+    `;
+  });
+  
+  $('#realTimeAlerts').html(html);
+}
+
+// Update recent events
+function updateRecentEvents(events) {
+  if (!events || events.length === 0) {
+    $('#recentEvents').html('<div class="text-muted text-center">No recent events</div>');
+    return;
+  }
+  
+  let html = '';
+  events.forEach(event => {
+    html += `
+      <div class="alert-item alert-info">
+        <strong>${event.type}</strong>
+        <small class="pull-right">${new Date(event.timestamp).toLocaleTimeString()}</small>
+        <p>${event.description}</p>
+      </div>
+    `;
+  });
+  
+  $('#recentEvents').html(html);
+}
+
+// Update traffic flow chart
+function updateTrafficFlow(traffic) {
+  const total = traffic.total_requests || 1;
+  const successful = traffic.successful_requests || 0;
+  const clientErrors = traffic.client_errors || 0;
+  const serverErrors = traffic.server_errors || 0;
+  
+  charts.trafficFlow.data.datasets[0].data = [
+    (successful / total) * 100,
+    (clientErrors / total) * 100,
+    (serverErrors / total) * 100
+  ];
+  charts.trafficFlow.update('none');
+}
+
+// Update network performance
+function updateNetworkPerformance(network) {
+  if (!network) return;
+  
+  const timestamp = new Date().toLocaleTimeString();
+  
+  // Add new data point
+  charts.networkPerformance.data.labels.push(timestamp);
+  charts.networkPerformance.data.datasets[0].data.push(network.throughput_mbps || 0);
+  charts.networkPerformance.data.datasets[1].data.push(network.latency_ms || 0);
+  
+  // Keep only last 50 points
+  if (charts.networkPerformance.data.labels.length > 50) {
+    charts.networkPerformance.data.labels.shift();
+    charts.networkPerformance.data.datasets[0].data.shift();
+    charts.networkPerformance.data.datasets[1].data.shift();
+  }
+  
+  charts.networkPerformance.update('none');
+}
+
+// Trim data to time window
+function trimData() {
+  const maxPoints = Math.floor(timeWindow / (refreshInterval / 1000));
+  
+  while (monitoringData.timestamps.length > maxPoints) {
+    monitoringData.timestamps.shift();
+    monitoringData.rps.shift();
+    monitoringData.responseTime.shift();
+    monitoringData.errorRate.shift();
+    monitoringData.activeServices.shift();
+  }
+}
+
+// Monitoring controls
+function startMonitoring() {
+  isMonitoring = true;
+  $('#startMonitoring').prop('disabled', true);
+  $('#pauseMonitoring').prop('disabled', false);
+  $('#autoRefreshIndicator').show();
+  
+  // Start data collection
+  if (websocket && websocket.readyState === WebSocket.OPEN) {
+    websocket.send(JSON.stringify({
+      action: 'start_monitoring',
+      interval: refreshInterval
+    }));
+  } else {
+    startPolling();
+  }
+}
+
+function pauseMonitoring() {
+  isMonitoring = false;
+  $('#startMonitoring').prop('disabled', false);
+  $('#pauseMonitoring').prop('disabled', true);
+  $('#autoRefreshIndicator').hide();
+  
+  if (websocket && websocket.readyState === WebSocket.OPEN) {
+    websocket.send(JSON.stringify({
+      action: 'stop_monitoring'
+    }));
+  }
+  
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
+}
+
+function restartMonitoring() {
+  if (isMonitoring) {
+    pauseMonitoring();
+    setTimeout(startMonitoring, 100);
+  }
+}
+
+function clearCharts() {
+  // Clear all data
+  monitoringData = {
+    timestamps: [],
+    rps: [],
+    responseTime: [],
+    errorRate: [],
+    activeServices: []
+  };
+  
+  // Clear all charts
+  Object.values(charts).forEach(chart => {
+    if (chart.data.labels) {
+      chart.data.labels = [];
+      chart.data.datasets.forEach(dataset => {
+        dataset.data = [];
+      });
+      chart.update('none');
+    }
+  });
+  
+  // Reset current values
+  $('#currentRPS').text('0');
+  $('#currentResponseTime').text('0ms');
+  $('#currentErrorRate').text('0%');
+  $('#activeServices').text('0');
+}
+
+// Fallback polling
+let pollingInterval;
+
+function startPolling() {
+  pollingInterval = setInterval(() => {
+    if (isMonitoring) {
+      fetchMonitoringData();
+    }
+  }, refreshInterval);
+}
+
+function fetchMonitoringData() {
+  $.ajax({
+    url: '{{ url_for("ServiceMeshDashboardView.dashboard_data") }}',
+    method: 'GET',
+    success: function(data) {
+      handleRealtimeData(data);
+    },
+    error: function(xhr, status, error) {
+      console.error('Failed to fetch monitoring data:', error);
+    }
+  });
+}
+
+// Connection status
+function updateConnectionStatus(connected) {
+  const indicator = $('#connectionStatus');
+  const text = $('#connectionText');
+  
+  if (connected) {
+    indicator.removeClass('disconnected').addClass('connected');
+    text.text('Connected');
+  } else {
+    indicator.removeClass('connected').addClass('disconnected');
+    text.text('Disconnected');
+  }
+}
+
+// Utility functions
+function getServiceStatusClass(healthStatus) {
+  const statusMap = {
+    healthy: 'healthy',
+    unhealthy: 'unhealthy',
+    degraded: 'degraded',
+    timeout: 'degraded',
+    connection_failed: 'unhealthy',
+    unknown: 'degraded'
+  };
+  return statusMap[healthStatus] || 'degraded';
+}
+
+// Cleanup on page unload
+$(window).on('beforeunload', function() {
+  if (websocket) {
+    websocket.close();
+  }
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
+});
+</script>
+{% endblock %}

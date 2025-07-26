@@ -1,0 +1,101 @@
+# APG API Service Mesh - Development Dependencies
+#
+# Extended development dependencies including testing, linting,
+# formatting, debugging, and development tools.
+#
+# © 2025 Datacraft. All rights reserved.
+# Author: Nyimbi Odero <nyimbi@gmail.com>
+
+# Include base requirements
+-r requirements.txt
+
+# Testing Framework
+pytest>=7.4.3,<8.0.0
+pytest-asyncio>=0.21.1,<1.0.0
+pytest-cov>=4.1.0,<5.0.0
+pytest-mock>=3.12.0,<4.0.0
+pytest-xdist>=3.5.0,<4.0.0
+pytest-benchmark>=4.0.0,<5.0.0
+pytest-httpserver>=1.0.8,<2.0.0
+pytest-timeout>=2.2.0,<3.0.0
+pytest-html>=4.1.1,<5.0.0
+
+# Test Data and Fixtures
+factory-boy>=3.3.0,<4.0.0
+faker>=20.1.0,<21.0.0
+freezegun>=1.2.2,<2.0.0
+
+# Load Testing
+locust>=2.17.0,<3.0.0
+
+# Code Quality and Linting
+black>=23.11.0,<24.0.0
+isort>=5.12.0,<6.0.0
+flake8>=6.1.0,<7.0.0
+flake8-docstrings>=1.7.0,<2.0.0
+flake8-import-order>=0.18.2,<1.0.0
+flake8-bugbear>=23.11.28,<24.0.0
+pylint>=3.0.3,<4.0.0
+bandit>=1.7.5,<2.0.0
+safety>=2.3.5,<3.0.0
+
+# Type Checking
+mypy>=1.7.1,<2.0.0
+types-redis>=4.6.0.11,<5.0.0
+types-pyyaml>=6.0.12.12,<7.0.0
+types-python-dateutil>=2.8.19.14,<3.0.0
+
+# Pre-commit Hooks
+pre-commit>=3.6.0,<4.0.0
+
+# Debugging
+debugpy>=1.8.0,<2.0.0
+ipdb>=0.13.13,<1.0.0
+
+# Performance Profiling
+py-spy>=0.3.14,<1.0.0
+memory-profiler>=0.61.0,<1.0.0
+line-profiler>=4.1.1,<5.0.0
+
+# Documentation
+mkdocs>=1.5.3,<2.0.0
+mkdocs-material>=9.4.8,<10.0.0
+mkdocstrings[python]>=0.24.0,<1.0.0
+mkdocs-mermaid2-plugin>=1.1.1,<2.0.0
+
+# Database Tools
+pgcli>=4.0.1,<5.0.0
+redis-cli>=3.0.0,<4.0.0
+
+# Development Utilities
+watchdog>=3.0.0,<4.0.0
+notebook>=7.0.6,<8.0.0
+jupyter>=1.0.0,<2.0.0
+
+# Environment Management
+python-dotenv>=1.0.0,<2.0.0
+environs>=10.0.0,<11.0.0
+
+# HTTP Tools
+httpie>=3.2.2,<4.0.0
+
+# Container and Cloud Development
+docker>=6.1.3,<7.0.0
+kubernetes>=28.1.0,<29.0.0
+
+# API Documentation
+swagger-ui-bundle>=0.0.9,<1.0.0
+
+# Task Runners
+invoke>=2.2.0,<3.0.0
+
+# Dependency Management
+pip-tools>=7.3.0,<8.0.0
+pipdeptree>=2.13.1,<3.0.0
+
+# Security Scanning
+semgrep>=1.51.0,<2.0.0
+
+# File Watching for Development
+aiofiles>=23.2.1,<24.0.0
+watchfiles>=0.21.0,<1.0.0

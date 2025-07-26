@@ -1,0 +1,748 @@
+{% extends "appbuilder/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="page-header">
+                <h1>
+                    <i class="fa fa-crystal-ball"></i> {{ _("AI Cash Flow Forecast") }}
+                    <small>{{ _("Powered by APG Time Series Analytics") }}</small>
+                </h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forecast Configuration -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-cogs"></i> {{ _("Forecast Parameters") }}</h4>
+                </div>
+                <div class="panel-body">
+                    <form id="forecast-form" class="form-horizontal">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="forecast_start_date">{{ _("Start Date") }}</label>
+                                    <input type="date" id="forecast_start_date" name="forecast_start_date" 
+                                           class="form-control" value="{{ today_date }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="forecast_end_date">{{ _("End Date") }}</label>
+                                    <input type="date" id="forecast_end_date" name="forecast_end_date" 
+                                           class="form-control" value="{{ default_end_date }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="forecast_period">{{ _("Period") }}</label>
+                                    <select id="forecast_period" name="forecast_period" class="form-control">
+                                        <option value="daily">{{ _("Daily") }}</option>
+                                        <option value="weekly">{{ _("Weekly") }}</option>
+                                        <option value="monthly">{{ _("Monthly") }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="scenario_type">{{ _("Scenario") }}</label>
+                                    <select id="scenario_type" name="scenario_type" class="form-control">
+                                        <option value="realistic">{{ _("Realistic") }}</option>
+                                        <option value="optimistic">{{ _("Optimistic") }}</option>
+                                        <option value="pessimistic">{{ _("Pessimistic") }}</option>
+                                        <option value="comparison">{{ _("All Scenarios") }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="include_seasonal_trends" name="include_seasonal_trends" checked>
+                                        {{ _("Include Seasonal Trends") }}
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="include_external_factors" name="include_external_factors" checked>
+                                        {{ _("Include External Factors") }}
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="confidence_level">{{ _("Confidence Level") }}</label>
+                                    <select id="confidence_level" name="confidence_level" class="form-control">
+                                        <option value="0.90">90%</option>
+                                        <option value="0.95" selected>95%</option>
+                                        <option value="0.99">99%</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>&nbsp;</label><br>
+                                    <button type="submit" class="btn btn-primary btn-lg" id="generate-forecast-btn">
+                                        <i class="fa fa-play"></i> {{ _("Generate Forecast") }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forecast Results -->
+    <div class="row" id="forecast-results" style="display: none;">
+        <!-- Summary Cards -->
+        <div class="col-lg-12">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="panel panel-success">
+                        <div class="panel-body">
+                            <div class="row">
+                                <div class="col-xs-3">
+                                    <i class="fa fa-arrow-up fa-3x text-success"></i>
+                                </div>
+                                <div class="col-xs-9 text-right">
+                                    <div class="huge" id="optimistic-total">$0</div>
+                                    <div>{{ _("Optimistic Scenario") }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="panel panel-info">
+                        <div class="panel-body">
+                            <div class="row">
+                                <div class="col-xs-3">
+                                    <i class="fa fa-minus fa-3x text-info"></i>
+                                </div>
+                                <div class="col-xs-9 text-right">
+                                    <div class="huge" id="realistic-total">$0</div>
+                                    <div>{{ _("Realistic Scenario") }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="panel panel-warning">
+                        <div class="panel-body">
+                            <div class="row">
+                                <div class="col-xs-3">
+                                    <i class="fa fa-arrow-down fa-3x text-warning"></i>
+                                </div>
+                                <div class="col-xs-9 text-right">
+                                    <div class="huge" id="pessimistic-total">$0</div>
+                                    <div>{{ _("Pessimistic Scenario") }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="panel panel-default">
+                        <div class="panel-body">
+                            <div class="row">
+                                <div class="col-xs-3">
+                                    <i class="fa fa-calendar fa-3x"></i>
+                                </div>
+                                <div class="col-xs-9 text-right">
+                                    <div class="huge" id="forecast-days">0</div>
+                                    <div>{{ _("Forecast Days") }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chart -->
+        <div class="col-lg-8">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-line-chart"></i> {{ _("Cash Flow Forecast Chart") }}</h4>
+                    <div class="pull-right">
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown">
+                                {{ _("Export") }} <span class="caret"></span>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a href="#" id="export-chart-png">{{ _("PNG Image") }}</a></li>
+                                <li><a href="#" id="export-chart-pdf">{{ _("PDF Report") }}</a></li>
+                                <li><a href="#" id="export-data-csv">{{ _("CSV Data") }}</a></li>
+                                <li><a href="#" id="export-data-excel">{{ _("Excel Workbook") }}</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <canvas id="cashflow-forecast-chart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Forecast Insights -->
+        <div class="col-lg-4">
+            <div class="panel panel-info">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-lightbulb-o"></i> {{ _("AI Insights") }}</h4>
+                </div>
+                <div class="panel-body" id="forecast-insights">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+            
+            <div class="panel panel-warning">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-exclamation-triangle"></i> {{ _("Risk Factors") }}</h4>
+                </div>
+                <div class="panel-body" id="risk-factors">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+            
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-check-circle"></i> {{ _("Opportunities") }}</h4>
+                </div>
+                <div class="panel-body" id="opportunities">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Forecast Table -->
+        <div class="col-lg-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-table"></i> {{ _("Detailed Forecast Data") }}</h4>
+                    <div class="pull-right">
+                        <button type="button" class="btn btn-xs btn-default" id="toggle-forecast-table">
+                            <i class="fa fa-chevron-down"></i> {{ _("Show/Hide Table") }}
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-body" id="forecast-table-container" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="forecast-data-table">
+                            <thead>
+                                <tr>
+                                    <th>{{ _("Date") }}</th>
+                                    <th>{{ _("Expected Collections") }}</th>
+                                    <th>{{ _("Invoice Receipts") }}</th>
+                                    <th>{{ _("Overdue Collections") }}</th>
+                                    <th>{{ _("Total Cash Flow") }}</th>
+                                    <th>{{ _("Confidence Range") }}</th>
+                                    <th>{{ _("Customer Count") }}</th>
+                                    <th>{{ _("Invoice Count") }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="forecast-data-body">
+                                <!-- Dynamic content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="col-lg-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-list-alt"></i> {{ _("AI Recommendations") }}</h4>
+                </div>
+                <div class="panel-body" id="recommendations-section">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historical Accuracy Panel -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-history"></i> {{ _("Forecast Accuracy History") }}</h4>
+                </div>
+                <div class="panel-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 id="accuracy-30-day">--%</h3>
+                                <p>{{ _("30-Day Accuracy") }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 id="accuracy-60-day">--%</h3>
+                                <p>{{ _("60-Day Accuracy") }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 id="accuracy-90-day">--%</h3>
+                                <p>{{ _("90-Day Accuracy") }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <canvas id="accuracy-trend-chart" width="400" height="150"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+var forecastChart, accuracyChart;
+
+$(document).ready(function() {
+    // Set default end date (30 days from now)
+    var defaultEndDate = new Date();
+    defaultEndDate.setDate(defaultEndDate.getDate() + 30);
+    $('#forecast_end_date').val(defaultEndDate.toISOString().split('T')[0]);
+    
+    // Load historical accuracy data
+    loadHistoricalAccuracy();
+    
+    // Form submission
+    $('#forecast-form').submit(function(e) {
+        e.preventDefault();
+        generateForecast();
+    });
+    
+    // Event handlers
+    $('#toggle-forecast-table').click(function() {
+        $('#forecast-table-container').toggle();
+        var icon = $(this).find('i');
+        icon.toggleClass('fa-chevron-down fa-chevron-up');
+    });
+    
+    // Export handlers
+    $('#export-chart-png').click(function() {
+        exportChart('png');
+    });
+    
+    $('#export-chart-pdf').click(function() {
+        exportChart('pdf');
+    });
+    
+    $('#export-data-csv').click(function() {
+        exportData('csv');
+    });
+    
+    $('#export-data-excel').click(function() {
+        exportData('excel');
+    });
+});
+
+function generateForecast() {
+    var formData = {
+        forecast_start_date: $('#forecast_start_date').val(),
+        forecast_end_date: $('#forecast_end_date').val(),
+        forecast_period: $('#forecast_period').val(),
+        scenario_type: $('#scenario_type').val(),
+        include_seasonal_trends: $('#include_seasonal_trends').is(':checked'),
+        include_external_factors: $('#include_external_factors').is(':checked'),
+        confidence_level: parseFloat($('#confidence_level').val())
+    };
+    
+    // Validate dates
+    if (new Date(formData.forecast_end_date) <= new Date(formData.forecast_start_date)) {
+        alert('{{ _("End date must be after start date") }}');
+        return;
+    }
+    
+    // Show loading state
+    $('#generate-forecast-btn').prop('disabled', true).html(
+        '<i class="fa fa-spinner fa-spin"></i> {{ _("Generating Forecast...") }}'
+    );
+    
+    $.ajax({
+        url: '/api/ar/analytics/cashflow-forecast',
+        method: 'POST',
+        data: JSON.stringify(formData),
+        contentType: 'application/json',
+        success: function(response) {
+            displayForecastResults(response.data);
+        },
+        error: function(xhr) {
+            alert('{{ _("Forecast generation failed") }}: ' + xhr.responseJSON.detail);
+        },
+        complete: function() {
+            $('#generate-forecast-btn').prop('disabled', false).html(
+                '<i class="fa fa-play"></i> {{ _("Generate Forecast") }}'
+            );
+        }
+    });
+}
+
+function displayForecastResults(data) {
+    // Show results section
+    $('#forecast-results').show();
+    
+    // Update summary cards
+    if (data.optimistic_total !== undefined) {
+        $('#optimistic-total').text('$' + formatCurrency(data.optimistic_total));
+    }
+    if (data.realistic_total !== undefined) {
+        $('#realistic-total').text('$' + formatCurrency(data.realistic_total));
+    }
+    if (data.pessimistic_total !== undefined) {
+        $('#pessimistic-total').text('$' + formatCurrency(data.pessimistic_total));
+    }
+    
+    // Calculate forecast days
+    var startDate = new Date($('#forecast_start_date').val());
+    var endDate = new Date($('#forecast_end_date').val());
+    var forecastDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    $('#forecast-days').text(forecastDays);
+    
+    // Create forecast chart
+    createForecastChart(data);
+    
+    // Display insights, risks, and opportunities
+    displayInsights(data);
+    
+    // Populate forecast table
+    populateForecastTable(data);
+    
+    // Show recommendations
+    displayRecommendations(data);
+    
+    // Scroll to results
+    $('html, body').animate({
+        scrollTop: $('#forecast-results').offset().top - 20
+    }, 500);
+}
+
+function createForecastChart(data) {
+    var ctx = document.getElementById('cashflow-forecast-chart').getContext('2d');
+    
+    if (forecastChart) {
+        forecastChart.destroy();
+    }
+    
+    var datasets = [];
+    var labels = [];
+    
+    // Handle single scenario vs comparison
+    if (data.forecast_points) {
+        // Single scenario
+        labels = data.forecast_points.map(point => formatDate(point.forecast_date));
+        datasets.push({
+            label: '{{ _("Cash Flow") }}',
+            data: data.forecast_points.map(point => point.total_cash_flow),
+            borderColor: '#5bc0de',
+            backgroundColor: 'rgba(91, 192, 222, 0.1)',
+            fill: false
+        });
+        
+        // Add confidence intervals
+        datasets.push({
+            label: '{{ _("Upper Confidence") }}',
+            data: data.forecast_points.map(point => point.confidence_interval_upper),
+            borderColor: '#5cb85c',
+            backgroundColor: 'rgba(92, 184, 92, 0.05)',
+            borderDash: [5, 5],
+            fill: false
+        });
+        
+        datasets.push({
+            label: '{{ _("Lower Confidence") }}',
+            data: data.forecast_points.map(point => point.confidence_interval_lower),
+            borderColor: '#d9534f',
+            backgroundColor: 'rgba(217, 83, 79, 0.05)',
+            borderDash: [5, 5],
+            fill: false
+        });
+    } else {
+        // Scenario comparison
+        if (data.realistic_forecast) {
+            labels = data.realistic_forecast.map(point => formatDate(point.forecast_date));
+        }
+        
+        if (data.optimistic_forecast) {
+            datasets.push({
+                label: '{{ _("Optimistic") }}',
+                data: data.optimistic_forecast.map(point => point.total_cash_flow),
+                borderColor: '#5cb85c',
+                backgroundColor: 'rgba(92, 184, 92, 0.1)',
+                fill: false
+            });
+        }
+        
+        if (data.realistic_forecast) {
+            datasets.push({
+                label: '{{ _("Realistic") }}',
+                data: data.realistic_forecast.map(point => point.total_cash_flow),
+                borderColor: '#5bc0de',
+                backgroundColor: 'rgba(91, 192, 222, 0.1)',
+                fill: false
+            });
+        }
+        
+        if (data.pessimistic_forecast) {
+            datasets.push({
+                label: '{{ _("Pessimistic") }}',
+                data: data.pessimistic_forecast.map(point => point.total_cash_flow),
+                borderColor: '#f0ad4e',
+                backgroundColor: 'rgba(240, 173, 78, 0.1)',
+                fill: false
+            });
+        }
+    }
+    
+    forecastChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: '{{ _("Cash Flow Forecast") }}'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + formatCurrency(value);
+                        }
+                    }
+                },
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: '{{ _("Date") }}'
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+}
+
+function displayInsights(data) {
+    // AI Insights
+    var insightsHtml = '';
+    if (data.insights) {
+        data.insights.forEach(function(insight) {
+            insightsHtml += '<div class="alert alert-info">';
+            insightsHtml += '<i class="fa fa-lightbulb-o"></i> ' + insight;
+            insightsHtml += '</div>';
+        });
+    } else {
+        insightsHtml = '<p class="text-muted">{{ _("No specific insights available") }}</p>';
+    }
+    $('#forecast-insights').html(insightsHtml);
+    
+    // Risk Factors
+    var risksHtml = '';
+    if (data.risk_factors) {
+        data.risk_factors.forEach(function(risk) {
+            risksHtml += '<div class="alert alert-warning">';
+            risksHtml += '<i class="fa fa-exclamation-triangle"></i> ' + risk;
+            risksHtml += '</div>';
+        });
+    } else {
+        risksHtml = '<p class="text-muted">{{ _("No significant risks identified") }}</p>';
+    }
+    $('#risk-factors').html(risksHtml);
+    
+    // Opportunities
+    var oppHtml = '';
+    if (data.opportunities) {
+        data.opportunities.forEach(function(opp) {
+            oppHtml += '<div class="alert alert-success">';
+            oppHtml += '<i class="fa fa-check-circle"></i> ' + opp;
+            oppHtml += '</div>';
+        });
+    } else {
+        oppHtml = '<p class="text-muted">{{ _("No specific opportunities identified") }}</p>';
+    }
+    $('#opportunities').html(oppHtml);
+}
+
+function populateForecastTable(data) {
+    var forecastPoints = data.forecast_points || data.realistic_forecast || [];
+    
+    var html = '';
+    forecastPoints.forEach(function(point) {
+        html += '<tr>';
+        html += '<td>' + formatDate(point.forecast_date) + '</td>';
+        html += '<td class="text-right">$' + formatCurrency(point.expected_collections || 0) + '</td>';
+        html += '<td class="text-right">$' + formatCurrency(point.invoice_receipts || 0) + '</td>';
+        html += '<td class="text-right">$' + formatCurrency(point.overdue_collections || 0) + '</td>';
+        html += '<td class="text-right"><strong>$' + formatCurrency(point.total_cash_flow) + '</strong></td>';
+        
+        if (point.confidence_interval_lower && point.confidence_interval_upper) {
+            html += '<td class="text-right">';
+            html += '$' + formatCurrency(point.confidence_interval_lower) + ' - ';
+            html += '$' + formatCurrency(point.confidence_interval_upper);
+            html += '</td>';
+        } else {
+            html += '<td class="text-center">--</td>';
+        }
+        
+        html += '<td class="text-center">' + (point.customer_count || '--') + '</td>';
+        html += '<td class="text-center">' + (point.invoice_count || '--') + '</td>';
+        html += '</tr>';
+    });
+    
+    $('#forecast-data-body').html(html);
+}
+
+function displayRecommendations(data) {
+    var recHtml = '';
+    
+    if (data.liquidity_recommendations && data.liquidity_recommendations.length > 0) {
+        recHtml += '<h5><i class="fa fa-tint"></i> {{ _("Liquidity Management") }}</h5>';
+        recHtml += '<ul>';
+        data.liquidity_recommendations.forEach(function(rec) {
+            recHtml += '<li>' + rec + '</li>';
+        });
+        recHtml += '</ul>';
+    }
+    
+    if (data.risk_mitigation_actions && data.risk_mitigation_actions.length > 0) {
+        recHtml += '<h5><i class="fa fa-shield"></i> {{ _("Risk Mitigation") }}</h5>';
+        recHtml += '<ul>';
+        data.risk_mitigation_actions.forEach(function(action) {
+            recHtml += '<li>' + action + '</li>';
+        });
+        recHtml += '</ul>';
+    }
+    
+    if (!recHtml) {
+        recHtml = '<p class="text-muted">{{ _("No specific recommendations at this time") }}</p>';
+    }
+    
+    $('#recommendations-section').html(recHtml);
+}
+
+function loadHistoricalAccuracy() {
+    $.ajax({
+        url: '/api/ar/analytics/forecast-accuracy-history',
+        method: 'GET',
+        success: function(response) {
+            var data = response.data;
+            
+            $('#accuracy-30-day').text(Math.round(data.accuracy_30_day * 100) + '%');
+            $('#accuracy-60-day').text(Math.round(data.accuracy_60_day * 100) + '%');
+            $('#accuracy-90-day').text(Math.round(data.accuracy_90_day * 100) + '%');
+            
+            // Create accuracy trend chart
+            var ctx = document.getElementById('accuracy-trend-chart').getContext('2d');
+            accuracyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.historical_periods,
+                    datasets: [{
+                        label: '{{ _("Forecast Accuracy") }}',
+                        data: data.historical_accuracy,
+                        borderColor: '#5cb85c',
+                        backgroundColor: 'rgba(92, 184, 92, 0.1)',
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: {
+                                callback: function(value) {
+                                    return Math.round(value * 100) + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        },
+        error: function() {
+            $('#accuracy-30-day, #accuracy-60-day, #accuracy-90-day').text('N/A');
+        }
+    });
+}
+
+function exportChart(format) {
+    if (!forecastChart) {
+        alert('{{ _("No chart available to export") }}');
+        return;
+    }
+    
+    if (format === 'png') {
+        var link = document.createElement('a');
+        link.download = 'cashflow_forecast_' + new Date().toISOString().split('T')[0] + '.png';
+        link.href = forecastChart.toBase64Image();
+        link.click();
+    } else if (format === 'pdf') {
+        // Implementation for PDF export would go here
+        alert('{{ _("PDF export coming soon") }}');
+    }
+}
+
+function exportData(format) {
+    var params = {
+        forecast_start_date: $('#forecast_start_date').val(),
+        forecast_end_date: $('#forecast_end_date').val(),
+        format: format
+    };
+    
+    window.open('/api/ar/analytics/export-forecast-data?' + $.param(params), '_blank');
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(amount);
+}
+
+function formatDate(dateStr) {
+    return new Date(dateStr).toLocaleDateString();
+}
+</script>
+{% endblock %}

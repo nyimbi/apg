@@ -1,0 +1,910 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+  .composition-designer {
+    height: 100vh;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .designer-header {
+    background: white;
+    padding: 16px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  
+  .designer-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+  
+  .capabilities-sidebar {
+    width: 320px;
+    background: white;
+    border-right: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f8fafc;
+  }
+  
+  .sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+  
+  .designer-canvas {
+    flex: 1;
+    background: #f8fafc;
+    position: relative;
+    overflow: auto;
+  }
+  
+  .canvas-grid {
+    background-image: 
+      radial-gradient(circle, #d1d5db 1px, transparent 1px);
+    background-size: 20px 20px;
+    min-height: 100%;
+    position: relative;
+  }
+  
+  .capability-item {
+    padding: 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: white;
+  }
+  
+  .capability-item:hover {
+    border-color: {{ ui_config.primary_color }};
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+    transform: translateY(-1px);
+  }
+  
+  .capability-item.selected {
+    border-color: {{ ui_config.primary_color }};
+    background: rgba(37, 99, 235, 0.05);
+  }
+  
+  .capability-node {
+    position: absolute;
+    width: 200px;
+    padding: 16px;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    cursor: move;
+    user-select: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+  }
+  
+  .capability-node:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+  }
+  
+  .capability-node.active {
+    border-color: {{ ui_config.primary_color }};
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  }
+  
+  .capability-node.error {
+    border-color: {{ ui_config.danger_color }};
+    background: rgba(220, 38, 38, 0.05);
+  }
+  
+  .capability-node.warning {
+    border-color: {{ ui_config.warning_color }};
+    background: rgba(234, 88, 12, 0.05);
+  }
+  
+  .node-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .node-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #374151;
+  }
+  
+  .node-code {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+  
+  .node-version {
+    font-size: 0.75rem;
+    background: #e5e7eb;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  
+  .node-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-left: 8px;
+  }
+  
+  .status-active { background: #16a34a; }
+  .status-warning { background: #ea580c; }
+  .status-error { background: #dc2626; }
+  
+  .connection-line {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  .connection-path {
+    stroke: #6b7280;
+    stroke-width: 2;
+    fill: none;
+    marker-end: url(#arrowhead);
+  }
+  
+  .connection-path.dependency {
+    stroke: {{ ui_config.primary_color }};
+  }
+  
+  .connection-path.conflict {
+    stroke: {{ ui_config.danger_color }};
+    stroke-dasharray: 5,5;
+  }
+  
+  .properties-panel {
+    width: 300px;
+    background: white;
+    border-left: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .panel-header {
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f8fafc;
+  }
+  
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+  
+  .validation-panel {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+  
+  .validation-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f8fafc;
+    font-weight: 600;
+  }
+  
+  .validation-content {
+    padding: 16px;
+  }
+  
+  .validation-score {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  
+  .score-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    margin-right: 12px;
+  }
+  
+  .score-excellent { background: #16a34a; }
+  .score-good { background: #2563eb; }
+  .score-fair { background: #ea580c; }
+  .score-poor { background: #dc2626; }
+  
+  .conflict-item {
+    padding: 8px 12px;
+    background: rgba(220, 38, 38, 0.05);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  
+  .recommendation-item {
+    padding: 8px 12px;
+    background: rgba(37, 99, 235, 0.05);
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  
+  .search-box {
+    position: relative;
+    margin-bottom: 16px;
+  }
+  
+  .search-input {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+  }
+  
+  .filter-tabs {
+    display: flex;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 16px;
+  }
+  
+  .filter-tab {
+    flex: 1;
+    padding: 8px 4px;
+    text-align: center;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: 0.85rem;
+  }
+  
+  .filter-tab.active {
+    border-bottom-color: {{ ui_config.primary_color }};
+    color: {{ ui_config.primary_color }};
+    font-weight: 600;
+  }
+  
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #d1d5db;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-icon:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+  }
+  
+  .btn-icon.active {
+    background: {{ ui_config.primary_color }};
+    border-color: {{ ui_config.primary_color }};
+    color: white;
+  }
+  
+  @media (max-width: {{ ui_config.responsive_breakpoints.desktop }}) {
+    .capabilities-sidebar {
+      width: 280px;
+    }
+    
+    .properties-panel {
+      width: 280px;
+    }
+    
+    .capability-node {
+      width: 180px;
+      padding: 12px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="composition-designer">
+  <!-- Header -->
+  <div class="designer-header">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h2 class="mb-0">
+          <i class="fa fa-magic"></i>
+          Composition Designer
+        </h2>
+        <small class="text-muted">Design and validate capability compositions</small>
+      </div>
+      
+      <div class="toolbar">
+        <div class="btn-icon" id="btn-select" title="Select Tool">
+          <i class="fa fa-mouse-pointer"></i>
+        </div>
+        <div class="btn-icon" id="btn-pan" title="Pan Tool">
+          <i class="fa fa-hand-paper-o"></i>
+        </div>
+        <div class="btn-icon" id="btn-zoom-in" title="Zoom In">
+          <i class="fa fa-search-plus"></i>
+        </div>
+        <div class="btn-icon" id="btn-zoom-out" title="Zoom Out">
+          <i class="fa fa-search-minus"></i>
+        </div>
+        <div class="btn-icon" id="btn-fit" title="Fit to Screen">
+          <i class="fa fa-expand"></i>
+        </div>
+        
+        <div style="width: 1px; height: 24px; background: #d1d5db; margin: 0 8px;"></div>
+        
+        <button class="btn btn-outline-secondary btn-sm" id="btn-clear">
+          <i class="fa fa-trash"></i> Clear
+        </button>
+        <button class="btn btn-primary btn-sm" id="btn-validate">
+          <i class="fa fa-check"></i> Validate
+        </button>
+        <button class="btn btn-success btn-sm" id="btn-save">
+          <i class="fa fa-save"></i> Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="designer-content">
+    <!-- Capabilities Sidebar -->
+    <div class="capabilities-sidebar">
+      <div class="sidebar-header">
+        <div class="search-box">
+          <input type="text" class="search-input" id="capability-search" placeholder="Search capabilities...">
+          <i class="fa fa-search search-icon"></i>
+        </div>
+        
+        <div class="filter-tabs">
+          <div class="filter-tab active" data-filter="all">All</div>
+          <div class="filter-tab" data-filter="foundation">Foundation</div>
+          <div class="filter-tab" data-filter="business">Business</div>
+          <div class="filter-tab" data-filter="analytics">Analytics</div>
+        </div>
+      </div>
+      
+      <div class="sidebar-content">
+        <div id="capabilities-list">
+          <!-- Capabilities will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Design Canvas -->
+    <div class="designer-canvas">
+      <div class="canvas-grid" id="design-canvas">
+        <!-- Canvas content -->
+        <svg id="connections-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;">
+          <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Properties Panel -->
+    <div class="properties-panel">
+      <div class="panel-header">
+        <h4 class="mb-0">
+          <i class="fa fa-cog"></i>
+          Properties
+        </h4>
+      </div>
+      
+      <div class="panel-content">
+        <!-- Validation Results -->
+        <div class="validation-panel">
+          <div class="validation-header">
+            <i class="fa fa-check-circle"></i>
+            Validation Results
+          </div>
+          <div class="validation-content" id="validation-results">
+            <p class="text-muted">Select capabilities to validate composition</p>
+          </div>
+        </div>
+
+        <!-- Performance Impact -->
+        <div class="validation-panel">
+          <div class="validation-header">
+            <i class="fa fa-tachometer"></i>
+            Performance Impact
+          </div>
+          <div class="validation-content" id="performance-impact">
+            <p class="text-muted">Performance analysis will appear here</p>
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="validation-panel">
+          <div class="validation-header">
+            <i class="fa fa-lightbulb-o"></i>
+            Recommendations
+          </div>
+          <div class="validation-content" id="recommendations">
+            <p class="text-muted">AI recommendations will appear here</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+class CompositionDesigner {
+    constructor() {
+        this.canvas = document.getElementById('design-canvas');
+        this.connectionsSvg = document.getElementById('connections-svg');
+        this.selectedCapabilities = new Set();
+        this.capabilityNodes = new Map();
+        this.isDragging = false;
+        this.dragOffset = { x: 0, y: 0 };
+        this.currentTool = 'select';
+        this.zoom = 1;
+        this.pan = { x: 0, y: 0 };
+        
+        this.init();
+    }
+    
+    init() {
+        this.setupEventListeners();
+        this.loadCapabilities();
+        this.setupToolbar();
+    }
+    
+    setupEventListeners() {
+        // Canvas events
+        this.canvas.addEventListener('click', this.onCanvasClick.bind(this));
+        this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
+        this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
+        this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
+        
+        // Search
+        document.getElementById('capability-search').addEventListener('input', this.onSearch.bind(this));
+        
+        // Filter tabs
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', this.onFilterChange.bind(this));
+        });
+        
+        // Validation button
+        document.getElementById('btn-validate').addEventListener('click', this.validateComposition.bind(this));
+        
+        // Save button
+        document.getElementById('btn-save').addEventListener('click', this.saveComposition.bind(this));
+        
+        // Clear button
+        document.getElementById('btn-clear').addEventListener('click', this.clearCanvas.bind(this));
+    }
+    
+    setupToolbar() {
+        document.querySelectorAll('.btn-icon').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tool = e.currentTarget.id.replace('btn-', '');
+                this.setTool(tool);
+            });
+        });
+    }
+    
+    setTool(tool) {
+        document.querySelectorAll('.btn-icon').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`btn-${tool}`).classList.add('active');
+        this.currentTool = tool;
+    }
+    
+    async loadCapabilities() {
+        // Mock data - in real implementation, would fetch from API
+        const capabilities = [
+            {
+                capability_id: 'cap_001',
+                capability_code: 'USER_MANAGEMENT',
+                capability_name: 'User Management',
+                category: 'foundation_infrastructure',
+                quality_score: 0.92,
+                status: 'active'
+            },
+            {
+                capability_id: 'cap_002',
+                capability_code: 'AUTH_RBAC',
+                capability_name: 'Authentication & RBAC',
+                category: 'foundation_infrastructure',
+                quality_score: 0.95,
+                status: 'active'
+            },
+            {
+                capability_id: 'cap_003',
+                capability_code: 'ANALYTICS_PLATFORM',
+                capability_name: 'Analytics Platform',
+                category: 'analytics_intelligence',
+                quality_score: 0.88,
+                status: 'active'
+            }
+        ];
+        
+        this.renderCapabilitiesList(capabilities);
+    }
+    
+    renderCapabilitiesList(capabilities) {
+        const container = document.getElementById('capabilities-list');
+        container.innerHTML = '';
+        
+        capabilities.forEach(capability => {
+            const item = document.createElement('div');
+            item.className = 'capability-item';
+            item.draggable = true;
+            item.dataset.capabilityId = capability.capability_id;
+            
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="font-weight-bold">${capability.capability_name}</div>
+                        <small class="text-muted">${capability.capability_code}</small>
+                    </div>
+                    <div class="text-right">
+                        <div class="badge badge-${this.getQualityBadgeClass(capability.quality_score)}">
+                            ${Math.round(capability.quality_score * 100)}%
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            item.addEventListener('dragstart', this.onCapabilityDragStart.bind(this));
+            item.addEventListener('click', () => this.selectCapability(capability));
+            
+            container.appendChild(item);
+        });
+    }
+    
+    getQualityBadgeClass(score) {
+        if (score >= 0.9) return 'success';
+        if (score >= 0.8) return 'primary';
+        if (score >= 0.7) return 'warning';
+        return 'danger';
+    }
+    
+    onCapabilityDragStart(e) {
+        e.dataTransfer.setData('text/plain', e.currentTarget.dataset.capabilityId);
+    }
+    
+    onCanvasClick(e) {
+        if (e.target === this.canvas || e.target.classList.contains('canvas-grid')) {
+            // Allow drop
+            e.preventDefault();
+            this.handleDrop(e);
+        }
+    }
+    
+    handleDrop(e) {
+        const capabilityId = e.dataTransfer?.getData('text/plain');
+        if (!capabilityId) return;
+        
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        this.addCapabilityNode(capabilityId, x, y);
+    }
+    
+    addCapabilityNode(capabilityId, x, y) {
+        // Mock capability data
+        const capability = {
+            capability_id: capabilityId,
+            capability_name: 'Sample Capability',
+            capability_code: 'SAMPLE_CAP',
+            version: '1.0.0',
+            status: 'active'
+        };
+        
+        const node = document.createElement('div');
+        node.className = 'capability-node';
+        node.style.left = x + 'px';
+        node.style.top = y + 'px';
+        node.dataset.capabilityId = capabilityId;
+        
+        node.innerHTML = `
+            <div class="node-header">
+                <div class="flex-grow-1">
+                    <div class="node-title">${capability.capability_name}</div>
+                    <div class="node-code">${capability.capability_code}</div>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="node-version">${capability.version}</span>
+                    <div class="node-status status-${capability.status}"></div>
+                </div>
+            </div>
+        `;
+        
+        node.addEventListener('mousedown', this.onNodeMouseDown.bind(this));
+        
+        this.canvas.appendChild(node);
+        this.capabilityNodes.set(capabilityId, node);
+        this.selectedCapabilities.add(capabilityId);
+        
+        this.updateValidation();
+    }
+    
+    onNodeMouseDown(e) {
+        if (this.currentTool !== 'select') return;
+        
+        e.stopPropagation();
+        this.isDragging = true;
+        
+        const node = e.currentTarget;
+        const rect = node.getBoundingClientRect();
+        const canvasRect = this.canvas.getBoundingClientRect();
+        
+        this.dragOffset = {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+        
+        // Bring to front
+        node.style.zIndex = 1000;
+        node.classList.add('active');
+    }
+    
+    onMouseMove(e) {
+        if (!this.isDragging) return;
+        
+        const activeNode = document.querySelector('.capability-node.active');
+        if (!activeNode) return;
+        
+        const canvasRect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - canvasRect.left - this.dragOffset.x;
+        const y = e.clientY - canvasRect.top - this.dragOffset.y;
+        
+        activeNode.style.left = Math.max(0, x) + 'px';
+        activeNode.style.top = Math.max(0, y) + 'px';
+        
+        this.updateConnections();
+    }
+    
+    onMouseUp(e) {
+        if (this.isDragging) {
+            this.isDragging = false;
+            
+            const activeNode = document.querySelector('.capability-node.active');
+            if (activeNode) {
+                activeNode.style.zIndex = '';
+                activeNode.classList.remove('active');
+            }
+        }
+    }
+    
+    updateConnections() {
+        // Update SVG connections between nodes
+        // This would implement dependency line drawing
+    }
+    
+    async validateComposition() {
+        if (this.selectedCapabilities.size === 0) {
+            this.showValidationResults({
+                is_valid: false,
+                message: 'No capabilities selected'
+            });
+            return;
+        }
+        
+        const capabilityIds = Array.from(this.selectedCapabilities);
+        
+        try {
+            const response = await fetch('/capability-registry/api/compositions/validate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ capability_ids: capabilityIds })
+            });
+            
+            const result = await response.json();
+            this.showValidationResults(result);
+            
+        } catch (error) {
+            console.error('Validation failed:', error);
+            this.showValidationResults({
+                is_valid: false,
+                message: 'Validation failed: ' + error.message
+            });
+        }
+    }
+    
+    showValidationResults(result) {
+        const container = document.getElementById('validation-results');
+        
+        if (result.is_valid) {
+            const score = result.validation_score || 0;
+            const scoreClass = this.getScoreClass(score);
+            
+            container.innerHTML = `
+                <div class="validation-score">
+                    <div class="score-circle score-${scoreClass}">
+                        ${Math.round(score * 100)}
+                    </div>
+                    <div>
+                        <div class="font-weight-bold">Validation Passed</div>
+                        <small class="text-muted">Score: ${Math.round(score * 100)}%</small>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="validation-score">
+                    <div class="score-circle score-poor">
+                        <i class="fa fa-times"></i>
+                    </div>
+                    <div>
+                        <div class="font-weight-bold text-danger">Validation Failed</div>
+                        <small class="text-muted">${result.message || 'Unknown error'}</small>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Show performance impact
+        if (result.performance_impact) {
+            this.showPerformanceImpact(result.performance_impact);
+        }
+        
+        // Show recommendations
+        if (result.recommendations) {
+            this.showRecommendations(result.recommendations);
+        }
+    }
+    
+    showPerformanceImpact(impact) {
+        const container = document.getElementById('performance-impact');
+        
+        container.innerHTML = `
+            <div class="row">
+                <div class="col-6">
+                    <small class="text-muted">Memory</small>
+                    <div class="font-weight-bold">${impact.memory_usage_mb}MB</div>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Response</small>
+                    <div class="font-weight-bold">${impact.response_time_ms}ms</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    showRecommendations(recommendations) {
+        const container = document.getElementById('recommendations');
+        
+        if (recommendations.length === 0) {
+            container.innerHTML = '<p class="text-muted">No recommendations</p>';
+            return;
+        }
+        
+        container.innerHTML = recommendations.map(rec => `
+            <div class="recommendation-item">
+                <div class="font-weight-bold">${rec.title}</div>
+                <small class="text-muted">${rec.description}</small>
+            </div>
+        `).join('');
+    }
+    
+    getScoreClass(score) {
+        if (score >= 0.9) return 'excellent';
+        if (score >= 0.8) return 'good';
+        if (score >= 0.7) return 'fair';
+        return 'poor';
+    }
+    
+    clearCanvas() {
+        this.capabilityNodes.clear();
+        this.selectedCapabilities.clear();
+        
+        document.querySelectorAll('.capability-node').forEach(node => {
+            node.remove();
+        });
+        
+        this.connectionsSvg.innerHTML = this.connectionsSvg.innerHTML.replace(/<path[^>]*><\/path>/g, '');
+        
+        document.getElementById('validation-results').innerHTML = '<p class="text-muted">Select capabilities to validate composition</p>';
+        document.getElementById('performance-impact').innerHTML = '<p class="text-muted">Performance analysis will appear here</p>';
+        document.getElementById('recommendations').innerHTML = '<p class="text-muted">AI recommendations will appear here</p>';
+    }
+    
+    async saveComposition() {
+        if (this.selectedCapabilities.size === 0) {
+            alert('No capabilities selected to save');
+            return;
+        }
+        
+        const name = prompt('Enter composition name:');
+        if (!name) return;
+        
+        const compositionData = {
+            name: name,
+            description: 'Composition created with designer',
+            capability_ids: Array.from(this.selectedCapabilities)
+        };
+        
+        // In real implementation, would save via API
+        console.log('Saving composition:', compositionData);
+        alert('Composition saved successfully!');
+    }
+    
+    onSearch(e) {
+        const query = e.target.value.toLowerCase();
+        document.querySelectorAll('.capability-item').forEach(item => {
+            const text = item.textContent.toLowerCase();
+            item.style.display = text.includes(query) ? 'block' : 'none';
+        });
+    }
+    
+    onFilterChange(e) {
+        document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
+        e.target.classList.add('active');
+        
+        const filter = e.target.dataset.filter;
+        // In real implementation, would filter capabilities by category
+        console.log('Filter changed to:', filter);
+    }
+}
+
+// Initialize designer when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    new CompositionDesigner();
+});
+
+// Enable drag and drop on canvas
+document.addEventListener('DOMContentLoaded', function() {
+    const canvas = document.getElementById('design-canvas');
+    
+    canvas.addEventListener('dragover', function(e) {
+        e.preventDefault();
+    });
+    
+    canvas.addEventListener('drop', function(e) {
+        e.preventDefault();
+        const capabilityId = e.dataTransfer.getData('text/plain');
+        if (capabilityId) {
+            // This will be handled by the CompositionDesigner instance
+        }
+    });
+});
+</script>
+{% endblock %}

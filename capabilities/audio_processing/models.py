@@ -1,446 +1,433 @@
 """
-Audio Processing Models
+Audio Processing & Intelligence Data Models
 
-Database models for comprehensive audio processing, transcription,
-synthesis, and analysis with multi-provider support and quality tracking.
+APG-compatible data models for comprehensive audio processing, transcription,
+synthesis, and analysis with multi-tenant support and modern async patterns.
+
+Copyright © 2025 Datacraft
+Author: APG Development Team
 """
 
+import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
-from sqlalchemy import Column, String, Text, Integer, Float, Boolean, DateTime, JSON, ForeignKey, LargeBinary
-from sqlalchemy.orm import relationship
+from decimal import Decimal
+from enum import Enum
+from typing import Any, Dict, List, Optional
 from uuid_extensions import uuid7str
-import json
 
-from ..auth_rbac.models import BaseMixin, AuditMixin, Model
-
-
-def uuid7str():
-	"""Generate UUID7 string for consistent ID generation"""
-	from uuid_extensions import uuid7
-	return str(uuid7())
+from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic.types import PositiveFloat, PositiveInt
 
 
-class APAudioFile(Model, AuditMixin, BaseMixin):
+class APGBaseModel(BaseModel):
+	"""Base model for all APG capabilities with multi-tenant support"""
+	model_config = ConfigDict(
+		extra='forbid',
+		validate_by_name=True,
+		validate_by_alias=True,
+		str_strip_whitespace=True,
+		use_enum_values=True
+	)
+	
+	# Core APG fields
+	id: str = Field(default_factory=uuid7str, description="Unique identifier")
+	tenant_id: str = Field(..., description="Tenant identifier for multi-tenancy")
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	updated_at: datetime = Field(default_factory=datetime.utcnow)
+	created_by: str | None = Field(None, description="User ID who created the record")
+	updated_by: str | None = Field(None, description="User ID who last updated the record")
+
+
+# Enumerations for audio processing
+
+class AudioSessionType(str, Enum):
+	"""Types of audio processing sessions"""
+	REAL_TIME_TRANSCRIPTION = "real_time_transcription"
+	BATCH_TRANSCRIPTION = "batch_transcription"
+	VOICE_SYNTHESIS = "voice_synthesis"
+	AUDIO_ANALYSIS = "audio_analysis"
+	AUDIO_ENHANCEMENT = "audio_enhancement"
+	COLLABORATIVE_SESSION = "collaborative_session"
+	CUSTOM_MODEL_TRAINING = "custom_model_training"
+
+
+class AudioFormat(str, Enum):
+	"""Supported audio formats"""
+	MP3 = "mp3"
+	WAV = "wav"
+	FLAC = "flac"
+	AAC = "aac"
+	OGG = "ogg"
+	M4A = "m4a"
+	WEBM = "webm"
+	OPUS = "opus"
+
+
+class AudioQuality(str, Enum):
+	"""Audio quality levels"""
+	LOW = "low"
+	STANDARD = "standard"
+	HIGH = "high"
+	PREMIUM = "premium"
+	LOSSLESS = "lossless"
+
+
+class TranscriptionProvider(str, Enum):
+	"""Speech recognition providers"""
+	OPENAI_WHISPER = "openai_whisper"
+	GOOGLE_SPEECH = "google_speech"
+	AZURE_COGNITIVE = "azure_cognitive"
+	AWS_TRANSCRIBE = "aws_transcribe"
+	DEEPGRAM = "deepgram"
+	ASSEMBLY_AI = "assembly_ai"
+	CUSTOM_MODEL = "custom_model"
+
+
+class VoiceSynthesisProvider(str, Enum):
+	"""Text-to-speech providers"""
+	OPENAI_TTS = "openai_tts"
+	GOOGLE_TTS = "google_tts"
+	AZURE_TTS = "azure_tts"
+	AWS_POLLY = "aws_polly"
+	ELEVEN_LABS = "eleven_labs"
+	CUSTOM_VOICE = "custom_voice"
+
+
+class ProcessingStatus(str, Enum):
+	"""Processing status for audio operations"""
+	PENDING = "pending"
+	QUEUED = "queued"
+	PROCESSING = "processing"
+	COMPLETED = "completed"
+	FAILED = "failed"
+	CANCELLED = "cancelled"
+	TIMEOUT = "timeout"
+
+
+class EmotionType(str, Enum):
+	"""Emotion types for voice synthesis and analysis"""
+	NEUTRAL = "neutral"
+	HAPPY = "happy"
+	SAD = "sad"
+	ANGRY = "angry"
+	EXCITED = "excited"
+	CALM = "calm"
+	CONFIDENT = "confident"
+	NERVOUS = "nervous"
+	FRIENDLY = "friendly"
+	PROFESSIONAL = "professional"
+	ENTHUSIASTIC = "enthusiastic"
+	CONCERNED = "concerned"
+	APOLOGETIC = "apologetic"
+	CHEERFUL = "cheerful"
+	SERIOUS = "serious"
+	EMPATHETIC = "empathetic"
+	AUTHORITATIVE = "authoritative"
+	CONVERSATIONAL = "conversational"
+	NEWS_CAST = "news_cast"
+	STORYTELLING = "storytelling"
+
+
+class SentimentType(str, Enum):
+	"""Sentiment analysis types"""
+	POSITIVE = "positive"
+	NEGATIVE = "negative"
+	NEUTRAL = "neutral"
+	MIXED = "mixed"
+
+
+class ContentType(str, Enum):
+	"""Audio content types"""
+	SPEECH = "speech"
+	MUSIC = "music"
+	MIXED = "mixed"
+	NOISE = "noise"
+	SILENCE = "silence"
+	CONVERSATION = "conversation"
+	PRESENTATION = "presentation"
+	INTERVIEW = "interview"
+	MEETING = "meeting"
+	PODCAST = "podcast"
+	VOICEMAIL = "voicemail"
+
+
+# Core Audio Processing Models
+
+class APAudioSession(APGBaseModel):
 	"""
-	Audio file management with metadata and processing status.
+	Audio processing session with real-time collaboration support
 	
-	Stores information about uploaded audio files including format,
-	quality metrics, and processing history.
+	Manages audio processing sessions with multi-participant support,
+	real-time streaming, and comprehensive configuration options.
 	"""
-	__tablename__ = 'ap_audio_file'
+	session_id: str = Field(default_factory=uuid7str, description="Session identifier")
+	session_name: str = Field(..., min_length=1, max_length=200, description="Session name")
+	session_type: AudioSessionType = Field(..., description="Type of audio session")
 	
-	# Identity
-	file_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
+	# Configuration
+	configuration: dict[str, Any] = Field(default_factory=dict, description="Session configuration")
+	processing_options: dict[str, Any] = Field(default_factory=dict, description="Processing options")
 	
-	# File Information
-	original_filename = Column(String(500), nullable=False)
-	file_path = Column(String(1000), nullable=False)  # Storage path
-	file_size_bytes = Column(Integer, nullable=False)
-	mime_type = Column(String(100), nullable=False)
-	file_hash = Column(String(64), nullable=False, index=True)  # SHA-256 for deduplication
+	# Participants and Collaboration
+	participants: list[str] = Field(default_factory=list, description="User IDs of participants")
+	max_participants: int = Field(default=50, ge=1, le=100, description="Maximum participants")
+	real_time_enabled: bool = Field(default=False, description="Real-time processing enabled")
+	collaborative_editing: bool = Field(default=False, description="Collaborative editing enabled")
 	
-	# Audio Properties
-	format = Column(String(20), nullable=False, index=True)  # mp3, wav, flac, m4a, etc.
-	duration_seconds = Column(Float, nullable=False)
-	sample_rate = Column(Integer, nullable=True)  # Hz
-	bit_depth = Column(Integer, nullable=True)  # bits
-	channels = Column(Integer, nullable=True)  # mono=1, stereo=2
-	bitrate = Column(Integer, nullable=True)  # kbps
+	# Session Status
+	status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, description="Session status")
+	started_at: datetime | None = Field(None, description="Session start time")
+	ended_at: datetime | None = Field(None, description="Session end time")
 	
-	# Quality Metrics
-	audio_quality_score = Column(Float, default=0.0)  # 0-100 quality rating
-	noise_level = Column(Float, nullable=True)  # dB
-	signal_to_noise_ratio = Column(Float, nullable=True)  # dB
-	dynamic_range = Column(Float, nullable=True)  # dB
-	peak_amplitude = Column(Float, nullable=True)
-	rms_level = Column(Float, nullable=True)
+	# Performance Metrics
+	total_processing_time: float = Field(default=0.0, ge=0, description="Total processing time in seconds")
+	total_audio_duration: float = Field(default=0.0, ge=0, description="Total audio duration processed")
+	quality_score: float = Field(default=0.0, ge=0, le=100, description="Overall quality score")
 	
-	# Content Analysis
-	detected_language = Column(String(10), nullable=True)  # ISO language code
-	speech_detected = Column(Boolean, nullable=True)
-	music_detected = Column(Boolean, nullable=True)
-	silence_percentage = Column(Float, nullable=True)  # Percentage of silence
-	speaker_count = Column(Integer, nullable=True)  # Estimated number of speakers
+	@field_validator('participants')
+	@classmethod
+	def validate_participants(cls, v: list[str]) -> list[str]:
+		"""Validate participant list"""
+		if len(v) > 100:
+			raise ValueError("Maximum 100 participants allowed")
+		return list(set(v))  # Remove duplicates
 	
-	# Processing Status
-	processing_status = Column(String(20), default='uploaded', index=True)  # uploaded, processing, completed, failed
-	upload_source = Column(String(50), nullable=True)  # web, api, mobile, integration
-	uploaded_by = Column(String(36), nullable=True, index=True)  # User ID
+	def _log_session_start(self) -> None:
+		"""Log session start for monitoring"""
+		print(f"[AUDIO_SESSION] Started session {self.session_id} with {len(self.participants)} participants")
 	
-	# Processing History
-	total_processing_jobs = Column(Integer, default=0)
-	successful_jobs = Column(Integer, default=0)
-	failed_jobs = Column(Integer, default=0)
-	last_processed = Column(DateTime, nullable=True, index=True)
+	def _log_session_end(self) -> None:
+		"""Log session completion for monitoring"""
+		duration = self.get_session_duration()
+		print(f"[AUDIO_SESSION] Completed session {self.session_id} in {duration:.2f} seconds")
 	
-	# Storage Management
-	storage_class = Column(String(20), default='standard')  # standard, cold, archive
-	retention_policy = Column(String(50), nullable=True)
-	expires_at = Column(DateTime, nullable=True, index=True)
-	is_temporary = Column(Boolean, default=False)
+	def get_session_duration(self) -> float:
+		"""Get session duration in seconds"""
+		if self.started_at and self.ended_at:
+			return (self.ended_at - self.started_at).total_seconds()
+		elif self.started_at:
+			return (datetime.utcnow() - self.started_at).total_seconds()
+		return 0.0
 	
-	# Privacy and Compliance
-	contains_pii = Column(Boolean, nullable=True)
-	privacy_level = Column(String(20), default='internal')  # public, internal, confidential, restricted
-	consent_obtained = Column(Boolean, default=False)
-	gdpr_compliant = Column(Boolean, default=True)
+	def add_participant(self, user_id: str) -> bool:
+		"""Add participant to session"""
+		if len(self.participants) >= self.max_participants:
+			return False
+		if user_id not in self.participants:
+			self.participants.append(user_id)
+			self.updated_at = datetime.utcnow()
+		return True
 	
-	# Relationships
-	transcriptions = relationship("APTranscription", back_populates="audio_file", cascade="all, delete-orphan")
-	analyses = relationship("APAudioAnalysis", back_populates="audio_file", cascade="all, delete-orphan")
-	processing_jobs = relationship("APProcessingJob", back_populates="audio_file", cascade="all, delete-orphan")
-	
-	def __repr__(self):
-		return f"<APAudioFile {self.original_filename} ({self.format}, {self.duration_seconds}s)>"
-	
-	def get_duration_formatted(self) -> str:
-		"""Get formatted duration string (HH:MM:SS)"""
-		hours = int(self.duration_seconds // 3600)
-		minutes = int((self.duration_seconds % 3600) // 60)
-		seconds = int(self.duration_seconds % 60)
-		
-		if hours > 0:
-			return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-		else:
-			return f"{minutes:02d}:{seconds:02d}"
-	
-	def get_file_size_formatted(self) -> str:
-		"""Get formatted file size string"""
-		size = self.file_size_bytes
-		
-		if size < 1024:
-			return f"{size} B"
-		elif size < 1024 * 1024:
-			return f"{size / 1024:.1f} KB"
-		elif size < 1024 * 1024 * 1024:
-			return f"{size / (1024 * 1024):.1f} MB"
-		else:
-			return f"{size / (1024 * 1024 * 1024):.1f} GB"
-	
-	def calculate_processing_success_rate(self) -> float:
-		"""Calculate success rate of processing jobs"""
-		if self.total_processing_jobs == 0:
-			return 0.0
-		return (self.successful_jobs / self.total_processing_jobs) * 100
-	
-	def is_suitable_for_transcription(self) -> bool:
-		"""Check if audio file is suitable for transcription"""
-		return (self.speech_detected is not False and  # None or True
-				self.duration_seconds >= 1.0 and  # At least 1 second
-				self.audio_quality_score >= 30)  # Minimum quality threshold
-	
-	def is_expired(self) -> bool:
-		"""Check if file has expired based on retention policy"""
-		return self.expires_at is not None and datetime.utcnow() > self.expires_at
-	
-	def update_quality_metrics(self, quality_data: Dict[str, Any]) -> None:
-		"""Update audio quality metrics from analysis"""
-		self.audio_quality_score = quality_data.get('quality_score', self.audio_quality_score)
-		self.noise_level = quality_data.get('noise_level', self.noise_level)
-		self.signal_to_noise_ratio = quality_data.get('snr', self.signal_to_noise_ratio)
-		self.dynamic_range = quality_data.get('dynamic_range', self.dynamic_range)
-		self.peak_amplitude = quality_data.get('peak_amplitude', self.peak_amplitude)
-		self.rms_level = quality_data.get('rms_level', self.rms_level)
-		self.silence_percentage = quality_data.get('silence_percentage', self.silence_percentage)
+	def remove_participant(self, user_id: str) -> bool:
+		"""Remove participant from session"""
+		if user_id in self.participants:
+			self.participants.remove(user_id)
+			self.updated_at = datetime.utcnow()
+			return True
+		return False
 
 
-class APTranscription(Model, AuditMixin, BaseMixin):
+class APTranscriptionJob(APGBaseModel):
 	"""
-	Audio transcription results with accuracy metrics and speaker identification.
+	Speech recognition job with advanced features and speaker diarization
 	
-	Stores speech-to-text results with detailed accuracy metrics,
-	speaker diarization, and word-level timestamps.
+	Handles speech-to-text conversion with speaker identification,
+	custom vocabularies, and comprehensive accuracy metrics.
 	"""
-	__tablename__ = 'ap_transcription'
+	job_id: str = Field(default_factory=uuid7str, description="Job identifier")
+	session_id: str | None = Field(None, description="Associated session ID")
 	
-	# Identity
-	transcription_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	audio_file_id = Column(String(36), ForeignKey('ap_audio_file.file_id'), nullable=False, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
+	# Audio Source
+	audio_source: dict[str, Any] = Field(..., description="Audio source configuration")
+	audio_duration: float = Field(..., gt=0, description="Audio duration in seconds")
+	audio_format: AudioFormat = Field(..., description="Audio format")
+	audio_quality_score: float = Field(default=0.0, ge=0, le=100, description="Input audio quality")
 	
 	# Transcription Configuration
-	provider = Column(String(50), nullable=False, index=True)  # openai, google, azure, aws, custom
-	model_used = Column(String(100), nullable=True)
-	language = Column(String(10), nullable=False, index=True)  # ISO language code
-	language_confidence = Column(Float, nullable=True)  # 0-1 confidence in language detection
+	provider: TranscriptionProvider = Field(..., description="Transcription provider")
+	model_name: str | None = Field(None, description="Specific model used")
+	language_code: str = Field(..., description="ISO language code (e.g., en-US)")
+	language_confidence: float = Field(default=1.0, ge=0, le=1, description="Language detection confidence")
 	
-	# Processing Configuration
-	enable_speaker_diarization = Column(Boolean, default=False)
-	enable_punctuation = Column(Boolean, default=True)
-	enable_word_timestamps = Column(Boolean, default=True)
-	custom_vocabulary = Column(JSON, default=list)  # Custom words/phrases
-	profanity_filter = Column(Boolean, default=False)
+	# Advanced Features
+	speaker_diarization: bool = Field(default=True, description="Enable speaker diarization")
+	custom_vocabulary: list[str] = Field(default_factory=list, description="Custom vocabulary terms")
+	enable_punctuation: bool = Field(default=True, description="Enable automatic punctuation")
+	enable_timestamps: bool = Field(default=True, description="Enable word-level timestamps")
+	profanity_filter: bool = Field(default=False, description="Enable profanity filtering")
+	confidence_threshold: float = Field(default=0.8, ge=0, le=1, description="Minimum confidence threshold")
 	
-	# Transcription Results
-	transcript_text = Column(Text, nullable=False)
-	confidence_score = Column(Float, nullable=True)  # Overall confidence 0-1
-	word_count = Column(Integer, default=0)
-	speaker_count = Column(Integer, default=1)
+	# Results
+	transcript_text: str = Field(default="", description="Final transcript text")
+	word_count: int = Field(default=0, ge=0, description="Total word count")
+	speaker_count: int = Field(default=0, ge=0, description="Number of identified speakers")
+	
+	# Quality Metrics
+	overall_confidence: float = Field(default=0.0, ge=0, le=1, description="Overall transcription confidence")
+	accuracy_estimate: float = Field(default=0.0, ge=0, le=1, description="Estimated accuracy")
 	
 	# Detailed Results
-	word_level_data = Column(JSON, nullable=True)  # Word timestamps and confidence
-	speaker_segments = Column(JSON, nullable=True)  # Speaker diarization results
-	sentence_segments = Column(JSON, nullable=True)  # Sentence-level segmentation
-	
-	# Quality Metrics
-	accuracy_estimate = Column(Float, nullable=True)  # Estimated accuracy 0-1
-	audio_quality_impact = Column(Float, nullable=True)  # How audio quality affected transcription
-	processing_warnings = Column(JSON, default=list)  # Warnings during processing
-	recognition_errors = Column(JSON, default=list)  # Detected recognition errors
+	word_level_data: list[dict[str, Any]] = Field(default_factory=list, description="Word-level timestamps and confidence")
+	speaker_segments: list[dict[str, Any]] = Field(default_factory=list, description="Speaker diarization segments")
+	sentence_segments: list[dict[str, Any]] = Field(default_factory=list, description="Sentence-level segmentation")
 	
 	# Processing Performance
-	processing_time_seconds = Column(Float, nullable=True)
-	processing_cost = Column(Float, nullable=True)
-	tokens_used = Column(Integer, nullable=True)  # For API-based services
+	processing_time: float = Field(default=0.0, ge=0, description="Processing time in seconds")
+	processing_cost: Decimal = Field(default=Decimal("0.00"), description="Processing cost")
+	tokens_used: int = Field(default=0, ge=0, description="API tokens consumed")
 	
-	# Status and Metadata
-	status = Column(String(20), default='completed', index=True)  # processing, completed, failed
-	requested_by = Column(String(36), nullable=True, index=True)  # User ID
-	processing_metadata = Column(JSON, default=dict)  # Provider-specific metadata
+	# Status and Error Handling
+	status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, description="Job status")
+	error_message: str | None = Field(None, description="Error message if failed")
+	processing_warnings: list[str] = Field(default_factory=list, description="Processing warnings")
 	
-	# Export and Integration
-	export_formats = Column(JSON, default=list)  # Available export formats
-	external_references = Column(JSON, default=dict)  # References to external systems
+	@field_validator('custom_vocabulary')
+	@classmethod
+	def validate_vocabulary(cls, v: list[str]) -> list[str]:
+		"""Validate custom vocabulary list"""
+		if len(v) > 1000:
+			raise ValueError("Maximum 1000 custom vocabulary terms allowed")
+		return [term.strip() for term in v if term.strip()]
 	
-	# Relationships
-	audio_file = relationship("APAudioFile", back_populates="transcriptions")
+	def _log_transcription_start(self) -> None:
+		"""Log transcription start for monitoring"""
+		print(f"[TRANSCRIPTION] Started job {self.job_id} for {self.audio_duration:.2f}s audio")
 	
-	def __repr__(self):
-		return f"<APTranscription {self.transcription_id} ({self.language}, {self.provider})>"
+	def _log_transcription_complete(self) -> None:
+		"""Log transcription completion for monitoring"""
+		print(f"[TRANSCRIPTION] Completed job {self.job_id} with {self.word_count} words, {self.overall_confidence:.3f} confidence")
 	
-	def get_transcript_summary(self, max_length: int = 200) -> str:
-		"""Get truncated transcript for summary display"""
-		if len(self.transcript_text) <= max_length:
-			return self.transcript_text
-		return self.transcript_text[:max_length] + "..."
+	def get_processing_speed(self) -> float:
+		"""Get processing speed as multiplier of real-time"""
+		if self.processing_time > 0:
+			return self.audio_duration / self.processing_time
+		return 0.0
 	
-	def get_speakers_list(self) -> List[str]:
-		"""Get list of identified speakers"""
-		if not self.speaker_segments:
-			return []
-		
-		speakers = set()
-		for segment in self.speaker_segments:
-			if 'speaker' in segment:
-				speakers.add(segment['speaker'])
-		
-		return sorted(list(speakers))
+	def get_cost_per_minute(self) -> Decimal:
+		"""Get cost per minute of audio"""
+		if self.audio_duration > 0:
+			return self.processing_cost / Decimal(str(self.audio_duration / 60))
+		return Decimal("0.00")
 	
-	def get_words_with_low_confidence(self, threshold: float = 0.6) -> List[Dict[str, Any]]:
-		"""Get words with confidence below threshold"""
-		if not self.word_level_data:
-			return []
-		
-		low_confidence_words = []
-		for word_data in self.word_level_data:
-			if word_data.get('confidence', 1.0) < threshold:
-				low_confidence_words.append(word_data)
-		
-		return low_confidence_words
-	
-	def calculate_speaking_time_per_speaker(self) -> Dict[str, float]:
-		"""Calculate speaking time for each speaker"""
-		if not self.speaker_segments:
-			return {}
-		
-		speaker_times = {}
+	def get_speakers_summary(self) -> dict[str, float]:
+		"""Get speaking time summary per speaker"""
+		speaker_times: dict[str, float] = {}
 		for segment in self.speaker_segments:
 			speaker = segment.get('speaker', 'Unknown')
-			start_time = segment.get('start_time', 0)
-			end_time = segment.get('end_time', 0)
-			duration = end_time - start_time
-			
-			if speaker in speaker_times:
-				speaker_times[speaker] += duration
-			else:
-				speaker_times[speaker] = duration
-		
+			duration = segment.get('end_time', 0) - segment.get('start_time', 0)
+			speaker_times[speaker] = speaker_times.get(speaker, 0) + duration
 		return speaker_times
 	
-	def get_transcript_by_speaker(self) -> Dict[str, List[str]]:
-		"""Get transcript organized by speaker"""
-		if not self.speaker_segments:
-			return {'Speaker 1': [self.transcript_text]}
-		
-		speaker_text = {}
-		for segment in self.speaker_segments:
-			speaker = segment.get('speaker', 'Unknown')
-			text = segment.get('text', '')
-			
-			if speaker in speaker_text:
-				speaker_text[speaker].append(text)
-			else:
-				speaker_text[speaker] = [text]
-		
-		return speaker_text
-	
-	def export_to_format(self, format_type: str) -> str:
-		"""Export transcription to specified format"""
-		if format_type.lower() == 'srt':
-			return self._export_to_srt()
-		elif format_type.lower() == 'vtt':
-			return self._export_to_vtt()
-		elif format_type.lower() == 'txt':
-			return self.transcript_text
-		elif format_type.lower() == 'json':
-			return json.dumps({
-				'transcript': self.transcript_text,
-				'speakers': self.get_speakers_list(),
-				'word_data': self.word_level_data,
-				'speaker_segments': self.speaker_segments,
-				'confidence': self.confidence_score,
-				'language': self.language
-			})
-		else:
-			raise ValueError(f"Unsupported export format: {format_type}")
-	
-	def _export_to_srt(self) -> str:
-		"""Export to SRT subtitle format"""
-		if not self.sentence_segments:
-			return ""
-		
-		srt_content = []
-		for i, segment in enumerate(self.sentence_segments, 1):
-			start_time = self._format_srt_time(segment.get('start_time', 0))
-			end_time = self._format_srt_time(segment.get('end_time', 0))
-			text = segment.get('text', '')
-			
-			srt_content.append(f"{i}")
-			srt_content.append(f"{start_time} --> {end_time}")
-			srt_content.append(text)
-			srt_content.append("")  # Empty line between segments
-		
-		return "\n".join(srt_content)
-	
-	def _export_to_vtt(self) -> str:
-		"""Export to WebVTT format"""
-		vtt_content = ["WEBVTT", ""]
-		
-		if self.sentence_segments:
-			for segment in self.sentence_segments:
-				start_time = self._format_vtt_time(segment.get('start_time', 0))
-				end_time = self._format_vtt_time(segment.get('end_time', 0))
-				text = segment.get('text', '')
-				
-				vtt_content.append(f"{start_time} --> {end_time}")
-				vtt_content.append(text)
-				vtt_content.append("")
-		
-		return "\n".join(vtt_content)
-	
-	def _format_srt_time(self, seconds: float) -> str:
-		"""Format time for SRT format (HH:MM:SS,mmm)"""
-		hours = int(seconds // 3600)
-		minutes = int((seconds % 3600) // 60)
-		secs = int(seconds % 60)
-		millisecs = int((seconds % 1) * 1000)
-		
-		return f"{hours:02d}:{minutes:02d}:{secs:02d},{millisecs:03d}"
-	
-	def _format_vtt_time(self, seconds: float) -> str:
-		"""Format time for VTT format (HH:MM:SS.mmm)"""
-		hours = int(seconds // 3600)
-		minutes = int((seconds % 3600) // 60)
-		secs = int(seconds % 60)
-		millisecs = int((seconds % 1) * 1000)
-		
-		return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millisecs:03d}"
+	def get_low_confidence_words(self, threshold: float = 0.6) -> list[dict[str, Any]]:
+		"""Get words below confidence threshold"""
+		return [
+			word for word in self.word_level_data
+			if word.get('confidence', 1.0) < threshold
+		]
 
 
-class APVoiceSynthesis(Model, AuditMixin, BaseMixin):
+class APVoiceSynthesisJob(APGBaseModel):
 	"""
-	Voice synthesis (text-to-speech) results with voice characteristics.
+	Voice synthesis job with emotion control and voice cloning
 	
-	Stores TTS generation results with voice settings, quality metrics,
-	and generated audio file information.
+	Handles text-to-speech generation with advanced voice characteristics,
+	emotional expression, and custom voice models.
 	"""
-	__tablename__ = 'ap_voice_synthesis'
-	
-	# Identity
-	synthesis_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
+	job_id: str = Field(default_factory=uuid7str, description="Job identifier")
+	session_id: str | None = Field(None, description="Associated session ID")
 	
 	# Input Configuration
-	input_text = Column(Text, nullable=False)
-	input_language = Column(String(10), nullable=False, index=True)  # ISO language code
-	input_ssml = Column(Text, nullable=True)  # SSML markup if used
-	text_length = Column(Integer, default=0)  # Character count
+	input_text: str = Field(..., min_length=1, max_length=10000, description="Text to synthesize")
+	input_language: str = Field(..., description="ISO language code")
+	input_ssml: str | None = Field(None, description="SSML markup if used")
+	text_preprocessing: dict[str, Any] = Field(default_factory=dict, description="Text preprocessing options")
 	
 	# Voice Configuration
-	provider = Column(String(50), nullable=False, index=True)  # openai, azure, google, amazon, custom
-	voice_id = Column(String(100), nullable=False)  # Provider-specific voice identifier
-	voice_name = Column(String(100), nullable=True)  # Human-readable voice name
-	voice_gender = Column(String(10), nullable=True)  # male, female, neutral
-	voice_age = Column(String(20), nullable=True)  # child, young, adult, elderly
-	voice_style = Column(String(50), nullable=True)  # conversational, newscast, cheerful, etc.
+	provider: VoiceSynthesisProvider = Field(..., description="TTS provider")
+	voice_id: str = Field(..., description="Voice identifier")
+	voice_name: str | None = Field(None, description="Human-readable voice name")
+	voice_gender: str | None = Field(None, description="Voice gender")
+	voice_age: str | None = Field(None, description="Voice age category")
+	voice_style: str | None = Field(None, description="Voice style")
+	custom_voice_model: str | None = Field(None, description="Custom voice model ID")
 	
 	# Audio Parameters
-	speed = Column(Float, default=1.0)  # Speaking rate multiplier
-	pitch = Column(Float, default=0.0)  # Pitch adjustment in semitones
-	volume = Column(Float, default=1.0)  # Volume multiplier
-	emphasis = Column(String(20), nullable=True)  # none, moderate, strong
+	speaking_rate: float = Field(default=1.0, ge=0.1, le=3.0, description="Speaking rate multiplier")
+	pitch_adjustment: float = Field(default=0.0, ge=-20.0, le=20.0, description="Pitch adjustment in semitones")
+	volume_level: float = Field(default=1.0, ge=0.1, le=2.0, description="Volume multiplier")
+	emphasis_level: str = Field(default="moderate", description="Emphasis level")
+	
+	# Emotion and Expression
+	primary_emotion: EmotionType = Field(default=EmotionType.NEUTRAL, description="Primary emotion")
+	emotion_intensity: float = Field(default=0.5, ge=0.0, le=1.0, description="Emotion intensity")
+	secondary_emotions: list[EmotionType] = Field(default_factory=list, description="Secondary emotions")
+	emotional_variation: bool = Field(default=False, description="Enable emotional variation")
 	
 	# Output Configuration
-	output_format = Column(String(20), nullable=False)  # mp3, wav, ogg, aac
-	sample_rate = Column(Integer, default=22050)  # Hz
-	bit_depth = Column(Integer, default=16)  # bits
-	quality = Column(String(20), default='standard')  # low, standard, high, premium
+	output_format: AudioFormat = Field(default=AudioFormat.MP3, description="Output audio format")
+	sample_rate: PositiveInt = Field(default=22050, description="Sample rate in Hz")
+	bit_depth: int = Field(default=16, ge=8, le=32, description="Bit depth")
+	audio_quality: AudioQuality = Field(default=AudioQuality.STANDARD, description="Audio quality level")
 	
 	# Generated Audio
-	audio_file_path = Column(String(1000), nullable=True)
-	audio_file_size = Column(Integer, nullable=True)
-	audio_duration = Column(Float, nullable=True)  # seconds
-	audio_hash = Column(String(64), nullable=True)  # SHA-256
+	output_file_path: str | None = Field(None, description="Path to generated audio file")
+	output_file_size: int = Field(default=0, ge=0, description="File size in bytes")
+	audio_duration: float = Field(default=0.0, ge=0, description="Generated audio duration")
+	audio_hash: str | None = Field(None, description="SHA-256 hash of audio file")
 	
 	# Quality Metrics
-	synthesis_quality = Column(Float, default=0.0)  # 0-100 quality score
-	naturalness_score = Column(Float, nullable=True)  # How natural the voice sounds
-	intelligibility_score = Column(Float, nullable=True)  # How clear/understandable
-	emotion_accuracy = Column(Float, nullable=True)  # How well emotion is conveyed
+	synthesis_quality: float = Field(default=0.0, ge=0, le=100, description="Synthesis quality score")
+	naturalness_score: float = Field(default=0.0, ge=0, le=100, description="Voice naturalness score")
+	intelligibility_score: float = Field(default=0.0, ge=0, le=100, description="Speech intelligibility score")
+	emotion_accuracy: float = Field(default=0.0, ge=0, le=100, description="Emotion expression accuracy")
 	
 	# Processing Performance
-	processing_time_seconds = Column(Float, nullable=True)
-	processing_cost = Column(Float, nullable=True)
-	characters_processed = Column(Integer, default=0)
+	processing_time: float = Field(default=0.0, ge=0, description="Processing time in seconds")
+	processing_cost: Decimal = Field(default=Decimal("0.00"), description="Processing cost")
+	characters_processed: int = Field(default=0, ge=0, description="Characters processed")
 	
-	# Status and Metadata
-	status = Column(String(20), default='completed', index=True)  # processing, completed, failed
-	requested_by = Column(String(36), nullable=True, index=True)  # User ID
-	processing_metadata = Column(JSON, default=dict)  # Provider-specific metadata
-	error_message = Column(Text, nullable=True)
+	# Status and Error Handling
+	status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, description="Job status")
+	error_message: str | None = Field(None, description="Error message if failed")
+	processing_warnings: list[str] = Field(default_factory=list, description="Processing warnings")
 	
-	# Usage and Context
-	usage_context = Column(String(100), nullable=True)  # announcement, narration, conversation, etc.
-	target_audience = Column(String(100), nullable=True)  # general, children, professional, etc.
-	content_type = Column(String(50), nullable=True)  # news, story, instruction, etc.
+	@field_validator('input_text')
+	@classmethod
+	def validate_input_text(cls, v: str) -> str:
+		"""Validate input text"""
+		if len(v.strip()) == 0:
+			raise ValueError("Input text cannot be empty")
+		return v.strip()
 	
-	def __repr__(self):
-		return f"<APVoiceSynthesis {self.synthesis_id} ({self.voice_name}, {self.input_language})>"
+	@field_validator('secondary_emotions')
+	@classmethod
+	def validate_secondary_emotions(cls, v: list[EmotionType]) -> list[EmotionType]:
+		"""Validate secondary emotions list"""
+		if len(v) > 3:
+			raise ValueError("Maximum 3 secondary emotions allowed")
+		return list(set(v))  # Remove duplicates
 	
-	def get_input_preview(self, max_length: int = 100) -> str:
-		"""Get truncated input text for preview"""
-		if len(self.input_text) <= max_length:
-			return self.input_text
-		return self.input_text[:max_length] + "..."
+	def _log_synthesis_start(self) -> None:
+		"""Log synthesis start for monitoring"""
+		print(f"[VOICE_SYNTHESIS] Started job {self.job_id} for {len(self.input_text)} characters")
 	
-	def calculate_cost_per_character(self) -> Optional[float]:
-		"""Calculate cost per character if cost data available"""
-		if self.processing_cost and self.characters_processed:
-			return self.processing_cost / self.characters_processed
-		return None
+	def _log_synthesis_complete(self) -> None:
+		"""Log synthesis completion for monitoring"""
+		print(f"[VOICE_SYNTHESIS] Completed job {self.job_id}, generated {self.audio_duration:.2f}s audio")
 	
-	def get_audio_duration_formatted(self) -> str:
-		"""Get formatted audio duration"""
-		if not self.audio_duration:
-			return "00:00"
-		
-		minutes = int(self.audio_duration // 60)
-		seconds = int(self.audio_duration % 60)
-		return f"{minutes:02d}:{seconds:02d}"
+	def get_synthesis_speed(self) -> float:
+		"""Get synthesis speed as multiple of real-time"""
+		if self.processing_time > 0 and self.audio_duration > 0:
+			return self.audio_duration / self.processing_time
+		return 0.0
 	
-	def get_voice_characteristics(self) -> Dict[str, Any]:
+	def get_cost_per_character(self) -> Decimal:
+		"""Get cost per character"""
+		if self.characters_processed > 0:
+			return self.processing_cost / Decimal(str(self.characters_processed))
+		return Decimal("0.00")
+	
+	def get_voice_characteristics(self) -> dict[str, Any]:
 		"""Get voice characteristics summary"""
 		return {
 			'voice_id': self.voice_id,
@@ -449,387 +436,370 @@ class APVoiceSynthesis(Model, AuditMixin, BaseMixin):
 			'age': self.voice_age,
 			'style': self.voice_style,
 			'language': self.input_language,
-			'provider': self.provider
-		}
-	
-	def get_audio_parameters(self) -> Dict[str, Any]:
-		"""Get audio generation parameters"""
-		return {
-			'speed': self.speed,
-			'pitch': self.pitch,
-			'volume': self.volume,
-			'emphasis': self.emphasis,
-			'format': self.output_format,
-			'sample_rate': self.sample_rate,
-			'bit_depth': self.bit_depth,
-			'quality': self.quality
+			'provider': self.provider,
+			'custom_model': self.custom_voice_model
 		}
 
 
-class APAudioAnalysis(Model, AuditMixin, BaseMixin):
+class APAudioAnalysisJob(APGBaseModel):
 	"""
-	Audio content analysis results including sentiment, topics, and classification.
+	Audio content analysis with AI-powered insights
 	
-	Stores comprehensive audio analysis including content classification,
-	sentiment analysis, and intelligent insights.
+	Provides comprehensive audio analysis including sentiment detection,
+	content classification, speaker characteristics, and intelligent insights.
 	"""
-	__tablename__ = 'ap_audio_analysis'
-	
-	# Identity
-	analysis_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	audio_file_id = Column(String(36), ForeignKey('ap_audio_file.file_id'), nullable=False, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
+	job_id: str = Field(default_factory=uuid7str, description="Job identifier")
+	session_id: str | None = Field(None, description="Associated session ID")
+	audio_source_id: str = Field(..., description="Source audio identifier")
 	
 	# Analysis Configuration
-	analysis_types = Column(JSON, nullable=False)  # Types of analysis performed
-	provider = Column(String(50), nullable=False, index=True)  # Analysis service provider
-	model_used = Column(String(100), nullable=True)
-	language = Column(String(10), nullable=True, index=True)
+	analysis_types: list[str] = Field(..., description="Types of analysis to perform")
+	provider: str = Field(..., description="Analysis service provider")
+	model_name: str | None = Field(None, description="Specific model used")
+	language_hint: str | None = Field(None, description="Language hint for analysis")
 	
 	# Content Classification
-	content_type = Column(String(50), nullable=True, index=True)  # speech, music, mixed, noise
-	content_category = Column(String(100), nullable=True)  # meeting, interview, presentation, etc.
-	content_confidence = Column(Float, nullable=True)  # 0-1 confidence in classification
+	content_type: ContentType | None = Field(None, description="Detected content type")
+	content_category: str | None = Field(None, description="Content category")
+	content_confidence: float = Field(default=0.0, ge=0, le=1, description="Classification confidence")
 	
-	# Speech Analysis
-	speech_percentage = Column(Float, nullable=True)  # Percentage of audio that is speech
-	music_percentage = Column(Float, nullable=True)  # Percentage that is music
-	noise_percentage = Column(Float, nullable=True)  # Percentage that is noise/silence
+	# Content Distribution
+	speech_percentage: float = Field(default=0.0, ge=0, le=100, description="Percentage of speech")
+	music_percentage: float = Field(default=0.0, ge=0, le=100, description="Percentage of music")
+	noise_percentage: float = Field(default=0.0, ge=0, le=100, description="Percentage of noise")
+	silence_percentage: float = Field(default=0.0, ge=0, le=100, description="Percentage of silence")
 	
 	# Sentiment Analysis
-	overall_sentiment = Column(String(20), nullable=True, index=True)  # positive, negative, neutral
-	sentiment_confidence = Column(Float, nullable=True)  # 0-1 confidence
-	sentiment_scores = Column(JSON, nullable=True)  # Detailed sentiment breakdown
-	emotional_tone = Column(JSON, nullable=True)  # Detected emotions
+	overall_sentiment: SentimentType | None = Field(None, description="Overall sentiment")
+	sentiment_confidence: float = Field(default=0.0, ge=0, le=1, description="Sentiment confidence")
+	sentiment_scores: dict[str, float] = Field(default_factory=dict, description="Detailed sentiment scores")
+	emotional_tone: dict[str, float] = Field(default_factory=dict, description="Emotional tone breakdown")
 	
-	# Topic Analysis
-	detected_topics = Column(JSON, nullable=True)  # List of identified topics
-	topic_confidence = Column(JSON, nullable=True)  # Confidence scores for topics
-	key_phrases = Column(JSON, nullable=True)  # Important phrases/keywords
-	named_entities = Column(JSON, nullable=True)  # People, places, organizations
+	# Topic and Content Analysis
+	detected_topics: list[str] = Field(default_factory=list, description="Identified topics")
+	topic_confidence: list[float] = Field(default_factory=list, description="Topic confidence scores")
+	key_phrases: list[str] = Field(default_factory=list, description="Important phrases")
+	named_entities: list[dict[str, Any]] = Field(default_factory=list, description="Named entities")
 	
 	# Speaker Analysis
-	speaker_characteristics = Column(JSON, nullable=True)  # Voice characteristics
-	speaker_emotions = Column(JSON, nullable=True)  # Emotional state of speakers
-	speaking_pace = Column(Float, nullable=True)  # Words per minute
-	voice_quality_metrics = Column(JSON, nullable=True)  # Technical voice quality
+	speaker_count: int = Field(default=0, ge=0, description="Number of speakers detected")
+	speaker_characteristics: dict[str, Any] = Field(default_factory=dict, description="Speaker characteristics")
+	speaker_emotions: dict[str, Any] = Field(default_factory=dict, description="Speaker emotional states")
+	speaking_pace: float = Field(default=0.0, ge=0, description="Speaking pace (words per minute)")
 	
 	# Content Insights
-	summary_text = Column(Text, nullable=True)  # AI-generated summary
-	key_moments = Column(JSON, nullable=True)  # Important timestamps
-	action_items = Column(JSON, nullable=True)  # Extracted action items
-	questions_asked = Column(JSON, nullable=True)  # Questions identified in audio
+	summary_text: str | None = Field(None, description="AI-generated summary")
+	key_moments: list[dict[str, Any]] = Field(default_factory=list, description="Important timestamps")
+	action_items: list[str] = Field(default_factory=list, description="Extracted action items")
+	questions_identified: list[str] = Field(default_factory=list, description="Questions found in audio")
 	
-	# Quality and Technical Metrics
-	audio_quality_score = Column(Float, nullable=True)  # Overall audio quality 0-100
-	transcription_quality = Column(Float, nullable=True)  # Quality of source transcription
-	analysis_confidence = Column(Float, nullable=True)  # Overall analysis confidence
-	processing_warnings = Column(JSON, default=list)  # Warnings during analysis
+	# Quality Assessment
+	audio_quality_score: float = Field(default=0.0, ge=0, le=100, description="Audio quality score")
+	analysis_confidence: float = Field(default=0.0, ge=0, le=1, description="Overall analysis confidence")
+	engagement_score: float = Field(default=0.0, ge=0, le=100, description="Content engagement score")
 	
 	# Processing Performance
-	processing_time_seconds = Column(Float, nullable=True)
-	processing_cost = Column(Float, nullable=True)
+	processing_time: float = Field(default=0.0, ge=0, description="Processing time in seconds")
+	processing_cost: Decimal = Field(default=Decimal("0.00"), description="Processing cost")
 	
-	# Status and Metadata
-	status = Column(String(20), default='completed', index=True)  # processing, completed, failed
-	requested_by = Column(String(36), nullable=True, index=True)  # User ID
-	analysis_metadata = Column(JSON, default=dict)  # Provider-specific metadata
-	error_message = Column(Text, nullable=True)
+	# Status and Error Handling
+	status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, description="Job status")
+	error_message: str | None = Field(None, description="Error message if failed")
+	processing_warnings: list[str] = Field(default_factory=list, description="Processing warnings")
 	
-	# Relationships
-	audio_file = relationship("APAudioFile", back_populates="analyses")
+	@field_validator('analysis_types')
+	@classmethod
+	def validate_analysis_types(cls, v: list[str]) -> list[str]:
+		"""Validate analysis types"""
+		valid_types = {
+			'sentiment', 'topics', 'entities', 'summary', 'quality',
+			'speaker_analysis', 'emotion', 'engagement', 'content_classification'
+		}
+		invalid_types = set(v) - valid_types
+		if invalid_types:
+			raise ValueError(f"Invalid analysis types: {invalid_types}")
+		return list(set(v))  # Remove duplicates
 	
-	def __repr__(self):
-		return f"<APAudioAnalysis {self.analysis_id} ({self.content_type}, {self.overall_sentiment})>"
+	def _log_analysis_start(self) -> None:
+		"""Log analysis start for monitoring"""
+		print(f"[AUDIO_ANALYSIS] Started job {self.job_id} with {len(self.analysis_types)} analysis types")
 	
-	def get_top_topics(self, limit: int = 5) -> List[Dict[str, Any]]:
-		"""Get top detected topics with confidence scores"""
-		if not self.detected_topics or not self.topic_confidence:
-			return []
-		
-		topic_list = []
+	def _log_analysis_complete(self) -> None:
+		"""Log analysis completion for monitoring"""
+		print(f"[AUDIO_ANALYSIS] Completed job {self.job_id} with {self.analysis_confidence:.3f} confidence")
+	
+	def get_top_topics(self, limit: int = 5) -> list[dict[str, Any]]:
+		"""Get top topics with confidence scores"""
+		topics = []
 		for i, topic in enumerate(self.detected_topics[:limit]):
 			confidence = self.topic_confidence[i] if i < len(self.topic_confidence) else 0.0
-			topic_list.append({
-				'topic': topic,
-				'confidence': confidence
-			})
-		
-		return sorted(topic_list, key=lambda x: x['confidence'], reverse=True)
+			topics.append({'topic': topic, 'confidence': confidence})
+		return sorted(topics, key=lambda x: x['confidence'], reverse=True)
 	
-	def get_sentiment_summary(self) -> Dict[str, Any]:
-		"""Get comprehensive sentiment analysis summary"""
-		summary = {
-			'overall_sentiment': self.overall_sentiment,
+	def get_sentiment_summary(self) -> dict[str, Any]:
+		"""Get comprehensive sentiment summary"""
+		return {
+			'overall': self.overall_sentiment,
 			'confidence': self.sentiment_confidence,
-			'emotional_tone': self.emotional_tone or {}
+			'scores': self.sentiment_scores,
+			'emotions': self.emotional_tone
 		}
-		
-		if self.sentiment_scores:
-			summary['detailed_scores'] = self.sentiment_scores
-		
-		return summary
 	
-	def get_speaker_insights(self) -> Dict[str, Any]:
-		"""Get speaker analysis insights"""
-		insights = {}
+	def calculate_content_distribution(self) -> dict[str, float]:
+		"""Calculate content type distribution"""
+		total = self.speech_percentage + self.music_percentage + self.noise_percentage + self.silence_percentage
+		if total == 0:
+			return {}
 		
-		if self.speaker_characteristics:
-			insights['characteristics'] = self.speaker_characteristics
-		
-		if self.speaker_emotions:
-			insights['emotions'] = self.speaker_emotions
-		
-		if self.speaking_pace:
-			insights['speaking_pace'] = {
-				'words_per_minute': self.speaking_pace,
-				'pace_category': self._categorize_speaking_pace(self.speaking_pace)
+		return {
+			'speech': self.speech_percentage / total * 100,
+			'music': self.music_percentage / total * 100,
+			'noise': self.noise_percentage / total * 100,
+			'silence': self.silence_percentage / total * 100
+		}
+
+
+class APVoiceModel(APGBaseModel):
+	"""
+	Custom voice model for voice cloning and synthesis
+	
+	Manages custom voice models created from audio samples,
+	including training data, quality metrics, and usage permissions.
+	"""
+	model_id: str = Field(default_factory=uuid7str, description="Model identifier")
+	voice_name: str = Field(..., min_length=1, max_length=100, description="Voice name")
+	voice_description: str | None = Field(None, max_length=500, description="Voice description")
+	
+	# Training Configuration
+	training_audio_samples: list[str] = Field(..., description="Training audio file IDs")
+	training_duration: float = Field(..., gt=0, description="Total training audio duration")
+	minimum_sample_duration: float = Field(default=30.0, description="Minimum sample duration in seconds")
+	training_language: str = Field(..., description="Primary training language")
+	additional_languages: list[str] = Field(default_factory=list, description="Additional supported languages")
+	
+	# Voice Characteristics
+	voice_gender: str | None = Field(None, description="Voice gender")
+	voice_age: str | None = Field(None, description="Voice age category")
+	voice_accent: str | None = Field(None, description="Voice accent/dialect")
+	voice_style: str | None = Field(None, description="Voice style characteristics")
+	
+	# Model Quality
+	training_quality_score: float = Field(default=0.0, ge=0, le=100, description="Training quality score")
+	voice_similarity_score: float = Field(default=0.0, ge=0, le=100, description="Similarity to original voice")
+	synthesis_quality_score: float = Field(default=0.0, ge=0, le=100, description="Synthesis quality score")
+	naturalness_score: float = Field(default=0.0, ge=0, le=100, description="Voice naturalness score")
+	
+	# Capabilities
+	emotion_support: list[EmotionType] = Field(default_factory=list, description="Supported emotions")
+	style_variations: list[str] = Field(default_factory=list, description="Supported style variations")
+	speaking_rate_range: tuple[float, float] = Field(default=(0.5, 2.0), description="Supported rate range")
+	pitch_range: tuple[float, float] = Field(default=(-10.0, 10.0), description="Supported pitch range")
+	
+	# Training Performance
+	training_time: float = Field(default=0.0, ge=0, description="Training time in seconds")
+	training_cost: Decimal = Field(default=Decimal("0.00"), description="Training cost")
+	training_iterations: int = Field(default=0, ge=0, description="Training iterations")
+	
+	# Model Status
+	training_status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, description="Training status")
+	model_version: str = Field(default="1.0.0", description="Model version")
+	is_active: bool = Field(default=True, description="Model is active")
+	is_public: bool = Field(default=False, description="Model is publicly available")
+	
+	# Usage and Permissions
+	usage_permissions: list[str] = Field(default_factory=list, description="User IDs with usage permissions")
+	usage_count: int = Field(default=0, ge=0, description="Number of times used")
+	last_used: datetime | None = Field(None, description="Last usage timestamp")
+	
+	# Storage and Management
+	model_file_path: str | None = Field(None, description="Path to model file")
+	model_file_size: int = Field(default=0, ge=0, description="Model file size in bytes")
+	backup_locations: list[str] = Field(default_factory=list, description="Backup storage locations")
+	
+	@field_validator('training_audio_samples')
+	@classmethod
+	def validate_training_samples(cls, v: list[str]) -> list[str]:
+		"""Validate training audio samples"""
+		if len(v) < 1:
+			raise ValueError("At least 1 training sample required")
+		if len(v) > 100:
+			raise ValueError("Maximum 100 training samples allowed")
+		return v
+	
+	@field_validator('emotion_support')
+	@classmethod
+	def validate_emotion_support(cls, v: list[EmotionType]) -> list[EmotionType]:
+		"""Validate emotion support list"""
+		return list(set(v))  # Remove duplicates
+	
+	def _log_training_start(self) -> None:
+		"""Log training start for monitoring"""
+		print(f"[VOICE_MODEL] Started training {self.model_id} with {len(self.training_audio_samples)} samples")
+	
+	def _log_training_complete(self) -> None:
+		"""Log training completion for monitoring"""
+		print(f"[VOICE_MODEL] Completed training {self.model_id} with {self.training_quality_score:.2f} quality score")
+	
+	def can_user_access(self, user_id: str) -> bool:
+		"""Check if user can access this voice model"""
+		return (
+			user_id == self.created_by or
+			user_id in self.usage_permissions or
+			self.is_public
+		)
+	
+	def add_usage_permission(self, user_id: str) -> None:
+		"""Add usage permission for user"""
+		if user_id not in self.usage_permissions:
+			self.usage_permissions.append(user_id)
+			self.updated_at = datetime.utcnow()
+	
+	def remove_usage_permission(self, user_id: str) -> None:
+		"""Remove usage permission for user"""
+		if user_id in self.usage_permissions:
+			self.usage_permissions.remove(user_id)
+			self.updated_at = datetime.utcnow()
+	
+	def record_usage(self) -> None:
+		"""Record model usage"""
+		self.usage_count += 1
+		self.last_used = datetime.utcnow()
+		self.updated_at = datetime.utcnow()
+	
+	def get_supported_capabilities(self) -> dict[str, Any]:
+		"""Get model capabilities summary"""
+		return {
+			'emotions': self.emotion_support,
+			'styles': self.style_variations,
+			'languages': [self.training_language] + self.additional_languages,
+			'rate_range': self.speaking_rate_range,
+			'pitch_range': self.pitch_range,
+			'quality_scores': {
+				'training': self.training_quality_score,
+				'similarity': self.voice_similarity_score,
+				'synthesis': self.synthesis_quality_score,
+				'naturalness': self.naturalness_score
 			}
-		
-		if self.voice_quality_metrics:
-			insights['voice_quality'] = self.voice_quality_metrics
-		
-		return insights
-	
-	def _categorize_speaking_pace(self, wpm: float) -> str:
-		"""Categorize speaking pace"""
-		if wpm < 120:
-			return 'slow'
-		elif wpm < 160:
-			return 'normal'
-		elif wpm < 200:
-			return 'fast'
-		else:
-			return 'very_fast'
-	
-	def get_actionable_insights(self) -> Dict[str, Any]:
-		"""Get actionable insights from analysis"""
-		insights = {}
-		
-		if self.action_items:
-			insights['action_items'] = self.action_items
-		
-		if self.questions_asked:
-			insights['questions'] = self.questions_asked
-		
-		if self.key_moments:
-			insights['key_moments'] = self.key_moments
-		
-		if self.key_phrases:
-			insights['key_phrases'] = self.key_phrases[:10]  # Top 10 phrases
-		
-		return insights
-	
-	def calculate_engagement_score(self) -> float:
-		"""Calculate engagement score based on various factors"""
-		score = 0.0
-		factors = 0
-		
-		# Factor in sentiment (positive sentiment = higher engagement)
-		if self.sentiment_scores and 'positive' in self.sentiment_scores:
-			score += self.sentiment_scores['positive'] * 100
-			factors += 1
-		
-		# Factor in speaking pace (normal pace = higher engagement)
-		if self.speaking_pace:
-			if 120 <= self.speaking_pace <= 160:  # Normal pace
-				score += 80
-			elif 100 <= self.speaking_pace < 200:  # Acceptable pace
-				score += 60
-			else:  # Too slow or too fast
-				score += 30
-			factors += 1
-		
-		# Factor in content quality
-		if self.analysis_confidence:
-			score += self.analysis_confidence * 100
-			factors += 1
-		
-		# Factor in topic richness
-		if self.detected_topics:
-			topic_score = min(100, len(self.detected_topics) * 20)  # More topics = higher engagement
-			score += topic_score
-			factors += 1
-		
-		return score / factors if factors > 0 else 0.0
+		}
 
 
-class APProcessingJob(Model, AuditMixin, BaseMixin):
+class APAudioProcessingMetrics(APGBaseModel):
 	"""
-	Audio processing job tracking with status and performance metrics.
+	Performance metrics and analytics for audio processing operations
 	
-	Tracks background audio processing jobs including batch operations,
-	complex analysis workflows, and long-running tasks.
+	Tracks system performance, quality metrics, and usage analytics
+	across all audio processing capabilities.
 	"""
-	__tablename__ = 'ap_processing_job'
+	metrics_id: str = Field(default_factory=uuid7str, description="Metrics identifier")
 	
-	# Identity
-	job_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	audio_file_id = Column(String(36), ForeignKey('ap_audio_file.file_id'), nullable=True, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
+	# Time Period
+	period_start: datetime = Field(..., description="Metrics period start")
+	period_end: datetime = Field(..., description="Metrics period end")
+	metric_type: str = Field(..., description="Type of metrics (hourly, daily, weekly)")
 	
-	# Job Configuration
-	job_type = Column(String(50), nullable=False, index=True)  # transcription, synthesis, analysis, enhancement
-	job_name = Column(String(200), nullable=True)
-	job_description = Column(Text, nullable=True)
+	# Processing Volume
+	total_jobs_processed: int = Field(default=0, ge=0, description="Total jobs processed")
+	transcription_jobs: int = Field(default=0, ge=0, description="Transcription jobs")
+	synthesis_jobs: int = Field(default=0, ge=0, description="Voice synthesis jobs")
+	analysis_jobs: int = Field(default=0, ge=0, description="Audio analysis jobs")
+	enhancement_jobs: int = Field(default=0, ge=0, description="Audio enhancement jobs")
 	
-	# Job Parameters
-	input_parameters = Column(JSON, nullable=False)  # Job configuration
-	processing_options = Column(JSON, default=dict)  # Additional processing options
-	priority = Column(String(20), default='normal', index=True)  # low, normal, high, urgent
+	# Processing Performance
+	average_processing_time: float = Field(default=0.0, ge=0, description="Average processing time")
+	total_audio_processed: float = Field(default=0.0, ge=0, description="Total audio duration processed")
+	processing_speed_multiplier: float = Field(default=0.0, ge=0, description="Average speed vs real-time")
 	
-	# Job Status
-	status = Column(String(20), default='pending', index=True)  # pending, running, completed, failed, cancelled
-	progress_percentage = Column(Float, default=0.0)  # 0-100 completion percentage
-	current_step = Column(String(100), nullable=True)  # Current processing step
-	total_steps = Column(Integer, nullable=True)
+	# Quality Metrics
+	average_quality_score: float = Field(default=0.0, ge=0, le=100, description="Average quality score")
+	average_confidence_score: float = Field(default=0.0, ge=0, le=1, description="Average confidence score")
+	success_rate: float = Field(default=0.0, ge=0, le=100, description="Job success rate")
 	
-	# Scheduling
-	scheduled_at = Column(DateTime, nullable=True, index=True)
-	started_at = Column(DateTime, nullable=True, index=True)
-	completed_at = Column(DateTime, nullable=True, index=True)
-	timeout_at = Column(DateTime, nullable=True)
+	# Resource Usage
+	total_processing_cost: Decimal = Field(default=Decimal("0.00"), description="Total processing cost")
+	cpu_hours_used: float = Field(default=0.0, ge=0, description="CPU hours consumed")
+	memory_gb_hours: float = Field(default=0.0, ge=0, description="Memory GB-hours consumed")
+	storage_gb_used: float = Field(default=0.0, ge=0, description="Storage GB used")
 	
-	# Results and Output
-	output_data = Column(JSON, nullable=True)  # Job results
-	output_files = Column(JSON, default=list)  # Generated files
-	processing_log = Column(Text, nullable=True)  # Processing log/messages
+	# User Engagement
+	active_users: int = Field(default=0, ge=0, description="Number of active users")
+	new_users: int = Field(default=0, ge=0, description="Number of new users")
+	session_count: int = Field(default=0, ge=0, description="Number of sessions")
+	average_session_duration: float = Field(default=0.0, ge=0, description="Average session duration")
 	
-	# Performance Metrics
-	processing_time_seconds = Column(Float, nullable=True)
-	cpu_time_seconds = Column(Float, nullable=True)
-	memory_used_mb = Column(Float, nullable=True)
-	processing_cost = Column(Float, nullable=True)
+	# Error and Reliability
+	error_count: int = Field(default=0, ge=0, description="Total errors")
+	timeout_count: int = Field(default=0, ge=0, description="Timeout occurrences")
+	retry_count: int = Field(default=0, ge=0, description="Retry attempts")
+	uptime_percentage: float = Field(default=100.0, ge=0, le=100, description="System uptime")
 	
-	# Error Handling
-	error_message = Column(Text, nullable=True)
-	error_code = Column(String(50), nullable=True)
-	error_details = Column(JSON, default=dict)
-	retry_count = Column(Integer, default=0)
-	max_retries = Column(Integer, default=3)
+	# Feature Usage
+	feature_usage: dict[str, int] = Field(default_factory=dict, description="Feature usage statistics")
+	provider_usage: dict[str, int] = Field(default_factory=dict, description="Provider usage statistics")
+	language_usage: dict[str, int] = Field(default_factory=dict, description="Language usage statistics")
 	
-	# Job Metadata
-	requested_by = Column(String(36), nullable=True, index=True)  # User ID
-	worker_id = Column(String(100), nullable=True)  # Processing worker identifier
-	worker_metadata = Column(JSON, default=dict)  # Worker-specific information
+	def _log_metrics_calculation(self) -> None:
+		"""Log metrics calculation for monitoring"""
+		print(f"[METRICS] Calculated metrics for {self.metric_type} period: {self.total_jobs_processed} jobs")
 	
-	# Relationships
-	audio_file = relationship("APAudioFile", back_populates="processing_jobs")
+	def calculate_throughput(self) -> float:
+		"""Calculate jobs per hour throughput"""
+		period_hours = (self.period_end - self.period_start).total_seconds() / 3600
+		if period_hours > 0:
+			return self.total_jobs_processed / period_hours
+		return 0.0
 	
-	def __repr__(self):
-		return f"<APProcessingJob {self.job_id} ({self.job_type}, {self.status})>"
-	
-	def is_running(self) -> bool:
-		"""Check if job is currently running"""
-		return self.status in ['pending', 'running']
-	
-	def is_completed(self) -> bool:
-		"""Check if job completed successfully"""
-		return self.status == 'completed'
-	
-	def is_failed(self) -> bool:
-		"""Check if job failed"""
-		return self.status == 'failed'
-	
-	def can_retry(self) -> bool:
-		"""Check if job can be retried"""
-		return self.is_failed() and self.retry_count < self.max_retries
-	
-	def get_duration(self) -> Optional[float]:
-		"""Get job duration in seconds"""
-		if self.started_at and self.completed_at:
-			return (self.completed_at - self.started_at).total_seconds()
-		elif self.started_at:
-			return (datetime.utcnow() - self.started_at).total_seconds()
-		return None
-	
-	def start_job(self, worker_id: str = None) -> None:
-		"""Mark job as started"""
-		self.status = 'running'
-		self.started_at = datetime.utcnow()
-		self.worker_id = worker_id
-		self.progress_percentage = 0.0
-	
-	def update_progress(self, percentage: float, current_step: str = None) -> None:
-		"""Update job progress"""
-		self.progress_percentage = min(100.0, max(0.0, percentage))
-		if current_step:
-			self.current_step = current_step
-	
-	def complete_job(self, output_data: Dict[str, Any] = None, 
-					 output_files: List[str] = None) -> None:
-		"""Mark job as completed with results"""
-		self.status = 'completed'
-		self.completed_at = datetime.utcnow()
-		self.progress_percentage = 100.0
+	def calculate_efficiency_score(self) -> float:
+		"""Calculate overall system efficiency score"""
+		factors = []
 		
-		if output_data:
-			self.output_data = output_data
+		# Success rate factor
+		factors.append(self.success_rate)
 		
-		if output_files:
-			self.output_files = output_files
+		# Processing speed factor
+		if self.processing_speed_multiplier > 0:
+			speed_score = min(100, self.processing_speed_multiplier * 10)
+			factors.append(speed_score)
 		
-		if self.started_at:
-			self.processing_time_seconds = (self.completed_at - self.started_at).total_seconds()
+		# Uptime factor
+		factors.append(self.uptime_percentage)
+		
+		# Quality factor
+		factors.append(self.average_quality_score)
+		
+		return sum(factors) / len(factors) if factors else 0.0
 	
-	def fail_job(self, error_message: str, error_code: str = None, 
-				 error_details: Dict[str, Any] = None) -> None:
-		"""Mark job as failed with error information"""
-		self.status = 'failed'
-		self.completed_at = datetime.utcnow()
-		self.error_message = error_message
-		self.error_code = error_code
-		self.error_details = error_details or {}
-		
-		if self.started_at:
-			self.processing_time_seconds = (self.completed_at - self.started_at).total_seconds()
+	def get_cost_per_minute(self) -> Decimal:
+		"""Calculate cost per minute of audio processed"""
+		if self.total_audio_processed > 0:
+			return self.total_processing_cost / Decimal(str(self.total_audio_processed / 60))
+		return Decimal("0.00")
 	
-	def retry_job(self) -> None:
-		"""Prepare job for retry"""
-		if not self.can_retry():
-			raise ValueError("Job cannot be retried")
-		
-		self.retry_count += 1
-		self.status = 'pending'
-		self.started_at = None
-		self.completed_at = None
-		self.progress_percentage = 0.0
-		self.current_step = None
-		self.error_message = None
-		self.error_code = None
-		self.error_details = {}
-	
-	def cancel_job(self, reason: str = None) -> None:
-		"""Cancel job"""
-		if self.status in ['completed', 'failed', 'cancelled']:
-			return  # Cannot cancel already finished jobs
-		
-		self.status = 'cancelled'
-		self.completed_at = datetime.utcnow()
-		
-		if reason:
-			self.error_message = f"Job cancelled: {reason}"
-		
-		if self.started_at:
-			self.processing_time_seconds = (self.completed_at - self.started_at).total_seconds()
-	
-	def add_log_entry(self, message: str, level: str = 'info') -> None:
-		"""Add entry to processing log"""
-		timestamp = datetime.utcnow().isoformat()
-		log_entry = f"[{timestamp}] [{level.upper()}] {message}\n"
-		
-		if self.processing_log:
-			self.processing_log += log_entry
-		else:
-			self.processing_log = log_entry
-	
-	def get_estimated_completion_time(self) -> Optional[datetime]:
-		"""Estimate completion time based on progress"""
-		if not self.started_at or self.progress_percentage <= 0:
-			return None
-		
-		elapsed = (datetime.utcnow() - self.started_at).total_seconds()
-		estimated_total = elapsed / (self.progress_percentage / 100)
-		remaining = estimated_total - elapsed
-		
-		return datetime.utcnow() + timedelta(seconds=remaining)
+	def get_usage_summary(self) -> dict[str, Any]:
+		"""Get comprehensive usage summary"""
+		return {
+			'period': f"{self.period_start.isoformat()} to {self.period_end.isoformat()}",
+			'jobs': {
+				'total': self.total_jobs_processed,
+				'transcription': self.transcription_jobs,
+				'synthesis': self.synthesis_jobs,
+				'analysis': self.analysis_jobs,
+				'enhancement': self.enhancement_jobs
+			},
+			'performance': {
+				'avg_processing_time': self.average_processing_time,
+				'speed_multiplier': self.processing_speed_multiplier,
+				'success_rate': self.success_rate,
+				'efficiency_score': self.calculate_efficiency_score()
+			},
+			'users': {
+				'active': self.active_users,
+				'new': self.new_users,
+				'sessions': self.session_count,
+				'avg_session_duration': self.average_session_duration
+			},
+			'costs': {
+				'total': str(self.total_processing_cost),
+				'per_minute': str(self.get_cost_per_minute()),
+				'per_job': str(self.total_processing_cost / max(1, self.total_jobs_processed))
+			}
+		}

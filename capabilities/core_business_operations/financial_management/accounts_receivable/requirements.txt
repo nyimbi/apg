@@ -1,0 +1,69 @@
+# APG Accounts Receivable - Production Requirements
+# Core production dependencies for the AR capability
+
+# Web Framework and API
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+flask-appbuilder==4.3.11
+flask==2.3.3
+werkzeug==2.3.7
+
+# Database
+asyncpg==0.29.0
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# Data Validation and Serialization
+pydantic==2.5.0
+pydantic[email]==2.5.0
+
+# Authentication and Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Caching and Session Management
+redis==5.0.1
+hiredis==2.2.3
+
+# HTTP Client
+httpx==0.25.2
+aiohttp==3.9.1
+
+# UUID Extensions
+uuid-extensions==0.1.2
+
+# Date and Time
+python-dateutil==2.8.2
+
+# Async Support
+asyncio-mqtt==0.16.1
+
+# Performance Monitoring
+psutil==5.9.6
+
+# Logging and Monitoring
+structlog==23.2.0
+
+# Configuration Management
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# APG Platform Integration (these would be internal packages)
+# apg-auth-rbac>=1.0.0
+# apg-audit-compliance>=1.0.0
+# apg-federated-learning>=1.0.0
+# apg-ai-orchestration>=1.0.0
+# apg-time-series-analytics>=1.0.0
+# apg-notification-engine>=1.0.0
+# apg-document-management>=1.0.0
+# apg-business-intelligence>=1.0.0
+
+# Production WSGI Server
+gunicorn==21.2.0
+
+# JSON and Data Processing
+orjson==3.9.10
+
+# Type Checking (runtime)
+typing-extensions==4.8.0

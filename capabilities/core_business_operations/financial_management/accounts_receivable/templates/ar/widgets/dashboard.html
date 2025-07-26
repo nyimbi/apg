@@ -1,0 +1,533 @@
+{% extends "appbuilder/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Dashboard Header -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="page-header">
+                <h1>
+                    <i class="fa fa-dashboard"></i> {{ _("Accounts Receivable Dashboard") }}
+                    <small>{{ _("Real-time AR insights with AI-powered analytics") }}</small>
+                </h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics Row -->
+    <div class="row">
+        <!-- Total AR Balance -->
+        <div class="col-lg-3 col-md-6">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3">
+                            <i class="fa fa-dollar fa-5x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge" id="total-ar-balance">$0.00</div>
+                            <div>{{ _("Total AR Balance") }}</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="{{ url_for('ARCustomerModelView.list') }}">
+                    <div class="panel-footer">
+                        <span class="pull-left">{{ _("View Details") }}</span>
+                        <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
+                        <div class="clearfix"></div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Overdue Amount -->
+        <div class="col-lg-3 col-md-6">
+            <div class="panel panel-red">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3">
+                            <i class="fa fa-exclamation-triangle fa-5x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge" id="overdue-amount">$0.00</div>
+                            <div>{{ _("Overdue Amount") }}</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="{{ url_for('ARInvoiceModelView.list') }}?status=OVERDUE">
+                    <div class="panel-footer">
+                        <span class="pull-left">{{ _("View Overdue") }}</span>
+                        <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
+                        <div class="clearfix"></div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- AI Credit Assessments -->
+        <div class="col-lg-3 col-md-6">
+            <div class="panel panel-yellow">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3">
+                            <i class="fa fa-calculator fa-5x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge" id="ai-assessments-today">0</div>
+                            <div>{{ _("AI Assessments Today") }}</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="/ar/credit-assessment">
+                    <div class="panel-footer">
+                        <span class="pull-left">{{ _("View AI Tools") }}</span>
+                        <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
+                        <div class="clearfix"></div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Collections Success Rate -->
+        <div class="col-lg-3 col-md-6">
+            <div class="panel panel-green">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3">
+                            <i class="fa fa-phone fa-5x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge" id="collections-success-rate">0%</div>
+                            <div>{{ _("Collections Success") }}</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="/ar/collections-optimization">
+                    <div class="panel-footer">
+                        <span class="pull-left">{{ _("View Collections") }}</span>
+                        <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
+                        <div class="clearfix"></div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- AR Aging Chart -->
+        <div class="col-lg-8">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-bar-chart-o fa-fw"></i> {{ _("AR Aging Analysis") }}
+                    <div class="pull-right">
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown">
+                                {{ _("Actions") }}
+                                <span class="caret"></span>
+                            </button>
+                            <ul class="dropdown-menu pull-right" role="menu">
+                                <li><a href="#" id="refresh-aging">{{ _("Refresh Data") }}</a></li>
+                                <li><a href="#" id="export-aging">{{ _("Export Chart") }}</a></li>
+                                <li class="divider"></li>
+                                <li><a href="{{ url_for('ar_aging_report') }}">{{ _("Full Report") }}</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <canvas id="aging-chart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="col-lg-4">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-clock-o fa-fw"></i> {{ _("Recent Activity") }}
+                </div>
+                <div class="panel-body">
+                    <div class="list-group" id="recent-activity-list">
+                        <!-- Dynamic content loaded via AJAX -->
+                    </div>
+                    <a href="{{ url_for('ar_activity_feed') }}" class="btn btn-default btn-block">
+                        {{ _("View All Activity") }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Insights Row -->
+    <div class="row">
+        <!-- Cash Flow Forecast -->
+        <div class="col-lg-6">
+            <div class="panel panel-info">
+                <div class="panel-heading">
+                    <i class="fa fa-crystal-ball fa-fw"></i> {{ _("AI Cash Flow Forecast") }}
+                    <span class="label label-info pull-right">{{ _("30-Day Outlook") }}</span>
+                </div>
+                <div class="panel-body">
+                    <canvas id="cashflow-chart" width="400" height="200"></canvas>
+                    <div class="row text-center" style="margin-top: 20px;">
+                        <div class="col-xs-4">
+                            <h4 id="forecast-optimistic">$0</h4>
+                            <p class="text-success">{{ _("Optimistic") }}</p>
+                        </div>
+                        <div class="col-xs-4">
+                            <h4 id="forecast-realistic">$0</h4>
+                            <p class="text-info">{{ _("Realistic") }}</p>
+                        </div>
+                        <div class="col-xs-4">
+                            <h4 id="forecast-pessimistic">$0</h4>
+                            <p class="text-warning">{{ _("Pessimistic") }}</p>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <a href="/ar/cash-flow-forecast" class="btn btn-info">
+                            {{ _("Detailed Forecast") }}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collections Recommendations -->
+        <div class="col-lg-6">
+            <div class="panel panel-warning">
+                <div class="panel-heading">
+                    <i class="fa fa-lightbulb-o fa-fw"></i> {{ _("AI Collections Recommendations") }}
+                    <span class="label label-warning pull-right">{{ _("Smart Insights") }}</span>
+                </div>
+                <div class="panel-body">
+                    <div id="collections-recommendations">
+                        <!-- Dynamic content loaded via AJAX -->
+                    </div>
+                    <div class="text-center" style="margin-top: 20px;">
+                        <a href="/ar/collections-optimization" class="btn btn-warning">
+                            {{ _("Optimize Collections") }}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Items Row -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-tasks fa-fw"></i> {{ _("Priority Action Items") }}
+                </div>
+                <div class="panel-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="action-items-table">
+                            <thead>
+                                <tr>
+                                    <th>{{ _("Priority") }}</th>
+                                    <th>{{ _("Customer") }}</th>
+                                    <th>{{ _("Action Required") }}</th>
+                                    <th>{{ _("Amount") }}</th>
+                                    <th>{{ _("Due Date") }}</th>
+                                    <th>{{ _("AI Recommendation") }}</th>
+                                    <th>{{ _("Actions") }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="action-items-body">
+                                <!-- Dynamic content loaded via AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+var agingChart, cashflowChart;
+
+$(document).ready(function() {
+    // Load dashboard data
+    loadDashboardMetrics();
+    loadAgingChart();
+    loadCashFlowForecast();
+    loadRecentActivity();
+    loadCollectionsRecommendations();
+    loadActionItems();
+    
+    // Set up auto-refresh every 5 minutes
+    setInterval(function() {
+        loadDashboardMetrics();
+        loadRecentActivity();
+    }, 300000);
+});
+
+function loadDashboardMetrics() {
+    $.ajax({
+        url: '/api/ar/analytics/dashboard',
+        method: 'GET',
+        success: function(response) {
+            var data = response.data;
+            $('#total-ar-balance').text('$' + formatCurrency(data.total_ar_balance));
+            $('#overdue-amount').text('$' + formatCurrency(data.overdue_amount));
+            $('#ai-assessments-today').text(data.ai_assessments_today);
+            $('#collections-success-rate').text(data.collections_success_rate + '%');
+        },
+        error: function(xhr) {
+            console.error('Error loading dashboard metrics:', xhr);
+        }
+    });
+}
+
+function loadAgingChart() {
+    $.ajax({
+        url: '/api/ar/analytics/aging-analysis',
+        method: 'GET',
+        success: function(response) {
+            var data = response.data;
+            
+            var ctx = document.getElementById('aging-chart').getContext('2d');
+            agingChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Current', '1-30 Days', '31-60 Days', '61-90 Days', '90+ Days'],
+                    datasets: [{
+                        label: '{{ _("Amount") }}',
+                        data: [
+                            data.current,
+                            data.days_1_30,
+                            data.days_31_60,
+                            data.days_61_90,
+                            data.days_90_plus
+                        ],
+                        backgroundColor: [
+                            '#5cb85c',
+                            '#f0ad4e',
+                            '#d9534f',
+                            '#d9534f',
+                            '#d9534f'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + formatCurrency(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+}
+
+function loadCashFlowForecast() {
+    $.ajax({
+        url: '/api/ar/analytics/cashflow-forecast',
+        method: 'POST',
+        data: JSON.stringify({
+            forecast_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            scenario_type: 'comparison'
+        }),
+        contentType: 'application/json',
+        success: function(response) {
+            var data = response.data;
+            
+            $('#forecast-optimistic').text('$' + formatCurrency(data.optimistic_total));
+            $('#forecast-realistic').text('$' + formatCurrency(data.realistic_total));
+            $('#forecast-pessimistic').text('$' + formatCurrency(data.pessimistic_total));
+            
+            var ctx = document.getElementById('cashflow-chart').getContext('2d');
+            cashflowChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.realistic_forecast.map(function(point) {
+                        return new Date(point.forecast_date).toLocaleDateString();
+                    }),
+                    datasets: [
+                        {
+                            label: '{{ _("Optimistic") }}',
+                            data: data.optimistic_forecast.map(f => f.total_cash_flow),
+                            borderColor: '#5cb85c',
+                            backgroundColor: 'rgba(92, 184, 92, 0.1)',
+                            fill: false
+                        },
+                        {
+                            label: '{{ _("Realistic") }}',
+                            data: data.realistic_forecast.map(f => f.total_cash_flow),
+                            borderColor: '#5bc0de',
+                            backgroundColor: 'rgba(91, 192, 222, 0.1)',
+                            fill: false
+                        },
+                        {
+                            label: '{{ _("Pessimistic") }}',
+                            data: data.pessimistic_forecast.map(f => f.total_cash_flow),
+                            borderColor: '#f0ad4e',
+                            backgroundColor: 'rgba(240, 173, 78, 0.1)',
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + formatCurrency(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+}
+
+function loadRecentActivity() {
+    $.ajax({
+        url: '/api/ar/analytics/recent-activity',
+        method: 'GET',
+        success: function(response) {
+            var activities = response.data;
+            var html = '';
+            
+            activities.forEach(function(activity) {
+                var iconClass = getActivityIcon(activity.type);
+                var timeAgo = moment(activity.timestamp).fromNow();
+                
+                html += '<a href="#" class="list-group-item">';
+                html += '<i class="fa ' + iconClass + ' fa-fw"></i> ';
+                html += activity.description;
+                html += '<span class="pull-right text-muted small"><em>' + timeAgo + '</em></span>';
+                html += '</a>';
+            });
+            
+            $('#recent-activity-list').html(html);
+        }
+    });
+}
+
+function loadCollectionsRecommendations() {
+    $.ajax({
+        url: '/api/ar/collections/ai-recommendations',
+        method: 'GET',
+        success: function(response) {
+            var recommendations = response.data;
+            var html = '';
+            
+            recommendations.forEach(function(rec) {
+                html += '<div class="alert alert-' + rec.priority_class + ' alert-dismissible">';
+                html += '<i class="fa ' + rec.icon + '"></i> ';
+                html += '<strong>' + rec.title + '</strong><br>';
+                html += rec.description;
+                html += '<div class="pull-right">';
+                html += '<button class="btn btn-xs btn-' + rec.priority_class + '" onclick="executeRecommendation(\'' + rec.id + '\')">';
+                html += '{{ _("Execute") }}</button>';
+                html += '</div>';
+                html += '<div class="clearfix"></div>';
+                html += '</div>';
+            });
+            
+            $('#collections-recommendations').html(html);
+        }
+    });
+}
+
+function loadActionItems() {
+    $.ajax({
+        url: '/api/ar/analytics/action-items',
+        method: 'GET',
+        success: function(response) {
+            var items = response.data;
+            var html = '';
+            
+            items.forEach(function(item) {
+                html += '<tr>';
+                html += '<td><span class="label label-' + item.priority_class + '">' + item.priority + '</span></td>';
+                html += '<td>' + item.customer_name + '</td>';
+                html += '<td>' + item.action_required + '</td>';
+                html += '<td class="text-right">$' + formatCurrency(item.amount) + '</td>';
+                html += '<td>' + formatDate(item.due_date) + '</td>';
+                html += '<td><small>' + item.ai_recommendation + '</small></td>';
+                html += '<td>';
+                html += '<div class="btn-group btn-group-xs">';
+                html += '<button class="btn btn-primary" onclick="executeAction(\'' + item.id + '\')">';
+                html += '<i class="fa fa-play"></i></button>';
+                html += '<button class="btn btn-info" onclick="viewActionDetails(\'' + item.id + '\')">';
+                html += '<i class="fa fa-eye"></i></button>';
+                html += '</div>';
+                html += '</td>';
+                html += '</tr>';
+            });
+            
+            $('#action-items-body').html(html);
+        }
+    });
+}
+
+// Utility functions
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(amount);
+}
+
+function formatDate(dateStr) {
+    return new Date(dateStr).toLocaleDateString();
+}
+
+function getActivityIcon(type) {
+    var icons = {
+        'invoice_created': 'fa-file-text',
+        'payment_received': 'fa-money',
+        'credit_assessment': 'fa-calculator',
+        'collection_activity': 'fa-phone',
+        'customer_created': 'fa-user-plus',
+        'invoice_overdue': 'fa-exclamation-triangle'
+    };
+    return icons[type] || 'fa-info-circle';
+}
+
+function executeRecommendation(recId) {
+    // Implementation for executing AI recommendations
+    alert('{{ _("Executing recommendation") }}: ' + recId);
+}
+
+function executeAction(actionId) {
+    // Implementation for executing priority actions
+    alert('{{ _("Executing action") }}: ' + actionId);
+}
+
+function viewActionDetails(actionId) {
+    // Implementation for viewing action details
+    alert('{{ _("Viewing action details") }}: ' + actionId);
+}
+</script>
+{% endblock %}

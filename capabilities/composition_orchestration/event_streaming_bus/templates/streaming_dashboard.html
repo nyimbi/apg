@@ -1,0 +1,318 @@
+{% extends "appbuilder/base.html" %}
+
+{% block title %}{{ title }} - APG Event Streaming Bus{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.metric-value {
+    font-size: 2.5em;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.metric-label {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.status-active { background-color: #28a745; }
+.status-paused { background-color: #ffc107; }
+.status-error { background-color: #dc3545; }
+
+.event-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.event-item {
+    border-left: 4px solid #007bff;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #f8f9fa;
+    border-radius: 0 5px 5px 0;
+}
+
+.live-indicator {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.chart-container {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row">
+        <div class="col-12">
+            <h1 class="page-header">
+                <i class="fa fa-dashboard"></i> {{ title }}
+                <small class="live-indicator">
+                    <i class="fa fa-circle text-success"></i> Live
+                </small>
+            </h1>
+        </div>
+    </div>
+
+    <!-- Key Metrics Cards -->
+    <div class="row">
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="metric-card">
+                <div class="metric-value">{{ stats.total_streams }}</div>
+                <div class="metric-label">Total Streams</div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="metric-card">
+                <div class="metric-value">{{ stats.active_streams }}</div>
+                <div class="metric-label">Active Streams</div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="metric-card">
+                <div class="metric-value">{{ stats.total_subscriptions }}</div>
+                <div class="metric-label">Subscriptions</div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="metric-card">
+                <div class="metric-value">{{ stats.active_subscriptions }}</div>
+                <div class="metric-label">Active Subs</div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="metric-card">
+                <div class="metric-value">{{ stats.total_consumer_groups }}</div>
+                <div class="metric-label">Consumer Groups</div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="metric-card">
+                <div class="metric-value">{{ stats.events_today }}</div>
+                <div class="metric-label">Events Today</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Charts -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="chart-container">
+                <h4><i class="fa fa-chart-line"></i> Events Per Second</h4>
+                <canvas id="eventsChart" height="100"></canvas>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="chart-container">
+                <h4><i class="fa fa-pie-chart"></i> Stream Status</h4>
+                <canvas id="streamStatusChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Events and Stream Health -->
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="chart-container">
+                <h4>
+                    <i class="fa fa-list"></i> Recent Events
+                    <small class="pull-right">
+                        <a href="/dashboard/event_browser" class="btn btn-sm btn-primary">
+                            <i class="fa fa-search"></i> Browse All
+                        </a>
+                    </small>
+                </h4>
+                <div class="event-list">
+                    {% for event in recent_events %}
+                    <div class="event-item">
+                        <strong>{{ event.event_type }}</strong>
+                        <span class="pull-right text-muted">{{ event.timestamp.strftime('%H:%M:%S') }}</span>
+                        <br>
+                        <small class="text-muted">
+                            {{ event.source_capability }} → {{ event.stream_id }}
+                        </small>
+                        <br>
+                        <small>
+                            <span class="status-indicator status-{{ event.status.replace('_', '-') }}"></span>
+                            {{ event.status.title() }}
+                        </small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="chart-container">
+                <h4>
+                    <i class="fa fa-heartbeat"></i> Stream Health
+                    <small class="pull-right">
+                        <a href="/dashboard/stream_topology" class="btn btn-sm btn-info">
+                            <i class="fa fa-project-diagram"></i> Topology
+                        </a>
+                    </small>
+                </h4>
+                <div id="streamHealthContainer">
+                    <!-- Stream health widgets will be dynamically loaded -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="chart-container">
+                <h4><i class="fa fa-bolt"></i> Quick Actions</h4>
+                <div class="btn-group" role="group">
+                    <a href="/eventstreamview/add" class="btn btn-success">
+                        <i class="fa fa-plus"></i> Create Stream
+                    </a>
+                    <a href="/subscriptionview/add" class="btn btn-primary">
+                        <i class="fa fa-rss"></i> Create Subscription
+                    </a>
+                    <a href="/consumerGroupview/add" class="btn btn-info">
+                        <i class="fa fa-users"></i> Create Consumer Group
+                    </a>
+                    <a href="/schemaview/add" class="btn btn-warning">
+                        <i class="fa fa-code"></i> Register Schema
+                    </a>
+                </div>
+                <div class="btn-group pull-right" role="group">
+                    <a href="/metricsview/" class="btn btn-outline-secondary">
+                        <i class="fa fa-chart-bar"></i> View Metrics
+                    </a>
+                    <a href="/eventstreamview/" class="btn btn-outline-secondary">
+                        <i class="fa fa-stream"></i> Manage Streams
+                    </a>
+                    <a href="/subscriptionview/" class="btn btn-outline-secondary">
+                        <i class="fa fa-rss"></i> Manage Subscriptions
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Events per second chart
+const eventsCtx = document.getElementById('eventsChart').getContext('2d');
+const eventsChart = new Chart(eventsCtx, {
+    type: 'line',
+    data: {
+        labels: [{% for metric in stream_metrics %}'{{ metric.time_bucket.strftime("%H:%M") }}'{% if not loop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+            label: 'Events/sec',
+            data: [{% for metric in stream_metrics %}{{ metric.metric_value }}{% if not loop.last %},{% endif %}{% endfor %}],
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Stream status pie chart
+const statusCtx = document.getElementById('streamStatusChart').getContext('2d');
+const streamStatusChart = new Chart(statusCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Active', 'Paused', 'Error'],
+        datasets: [{
+            data: [{{ stats.active_streams }}, 0, 0], // Would get real status counts
+            backgroundColor: ['#28a745', '#ffc107', '#dc3545']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+});
+
+// Auto-refresh dashboard data
+function refreshDashboard() {
+    fetch('/dashboard/api/live_metrics')
+        .then(response => response.json())
+        .then(data => {
+            // Update metrics displays
+            updateMetrics(data);
+        })
+        .catch(error => {
+            console.error('Error fetching live metrics:', error);
+        });
+}
+
+function updateMetrics(data) {
+    // Update charts with new data
+    if (data.events_per_second !== undefined) {
+        eventsChart.data.datasets[0].data.push(data.events_per_second);
+        eventsChart.data.labels.push(new Date().toLocaleTimeString());
+        
+        // Keep only last 20 data points
+        if (eventsChart.data.datasets[0].data.length > 20) {
+            eventsChart.data.datasets[0].data.shift();
+            eventsChart.data.labels.shift();
+        }
+        
+        eventsChart.update('none');
+    }
+    
+    // Update stream status chart
+    if (data.stream_status) {
+        streamStatusChart.data.datasets[0].data = [
+            data.stream_status.active,
+            data.stream_status.paused,
+            data.stream_status.error
+        ];
+        streamStatusChart.update('none');
+    }
+}
+
+// Refresh every 5 seconds
+setInterval(refreshDashboard, 5000);
+
+// Initial load
+refreshDashboard();
+</script>
+{% endblock %}

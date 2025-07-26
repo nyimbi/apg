@@ -1,0 +1,533 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.service-mesh-dashboard {
+  padding: 20px;
+}
+
+.metric-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+  border-left: 4px solid #3498db;
+}
+
+.metric-card.success { border-left-color: #27ae60; }
+.metric-card.warning { border-left-color: #f39c12; }
+.metric-card.danger { border-left-color: #e74c3c; }
+
+.metric-value {
+  font-size: 2.5em;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.metric-label {
+  color: #7f8c8d;
+  font-size: 0.9em;
+  text-transform: uppercase;
+}
+
+.service-status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.status-healthy { background-color: #d4edda; color: #155724; }
+.status-unhealthy { background-color: #f8d7da; color: #721c24; }
+.status-degraded { background-color: #fff3cd; color: #856404; }
+
+.chart-container {
+  height: 300px;
+  margin: 20px 0;
+}
+
+.topology-preview {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  min-height: 200px;
+}
+
+.quick-actions {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 20px;
+}
+
+.quick-actions .btn {
+  margin: 5px;
+}
+
+.alert-item {
+  padding: 10px;
+  border-left: 4px solid;
+  margin-bottom: 10px;
+  background: #f8f9fa;
+}
+
+.alert-critical { border-left-color: #dc3545; }
+.alert-warning { border-left-color: #ffc107; }
+.alert-info { border-left-color: #17a2b8; }
+
+.refresh-indicator {
+  display: none;
+  color: #28a745;
+}
+
+.refresh-indicator.active {
+  display: inline-block;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="service-mesh-dashboard">
+  <div class="row">
+    <div class="col-md-12">
+      <h1>
+        <i class="fa fa-sitemap"></i> Service Mesh Dashboard
+        <small class="pull-right">
+          <i class="fa fa-sync refresh-indicator" id="refreshIndicator"></i>
+          Last updated: <span id="lastUpdated">{{ moment().format('HH:mm:ss') }}</span>
+        </small>
+      </h1>
+    </div>
+  </div>
+
+  <!-- Key Metrics Row -->
+  <div class="row">
+    <div class="col-md-3">
+      <div class="metric-card success">
+        <div class="metric-value" id="totalServices">{{ dashboard_data.total_services }}</div>
+        <div class="metric-label">Total Services</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="metric-card success">
+        <div class="metric-value" id="healthyServices">{{ dashboard_data.healthy_services }}</div>
+        <div class="metric-label">Healthy Services</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="metric-card">
+        <div class="metric-value" id="requestsToday">{{ dashboard_data.total_requests_today | number_format }}</div>
+        <div class="metric-label">Requests Today</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="metric-card" id="errorRateCard">
+        <div class="metric-value" id="errorRate">{{ "%.2f" | format(dashboard_data.error_rate) }}%</div>
+        <div class="metric-label">Error Rate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Traffic Metrics Row -->
+  <div class="row">
+    <div class="col-md-4">
+      <div class="metric-card">
+        <div class="metric-value" id="avgResponseTime">{{ dashboard_data.avg_response_time | round(1) }}ms</div>
+        <div class="metric-label">Avg Response Time</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="metric-card">
+        <div class="metric-value" id="currentRPS">0</div>
+        <div class="metric-label">Current RPS</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="metric-card">
+        <div class="metric-value" id="activeConnections">0</div>
+        <div class="metric-label">Active Connections</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts and Topology Row -->
+  <div class="row">
+    <div class="col-md-8">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">
+            <i class="fa fa-chart-line"></i> Traffic Overview
+            <div class="btn-group pull-right" role="group">
+              <button type="button" class="btn btn-xs btn-default" onclick="setTimeRange('1h')">1H</button>
+              <button type="button" class="btn btn-xs btn-default active" onclick="setTimeRange('6h')">6H</button>
+              <button type="button" class="btn btn-xs btn-default" onclick="setTimeRange('24h')">24H</button>
+              <button type="button" class="btn btn-xs btn-default" onclick="setTimeRange('7d')">7D</button>
+            </div>
+          </h3>
+        </div>
+        <div class="panel-body">
+          <div class="chart-container">
+            <canvas id="trafficChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">
+            <i class="fa fa-project-diagram"></i> Service Topology
+            <a href="{{ url_for('ServiceMeshDashboardView.topology') }}" class="btn btn-xs btn-primary pull-right">
+              View Full Topology
+            </a>
+          </h3>
+        </div>
+        <div class="panel-body">
+          <div class="topology-preview" id="topologyPreview">
+            <i class="fa fa-spinner fa-spin fa-2x"></i>
+            <p>Loading topology...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Services and Alerts Row -->
+  <div class="row">
+    <div class="col-md-6">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">
+            <i class="fa fa-server"></i> Recent Services
+            <a href="{{ url_for('SMServiceView.list') }}" class="btn btn-xs btn-primary pull-right">
+              View All Services
+            </a>
+          </h3>
+        </div>
+        <div class="panel-body">
+          <div id="recentServices">
+            <div class="text-center">
+              <i class="fa fa-spinner fa-spin"></i> Loading services...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">
+            <i class="fa fa-exclamation-triangle"></i> Recent Alerts
+            <span class="badge" id="alertCount">{{ dashboard_data.recent_alerts | length }}</span>
+          </h3>
+        </div>
+        <div class="panel-body">
+          <div id="recentAlerts">
+            {% if dashboard_data.recent_alerts %}
+              {% for alert in dashboard_data.recent_alerts %}
+                <div class="alert-item alert-{{ alert.severity }}">
+                  <strong>{{ alert.title }}</strong><br>
+                  <small>{{ alert.timestamp | strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                  <p>{{ alert.message }}</p>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="text-muted text-center">
+                <i class="fa fa-check-circle fa-2x"></i>
+                <p>No recent alerts</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions Row -->
+  <div class="row">
+    <div class="col-md-12">
+      <div class="quick-actions">
+        <h4><i class="fa fa-bolt"></i> Quick Actions</h4>
+        <a href="{{ url_for('SMServiceView.add') }}" class="btn btn-success">
+          <i class="fa fa-plus"></i> Register New Service
+        </a>
+        <a href="{{ url_for('SMRouteView.add') }}" class="btn btn-primary">
+          <i class="fa fa-route"></i> Create Route
+        </a>
+        <a href="{{ url_for('SMLoadBalancerView.add') }}" class="btn btn-info">
+          <i class="fa fa-balance-scale"></i> Setup Load Balancer
+        </a>
+        <a href="{{ url_for('SMPolicyView.add') }}" class="btn btn-warning">
+          <i class="fa fa-shield"></i> Create Policy
+        </a>
+        <a href="{{ url_for('ServiceMeshDashboardView.monitoring') }}" class="btn btn-default">
+          <i class="fa fa-monitor"></i> Real-time Monitoring
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Dashboard state
+let currentTimeRange = '6h';
+let trafficChart;
+let refreshInterval;
+
+// Initialize dashboard
+$(document).ready(function() {
+  initializeTrafficChart();
+  loadDashboardData();
+  startAutoRefresh();
+});
+
+// Initialize traffic chart
+function initializeTrafficChart() {
+  const ctx = document.getElementById('trafficChart').getContext('2d');
+  trafficChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Requests/sec',
+        data: [],
+        borderColor: '#3498db',
+        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+        tension: 0.4
+      }, {
+        label: 'Error Rate %',
+        data: [],
+        borderColor: '#e74c3c',
+        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+        tension: 0.4,
+        yAxisID: 'y1'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          grid: {
+            drawOnChartArea: false,
+          },
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top'
+        }
+      }
+    }
+  });
+}
+
+// Load dashboard data
+function loadDashboardData() {
+  $('#refreshIndicator').addClass('active');
+  
+  $.ajax({
+    url: '{{ url_for("ServiceMeshDashboardView.dashboard_data") }}',
+    method: 'GET',
+    success: function(data) {
+      updateMetrics(data);
+      updateCharts(data);
+      updateRecentServices(data.recent_services);
+      updateRecentAlerts(data.recent_alerts);
+      updateTopologyPreview(data.topology_summary);
+      $('#lastUpdated').text(new Date().toLocaleTimeString());
+    },
+    error: function(xhr, status, error) {
+      console.error('Failed to load dashboard data:', error);
+      showNotification('Error loading dashboard data', 'error');
+    },
+    complete: function() {
+      $('#refreshIndicator').removeClass('active');
+    }
+  });
+}
+
+// Update metrics display
+function updateMetrics(data) {
+  $('#totalServices').text(data.services.total);
+  $('#healthyServices').text(data.services.healthy);
+  $('#currentRPS').text(Math.round(data.traffic.requests_per_second));
+  $('#avgResponseTime').text(Math.round(data.traffic.avg_response_time) + 'ms');
+  $('#errorRate').text(data.traffic.error_rate.toFixed(2) + '%');
+  
+  // Update error rate card color
+  const errorRateCard = $('#errorRateCard');
+  errorRateCard.removeClass('success warning danger');
+  if (data.traffic.error_rate < 1) {
+    errorRateCard.addClass('success');
+  } else if (data.traffic.error_rate < 5) {
+    errorRateCard.addClass('warning');
+  } else {
+    errorRateCard.addClass('danger');
+  }
+  
+  // Update alert count
+  $('#alertCount').text(data.alerts.critical + data.alerts.warning + data.alerts.info);
+}
+
+// Update charts
+function updateCharts(data) {
+  if (data.metrics && data.metrics.timeline) {
+    const timeline = data.metrics.timeline;
+    trafficChart.data.labels = timeline.map(t => new Date(t.timestamp).toLocaleTimeString());
+    trafficChart.data.datasets[0].data = timeline.map(t => t.requests_per_second);
+    trafficChart.data.datasets[1].data = timeline.map(t => t.error_rate);
+    trafficChart.update('none');
+  }
+}
+
+// Update recent services
+function updateRecentServices(services) {
+  const container = $('#recentServices');
+  if (!services || services.length === 0) {
+    container.html('<div class="text-muted text-center">No recent services</div>');
+    return;
+  }
+  
+  let html = '';
+  services.forEach(service => {
+    const statusClass = getStatusClass(service.status);
+    const healthClass = getHealthClass(service.health_status);
+    
+    html += `
+      <div class="row" style="margin-bottom: 10px; padding: 10px; border-bottom: 1px solid #eee;">
+        <div class="col-md-8">
+          <strong>${service.service_name}</strong> <small>${service.service_version}</small><br>
+          <small class="text-muted">${service.namespace}</small>
+        </div>
+        <div class="col-md-4 text-right">
+          <span class="service-status status-${statusClass}">${service.status}</span><br>
+          <span class="service-status status-${healthClass}">${service.health_status}</span>
+        </div>
+      </div>
+    `;
+  });
+  
+  container.html(html);
+}
+
+// Update recent alerts
+function updateRecentAlerts(alerts) {
+  const container = $('#recentAlerts');
+  if (!alerts || alerts.length === 0) {
+    container.html(`
+      <div class="text-muted text-center">
+        <i class="fa fa-check-circle fa-2x"></i>
+        <p>No recent alerts</p>
+      </div>
+    `);
+    return;
+  }
+  
+  let html = '';
+  alerts.forEach(alert => {
+    html += `
+      <div class="alert-item alert-${alert.severity}">
+        <strong>${alert.title}</strong><br>
+        <small>${new Date(alert.timestamp).toLocaleString()}</small>
+        <p>${alert.message}</p>
+      </div>
+    `;
+  });
+  
+  container.html(html);
+}
+
+// Update topology preview
+function updateTopologyPreview(topology) {
+  const container = $('#topologyPreview');
+  if (!topology) {
+    container.html('<p class="text-muted">No topology data available</p>');
+    return;
+  }
+  
+  container.html(`
+    <div class="row">
+      <div class="col-xs-6 text-center">
+        <h4>${topology.total_services}</h4>
+        <small>Services</small>
+      </div>
+      <div class="col-xs-6 text-center">
+        <h4>${topology.total_connections}</h4>
+        <small>Connections</small>
+      </div>
+    </div>
+    <hr>
+    <p><i class="fa fa-info-circle"></i> Click "View Full Topology" for interactive graph</p>
+  `);
+}
+
+// Set time range for charts
+function setTimeRange(range) {
+  currentTimeRange = range;
+  $('.btn-group .btn').removeClass('active');
+  $(`button[onclick="setTimeRange('${range}')"]`).addClass('active');
+  loadDashboardData();
+}
+
+// Auto refresh functionality
+function startAutoRefresh() {
+  refreshInterval = setInterval(loadDashboardData, 30000); // Refresh every 30 seconds
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+}
+
+// Utility functions
+function getStatusClass(status) {
+  const statusMap = {
+    'healthy': 'healthy',
+    'unhealthy': 'unhealthy',
+    'degraded': 'degraded',
+    'maintenance': 'degraded'
+  };
+  return statusMap[status] || 'degraded';
+}
+
+function getHealthClass(healthStatus) {
+  const healthMap = {
+    'healthy': 'healthy',
+    'unhealthy': 'unhealthy',
+    'timeout': 'degraded',
+    'connection_failed': 'unhealthy',
+    'unknown': 'degraded'
+  };
+  return healthMap[healthStatus] || 'degraded';
+}
+
+function showNotification(message, type = 'info') {
+  // Implement notification system
+  console.log(`${type.toUpperCase()}: ${message}`);
+}
+
+// Cleanup on page unload
+$(window).on('beforeunload', function() {
+  stopAutoRefresh();
+});
+</script>
+{% endblock %}

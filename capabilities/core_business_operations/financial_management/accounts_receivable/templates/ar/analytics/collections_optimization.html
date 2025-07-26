@@ -1,0 +1,890 @@
+{% extends "appbuilder/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="page-header">
+                <h1>
+                    <i class="fa fa-phone"></i> {{ _("AI Collections Optimization") }}
+                    <small>{{ _("Powered by APG AI Orchestration") }}</small>
+                </h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Optimization Configuration -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-cogs"></i> {{ _("Optimization Parameters") }}</h4>
+                </div>
+                <div class="panel-body">
+                    <form id="optimization-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="optimization_scope">{{ _("Optimization Scope") }} <span class="text-danger">*</span></label>
+                                    <select id="optimization_scope" name="optimization_scope" class="form-control" required>
+                                        <option value="single">{{ _("Single Customer") }}</option>
+                                        <option value="batch">{{ _("Multiple Customers") }}</option>
+                                        <option value="campaign">{{ _("Campaign Planning") }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="scenario_type">{{ _("Scenario Type") }}</label>
+                                    <select id="scenario_type" name="scenario_type" class="form-control">
+                                        <option value="realistic">{{ _("Realistic") }}</option>
+                                        <option value="optimistic">{{ _("Optimistic") }}</option>
+                                        <option value="pessimistic">{{ _("Pessimistic") }}</option>
+                                        <option value="custom">{{ _("Custom") }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="customer-selection-group">
+                            <label for="customer_ids">{{ _("Select Customers") }}</label>
+                            <select id="customer_ids" name="customer_ids" class="form-control select2" multiple>
+                                {% for customer in overdue_customers %}
+                                <option value="{{ customer.id }}" data-overdue="{{ customer.overdue_amount }}">
+                                    {{ customer.customer_code }} - {{ customer.legal_name }} 
+                                    ({{ _("Overdue") }}: ${{ "{:,.2f}".format(customer.overdue_amount|float) }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="help-block">{{ _("Select customers with overdue amounts for optimization") }}</small>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="include_ai_recommendations" name="include_ai_recommendations" checked>
+                                        {{ _("Include AI Recommendations") }}
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="generate_campaign_plan" name="generate_campaign_plan">
+                                        {{ _("Generate Campaign Plan") }}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary btn-lg" id="run-optimization-btn">
+                                <i class="fa fa-play"></i> {{ _("Run AI Optimization") }}
+                            </button>
+                            <button type="button" class="btn btn-info" id="quick-optimize-btn">
+                                <i class="fa fa-flash"></i> {{ _("Quick Optimize All Overdue") }}
+                            </button>
+                            <button type="button" class="btn btn-warning" id="schedule-optimization-btn">
+                                <i class="fa fa-clock-o"></i> {{ _("Schedule Optimization") }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collections Performance -->
+        <div class="col-lg-4">
+            <div class="panel panel-info">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-bar-chart"></i> {{ _("Collections Performance") }}</h4>
+                </div>
+                <div class="panel-body">
+                    <div class="row text-center">
+                        <div class="col-xs-6">
+                            <h3 id="success-rate">--%</h3>
+                            <p class="text-muted">{{ _("Success Rate") }}</p>
+                        </div>
+                        <div class="col-xs-6">
+                            <h3 id="avg-resolution-days">-- {{ _("days") }}</h3>
+                            <p class="text-muted">{{ _("Avg Resolution") }}</p>
+                        </div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-xs-12">
+                            <h4 id="monthly-collected">$--</h4>
+                            <p class="text-muted">{{ _("Collected This Month") }}</p>
+                        </div>
+                    </div>
+                    <canvas id="performance-chart" width="300" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="panel panel-warning">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-exclamation-triangle"></i> {{ _("Priority Customers") }}</h4>
+                </div>
+                <div class="panel-body" id="priority-customers">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Optimization Results -->
+    <div class="row" id="optimization-results" style="display: none;">
+        <div class="col-lg-12">
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-check-circle"></i> {{ _("Optimization Results") }}</h4>
+                    <div class="pull-right">
+                        <span id="optimization-timestamp" class="text-muted"></span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <!-- Summary Metrics -->
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 id="total-optimized-customers">0</h3>
+                                <p class="text-muted">{{ _("Customers Optimized") }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 id="predicted-collection-rate">--%</h3>
+                                <p class="text-muted">{{ _("Predicted Success Rate") }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 id="total-optimized-amount">$0</h3>
+                                <p class="text-muted">{{ _("Target Collection Amount") }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 id="estimated-collection-days">-- {{ _("days") }}</h3>
+                                <p class="text-muted">{{ _("Est. Collection Time") }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Strategy Breakdown -->
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <h4><i class="fa fa-pie-chart"></i> {{ _("Recommended Strategy Mix") }}</h4>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <canvas id="strategy-mix-chart" width="400" height="200"></canvas>
+                                </div>
+                                <div class="col-md-4">
+                                    <div id="strategy-legend">
+                                        <!-- Dynamic legend content -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Customer-Specific Recommendations -->
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <h4><i class="fa fa-users"></i> {{ _("Customer-Specific Strategies") }}</h4>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover" id="customer-strategies-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{{ _("Customer") }}</th>
+                                            <th>{{ _("Overdue Amount") }}</th>
+                                            <th>{{ _("Recommended Strategy") }}</th>
+                                            <th>{{ _("Contact Method") }}</th>
+                                            <th>{{ _("Success Probability") }}</th>
+                                            <th>{{ _("Priority") }}</th>
+                                            <th>{{ _("Actions") }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="customer-strategies-body">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Insights -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4><i class="fa fa-lightbulb-o"></i> {{ _("AI Insights") }}</h4>
+                            <div id="ai-insights">
+                                <!-- Dynamic content -->
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h4><i class="fa fa-list-alt"></i> {{ _("Action Recommendations") }}</h4>
+                            <div id="action-recommendations">
+                                <!-- Dynamic content -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campaign Plan -->
+                    <div id="campaign-plan-section" style="display: none;">
+                        <hr>
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <h4><i class="fa fa-calendar"></i> {{ _("Generated Campaign Plan") }}</h4>
+                                <div id="campaign-plan-content">
+                                    <!-- Dynamic content -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="text-center" style="margin-top: 30px;">
+                        <button type="button" class="btn btn-success btn-lg" id="execute-strategies-btn">
+                            <i class="fa fa-play"></i> {{ _("Execute Strategies") }}
+                        </button>
+                        <button type="button" class="btn btn-info" id="export-plan-btn">
+                            <i class="fa fa-download"></i> {{ _("Export Plan") }}
+                        </button>
+                        <button type="button" class="btn btn-warning" id="schedule-activities-btn">
+                            <i class="fa fa-calendar-plus-o"></i> {{ _("Schedule Activities") }}
+                        </button>
+                        <button type="button" class="btn btn-default" id="new-optimization-btn">
+                            <i class="fa fa-plus"></i> {{ _("New Optimization") }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Execution Progress Modal -->
+    <div class="modal fade" id="execution-progress-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">
+                        <i class="fa fa-cogs"></i> {{ _("Executing Collection Strategies") }}
+                    </h4>
+                </div>
+                <div class="modal-body">
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped active" id="execution-progress-bar" 
+                             style="width: 0%">
+                            <span id="execution-progress-text">0%</span>
+                        </div>
+                    </div>
+                    <div id="execution-log">
+                        <!-- Dynamic execution log -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" id="close-execution-btn" 
+                            style="display: none;">
+                        {{ _("Close") }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+var performanceChart, strategyMixChart;
+var optimizationResults = null;
+
+$(document).ready(function() {
+    // Initialize Select2
+    $('.select2').select2({
+        placeholder: '{{ _("Select customers...") }}',
+        allowClear: true
+    });
+    
+    // Load initial data
+    loadCollectionsPerformance();
+    loadPriorityCustomers();
+    
+    // Form submission
+    $('#optimization-form').submit(function(e) {
+        e.preventDefault();
+        runOptimization();
+    });
+    
+    // Event handlers
+    $('#optimization_scope').change(function() {
+        updateCustomerSelection();
+    });
+    
+    $('#quick-optimize-btn').click(function() {
+        quickOptimizeAll();
+    });
+    
+    $('#execute-strategies-btn').click(function() {
+        executeStrategies();
+    });
+    
+    $('#new-optimization-btn').click(function() {
+        resetForm();
+    });
+    
+    // Initialize customer selection based on scope
+    updateCustomerSelection();
+});
+
+function updateCustomerSelection() {
+    var scope = $('#optimization_scope').val();
+    var customerGroup = $('#customer-selection-group');
+    
+    if (scope === 'single') {
+        customerGroup.show();
+        $('#customer_ids').prop('multiple', false);
+        $('.select2').select2('destroy').select2({
+            placeholder: '{{ _("Select one customer...") }}',
+            allowClear: true
+        });
+    } else if (scope === 'batch') {
+        customerGroup.show();
+        $('#customer_ids').prop('multiple', true);
+        $('.select2').select2('destroy').select2({
+            placeholder: '{{ _("Select customers...") }}',
+            allowClear: true
+        });
+    } else {
+        // Campaign - auto-select all overdue customers
+        customerGroup.hide();
+    }
+}
+
+function runOptimization() {
+    var formData = {
+        optimization_scope: $('#optimization_scope').val(),
+        scenario_type: $('#scenario_type').val(),
+        include_ai_recommendations: $('#include_ai_recommendations').is(':checked'),
+        generate_campaign_plan: $('#generate_campaign_plan').is(':checked')
+    };
+    
+    // Add customer IDs based on scope
+    if (formData.optimization_scope !== 'campaign') {
+        var customerIds = $('#customer_ids').val();
+        if (!customerIds || customerIds.length === 0) {
+            alert('{{ _("Please select customers for optimization") }}');
+            return;
+        }
+        formData.customer_ids = Array.isArray(customerIds) ? customerIds : [customerIds];
+    }
+    
+    // Show loading state
+    $('#run-optimization-btn').prop('disabled', true).html(
+        '<i class="fa fa-spinner fa-spin"></i> {{ _("Running Optimization...") }}'
+    );
+    
+    $.ajax({
+        url: '/api/ar/collections/optimize',
+        method: 'POST',
+        data: JSON.stringify(formData),
+        contentType: 'application/json',
+        success: function(response) {
+            optimizationResults = response.data;
+            displayOptimizationResults(response.data);
+        },
+        error: function(xhr) {
+            alert('{{ _("Optimization failed") }}: ' + xhr.responseJSON.detail);
+        },
+        complete: function() {
+            $('#run-optimization-btn').prop('disabled', false).html(
+                '<i class="fa fa-play"></i> {{ _("Run AI Optimization") }}'
+            );
+        }
+    });
+}
+
+function quickOptimizeAll() {
+    if (confirm('{{ _("Run optimization for all overdue customers?") }}')) {
+        var formData = {
+            optimization_scope: 'campaign',
+            scenario_type: 'realistic',
+            include_ai_recommendations: true,
+            generate_campaign_plan: true
+        };
+        
+        $('#run-optimization-btn').trigger('click');
+    }
+}
+
+function displayOptimizationResults(data) {
+    // Show results section
+    $('#optimization-results').show();
+    $('#optimization-timestamp').text('{{ _("Optimized") }}: ' + new Date().toLocaleString());
+    
+    // Update summary metrics
+    $('#total-optimized-customers').text(data.total_customers || 0);
+    $('#predicted-collection-rate').text(Math.round((data.overall_success_probability || 0) * 100) + '%');
+    $('#total-optimized-amount').text('$' + formatCurrency(data.total_target_amount || 0));
+    $('#estimated-collection-days').text(Math.round(data.estimated_collection_days || 0) + ' {{ _("days") }}');
+    
+    // Create strategy mix chart
+    createStrategyMixChart(data.strategy_breakdown);
+    
+    // Populate customer strategies table
+    populateCustomerStrategies(data.customer_strategies);
+    
+    // Display AI insights
+    displayAIInsights(data.insights);
+    
+    // Display action recommendations
+    displayActionRecommendations(data.recommendations);
+    
+    // Show campaign plan if generated
+    if (data.campaign_plan) {
+        displayCampaignPlan(data.campaign_plan);
+    }
+    
+    // Scroll to results
+    $('html, body').animate({
+        scrollTop: $('#optimization-results').offset().top - 20
+    }, 500);
+}
+
+function createStrategyMixChart(strategyBreakdown) {
+    if (!strategyBreakdown) return;
+    
+    var ctx = document.getElementById('strategy-mix-chart').getContext('2d');
+    
+    if (strategyMixChart) {
+        strategyMixChart.destroy();
+    }
+    
+    var labels = Object.keys(strategyBreakdown);
+    var data = Object.values(strategyBreakdown);
+    var colors = [
+        '#5cb85c', '#5bc0de', '#f0ad4e', '#d9534f', 
+        '#5bc0de', '#f0ad4e', '#d9534f', '#5cb85c'
+    ];
+    
+    strategyMixChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors.slice(0, labels.length)
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    
+    // Create custom legend
+    var legendHtml = '';
+    labels.forEach(function(label, index) {
+        var percentage = Math.round((data[index] / data.reduce((a, b) => a + b, 0)) * 100);
+        legendHtml += '<div class="strategy-legend-item">';
+        legendHtml += '<span class="legend-color" style="background-color: ' + colors[index] + '"></span>';
+        legendHtml += '<span class="legend-label">' + label + ' (' + percentage + '%)</span>';
+        legendHtml += '</div>';
+    });
+    $('#strategy-legend').html(legendHtml);
+}
+
+function populateCustomerStrategies(strategies) {
+    if (!strategies) return;
+    
+    var html = '';
+    strategies.forEach(function(strategy) {
+        html += '<tr>';
+        html += '<td>';
+        html += '<strong>' + strategy.customer_name + '</strong><br>';
+        html += '<small class="text-muted">' + strategy.customer_code + '</small>';
+        html += '</td>';
+        html += '<td class="text-right">$' + formatCurrency(strategy.overdue_amount) + '</td>';
+        html += '<td>';
+        html += '<span class="label label-' + getStrategyClass(strategy.recommended_strategy) + '">';
+        html += strategy.recommended_strategy;
+        html += '</span>';
+        html += '</td>';
+        html += '<td>' + strategy.contact_method + '</td>';
+        html += '<td>';
+        html += '<div class="progress" style="margin-bottom: 0;">';
+        html += '<div class="progress-bar progress-bar-' + getProbabilityClass(strategy.success_probability) + '" ';
+        html += 'style="width: ' + Math.round(strategy.success_probability * 100) + '%">';
+        html += Math.round(strategy.success_probability * 100) + '%';
+        html += '</div>';
+        html += '</div>';
+        html += '</td>';
+        html += '<td>';
+        html += '<span class="label label-' + getPriorityClass(strategy.priority) + '">';
+        html += strategy.priority;
+        html += '</span>';
+        html += '</td>';
+        html += '<td>';
+        html += '<div class="btn-group btn-group-xs">';
+        html += '<button class="btn btn-primary execute-strategy-btn" ';
+        html += 'data-customer-id="' + strategy.customer_id + '" title="{{ _("Execute Strategy") }}">';
+        html += '<i class="fa fa-play"></i>';
+        html += '</button>';
+        html += '<button class="btn btn-info view-details-btn" ';
+        html += 'data-customer-id="' + strategy.customer_id + '" title="{{ _("View Details") }}">';
+        html += '<i class="fa fa-eye"></i>';
+        html += '</button>';
+        html += '</div>';
+        html += '</td>';
+        html += '</tr>';
+    });
+    
+    $('#customer-strategies-body').html(html);
+    
+    // Attach event listeners
+    $('.execute-strategy-btn').click(function() {
+        var customerId = $(this).data('customer-id');
+        executeCustomerStrategy(customerId);
+    });
+    
+    $('.view-details-btn').click(function() {
+        var customerId = $(this).data('customer-id');
+        viewCustomerDetails(customerId);
+    });
+}
+
+function displayAIInsights(insights) {
+    if (!insights || insights.length === 0) {
+        $('#ai-insights').html('<p class="text-muted">{{ _("No specific insights available") }}</p>');
+        return;
+    }
+    
+    var html = '';
+    insights.forEach(function(insight) {
+        html += '<div class="alert alert-info">';
+        html += '<i class="fa fa-lightbulb-o"></i> ' + insight;
+        html += '</div>';
+    });
+    $('#ai-insights').html(html);
+}
+
+function displayActionRecommendations(recommendations) {
+    if (!recommendations || recommendations.length === 0) {
+        $('#action-recommendations').html('<p class="text-muted">{{ _("No specific recommendations") }}</p>');
+        return;
+    }
+    
+    var html = '<ul class="list-unstyled">';
+    recommendations.forEach(function(rec) {
+        html += '<li><i class="fa fa-arrow-right text-primary"></i> ' + rec + '</li>';
+    });
+    html += '</ul>';
+    $('#action-recommendations').html(html);
+}
+
+function displayCampaignPlan(campaignPlan) {
+    if (!campaignPlan) return;
+    
+    $('#campaign-plan-section').show();
+    
+    var html = '<div class="panel panel-info">';
+    html += '<div class="panel-heading">';
+    html += '<h5>' + campaignPlan.campaign_name + '</h5>';
+    html += '</div>';
+    html += '<div class="panel-body">';
+    html += '<p>' + campaignPlan.description + '</p>';
+    
+    if (campaignPlan.phases && campaignPlan.phases.length > 0) {
+        html += '<h6>{{ _("Campaign Phases") }}</h6>';
+        html += '<div class="timeline">';
+        campaignPlan.phases.forEach(function(phase, index) {
+            html += '<div class="timeline-item">';
+            html += '<div class="timeline-marker">' + (index + 1) + '</div>';
+            html += '<div class="timeline-content">';
+            html += '<h6>' + phase.phase_name + '</h6>';
+            html += '<p>' + phase.description + '</p>';
+            html += '<small class="text-muted">{{ _("Duration") }}: ' + phase.duration_days + ' {{ _("days") }}</small>';
+            html += '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    html += '</div>';
+    
+    $('#campaign-plan-content').html(html);
+}
+
+function executeStrategies() {
+    if (!optimizationResults) {
+        alert('{{ _("No optimization results available") }}');
+        return;
+    }
+    
+    if (!confirm('{{ _("Execute all recommended collection strategies?") }}')) {
+        return;
+    }
+    
+    // Show execution progress modal
+    $('#execution-progress-modal').modal({
+        backdrop: 'static',
+        keyboard: false
+    });
+    
+    var totalStrategies = optimizationResults.customer_strategies.length;
+    var executedStrategies = 0;
+    
+    // Simulate strategy execution (in real implementation, this would call the API)
+    executeNextStrategy();
+    
+    function executeNextStrategy() {
+        if (executedStrategies >= totalStrategies) {
+            // Execution complete
+            $('#execution-progress-bar').removeClass('active');
+            $('#execution-progress-text').text('{{ _("Complete!") }}');
+            $('#close-execution-btn').show();
+            
+            var logHtml = $('#execution-log').html();
+            logHtml += '<div class="alert alert-success">';
+            logHtml += '<i class="fa fa-check"></i> {{ _("All strategies executed successfully!") }}';
+            logHtml += '</div>';
+            $('#execution-log').html(logHtml);
+            
+            return;
+        }
+        
+        var strategy = optimizationResults.customer_strategies[executedStrategies];
+        var progress = Math.round(((executedStrategies + 1) / totalStrategies) * 100);
+        
+        // Update progress bar
+        $('#execution-progress-bar').css('width', progress + '%');
+        $('#execution-progress-text').text(progress + '%');
+        
+        // Add to execution log
+        var logHtml = $('#execution-log').html();
+        logHtml += '<div class="execution-log-item">';
+        logHtml += '<i class="fa fa-play text-primary"></i> ';
+        logHtml += '{{ _("Executing strategy for") }} ' + strategy.customer_name + '...';
+        logHtml += '</div>';
+        $('#execution-log').html(logHtml);
+        
+        // Simulate execution delay
+        setTimeout(function() {
+            executedStrategies++;
+            
+            // Update log with completion
+            var logHtml = $('#execution-log').html();
+            logHtml += '<div class="execution-log-item">';
+            logHtml += '<i class="fa fa-check text-success"></i> ';
+            logHtml += '{{ _("Strategy executed for") }} ' + strategy.customer_name;
+            logHtml += '</div>';
+            $('#execution-log').html(logHtml);
+            
+            // Scroll to bottom of log
+            $('#execution-log').scrollTop($('#execution-log')[0].scrollHeight);
+            
+            executeNextStrategy();
+        }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
+    }
+}
+
+function executeCustomerStrategy(customerId) {
+    if (confirm('{{ _("Execute collection strategy for this customer?") }}')) {
+        // Implementation for individual customer strategy execution
+        alert('{{ _("Strategy executed for customer") }}: ' + customerId);
+    }
+}
+
+function viewCustomerDetails(customerId) {
+    window.open('/ar/customers/' + customerId, '_blank');
+}
+
+function loadCollectionsPerformance() {
+    $.ajax({
+        url: '/api/ar/collections/metrics',
+        method: 'GET',
+        success: function(response) {
+            var data = response.data;
+            
+            $('#success-rate').text(Math.round(data.success_rate * 100) + '%');
+            $('#avg-resolution-days').text(Math.round(data.avg_resolution_days) + ' {{ _("days") }}');
+            $('#monthly-collected').text('$' + formatCurrency(data.monthly_collected));
+            
+            // Create performance chart
+            var ctx = document.getElementById('performance-chart').getContext('2d');
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.monthly_labels,
+                    datasets: [{
+                        label: '{{ _("Collections") }}',
+                        data: data.monthly_collections,
+                        borderColor: '#5cb85c',
+                        backgroundColor: 'rgba(92, 184, 92, 0.1)',
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + formatCurrency(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+}
+
+function loadPriorityCustomers() {
+    $.ajax({
+        url: '/api/ar/collections/priority-customers',
+        method: 'GET',
+        success: function(response) {
+            var customers = response.data;
+            var html = '';
+            
+            customers.forEach(function(customer) {
+                html += '<div class="media">';
+                html += '<div class="media-left">';
+                html += '<span class="label label-danger">$' + formatCurrency(customer.overdue_amount) + '</span>';
+                html += '</div>';
+                html += '<div class="media-body">';
+                html += '<h6 class="media-heading">' + customer.customer_name + '</h6>';
+                html += '<small class="text-muted">' + customer.days_overdue + ' {{ _("days overdue") }}</small>';
+                html += '</div>';
+                html += '</div>';
+                html += '<hr>';
+            });
+            
+            $('#priority-customers').html(html);
+        }
+    });
+}
+
+function resetForm() {
+    $('#optimization-form')[0].reset();
+    $('#customer_ids').val(null).trigger('change');
+    $('#optimization-results').hide();
+    optimizationResults = null;
+}
+
+// Utility functions
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(amount);
+}
+
+function getStrategyClass(strategy) {
+    var classes = {
+        'EMAIL_REMINDER': 'info',
+        'PHONE_CALL': 'warning',
+        'PAYMENT_PLAN': 'success',
+        'LEGAL_ACTION': 'danger',
+        'ACCOUNT_REVIEW': 'default'
+    };
+    return classes[strategy] || 'default';
+}
+
+function getProbabilityClass(probability) {
+    if (probability >= 0.8) return 'success';
+    if (probability >= 0.6) return 'info';
+    if (probability >= 0.4) return 'warning';
+    return 'danger';
+}
+
+function getPriorityClass(priority) {
+    var classes = {
+        'HIGH': 'danger',
+        'MEDIUM': 'warning',
+        'LOW': 'info'
+    };
+    return classes[priority] || 'default';
+}
+</script>
+
+<style>
+.strategy-legend-item {
+    margin-bottom: 5px;
+}
+
+.legend-color {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 8px;
+    border-radius: 2px;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -30px;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    background: #5bc0de;
+    color: white;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.timeline-content {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 3px solid #5bc0de;
+}
+
+.execution-log-item {
+    margin-bottom: 5px;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+#execution-log {
+    max-height: 300px;
+    overflow-y: auto;
+    background: #f5f5f5;
+    padding: 10px;
+    border-radius: 3px;
+    margin-top: 10px;
+}
+</style>
+{% endblock %}

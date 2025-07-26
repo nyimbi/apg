@@ -1,0 +1,948 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.css">
+<style>
+  .analytics-dashboard {
+    padding: 20px;
+    background: #f8fafc;
+    min-height: 100vh;
+  }
+  
+  .analytics-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e5e7eb;
+  }
+  
+  .analytics-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .metric-box {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .metric-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: {{ ui_config.primary_color }};
+    margin-bottom: 4px;
+  }
+  
+  .metric-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 500;
+  }
+  
+  .metric-change {
+    font-size: 0.8rem;
+    margin-top: 4px;
+  }
+  
+  .metric-up { color: #16a34a; }
+  .metric-down { color: #dc2626; }
+  .metric-stable { color: #64748b; }
+  
+  .chart-container {
+    position: relative;
+    height: 300px;
+    margin-bottom: 16px;
+  }
+  
+  .chart-large {
+    height: 400px;
+  }
+  
+  .chart-small {
+    height: 200px;
+  }
+  
+  .heatmap-container {
+    display: grid;
+    gap: 2px;
+    margin: 16px 0;
+  }
+  
+  .heatmap-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  
+  .heatmap-day {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .heatmap-day:hover {
+    transform: scale(1.2);
+    border: 2px solid #374151;
+  }
+  
+  .heatmap-0 { background: #f3f4f6; }
+  .heatmap-1 { background: #c7d2fe; }
+  .heatmap-2 { background: #a5b4fc; }
+  .heatmap-3 { background: #818cf8; }
+  .heatmap-4 { background: #6366f1; }
+  .heatmap-5 { background: #4338ca; }
+  
+  .capability-ranking {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .ranking-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  
+  .ranking-position {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: {{ ui_config.primary_color }};
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 16px;
+    font-size: 0.9rem;
+  }
+  
+  .ranking-position.gold {
+    background: linear-gradient(45deg, #fbbf24, #f59e0b);
+  }
+  
+  .ranking-position.silver {
+    background: linear-gradient(45deg, #e5e7eb, #9ca3af);
+  }
+  
+  .ranking-position.bronze {
+    background: linear-gradient(45deg, #d97706, #92400e);
+  }
+  
+  .ranking-info {
+    flex: 1;
+  }
+  
+  .ranking-name {
+    font-weight: 600;
+    color: #374151;
+  }
+  
+  .ranking-category {
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+  
+  .ranking-metrics {
+    text-align: right;
+  }
+  
+  .ranking-score {
+    font-weight: bold;
+    color: {{ ui_config.primary_color }};
+  }
+  
+  .ranking-usage {
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+  
+  .filter-tabs {
+    display: flex;
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 20px;
+  }
+  
+  .filter-tab {
+    flex: 1;
+    padding: 8px 16px;
+    text-align: center;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  
+  .filter-tab.active {
+    background: white;
+    color: {{ ui_config.primary_color }};
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .trend-indicator {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.8rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+  }
+  
+  .trend-up {
+    background: rgba(22, 163, 74, 0.1);
+    color: #16a34a;
+  }
+  
+  .trend-down {
+    background: rgba(220, 38, 38, 0.1);
+    color: #dc2626;
+  }
+  
+  .trend-stable {
+    background: rgba(100, 116, 139, 0.1);
+    color: #64748b;
+  }
+  
+  .performance-gauge {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    margin: 0 auto;
+  }
+  
+  .gauge-bg {
+    fill: none;
+    stroke: #e5e7eb;
+    stroke-width: 10;
+  }
+  
+  .gauge-fill {
+    fill: none;
+    stroke: {{ ui_config.primary_color }};
+    stroke-width: 10;
+    stroke-linecap: round;
+    transition: stroke-dasharray 1s ease;
+  }
+  
+  .gauge-text {
+    text-anchor: middle;
+    dominant-baseline: central;
+    font-size: 1.2rem;
+    font-weight: bold;
+    fill: #374151;
+  }
+  
+  .insight-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  
+  .insight-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+  
+  .insight-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  
+  .insight-description {
+    opacity: 0.9;
+    font-size: 0.9rem;
+  }
+  
+  .date-range-picker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .date-input {
+    padding: 6px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  
+  @media (max-width: {{ ui_config.responsive_breakpoints.tablet }}) {
+    .analytics-dashboard {
+      padding: 10px;
+    }
+    
+    .analytics-card {
+      padding: 16px;
+    }
+    
+    .metric-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .metric-value {
+      font-size: 1.5rem;
+    }
+    
+    .chart-container {
+      height: 250px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="analytics-dashboard">
+  <!-- Page Header -->
+  <div class="analytics-card">
+    <div class="analytics-header">
+      <div>
+        <h1 class="mb-0">
+          <i class="fa fa-bar-chart"></i>
+          Registry Analytics
+        </h1>
+        <p class="text-muted mt-2">
+          Comprehensive insights into capability usage and performance
+        </p>
+      </div>
+      <div class="date-range-picker">
+        <label class="text-muted">Date Range:</label>
+        <input type="date" class="date-input" id="start-date" value="2024-12-01">
+        <span class="text-muted">to</span>
+        <input type="date" class="date-input" id="end-date" value="2025-01-26">
+        <button class="btn btn-primary btn-sm ml-2" id="apply-filter">Apply</button>
+      </div>
+    </div>
+    
+    <!-- Filter Tabs -->
+    <div class="filter-tabs">
+      <div class="filter-tab active" data-period="7d">Last 7 Days</div>
+      <div class="filter-tab" data-period="30d">Last 30 Days</div>
+      <div class="filter-tab" data-period="90d">Last 90 Days</div>
+      <div class="filter-tab" data-period="1y">Last Year</div>
+    </div>
+  </div>
+
+  <!-- Key Metrics -->
+  <div class="analytics-card">
+    <h3 class="mb-3">
+      <i class="fa fa-tachometer"></i>
+      Key Performance Metrics
+    </h3>
+    <div class="metric-grid">
+      <div class="metric-box">
+        <div class="metric-value">1,247</div>
+        <div class="metric-label">Total Usage</div>
+        <div class="metric-change metric-up">
+          <i class="fa fa-arrow-up"></i> +12.5%
+        </div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-value">89.2%</div>
+        <div class="metric-label">Availability</div>
+        <div class="metric-change metric-up">
+          <i class="fa fa-arrow-up"></i> +2.1%
+        </div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-value">145ms</div>
+        <div class="metric-label">Avg Response</div>
+        <div class="metric-change metric-down">
+          <i class="fa fa-arrow-down"></i> -8.7%
+        </div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-value">0.92</div>
+        <div class="metric-label">Quality Score</div>
+        <div class="metric-change metric-stable">
+          <i class="fa fa-minus"></i> 0.0%
+        </div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-value">234</div>
+        <div class="metric-label">Active Users</div>
+        <div class="metric-change metric-up">
+          <i class="fa fa-arrow-up"></i> +18.3%
+        </div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-value">15</div>
+        <div class="metric-label">New Capabilities</div>
+        <div class="metric-change metric-up">
+          <i class="fa fa-arrow-up"></i> +25.0%
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Usage Trends and Performance -->
+  <div class="row">
+    <div class="col-md-8">
+      <div class="analytics-card">
+        <h3 class="mb-3">
+          <i class="fa fa-line-chart"></i>
+          Usage Trends
+        </h3>
+        <div class="chart-container chart-large">
+          <canvas id="usage-trends-chart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="analytics-card">
+        <h3 class="mb-3">
+          <i class="fa fa-pie-chart"></i>
+          Category Distribution
+        </h3>
+        <div class="chart-container">
+          <canvas id="category-distribution-chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance Metrics and Capability Rankings -->
+  <div class="row">
+    <div class="col-md-6">
+      <div class="analytics-card">
+        <h3 class="mb-3">
+          <i class="fa fa-tachometer"></i>
+          Performance Overview
+        </h3>
+        
+        <div class="row">
+          <div class="col-6 text-center">
+            <h5>System Health</h5>
+            <div class="performance-gauge">
+              <svg width="150" height="150">
+                <circle cx="75" cy="75" r="60" class="gauge-bg"></circle>
+                <circle cx="75" cy="75" r="60" class="gauge-fill" id="health-gauge"
+                        stroke-dasharray="0 377" transform="rotate(-90 75 75)"></circle>
+                <text x="75" y="75" class="gauge-text" id="health-text">94%</text>
+              </svg>
+            </div>
+          </div>
+          <div class="col-6 text-center">
+            <h5>Performance Score</h5>
+            <div class="performance-gauge">
+              <svg width="150" height="150">
+                <circle cx="75" cy="75" r="60" class="gauge-bg"></circle>
+                <circle cx="75" cy="75" r="60" class="gauge-fill" id="performance-gauge"
+                        stroke-dasharray="0 377" transform="rotate(-90 75 75)"></circle>
+                <text x="75" y="75" class="gauge-text" id="performance-text">87%</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mt-3">
+          <canvas id="performance-metrics-chart" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6">
+      <div class="analytics-card">
+        <h3 class="mb-3">
+          <i class="fa fa-trophy"></i>
+          Top Performing Capabilities
+        </h3>
+        <div class="capability-ranking">
+          <div class="ranking-item">
+            <div class="ranking-position gold">1</div>
+            <div class="ranking-info">
+              <div class="ranking-name">Authentication & RBAC</div>
+              <div class="ranking-category">Foundation Infrastructure</div>
+            </div>
+            <div class="ranking-metrics">
+              <div class="ranking-score">0.95</div>
+              <div class="ranking-usage">1,456 uses</div>
+            </div>
+          </div>
+          
+          <div class="ranking-item">
+            <div class="ranking-position silver">2</div>
+            <div class="ranking-info">
+              <div class="ranking-name">User Management</div>
+              <div class="ranking-category">Foundation Infrastructure</div>
+            </div>
+            <div class="ranking-metrics">
+              <div class="ranking-score">0.92</div>
+              <div class="ranking-usage">1,247 uses</div>
+            </div>
+          </div>
+          
+          <div class="ranking-item">
+            <div class="ranking-position bronze">3</div>
+            <div class="ranking-info">
+              <div class="ranking-name">Analytics Platform</div>
+              <div class="ranking-category">Analytics & Intelligence</div>
+            </div>
+            <div class="ranking-metrics">
+              <div class="ranking-score">0.88</div>
+              <div class="ranking-usage">892 uses</div>
+            </div>
+          </div>
+          
+          <div class="ranking-item">
+            <div class="ranking-position">4</div>
+            <div class="ranking-info">
+              <div class="ranking-name">Document Management</div>
+              <div class="ranking-category">Business Operations</div>
+            </div>
+            <div class="ranking-metrics">
+              <div class="ranking-score">0.85</div>
+              <div class="ranking-usage">756 uses</div>
+            </div>
+          </div>
+          
+          <div class="ranking-item">
+            <div class="ranking-position">5</div>
+            <div class="ranking-info">
+              <div class="ranking-name">Notification Engine</div>
+              <div class="ranking-category">Foundation Infrastructure</div>
+            </div>
+            <div class="ranking-metrics">
+              <div class="ranking-score">0.83</div>
+              <div class="ranking-usage">634 uses</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Usage Heatmap and AI Insights -->
+  <div class="row">
+    <div class="col-md-8">
+      <div class="analytics-card">
+        <h3 class="mb-3">
+          <i class="fa fa-calendar"></i>
+          Usage Activity Heatmap
+        </h3>
+        <p class="text-muted mb-3">Capability usage patterns over the last 12 weeks</p>
+        
+        <div class="row">
+          <div class="col-2">
+            <div style="font-size: 0.8rem; color: #6b7280; text-align: right; padding-top: 4px;">Mon</div>
+            <div style="font-size: 0.8rem; color: #6b7280; text-align: right; padding-top: 8px;">Wed</div>
+            <div style="font-size: 0.8rem; color: #6b7280; text-align: right; padding-top: 8px;">Fri</div>
+          </div>
+          <div class="col-10">
+            <div class="heatmap-container" id="usage-heatmap">
+              <!-- Heatmap will be generated by JavaScript -->
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <small class="text-muted">Less</small>
+              <div class="d-flex gap-1">
+                <div class="heatmap-day heatmap-0" style="width: 10px; height: 10px;"></div>
+                <div class="heatmap-day heatmap-1" style="width: 10px; height: 10px;"></div>
+                <div class="heatmap-day heatmap-2" style="width: 10px; height: 10px;"></div>
+                <div class="heatmap-day heatmap-3" style="width: 10px; height: 10px;"></div>
+                <div class="heatmap-day heatmap-4" style="width: 10px; height: 10px;"></div>
+                <div class="heatmap-day heatmap-5" style="width: 10px; height: 10px;"></div>
+              </div>
+              <small class="text-muted">More</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4">
+      <div class="analytics-card">
+        <h3 class="mb-3">
+          <i class="fa fa-lightbulb-o"></i>
+          AI Insights
+        </h3>
+        
+        <div class="insight-card">
+          <div class="insight-icon">
+            <i class="fa fa-arrow-up"></i>
+          </div>
+          <div class="insight-title">Usage Surge Detected</div>
+          <div class="insight-description">
+            Analytics Platform usage increased 45% this week, primarily driven by new reporting features.
+          </div>
+        </div>
+        
+        <div class="insight-card">
+          <div class="insight-icon">
+            <i class="fa fa-exclamation-triangle"></i>
+          </div>
+          <div class="insight-title">Performance Alert</div>
+          <div class="insight-description">
+            Document Management response times have increased. Consider scaling or optimization.
+          </div>
+        </div>
+        
+        <div class="insight-card">
+          <div class="insight-icon">
+            <i class="fa fa-star"></i>
+          </div>
+          <div class="insight-title">Quality Improvement</div>
+          <div class="insight-description">
+            Overall system quality score improved by 3% following recent capability updates.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Composition Analytics -->
+  <div class="analytics-card">
+    <h3 class="mb-3">
+      <i class="fa fa-cubes"></i>
+      Composition Analytics
+    </h3>
+    <div class="row">
+      <div class="col-md-6">
+        <canvas id="composition-trends-chart"></canvas>
+      </div>
+      <div class="col-md-6">
+        <canvas id="composition-success-chart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize all charts
+    initializeCharts();
+    
+    // Initialize heatmap
+    generateUsageHeatmap();
+    
+    // Initialize performance gauges
+    animateGauges();
+    
+    // Setup event listeners
+    setupEventListeners();
+});
+
+function initializeCharts() {
+    // Usage Trends Chart
+    const usageTrendsCtx = document.getElementById('usage-trends-chart').getContext('2d');
+    new Chart(usageTrendsCtx, {
+        type: 'line',
+        data: {
+            labels: ['Jan 1', 'Jan 8', 'Jan 15', 'Jan 22', 'Jan 29', 'Feb 5', 'Feb 12'],
+            datasets: [
+                {
+                    label: 'Total Usage',
+                    data: [850, 920, 1100, 980, 1200, 1150, 1247],
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Unique Users',
+                    data: [120, 135, 158, 142, 168, 162, 175],
+                    borderColor: '#16a34a',
+                    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Error Rate',
+                    data: [12, 8, 15, 6, 9, 7, 5],
+                    borderColor: '#dc2626',
+                    backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Usage Count'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Error Rate'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            }
+        }
+    });
+
+    // Category Distribution Chart
+    const categoryCtx = document.getElementById('category-distribution-chart').getContext('2d');
+    new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Foundation', 'Business Ops', 'Analytics', 'Manufacturing', 'Verticals'],
+            datasets: [{
+                data: [12, 15, 8, 7, 5],
+                backgroundColor: [
+                    '#2563eb',
+                    '#16a34a',
+                    '#ea580c',
+                    '#7c3aed',
+                    '#dc2626'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            }
+        }
+    });
+
+    // Performance Metrics Chart
+    const performanceCtx = document.getElementById('performance-metrics-chart').getContext('2d');
+    new Chart(performanceCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Response Time', 'Memory Usage', 'CPU Usage', 'Error Rate'],
+            datasets: [{
+                label: 'Current',
+                data: [145, 67, 23, 2.1],
+                backgroundColor: ['#2563eb', '#16a34a', '#ea580c', '#dc2626']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Composition Trends Chart
+    const compositionTrendsCtx = document.getElementById('composition-trends-chart').getContext('2d');
+    new Chart(compositionTrendsCtx, {
+        type: 'line',
+        data: {
+            labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+            datasets: [{
+                label: 'Compositions Created',
+                data: [5, 8, 12, 15],
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Composition Creation Trends'
+                }
+            }
+        }
+    });
+
+    // Composition Success Chart
+    const compositionSuccessCtx = document.getElementById('composition-success-chart').getContext('2d');
+    new Chart(compositionSuccessCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Successful', 'With Warnings', 'Failed'],
+            datasets: [{
+                data: [85, 12, 3],
+                backgroundColor: ['#16a34a', '#ea580c', '#dc2626']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Composition Validation Results'
+                }
+            }
+        }
+    });
+}
+
+function generateUsageHeatmap() {
+    const heatmapContainer = document.getElementById('usage-heatmap');
+    const weeks = 12;
+    const days = 7;
+    
+    // Generate random usage data for demo
+    for (let week = 0; week < weeks; week++) {
+        const weekDiv = document.createElement('div');
+        weekDiv.className = 'heatmap-week';
+        
+        for (let day = 0; day < days; day++) {
+            const dayDiv = document.createElement('div');
+            const intensity = Math.floor(Math.random() * 6); // 0-5
+            dayDiv.className = `heatmap-day heatmap-${intensity}`;
+            
+            // Add tooltip data
+            const date = new Date();
+            date.setDate(date.getDate() - ((weeks - week - 1) * 7 + (days - day - 1)));
+            dayDiv.title = `${date.toDateString()}: ${intensity * 20} uses`;
+            
+            weekDiv.appendChild(dayDiv);
+        }
+        
+        heatmapContainer.appendChild(weekDiv);
+    }
+}
+
+function animateGauges() {
+    // Animate health gauge
+    animateGauge('health-gauge', 'health-text', 94);
+    
+    // Animate performance gauge  
+    animateGauge('performance-gauge', 'performance-text', 87);
+}
+
+function animateGauge(gaugeId, textId, percentage) {
+    const gauge = document.getElementById(gaugeId);
+    const text = document.getElementById(textId);
+    const circumference = 2 * Math.PI * 60; // radius = 60
+    const offset = circumference - (percentage / 100) * circumference;
+    
+    // Animate stroke-dasharray
+    let currentOffset = circumference;
+    const animation = setInterval(() => {
+        currentOffset -= (circumference - offset) / 30;
+        gauge.style.strokeDasharray = `${circumference - currentOffset} ${circumference}`;
+        
+        if (currentOffset <= offset) {
+            clearInterval(animation);
+            gauge.style.strokeDasharray = `${circumference - offset} ${circumference}`;
+        }
+    }, 16);
+    
+    // Update gauge color based on percentage
+    if (percentage >= 90) {
+        gauge.style.stroke = '#16a34a';
+    } else if (percentage >= 70) {
+        gauge.style.stroke = '#2563eb';
+    } else if (percentage >= 50) {
+        gauge.style.stroke = '#ea580c';
+    } else {
+        gauge.style.stroke = '#dc2626';
+    }
+}
+
+function setupEventListeners() {
+    // Filter tabs
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            const period = this.dataset.period;
+            console.log('Filtering by period:', period);
+            // In real implementation, would reload charts with new data
+        });
+    });
+    
+    // Date range filter
+    document.getElementById('apply-filter').addEventListener('click', function() {
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+        
+        console.log('Applying date filter:', startDate, 'to', endDate);
+        // In real implementation, would reload charts with filtered data
+    });
+    
+    // Auto-refresh every 5 minutes
+    setInterval(function() {
+        console.log('Auto-refreshing analytics data...');
+        // In real implementation, would fetch new data and update charts
+    }, 300000);
+}
+
+// Export functions for external use
+window.AnalyticsDashboard = {
+    refreshCharts: initializeCharts,
+    updateMetrics: function(metrics) {
+        // Update metric boxes with new data
+        console.log('Updating metrics:', metrics);
+    },
+    exportData: function() {
+        // Export analytics data
+        console.log('Exporting analytics data...');
+    }
+};
+</script>
+{% endblock %}

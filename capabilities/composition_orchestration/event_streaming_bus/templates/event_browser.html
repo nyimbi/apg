@@ -1,0 +1,535 @@
+{% extends "appbuilder/base.html" %}
+
+{% block title %}{{ title }} - APG Event Streaming Bus{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.filter-panel {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.event-browser-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.event-item {
+    border-bottom: 1px solid #eee;
+    padding: 15px;
+    transition: background-color 0.2s;
+}
+
+.event-item:hover {
+    background-color: #f8f9fa;
+}
+
+.event-item:last-child {
+    border-bottom: none;
+}
+
+.event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.event-type {
+    font-weight: bold;
+    color: #007bff;
+    font-size: 1.1em;
+}
+
+.event-timestamp {
+    color: #6c757d;
+    font-size: 0.9em;
+}
+
+.event-meta {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.event-payload {
+    background: #f8f9fa;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.status-badge {
+    font-size: 0.8em;
+    padding: 3px 8px;
+    border-radius: 12px;
+}
+
+.status-published { background-color: #d4edda; color: #155724; }
+.status-consumed { background-color: #cce7ff; color: #004085; }
+.status-failed { background-color: #f8d7da; color: #721c24; }
+.status-retry { background-color: #fff3cd; color: #856404; }
+.status-pending { background-color: #e2e3e5; color: #383d41; }
+
+.pagination-container {
+    padding: 20px;
+    text-align: center;
+}
+
+.real-time-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.new-event-indicator {
+    animation: slideInRight 0.5s ease-out;
+    border-left: 4px solid #28a745;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.filter-tags {
+    margin-top: 10px;
+}
+
+.filter-tag {
+    display: inline-block;
+    background: #e9ecef;
+    padding: 4px 8px;
+    margin: 2px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+.filter-tag .remove {
+    margin-left: 5px;
+    color: #6c757d;
+    cursor: pointer;
+}
+
+.event-actions {
+    margin-top: 10px;
+}
+
+.event-actions .btn {
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row">
+        <div class="col-12">
+            <h1 class="page-header">
+                <i class="fa fa-search"></i> {{ title }}
+                <small class="pull-right">
+                    <a href="/dashboard/" class="btn btn-sm btn-secondary">
+                        <i class="fa fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </small>
+            </h1>
+        </div>
+    </div>
+
+    <!-- Filter Panel -->
+    <div class="row">
+        <div class="col-12">
+            <div class="filter-panel">
+                <h5><i class="fa fa-filter"></i> Event Filters</h5>
+                <form id="filter-form" method="get">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="stream_id">Stream</label>
+                                <select name="stream_id" id="stream_id" class="form-control">
+                                    <option value="">All Streams</option>
+                                    {% for stream in streams %}
+                                    <option value="{{ stream.stream_id }}" 
+                                            {% if filters.stream_id == stream.stream_id %}selected{% endif %}>
+                                        {{ stream.stream_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="event_type">Event Type</label>
+                                <input type="text" name="event_type" id="event_type" 
+                                       class="form-control" placeholder="e.g., user.created"
+                                       value="{{ filters.event_type or '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="start_time">Start Time</label>
+                                <input type="datetime-local" name="start_time" id="start_time" 
+                                       class="form-control" value="{{ filters.start_time or '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="end_time">End Time</label>
+                                <input type="datetime-local" name="end_time" id="end_time" 
+                                       class="form-control" value="{{ filters.end_time or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-search"></i> Apply Filters
+                            </button>
+                            <button type="button" id="clear-filters" class="btn btn-secondary">
+                                <i class="fa fa-times"></i> Clear Filters
+                            </button>
+                            <button type="button" id="save-filter" class="btn btn-info">
+                                <i class="fa fa-save"></i> Save Filter
+                            </button>
+                            <div class="form-check form-check-inline ml-3">
+                                <input class="form-check-input" type="checkbox" id="auto-refresh" value="1">
+                                <label class="form-check-label" for="auto-refresh">
+                                    Auto-refresh (5s)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Active Filter Tags -->
+                    {% if filters.stream_id or filters.event_type or filters.start_time or filters.end_time %}
+                    <div class="filter-tags">
+                        <strong>Active Filters:</strong>
+                        {% if filters.stream_id %}
+                        <span class="filter-tag">
+                            Stream: {{ filters.stream_id }}
+                            <span class="remove" data-filter="stream_id">&times;</span>
+                        </span>
+                        {% endif %}
+                        {% if filters.event_type %}
+                        <span class="filter-tag">
+                            Type: {{ filters.event_type }}
+                            <span class="remove" data-filter="event_type">&times;</span>
+                        </span>
+                        {% endif %}
+                        {% if filters.start_time %}
+                        <span class="filter-tag">
+                            Start: {{ filters.start_time }}
+                            <span class="remove" data-filter="start_time">&times;</span>
+                        </span>
+                        {% endif %}
+                        {% if filters.end_time %}
+                        <span class="filter-tag">
+                            End: {{ filters.end_time }}
+                            <span class="remove" data-filter="end_time">&times;</span>
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="event-browser-container">
+                <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+                    <h5 class="mb-0">
+                        <i class="fa fa-list"></i> Events 
+                        <small class="text-muted">({{ events|length }} found)</small>
+                    </h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary" id="export-events">
+                            <i class="fa fa-download"></i> Export CSV
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" id="expand-all">
+                            <i class="fa fa-expand"></i> Expand All
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" id="collapse-all">
+                            <i class="fa fa-compress"></i> Collapse All
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="events-container">
+                    {% for event in events %}
+                    <div class="event-item" data-event-id="{{ event.event_id }}">
+                        <div class="event-header">
+                            <div>
+                                <span class="event-type">{{ event.event_type }}</span>
+                                <span class="status-badge status-{{ event.status.replace('_', '-') }}">
+                                    {{ event.status.replace('_', ' ').title() }}
+                                </span>
+                            </div>
+                            <div class="event-timestamp">
+                                {{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+                            </div>
+                        </div>
+                        
+                        <div class="event-meta">
+                            <span><strong>ID:</strong> {{ event.event_id }}</span>
+                            <span><strong>Source:</strong> {{ event.source_capability }}</span>
+                            <span><strong>Aggregate:</strong> {{ event.aggregate_type }}#{{ event.aggregate_id }}</span>
+                            <span><strong>Stream:</strong> {{ event.stream_id }}</span>
+                            {% if event.correlation_id %}
+                            <span><strong>Correlation:</strong> {{ event.correlation_id }}</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="event-payload collapse" id="payload-{{ loop.index }}">
+                            <strong>Payload:</strong>
+                            <pre>{{ event.payload | tojson(indent=2) }}</pre>
+                            
+                            {% if event.metadata %}
+                            <strong>Metadata:</strong>
+                            <pre>{{ event.metadata | tojson(indent=2) }}</pre>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="event-actions">
+                            <button class="btn btn-sm btn-outline-primary" 
+                                    data-toggle="collapse" 
+                                    data-target="#payload-{{ loop.index }}">
+                                <i class="fa fa-eye"></i> View Payload
+                            </button>
+                            <a href="/eventview/show/{{ event.event_id }}" 
+                               class="btn btn-sm btn-outline-info">
+                                <i class="fa fa-info-circle"></i> Details
+                            </a>
+                            {% if event.correlation_id %}
+                            <a href="/eventview/event_trace/{{ event.event_id }}" 
+                               class="btn btn-sm btn-outline-warning">
+                                <i class="fa fa-route"></i> Trace
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if not events %}
+                    <div class="text-center p-5">
+                        <i class="fa fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No events found</h5>
+                        <p class="text-muted">Try adjusting your filters or check back later</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Pagination -->
+                <div class="pagination-container">
+                    <nav>
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item disabled">
+                                <span class="page-link">Previous</span>
+                            </li>
+                            <li class="page-item active">
+                                <span class="page-link">1</span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">Next</span>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Toggle -->
+    <div class="real-time-toggle">
+        <button id="realtime-toggle" class="btn btn-success btn-lg rounded-circle" title="Enable Real-time">
+            <i class="fa fa-play"></i>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+let autoRefreshInterval;
+let isRealTime = false;
+
+// Clear filters
+document.getElementById('clear-filters').addEventListener('click', function() {
+    document.getElementById('filter-form').reset();
+    window.location.href = window.location.pathname;
+});
+
+// Remove individual filter tags
+document.querySelectorAll('.filter-tag .remove').forEach(function(element) {
+    element.addEventListener('click', function() {
+        const filter = this.getAttribute('data-filter');
+        const form = document.getElementById('filter-form');
+        const input = form.querySelector(`[name="${filter}"]`);
+        if (input) {
+            input.value = '';
+            form.submit();
+        }
+    });
+});
+
+// Expand/collapse all payloads
+document.getElementById('expand-all').addEventListener('click', function() {
+    document.querySelectorAll('.event-payload').forEach(function(element) {
+        element.classList.add('show');
+    });
+});
+
+document.getElementById('collapse-all').addEventListener('click', function() {
+    document.querySelectorAll('.event-payload').forEach(function(element) {
+        element.classList.remove('show');
+    });
+});
+
+// Auto-refresh toggle
+document.getElementById('auto-refresh').addEventListener('change', function() {
+    if (this.checked) {
+        startAutoRefresh();
+    } else {
+        stopAutoRefresh();
+    }
+});
+
+// Real-time toggle
+document.getElementById('realtime-toggle').addEventListener('click', function() {
+    if (isRealTime) {
+        stopRealTime();
+    } else {
+        startRealTime();
+    }
+});
+
+function startAutoRefresh() {
+    autoRefreshInterval = setInterval(function() {
+        location.reload();
+    }, 5000);
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
+
+function startRealTime() {
+    isRealTime = true;
+    const button = document.getElementById('realtime-toggle');
+    button.innerHTML = '<i class="fa fa-pause"></i>';
+    button.className = 'btn btn-warning btn-lg rounded-circle';
+    button.title = 'Disable Real-time';
+    
+    // Start polling for new events
+    pollForNewEvents();
+}
+
+function stopRealTime() {
+    isRealTime = false;
+    const button = document.getElementById('realtime-toggle');
+    button.innerHTML = '<i class="fa fa-play"></i>';
+    button.className = 'btn btn-success btn-lg rounded-circle';
+    button.title = 'Enable Real-time';
+}
+
+function pollForNewEvents() {
+    if (!isRealTime) return;
+    
+    // Get current filters
+    const params = new URLSearchParams(window.location.search);
+    params.set('realtime', '1');
+    
+    fetch(`${window.location.pathname}?${params.toString()}`)
+        .then(response => response.text())
+        .then(html => {
+            // Parse the new events and prepend them
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newEvents = doc.querySelectorAll('.event-item');
+            const container = document.getElementById('events-container');
+            
+            // Add new events with animation
+            newEvents.forEach(function(eventElement) {
+                const eventId = eventElement.getAttribute('data-event-id');
+                if (!document.querySelector(`[data-event-id="${eventId}"]`)) {
+                    eventElement.classList.add('new-event-indicator');
+                    container.insertBefore(eventElement, container.firstChild);
+                }
+            });
+            
+            // Schedule next poll
+            setTimeout(pollForNewEvents, 2000);
+        })
+        .catch(error => {
+            console.error('Error polling for new events:', error);
+            setTimeout(pollForNewEvents, 5000); // Retry after error
+        });
+}
+
+// Export events to CSV
+document.getElementById('export-events').addEventListener('click', function() {
+    const events = document.querySelectorAll('.event-item');
+    let csv = 'Event ID,Event Type,Source,Aggregate,Timestamp,Status\n';
+    
+    events.forEach(function(eventElement) {
+        const eventId = eventElement.getAttribute('data-event-id');
+        const eventType = eventElement.querySelector('.event-type').textContent;
+        const meta = eventElement.querySelector('.event-meta').textContent;
+        const timestamp = eventElement.querySelector('.event-timestamp').textContent;
+        const status = eventElement.querySelector('.status-badge').textContent;
+        
+        // Extract source and aggregate from meta text
+        const sourceMatch = meta.match(/Source:\s*([^\s]+)/);
+        const aggregateMatch = meta.match(/Aggregate:\s*([^\s]+)/);
+        
+        const source = sourceMatch ? sourceMatch[1] : '';
+        const aggregate = aggregateMatch ? aggregateMatch[1] : '';
+        
+        csv += `"${eventId}","${eventType}","${source}","${aggregate}","${timestamp}","${status}"\n`;
+    });
+    
+    // Download CSV
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `events_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+});
+
+// Save current filter as bookmark
+document.getElementById('save-filter').addEventListener('click', function() {
+    const filterName = prompt('Enter a name for this filter:');
+    if (filterName) {
+        const filters = new URLSearchParams(window.location.search);
+        localStorage.setItem(`eventFilter_${filterName}`, filters.toString());
+        alert(`Filter "${filterName}" saved successfully!`);
+    }
+});
+
+// Auto-refresh if enabled on page load
+if (document.getElementById('auto-refresh').checked) {
+    startAutoRefresh();
+}
+</script>
+{% endblock %}

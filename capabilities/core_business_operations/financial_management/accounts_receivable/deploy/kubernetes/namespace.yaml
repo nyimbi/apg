@@ -1,0 +1,15 @@
+# APG Accounts Receivable - Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apg-ar
+  labels:
+    name: apg-ar
+    app.kubernetes.io/name: apg-accounts-receivable
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/version: "1.0"
+    app.kubernetes.io/managed-by: kubernetes
+  annotations:
+    description: "APG Accounts Receivable capability namespace"
+    contact: "nyimbi@gmail.com"
+    vendor: "Datacraft"

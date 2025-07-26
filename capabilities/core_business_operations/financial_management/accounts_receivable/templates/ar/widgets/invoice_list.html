@@ -1,0 +1,353 @@
+{% extends "appbuilder/general/widgets/list.html" %}
+
+{% block list_title %}
+<h3>
+    <i class="fa fa-file-text"></i> 
+    {{ _("AR Invoices") }}
+    <small class="text-muted">{{ _("Manage accounts receivable invoices") }}</small>
+</h3>
+{% endblock %}
+
+{% block list_search %}
+{{ super() }}
+<div class="row search-widget">
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="customer_filter">{{ _("Customer") }}</label>
+            <select id="customer_filter" class="form-control select2" name="customer_id">
+                <option value="">{{ _("All Customers") }}</option>
+                {% for customer in customers %}
+                <option value="{{ customer.id }}">{{ customer.legal_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="status_filter">{{ _("Status") }}</label>
+            <select id="status_filter" class="form-control" name="status">
+                <option value="">{{ _("All Status") }}</option>
+                <option value="DRAFT">{{ _("Draft") }}</option>
+                <option value="SENT">{{ _("Sent") }}</option>
+                <option value="PAID">{{ _("Paid") }}</option>
+                <option value="OVERDUE">{{ _("Overdue") }}</option>
+                <option value="CANCELLED">{{ _("Cancelled") }}</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="date_from">{{ _("Date From") }}</label>
+            <input type="date" id="date_from" class="form-control" name="date_from">
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="date_to">{{ _("Date To") }}</label>
+            <input type="date" id="date_to" class="form-control" name="date_to">
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="min_amount">{{ _("Min Amount") }}</label>
+            <input type="number" id="min_amount" class="form-control" name="min_amount" 
+                   placeholder="0.00" step="0.01">
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>&nbsp;</label><br>
+            <button type="button" id="apply_filters" class="btn btn-primary">
+                <i class="fa fa-filter"></i> {{ _("Apply") }}
+            </button>
+            <button type="button" id="clear_filters" class="btn btn-default">
+                <i class="fa fa-times"></i> {{ _("Clear") }}
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block list_add_actions %}
+{{ super() }}
+<div class="btn-group" role="group">
+    <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown">
+        <i class="fa fa-cogs"></i> {{ _("Bulk Actions") }} <span class="caret"></span>
+    </button>
+    <ul class="dropdown-menu">
+        <li><a href="#" id="bulk_send_invoices">
+            <i class="fa fa-envelope"></i> {{ _("Send Invoices") }}
+        </a></li>
+        <li><a href="#" id="bulk_mark_overdue">
+            <i class="fa fa-exclamation-triangle"></i> {{ _("Mark Overdue") }}
+        </a></li>
+        <li><a href="#" id="bulk_payment_prediction">
+            <i class="fa fa-crystal-ball"></i> {{ _("AI Payment Prediction") }}
+        </a></li>
+        <li class="divider"></li>
+        <li><a href="#" id="export_invoice_data">
+            <i class="fa fa-download"></i> {{ _("Export Data") }}
+        </a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block list_rows %}
+{% for item in items %}
+<tr class="{% if item.status == 'OVERDUE' %}danger{% elif item.status == 'PAID' %}success{% endif %}">
+    <td>
+        <input type="checkbox" class="invoice-checkbox" value="{{ item.id }}">
+    </td>
+    <td>
+        <a href="{{ url_for('ARInvoiceModelView.show', pk=item.id) }}">
+            <strong>{{ item.invoice_number }}</strong>
+        </a>
+    </td>
+    <td>
+        <a href="{{ url_for('ARCustomerModelView.show', pk=item.customer_id) }}">
+            {{ item.customer.legal_name if item.customer else 'N/A' }}
+        </a>
+    </td>
+    <td>{{ item.invoice_date.strftime('%Y-%m-%d') }}</td>
+    <td>
+        {% if item.status == 'OVERDUE' %}
+        <span class="text-danger">{{ item.due_date.strftime('%Y-%m-%d') }}</span>
+        {% else %}
+        {{ item.due_date.strftime('%Y-%m-%d') }}
+        {% endif %}
+    </td>
+    <td class="text-right">
+        <strong>${{ "{:,.2f}".format(item.total_amount|float) }}</strong>
+    </td>
+    <td class="text-right">
+        {% if item.paid_amount > 0 %}
+        <span class="text-success">
+            ${{ "{:,.2f}".format(item.paid_amount|float) }}
+        </span>
+        {% else %}
+        <span class="text-muted">$0.00</span>
+        {% endif %}
+    </td>
+    <td class="text-right">
+        {% if item.outstanding_amount > 0 %}
+        <span class="{% if item.status == 'OVERDUE' %}text-danger{% else %}text-warning{% endif %}">
+            ${{ "{:,.2f}".format(item.outstanding_amount|float) }}
+        </span>
+        {% else %}
+        <span class="text-muted">$0.00</span>
+        {% endif %}
+    </td>
+    <td>
+        <span class="label label-{% if item.status == 'PAID' %}success{% elif item.status == 'OVERDUE' %}danger{% elif item.status == 'SENT' %}info{% elif item.status == 'DRAFT' %}default{% else %}warning{% endif %}">
+            {{ item.status }}
+        </span>
+    </td>
+    <td>
+        <div class="btn-group btn-group-sm">
+            <a href="{{ url_for('ARInvoiceModelView.show', pk=item.id) }}" 
+               class="btn btn-primary btn-xs" title="{{ _('View Details') }}">
+                <i class="fa fa-eye"></i>
+            </a>
+            {% if item.status not in ['PAID', 'CANCELLED'] %}
+            <a href="{{ url_for('ARInvoiceModelView.edit', pk=item.id) }}" 
+               class="btn btn-warning btn-xs" title="{{ _('Edit') }}">
+                <i class="fa fa-pencil"></i>
+            </a>
+            {% endif %}
+            <button type="button" class="btn btn-info btn-xs payment-prediction-btn" 
+                    data-invoice-id="{{ item.id }}" title="{{ _('AI Payment Prediction') }}">
+                <i class="fa fa-crystal-ball"></i>
+            </button>
+            {% if item.status not in ['PAID', 'CANCELLED'] %}
+            <div class="btn-group btn-group-xs">
+                <button type="button" class="btn btn-default btn-xs dropdown-toggle" 
+                        data-toggle="dropdown" title="{{ _('More Actions') }}">
+                    <i class="fa fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-right">
+                    <li><a href="#" class="send-invoice-btn" data-invoice-id="{{ item.id }}">
+                        <i class="fa fa-envelope"></i> {{ _("Send Invoice") }}
+                    </a></li>
+                    {% if item.status != 'OVERDUE' %}
+                    <li><a href="#" class="mark-overdue-btn" data-invoice-id="{{ item.id }}">
+                        <i class="fa fa-exclamation-triangle"></i> {{ _("Mark Overdue") }}
+                    </a></li>
+                    {% endif %}
+                    <li class="divider"></li>
+                    <li><a href="#" class="print-invoice-btn" data-invoice-id="{{ item.id }}">
+                        <i class="fa fa-print"></i> {{ _("Print") }}
+                    </a></li>
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </td>
+</tr>
+{% endfor %}
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+$(document).ready(function() {
+    // Initialize Select2 for customer dropdown
+    $('#customer_filter').select2({
+        placeholder: '{{ _("Select Customer") }}',
+        allowClear: true
+    });
+    
+    // Apply filters
+    $('#apply_filters').click(function() {
+        var filters = {
+            customer_id: $('#customer_filter').val(),
+            status: $('#status_filter').val(),
+            date_from: $('#date_from').val(),
+            date_to: $('#date_to').val(),
+            min_amount: $('#min_amount').val()
+        };
+        
+        window.location.search = $.param(filters);
+    });
+    
+    $('#clear_filters').click(function() {
+        $('#customer_filter, #status_filter').val('').trigger('change');
+        $('#date_from, #date_to, #min_amount').val('');
+        window.location.search = '';
+    });
+    
+    // Payment prediction
+    $('.payment-prediction-btn').click(function() {
+        var invoiceId = $(this).data('invoice-id');
+        launchPaymentPrediction(invoiceId);
+    });
+    
+    // Bulk actions
+    $('#bulk_payment_prediction').click(function() {
+        var selectedInvoices = $('.invoice-checkbox:checked').map(function() {
+            return $(this).val();
+        }).get();
+        
+        if (selectedInvoices.length === 0) {
+            alert('{{ _("Please select invoices for payment prediction") }}');
+            return;
+        }
+        
+        launchBulkPaymentPrediction(selectedInvoices);
+    });
+    
+    // Individual actions
+    $('.send-invoice-btn').click(function(e) {
+        e.preventDefault();
+        var invoiceId = $(this).data('invoice-id');
+        sendInvoice(invoiceId);
+    });
+    
+    $('.mark-overdue-btn').click(function(e) {
+        e.preventDefault();
+        var invoiceId = $(this).data('invoice-id');
+        markInvoiceOverdue(invoiceId);
+    });
+});
+
+function launchPaymentPrediction(invoiceId) {
+    $.ajax({
+        url: '/api/ar/invoices/' + invoiceId + '/payment-prediction',
+        method: 'GET',
+        success: function(response) {
+            showPaymentPredictionModal(response.data);
+        },
+        error: function(xhr) {
+            alert('{{ _("Error getting payment prediction") }}: ' + xhr.responseJSON.detail);
+        }
+    });
+}
+
+function launchBulkPaymentPrediction(invoiceIds) {
+    // Implementation for bulk payment prediction
+    var params = 'invoice_ids=' + invoiceIds.join(',');
+    window.open('/ar/bulk-payment-prediction?' + params, '_blank',
+                'width=1000,height=700,scrollbars=yes,resizable=yes');
+}
+
+function sendInvoice(invoiceId) {
+    if (confirm('{{ _("Send this invoice to the customer?") }}')) {
+        $.ajax({
+            url: '/api/ar/invoices/' + invoiceId + '/send',
+            method: 'POST',
+            success: function(response) {
+                alert('{{ _("Invoice sent successfully") }}');
+                location.reload();
+            },
+            error: function(xhr) {
+                alert('{{ _("Error sending invoice") }}: ' + xhr.responseJSON.detail);
+            }
+        });
+    }
+}
+
+function markInvoiceOverdue(invoiceId) {
+    if (confirm('{{ _("Mark this invoice as overdue?") }}')) {
+        $.ajax({
+            url: '/api/ar/invoices/' + invoiceId + '/mark-overdue',
+            method: 'POST',
+            success: function(response) {
+                alert('{{ _("Invoice marked as overdue") }}');
+                location.reload();
+            },
+            error: function(xhr) {
+                alert('{{ _("Error marking invoice overdue") }}: ' + xhr.responseJSON.detail);
+            }
+        });
+    }
+}
+
+function showPaymentPredictionModal(predictionData) {
+    var modal = $('<div class="modal fade" id="paymentPredictionModal" tabindex="-1">');
+    var modalContent = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title"><i class="fa fa-crystal-ball"></i> {{ _("AI Payment Prediction") }}</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>{{ _("Predicted Payment Date") }}</h5>
+                            <p class="lead">${predictionData.predicted_date}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>{{ _("Confidence Level") }}</h5>
+                            <div class="progress">
+                                <div class="progress-bar" style="width: ${predictionData.confidence * 100}%">
+                                    ${Math.round(predictionData.confidence * 100)}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h5>{{ _("Key Factors") }}</h5>
+                            <ul class="list-unstyled">
+                                ${predictionData.factors.map(f => '<li><i class="fa fa-arrow-right"></i> ' + f + '</li>').join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ _("Close") }}</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    modal.html(modalContent);
+    $('body').append(modal);
+    modal.modal('show');
+    
+    modal.on('hidden.bs.modal', function() {
+        modal.remove();
+    });
+}
+</script>
+{% endblock %}
