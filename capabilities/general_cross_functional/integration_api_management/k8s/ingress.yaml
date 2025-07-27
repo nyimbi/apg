@@ -1,0 +1,187 @@
+# APG Integration API Management - Ingress Configuration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-management-ingress
+  namespace: integration-api-management
+  labels:
+    app: api-management
+    component: ingress
+  annotations:
+    # NGINX Ingress Controller annotations
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    
+    # CORS settings
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://*.yourcompany.com,https://yourcompany.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options DENY always;
+      add_header X-Content-Type-Options nosniff always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';" always;
+    
+    # Connection settings
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    
+    # SSL configuration
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305"
+spec:
+  tls:
+  - hosts:
+    - api-management.yourcompany.com
+    - gateway.yourcompany.com
+    secretName: tls-secret
+  rules:
+  # API Management Interface
+  - host: api-management.yourcompany.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-management-service
+            port:
+              number: 8080
+  
+  # API Gateway
+  - host: gateway.yourcompany.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-management-service
+            port:
+              number: 8081
+
+---
+# Internal Ingress for cluster services
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-management-internal-ingress
+  namespace: integration-api-management
+  labels:
+    app: api-management
+    component: internal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx-internal"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: monitoring-secret
+    nginx.ingress.kubernetes.io/auth-realm: "API Management Internal Services"
+spec:
+  rules:
+  # Metrics endpoint (internal only)
+  - host: metrics.api-management.internal
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: api-management-service
+            port:
+              number: 9090
+
+---
+# Certificate for external domains
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: api-management-cert
+  namespace: integration-api-management
+spec:
+  secretName: tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - api-management.yourcompany.com
+  - gateway.yourcompany.com
+
+---
+# External Load Balancer Service (for cloud environments)
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-management-external
+  namespace: integration-api-management
+  labels:
+    app: api-management
+    component: external-lb
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:region:account:certificate/cert-id"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    # For GCP
+    cloud.google.com/load-balancer-type: "External"
+    # For Azure
+    service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: https
+    port: 443
+    targetPort: 8080
+    protocol: TCP
+  - name: gateway-https
+    port: 8443
+    targetPort: 8081
+    protocol: TCP
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: gateway-http
+    port: 8080
+    targetPort: 8081
+    protocol: TCP
+  selector:
+    app: api-management
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 300
+
+---
+# Health Check Service for Load Balancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-management-health
+  namespace: integration-api-management
+  labels:
+    app: api-management
+    component: health-check
+spec:
+  type: ClusterIP
+  ports:
+  - name: health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: api-management

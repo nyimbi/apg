@@ -1,0 +1,54 @@
+# APG Integration API Management - Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: integration-api-management
+  labels:
+    name: integration-api-management
+    capability: api-management
+    environment: production
+    managed-by: apg-platform
+  annotations:
+    apg.datacraft.co.ke/capability-id: "integration-api-management"
+    apg.datacraft.co.ke/capability-version: "1.0.0"
+    apg.datacraft.co.ke/description: "Enterprise API Management and Gateway"
+---
+# Resource Quotas
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: api-management-quota
+  namespace: integration-api-management
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    persistentvolumeclaims: "10"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+---
+# Limit Range for Pods
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: api-management-limits
+  namespace: integration-api-management
+spec:
+  limits:
+  - default:
+      cpu: 1000m
+      memory: 2Gi
+    defaultRequest:
+      cpu: 100m
+      memory: 256Mi
+    type: Container
+  - max:
+      cpu: 4000m
+      memory: 8Gi
+    min:
+      cpu: 50m
+      memory: 128Mi
+    type: Container

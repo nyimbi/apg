@@ -1,0 +1,161 @@
+# APG Event Streaming Bus - Kubernetes Namespace
+# Isolated namespace for the event streaming bus deployment
+# © 2025 Datacraft. All rights reserved.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubernetes
+    apg.datacraft.co.ke/capability: event-streaming-bus
+    apg.datacraft.co.ke/environment: production
+  annotations:
+    description: "APG Event Streaming Bus capability namespace"
+    contact: "nyimbi@gmail.com"
+    documentation: "https://docs.datacraft.co.ke/apg/event-streaming-bus"
+
+---
+# Resource Quota for the namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: esb-resource-quota
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/component: resource-quota
+spec:
+  hard:
+    # Compute resources
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    
+    # Storage resources
+    requests.storage: 100Gi
+    persistentvolumeclaims: "10"
+    
+    # Object counts
+    count/deployments.apps: "10"
+    count/services: "15"
+    count/configmaps: "20"
+    count/secrets: "15"
+    count/pods: "50"
+
+---
+# Limit Range for resource constraints
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: esb-limit-range
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/component: limit-range
+spec:
+  limits:
+    # Default limits for containers
+    - default:
+        cpu: "1"
+        memory: 1Gi
+      defaultRequest:
+        cpu: 250m
+        memory: 256Mi
+      max:
+        cpu: "4"
+        memory: 4Gi
+      min:
+        cpu: 100m
+        memory: 128Mi
+      type: Container
+    
+    # Default limits for pods
+    - max:
+        cpu: "6"
+        memory: 8Gi
+      type: Pod
+    
+    # Default limits for persistent volumes
+    - max:
+        storage: 50Gi
+      min:
+        storage: 1Gi
+      type: PersistentVolumeClaim
+
+---
+# Network Policy for secure communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: esb-network-policy
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    # Allow ingress from same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: apg-event-streaming-bus
+    
+    # Allow ingress from APG platform namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              apg.datacraft.co.ke/platform: "true"
+    
+    # Allow ingress from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+    
+    # Allow external access to API
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8080
+  
+  egress:
+    # Allow egress to same namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: apg-event-streaming-bus
+    
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    
+    # Allow HTTPS egress for external APIs
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    
+    # Allow HTTP egress for health checks
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 80

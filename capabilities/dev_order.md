@@ -11,12 +11,12 @@ This document outlines the optimal development order for APG capabilities and su
 ```bash
 # Core platform foundation - Must be completed first
 X/dev composition_orchestration/capability_registry
-/dev composition_orchestration/api_service_mesh
-/dev composition_orchestration/event_streaming_bus
+X/dev composition_orchestration/api_service_mesh
+X/dev composition_orchestration/event_streaming_bus
 
 # Essential cross-functional services
 X/dev general_cross_functional/integration_api_management
-/dev general_cross_functional/multi_language_localization
+X/dev general_cross_functional/multi_language_localization
 ```
 
 **Rationale:** These provide the foundational infrastructure that all other capabilities require for registration, communication, and integration.

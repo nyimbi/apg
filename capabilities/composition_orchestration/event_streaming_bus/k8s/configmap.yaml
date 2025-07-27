@@ -1,0 +1,343 @@
+# APG Event Streaming Bus - Kubernetes ConfigMaps
+# Configuration data for the event streaming bus
+# © 2025 Datacraft. All rights reserved.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: esb-config
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/component: config
+data:
+  # Application configuration
+  ENV: "production"
+  LOG_LEVEL: "INFO"
+  API_PORT: "8080"
+  API_WORKERS: "4"
+  METRICS_PORT: "9090"
+  METRICS_ENABLED: "true"
+  TRACING_ENABLED: "true"
+  
+  # Kafka configuration
+  KAFKA_ACKS: "all"
+  KAFKA_RETRIES: "3"
+  KAFKA_COMPRESSION_TYPE: "snappy"
+  KAFKA_BATCH_SIZE: "16384"
+  KAFKA_LINGER_MS: "10"
+  KAFKA_MAX_REQUEST_SIZE: "1048576"
+  
+  # Database configuration
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_MAX_OVERFLOW: "30"
+  DATABASE_POOL_TIMEOUT: "30"
+  DATABASE_POOL_RECYCLE: "3600"
+  
+  # Redis configuration
+  REDIS_MAX_CONNECTIONS: "100"
+  REDIS_RETRY_ON_TIMEOUT: "true"
+  REDIS_SOCKET_TIMEOUT: "5"
+  REDIS_SOCKET_CONNECT_TIMEOUT: "5"
+  
+  # Security configuration
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRATION_HOURS: "24"
+  CORS_ALLOW_ORIGINS: "*"
+  CORS_ALLOW_CREDENTIALS: "true"
+  
+  # Monitoring configuration
+  JAEGER_SAMPLER_TYPE: "probabilistic"
+  JAEGER_SAMPLER_PARAM: "0.1"
+  PROMETHEUS_MULTIPROC_DIR: "/tmp/prometheus_multiproc_dir"
+  
+  # Event processing configuration
+  DEFAULT_EVENT_RETENTION_HOURS: "168"  # 7 days
+  MAX_RETRY_ATTEMPTS: "3"
+  RETRY_DELAY_SECONDS: "60"
+  DEAD_LETTER_QUEUE_ENABLED: "true"
+  
+  # Stream processing configuration
+  DEFAULT_PARALLELISM: "3"
+  WINDOW_SIZE_MS: "60000"  # 1 minute
+  GRACE_PERIOD_MS: "10000"  # 10 seconds
+  STATE_STORE_TYPE: "rocksdb"
+
+---
+# Kafka Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-config
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/instance: apg-esb-kafka
+    app.kubernetes.io/component: config
+data:
+  server.properties: |
+    # Kafka broker configuration for APG Event Streaming Bus
+    
+    # Basic settings
+    broker.id=1
+    listeners=PLAINTEXT://0.0.0.0:9092
+    advertised.listeners=PLAINTEXT://kafka:9092
+    
+    # Zookeeper connection (if using Zookeeper mode)
+    # zookeeper.connect=zookeeper:2181
+    
+    # KRaft mode settings (recommended)
+    process.roles=broker,controller
+    node.id=1
+    controller.quorum.voters=1@kafka:9093
+    controller.listener.names=CONTROLLER
+    listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+    
+    # Log settings
+    log.dirs=/kafka/kafka-logs
+    num.network.threads=8
+    num.io.threads=8
+    socket.send.buffer.bytes=102400
+    socket.receive.buffer.bytes=102400
+    socket.request.max.bytes=104857600
+    
+    # Topic defaults
+    num.partitions=6
+    default.replication.factor=3
+    min.insync.replicas=2
+    
+    # Log retention
+    log.retention.hours=168
+    log.retention.bytes=1073741824
+    log.segment.bytes=1073741824
+    log.retention.check.interval.ms=300000
+    log.cleanup.policy=delete
+    
+    # Compression
+    compression.type=snappy
+    
+    # Performance tuning
+    replica.fetch.max.bytes=1048576
+    message.max.bytes=1000000
+    replica.socket.timeout.ms=30000
+    replica.socket.receive.buffer.bytes=65536
+    
+    # Group coordinator settings
+    group.initial.rebalance.delay.ms=3000
+    
+    # Transaction settings
+    transaction.state.log.replication.factor=3
+    transaction.state.log.min.isr=2
+    
+    # Metrics
+    metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
+    confluent.metrics.reporter.bootstrap.servers=kafka:9092
+    confluent.metrics.reporter.topic.replicas=3
+    confluent.metrics.enable=true
+
+---
+# Redis Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: apg-esb-redis
+    app.kubernetes.io/component: config
+data:
+  redis.conf: |
+    # Redis configuration for APG Event Streaming Bus
+    
+    # Network
+    bind 0.0.0.0
+    port 6379
+    tcp-backlog 511
+    timeout 0
+    tcp-keepalive 300
+    
+    # General
+    daemonize no
+    supervised no
+    pidfile /var/run/redis_6379.pid
+    loglevel notice
+    logfile ""
+    databases 16
+    
+    # Persistence
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir ./
+    
+    # Replication
+    replica-serve-stale-data yes
+    replica-read-only yes
+    repl-diskless-sync no
+    repl-diskless-sync-delay 5
+    repl-ping-replica-period 10
+    repl-timeout 60
+    repl-disable-tcp-nodelay no
+    repl-backlog-size 1mb
+    repl-backlog-ttl 3600
+    
+    # Security
+    requirepass changeme
+    
+    # Memory management
+    maxmemory 1gb
+    maxmemory-policy allkeys-lru
+    maxmemory-samples 5
+    
+    # Lazy freeing
+    lazyfree-lazy-eviction no
+    lazyfree-lazy-expire no
+    lazyfree-lazy-server-del no
+    replica-lazy-flush no
+    
+    # Append only file
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+    no-appendfsync-on-rewrite no
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+    aof-load-truncated yes
+    aof-use-rdb-preamble yes
+    
+    # Lua scripting
+    lua-time-limit 5000
+    
+    # Slow log
+    slowlog-log-slower-than 10000
+    slowlog-max-len 128
+    
+    # Event notification
+    notify-keyspace-events ""
+    
+    # Advanced config
+    hash-max-ziplist-entries 512
+    hash-max-ziplist-value 64
+    list-max-ziplist-size -2
+    list-compress-depth 0
+    set-max-intset-entries 512
+    zset-max-ziplist-entries 128
+    zset-max-ziplist-value 64
+    hll-sparse-max-bytes 3000
+    stream-node-max-bytes 4096
+    stream-node-max-entries 100
+    
+    # Client output buffer limits
+    client-output-buffer-limit normal 0 0 0
+    client-output-buffer-limit replica 256mb 64mb 60
+    client-output-buffer-limit pubsub 32mb 8mb 60
+    
+    # Client query buffer
+    client-query-buffer-limit 1gb
+    
+    # Protocol
+    proto-max-bulk-len 512mb
+    
+    # CPU
+    hz 10
+    dynamic-hz yes
+    
+    # Defragmentation
+    activedefrag yes
+    active-defrag-ignore-bytes 100mb
+    active-defrag-threshold-lower 10
+    active-defrag-threshold-upper 100
+    active-defrag-cycle-min 5
+    active-defrag-cycle-max 75
+
+---
+# PostgreSQL Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: apg-esb-postgres
+    app.kubernetes.io/component: config
+data:
+  postgresql.conf: |
+    # PostgreSQL configuration for APG Event Streaming Bus
+    
+    # Connection settings
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 200
+    superuser_reserved_connections = 3
+    
+    # Memory settings
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    work_mem = 4MB
+    maintenance_work_mem = 64MB
+    
+    # Checkpoint settings
+    checkpoint_completion_target = 0.9
+    checkpoint_timeout = 10min
+    max_wal_size = 1GB
+    min_wal_size = 80MB
+    
+    # Logging settings
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = 'pg_log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_rotation_age = 1d
+    log_rotation_size = 100MB
+    log_min_duration_statement = 1000
+    log_checkpoints = on
+    log_connections = on
+    log_disconnections = on
+    log_lock_waits = on
+    log_statement = 'mod'
+    log_temp_files = 0
+    
+    # Performance settings
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    default_statistics_target = 100
+    
+    # Autovacuum settings
+    autovacuum = on
+    autovacuum_max_workers = 3
+    autovacuum_naptime = 1min
+    autovacuum_vacuum_threshold = 50
+    autovacuum_analyze_threshold = 50
+    autovacuum_vacuum_scale_factor = 0.2
+    autovacuum_analyze_scale_factor = 0.1
+    
+    # Replication settings
+    wal_level = replica
+    archive_mode = on
+    archive_command = 'test ! -f /var/lib/postgresql/archive/%f && cp %p /var/lib/postgresql/archive/%f'
+    max_wal_senders = 3
+    wal_keep_segments = 32
+    hot_standby = on
+
+  pg_hba.conf: |
+    # PostgreSQL client authentication configuration
+    
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             all                                     trust
+    host    all             all             127.0.0.1/32            md5
+    host    all             all             ::1/128                 md5
+    host    all             all             10.0.0.0/8              md5
+    host    all             all             172.16.0.0/12           md5
+    host    all             all             192.168.0.0/16          md5
+    
+    # Replication connections
+    host    replication     all             10.0.0.0/8              md5
+    host    replication     all             172.16.0.0/12           md5
+    host    replication     all             192.168.0.0/16          md5

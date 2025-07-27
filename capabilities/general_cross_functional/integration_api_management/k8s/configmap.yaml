@@ -1,0 +1,435 @@
+# APG Integration API Management - Kubernetes ConfigMaps
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-management-config
+  namespace: integration-api-management
+  labels:
+    app: api-management
+    component: configuration
+data:
+  # Application configuration
+  settings.toml: |
+    [environment]
+    name = "production"
+    debug = false
+    testing = false
+    
+    [database]
+    engine = "postgresql"
+    host = "postgres-service"
+    port = 5432
+    database = "integration_api_management"
+    ssl_mode = "require"
+    pool_size = 20
+    max_overflow = 30
+    pool_timeout = 30
+    pool_recycle = 3600
+    echo = false
+    
+    [redis]
+    host = "redis-service"
+    port = 6379
+    database = 0
+    ssl = false
+    socket_timeout = 5
+    socket_connect_timeout = 5
+    connection_pool_size = 20
+    retry_on_timeout = true
+    
+    [gateway]
+    host = "0.0.0.0"
+    port = 8081
+    workers = 4
+    max_connections = 10000
+    keep_alive_timeout = 75
+    client_timeout = 60
+    request_timeout = 30
+    
+    [security]
+    allowed_origins = [
+        "https://*.yourcompany.com",
+        "https://yourcompany.com"
+    ]
+    cors_enabled = true
+    csrf_enabled = true
+    secure_cookies = true
+    
+    [monitoring]
+    log_level = "INFO"
+    metrics_enabled = true
+    tracing_enabled = true
+    alerting_enabled = true
+    health_check_enabled = true
+    
+    [performance]
+    enable_compression = true
+    compression_level = 6
+    max_request_size = "10MB"
+    response_timeout = 30
+    
+    [features]
+    rate_limiting_enabled = true
+    analytics_enabled = true
+    caching_enabled = true
+    transformation_enabled = true
+    validation_enabled = true
+
+  # Logging configuration
+  logging.yaml: |
+    version: 1
+    disable_existing_loggers: false
+    
+    formatters:
+      standard:
+        format: '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+      json:
+        format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d}'
+        datefmt: '%Y-%m-%dT%H:%M:%SZ'
+    
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: json
+        stream: ext://sys.stdout
+      
+      file:
+        class: logging.handlers.RotatingFileHandler
+        level: DEBUG
+        formatter: standard
+        filename: /app/logs/application.log
+        maxBytes: 10485760  # 10MB
+        backupCount: 5
+    
+    loggers:
+      integration_api_management:
+        level: INFO
+        handlers: [console, file]
+        propagate: false
+      
+      sqlalchemy.engine:
+        level: WARNING
+        handlers: [console]
+        propagate: false
+      
+      aiohttp.access:
+        level: INFO
+        handlers: [console]
+        propagate: false
+    
+    root:
+      level: INFO
+      handlers: [console]
+
+  # Health check configuration
+  health-check.yaml: |
+    checks:
+      database:
+        enabled: true
+        timeout: 5
+        interval: 30
+        critical: true
+      
+      redis:
+        enabled: true
+        timeout: 3
+        interval: 15
+        critical: true
+      
+      upstream_services:
+        enabled: true
+        timeout: 10
+        interval: 60
+        critical: false
+      
+      disk_space:
+        enabled: true
+        threshold: 85  # percentage
+        interval: 300
+        critical: false
+      
+      memory_usage:
+        enabled: true
+        threshold: 90  # percentage
+        interval: 60
+        critical: false
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: integration-api-management
+  labels:
+    app: nginx
+    component: load-balancer
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                       '$status $body_bytes_sent "$http_referer" '
+                       '"$http_user_agent" "$http_x_forwarded_for"';
+        
+        access_log /var/log/nginx/access.log main;
+        
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml;
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+        
+        # Upstream services
+        upstream api_management {
+            least_conn;
+            server api-management-service:8080 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+        
+        upstream gateway {
+            least_conn;
+            server api-management-service:8081 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+        
+        # API Management interface
+        server {
+            listen 80;
+            server_name api-management.local;
+            
+            location /health {
+                access_log off;
+                proxy_pass http://api_management;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location /api/v1/auth {
+                limit_req zone=auth burst=10 nodelay;
+                proxy_pass http://api_management;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location / {
+                limit_req zone=api burst=20 nodelay;
+                proxy_pass http://api_management;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_connect_timeout 30s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+            }
+        }
+        
+        # API Gateway
+        server {
+            listen 8080;
+            server_name gateway.local;
+            
+            location /health {
+                access_log off;
+                proxy_pass http://gateway;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location / {
+                proxy_pass http://gateway;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_buffering off;
+                proxy_request_buffering off;
+                client_max_body_size 10m;
+            }
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: integration-api-management
+  labels:
+    app: prometheus
+    component: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    
+    rule_files:
+      - "/etc/prometheus/rules/*.yml"
+    
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+    
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      
+      - job_name: 'api-management'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - integration-api-management
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+          - action: labelmap
+            regex: __meta_kubernetes_service_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_service_name]
+            action: replace
+            target_label: kubernetes_name
+      
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - integration-api-management
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+  alert_rules.yml: |
+    groups:
+      - name: api-management.rules
+        rules:
+          - alert: HighErrorRate
+            expr: rate(api_requests_total{status=~"5.."}[5m]) / rate(api_requests_total[5m]) > 0.1
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High API error rate detected"
+              description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+          
+          - alert: HighLatency
+            expr: histogram_quantile(0.95, rate(api_request_duration_seconds_bucket[5m])) > 2
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High API latency detected"
+              description: "95th percentile latency is {{ $value }}s"
+          
+          - alert: DatabaseConnectionFailure
+            expr: up{job="postgres"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Database connection failed"
+              description: "PostgreSQL database is not responding"
+          
+          - alert: RedisConnectionFailure
+            expr: up{job="redis"} == 0
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Redis connection failed"
+              description: "Redis cache is not responding"
+          
+          - alert: HighMemoryUsage
+            expr: process_resident_memory_bytes / node_memory_MemTotal_bytes > 0.8
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage detected"
+              description: "Memory usage is {{ $value | humanizePercentage }}"
+          
+          - alert: PodCrashLooping
+            expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 0
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod is crash looping"
+              description: "Pod {{ $labels.pod }} is crash looping in namespace {{ $labels.namespace }}"

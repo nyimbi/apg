@@ -1,0 +1,132 @@
+# APG Event Streaming Bus - Production Requirements
+# Production-specific Python dependencies
+# © 2025 Datacraft. All rights reserved.
+
+# Include base requirements
+-r requirements.txt
+
+# Production WSGI server
+gunicorn>=21.2.0,<22.0.0
+uvicorn[standard]>=0.24.0,<1.0.0
+
+# Performance monitoring
+psutil>=5.9.0,<6.0.0
+py-spy>=0.3.14,<1.0.0
+
+# Production logging
+structlog>=23.2.0,<24.0.0
+python-json-logger>=2.0.7,<3.0.0
+
+# Security enhancements
+cryptography>=41.0.0,<42.0.0
+pyotp>=2.9.0,<3.0.0
+
+# Monitoring and metrics
+prometheus-client>=0.19.0,<1.0.0
+statsd>=4.0.1,<5.0.0
+
+# Distributed tracing
+opentelemetry-api>=1.21.0,<2.0.0
+opentelemetry-sdk>=1.21.0,<2.0.0
+opentelemetry-instrumentation-fastapi>=0.42b0,<1.0.0
+opentelemetry-instrumentation-sqlalchemy>=0.42b0,<1.0.0
+opentelemetry-instrumentation-redis>=0.42b0,<1.0.0
+opentelemetry-instrumentation-kafka-python>=0.42b0,<1.0.0
+opentelemetry-exporter-jaeger>=1.21.0,<2.0.0
+opentelemetry-exporter-prometheus>=1.12.0rc1,<2.0.0
+
+# Database connection pooling
+pgbouncer>=1.0.0,<2.0.0
+
+# Redis connection pooling
+redis-py-cluster>=2.1.3,<3.0.0
+
+# Message queue for background tasks
+celery[redis]>=5.3.4,<6.0.0
+kombu>=5.3.4,<6.0.0
+
+# Caching
+python-memcached>=1.59,<2.0.0
+
+# File storage
+boto3>=1.34.0,<2.0.0
+botocore>=1.34.0,<2.0.0
+
+# Configuration management
+python-dotenv>=1.0.0,<2.0.0
+dynaconf>=3.2.4,<4.0.0
+
+# Health checks
+health-check>=3.4.1,<4.0.0
+
+# Rate limiting
+slowapi>=0.1.9,<1.0.0
+
+# Background job processing
+rq>=1.15.1,<2.0.0
+rq-scheduler>=0.13.1,<1.0.0
+
+# Process management
+supervisor>=4.2.5,<5.0.0
+
+# System monitoring
+setproctitle>=1.3.3,<2.0.0
+
+# Memory profiling
+memory-profiler>=0.61.0,<1.0.0
+pympler>=0.9,<1.0.0
+
+# Network utilities
+netaddr>=0.10.1,<1.0.0
+dnspython>=2.4.2,<3.0.0
+
+# Gevent for async processing
+gevent>=23.9.1,<24.0.0
+greenlet>=3.0.3,<4.0.0
+
+# Production-grade JSON handling
+orjson>=3.9.10,<4.0.0
+ujson>=5.8.0,<6.0.0
+
+# Advanced validation
+cerberus>=1.3.4,<2.0.0
+marshmallow>=3.20.2,<4.0.0
+
+# API documentation
+sphinx>=7.2.6,<8.0.0
+sphinx-rtd-theme>=2.0.0,<3.0.0
+
+# Security scanning
+bandit>=1.7.5,<2.0.0
+safety>=2.3.5,<3.0.0
+
+# Code quality
+black>=23.12.1,<24.0.0
+isort>=5.13.2,<6.0.0
+ruff>=0.1.9,<1.0.0
+mypy>=1.8.0,<2.0.0
+
+# Testing in production
+hypothesis>=6.92.1,<7.0.0
+factory-boy>=3.3.0,<4.0.0
+
+# Time zone handling
+pytz>=2023.3
+python-dateutil>=2.8.2,<3.0.0
+
+# Email notifications
+sendgrid>=6.10.0,<7.0.0
+boto3-ses>=0.1.0,<1.0.0
+
+# SMS notifications
+twilio>=8.11.0,<9.0.0
+
+# Push notifications
+firebase-admin>=6.4.0,<7.0.0
+
+# Container optimization
+distroless>=0.1.0,<1.0.0
+
+# Resource limits
+resource>=0.2.1,<1.0.0
+ulimit>=0.1.1,<1.0.0

@@ -1,0 +1,503 @@
+# APG Event Streaming Bus - Kubernetes Deployment
+# Production-ready deployment configuration
+# © 2025 Datacraft. All rights reserved.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-streaming-bus
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubernetes
+    apg.datacraft.co.ke/capability: event-streaming-bus
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: event-streaming-bus
+      app.kubernetes.io/instance: apg-esb
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: event-streaming-bus
+        app.kubernetes.io/instance: apg-esb
+        app.kubernetes.io/version: "1.0.0"
+        app.kubernetes.io/component: api
+        app.kubernetes.io/part-of: apg-platform
+        apg.datacraft.co.ke/capability: event-streaming-bus
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        config.checksum: "{{ include (print $.Template.BasePath \"/configmap.yaml\") . | sha256sum }}"
+    spec:
+      serviceAccountName: event-streaming-bus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: event-streaming-bus
+          image: apg/event-streaming-bus:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            # Configuration from ConfigMap
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: ENV
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: LOG_LEVEL
+            - name: API_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: API_PORT
+            - name: API_WORKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: API_WORKERS
+            - name: METRICS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: METRICS_PORT
+            - name: METRICS_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: METRICS_ENABLED
+            - name: TRACING_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: TRACING_ENABLED
+            
+            # Database configuration
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: esb-secrets
+                  key: database-url
+            - name: DATABASE_POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: DATABASE_POOL_SIZE
+            - name: DATABASE_MAX_OVERFLOW
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: DATABASE_MAX_OVERFLOW
+            
+            # Redis configuration
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: esb-secrets
+                  key: redis-url
+            - name: REDIS_MAX_CONNECTIONS
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: REDIS_MAX_CONNECTIONS
+            
+            # Kafka configuration
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                secretKeyRef:
+                  name: esb-secrets
+                  key: kafka-bootstrap-servers
+            - name: KAFKA_ACKS
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: KAFKA_ACKS
+            - name: KAFKA_RETRIES
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: KAFKA_RETRIES
+            
+            # Security configuration
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: esb-secrets
+                  key: jwt-secret-key
+            - name: JWT_ALGORITHM
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: JWT_ALGORITHM
+            - name: JWT_EXPIRATION_HOURS
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: JWT_EXPIRATION_HOURS
+            
+            # Monitoring configuration
+            - name: JAEGER_ENDPOINT
+              value: "http://jaeger-collector:14268/api/traces"
+            - name: JAEGER_SAMPLER_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: JAEGER_SAMPLER_TYPE
+            - name: JAEGER_SAMPLER_PARAM
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: JAEGER_SAMPLER_PARAM
+            
+            # Pod information
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            periodSeconds: 30
+            successThreshold: 1
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 30
+          
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+              readOnly: true
+            - name: logs-volume
+              mountPath: /app/logs
+            - name: data-volume
+              mountPath: /app/data
+            - name: tmp-volume
+              mountPath: /app/tmp
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL
+      
+      volumes:
+        - name: config-volume
+          configMap:
+            name: esb-config
+            defaultMode: 0644
+        - name: logs-volume
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: data-volume
+          emptyDir:
+            sizeLimit: 2Gi
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: 1Gi
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - event-streaming-bus
+                topologyKey: kubernetes.io/hostname
+      
+      tolerations:
+        - key: "apg.datacraft.co.ke/dedicated"
+          operator: "Equal"
+          value: "event-streaming-bus"
+          effect: "NoSchedule"
+      
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      
+      terminationGracePeriodSeconds: 60
+      
+      initContainers:
+        - name: wait-for-dependencies
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for PostgreSQL..."
+              until nc -z postgres 5432; do
+                echo "PostgreSQL is not ready. Waiting..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready"
+              
+              echo "Waiting for Redis..."
+              until nc -z redis 6379; do
+                echo "Redis is not ready. Waiting..."
+                sleep 2
+              done
+              echo "Redis is ready"
+              
+              echo "Waiting for Kafka..."
+              until nc -z kafka 9092; do
+                echo "Kafka is not ready. Waiting..."
+                sleep 2
+              done
+              echo "Kafka is ready"
+              
+              echo "All dependencies are ready"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+
+---
+# Worker Deployment for Background Processing
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-streaming-bus-worker
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubernetes
+    apg.datacraft.co.ke/capability: event-streaming-bus
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: event-streaming-bus
+      app.kubernetes.io/instance: apg-esb
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: event-streaming-bus
+        app.kubernetes.io/instance: apg-esb
+        app.kubernetes.io/version: "1.0.0"
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: apg-platform
+        apg.datacraft.co.ke/capability: event-streaming-bus
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: event-streaming-bus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: event-streaming-bus-worker
+          image: apg/event-streaming-bus:1.0.0
+          imagePullPolicy: IfNotPresent
+          command: ["/app/entrypoint.sh", "worker"]
+          ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            # Same environment variables as API deployment
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: ENV
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: LOG_LEVEL
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: esb-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: esb-secrets
+                  key: redis-url
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                secretKeyRef:
+                  name: esb-secrets
+                  key: kafka-bootstrap-servers
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1
+              memory: 2Gi
+          
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "ps aux | grep -v grep | grep worker"
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            periodSeconds: 30
+            successThreshold: 1
+            failureThreshold: 3
+          
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "ps aux | grep -v grep | grep worker"
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+              readOnly: true
+            - name: logs-volume
+              mountPath: /app/logs
+            - name: data-volume
+              mountPath: /app/data
+            - name: tmp-volume
+              mountPath: /app/tmp
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL
+      
+      volumes:
+        - name: config-volume
+          configMap:
+            name: esb-config
+            defaultMode: 0644
+        - name: logs-volume
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: data-volume
+          emptyDir:
+            sizeLimit: 2Gi
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: 1Gi
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - event-streaming-bus
+                    - key: app.kubernetes.io/component
+                      operator: In
+                      values:
+                        - worker
+                topologyKey: kubernetes.io/hostname
+      
+      terminationGracePeriodSeconds: 120

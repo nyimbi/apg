@@ -1,31 +1,31 @@
 """
 APG Event Streaming Bus - Data Models
 
-Comprehensive data models for event streaming, including events, streams,
-subscriptions, schemas, and metrics with full SQLAlchemy and Pydantic integration.
+Comprehensive data models for event streaming, stream processing, and event sourcing
+with Apache Kafka integration and enterprise-grade event management.
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero <nyimbi@gmail.com>
+Author: Nyimbi Odero
+Company: Datacraft
+Copyright: © 2025 Datacraft. All rights reserved.
 """
 
 import json
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Any, Union
-from uuid import uuid4
+from uuid import UUID
 
 from sqlalchemy import (
-    Column, String, Text, Integer, Float, Boolean, DateTime, JSON,
-    ForeignKey, Index, UniqueConstraint, CheckConstraint, BigInteger
+	Column, String, Integer, Float, Boolean, DateTime, Text, JSON,
+	ForeignKey, Index, UniqueConstraint, CheckConstraint, BigInteger,
+	LargeBinary, SmallInteger, Numeric
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, validates
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQL_UUID, JSONB, ARRAY
 
-from pydantic import (
-    BaseModel, Field, ConfigDict, validator, root_validator,
-    AfterValidator, field_validator
-)
+from pydantic import BaseModel, ConfigDict, Field, validator, root_validator
+from pydantic.types import UUID4
 from uuid_extensions import uuid7str
 
 # =============================================================================
@@ -48,141 +48,237 @@ model_config = ConfigDict(
 # =============================================================================
 
 class EventStatus(str, Enum):
-    """Event processing status."""
-    PENDING = "pending"
-    PUBLISHED = "published"
-    CONSUMED = "consumed"
-    FAILED = "failed"
-    RETRY = "retry"
-    DEAD_LETTER = "dead_letter"
+	"""Event processing status"""
+	PENDING = "pending"
+	PROCESSING = "processing"
+	PROCESSED = "processed"
+	PUBLISHED = "published"
+	CONSUMED = "consumed"
+	FAILED = "failed"
+	RETRYING = "retrying"
+	DEAD_LETTER = "dead_letter"
+	ARCHIVED = "archived"
+
+class EventPriority(str, Enum):
+	"""Event priority levels"""
+	LOW = "low"
+	NORMAL = "normal"
+	HIGH = "high"
+	CRITICAL = "critical"
+	EMERGENCY = "emergency"
 
 class StreamStatus(str, Enum):
-    """Stream operational status."""
-    ACTIVE = "active"
-    PAUSED = "paused"
-    ARCHIVED = "archived"
-    ERROR = "error"
+	"""Stream operational status"""
+	ACTIVE = "active"
+	PAUSED = "paused"
+	STOPPED = "stopped"
+	ERROR = "error"
+	MIGRATING = "migrating"
+	ARCHIVED = "archived"
 
 class SubscriptionStatus(str, Enum):
-    """Subscription status."""
-    ACTIVE = "active"
-    PAUSED = "paused"
-    CANCELLED = "cancelled"
-    ERROR = "error"
+	"""Subscription status"""
+	ACTIVE = "active"
+	PAUSED = "paused"
+	CANCELLED = "cancelled"
+	ERROR = "error"
+
+class ConsumerStatus(str, Enum):
+	"""Consumer group status"""
+	ACTIVE = "active"
+	INACTIVE = "inactive"
+	REBALANCING = "rebalancing"
+	ERROR = "error"
+	DEAD = "dead"
+
+class ProcessorType(str, Enum):
+	"""Stream processor types"""
+	FILTER = "filter"
+	MAP = "map"
+	AGGREGATE = "aggregate"
+	JOIN = "join"
+	WINDOW = "window"
+	COMPLEX_EVENT = "complex_event"
+	ENRICHMENT = "enrichment"
+	VALIDATION = "validation"
 
 class EventType(str, Enum):
-    """Event type categories."""
-    DOMAIN_EVENT = "domain_event"
-    INTEGRATION_EVENT = "integration_event"
-    NOTIFICATION_EVENT = "notification_event"
-    SYSTEM_EVENT = "system_event"
-    AUDIT_EVENT = "audit_event"
+	"""Event type categories"""
+	DOMAIN_EVENT = "domain_event"
+	INTEGRATION_EVENT = "integration_event"
+	NOTIFICATION_EVENT = "notification_event"
+	SYSTEM_EVENT = "system_event"
+	AUDIT_EVENT = "audit_event"
 
 class DeliveryMode(str, Enum):
-    """Message delivery guarantees."""
-    AT_MOST_ONCE = "at_most_once"
-    AT_LEAST_ONCE = "at_least_once"
-    EXACTLY_ONCE = "exactly_once"
+	"""Message delivery guarantees"""
+	AT_MOST_ONCE = "at_most_once"
+	AT_LEAST_ONCE = "at_least_once"
+	EXACTLY_ONCE = "exactly_once"
 
 class CompressionType(str, Enum):
-    """Stream compression algorithms."""
-    NONE = "none"
-    GZIP = "gzip"
-    SNAPPY = "snappy"
-    LZ4 = "lz4"
-    ZSTD = "zstd"
+	"""Compression algorithms"""
+	NONE = "none"
+	GZIP = "gzip"
+	SNAPPY = "snappy"
+	LZ4 = "lz4"
+	ZSTD = "zstd"
 
 class SerializationFormat(str, Enum):
-    """Event serialization formats."""
-    JSON = "json"
-    AVRO = "avro"
-    PROTOBUF = "protobuf"
-    MESSAGEPACK = "messagepack"
+	"""Event serialization formats"""
+	JSON = "json"
+	AVRO = "avro"
+	PROTOBUF = "protobuf"
+	MSGPACK = "msgpack"
+	BINARY = "binary"
 
 # =============================================================================
 # Core Event Model
 # =============================================================================
 
 class ESEvent(Base):
-    """Core event model for the event streaming platform."""
-    
-    __tablename__ = "es_events"
-    
-    # Primary identification
-    event_id = Column(String(36), primary_key=True, default=lambda: f"evt_{uuid7str()}")
-    event_type = Column(String(100), nullable=False, index=True)
-    event_version = Column(String(20), nullable=False, default="1.0")
-    
-    # Event source and aggregate information
-    source_capability = Column(String(100), nullable=False, index=True)
-    aggregate_id = Column(String(100), nullable=False, index=True)
-    aggregate_type = Column(String(100), nullable=False)
-    sequence_number = Column(BigInteger, nullable=False, default=0)
-    
-    # Timing and correlation
-    timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    correlation_id = Column(String(100), nullable=True, index=True)
-    causation_id = Column(String(100), nullable=True, index=True)
-    
-    # Multi-tenancy and security
-    tenant_id = Column(String(100), nullable=False, index=True)
-    user_id = Column(String(100), nullable=True, index=True)
-    
-    # Event content
-    payload = Column(JSONB, nullable=False)
-    metadata = Column(JSONB, nullable=True, default={})
-    
-    # Schema and format
-    schema_id = Column(String(100), nullable=True)
-    schema_version = Column(String(20), nullable=False, default="1.0")
-    serialization_format = Column(String(20), nullable=False, default=SerializationFormat.JSON.value)
-    
-    # Processing status
-    status = Column(String(20), nullable=False, default=EventStatus.PENDING.value)
-    retry_count = Column(Integer, nullable=False, default=0)
-    max_retries = Column(Integer, nullable=False, default=3)
-    
-    # Stream assignment
-    stream_id = Column(String(100), nullable=False, index=True)
-    partition_key = Column(String(200), nullable=True)
-    offset_position = Column(BigInteger, nullable=True)
-    
-    # Audit fields
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc))
-    created_by = Column(String(100), nullable=False)
-    
-    # Relationships
-    stream = relationship("ESStream", back_populates="events")
-    audit_logs = relationship("ESAuditLog", back_populates="event")
-    
-    # Indexes for performance
-    __table_args__ = (
-        Index('idx_es_events_tenant_type', 'tenant_id', 'event_type'),
-        Index('idx_es_events_aggregate', 'aggregate_type', 'aggregate_id'),
-        Index('idx_es_events_timestamp', 'timestamp'),
-        Index('idx_es_events_correlation', 'correlation_id'),
-        Index('idx_es_events_stream_offset', 'stream_id', 'offset_position'),
-        Index('idx_es_events_sequence', 'aggregate_id', 'sequence_number'),
-        CheckConstraint('retry_count >= 0', name='check_retry_count_positive'),
-        CheckConstraint('max_retries >= 0', name='check_max_retries_positive'),
-        CheckConstraint('sequence_number >= 0', name='check_sequence_positive')
-    )
-    
-    @validates('event_type')
-    def validate_event_type(self, key, value):
-        if not value or len(value.strip()) == 0:
-            raise ValueError("Event type cannot be empty")
-        return value.strip()
-    
-    @validates('payload')
-    def validate_payload(self, key, value):
-        if not isinstance(value, dict):
-            raise ValueError("Payload must be a dictionary")
-        return value
-    
-    def __repr__(self):
-        return f"<ESEvent(id={self.event_id}, type={self.event_type}, aggregate={self.aggregate_id})>"
+	"""Core event entity for event streaming bus"""
+	__tablename__ = "es_events"
+	
+	# Primary identification
+	event_id = Column(String(30), primary_key=True, default=uuid7str)
+	event_type = Column(String(200), nullable=False, index=True)
+	event_version = Column(String(20), nullable=False, default="1.0")
+	
+	# Source and targeting
+	source_capability = Column(String(100), nullable=False, index=True)
+	target_capability = Column(String(100), nullable=True, index=True)
+	aggregate_id = Column(String(50), nullable=False, index=True)
+	aggregate_type = Column(String(100), nullable=False, index=True)
+	
+	# Event ordering and correlation
+	sequence_number = Column(BigInteger, nullable=False, index=True)
+	correlation_id = Column(String(50), nullable=True, index=True)
+	causation_id = Column(String(30), nullable=True, index=True)
+	
+	# Timestamps
+	event_timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+	ingestion_timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+	processed_timestamp = Column(DateTime(timezone=True), nullable=True)
+	
+	# Multi-tenancy and security
+	tenant_id = Column(String(50), nullable=False, index=True)
+	user_id = Column(String(50), nullable=True, index=True)
+	session_id = Column(String(50), nullable=True)
+	
+	# Event status and processing
+	status = Column(String(20), nullable=False, default=EventStatus.PENDING, index=True)
+	priority = Column(String(20), nullable=False, default=EventPriority.NORMAL, index=True)
+	retry_count = Column(Integer, nullable=False, default=0)
+	max_retries = Column(Integer, nullable=False, default=3)
+	
+	# Content and metadata
+	payload = Column(JSONB, nullable=False)
+	metadata = Column(JSONB, nullable=False, default=dict)
+	headers = Column(JSONB, nullable=False, default=dict)
+	
+	# Schema and validation
+	schema_id = Column(String(50), nullable=True, index=True)
+	schema_version = Column(String(20), nullable=False, default="1.0")
+	content_type = Column(String(100), nullable=False, default="application/json")
+	
+	# Serialization and compression
+	serialization_format = Column(String(20), nullable=False, default=SerializationFormat.JSON)
+	compression_type = Column(String(20), nullable=False, default=CompressionType.NONE)
+	original_size = Column(Integer, nullable=True)
+	compressed_size = Column(Integer, nullable=True)
+	
+	# Processing metrics
+	processing_duration_ms = Column(Integer, nullable=True)
+	bytes_processed = Column(BigInteger, nullable=True)
+	
+	# Error handling
+	error_message = Column(Text, nullable=True)
+	error_code = Column(String(50), nullable=True)
+	error_details = Column(JSONB, nullable=True)
+	
+	# Stream assignment (keep compatibility with existing code)
+	stream_id = Column(String(100), nullable=False, index=True)
+	partition_key = Column(String(200), nullable=True)
+	offset_position = Column(BigInteger, nullable=True)
+	
+	# Audit fields
+	created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+	updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+	created_by = Column(String(50), nullable=False)
+	updated_by = Column(String(50), nullable=False)
+	
+	# Relationships
+	stream = relationship("ESStream", back_populates="events")
+	audit_logs = relationship("ESAuditLog", back_populates="event")
+	stream_assignments = relationship("ESStreamAssignment", back_populates="event", cascade="all, delete-orphan")
+	processing_history = relationship("ESEventProcessingHistory", back_populates="event", cascade="all, delete-orphan")
+	
+	# Indexes and constraints
+	__table_args__ = (
+		Index('idx_es_events_tenant_type_timestamp', 'tenant_id', 'event_type', 'event_timestamp'),
+		Index('idx_es_events_aggregate', 'aggregate_type', 'aggregate_id', 'sequence_number'),
+		Index('idx_es_events_correlation', 'correlation_id', 'event_timestamp'),
+		Index('idx_es_events_status_priority', 'status', 'priority', 'event_timestamp'),
+		Index('idx_es_events_source_target', 'source_capability', 'target_capability'),
+		Index('idx_es_events_stream_offset', 'stream_id', 'offset_position'),
+		CheckConstraint('retry_count >= 0', name='ck_es_events_retry_count_positive'),
+		CheckConstraint('max_retries >= 0', name='ck_es_events_max_retries_positive'),
+		CheckConstraint('sequence_number > 0', name='ck_es_events_sequence_positive'),
+		CheckConstraint('original_size >= 0', name='ck_es_events_original_size_positive'),
+		CheckConstraint('compressed_size >= 0', name='ck_es_events_compressed_size_positive'),
+	)
+	
+	@validates('status')
+	def validate_status(self, key, value):
+		if value not in [status.value for status in EventStatus]:
+			raise ValueError(f"Invalid event status: {value}")
+		return value
+	
+	@validates('priority')
+	def validate_priority(self, key, value):
+		if value not in [priority.value for priority in EventPriority]:
+			raise ValueError(f"Invalid event priority: {value}")
+		return value
+	
+	@validates('event_type')
+	def validate_event_type(self, key, value):
+		if not value or len(value.strip()) == 0:
+			raise ValueError("Event type cannot be empty")
+		return value.strip()
+	
+	@validates('payload')
+	def validate_payload(self, key, value):
+		if not isinstance(value, dict):
+			raise ValueError("Payload must be a dictionary")
+		return value
+	
+	def to_dict(self) -> Dict[str, Any]:
+		"""Convert event to dictionary representation"""
+		return {
+			"event_id": self.event_id,
+			"event_type": self.event_type,
+			"event_version": self.event_version,
+			"source_capability": self.source_capability,
+			"target_capability": self.target_capability,
+			"aggregate_id": self.aggregate_id,
+			"aggregate_type": self.aggregate_type,
+			"sequence_number": self.sequence_number,
+			"correlation_id": self.correlation_id,
+			"causation_id": self.causation_id,
+			"event_timestamp": self.event_timestamp.isoformat() if self.event_timestamp else None,
+			"tenant_id": self.tenant_id,
+			"user_id": self.user_id,
+			"status": self.status,
+			"priority": self.priority,
+			"payload": self.payload,
+			"metadata": self.metadata,
+			"headers": self.headers,
+			"schema_version": self.schema_version
+		}
+	
+	def __repr__(self):
+		return f"<ESEvent(id={self.event_id}, type={self.event_type}, aggregate={self.aggregate_id})>"
 
 # =============================================================================
 # Stream Configuration Model
@@ -234,6 +330,9 @@ class ESStream(Base):
     events = relationship("ESEvent", back_populates="stream")
     subscriptions = relationship("ESSubscription", back_populates="stream")
     metrics = relationship("ESMetrics", back_populates="stream")
+    assignments = relationship("ESStreamAssignment", back_populates="stream", cascade="all, delete-orphan")
+    consumer_groups = relationship("ESConsumerGroup", back_populates="stream", cascade="all, delete-orphan")
+    processors = relationship("ESStreamProcessor", back_populates="stream", cascade="all, delete-orphan")
     
     # Indexes
     __table_args__ = (
@@ -356,6 +455,7 @@ class ESConsumerGroup(Base):
     group_id = Column(String(100), primary_key=True)
     group_name = Column(String(200), nullable=False)
     group_description = Column(Text, nullable=True)
+    stream_id = Column(String(100), ForeignKey('es_streams.stream_id'), nullable=True, index=True)
     
     # Group configuration
     session_timeout_ms = Column(Integer, nullable=False, default=30000)
@@ -380,6 +480,7 @@ class ESConsumerGroup(Base):
     
     # Relationships
     subscriptions = relationship("ESSubscription", back_populates="consumer_group")
+    stream = relationship("ESStream", back_populates="consumer_groups")
     
     # Indexes
     __table_args__ = (
@@ -549,6 +650,261 @@ class ESAuditLog(Base):
     def __repr__(self):
         return f"<ESAuditLog(id={self.audit_id}, operation={self.operation_type}, actor={self.actor_id})>"
 
+
+# =============================================================================
+# ADDITIONAL ENTERPRISE MODELS
+# =============================================================================
+
+class ESEventSchema(Base):
+	"""Event schema definitions for validation"""
+	__tablename__ = "es_event_schemas"
+	
+	# Primary identification
+	schema_id = Column(String(50), primary_key=True, default=uuid7str)
+	event_type = Column(String(200), nullable=False, index=True)
+	schema_version = Column(String(20), nullable=False, default="1.0")
+	
+	# Schema definition
+	schema_name = Column(String(200), nullable=False)
+	schema_description = Column(Text, nullable=True)
+	json_schema = Column(JSONB, nullable=False)
+	avro_schema = Column(JSONB, nullable=True)
+	protobuf_schema = Column(Text, nullable=True)
+	
+	# Schema metadata
+	namespace = Column(String(100), nullable=False, default="default")
+	compatibility_level = Column(String(50), nullable=False, default="BACKWARD")
+	schema_type = Column(String(50), nullable=False, default="JSON")
+	
+	# Versioning and evolution
+	parent_schema_id = Column(String(50), ForeignKey('es_event_schemas.schema_id'), nullable=True)
+	evolution_strategy = Column(String(50), nullable=False, default="BACKWARD_COMPATIBLE")
+	is_active = Column(Boolean, nullable=False, default=True)
+	is_deprecated = Column(Boolean, nullable=False, default=False)
+	deprecation_date = Column(DateTime(timezone=True), nullable=True)
+	
+	# Validation settings
+	strict_validation = Column(Boolean, nullable=False, default=True)
+	allow_unknown_fields = Column(Boolean, nullable=False, default=False)
+	required_fields = Column(ARRAY(String), nullable=False, default=list)
+	optional_fields = Column(ARRAY(String), nullable=False, default=list)
+	
+	# Usage statistics
+	usage_count = Column(BigInteger, nullable=False, default=0)
+	last_used = Column(DateTime(timezone=True), nullable=True)
+	validation_failures = Column(BigInteger, nullable=False, default=0)
+	
+	# Multi-tenancy
+	tenant_id = Column(String(50), nullable=False, index=True)
+	
+	# Audit fields
+	created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+	updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+	created_by = Column(String(50), nullable=False)
+	updated_by = Column(String(50), nullable=False)
+	
+	# Relationships
+	parent_schema = relationship("ESEventSchema", remote_side=[schema_id])
+	child_schemas = relationship("ESEventSchema", back_populates="parent_schema")
+	
+	# Indexes and constraints
+	__table_args__ = (
+		UniqueConstraint('event_type', 'schema_version', name='uk_es_schemas_type_version'),
+		Index('idx_es_schemas_namespace_type', 'namespace', 'event_type'),
+		Index('idx_es_schemas_active', 'is_active', 'is_deprecated'),
+	)
+
+
+class ESStreamAssignment(Base):
+	"""Assignment of events to streams"""
+	__tablename__ = "es_stream_assignments"
+	
+	# Primary identification
+	assignment_id = Column(String(50), primary_key=True, default=uuid7str)
+	event_id = Column(String(30), ForeignKey('es_events.event_id'), nullable=False, index=True)
+	stream_id = Column(String(100), ForeignKey('es_streams.stream_id'), nullable=False, index=True)
+	
+	# Kafka details
+	partition_id = Column(Integer, nullable=False)
+	offset = Column(BigInteger, nullable=False)
+	key = Column(String(500), nullable=True)
+	
+	# Assignment metadata
+	assignment_reason = Column(String(100), nullable=False, default="AUTOMATIC")
+	assignment_rules = Column(JSONB, nullable=False, default=list)
+	
+	# Processing tracking
+	published_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+	consumed_count = Column(Integer, nullable=False, default=0)
+	last_consumed_at = Column(DateTime(timezone=True), nullable=True)
+	
+	# Delivery tracking
+	delivery_attempts = Column(Integer, nullable=False, default=0)
+	successful_deliveries = Column(Integer, nullable=False, default=0)
+	failed_deliveries = Column(Integer, nullable=False, default=0)
+	
+	# Audit fields
+	created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+	created_by = Column(String(50), nullable=False)
+	
+	# Relationships
+	event = relationship("ESEvent", back_populates="stream_assignments")
+	stream = relationship("ESStream", back_populates="assignments")
+	
+	# Indexes and constraints
+	__table_args__ = (
+		UniqueConstraint('event_id', 'stream_id', name='uk_es_stream_assignments_event_stream'),
+		Index('idx_es_stream_assignments_stream_partition', 'stream_id', 'partition_id'),
+		Index('idx_es_stream_assignments_offset', 'stream_id', 'offset'),
+		Index('idx_es_stream_assignments_published', 'published_at'),
+		CheckConstraint('partition_id >= 0', name='ck_es_stream_assignments_partition_id_non_negative'),
+		CheckConstraint('offset >= 0', name='ck_es_stream_assignments_offset_non_negative'),
+		CheckConstraint('consumed_count >= 0', name='ck_es_stream_assignments_consumed_count_non_negative'),
+	)
+
+
+class ESEventProcessingHistory(Base):
+	"""Event processing history and audit trail"""
+	__tablename__ = "es_event_processing_history"
+	
+	# Primary identification
+	history_id = Column(String(50), primary_key=True, default=uuid7str)
+	event_id = Column(String(30), ForeignKey('es_events.event_id'), nullable=False, index=True)
+	
+	# Processing details
+	processor_name = Column(String(200), nullable=False)
+	processor_version = Column(String(50), nullable=False)
+	processing_stage = Column(String(100), nullable=False)
+	
+	# Status and timing
+	status = Column(String(20), nullable=False, index=True)
+	started_at = Column(DateTime(timezone=True), nullable=False)
+	completed_at = Column(DateTime(timezone=True), nullable=True)
+	duration_ms = Column(Integer, nullable=True)
+	
+	# Processing results
+	input_data = Column(JSONB, nullable=True)
+	output_data = Column(JSONB, nullable=True)
+	transformation_applied = Column(JSONB, nullable=True)
+	
+	# Error details
+	error_message = Column(Text, nullable=True)
+	error_code = Column(String(50), nullable=True)
+	error_details = Column(JSONB, nullable=True)
+	stack_trace = Column(Text, nullable=True)
+	
+	# Performance metrics
+	cpu_time_ms = Column(Integer, nullable=True)
+	memory_used_mb = Column(Integer, nullable=True)
+	io_operations = Column(Integer, nullable=True)
+	
+	# Retry information
+	retry_attempt = Column(Integer, nullable=False, default=0)
+	retry_reason = Column(String(200), nullable=True)
+	
+	# Audit fields
+	created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+	created_by = Column(String(50), nullable=False)
+	
+	# Relationships
+	event = relationship("ESEvent", back_populates="processing_history")
+	
+	# Indexes and constraints
+	__table_args__ = (
+		Index('idx_es_processing_history_event_status', 'event_id', 'status'),
+		Index('idx_es_processing_history_processor', 'processor_name', 'processing_stage'),
+		Index('idx_es_processing_history_timing', 'started_at', 'completed_at'),
+		CheckConstraint('retry_attempt >= 0', name='ck_es_processing_history_retry_attempt_non_negative'),
+	)
+
+
+class ESStreamProcessor(Base):
+	"""Stream processing job configuration and management"""
+	__tablename__ = "es_stream_processors"
+	
+	# Primary identification
+	processor_id = Column(String(50), primary_key=True, default=uuid7str)
+	processor_name = Column(String(200), nullable=False, index=True)
+	processor_type = Column(String(50), nullable=False, default=ProcessorType.FILTER)
+	
+	# Stream association
+	stream_id = Column(String(100), ForeignKey('es_streams.stream_id'), nullable=False, index=True)
+	output_stream_id = Column(String(100), ForeignKey('es_streams.stream_id'), nullable=True, index=True)
+	
+	# Processor configuration
+	description = Column(Text, nullable=True)
+	processing_logic = Column(JSONB, nullable=False)
+	configuration = Column(JSONB, nullable=False, default=dict)
+	
+	# Processing rules and functions
+	filter_expression = Column(Text, nullable=True)
+	transformation_function = Column(Text, nullable=True)
+	aggregation_config = Column(JSONB, nullable=True)
+	windowing_config = Column(JSONB, nullable=True)
+	
+	# Join configuration (for join processors)
+	join_stream_id = Column(String(100), ForeignKey('es_streams.stream_id'), nullable=True)
+	join_condition = Column(Text, nullable=True)
+	join_window_ms = Column(Integer, nullable=True)
+	
+	# Processing settings
+	parallelism = Column(Integer, nullable=False, default=1)
+	batch_size = Column(Integer, nullable=False, default=100)
+	processing_timeout_ms = Column(Integer, nullable=False, default=30000)
+	checkpoint_interval_ms = Column(Integer, nullable=False, default=60000)
+	
+	# State management
+	stateful = Column(Boolean, nullable=False, default=False)
+	state_store_config = Column(JSONB, nullable=True)
+	changelog_topic = Column(String(300), nullable=True)
+	
+	# Multi-tenancy and access
+	tenant_id = Column(String(50), nullable=False, index=True)
+	owner_id = Column(String(50), nullable=False, index=True)
+	
+	# Status and health
+	status = Column(String(20), nullable=False, default="STOPPED", index=True)
+	health_status = Column(String(20), nullable=False, default="HEALTHY")
+	last_checkpoint = Column(DateTime(timezone=True), nullable=True)
+	
+	# Processing metrics
+	messages_processed = Column(BigInteger, nullable=False, default=0)
+	bytes_processed = Column(BigInteger, nullable=False, default=0)
+	processing_errors = Column(BigInteger, nullable=False, default=0)
+	output_messages = Column(BigInteger, nullable=False, default=0)
+	
+	# Performance metrics
+	throughput_msgs_sec = Column(Integer, nullable=False, default=0)
+	latency_p95_ms = Column(Integer, nullable=False, default=0)
+	cpu_usage_percent = Column(Integer, nullable=False, default=0)
+	memory_usage_mb = Column(Integer, nullable=False, default=0)
+	
+	# Error handling
+	error_tolerance = Column(String(20), nullable=False, default="FAIL")  # FAIL, CONTINUE, SKIP
+	dead_letter_enabled = Column(Boolean, nullable=False, default=False)
+	dead_letter_topic = Column(String(300), nullable=True)
+	
+	# Audit fields
+	created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+	updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+	created_by = Column(String(50), nullable=False)
+	updated_by = Column(String(50), nullable=False)
+	
+	# Relationships
+	stream = relationship("ESStream", back_populates="processors", foreign_keys=[stream_id])
+	output_stream = relationship("ESStream", foreign_keys=[output_stream_id])
+	join_stream = relationship("ESStream", foreign_keys=[join_stream_id])
+	
+	# Indexes and constraints
+	__table_args__ = (
+		Index('idx_es_processors_tenant_type', 'tenant_id', 'processor_type'),
+		Index('idx_es_processors_status', 'status'),
+		Index('idx_es_processors_stream', 'stream_id', 'status'),
+		CheckConstraint('parallelism > 0', name='ck_es_processors_parallelism_positive'),
+		CheckConstraint('batch_size > 0', name='ck_es_processors_batch_size_positive'),
+		CheckConstraint('messages_processed >= 0', name='ck_es_processors_messages_processed_non_negative'),
+	)
+
 # =============================================================================
 # Pydantic Models for API
 # =============================================================================
@@ -655,6 +1011,207 @@ class SchemaConfig(BaseModel):
             raise ValueError('compatibility_level must be "backward", "forward", "full", or "none"')
         return v
 
+# =============================================================================
+# ENHANCED PYDANTIC API MODELS
+# =============================================================================
+
+class EventCreate(BaseModel):
+	"""Pydantic model for creating events"""
+	model_config = ConfigDict(extra='forbid', validate_assignment=True)
+	
+	event_type: str = Field(..., max_length=200, description="Event type identifier")
+	event_version: str = Field(default="1.0", max_length=20, description="Event schema version")
+	source_capability: str = Field(..., max_length=100, description="Source capability identifier")
+	target_capability: Optional[str] = Field(None, max_length=100, description="Target capability identifier")
+	aggregate_id: str = Field(..., max_length=50, description="Aggregate identifier")
+	aggregate_type: str = Field(..., max_length=100, description="Aggregate type")
+	sequence_number: int = Field(..., gt=0, description="Event sequence number")
+	correlation_id: Optional[str] = Field(None, max_length=50, description="Correlation ID for related events")
+	causation_id: Optional[str] = Field(None, max_length=30, description="ID of the event that caused this event")
+	tenant_id: str = Field(..., max_length=50, description="Tenant identifier")
+	user_id: Optional[str] = Field(None, max_length=50, description="User identifier")
+	session_id: Optional[str] = Field(None, max_length=50, description="Session identifier")
+	priority: EventPriority = Field(default=EventPriority.NORMAL, description="Event priority level")
+	payload: Dict[str, Any] = Field(..., description="Event payload data")
+	metadata: Dict[str, Any] = Field(default_factory=dict, description="Event metadata")
+	headers: Dict[str, Any] = Field(default_factory=dict, description="Event headers")
+	schema_id: Optional[str] = Field(None, max_length=50, description="Schema ID for validation")
+	content_type: str = Field(default="application/json", max_length=100, description="Content type")
+	created_by: str = Field(..., max_length=50, description="Creator identifier")
+
+class EventResponse(BaseModel):
+	"""Pydantic model for event responses"""
+	model_config = ConfigDict(from_attributes=True)
+	
+	event_id: str
+	event_type: str
+	event_version: str
+	source_capability: str
+	target_capability: Optional[str]
+	aggregate_id: str
+	aggregate_type: str
+	sequence_number: int
+	correlation_id: Optional[str]
+	causation_id: Optional[str]
+	event_timestamp: datetime
+	tenant_id: str
+	user_id: Optional[str]
+	status: EventStatus
+	priority: EventPriority
+	payload: Dict[str, Any]
+	metadata: Dict[str, Any]
+	headers: Dict[str, Any]
+	schema_version: str
+	created_at: datetime
+	updated_at: datetime
+
+class StreamCreate(BaseModel):
+	"""Pydantic model for creating streams"""
+	model_config = ConfigDict(extra='forbid', validate_assignment=True)
+	
+	stream_name: str = Field(..., max_length=200, description="Stream name")
+	stream_type: str = Field(default="EVENT_STREAM", max_length=50, description="Stream type")
+	description: Optional[str] = Field(None, description="Stream description")
+	stream_category: str = Field(default="general", max_length=100, description="Stream category")
+	business_domain: str = Field(default="default", max_length=100, description="Business domain")
+	topic_name: str = Field(..., max_length=300, description="Kafka topic name")
+	partition_count: int = Field(default=12, gt=0, description="Number of partitions")
+	replication_factor: int = Field(default=3, gt=0, description="Replication factor")
+	min_in_sync_replicas: int = Field(default=2, gt=0, description="Minimum in-sync replicas")
+	retention_time_ms: int = Field(default=604800000, gt=0, description="Retention time in milliseconds")
+	retention_size_bytes: Optional[int] = Field(None, gt=0, description="Retention size in bytes")
+	cleanup_policy: str = Field(default="delete", description="Cleanup policy")
+	compression_type: CompressionType = Field(default=CompressionType.SNAPPY, description="Compression type")
+	serialization_format: SerializationFormat = Field(default=SerializationFormat.JSON, description="Serialization format")
+	tenant_id: str = Field(..., max_length=50, description="Tenant identifier")
+	owner_id: str = Field(..., max_length=50, description="Owner identifier")
+	visibility: str = Field(default="PRIVATE", description="Stream visibility")
+	encryption_enabled: bool = Field(default=True, description="Enable encryption")
+	access_control_enabled: bool = Field(default=True, description="Enable access control")
+	event_filters: List[Dict[str, Any]] = Field(default_factory=list, description="Event filters")
+	routing_rules: List[Dict[str, Any]] = Field(default_factory=list, description="Routing rules")
+	created_by: str = Field(..., max_length=50, description="Creator identifier")
+
+class StreamResponse(BaseModel):
+	"""Pydantic model for stream responses"""
+	model_config = ConfigDict(from_attributes=True)
+	
+	stream_id: str
+	stream_name: str
+	stream_type: str
+	description: Optional[str]
+	stream_category: str
+	business_domain: str
+	topic_name: str
+	partition_count: int
+	replication_factor: int
+	status: StreamStatus
+	health_status: str
+	tenant_id: str
+	owner_id: str
+	visibility: str
+	encryption_enabled: bool
+	message_count: int
+	bytes_in: int
+	bytes_out: int
+	producer_count: int
+	consumer_count: int
+	created_at: datetime
+	updated_at: datetime
+
+class ConsumerGroupCreate(BaseModel):
+	"""Pydantic model for creating consumer groups"""
+	model_config = ConfigDict(extra='forbid', validate_assignment=True)
+	
+	group_name: str = Field(..., max_length=200, description="Consumer group name")
+	stream_id: str = Field(..., max_length=50, description="Stream identifier")
+	description: Optional[str] = Field(None, description="Consumer group description")
+	group_type: str = Field(default="STANDARD", description="Consumer group type")
+	processing_mode: str = Field(default="PARALLEL", description="Processing mode")
+	max_consumers: int = Field(default=10, gt=0, description="Maximum number of consumers")
+	auto_offset_reset: str = Field(default="latest", description="Auto offset reset policy")
+	enable_auto_commit: bool = Field(default=True, description="Enable auto commit")
+	delivery_guarantee: DeliveryMode = Field(default=DeliveryMode.AT_LEAST_ONCE, description="Delivery guarantee")
+	enable_idempotency: bool = Field(default=False, description="Enable idempotency")
+	retry_policy: Dict[str, Any] = Field(default_factory=lambda: {"max_retries": 3, "backoff_ms": 1000}, description="Retry policy")
+	dead_letter_enabled: bool = Field(default=True, description="Enable dead letter queue")
+	event_filters: List[Dict[str, Any]] = Field(default_factory=list, description="Event filters")
+	processing_rules: List[Dict[str, Any]] = Field(default_factory=list, description="Processing rules")
+	tenant_id: str = Field(..., max_length=50, description="Tenant identifier")
+	owner_id: str = Field(..., max_length=50, description="Owner identifier")
+	created_by: str = Field(..., max_length=50, description="Creator identifier")
+
+class ConsumerGroupResponse(BaseModel):
+	"""Pydantic model for consumer group responses"""
+	model_config = ConfigDict(from_attributes=True)
+	
+	group_id: str
+	group_name: str
+	stream_id: str
+	description: Optional[str]
+	group_type: str
+	processing_mode: str
+	max_consumers: int
+	delivery_guarantee: DeliveryMode
+	status: ConsumerStatus
+	health_status: str
+	active_consumers: int
+	messages_consumed: int
+	bytes_consumed: int
+	processing_errors: int
+	consumer_lag: int
+	tenant_id: str
+	owner_id: str
+	created_at: datetime
+	updated_at: datetime
+
+class StreamProcessorCreate(BaseModel):
+	"""Pydantic model for creating stream processors"""
+	model_config = ConfigDict(extra='forbid', validate_assignment=True)
+	
+	processor_name: str = Field(..., max_length=200, description="Processor name")
+	processor_type: ProcessorType = Field(..., description="Processor type")
+	stream_id: str = Field(..., max_length=50, description="Input stream identifier")
+	output_stream_id: Optional[str] = Field(None, max_length=50, description="Output stream identifier")
+	description: Optional[str] = Field(None, description="Processor description")
+	processing_logic: Dict[str, Any] = Field(..., description="Processing logic configuration")
+	configuration: Dict[str, Any] = Field(default_factory=dict, description="Processor configuration")
+	filter_expression: Optional[str] = Field(None, description="Filter expression")
+	transformation_function: Optional[str] = Field(None, description="Transformation function")
+	parallelism: int = Field(default=1, gt=0, description="Processing parallelism")
+	batch_size: int = Field(default=100, gt=0, description="Batch size")
+	processing_timeout_ms: int = Field(default=30000, gt=0, description="Processing timeout")
+	stateful: bool = Field(default=False, description="Is processor stateful")
+	tenant_id: str = Field(..., max_length=50, description="Tenant identifier")
+	owner_id: str = Field(..., max_length=50, description="Owner identifier")
+	created_by: str = Field(..., max_length=50, description="Creator identifier")
+
+class StreamProcessorResponse(BaseModel):
+	"""Pydantic model for stream processor responses"""
+	model_config = ConfigDict(from_attributes=True)
+	
+	processor_id: str
+	processor_name: str
+	processor_type: ProcessorType
+	stream_id: str
+	output_stream_id: Optional[str]
+	description: Optional[str]
+	parallelism: int
+	batch_size: int
+	stateful: bool
+	status: str
+	health_status: str
+	messages_processed: int
+	bytes_processed: int
+	processing_errors: int
+	output_messages: int
+	throughput_msgs_sec: int
+	latency_p95_ms: int
+	tenant_id: str
+	owner_id: str
+	created_at: datetime
+	updated_at: datetime
+
 # Export all models for external use
 __all__ = [
     # SQLAlchemy models
@@ -666,19 +1223,36 @@ __all__ = [
     "ESSchema",
     "ESMetrics",
     "ESAuditLog",
+    "ESEventSchema",
+    "ESStreamAssignment",
+    "ESEventProcessingHistory",
+    "ESStreamProcessor",
     
     # Enums
     "EventStatus",
+    "EventPriority",
     "StreamStatus",
-    "SubscriptionStatus", 
+    "SubscriptionStatus",
+    "ConsumerStatus",
+    "ProcessorType",
     "EventType",
     "DeliveryMode",
     "CompressionType",
     "SerializationFormat",
     
-    # Pydantic models
+    # Legacy Pydantic models
     "EventConfig",
     "StreamConfig",
     "SubscriptionConfig",
-    "SchemaConfig"
+    "SchemaConfig",
+    
+    # Enhanced Pydantic models
+    "EventCreate",
+    "EventResponse",
+    "StreamCreate",
+    "StreamResponse",
+    "ConsumerGroupCreate",
+    "ConsumerGroupResponse",
+    "StreamProcessorCreate",
+    "StreamProcessorResponse"
 ]

@@ -1,0 +1,281 @@
+# APG Multi-language Localization - Kubernetes Namespace
+#
+# Kubernetes namespace configuration for multi-language localization capability
+# Includes resource quotas, network policies, and RBAC settings
+#
+# Author: Nyimbi Odero
+# Company: Datacraft
+# Copyright: © 2025 Datacraft. All rights reserved.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: localization
+  labels:
+    name: localization
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+    datacraft.co.ke/capability: localization
+    datacraft.co.ke/environment: production
+  annotations:
+    description: "APG Multi-language Localization capability namespace"
+    contact: "nyimbi@gmail.com"
+    documentation: "https://docs.apg.platform/capabilities/localization"
+
+---
+# Resource Quota for the namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: localization-resource-quota
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: resource-quota
+spec:
+  hard:
+    # Compute resources
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    
+    # Storage resources
+    requests.storage: 100Gi
+    persistentvolumeclaims: "10"
+    
+    # Object counts
+    pods: "20"
+    replicationcontrollers: "10"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+    
+    # Network resources
+    services.loadbalancers: "2"
+    services.nodeports: "5"
+
+---
+# Limit Range for default resource limits
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: localization-limit-range
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: limit-range
+spec:
+  limits:
+  # Default container limits
+  - default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 100m
+      memory: 128Mi
+    type: Container
+    
+  # Pod limits
+  - max:
+      cpu: "2"
+      memory: 4Gi
+    min:
+      cpu: 50m
+      memory: 64Mi
+    type: Pod
+    
+  # PVC limits
+  - max:
+      storage: 50Gi
+    min:
+      storage: 1Gi
+    type: PersistentVolumeClaim
+
+---
+# Network Policy for secure communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: localization-network-policy
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow ingress from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+      
+  # Allow ingress from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+      
+  # Allow intra-namespace communication
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: localization
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+  
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+      
+  # Allow HTTPS for external services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+      
+  # Allow HTTP for external services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+      
+  # Allow database connections
+  - to:
+    - podSelector:
+        matchLabels:
+          app: localization-db
+    ports:
+    - protocol: TCP
+      port: 5432
+      
+  # Allow Redis connections  
+  - to:
+    - podSelector:
+        matchLabels:
+          app: localization-redis
+    ports:
+    - protocol: TCP
+      port: 6379
+
+---
+# Service Account for localization services
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: localization-service-account
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: service-account
+automountServiceAccountToken: true
+
+---
+# Role for localization services
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: localization-role
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: role
+rules:
+# Allow reading pods and services
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+  
+# Allow reading config maps and secrets
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+  
+# Allow reading events
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Role Binding for localization services
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: localization-role-binding
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: role-binding
+subjects:
+- kind: ServiceAccount
+  name: localization-service-account
+  namespace: localization
+roleRef:
+  kind: Role
+  name: localization-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Pod Security Policy (if PSP is enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: localization-psp
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: pod-security-policy
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: false

@@ -1,0 +1,549 @@
+# APG Event Streaming Bus - CI/CD Pipeline
+# Automated build, test, and deployment workflow
+# © 2025 Datacraft. All rights reserved.
+
+name: APG Event Streaming Bus CI/CD
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      force_deploy:
+        description: 'Force deployment (skip tests)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: datacraft/apg-event-streaming-bus
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Code Quality and Security Checks
+  quality-checks:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      - name: Code Formatting Check (Black)
+        run: |
+          black --check --diff .
+      
+      - name: Import Sorting Check (isort)
+        run: |
+          isort --check-only --diff .
+      
+      - name: Linting (Ruff)
+        run: |
+          ruff check .
+      
+      - name: Type Checking (MyPy)
+        run: |
+          mypy --config-file pyproject.toml .
+      
+      - name: Security Scanning (Bandit)
+        run: |
+          bandit -r . -f json -o bandit-report.json
+        continue-on-error: true
+      
+      - name: Dependency Security Check (Safety)
+        run: |
+          safety check --json --output safety-report.json
+        continue-on-error: true
+      
+      - name: License Compliance Check
+        run: |
+          pip-licenses --format=json --output-file=licenses.json
+      
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+            licenses.json
+
+  # Unit Tests
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quality-checks
+    
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+        test-group: ['models', 'services', 'api', 'integration']
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+      
+      - name: Run Unit Tests
+        run: |
+          python run_tests.py --group=${{ matrix.test-group }} --coverage --xml
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          DATABASE_URL: sqlite:///test.db
+          REDIS_URL: redis://localhost:6379/1
+          ENV: test
+      
+      - name: Upload Coverage Reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests,${{ matrix.test-group }}
+          name: codecov-${{ matrix.python-version }}-${{ matrix.test-group }}
+
+  # Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: unit-tests
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_esb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      
+      kafka:
+        image: confluentinc/cp-kafka:7.4.0
+        env:
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+        options: >-
+          --health-cmd "kafka-broker-api-versions --bootstrap-server localhost:9092"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 3
+        ports:
+          - 9092:9092
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+      
+      - name: Wait for Services
+        run: |
+          # Wait for PostgreSQL
+          while ! pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          
+          # Wait for Redis
+          while ! redis-cli -h localhost -p 6379 ping; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+          
+          # Wait for Kafka
+          timeout 120 bash -c 'until kafka-broker-api-versions --bootstrap-server localhost:9092; do sleep 5; done'
+      
+      - name: Setup Test Database
+        run: |
+          python -m alembic upgrade head
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/test_esb
+      
+      - name: Run Integration Tests
+        run: |
+          python run_tests.py --integration --coverage --xml
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/test_esb
+          REDIS_URL: redis://localhost:6379/0
+          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          ENV: test
+      
+      - name: Upload Integration Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            test-results.xml
+            coverage.xml
+
+  # Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: integration-tests
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-perf.txt
+      
+      - name: Start Services
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          sleep 30
+      
+      - name: Run Performance Tests
+        run: |
+          python run_tests.py --performance --report
+        env:
+          DATABASE_URL: postgresql://esb_user:esb_password@localhost:5432/apg_event_streaming_bus
+          REDIS_URL: redis://localhost:6379/0
+          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+      
+      - name: Upload Performance Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: performance-report.json
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose -f docker-compose.test.yml down -v
+
+  # Build and Push Docker Image
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [quality-checks, unit-tests]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+      
+      - name: Build and Push Docker Image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+      
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [integration-tests, build]
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+      url: https://staging.event-streaming-bus.datacraft.co.ke
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-west-2 --name apg-staging-cluster
+      
+      - name: Deploy to Staging
+        run: |
+          # Update image in deployment
+          kubectl set image deployment/event-streaming-bus \
+            event-streaming-bus=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -n apg-event-streaming-bus-staging
+          
+          # Wait for rollout
+          kubectl rollout status deployment/event-streaming-bus \
+            -n apg-event-streaming-bus-staging \
+            --timeout=600s
+      
+      - name: Verify Deployment
+        run: |
+          # Check pod status
+          kubectl get pods -n apg-event-streaming-bus-staging -l app.kubernetes.io/name=event-streaming-bus
+          
+          # Run health check
+          kubectl run health-check --rm -i --restart=Never --image=curlimages/curl:latest -- \
+            curl -f http://event-streaming-bus.apg-event-streaming-bus-staging:8080/health
+      
+      - name: Run Smoke Tests
+        run: |
+          python tests/smoke/staging_smoke_tests.py
+        env:
+          STAGING_API_URL: https://staging.event-streaming-bus.datacraft.co.ke
+          STAGING_API_KEY: ${{ secrets.STAGING_API_KEY }}
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [performance-tests, build, deploy-staging]
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment:
+      name: production
+      url: https://api.event-streaming-bus.datacraft.co.ke
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-west-2 --name apg-production-cluster
+      
+      - name: Pre-deployment Checks
+        run: |
+          # Check cluster status
+          kubectl get nodes
+          kubectl get pods -n apg-event-streaming-bus
+          
+          # Check current version
+          kubectl get deployment event-streaming-bus -o jsonpath='{.spec.template.spec.containers[0].image}' -n apg-event-streaming-bus
+      
+      - name: Deploy to Production (Blue-Green)
+        run: |
+          # Create green deployment
+          kubectl apply -f k8s/deployment-green.yaml -n apg-event-streaming-bus
+          
+          # Wait for green deployment
+          kubectl rollout status deployment/event-streaming-bus-green \
+            -n apg-event-streaming-bus \
+            --timeout=600s
+          
+          # Switch traffic to green
+          kubectl patch service event-streaming-bus \
+            -p '{"spec":{"selector":{"version":"green"}}}' \
+            -n apg-event-streaming-bus
+          
+          # Wait and verify
+          sleep 30
+          kubectl run health-check --rm -i --restart=Never --image=curlimages/curl:latest -- \
+            curl -f http://event-streaming-bus.apg-event-streaming-bus:8080/health
+          
+          # Remove blue deployment
+          kubectl delete deployment event-streaming-bus-blue -n apg-event-streaming-bus || true
+          
+          # Rename green to main
+          kubectl patch deployment event-streaming-bus-green \
+            -p '{"metadata":{"name":"event-streaming-bus"}}' \
+            -n apg-event-streaming-bus
+      
+      - name: Run Production Smoke Tests
+        run: |
+          python tests/smoke/production_smoke_tests.py
+        env:
+          PRODUCTION_API_URL: https://api.event-streaming-bus.datacraft.co.ke
+          PRODUCTION_API_KEY: ${{ secrets.PRODUCTION_API_KEY }}
+      
+      - name: Notify Deployment Success
+        uses: 8398a7/action-slack@v3
+        if: success()
+        with:
+          status: success
+          channel: '#deployments'
+          message: |
+            ✅ APG Event Streaming Bus deployed to production successfully!
+            Version: ${{ github.sha }}
+            Environment: Production
+            URL: https://api.event-streaming-bus.datacraft.co.ke
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+      - name: Cleanup Old Images
+        run: |
+          # Keep only last 10 images
+          echo "Cleaning up old container images..."
+          # This would be implemented based on your registry cleanup policy
+
+  # Notification
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [quality-checks, unit-tests, integration-tests, performance-tests, build, deploy-staging, deploy-production]
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    steps:
+      - name: Notify Failure
+        uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: failure
+          channel: '#ci-cd'
+          message: |
+            ❌ APG Event Streaming Bus CI/CD pipeline failed!
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            Workflow: ${{ github.workflow }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

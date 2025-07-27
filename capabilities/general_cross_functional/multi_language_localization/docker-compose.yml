@@ -1,0 +1,331 @@
+# APG Multi-language Localization - Docker Compose Configuration
+#
+# Complete development and production environment setup with all dependencies
+# Includes PostgreSQL, Redis, API service, background workers, and monitoring
+#
+# Author: Nyimbi Odero
+# Company: Datacraft
+# Copyright: © 2025 Datacraft. All rights reserved.
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  localization-db:
+    image: postgres:14-alpine
+    container_name: localization-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-localization}
+      POSTGRES_USER: ${POSTGRES_USER:-localization_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./docker/postgres.conf:/etc/postgresql/postgresql.conf:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-localization_user} -d ${POSTGRES_DB:-localization}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - localization-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis Cache
+  localization-redis:
+    image: redis:7-alpine
+    container_name: localization-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
+    volumes:
+      - redis_data:/data
+      - ./docker/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-redis_password}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - localization-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # Main API Service
+  localization-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: localization-api
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-localization_user}:${POSTGRES_PASSWORD:-secure_password}@localization-db:5432/${POSTGRES_DB:-localization}
+      DATABASE_POOL_SIZE: 20
+      DATABASE_MAX_OVERFLOW: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@localization-redis:6379/0
+      REDIS_POOL_SIZE: 50
+      
+      # API Configuration
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      WORKERS: ${API_WORKERS:-4}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-development_secret_key_change_in_production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-jwt_secret_key_change_in_production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8080"]}
+      
+      # Translation Services
+      GOOGLE_TRANSLATE_API_KEY: ${GOOGLE_TRANSLATE_API_KEY:-}
+      AZURE_TRANSLATOR_KEY: ${AZURE_TRANSLATOR_KEY:-}
+      DEEPL_API_KEY: ${DEEPL_API_KEY:-}
+      ENABLE_AUTO_TRANSLATION: ${ENABLE_AUTO_TRANSLATION:-true}
+      
+      # Performance
+      CACHE_TTL: ${CACHE_TTL:-3600}
+      ENABLE_COMPRESSION: ${ENABLE_COMPRESSION:-true}
+      MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE:-10485760}
+      
+      # Monitoring
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-true}
+      METRICS_PORT: 9090
+      
+      # APG Platform Integration
+      APG_PLATFORM_URL: ${APG_PLATFORM_URL:-http://localhost:8080}
+      APG_API_KEY: ${APG_API_KEY:-}
+      APG_SERVICE_NAME: multi-language-localization
+      APG_SERVICE_VERSION: 1.0.0
+    ports:
+      - "${API_PORT:-8000}:8000"
+      - "${METRICS_PORT:-9090}:9090"
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    depends_on:
+      localization-db:
+        condition: service_healthy
+      localization-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - localization-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # Background Worker Service
+  localization-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: localization-worker
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-localization_user}:${POSTGRES_PASSWORD:-secure_password}@localization-db:5432/${POSTGRES_DB:-localization}
+      
+      # Redis Configuration
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@localization-redis:6379/0
+      
+      # Worker Configuration
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@localization-redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@localization-redis:6379/2
+      CELERY_WORKERS: ${CELERY_WORKERS:-4}
+      CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-2}
+      
+      # Translation Services
+      GOOGLE_TRANSLATE_API_KEY: ${GOOGLE_TRANSLATE_API_KEY:-}
+      AZURE_TRANSLATOR_KEY: ${AZURE_TRANSLATOR_KEY:-}
+      DEEPL_API_KEY: ${DEEPL_API_KEY:-}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: celery -A service.tasks worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-2}
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    depends_on:
+      localization-db:
+        condition: service_healthy
+      localization-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - localization-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # Celery Beat Scheduler
+  localization-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: localization-scheduler
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-localization_user}:${POSTGRES_PASSWORD:-secure_password}@localization-db:5432/${POSTGRES_DB:-localization}
+      
+      # Redis Configuration
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@localization-redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@localization-redis:6379/1
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: celery -A service.tasks beat --loglevel=info --scheduler=django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      localization-db:
+        condition: service_healthy
+      localization-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - localization-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx Reverse Proxy
+  localization-nginx:
+    image: nginx:alpine
+    container_name: localization-nginx
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - localization-api
+    restart: unless-stopped
+    networks:
+      - localization-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Prometheus Monitoring
+  localization-prometheus:
+    image: prom/prometheus:latest
+    container_name: localization-prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - localization-network
+    profiles:
+      - monitoring
+
+  # Grafana Dashboard
+  localization-grafana:
+    image: grafana/grafana:latest
+    container_name: localization-grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - localization-prometheus
+    restart: unless-stopped
+    networks:
+      - localization-network
+    profiles:
+      - monitoring
+
+  # pgAdmin Database Management
+  localization-pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: localization-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@datacraft.co.ke}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      - localization-db
+    restart: unless-stopped
+    networks:
+      - localization-network
+    profiles:
+      - admin
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  localization-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16

@@ -6,11 +6,14 @@ Enterprise-grade event streaming platform providing real-time event-driven commu
 
 The APG Event Streaming Bus is a foundational capability that enables:
 
-- **Real-time Event Streaming** - High-throughput event publishing and consumption
-- **Event Sourcing** - Immutable event logs for audit trails and state reconstruction  
-- **Stream Processing** - Real-time aggregation, windowing, and complex event processing
+- **Real-time Event Streaming** - High-throughput event publishing and consumption with priority handling
+- **Event Sourcing & CQRS** - Immutable event logs with optimistic concurrency control and aggregate reconstruction
+- **Stream Processing** - Real-time filtering, mapping, aggregation, windowing, and complex event processing
+- **Enhanced Schema Registry** - Schema evolution, validation, and compatibility management
+- **Consumer Management** - Advanced consumer group operations with lag monitoring and rebalancing
 - **Cross-Capability Integration** - Event-driven communication between APG capabilities
 - **Multi-tenant Isolation** - Secure separation of event data across tenants
+- **Enterprise Monitoring** - Comprehensive processing history, audit trails, and real-time metrics
 
 ## Key Features
 
@@ -29,14 +32,22 @@ The APG Event Streaming Bus is a foundational capability that enables:
 ### 🔄 Event Processing
 - **Exactly-once delivery** semantics where needed
 - **At-least-once** and **at-most-once** delivery modes
+- **Priority-based routing** with HIGH, NORMAL, LOW, and CRITICAL priorities
 - **Dead letter queues** for failed message handling
-- **Automatic retry** with exponential backoff
+- **Automatic retry** with exponential backoff and configurable retry policies
+- **Event compression** with GZIP, SNAPPY, LZ4, and ZSTD support
+- **Multiple serialization formats** (JSON, Avro, Protobuf)
+- **Schema validation** with evolution support
 
 ### 📊 Real-time Analytics
-- **Stream aggregation** with windowing functions
-- **Complex event processing** for pattern detection
-- **Event correlation** across time windows
-- **Real-time dashboards** and metrics
+- **Stream aggregation** with tumbling, hopping, and session windows
+- **Complex event processing** for pattern detection and correlation
+- **Event correlation** across time windows with causation tracking
+- **Real-time dashboards** with enhanced enterprise metrics
+- **Stream processor management** with start/stop/metrics monitoring
+- **Consumer lag monitoring** with automatic rebalancing
+- **Processing history tracking** with detailed audit trails
+- **Performance metrics** with duration tracking and error analysis
 
 ## Quick Start
 
@@ -56,10 +67,11 @@ python -m uvicorn api:app --host 0.0.0.0 --port 8080
 ### 2. Create Your First Stream
 
 ```python
-from event_streaming_bus import EventStreamingService, StreamConfig
+from event_streaming_bus import StreamManagementService, StreamConfig
+from event_streaming_bus.models import CompressionType, SerializationFormat
 
 # Initialize service
-streaming_service = EventStreamingService()
+stream_service = StreamManagementService()
 
 # Create stream configuration
 stream_config = StreamConfig(
@@ -67,14 +79,17 @@ stream_config = StreamConfig(
     topic_name="apg-user-events",
     source_capability="user_management",
     partitions=6,
-    replication_factor=3
+    replication_factor=3,
+    compression_type=CompressionType.SNAPPY,
+    default_serialization=SerializationFormat.JSON,
+    retention_time_ms=604800000  # 7 days
 )
 
 # Create the stream
-stream_id = await streaming_service.create_stream(
-    config=stream_config,
+stream_id = await stream_service.create_stream(
+    stream_config=stream_config,
     tenant_id="your_tenant",
-    created_by="your_user"
+    user_id="your_user"
 )
 ```
 
@@ -82,25 +97,33 @@ stream_id = await streaming_service.create_stream(
 
 ```python
 from event_streaming_bus import EventPublishingService, EventConfig
+from event_streaming_bus.models import EventPriority, CompressionType, SerializationFormat
 
 # Initialize publishing service
 publishing_service = EventPublishingService()
 
-# Create event configuration
+# Create event configuration with enterprise features
 event_config = EventConfig(
     event_type="user.created",
     source_capability="user_management",
     aggregate_id="user_123",
-    aggregate_type="User"
+    aggregate_type="User",
+    priority=EventPriority.HIGH,
+    compression_type=CompressionType.SNAPPY,
+    serialization_format=SerializationFormat.JSON,
+    schema_id="sch_user_created_v1",
+    max_retries=5
 )
 
-# Publish event
+# Publish event with enhanced payload
 event_id = await publishing_service.publish_event(
     event_config=event_config,
     payload={
         "user_name": "john.doe",
         "email": "john.doe@company.com",
-        "department": "Engineering"
+        "department": "Engineering",
+        "created_at": "2025-01-26T10:30:00Z",
+        "verification_status": "pending"
     },
     stream_id=stream_id,
     tenant_id="your_tenant",
@@ -111,23 +134,34 @@ event_id = await publishing_service.publish_event(
 ### 4. Subscribe to Events
 
 ```python
-from event_streaming_bus import EventConsumptionService, SubscriptionConfig
+from event_streaming_bus import ConsumerManagementService, SubscriptionConfig
+from event_streaming_bus.models import DeliveryMode
 
-# Initialize consumption service
-consumption_service = EventConsumptionService()
+# Initialize consumer management service
+consumer_service = ConsumerManagementService()
 
-# Create subscription configuration
+# Create subscription configuration with advanced features
 subscription_config = SubscriptionConfig(
     subscription_name="user_notifications",
     stream_id=stream_id,
     consumer_group_id="notification_service",
     consumer_name="notification_consumer",
-    event_type_patterns=["user.*"],
-    webhook_url="https://your-service.com/webhook"
+    event_type_patterns=["user.*", "profile.updated"],
+    delivery_mode=DeliveryMode.EXACTLY_ONCE,
+    batch_size=50,
+    max_wait_time_ms=1000,
+    webhook_url="https://your-service.com/webhook",
+    webhook_timeout_ms=5000,
+    dead_letter_enabled=True,
+    retry_policy={
+        "max_retries": 3,
+        "retry_delay_ms": 1000,
+        "exponential_backoff": True
+    }
 )
 
 # Create subscription
-subscription_id = await consumption_service.create_subscription(
+subscription_id = await consumer_service.create_subscription(
     config=subscription_config,
     tenant_id="your_tenant",
     created_by="your_user"
@@ -140,26 +174,60 @@ subscription_id = await consumption_service.create_subscription(
 
 The Event Streaming Bus provides a comprehensive REST API:
 
+#### Event Publishing
 ```
 POST   /api/v1/events                    # Publish single event
 POST   /api/v1/events/batch              # Publish event batch  
 GET    /api/v1/events/{event_id}         # Get event by ID
 POST   /api/v1/events/query              # Query events with filters
+```
 
+#### Stream Management
+```
 GET    /api/v1/streams                   # List streams
 POST   /api/v1/streams                   # Create stream
 GET    /api/v1/streams/{id}              # Get stream details
 GET    /api/v1/streams/{id}/events       # Get stream events
 GET    /api/v1/streams/{id}/metrics      # Get stream metrics
+```
+
+#### Event Sourcing & CQRS
+```
+POST   /api/v1/event-sourcing/append     # Append event to aggregate
+POST   /api/v1/event-sourcing/reconstruct # Reconstruct aggregate state
+GET    /api/v1/event-sourcing/aggregate/{id}/events # Get aggregate events
+```
+
+#### Stream Processing
+```
+POST   /api/v1/stream-processors         # Create stream processor
+GET    /api/v1/stream-processors         # List stream processors
+POST   /api/v1/stream-processors/{id}/start # Start processor
+POST   /api/v1/stream-processors/{id}/stop  # Stop processor
+GET    /api/v1/stream-processors/{id}/metrics # Get processor metrics
+```
+
+#### Consumer Management
+```
+POST   /api/v1/consumer-groups           # Create consumer group
+GET    /api/v1/consumer-groups           # List consumer groups
+GET    /api/v1/consumer-groups/{id}/lag  # Get consumer lag
+POST   /api/v1/consumer-groups/{id}/rebalance # Trigger rebalance
 
 POST   /api/v1/subscriptions             # Create subscription
 GET    /api/v1/subscriptions             # List subscriptions
 GET    /api/v1/subscriptions/{id}/status # Get subscription status
 DELETE /api/v1/subscriptions/{id}        # Cancel subscription
+```
 
-POST   /api/v1/schemas                   # Register schema
+#### Enhanced Schema Registry
+```
+POST   /api/v1/schemas                   # Register schema (legacy)
+POST   /api/v1/schemas/enhanced          # Register enhanced schema
 GET    /api/v1/schemas                   # List schemas
 GET    /api/v1/schemas/{id}              # Get schema details
+POST   /api/v1/schemas/{id}/validate     # Validate event against schema
+GET    /api/v1/schemas/evolution/{type}  # Get schema evolution history
 ```
 
 ### WebSocket API
@@ -180,6 +248,10 @@ from event_streaming_bus import (
     EventPublishingService, 
     EventConsumptionService,
     StreamProcessingService,
+    EventSourcingService,
+    SchemaRegistryService,
+    StreamManagementService,
+    ConsumerManagementService,
     APGEventStreamingIntegration
 )
 
@@ -189,11 +261,21 @@ publishing = EventPublishingService()
 consumption = EventConsumptionService()
 processing = StreamProcessingService()
 
+# Enterprise services
+sourcing = EventSourcingService()
+schema_registry = SchemaRegistryService()
+stream_management = StreamManagementService()
+consumer_management = ConsumerManagementService()
+
 # APG platform integration
 integration = APGEventStreamingIntegration(
     event_streaming_service=streaming,
     publishing_service=publishing,
-    consumption_service=consumption
+    consumption_service=consumption,
+    sourcing_service=sourcing,
+    schema_registry_service=schema_registry,
+    stream_management_service=stream_management,
+    consumer_management_service=consumer_management
 )
 ```
 
@@ -202,39 +284,50 @@ integration = APGEventStreamingIntegration(
 ### Core Components
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    APG Event Streaming Bus                  │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │   Web UI    │  │  REST API   │  │  WebSocket  │         │
-│  │ Dashboard   │  │   Layer     │  │   Gateway   │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │   Event     │  │   Stream    │  │   Schema    │         │
-│  │ Publishing  │  │ Processing  │  │  Registry   │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │   Apache    │  │    Redis    │  │ PostgreSQL  │         │
-│  │   Kafka     │  │   Streams   │  │  Database   │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                       APG Event Streaming Bus Enterprise                        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Web UI     │  │  REST API    │  │  WebSocket   │  │   GraphQL    │     │
+│  │ Dashboard    │  │   Layer      │  │   Gateway    │  │   Gateway    │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Event      │  │   Stream     │  │  Enhanced    │  │   Consumer   │     │
+│  │ Publishing   │  │ Processing   │  │   Schema     │  │ Management   │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │    Event     │  │   Stream     │  │  Processing  │  │    Audit     │     │
+│  │  Sourcing    │  │ Assignment   │  │   History    │  │   Trails     │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Apache     │  │    Redis     │  │ PostgreSQL   │  │ Monitoring   │     │
+│  │   Kafka      │  │   Streams    │  │  Database    │  │ & Metrics    │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Event Flow
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  Producer   │───▶│   Kafka     │───▶│  Consumer   │
-│ Application │    │   Broker    │    │ Application │
-└─────────────┘    └─────────────┘    └─────────────┘
-       │                  │                  │
-       ▼                  ▼                  ▼
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Schema    │    │   Stream    │    │   Event     │
-│ Validation  │    │ Processing  │    │  Handlers   │
-└─────────────┘    └─────────────┘    └─────────────┘
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  Producer   │───▶│   Schema    │───▶│   Kafka     │───▶│  Stream     │
+│ Application │    │ Validation  │    │   Broker    │    │ Processor   │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+       │                  │                  │                  │
+       ▼                  ▼                  ▼                  ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│    Event    │    │   Priority  │    │   Event     │    │  Consumer   │
+│  Sourcing   │    │  Routing    │    │ Assignment  │    │   Groups    │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+       │                  │                  │                  │
+       ▼                  ▼                  ▼                  ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ Processing  │    │   Audit     │    │   Dead      │    │  Consumer   │
+│  History    │    │   Logs      │    │  Letter     │    │ Application │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 ## Configuration
@@ -396,10 +489,12 @@ python run_tests.py --lint
 
 The project maintains high code quality standards:
 
-- **Test Coverage**: >80% required
-- **Type Hints**: Full typing coverage
+- **Test Coverage**: >95% required for enterprise features
+- **Type Hints**: Full typing coverage with strict mypy configuration
 - **Linting**: Ruff for Python linting and formatting
-- **Documentation**: Comprehensive docstrings and examples
+- **Documentation**: Comprehensive docstrings, examples, and API documentation
+- **Security**: Regular security audits and dependency scanning
+- **Performance**: Continuous performance benchmarking and optimization
 
 ## Deployment
 

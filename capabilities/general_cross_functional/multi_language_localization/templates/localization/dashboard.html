@@ -1,0 +1,347 @@
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block head_css %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/localization.css') }}">
+<style>
+.stat-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+    border-left: 4px solid #007bff;
+}
+
+.stat-card.warning { border-left-color: #ffc107; }
+.stat-card.success { border-left-color: #28a745; }
+.stat-card.danger { border-left-color: #dc3545; }
+.stat-card.info { border-left-color: #17a2b8; }
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.chart-container {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.progress-custom {
+    height: 20px;
+    border-radius: 10px;
+    background-color: #e9ecef;
+}
+
+.progress-bar-custom {
+    border-radius: 10px;
+    line-height: 20px;
+    color: #fff;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.language-flag {
+    width: 24px;
+    height: 18px;
+    border-radius: 3px;
+    margin-right: 8px;
+    display: inline-block;
+    background-size: cover;
+}
+
+.quick-action-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    margin: 5px;
+    background: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background 0.3s;
+}
+
+.quick-action-btn:hover {
+    background: #0056b3;
+    text-decoration: none;
+    color: white;
+}
+
+.recent-activity-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.recent-activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-time {
+    color: #999;
+    font-size: 0.8rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="page-header">
+                <i class="fa fa-globe"></i> {{ _('Localization Dashboard') }}
+            </h1>
+        </div>
+    </div>
+
+    <!-- Key Metrics Row -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="stat-card success">
+                <div class="stat-number">{{ stats.total_languages }}</div>
+                <div class="stat-label">{{ _('Total Languages') }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card info">
+                <div class="stat-number">{{ stats.active_languages }}</div>
+                <div class="stat-label">{{ _('Active Languages') }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-number">{{ "{:,}".format(stats.total_keys) }}</div>
+                <div class="stat-label">{{ _('Translation Keys') }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card {% if stats.completion_percentage >= 90 %}success{% elif stats.completion_percentage >= 70 %}warning{% else %}danger{% endif %}">
+                <div class="stat-number">{{ "%.1f"|format(stats.completion_percentage) }}%</div>
+                <div class="stat-label">{{ _('Overall Completion') }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress and Quality Row -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4><i class="fa fa-chart-line"></i> {{ _('Translation Progress') }}</h4>
+                <div class="progress progress-custom">
+                    <div class="progress-bar progress-bar-custom bg-success" 
+                         role="progressbar" 
+                         style="width: {{ stats.completion_percentage }}%"
+                         aria-valuenow="{{ stats.completion_percentage }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                        {{ "{:,}".format(stats.translated_keys) }} / {{ "{:,}".format(stats.total_keys) }}
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="fa fa-info-circle"></i> 
+                        {{ _('%(translated)s of %(total)s translation keys completed', 
+                             translated="{:,}".format(stats.translated_keys), 
+                             total="{:,}".format(stats.total_keys)) }}
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4><i class="fa fa-star"></i> {{ _('Quality Metrics') }}</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="stat-number" style="font-size: 1.8rem; color: #28a745;">
+                            {{ "%.1f"|format(stats.quality_average) }}/10
+                        </div>
+                        <div class="stat-label">{{ _('Average Quality') }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="stat-number" style="font-size: 1.8rem; color: #ffc107;">
+                            {{ stats.pending_review }}
+                        </div>
+                        <div class="stat-label">{{ _('Pending Review') }}</div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ url_for('TranslationView.list') }}?_flt_0_status=pending_review" 
+                       class="btn btn-warning btn-sm">
+                        <i class="fa fa-eye"></i> {{ _('Review Pending Translations') }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions and Recent Activity -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4><i class="fa fa-bolt"></i> {{ _('Quick Actions') }}</h4>
+                <div class="text-center">
+                    <a href="{{ url_for('TranslationWorkbenchView.index') }}" class="quick-action-btn">
+                        <i class="fa fa-edit"></i> {{ _('Translation Workbench') }}
+                    </a>
+                    <a href="{{ url_for('TranslationKeyView.add') }}" class="quick-action-btn">
+                        <i class="fa fa-plus"></i> {{ _('Add Translation Key') }}
+                    </a>
+                    <a href="{{ url_for('LanguageView.add') }}" class="quick-action-btn">
+                        <i class="fa fa-language"></i> {{ _('Add Language') }}
+                    </a>
+                    <a href="{{ url_for('LocalizationDashboardView.analytics') }}" class="quick-action-btn">
+                        <i class="fa fa-chart-bar"></i> {{ _('View Analytics') }}
+                    </a>
+                    <a href="{{ url_for('LocalizationDashboardView.quality_assurance') }}" class="quick-action-btn">
+                        <i class="fa fa-shield-alt"></i> {{ _('Quality Assurance') }}
+                    </a>
+                    <a href="{{ url_for('TranslationProjectView.add') }}" class="quick-action-btn">
+                        <i class="fa fa-project-diagram"></i> {{ _('New Project') }}
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4><i class="fa fa-clock"></i> {{ _('Recent Activity') }}</h4>
+                {% if stats.recent_activity %}
+                    {% for activity in stats.recent_activity %}
+                    <div class="recent-activity-item">
+                        <strong>{{ activity.user_name }}</strong> {{ activity.action }}
+                        <span class="text-muted">{{ activity.target }}</span>
+                        <div class="activity-time">{{ activity.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="fa fa-inbox fa-3x"></i>
+                        <p>{{ _('No recent activity') }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Language Coverage Overview -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="chart-container">
+                <h4><i class="fa fa-globe-americas"></i> {{ _('Language Coverage Overview') }}</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>{{ _('Language') }}</th>
+                                <th>{{ _('Progress') }}</th>
+                                <th>{{ _('Translations') }}</th>
+                                <th>{{ _('Quality') }}</th>
+                                <th>{{ _('Last Updated') }}</th>
+                                <th>{{ _('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- This would be populated with actual language data -->
+                            <tr>
+                                <td>
+                                    <span class="language-flag" style="background-image: url('{{ url_for('static', filename='flags/us.png') }}')"></span>
+                                    English (en)
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 15px;">
+                                        <div class="progress-bar bg-success" style="width: 100%">100%</div>
+                                    </div>
+                                </td>
+                                <td>15,000 / 15,000</td>
+                                <td><span class="badge badge-success">9.2/10</span></td>
+                                <td>2 hours ago</td>
+                                <td>
+                                    <a href="#" class="btn btn-sm btn-primary">
+                                        <i class="fa fa-edit"></i> {{ _('Edit') }}
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="language-flag" style="background-image: url('{{ url_for('static', filename='flags/es.png') }}')"></span>
+                                    Spanish (es)
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 15px;">
+                                        <div class="progress-bar bg-warning" style="width: 85%">85%</div>
+                                    </div>
+                                </td>
+                                <td>12,750 / 15,000</td>
+                                <td><span class="badge badge-info">8.5/10</span></td>
+                                <td>1 day ago</td>
+                                <td>
+                                    <a href="#" class="btn btn-sm btn-primary">
+                                        <i class="fa fa-edit"></i> {{ _('Edit') }}
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="language-flag" style="background-image: url('{{ url_for('static', filename='flags/fr.png') }}')"></span>
+                                    French (fr)
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 15px;">
+                                        <div class="progress-bar bg-info" style="width: 78%">78%</div>
+                                    </div>
+                                </td>
+                                <td>11,700 / 15,000</td>
+                                <td><span class="badge badge-info">8.1/10</span></td>
+                                <td>3 days ago</td>
+                                <td>
+                                    <a href="#" class="btn btn-sm btn-primary">
+                                        <i class="fa fa-edit"></i> {{ _('Edit') }}
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('LanguageView.list') }}" class="btn btn-outline-primary">
+                        <i class="fa fa-list"></i> {{ _('View All Languages') }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+$(document).ready(function() {
+    // Auto-refresh dashboard every 5 minutes
+    setInterval(function() {
+        location.reload();
+    }, 300000);
+    
+    // Add tooltips to progress bars
+    $('[data-toggle="tooltip"]').tooltip();
+    
+    // Add click tracking for quick actions
+    $('.quick-action-btn').click(function() {
+        var action = $(this).text().trim();
+        // Track action analytics here
+        console.log('Quick action clicked:', action);
+    });
+});
+</script>
+{% endblock %}

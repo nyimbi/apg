@@ -1,0 +1,519 @@
+# APG Integration API Management - Helm Values
+# Configuration values for the API Management deployment
+
+# Global configuration
+global:
+  # Image registry and repository
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: "fast-ssd"
+  
+  # APG Platform configuration
+  apgPlatform:
+    enabled: true
+    namespace: "apg-platform"
+    serviceDiscovery:
+      enabled: true
+      consul:
+        address: "consul.apg-platform:8500"
+    eventBus:
+      enabled: true
+      kafka:
+        brokers: "kafka.apg-platform:9092"
+
+# Application configuration
+app:
+  name: api-management
+  namespace: integration-api-management
+  
+  # Image configuration
+  image:
+    registry: ""
+    repository: api-management
+    tag: "latest"
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+  
+  # Deployment configuration
+  replicaCount: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  
+  # Resource configuration
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "2"
+  
+  # Auto-scaling configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  # Pod Disruption Budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  
+  # Security Context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    readOnlyRootFilesystem: true
+  
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  # Environment configuration
+  environment: production
+  debug: false
+  
+  # Application-specific configuration
+  config:
+    gateway:
+      workers: 4
+      maxConnections: 10000
+      keepAliveTimeout: 75
+      clientTimeout: 60
+      requestTimeout: 30
+    
+    security:
+      allowedOrigins:
+        - "https://*.yourcompany.com"
+        - "https://yourcompany.com"
+      corsEnabled: true
+      csrfEnabled: true
+      secureCookies: true
+    
+    features:
+      rateLimitingEnabled: true
+      analyticsEnabled: true
+      cachingEnabled: true
+      transformationEnabled: true
+      validationEnabled: true
+
+# API Gateway configuration
+gateway:
+  enabled: true
+  
+  # Separate gateway deployment
+  separateDeployment: false
+  
+  # Gateway-specific resources
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1"
+  
+  # Gateway configuration
+  config:
+    port: 8081
+    maxRequestSize: "10MB"
+    responseTimeout: 30
+    enableCompression: true
+    compressionLevel: 6
+
+# Service configuration
+service:
+  type: ClusterIP
+  
+  # API Management service
+  apiManagement:
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  
+  # Gateway service
+  gateway:
+    port: 8081
+    targetPort: 8081
+    protocol: TCP
+  
+  # Metrics service
+  metrics:
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  
+  # External load balancer
+  external:
+    enabled: false
+    type: LoadBalancer
+    annotations: {}
+    # AWS
+    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    # GCP
+    # cloud.google.com/load-balancer-type: "External"
+    # Azure
+    # service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  
+  # API Management ingress
+  apiManagement:
+    enabled: true
+    host: api-management.yourcompany.com
+    path: /
+    pathType: Prefix
+    tls:
+      enabled: true
+      secretName: tls-secret
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rate-limit: "100"
+      nginx.ingress.kubernetes.io/enable-cors: "true"
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  
+  # Gateway ingress
+  gateway:
+    enabled: true
+    host: gateway.yourcompany.com
+    path: /
+    pathType: Prefix
+    tls:
+      enabled: true
+      secretName: tls-secret
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+# Database configuration
+database:
+  # Use external PostgreSQL
+  external:
+    enabled: false
+    host: ""
+    port: 5432
+    database: ""
+    username: ""
+    password: ""
+    sslMode: "require"
+  
+  # Connection pool settings
+  pool:
+    size: 20
+    maxOverflow: 30
+    timeout: 30
+    recycle: 3600
+
+# PostgreSQL dependency configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "secure_production_password"
+    username: "api_management_user"
+    password: "secure_app_password"
+    database: "integration_api_management"
+  
+  primary:
+    persistence:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: 100Gi
+    
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "4Gi"
+        cpu: "2"
+    
+    configuration: |
+      shared_buffers = 2GB
+      effective_cache_size = 6GB
+      maintenance_work_mem = 512MB
+      checkpoint_completion_target = 0.9
+      wal_buffers = 64MB
+      default_statistics_target = 100
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
+      work_mem = 32MB
+      min_wal_size = 1GB
+      max_wal_size = 4GB
+      max_connections = 200
+  
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Cache configuration
+cache:
+  # Use external Redis
+  external:
+    enabled: false
+    host: ""
+    port: 6379
+    password: ""
+    database: 0
+  
+  # Connection settings
+  connection:
+    timeout: 5
+    connectTimeout: 5
+    poolSize: 20
+    retryOnTimeout: true
+
+# Redis dependency configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "secure_redis_password"
+  
+  master:
+    persistence:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: 50Gi
+    
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "2Gi"
+        cpu: "1"
+    
+    configuration: |
+      maxmemory 1.5gb
+      maxmemory-policy allkeys-lru
+      save 900 1
+      save 300 10
+      save 60 10000
+  
+  sentinel:
+    enabled: true
+    masterSet: mymaster
+    downAfterMilliseconds: 30000
+    failoverTimeout: 180000
+    parallelSyncs: 1
+  
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  
+  # Prometheus configuration
+  prometheus:
+    enabled: true
+    retention: "30d"
+    
+    persistence:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: 50Gi
+    
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "4Gi"
+        cpu: "2"
+    
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+  
+  # Grafana configuration
+  grafana:
+    enabled: true
+    
+    adminUser: admin
+    adminPassword: "secure_grafana_password"
+    
+    persistence:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: 10Gi
+    
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    
+    plugins:
+      - grafana-clock-panel
+      - grafana-simple-json-datasource
+      - grafana-piechart-panel
+    
+    dashboards:
+      enabled: true
+      
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://prometheus-service:9090
+          isDefault: true
+  
+  # AlertManager configuration
+  alertmanager:
+    enabled: true
+    
+    config:
+      global:
+        smtp_smarthost: 'mail.yourcompany.com:587'
+        smtp_from: 'alerts@yourcompany.com'
+      
+      route:
+        group_by: ['alertname']
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 1h
+        receiver: 'web.hook'
+      
+      receivers:
+      - name: 'web.hook'
+        email_configs:
+        - to: 'admin@yourcompany.com'
+          subject: 'API Management Alert'
+
+# Security configuration
+security:
+  # Service Account
+  serviceAccount:
+    create: true
+    name: "api-management-sa"
+    automountServiceAccountToken: true
+  
+  # RBAC
+  rbac:
+    create: true
+  
+  # Pod Security Policy
+  podSecurityPolicy:
+    enabled: false
+  
+  # Network Policies
+  networkPolicy:
+    enabled: true
+    policyTypes:
+      - Ingress
+      - Egress
+  
+  # Secrets management
+  secrets:
+    # External secrets operator
+    external:
+      enabled: false
+      backend: "vault"  # vault, aws, azure, gcp
+      
+    # TLS certificates
+    tls:
+      enabled: true
+      secretName: "tls-secret"
+      issuer: "letsencrypt-prod"
+
+# Backup and recovery
+backup:
+  enabled: false
+  
+  # Database backup
+  database:
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention: "30d"
+    storageClass: "standard"
+    
+  # Configuration backup
+  config:
+    enabled: true
+    schedule: "0 3 * * *"  # Daily at 3 AM
+
+# Migration and initialization
+migration:
+  enabled: true
+  
+  # Database migration job
+  job:
+    image:
+      repository: api-management
+      tag: "latest"
+    
+    command:
+      - /bin/sh
+      - -c
+      - "python -m alembic upgrade head"
+    
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+# Testing configuration
+testing:
+  enabled: false
+  
+  # Test job configuration
+  job:
+    image:
+      repository: api-management
+      tag: "latest"
+    
+    command:
+      - /bin/sh
+      - -c
+      - "python -m pytest tests/ -v"
+
+# Development configuration
+development:
+  enabled: false
+  
+  # Debug settings
+  debug: true
+  logLevel: DEBUG
+  
+  # Hot reload
+  hotReload: false
+  
+  # Local storage
+  persistence:
+    enabled: false

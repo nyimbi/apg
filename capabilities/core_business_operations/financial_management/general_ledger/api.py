@@ -1,24 +1,40 @@
 """
-General Ledger REST API
+APG Financial Management General Ledger - REST API Layer
 
-REST API endpoints for General Ledger functionality.
-Provides programmatic access to GL operations.
+Comprehensive REST API endpoints for enterprise general ledger operations including:
+- Chart of Accounts management with hierarchical operations
+- Journal Entry processing with validation and posting
+- Financial Reporting with real-time analytics
+- Period management and closing procedures
+- Multi-currency transaction support
+- Audit trail and compliance monitoring
+- Advanced search and filtering capabilities
+
+© 2025 Datacraft. All rights reserved.
+Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
-from flask import request, jsonify, Blueprint
+from flask import request, jsonify, Blueprint, session, current_app
 from flask_restful import Api, Resource
 from flask_appbuilder.api import BaseApi, expose
 from flask_appbuilder.models.sqla.interface import SQLAInterface
-from marshmallow import Schema, fields
-from datetime import date, datetime
-from typing import Dict, List, Any
+from flask_appbuilder.security.decorators import protect
+from marshmallow import Schema, fields, validate, ValidationError, post_load
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from typing import Dict, List, Any, Optional
+import logging
 
 from .models import (
-	CFGLAccount, CFGLAccountType, CFGLPeriod, CFGLJournalEntry,
-	CFGLJournalLine, CFGLPosting
+	GLTenant, GLAccountType, GLAccount, GLAccountGroup, GLAccountBalance,
+	GLAccountBudget, GLPeriod, GLCurrencyRate, GLJournalEntry, GLJournalLine,
+	GLPosting, AccountTypeEnum, BalanceTypeEnum, PeriodStatusEnum, 
+	JournalStatusEnum, JournalSourceEnum, CurrencyEnum, ReportingFrameworkEnum
 )
-from .service import GeneralLedgerService
-from ...auth_rbac.models import db
+from .service import (
+	GeneralLedgerService, AccountCreationRequest, JournalEntryRequest,
+	TrialBalanceParams, FinancialReportingResult, GLServiceException
+)
 
 
 # Marshmallow Schemas for API serialization
@@ -103,7 +119,7 @@ class GLAccountApi(BaseApi):
 	"""GL Account API endpoints"""
 	
 	resource_name = 'accounts'
-	datamodel = SQLAInterface(CFGLAccount)
+	datamodel = SQLAInterface(GLAccount)
 	
 	list_columns = [
 		'account_id', 'account_code', 'account_name', 'account_type.type_name',
@@ -196,7 +212,7 @@ class GLJournalEntryApi(BaseApi):
 	"""Journal Entry API endpoints"""
 	
 	resource_name = 'journal_entries'
-	datamodel = SQLAInterface(CFGLJournalEntry)
+	datamodel = SQLAInterface(GLJournalEntry)
 	
 	list_columns = [
 		'journal_id', 'journal_number', 'description', 'entry_date',
@@ -262,7 +278,7 @@ class GLJournalEntryApi(BaseApi):
 		tenant_id = self.get_tenant_id()
 		
 		try:
-			journal = CFGLJournalEntry.query.filter_by(
+			journal = GLJournalEntry.query.filter_by(
 				tenant_id=tenant_id,
 				journal_id=journal_id
 			).first()
@@ -393,8 +409,13 @@ class GLAccountResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		# TODO: Implement tenant resolution
-		return "default_tenant"
+		from flask import session
+		return session.get('tenant_id', 'default_tenant')
+	
+	def _get_user_id(self):
+		"""Get user ID from request context"""
+		from flask import session
+		return session.get('user_id')
 
 
 class GLJournalEntryResource(Resource):
@@ -438,8 +459,13 @@ class GLJournalEntryResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		# TODO: Implement tenant resolution
-		return "default_tenant"
+		from flask import session
+		return session.get('tenant_id', 'default_tenant')
+	
+	def _get_user_id(self):
+		"""Get user ID from request context"""
+		from flask import session
+		return session.get('user_id')
 
 
 class GLTrialBalanceResource(Resource):
@@ -463,8 +489,13 @@ class GLTrialBalanceResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		# TODO: Implement tenant resolution
-		return "default_tenant"
+		from flask import session
+		return session.get('tenant_id', 'default_tenant')
+	
+	def _get_user_id(self):
+		"""Get user ID from request context"""
+		from flask import session
+		return session.get('user_id')
 
 
 class GLAccountLedgerResource(Resource):
@@ -493,5 +524,10 @@ class GLAccountLedgerResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		# TODO: Implement tenant resolution
-		return "default_tenant"
+		from flask import session
+		return session.get('tenant_id', 'default_tenant')
+	
+	def _get_user_id(self):
+		"""Get user ID from request context"""
+		from flask import session
+		return session.get('user_id')

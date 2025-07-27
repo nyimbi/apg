@@ -14,9 +14,10 @@ from pydantic import ValidationError
 
 from ...models import (
 	ESEvent, ESStream, ESSubscription, ESConsumerGroup, ESSchema, ESMetrics,
+	ESEventSchema, ESStreamAssignment, ESEventProcessingHistory, ESStreamProcessor,
 	EventConfig, StreamConfig, SubscriptionConfig, SchemaConfig,
 	EventStatus, StreamStatus, SubscriptionStatus, EventType, DeliveryMode,
-	CompressionType, SerializationFormat
+	CompressionType, SerializationFormat, EventPriority, ProcessorType, ConsumerStatus
 )
 
 # =============================================================================
@@ -425,3 +426,265 @@ class TestEnums:
 		assert DeliveryMode.AT_MOST_ONCE.value == "at_most_once"
 		assert DeliveryMode.AT_LEAST_ONCE.value == "at_least_once"
 		assert DeliveryMode.EXACTLY_ONCE.value == "exactly_once"
+	
+	def test_event_priority_values(self):
+		"""Test EventPriority enum values."""
+		assert EventPriority.LOW.value == "low"
+		assert EventPriority.NORMAL.value == "normal"
+		assert EventPriority.HIGH.value == "high"
+		assert EventPriority.CRITICAL.value == "critical"
+	
+	def test_processor_type_values(self):
+		"""Test ProcessorType enum values."""
+		assert ProcessorType.FILTER.value == "filter"
+		assert ProcessorType.MAP.value == "map"
+		assert ProcessorType.AGGREGATE.value == "aggregate"
+		assert ProcessorType.JOIN.value == "join"
+		assert ProcessorType.WINDOW.value == "window"
+		assert ProcessorType.CUSTOM.value == "custom"
+
+# =============================================================================
+# Enhanced Event Schema Model Tests
+# =============================================================================
+
+@pytest.mark.unit
+class TestESEventSchema:
+	"""Test ESEventSchema model."""
+	
+	def test_event_schema_creation_with_defaults(self):
+		"""Test creating an event schema with default values."""
+		schema = ESEventSchema(
+			schema_name="user_created",
+			schema_version="1.0",
+			json_schema={"type": "object", "properties": {"user_id": {"type": "string"}}},
+			event_type="user.created",
+			tenant_id="test_tenant",
+			created_by="test_user"
+		)
+		
+		assert schema.schema_id.startswith('sch_')
+		assert schema.compatibility_level == "BACKWARD"
+		assert schema.evolution_strategy == "COMPATIBLE"
+		assert schema.is_active == True
+		assert schema.validation_rules == {}
+	
+	def test_event_schema_validation_json_schema(self):
+		"""Test JSON schema validation."""
+		with pytest.raises(ValueError, match="JSON schema must be a dictionary"):
+			schema = ESEventSchema(
+				schema_name="test_schema",
+				schema_version="1.0",
+				json_schema="invalid_schema",  # Should be dict
+				event_type="test.event",
+				tenant_id="test_tenant",
+				created_by="test_user"
+			)
+	
+	def test_event_schema_compatibility_levels(self):
+		"""Test valid compatibility levels."""
+		valid_levels = ["BACKWARD", "FORWARD", "FULL", "NONE"]
+		
+		for level in valid_levels:
+			schema = ESEventSchema(
+				schema_name="test_schema",
+				schema_version="1.0",
+				json_schema={"type": "object"},
+				event_type="test.event",
+				compatibility_level=level,
+				tenant_id="test_tenant",
+				created_by="test_user"
+			)
+			assert schema.compatibility_level == level
+	
+	def test_event_schema_string_representation(self):
+		"""Test event schema string representation."""
+		schema = ESEventSchema(
+			schema_name="user_created",
+			schema_version="1.0",
+			json_schema={"type": "object"},
+			event_type="user.created",
+			tenant_id="test_tenant",
+			created_by="test_user"
+		)
+		
+		repr_str = repr(schema)
+		assert "ESEventSchema" in repr_str
+		assert schema.schema_id in repr_str
+		assert schema.schema_name in repr_str
+
+# =============================================================================
+# Stream Assignment Model Tests
+# =============================================================================
+
+@pytest.mark.unit
+class TestESStreamAssignment:
+	"""Test ESStreamAssignment model."""
+	
+	def test_stream_assignment_creation_with_defaults(self):
+		"""Test creating a stream assignment with default values."""
+		assignment = ESStreamAssignment(
+			event_id="evt_test_123",
+			stream_id="str_test_456",
+			assignment_type="AUTOMATIC",
+			tenant_id="test_tenant",
+			assigned_by="test_user"
+		)
+		
+		assert assignment.assignment_id.startswith('asg_')
+		assert assignment.priority_level == "NORMAL"
+		assert assignment.is_active == True
+		assert assignment.assignment_rules == {}
+	
+	def test_stream_assignment_priority_levels(self):
+		"""Test valid priority levels."""
+		valid_priorities = ["LOW", "NORMAL", "HIGH", "CRITICAL"]
+		
+		for priority in valid_priorities:
+			assignment = ESStreamAssignment(
+				event_id="evt_test_123",
+				stream_id="str_test_456",
+				assignment_type="MANUAL",
+				priority_level=priority,
+				tenant_id="test_tenant",
+				assigned_by="test_user"
+			)
+			assert assignment.priority_level == priority
+	
+	def test_stream_assignment_string_representation(self):
+		"""Test stream assignment string representation."""
+		assignment = ESStreamAssignment(
+			event_id="evt_test_123",
+			stream_id="str_test_456",
+			assignment_type="AUTOMATIC",
+			tenant_id="test_tenant",
+			assigned_by="test_user"
+		)
+		
+		repr_str = repr(assignment)
+		assert "ESStreamAssignment" in repr_str
+		assert assignment.assignment_id in repr_str
+
+# =============================================================================
+# Event Processing History Model Tests
+# =============================================================================
+
+@pytest.mark.unit
+class TestESEventProcessingHistory:
+	"""Test ESEventProcessingHistory model."""
+	
+	def test_processing_history_creation_with_defaults(self):
+		"""Test creating processing history with default values."""
+		history = ESEventProcessingHistory(
+			event_id="evt_test_123",
+			processor_id="proc_test_456",
+			processing_stage="VALIDATION",
+			status="COMPLETED",
+			tenant_id="test_tenant",
+			processed_by="test_processor"
+		)
+		
+		assert history.history_id.startswith('hist_')
+		assert history.retry_count == 0
+		assert history.input_data == {}
+		assert history.output_data == {}
+		assert history.error_details is None
+	
+	def test_processing_history_status_values(self):
+		"""Test valid processing status values."""
+		valid_statuses = ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED", "RETRY"]
+		
+		for status in valid_statuses:
+			history = ESEventProcessingHistory(
+				event_id="evt_test_123",
+				processor_id="proc_test_456",
+				processing_stage="VALIDATION",
+				status=status,
+				tenant_id="test_tenant",
+				processed_by="test_processor"
+			)
+			assert history.status == status
+	
+	def test_processing_history_timing(self):
+		"""Test processing timing calculations."""
+		start_time = datetime.now(timezone.utc)
+		history = ESEventProcessingHistory(
+			event_id="evt_test_123",
+			processor_id="proc_test_456",
+			processing_stage="TRANSFORMATION",
+			status="IN_PROGRESS",
+			started_at=start_time,
+			tenant_id="test_tenant",
+			processed_by="test_processor"
+		)
+		
+		assert history.started_at == start_time
+		assert history.completed_at is None
+		assert history.processing_duration_ms is None
+
+# =============================================================================
+# Stream Processor Model Tests
+# =============================================================================
+
+@pytest.mark.unit
+class TestESStreamProcessor:
+	"""Test ESStreamProcessor model."""
+	
+	def test_stream_processor_creation_with_defaults(self):
+		"""Test creating a stream processor with default values."""
+		processor = ESStreamProcessor(
+			processor_name="user_validation_filter",
+			processor_type=ProcessorType.FILTER.value,
+			source_stream_id="str_source_123",
+			processing_logic={"filter": "user_id IS NOT NULL"},
+			tenant_id="test_tenant",
+			created_by="test_user"
+		)
+		
+		assert processor.processor_id.startswith('proc_')
+		assert processor.parallelism == 1
+		assert processor.status == "STOPPED"
+		assert processor.error_handling_strategy == "RETRY"
+		assert processor.state_store_config == {}
+		assert processor.window_config == {}
+	
+	def test_stream_processor_type_validation(self):
+		"""Test processor type validation."""
+		for processor_type in ProcessorType:
+			processor = ESStreamProcessor(
+				processor_name=f"test_{processor_type.value}_processor",
+				processor_type=processor_type.value,
+				source_stream_id="str_source_123",
+				processing_logic={"type": processor_type.value},
+				tenant_id="test_tenant",
+				created_by="test_user"
+			)
+			assert processor.processor_type == processor_type.value
+	
+	def test_stream_processor_parallelism_validation(self):
+		"""Test parallelism validation."""
+		with pytest.raises(ValueError, match="Parallelism must be between 1 and 100"):
+			processor = ESStreamProcessor(
+				processor_name="test_processor",
+				processor_type=ProcessorType.FILTER.value,
+				source_stream_id="str_source_123",
+				processing_logic={"filter": "true"},
+				parallelism=0,  # Invalid
+				tenant_id="test_tenant",
+				created_by="test_user"
+			)
+	
+	def test_stream_processor_string_representation(self):
+		"""Test stream processor string representation."""
+		processor = ESStreamProcessor(
+			processor_name="user_validation_filter",
+			processor_type=ProcessorType.FILTER.value,
+			source_stream_id="str_source_123",
+			processing_logic={"filter": "user_id IS NOT NULL"},
+			tenant_id="test_tenant",
+			created_by="test_user"
+		)
+		
+		repr_str = repr(processor)
+		assert "ESStreamProcessor" in repr_str
+		assert processor.processor_id in repr_str
+		assert processor.processor_name in repr_str

@@ -1,0 +1,289 @@
+{{/*
+APG Integration API Management - Helm Deployment Template
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "integration-api-management.fullname" . }}
+  namespace: {{ .Values.app.namespace }}
+  labels:
+    {{- include "integration-api-management.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  strategy:
+    type: {{ .Values.app.strategy.type }}
+    {{- if eq .Values.app.strategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.app.strategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.app.strategy.rollingUpdate.maxSurge }}
+    {{- end }}
+  selector:
+    matchLabels:
+      {{- include "integration-api-management.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "integration-api-management.selectorLabels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.service.metrics.port }}"
+        prometheus.io/path: "/metrics"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.app.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "integration-api-management.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.app.securityContext | nindent 8 }}
+      
+      {{- if .Values.migration.enabled }}
+      initContainers:
+      - name: database-migration
+        image: "{{ .Values.app.image.registry }}{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+        imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Running database migrations..."
+          python -m alembic upgrade head
+          echo "Database migration completed"
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "integration-api-management.fullname" . }}-secret
+              key: database-url
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: {{ .Values.app.securityContext.runAsUser }}
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          {{- toYaml .Values.migration.job.resources | nindent 10 }}
+      {{- end }}
+      
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.app.image.registry }}{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+        imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Starting API Management application..."
+          exec python -m integration_api_management.app
+        env:
+        - name: ENVIRONMENT
+          value: {{ .Values.app.environment }}
+        - name: DEBUG
+          value: "{{ .Values.app.debug }}"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "integration-api-management.fullname" . }}-secret
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "integration-api-management.fullname" . }}-secret
+              key: redis-url
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "integration-api-management.fullname" . }}-secret
+              key: jwt-secret-key
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "integration-api-management.fullname" . }}-secret
+              key: encryption-key
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "integration-api-management.fullname" . }}-secret
+              key: secret-key
+        {{- if .Values.database.external.enabled }}
+        - name: POSTGRES_HOST
+          value: {{ .Values.database.external.host }}
+        - name: POSTGRES_PORT
+          value: "{{ .Values.database.external.port }}"
+        {{- else }}
+        - name: POSTGRES_HOST
+          value: "{{ include "integration-api-management.postgresql.fullname" . }}"
+        - name: POSTGRES_PORT
+          value: "5432"
+        {{- end }}
+        {{- if .Values.cache.external.enabled }}
+        - name: REDIS_HOST
+          value: {{ .Values.cache.external.host }}
+        - name: REDIS_PORT
+          value: "{{ .Values.cache.external.port }}"
+        {{- else }}
+        - name: REDIS_HOST
+          value: "{{ include "integration-api-management.redis.fullname" . }}-master"
+        - name: REDIS_PORT
+          value: "6379"
+        {{- end }}
+        {{- if .Values.global.apgPlatform.enabled }}
+        - name: APG_PLATFORM_ENABLED
+          value: "true"
+        - name: APG_PLATFORM_NAMESPACE
+          value: {{ .Values.global.apgPlatform.namespace }}
+        {{- if .Values.global.apgPlatform.serviceDiscovery.enabled }}
+        - name: CONSUL_ADDRESS
+          value: {{ .Values.global.apgPlatform.serviceDiscovery.consul.address }}
+        {{- end }}
+        {{- if .Values.global.apgPlatform.eventBus.enabled }}
+        - name: KAFKA_BROKERS
+          value: {{ .Values.global.apgPlatform.eventBus.kafka.brokers }}
+        {{- end }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.apiManagement.targetPort }}
+          protocol: TCP
+        - name: metrics
+          containerPort: {{ .Values.service.metrics.targetPort }}
+          protocol: TCP
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: logs-volume
+          mountPath: /app/logs
+        - name: tmp-volume
+          mountPath: /tmp
+        livenessProbe:
+          {{- toYaml .Values.app.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.app.readinessProbe | nindent 10 }}
+        resources:
+          {{- toYaml .Values.app.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: {{ .Values.app.securityContext.runAsUser }}
+          capabilities:
+            drop:
+            - ALL
+      
+      {{- if .Values.gateway.enabled }}
+      - name: api-gateway
+        image: "{{ .Values.app.image.registry }}{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+        imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Starting API Gateway..."
+          exec python -m integration_api_management.gateway
+        env:
+        - name: ENVIRONMENT
+          value: {{ .Values.app.environment }}
+        - name: GATEWAY_MODE
+          value: "true"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "integration-api-management.fullname" . }}-secret
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "integration-api-management.fullname" . }}-secret
+              key: redis-url
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "integration-api-management.fullname" . }}-secret
+              key: jwt-secret-key
+        ports:
+        - name: gateway
+          containerPort: {{ .Values.service.gateway.targetPort }}
+          protocol: TCP
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: logs-volume
+          mountPath: /app/logs
+        - name: tmp-volume
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /gateway/health
+            port: {{ .Values.service.gateway.targetPort }}
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /gateway/ready
+            port: {{ .Values.service.gateway.targetPort }}
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.gateway.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: {{ .Values.app.securityContext.runAsUser }}
+          capabilities:
+            drop:
+            - ALL
+      {{- end }}
+      
+      volumes:
+      - name: config-volume
+        configMap:
+          name: {{ include "integration-api-management.fullname" . }}-config
+      - name: logs-volume
+        emptyDir: {}
+      - name: tmp-volume
+        emptyDir: {}
+      
+      {{- with .Values.app.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- else }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - {{ include "integration-api-management.name" . }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
+      {{- with .Values.app.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -29,8 +29,11 @@ from uuid_extensions import uuid7str
 
 from .models import (
     ESEvent, ESStream, ESSubscription, ESConsumerGroup, ESSchema, ESMetrics, ESAuditLog,
-    EventStatus, StreamStatus, SubscriptionStatus, EventType, DeliveryMode,
-    EventConfig, StreamConfig, SubscriptionConfig, SchemaConfig
+    ESEventSchema, ESStreamAssignment, ESEventProcessingHistory, ESStreamProcessor,
+    EventStatus, EventPriority, StreamStatus, SubscriptionStatus, ConsumerStatus, ProcessorType,
+    EventType, DeliveryMode, CompressionType, SerializationFormat,
+    EventConfig, StreamConfig, SubscriptionConfig, SchemaConfig,
+    EventCreate, EventResponse, StreamCreate, StreamResponse
 )
 
 # =============================================================================
@@ -885,6 +888,840 @@ class StreamProcessingService:
         for processor_id in list(self.processors.keys()):
             await self.stop_stream_processor(processor_id)
 
+
+# =============================================================================
+# Event Sourcing Service
+# =============================================================================
+
+class EventSourcingService:
+	"""Service for event sourcing and aggregate reconstruction."""
+	
+	def __init__(self, db_session: AsyncSession, redis_client: redis.Redis):
+		self.db_session = db_session
+		self.redis_client = redis_client
+	
+	async def append_event(
+		self,
+		aggregate_id: str,
+		aggregate_type: str,
+		event_data: Dict[str, Any],
+		expected_version: Optional[int] = None,
+		tenant_id: str = None
+	) -> str:
+		"""Append event to event store with optimistic concurrency control."""
+		
+		# Get current aggregate version
+		current_version = await self._get_aggregate_version(aggregate_id, aggregate_type, tenant_id)
+		
+		# Check optimistic concurrency
+		if expected_version is not None and current_version != expected_version:
+			raise ValueError(f"Concurrency conflict: expected version {expected_version}, got {current_version}")
+		
+		# Create event store entry
+		new_version = current_version + 1
+		event_id = f"evt_{uuid7str()}"
+		
+		from .models import ESEventStore
+		event_store_entry = ESEventStore(
+			aggregate_id=aggregate_id,
+			aggregate_type=aggregate_type,
+			event_id=event_id,
+			event_sequence=new_version,
+			aggregate_version=new_version,
+			event_type=event_data.get('event_type'),
+			event_data=event_data.get('payload', {}),
+			event_metadata=event_data.get('metadata', {}),
+			event_timestamp=datetime.now(timezone.utc),
+			tenant_id=tenant_id,
+			created_by=event_data.get('created_by', 'system')
+		)
+		
+		self.db_session.add(event_store_entry)
+		await self.db_session.commit()
+		
+		# Invalidate cached aggregate
+		await self._invalidate_aggregate_cache(aggregate_id, aggregate_type, tenant_id)
+		
+		logger.info(f"Appended event {event_id} to aggregate {aggregate_id} version {new_version}")
+		return event_id
+	
+	async def get_aggregate_events(
+		self,
+		aggregate_id: str,
+		aggregate_type: str,
+		from_version: int = 0,
+		to_version: Optional[int] = None,
+		tenant_id: str = None
+	) -> List[Dict[str, Any]]:
+		"""Get events for aggregate within version range."""
+		
+		from .models import ESEventStore
+		query = select(ESEventStore).where(
+			and_(
+				ESEventStore.aggregate_id == aggregate_id,
+				ESEventStore.aggregate_type == aggregate_type,
+				ESEventStore.aggregate_version > from_version
+			)
+		)
+		
+		if tenant_id:
+			query = query.where(ESEventStore.tenant_id == tenant_id)
+		
+		if to_version:
+			query = query.where(ESEventStore.aggregate_version <= to_version)
+		
+		query = query.order_by(ESEventStore.aggregate_version)
+		
+		result = await self.db_session.execute(query)
+		events = result.scalars().all()
+		
+		return [
+			{
+				"event_id": event.event_id,
+				"event_type": event.event_type,
+				"event_sequence": event.event_sequence,
+				"aggregate_version": event.aggregate_version,
+				"event_data": event.event_data,
+				"event_metadata": event.event_metadata,
+				"event_timestamp": event.event_timestamp,
+				"tenant_id": event.tenant_id
+			}
+			for event in events
+		]
+	
+	async def replay_aggregate(
+		self,
+		aggregate_id: str,
+		aggregate_type: str,
+		to_version: Optional[int] = None,
+		tenant_id: str = None
+	) -> Dict[str, Any]:
+		"""Replay events to reconstruct aggregate state."""
+		
+		# Check for cached snapshot
+		snapshot = await self._get_latest_snapshot(aggregate_id, aggregate_type, tenant_id)
+		
+		from_version = 0
+		aggregate_state = {}
+		
+		if snapshot:
+			from_version = snapshot.get('snapshot_version', 0)
+			aggregate_state = snapshot.get('aggregate_data', {})
+		
+		# Get events since snapshot
+		events = await self.get_aggregate_events(
+			aggregate_id, aggregate_type, from_version, to_version, tenant_id
+		)
+		
+		# Apply events to reconstruct state
+		for event in events:
+			aggregate_state = await self._apply_event_to_aggregate(
+				aggregate_state, event, aggregate_type
+			)
+		
+		# Cache reconstructed state
+		if len(events) > 0:
+			await self._cache_aggregate_state(aggregate_id, aggregate_type, aggregate_state, tenant_id)
+		
+		return aggregate_state
+	
+	async def create_snapshot(
+		self,
+		aggregate_id: str,
+		aggregate_type: str,
+		tenant_id: str = None
+	) -> str:
+		"""Create snapshot of current aggregate state."""
+		
+		# Get current aggregate state
+		aggregate_state = await self.replay_aggregate(aggregate_id, aggregate_type, None, tenant_id)
+		current_version = await self._get_aggregate_version(aggregate_id, aggregate_type, tenant_id)
+		
+		# Serialize and compress aggregate data
+		import gzip
+		import pickle
+		
+		serialized_data = pickle.dumps(aggregate_state)
+		compressed_data = gzip.compress(serialized_data)
+		
+		# Create snapshot record
+		from .models import ESSnapshot
+		snapshot = ESSnapshot(
+			aggregate_id=aggregate_id,
+			aggregate_type=aggregate_type,
+			snapshot_version=current_version,
+			last_event_sequence=current_version,
+			aggregate_data=compressed_data,
+			compression_type=CompressionType.GZIP,
+			serialization_format=SerializationFormat.BINARY,
+			original_size=len(serialized_data),
+			compressed_size=len(compressed_data),
+			tenant_id=tenant_id,
+			creation_time_ms=int((datetime.now(timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds() * 1000),
+			events_included=current_version,
+			created_by='system'
+		)
+		
+		self.db_session.add(snapshot)
+		await self.db_session.commit()
+		
+		logger.info(f"Created snapshot for aggregate {aggregate_id} at version {current_version}")
+		return snapshot.snapshot_id
+	
+	async def _get_aggregate_version(self, aggregate_id: str, aggregate_type: str, tenant_id: str) -> int:
+		"""Get current version of aggregate."""
+		
+		from .models import ESEventStore
+		result = await self.db_session.execute(
+			select(func.max(ESEventStore.aggregate_version)).where(
+				and_(
+					ESEventStore.aggregate_id == aggregate_id,
+					ESEventStore.aggregate_type == aggregate_type,
+					ESEventStore.tenant_id == tenant_id if tenant_id else True
+				)
+			)
+		)
+		
+		version = result.scalar()
+		return version or 0
+	
+	async def _get_latest_snapshot(self, aggregate_id: str, aggregate_type: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+		"""Get latest snapshot for aggregate."""
+		
+		from .models import ESSnapshot
+		result = await self.db_session.execute(
+			select(ESSnapshot).where(
+				and_(
+					ESSnapshot.aggregate_id == aggregate_id,
+					ESSnapshot.aggregate_type == aggregate_type,
+					ESSnapshot.tenant_id == tenant_id if tenant_id else True
+				)
+			).order_by(desc(ESSnapshot.snapshot_version)).limit(1)
+		)
+		
+		snapshot = result.scalar_one_or_none()
+		if not snapshot:
+			return None
+		
+		# Decompress and deserialize
+		import gzip
+		import pickle
+		
+		decompressed_data = gzip.decompress(snapshot.aggregate_data)
+		aggregate_data = pickle.loads(decompressed_data)
+		
+		return {
+			"snapshot_version": snapshot.snapshot_version,
+			"aggregate_data": aggregate_data
+		}
+	
+	async def _apply_event_to_aggregate(
+		self,
+		aggregate_state: Dict[str, Any],
+		event: Dict[str, Any],
+		aggregate_type: str
+	) -> Dict[str, Any]:
+		"""Apply event to aggregate state (domain-specific logic)."""
+		
+		# This is a generic implementation - would be customized per aggregate type
+		event_type = event.get('event_type', '')
+		event_data = event.get('event_data', {})
+		
+		# Simple merge strategy for demonstration
+		if 'data' not in aggregate_state:
+			aggregate_state['data'] = {}
+		
+		aggregate_state['data'].update(event_data)
+		aggregate_state['version'] = event.get('aggregate_version')
+		aggregate_state['last_modified'] = event.get('event_timestamp')
+		
+		return aggregate_state
+	
+	async def _cache_aggregate_state(
+		self,
+		aggregate_id: str,
+		aggregate_type: str,
+		state: Dict[str, Any],
+		tenant_id: str
+	):
+		"""Cache aggregate state in Redis."""
+		
+		cache_key = f"aggregate:{tenant_id}:{aggregate_type}:{aggregate_id}"
+		await self.redis_client.setex(
+			cache_key,
+			3600,  # 1 hour
+			json.dumps(state, default=str)
+		)
+	
+	async def _invalidate_aggregate_cache(
+		self,
+		aggregate_id: str,
+		aggregate_type: str,
+		tenant_id: str
+	):
+		"""Invalidate cached aggregate state."""
+		
+		cache_key = f"aggregate:{tenant_id}:{aggregate_type}:{aggregate_id}"
+		await self.redis_client.delete(cache_key)
+
+
+# =============================================================================
+# Stream Management Service
+# =============================================================================
+
+class StreamManagementService:
+	"""Service for managing streams, topics, and configurations."""
+	
+	def __init__(self, db_session: AsyncSession, kafka_config: Dict[str, Any]):
+		self.db_session = db_session
+		self.kafka_config = kafka_config
+		self.admin_client = None
+	
+	async def create_stream(self, stream_config: StreamCreate, tenant_id: str, user_id: str) -> str:
+		"""Create a new event stream with Kafka topic."""
+		
+		# Check if stream name already exists
+		existing = await self.db_session.execute(
+			select(ESStream).where(
+				and_(
+					ESStream.stream_name == stream_config.stream_name,
+					ESStream.tenant_id == tenant_id
+				)
+			)
+		)
+		
+		if existing.scalar_one_or_none():
+			raise ValueError(f"Stream name already exists: {stream_config.stream_name}")
+		
+		# Create Kafka topic
+		topic_created = await self._create_kafka_topic(
+			stream_config.topic_name,
+			stream_config.partition_count,
+			stream_config.replication_factor,
+			{
+				'cleanup.policy': stream_config.cleanup_policy,
+				'compression.type': stream_config.compression_type.value,
+				'retention.ms': str(stream_config.retention_time_ms)
+			}
+		)
+		
+		if not topic_created:
+			raise RuntimeError(f"Failed to create Kafka topic: {stream_config.topic_name}")
+		
+		# Create stream record
+		stream = ESStream(
+			stream_name=stream_config.stream_name,
+			stream_description=stream_config.description,
+			topic_name=stream_config.topic_name,
+			partitions=stream_config.partition_count,
+			replication_factor=stream_config.replication_factor,
+			retention_time_ms=stream_config.retention_time_ms,
+			retention_size_bytes=stream_config.retention_size_bytes,
+			cleanup_policy=stream_config.cleanup_policy,
+			compression_type=stream_config.compression_type.value,
+			default_serialization=stream_config.serialization_format.value,
+			event_category=EventType.DOMAIN_EVENT.value,
+			source_capability=stream_config.tenant_id,  # Using tenant as source for now
+			tenant_id=tenant_id,
+			created_by=user_id
+		)
+		
+		# Add enhanced fields
+		stream.stream_category = stream_config.stream_category
+		stream.business_domain = stream_config.business_domain
+		stream.visibility = stream_config.visibility
+		stream.encryption_enabled = stream_config.encryption_enabled
+		stream.access_control_enabled = stream_config.access_control_enabled
+		
+		# Store routing rules and filters as JSON
+		stream.config_settings = {
+			'event_filters': stream_config.event_filters,
+			'routing_rules': stream_config.routing_rules,
+			'min_in_sync_replicas': stream_config.min_in_sync_replicas
+		}
+		
+		self.db_session.add(stream)
+		await self.db_session.commit()
+		
+		logger.info(f"Created stream {stream.stream_id} with topic {stream_config.topic_name}")
+		return stream.stream_id
+	
+	async def update_stream(
+		self,
+		stream_id: str,
+		updates: Dict[str, Any],
+		tenant_id: str,
+		user_id: str
+	) -> bool:
+		"""Update stream configuration."""
+		
+		# Get existing stream
+		result = await self.db_session.execute(
+			select(ESStream).where(
+				and_(
+					ESStream.stream_id == stream_id,
+					ESStream.tenant_id == tenant_id
+				)
+			)
+		)
+		
+		stream = result.scalar_one_or_none()
+		if not stream:
+			raise ValueError(f"Stream not found: {stream_id}")
+		
+		# Update allowed fields
+		updatable_fields = [
+			'stream_description', 'retention_time_ms', 'retention_size_bytes',
+			'compression_type', 'status', 'config_settings'
+		]
+		
+		for field, value in updates.items():
+			if field in updatable_fields:
+				setattr(stream, field, value)
+		
+		# Update Kafka topic configuration if needed
+		if 'retention_time_ms' in updates or 'compression_type' in updates:
+			await self._update_kafka_topic_config(
+				stream.topic_name,
+				{
+					'retention.ms': str(stream.retention_time_ms),
+					'compression.type': stream.compression_type
+				}
+			)
+		
+		await self.db_session.commit()
+		
+		logger.info(f"Updated stream {stream_id}")
+		return True
+	
+	async def delete_stream(self, stream_id: str, tenant_id: str, user_id: str) -> bool:
+		"""Delete stream and associated Kafka topic."""
+		
+		# Get stream
+		result = await self.db_session.execute(
+			select(ESStream).where(
+				and_(
+					ESStream.stream_id == stream_id,
+					ESStream.tenant_id == tenant_id
+				)
+			)
+		)
+		
+		stream = result.scalar_one_or_none()
+		if not stream:
+			raise ValueError(f"Stream not found: {stream_id}")
+		
+		# Check for active subscriptions
+		subscriptions = await self.db_session.execute(
+			select(func.count(ESSubscription.subscription_id)).where(
+				and_(
+					ESSubscription.stream_id == stream_id,
+					ESSubscription.status == SubscriptionStatus.ACTIVE.value
+				)
+			)
+		)
+		
+		if subscriptions.scalar() > 0:
+			raise ValueError("Cannot delete stream with active subscriptions")
+		
+		# Archive stream instead of hard delete
+		stream.status = StreamStatus.ARCHIVED.value
+		await self.db_session.commit()
+		
+		# Delete Kafka topic (optional - might want to retain for audit)
+		# await self._delete_kafka_topic(stream.topic_name)
+		
+		logger.info(f"Archived stream {stream_id}")
+		return True
+	
+	async def get_stream_metrics(self, stream_id: str, tenant_id: str) -> Dict[str, Any]:
+		"""Get comprehensive stream metrics."""
+		
+		# Get stream info
+		result = await self.db_session.execute(
+			select(ESStream).where(
+				and_(
+					ESStream.stream_id == stream_id,
+					ESStream.tenant_id == tenant_id
+				)
+			)
+		)
+		
+		stream = result.scalar_one_or_none()
+		if not stream:
+			raise ValueError(f"Stream not found: {stream_id}")
+		
+		# Get event counts
+		event_count_result = await self.db_session.execute(
+			select(func.count(ESEvent.event_id)).where(
+				and_(
+					ESEvent.stream_id == stream_id,
+					ESEvent.created_at >= datetime.now(timezone.utc) - timedelta(hours=24)
+				)
+			)
+		)
+		
+		recent_events = event_count_result.scalar()
+		
+		# Get subscription count
+		subscription_count_result = await self.db_session.execute(
+			select(func.count(ESSubscription.subscription_id)).where(
+				ESSubscription.stream_id == stream_id
+			)
+		)
+		
+		subscription_count = subscription_count_result.scalar()
+		
+		# Get Kafka topic metrics (would integrate with Kafka JMX)
+		kafka_metrics = await self._get_kafka_topic_metrics(stream.topic_name)
+		
+		return {
+			"stream_id": stream_id,
+			"stream_name": stream.stream_name,
+			"topic_name": stream.topic_name,
+			"status": stream.status,
+			"partition_count": stream.partitions,
+			"replication_factor": stream.replication_factor,
+			"retention_time_ms": stream.retention_time_ms,
+			"events_24h": recent_events,
+			"total_subscriptions": subscription_count,
+			"kafka_metrics": kafka_metrics,
+			"last_updated": datetime.now(timezone.utc).isoformat()
+		}
+	
+	async def _create_kafka_topic(
+		self,
+		topic_name: str,
+		partitions: int,
+		replication_factor: int,
+		config: Dict[str, str]
+	) -> bool:
+		"""Create Kafka topic with specified configuration."""
+		
+		try:
+			# Use KafkaAdminClient for topic management
+			admin_client = KafkaAdminClient(
+				bootstrap_servers=self.kafka_config.get('bootstrap_servers', 'localhost:9092')
+			)
+			
+			topic = NewTopic(
+				name=topic_name,
+				num_partitions=partitions,
+				replication_factor=replication_factor,
+				topic_configs=config
+			)
+			
+			result = admin_client.create_topics([topic])
+			
+			# Wait for topic creation
+			for topic, future in result.items():
+				try:
+					future.result()
+					logger.info(f"Created Kafka topic: {topic}")
+					return True
+				except TopicAlreadyExistsError:
+					logger.info(f"Kafka topic already exists: {topic}")
+					return True
+				except Exception as e:
+					logger.error(f"Failed to create topic {topic}: {e}")
+					return False
+		
+		except Exception as e:
+			logger.error(f"Error creating Kafka topic {topic_name}: {e}")
+			return False
+		
+		finally:
+			if 'admin_client' in locals():
+				admin_client.close()
+	
+	async def _update_kafka_topic_config(self, topic_name: str, config: Dict[str, str]) -> bool:
+		"""Update Kafka topic configuration."""
+		
+		try:
+			admin_client = KafkaAdminClient(
+				bootstrap_servers=self.kafka_config.get('bootstrap_servers', 'localhost:9092')
+			)
+			
+			resource = ConfigResource(ConfigResourceType.TOPIC, topic_name)
+			configs = {resource: config}
+			
+			result = admin_client.alter_configs(configs)
+			
+			for resource, future in result.items():
+				try:
+					future.result()
+					logger.info(f"Updated Kafka topic config: {resource}")
+					return True
+				except Exception as e:
+					logger.error(f"Failed to update topic config {resource}: {e}")
+					return False
+		
+		except Exception as e:
+			logger.error(f"Error updating Kafka topic config {topic_name}: {e}")
+			return False
+		
+		finally:
+			if 'admin_client' in locals():
+				admin_client.close()
+	
+	async def _get_kafka_topic_metrics(self, topic_name: str) -> Dict[str, Any]:
+		"""Get Kafka topic metrics (placeholder - would integrate with JMX)."""
+		
+		# Placeholder implementation - would integrate with Kafka JMX metrics
+		return {
+			"bytes_in_per_sec": 0,
+			"bytes_out_per_sec": 0,
+			"messages_in_per_sec": 0,
+			"total_log_size": 0,
+			"leader_count": 0,
+			"partition_count": 0
+		}
+
+
+# =============================================================================
+# Consumer Management Service  
+# =============================================================================
+
+class ConsumerManagementService:
+	"""Service for managing consumer groups and individual consumers."""
+	
+	def __init__(self, db_session: AsyncSession, kafka_config: Dict[str, Any]):
+		self.db_session = db_session
+		self.kafka_config = kafka_config
+	
+	async def create_consumer_group(
+		self,
+		group_config: Dict[str, Any],
+		tenant_id: str,
+		user_id: str
+	) -> str:
+		"""Create a new consumer group."""
+		
+		# Check if group already exists
+		existing = await self.db_session.execute(
+			select(ESConsumerGroup).where(
+				and_(
+					ESConsumerGroup.group_name == group_config['group_name'],
+					ESConsumerGroup.tenant_id == tenant_id
+				)
+			)
+		)
+		
+		if existing.scalar_one_or_none():
+			raise ValueError(f"Consumer group already exists: {group_config['group_name']}")
+		
+		# Create consumer group
+		consumer_group = ESConsumerGroup(
+			group_id=group_config.get('group_id', f"cg_{uuid7str()}"),
+			group_name=group_config['group_name'],
+			group_description=group_config.get('description'),
+			session_timeout_ms=group_config.get('session_timeout_ms', 30000),
+			heartbeat_interval_ms=group_config.get('heartbeat_interval_ms', 3000),
+			max_poll_interval_ms=group_config.get('max_poll_interval_ms', 300000),
+			partition_assignment_strategy=group_config.get('assignment_strategy', 'round_robin'),
+			rebalance_timeout_ms=group_config.get('rebalance_timeout_ms', 60000),
+			tenant_id=tenant_id,
+			created_by=user_id
+		)
+		
+		self.db_session.add(consumer_group)
+		await self.db_session.commit()
+		
+		logger.info(f"Created consumer group {consumer_group.group_id}")
+		return consumer_group.group_id
+	
+	async def register_consumer(
+		self,
+		group_id: str,
+		consumer_config: Dict[str, Any],
+		tenant_id: str
+	) -> str:
+		"""Register a new consumer in a group."""
+		
+		# Get consumer group
+		result = await self.db_session.execute(
+			select(ESConsumerGroup).where(
+				and_(
+					ESConsumerGroup.group_id == group_id,
+					ESConsumerGroup.tenant_id == tenant_id
+				)
+			)
+		)
+		
+		group = result.scalar_one_or_none()
+		if not group:
+			raise ValueError(f"Consumer group not found: {group_id}")
+		
+		# Create consumer record
+		from .models import ESConsumer
+		consumer = ESConsumer(
+			consumer_name=consumer_config['consumer_name'],
+			group_id=group_id,
+			instance_id=consumer_config['instance_id'],
+			host_name=consumer_config.get('host_name', 'unknown'),
+			ip_address=consumer_config.get('ip_address'),
+			port=consumer_config.get('port'),
+			assigned_partitions=consumer_config.get('assigned_partitions', []),
+			partition_assignments=consumer_config.get('partition_assignments', {}),
+			status=ConsumerStatus.INACTIVE.value,
+			joined_at=datetime.now(timezone.utc)
+		)
+		
+		self.db_session.add(consumer)
+		
+		# Update group active consumers count
+		group.active_consumers += 1
+		
+		await self.db_session.commit()
+		
+		logger.info(f"Registered consumer {consumer.consumer_id} in group {group_id}")
+		return consumer.consumer_id
+	
+	async def update_consumer_heartbeat(
+		self,
+		consumer_id: str,
+		performance_metrics: Dict[str, Any],
+		tenant_id: str
+	) -> bool:
+		"""Update consumer heartbeat and performance metrics."""
+		
+		from .models import ESConsumer
+		result = await self.db_session.execute(
+			select(ESConsumer).where(ESConsumer.consumer_id == consumer_id)
+		)
+		
+		consumer = result.scalar_one_or_none()
+		if not consumer:
+			return False
+		
+		# Update heartbeat and metrics
+		consumer.last_heartbeat = datetime.now(timezone.utc)
+		consumer.last_poll = performance_metrics.get('last_poll', consumer.last_poll)
+		consumer.status = ConsumerStatus.ACTIVE.value
+		
+		# Update performance metrics
+		if 'throughput_msgs_sec' in performance_metrics:
+			consumer.throughput_msgs_sec = performance_metrics['throughput_msgs_sec']
+		if 'latency_p95_ms' in performance_metrics:
+			consumer.latency_p95_ms = performance_metrics['latency_p95_ms']
+		if 'memory_usage_mb' in performance_metrics:
+			consumer.memory_usage_mb = performance_metrics['memory_usage_mb']
+		if 'cpu_usage_percent' in performance_metrics:
+			consumer.cpu_usage_percent = performance_metrics['cpu_usage_percent']
+		
+		# Update processing metrics
+		if 'messages_processed' in performance_metrics:
+			consumer.messages_processed += performance_metrics['messages_processed']
+		if 'bytes_processed' in performance_metrics:
+			consumer.bytes_processed += performance_metrics['bytes_processed']
+		
+		await self.db_session.commit()
+		return True
+	
+	async def handle_consumer_rebalance(
+		self,
+		group_id: str,
+		partition_assignments: Dict[str, List[int]],
+		tenant_id: str
+	) -> bool:
+		"""Handle consumer group rebalancing."""
+		
+		# Get all consumers in group
+		from .models import ESConsumer
+		result = await self.db_session.execute(
+			select(ESConsumer).where(ESConsumer.group_id == group_id)
+		)
+		
+		consumers = result.scalars().all()
+		
+		# Update partition assignments
+		for consumer in consumers:
+			consumer_assignments = partition_assignments.get(consumer.consumer_id, [])
+			consumer.assigned_partitions = consumer_assignments
+			consumer.partition_assignments = {
+				"partitions": consumer_assignments,
+				"assigned_at": datetime.now(timezone.utc).isoformat()
+			}
+		
+		# Update consumer group rebalance timestamp
+		group_result = await self.db_session.execute(
+			select(ESConsumerGroup).where(ESConsumerGroup.group_id == group_id)
+		)
+		
+		group = group_result.scalar_one_or_none()
+		if group:
+			group.last_rebalance = datetime.now(timezone.utc)
+		
+		await self.db_session.commit()
+		
+		logger.info(f"Handled rebalance for consumer group {group_id}")
+		return True
+	
+	async def get_consumer_group_status(self, group_id: str, tenant_id: str) -> Dict[str, Any]:
+		"""Get detailed consumer group status."""
+		
+		# Get consumer group
+		result = await self.db_session.execute(
+			select(ESConsumerGroup).where(
+				and_(
+					ESConsumerGroup.group_id == group_id,
+					ESConsumerGroup.tenant_id == tenant_id
+				)
+			)
+		)
+		
+		group = result.scalar_one_or_none()
+		if not group:
+			raise ValueError(f"Consumer group not found: {group_id}")
+		
+		# Get consumers
+		from .models import ESConsumer
+		consumers_result = await self.db_session.execute(
+			select(ESConsumer).where(ESConsumer.group_id == group_id)
+		)
+		
+		consumers = consumers_result.scalars().all()
+		
+		# Calculate lag and metrics
+		total_lag = 0
+		active_consumers = 0
+		total_throughput = 0
+		
+		consumer_details = []
+		for consumer in consumers:
+			if consumer.status == ConsumerStatus.ACTIVE.value:
+				active_consumers += 1
+				total_throughput += consumer.throughput_msgs_sec
+			
+			consumer_details.append({
+				"consumer_id": consumer.consumer_id,
+				"consumer_name": consumer.consumer_name,
+				"status": consumer.status,
+				"assigned_partitions": consumer.assigned_partitions,
+				"last_heartbeat": consumer.last_heartbeat.isoformat() if consumer.last_heartbeat else None,
+				"throughput_msgs_sec": consumer.throughput_msgs_sec,
+				"latency_p95_ms": consumer.latency_p95_ms,
+				"memory_usage_mb": consumer.memory_usage_mb,
+				"cpu_usage_percent": consumer.cpu_usage_percent
+			})
+		
+		# Update group metrics
+		group.active_consumers = active_consumers
+		group.total_lag = total_lag
+		await self.db_session.commit()
+		
+		return {
+			"group_id": group_id,
+			"group_name": group.group_name,
+			"status": "healthy" if active_consumers > 0 else "unhealthy",
+			"active_consumers": active_consumers,
+			"total_consumers": len(consumers),
+			"total_lag": total_lag,
+			"total_throughput_msgs_sec": total_throughput,
+			"last_rebalance": group.last_rebalance.isoformat() if group.last_rebalance else None,
+			"consumers": consumer_details
+		}
+
 # =============================================================================
 # Main Event Streaming Service
 # =============================================================================
@@ -908,6 +1745,9 @@ class EventStreamingService:
         self.publisher = EventPublishingService(db_session, redis_client, self.kafka_config)
         self.consumer = EventConsumptionService(db_session, redis_client, self.kafka_config)
         self.processor = StreamProcessingService(db_session, redis_client, self.kafka_config)
+        self.event_sourcing = EventSourcingService(db_session, redis_client)
+        self.stream_manager = StreamManagementService(db_session, self.kafka_config)
+        self.consumer_manager = ConsumerManagementService(db_session, self.kafka_config)
         
     async def publish_event(
         self,
@@ -947,6 +1787,98 @@ class EventStreamingService:
     async def stop_stream_processor(self, processor_id: str) -> bool:
         """Stop a stream processing job."""
         return await self.processor.stop_stream_processor(processor_id)
+    
+    # Event Sourcing Methods
+    async def append_event_to_store(
+        self,
+        aggregate_id: str,
+        aggregate_type: str,
+        event_data: Dict[str, Any],
+        expected_version: Optional[int] = None,
+        tenant_id: str = None
+    ) -> str:
+        """Append event to event store."""
+        return await self.event_sourcing.append_event(
+            aggregate_id, aggregate_type, event_data, expected_version, tenant_id
+        )
+    
+    async def replay_aggregate(
+        self,
+        aggregate_id: str,
+        aggregate_type: str,
+        to_version: Optional[int] = None,
+        tenant_id: str = None
+    ) -> Dict[str, Any]:
+        """Replay events to reconstruct aggregate state."""
+        return await self.event_sourcing.replay_aggregate(
+            aggregate_id, aggregate_type, to_version, tenant_id
+        )
+    
+    async def create_aggregate_snapshot(
+        self,
+        aggregate_id: str,
+        aggregate_type: str,
+        tenant_id: str = None
+    ) -> str:
+        """Create snapshot of aggregate state."""
+        return await self.event_sourcing.create_snapshot(aggregate_id, aggregate_type, tenant_id)
+    
+    # Stream Management Methods
+    async def create_stream(self, stream_config: StreamCreate, tenant_id: str, user_id: str) -> str:
+        """Create a new event stream."""
+        return await self.stream_manager.create_stream(stream_config, tenant_id, user_id)
+    
+    async def update_stream(
+        self,
+        stream_id: str,
+        updates: Dict[str, Any],
+        tenant_id: str,
+        user_id: str
+    ) -> bool:
+        """Update stream configuration."""
+        return await self.stream_manager.update_stream(stream_id, updates, tenant_id, user_id)
+    
+    async def delete_stream(self, stream_id: str, tenant_id: str, user_id: str) -> bool:
+        """Delete/archive a stream."""
+        return await self.stream_manager.delete_stream(stream_id, tenant_id, user_id)
+    
+    async def get_stream_metrics(self, stream_id: str, tenant_id: str) -> Dict[str, Any]:
+        """Get comprehensive stream metrics."""
+        return await self.stream_manager.get_stream_metrics(stream_id, tenant_id)
+    
+    # Consumer Management Methods
+    async def create_consumer_group(
+        self,
+        group_config: Dict[str, Any],
+        tenant_id: str,
+        user_id: str
+    ) -> str:
+        """Create a new consumer group."""
+        return await self.consumer_manager.create_consumer_group(group_config, tenant_id, user_id)
+    
+    async def register_consumer(
+        self,
+        group_id: str,
+        consumer_config: Dict[str, Any],
+        tenant_id: str
+    ) -> str:
+        """Register a consumer in a group."""
+        return await self.consumer_manager.register_consumer(group_id, consumer_config, tenant_id)
+    
+    async def update_consumer_heartbeat(
+        self,
+        consumer_id: str,
+        performance_metrics: Dict[str, Any],
+        tenant_id: str
+    ) -> bool:
+        """Update consumer heartbeat and metrics."""
+        return await self.consumer_manager.update_consumer_heartbeat(
+            consumer_id, performance_metrics, tenant_id
+        )
+    
+    async def get_consumer_group_status(self, group_id: str, tenant_id: str) -> Dict[str, Any]:
+        """Get detailed consumer group status."""
+        return await self.consumer_manager.get_consumer_group_status(group_id, tenant_id)
     
     async def get_streaming_health(self, tenant_id: str) -> Dict[str, Any]:
         """Get overall streaming platform health."""
@@ -1006,6 +1938,7 @@ class EventStreamingService:
         await self.publisher.close()
         await self.consumer.close()
         await self.processor.close()
+        # Note: Event sourcing, stream manager, and consumer manager don't need explicit close
 
 # =============================================================================
 # Service Factory Functions
@@ -1027,5 +1960,8 @@ __all__ = [
     "EventPublishingService",
     "EventConsumptionService", 
     "StreamProcessingService",
+    "EventSourcingService",
+    "StreamManagementService",
+    "ConsumerManagementService",
     "create_event_streaming_service"
 ]

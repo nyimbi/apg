@@ -1,0 +1,263 @@
+# APG Event Streaming Bus - Kubernetes Ingress
+# External access and routing configuration
+# © 2025 Datacraft. All rights reserved.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: event-streaming-bus
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubernetes
+    apg.datacraft.co.ke/capability: event-streaming-bus
+  annotations:
+    # Ingress class and controller
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    
+    # SSL and TLS configuration
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-RSA-AES128-GCM-SHA256,ECDHE-RSA-AES256-GCM-SHA384,ECDHE-RSA-AES128-SHA256,ECDHE-RSA-AES256-SHA384"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/rate-limit-connections: "10"
+    
+    # Request size limits
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/client-max-body-size: "10m"
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    
+    # CORS configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+    
+    # Load balancing
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    nginx.ingress.kubernetes.io/load-balance: "round_robin"
+    
+    # Health checks
+    nginx.ingress.kubernetes.io/health-check-path: "/health"
+    nginx.ingress.kubernetes.io/health-check-interval: "30s"
+    nginx.ingress.kubernetes.io/health-check-timeout: "10s"
+    
+    # Logging
+    nginx.ingress.kubernetes.io/enable-access-log: "true"
+    nginx.ingress.kubernetes.io/log-format: |
+      {
+        "time": "$time_iso8601",
+        "remote_addr": "$remote_addr",
+        "x_forwarded_for": "$http_x_forwarded_for",
+        "request": "$request",
+        "status": $status,
+        "bytes_sent": $bytes_sent,
+        "http_referer": "$http_referer",
+        "http_user_agent": "$http_user_agent",
+        "request_time": $request_time,
+        "upstream_response_time": "$upstream_response_time",
+        "upstream_addr": "$upstream_addr",
+        "host": "$host",
+        "request_id": "$req_id"
+      }
+    
+    # Certificate management (cert-manager)
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+
+spec:
+  tls:
+    - hosts:
+        - api.event-streaming-bus.datacraft.co.ke
+        - esb.apg.datacraft.co.ke
+      secretName: esb-tls-secret
+  
+  rules:
+    # Primary API domain
+    - host: api.event-streaming-bus.datacraft.co.ke
+      http:
+        paths:
+          # API endpoints
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: event-streaming-bus
+                port:
+                  number: 8080
+          
+          # WebSocket endpoints
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: event-streaming-bus
+                port:
+                  number: 8080
+          
+          # Health and status endpoints
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: event-streaming-bus
+                port:
+                  number: 8080
+          
+          - path: /ready
+            pathType: Exact
+            backend:
+              service:
+                name: event-streaming-bus
+                port:
+                  number: 8080
+          
+          - path: /status
+            pathType: Exact
+            backend:
+              service:
+                name: event-streaming-bus
+                port:
+                  number: 8080
+          
+          # Metrics endpoint (protected)
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: event-streaming-bus
+                port:
+                  number: 9090
+    
+    # APG platform subdomain
+    - host: esb.apg.datacraft.co.ke
+      http:
+        paths:
+          # All paths for APG integration
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: event-streaming-bus
+                port:
+                  number: 8080
+
+---
+# Separate Ingress for Monitoring (with authentication)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: event-streaming-bus-monitoring
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/component: monitoring-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Basic authentication for monitoring endpoints
+    nginx.ingress.kubernetes.io/auth-type: "basic"
+    nginx.ingress.kubernetes.io/auth-secret: "monitoring-auth"
+    nginx.ingress.kubernetes.io/auth-realm: "APG Event Streaming Bus Monitoring"
+    
+    # IP whitelist for monitoring
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    
+    # Certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+spec:
+  tls:
+    - hosts:
+        - monitoring.event-streaming-bus.datacraft.co.ke
+      secretName: esb-monitoring-tls-secret
+  
+  rules:
+    - host: monitoring.event-streaming-bus.datacraft.co.ke
+      http:
+        paths:
+          # Prometheus metrics
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: event-streaming-bus-monitoring
+                port:
+                  number: 9090
+          
+          # Health checks for monitoring
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: event-streaming-bus
+                port:
+                  number: 8080
+
+---
+# Network Policy for Ingress Traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: esb-ingress-policy
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: event-streaming-bus
+      app.kubernetes.io/instance: apg-esb
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9090
+    
+    # Allow traffic from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090

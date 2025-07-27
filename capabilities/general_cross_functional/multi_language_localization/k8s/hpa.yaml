@@ -1,0 +1,343 @@
+# APG Multi-language Localization - Horizontal Pod Autoscaler
+#
+# Automatic scaling configuration for the localization services based on
+# CPU, memory usage, and custom metrics for optimal resource utilization
+#
+# Author: Nyimbi Odero
+# Company: Datacraft
+# Copyright: © 2025 Datacraft. All rights reserved.
+
+# API Service HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: localization-api-hpa
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: hpa
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: localization-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metrics for API requests per second
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  # Custom metrics for translation cache miss rate
+  - type: Pods
+    pods:
+      metric:
+        name: translation_cache_miss_rate
+      target:
+        type: AverageValue
+        averageValue: "0.2"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 5
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# Worker Service HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: localization-worker-hpa
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: hpa
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: localization-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  # Custom metrics for queue length
+  - type: Pods
+    pods:
+      metric:
+        name: celery_queue_length
+      target:
+        type: AverageValue
+        averageValue: "10"
+  # Custom metrics for worker active tasks
+  - type: Pods
+    pods:
+      metric:
+        name: celery_active_tasks_per_worker
+      target:
+        type: AverageValue
+        averageValue: "3"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # Longer stabilization for workers
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 120
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 3
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# Nginx Proxy HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: localization-nginx-hpa
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: hpa
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: localization-nginx
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Custom metrics for active connections
+  - type: Pods
+    pods:
+      metric:
+        name: nginx_active_connections
+      target:
+        type: AverageValue
+        averageValue: "500"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+# Vertical Pod Autoscaler for Database (Optional - requires VPA)
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: localization-db-vpa
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: vpa
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: localization-db
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: postgres
+      minAllowed:
+        cpu: 500m
+        memory: 512Mi
+      maxAllowed:
+        cpu: 2000m
+        memory: 4Gi
+      controlledResources: ["cpu", "memory"]
+    - containerName: postgres-exporter
+      minAllowed:
+        cpu: 50m
+        memory: 64Mi
+      maxAllowed:
+        cpu: 200m
+        memory: 256Mi
+      controlledResources: ["cpu", "memory"]
+
+---
+# Custom Resource for Advanced Autoscaling (KEDA-based)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: localization-worker-keda
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: keda-scaler
+spec:
+  scaleTargetRef:
+    name: localization-worker
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 1
+  minReplicaCount: 2
+  maxReplicaCount: 15
+  triggers:
+  # Redis queue length trigger
+  - type: redis
+    metadata:
+      address: localization-redis:6379
+      password: redis_password
+      listName: celery
+      listLength: "5"
+      enableTLS: "false"
+  # Prometheus metrics trigger
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus:9090
+      metricName: celery_queue_length
+      threshold: "10"
+      query: sum(celery_queue_length{queue="translation"})
+  # CPU trigger as fallback
+  - type: cpu
+    metadata:
+      type: Utilization
+      value: "75"
+
+---
+# Pod Disruption Budget for API
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: localization-api-pdb
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: localization-api
+
+---
+# Pod Disruption Budget for Workers
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: localization-worker-pdb
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: localization-worker
+
+---
+# Pod Disruption Budget for Nginx
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: localization-nginx-pdb
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: localization-nginx

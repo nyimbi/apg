@@ -1,0 +1,684 @@
+# APG Multi-language Localization - Kubernetes Deployments
+#
+# Complete deployment configuration for all services including API, workers,
+# database, Redis, and supporting services with high availability and scalability
+#
+# Author: Nyimbi Odero
+# Company: Datacraft
+# Copyright: © 2025 Datacraft. All rights reserved.
+
+# PostgreSQL Database Deployment
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: localization-db
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+    app: localization-db
+spec:
+  serviceName: localization-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localization-db
+  template:
+    metadata:
+      labels:
+        app: localization-db
+        app.kubernetes.io/name: multi-language-localization
+        app.kubernetes.io/component: database
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+    spec:
+      serviceAccountName: localization-service-account
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: postgres
+        image: postgres:14-alpine
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: db-name
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: db-username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: db-password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      # PostgreSQL Exporter for Prometheus
+      - name: postgres-exporter
+        image: prometheuscommunity/postgres-exporter:v0.11.1
+        env:
+        - name: DATA_SOURCE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: database-url
+        ports:
+        - containerPort: 9187
+          name: metrics
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: postgres-config
+        configMap:
+          name: localization-postgres-config
+      - name: init-scripts
+        secret:
+          secretName: localization-db-init
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 50Gi
+
+---
+# Redis Cache Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localization-redis
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+    app: localization-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localization-redis
+  template:
+    metadata:
+      labels:
+        app: localization-redis
+        app.kubernetes.io/name: multi-language-localization
+        app.kubernetes.io/component: cache
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9121"
+    spec:
+      serviceAccountName: localization-service-account
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: redis-password
+        ports:
+        - containerPort: 6379
+          name: redis
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        - name: redis-config
+          mountPath: /etc/redis
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --raw
+            - incr
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --raw
+            - incr
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      # Redis Exporter for Prometheus
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.45.0
+        env:
+        - name: REDIS_ADDR
+          value: "redis://localhost:6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: redis-password
+        ports:
+        - containerPort: 9121
+          name: metrics
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: redis-data
+        emptyDir: {}
+      - name: redis-config
+        configMap:
+          name: localization-redis-config
+
+---
+# Main API Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localization-api
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+    app: localization-api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: localization-api
+  template:
+    metadata:
+      labels:
+        app: localization-api
+        app.kubernetes.io/name: multi-language-localization
+        app.kubernetes.io/component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: localization-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      initContainers:
+      # Wait for database to be ready
+      - name: wait-for-db
+        image: datacraft/apg-localization:latest
+        command: ['python', '/wait-for-postgres.py']
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: database-url
+      # Run database migrations
+      - name: migrate
+        image: datacraft/apg-localization:latest
+        command: ['alembic', 'upgrade', 'head']
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: database-url
+        envFrom:
+        - configMapRef:
+            name: localization-config
+      containers:
+      - name: api
+        image: datacraft/apg-localization:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        # Database Configuration
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: database-url
+        # Redis Configuration
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: redis-url
+        # Security Configuration
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: secret-key
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: jwt-secret
+        # Translation Service Keys
+        - name: GOOGLE_TRANSLATE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: google-translate-api-key
+              optional: true
+        - name: AZURE_TRANSLATOR_KEY
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: azure-translator-key
+              optional: true
+        - name: DEEPL_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: deepl-api-key
+              optional: true
+        # APG Platform Integration
+        - name: APG_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: apg-api-key
+        - name: APG_PLATFORM_URL
+          valueFrom:
+            configMapKeyRef:
+              name: localization-config
+              key: APG_PLATFORM_URL
+              optional: true
+        # Monitoring
+        - name: SENTRY_DSN
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: sentry-dsn
+              optional: true
+        envFrom:
+        - configMapRef:
+            name: localization-config
+        volumeMounts:
+        - name: uploads
+          mountPath: /app/uploads
+        - name: logs
+          mountPath: /app/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: uploads
+        persistentVolumeClaim:
+          claimName: localization-uploads-pvc
+      - name: logs
+        emptyDir: {}
+      imagePullSecrets:
+      - name: localization-registry-secret
+
+---
+# Background Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localization-worker
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+    app: localization-worker
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: localization-worker
+  template:
+    metadata:
+      labels:
+        app: localization-worker
+        app.kubernetes.io/name: multi-language-localization
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: localization-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: worker
+        image: datacraft/apg-localization:latest
+        command: ['celery', '-A', 'service.tasks', 'worker', '--loglevel=info', '--concurrency=2']
+        env:
+        # Database Configuration
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: database-url
+        # Redis Configuration
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: redis-url
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: redis-url
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: redis-url
+        # Translation Service Keys
+        - name: GOOGLE_TRANSLATE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: google-translate-api-key
+              optional: true
+        - name: AZURE_TRANSLATOR_KEY
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: azure-translator-key
+              optional: true
+        - name: DEEPL_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: deepl-api-key
+              optional: true
+        envFrom:
+        - configMapRef:
+            name: localization-config
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - service.tasks
+            - inspect
+            - ping
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: logs
+        emptyDir: {}
+      imagePullSecrets:
+      - name: localization-registry-secret
+
+---
+# Celery Beat Scheduler Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localization-scheduler
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: scheduler
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+    app: localization-scheduler
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: localization-scheduler
+  template:
+    metadata:
+      labels:
+        app: localization-scheduler
+        app.kubernetes.io/name: multi-language-localization
+        app.kubernetes.io/component: scheduler
+    spec:
+      serviceAccountName: localization-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: scheduler
+        image: datacraft/apg-localization:latest
+        command: ['celery', '-A', 'service.tasks', 'beat', '--loglevel=info']
+        env:
+        # Database Configuration
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: database-url
+        # Redis Configuration
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: redis-url
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: localization-secrets
+              key: redis-url
+        envFrom:
+        - configMapRef:
+            name: localization-config
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: logs
+        emptyDir: {}
+      imagePullSecrets:
+      - name: localization-registry-secret
+
+---
+# Nginx Reverse Proxy Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localization-nginx
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: proxy
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+    app: localization-nginx
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: localization-nginx
+  template:
+    metadata:
+      labels:
+        app: localization-nginx
+        app.kubernetes.io/name: multi-language-localization
+        app.kubernetes.io/component: proxy
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 443
+          name: https
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: tls-cert
+          mountPath: /etc/nginx/ssl
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: localization-nginx-config
+      - name: tls-cert
+        secret:
+          secretName: localization-tls

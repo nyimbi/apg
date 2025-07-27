@@ -1,0 +1,269 @@
+# APG Event Streaming Bus - Kubernetes Services
+# Service definitions for API and monitoring endpoints
+# © 2025 Datacraft. All rights reserved.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-streaming-bus
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: api-service
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubernetes
+    apg.datacraft.co.ke/capability: event-streaming-bus
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/component: api
+  sessionAffinity: None
+
+---
+# Headless Service for StatefulSet (if needed for Kafka)
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-streaming-bus-headless
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/component: headless-service
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/component: api
+
+---
+# External Service for LoadBalancer (if needed)
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-streaming-bus-external
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/component: external-service
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:region:account:certificate/cert-id"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+spec:
+  type: LoadBalancer
+  ports:
+    - name: https
+      port: 443
+      targetPort: http
+      protocol: TCP
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/component: api
+  loadBalancerSourceRanges:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: apg-esb-postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: apg-esb-postgres
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: apg-esb-redis
+    app.kubernetes.io/component: cache
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: apg-esb-redis
+
+---
+# Kafka Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/instance: apg-esb-kafka
+    app.kubernetes.io/component: message-broker
+spec:
+  type: ClusterIP
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+      protocol: TCP
+    - name: jmx
+      port: 9101
+      targetPort: 9101
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/instance: apg-esb-kafka
+
+---
+# Kafka Headless Service for StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/instance: apg-esb-kafka
+    app.kubernetes.io/component: headless-service
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+      protocol: TCP
+    - name: kafka-internal
+      port: 29092
+      targetPort: 29092
+      protocol: TCP
+    - name: controller
+      port: 29093
+      targetPort: 29093
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/instance: apg-esb-kafka
+
+---
+# Monitoring Service for Prometheus Discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-streaming-bus-monitoring
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/component: monitoring
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+    prometheus.io/interval: "15s"
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+
+---
+# Service Monitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: event-streaming-bus
+  namespace: apg-event-streaming-bus
+  labels:
+    app.kubernetes.io/name: event-streaming-bus
+    app.kubernetes.io/instance: apg-esb
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: event-streaming-bus
+      app.kubernetes.io/instance: apg-esb
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+      scheme: http
+      honorLabels: true
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'esb_.*'
+          targetLabel: __tmp_esb_metric
+          replacement: 'true'
+        - sourceLabels: [__tmp_esb_metric]
+          regex: 'true'
+          targetLabel: service
+          replacement: 'event-streaming-bus'

@@ -23,7 +23,9 @@ from wtforms.validators import DataRequired, Length, NumberRange
 
 from .models import (
 	ESEvent, ESStream, ESSubscription, ESConsumerGroup, ESSchema, 
-	ESMetrics, ESAuditLog, EventStatus, StreamStatus, SubscriptionStatus,
+	ESMetrics, ESAuditLog, ESEventSchema, ESStreamAssignment, 
+	ESEventProcessingHistory, ESStreamProcessor,
+	EventStatus, EventPriority, StreamStatus, SubscriptionStatus, ConsumerStatus, ProcessorType,
 	EventType, DeliveryMode, CompressionType, SerializationFormat
 )
 from .service import EventStreamingService, EventPublishingService, EventConsumptionService
@@ -817,6 +819,490 @@ class StreamingDashboardView(BaseView):
 			title="Event Browser"
 		)
 
+# =============================================================================
+# Enhanced Event Schema Registry Views
+# =============================================================================
+
+class EventSchemaView(ModelView):
+	"""Enhanced event schema registry management."""
+	
+	datamodel = SQLAInterface(ESEventSchema)
+	list_title = "Event Schema Registry"
+	show_title = "Event Schema Details"
+	add_title = "Register Event Schema"
+	edit_title = "Edit Event Schema"
+	
+	# List view configuration
+	list_columns = [
+		'schema_name', 'schema_version', 'event_type', 'compatibility_level',
+		'is_active', 'evolution_strategy', 'created_at'
+	]
+	
+	search_columns = [
+		'schema_name', 'event_type', 'compatibility_level', 'evolution_strategy'
+	]
+	
+	order_columns = ['schema_name', 'schema_version', 'created_at']
+	base_order = ('created_at', 'desc')
+	
+	# Show view configuration
+	show_columns = [
+		'schema_id', 'schema_name', 'schema_version', 'json_schema',
+		'event_type', 'compatibility_level', 'evolution_strategy',
+		'validation_rules', 'is_active', 'tenant_id',
+		'created_at', 'updated_at', 'created_by'
+	]
+	
+	# Form configuration
+	add_columns = [
+		'schema_name', 'schema_version', 'json_schema', 'event_type',
+		'compatibility_level', 'evolution_strategy', 'validation_rules', 'is_active'
+	]
+	
+	edit_columns = [
+		'json_schema', 'compatibility_level', 'evolution_strategy',
+		'validation_rules', 'is_active'
+	]
+	
+	# Field customization
+	add_form_extra_fields = {
+		'json_schema': TextAreaField(
+			'JSON Schema',
+			widget=JSONTextAreaWidget(),
+			description='JSON Schema definition for event validation',
+			validators=[DataRequired()]
+		),
+		'validation_rules': TextAreaField(
+			'Validation Rules',
+			widget=JSONTextAreaWidget(),
+			description='Additional validation rules in JSON format'
+		)
+	}
+	
+	edit_form_extra_fields = add_form_extra_fields
+	
+	# Labels
+	label_columns = {
+		'schema_id': 'Schema ID',
+		'schema_name': 'Schema Name',
+		'schema_version': 'Version',
+		'json_schema': 'JSON Schema',
+		'event_type': 'Event Type',
+		'compatibility_level': 'Compatibility',
+		'evolution_strategy': 'Evolution Strategy',
+		'validation_rules': 'Validation Rules',
+		'is_active': 'Active',
+		'tenant_id': 'Tenant',
+		'created_at': 'Created',
+		'updated_at': 'Updated',
+		'created_by': 'Created By'
+	}
+	
+	# Formatters
+	formatters_columns = {
+		'json_schema': lambda x: json.dumps(x, indent=2)[:200] + "..." if x else "{}",
+		'validation_rules': lambda x: json.dumps(x, indent=2) if x else "{}"
+	}
+
+# =============================================================================
+# Stream Assignment Management Views
+# =============================================================================
+
+class StreamAssignmentView(ModelView):
+	"""Manage event-to-stream assignments."""
+	
+	datamodel = SQLAInterface(ESStreamAssignment)
+	list_title = "Stream Assignments"
+	show_title = "Assignment Details"
+	add_title = "Create Stream Assignment"
+	edit_title = "Edit Stream Assignment"
+	
+	# List view configuration
+	list_columns = [
+		'event_id', 'stream_id', 'assignment_type', 'priority_level',
+		'is_active', 'assigned_at'
+	]
+	
+	search_columns = [
+		'event_id', 'stream_id', 'assignment_type', 'priority_level'
+	]
+	
+	order_columns = ['assigned_at', 'priority_level']
+	base_order = ('assigned_at', 'desc')
+	
+	# Show view configuration
+	show_columns = [
+		'assignment_id', 'event_id', 'stream_id', 'assignment_type',
+		'priority_level', 'routing_key', 'partition_strategy',
+		'assignment_rules', 'is_active', 'tenant_id',
+		'assigned_at', 'updated_at', 'assigned_by'
+	]
+	
+	# Form configuration
+	add_columns = [
+		'event_id', 'stream_id', 'assignment_type', 'priority_level',
+		'routing_key', 'partition_strategy', 'assignment_rules', 'is_active'
+	]
+	
+	edit_columns = [
+		'assignment_type', 'priority_level', 'routing_key',
+		'partition_strategy', 'assignment_rules', 'is_active'
+	]
+	
+	# Field customization
+	add_form_extra_fields = {
+		'assignment_rules': TextAreaField(
+			'Assignment Rules',
+			widget=JSONTextAreaWidget(),
+			description='JSON rules for event assignment logic'
+		)
+	}
+	
+	edit_form_extra_fields = add_form_extra_fields
+	
+	# Labels
+	label_columns = {
+		'assignment_id': 'Assignment ID',
+		'event_id': 'Event',
+		'stream_id': 'Stream',
+		'assignment_type': 'Type',
+		'priority_level': 'Priority',
+		'routing_key': 'Routing Key',
+		'partition_strategy': 'Partition Strategy',
+		'assignment_rules': 'Assignment Rules',
+		'is_active': 'Active',
+		'tenant_id': 'Tenant',
+		'assigned_at': 'Assigned',
+		'updated_at': 'Updated',
+		'assigned_by': 'Assigned By'
+	}
+
+# =============================================================================
+# Event Processing History Views
+# =============================================================================
+
+class EventProcessingHistoryView(ModelView):
+	"""Monitor event processing history and audit trails."""
+	
+	datamodel = SQLAInterface(ESEventProcessingHistory)
+	list_title = "Event Processing History"
+	show_title = "Processing Details"
+	
+	# List view configuration
+	list_columns = [
+		'event_id', 'processor_id', 'processing_stage', 'status',
+		'processing_duration_ms', 'started_at', 'completed_at'
+	]
+	
+	search_columns = [
+		'event_id', 'processor_id', 'processing_stage', 'status'
+	]
+	
+	order_columns = ['started_at', 'processing_duration_ms']
+	base_order = ('started_at', 'desc')
+	
+	# Show view configuration
+	show_columns = [
+		'history_id', 'event_id', 'processor_id', 'processing_stage',
+		'status', 'input_data', 'output_data', 'error_details',
+		'processing_duration_ms', 'retry_count', 'tenant_id',
+		'started_at', 'completed_at', 'processed_by'
+	]
+	
+	# No add/edit - history is system generated
+	can_create = False
+	can_edit = False
+	can_delete = True  # Allow cleanup of old history
+	
+	# Labels
+	label_columns = {
+		'history_id': 'History ID',
+		'event_id': 'Event',
+		'processor_id': 'Processor',
+		'processing_stage': 'Stage',
+		'status': 'Status',
+		'input_data': 'Input Data',
+		'output_data': 'Output Data',
+		'error_details': 'Error Details',
+		'processing_duration_ms': 'Duration (ms)',
+		'retry_count': 'Retries',
+		'tenant_id': 'Tenant',
+		'started_at': 'Started',
+		'completed_at': 'Completed',
+		'processed_by': 'Processed By'
+	}
+	
+	# Formatters
+	formatters_columns = {
+		'input_data': lambda x: json.dumps(x, indent=2)[:200] + "..." if x else "{}",
+		'output_data': lambda x: json.dumps(x, indent=2)[:200] + "..." if x else "{}",
+		'error_details': lambda x: str(x)[:200] + "..." if x and len(str(x)) > 200 else x or "",
+		'processing_duration_ms': lambda x: f"{x:,.0f} ms" if x else "N/A",
+		'started_at': lambda x: x.strftime('%Y-%m-%d %H:%M:%S UTC') if x else "",
+		'completed_at': lambda x: x.strftime('%Y-%m-%d %H:%M:%S UTC') if x else "In Progress"
+	}
+
+# =============================================================================
+# Stream Processor Management Views
+# =============================================================================
+
+class StreamProcessorView(ModelView):
+	"""Manage stream processing jobs and configurations."""
+	
+	datamodel = SQLAInterface(ESStreamProcessor)
+	list_title = "Stream Processors"
+	show_title = "Processor Details"
+	add_title = "Create Stream Processor"
+	edit_title = "Edit Stream Processor"
+	
+	# List view configuration
+	list_columns = [
+		'processor_name', 'processor_type', 'source_stream_id',
+		'target_stream_id', 'status', 'parallelism', 'created_at'
+	]
+	
+	search_columns = [
+		'processor_name', 'processor_type', 'source_stream_id', 'target_stream_id'
+	]
+	
+	order_columns = ['processor_name', 'created_at', 'status']
+	base_order = ('created_at', 'desc')
+	
+	# Show view configuration
+	show_columns = [
+		'processor_id', 'processor_name', 'processor_description',
+		'processor_type', 'source_stream_id', 'target_stream_id',
+		'processing_logic', 'state_store_config', 'window_config',
+		'parallelism', 'error_handling_strategy', 'status',
+		'tenant_id', 'created_at', 'updated_at', 'created_by'
+	]
+	
+	# Form configuration
+	add_columns = [
+		'processor_name', 'processor_description', 'processor_type',
+		'source_stream_id', 'target_stream_id', 'processing_logic',
+		'state_store_config', 'window_config', 'parallelism',
+		'error_handling_strategy'
+	]
+	
+	edit_columns = [
+		'processor_description', 'processing_logic', 'state_store_config',
+		'window_config', 'parallelism', 'error_handling_strategy', 'status'
+	]
+	
+	# Field customization
+	add_form_extra_fields = {
+		'processing_logic': TextAreaField(
+			'Processing Logic',
+			widget=JSONTextAreaWidget(),
+			description='JSON configuration for processing logic',
+			validators=[DataRequired()]
+		),
+		'state_store_config': TextAreaField(
+			'State Store Configuration',
+			widget=JSONTextAreaWidget(),
+			description='Configuration for stateful processing'
+		),
+		'window_config': TextAreaField(
+			'Window Configuration',
+			widget=JSONTextAreaWidget(),
+			description='Time window configuration for aggregations'
+		)
+	}
+	
+	edit_form_extra_fields = add_form_extra_fields
+	
+	# Labels
+	label_columns = {
+		'processor_id': 'Processor ID',
+		'processor_name': 'Name',
+		'processor_description': 'Description',
+		'processor_type': 'Type',
+		'source_stream_id': 'Source Stream',
+		'target_stream_id': 'Target Stream',
+		'processing_logic': 'Processing Logic',
+		'state_store_config': 'State Store Config',
+		'window_config': 'Window Config',
+		'parallelism': 'Parallelism',
+		'error_handling_strategy': 'Error Handling',
+		'status': 'Status',
+		'tenant_id': 'Tenant',
+		'created_at': 'Created',
+		'updated_at': 'Updated',
+		'created_by': 'Created By'
+	}
+	
+	# Formatters
+	formatters_columns = {
+		'processing_logic': lambda x: json.dumps(x, indent=2)[:200] + "..." if x else "{}",
+		'state_store_config': lambda x: json.dumps(x, indent=2) if x else "{}",
+		'window_config': lambda x: json.dumps(x, indent=2) if x else "{}"
+	}
+	
+	@expose('/start_processor/<processor_id>')
+	@has_access
+	def start_processor(self, processor_id):
+		"""Start stream processor."""
+		try:
+			processor = self.datamodel.get(processor_id)
+			if processor:
+				processor.status = 'RUNNING'
+				self.datamodel.edit(processor)
+				flash(f'Processor {processor.processor_name} started successfully', 'success')
+			else:
+				flash('Processor not found', 'error')
+		except Exception as e:
+			flash(f'Error starting processor: {str(e)}', 'error')
+		
+		return self.list()
+	
+	@expose('/stop_processor/<processor_id>')
+	@has_access
+	def stop_processor(self, processor_id):
+		"""Stop stream processor."""
+		try:
+			processor = self.datamodel.get(processor_id)
+			if processor:
+				processor.status = 'STOPPED'
+				self.datamodel.edit(processor)
+				flash(f'Processor {processor.processor_name} stopped successfully', 'success')
+			else:
+				flash('Processor not found', 'error')
+		except Exception as e:
+			flash(f'Error stopping processor: {str(e)}', 'error')
+		
+		return self.list()
+
+# =============================================================================
+# Enhanced Streaming Dashboard with New Models
+# =============================================================================
+
+class EnhancedStreamingDashboardView(BaseView):
+	"""Enhanced real-time dashboard with enterprise features."""
+	
+	route_base = '/enhanced_dashboard'
+	default_view = 'index'
+	
+	@expose('/')
+	@has_access
+	def index(self):
+		"""Enhanced streaming dashboard with new models."""
+		# Enhanced statistics
+		stats = {
+			# Basic stats
+			'total_streams': ESStream.query.count(),
+			'active_streams': ESStream.query.filter_by(status=StreamStatus.ACTIVE.value).count(),
+			'total_subscriptions': ESSubscription.query.count(),
+			'active_subscriptions': ESSubscription.query.filter_by(status=SubscriptionStatus.ACTIVE.value).count(),
+			'total_consumer_groups': ESConsumerGroup.query.count(),
+			'events_today': ESEvent.query.filter(
+				ESEvent.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
+			).count(),
+			
+			# Enhanced stats
+			'total_schemas': ESEventSchema.query.count(),
+			'active_schemas': ESEventSchema.query.filter_by(is_active=True).count(),
+			'total_processors': ESStreamProcessor.query.count(),
+			'running_processors': ESStreamProcessor.query.filter_by(status='RUNNING').count(),
+			'processing_history_count': ESEventProcessingHistory.query.count(),
+			'stream_assignments': ESStreamAssignment.query.filter_by(is_active=True).count(),
+			
+			# Priority distribution
+			'high_priority_events': ESEvent.query.filter_by(priority=EventPriority.HIGH.value).count(),
+			'normal_priority_events': ESEvent.query.filter_by(priority=EventPriority.NORMAL.value).count(),
+			'low_priority_events': ESEvent.query.filter_by(priority=EventPriority.LOW.value).count()
+		}
+		
+		# Recent processing history
+		recent_processing = ESEventProcessingHistory.query.order_by(
+			ESEventProcessingHistory.started_at.desc()
+		).limit(10).all()
+		
+		# Active processors
+		active_processors = ESStreamProcessor.query.filter_by(status='RUNNING').all()
+		
+		# Schema registry status
+		schema_stats = {
+			'compatibility_levels': {},
+			'evolution_strategies': {}
+		}
+		
+		# Get schema distribution
+		schemas = ESEventSchema.query.filter_by(is_active=True).all()
+		for schema in schemas:
+			level = schema.compatibility_level
+			strategy = schema.evolution_strategy
+			schema_stats['compatibility_levels'][level] = schema_stats['compatibility_levels'].get(level, 0) + 1
+			schema_stats['evolution_strategies'][strategy] = schema_stats['evolution_strategies'].get(strategy, 0) + 1
+		
+		return self.render_template(
+			'enhanced_streaming_dashboard.html',
+			stats=stats,
+			recent_processing=recent_processing,
+			active_processors=active_processors,
+			schema_stats=schema_stats,
+			title="Enhanced Event Streaming Dashboard"
+		)
+	
+	@expose('/processor_metrics')
+	@has_access
+	def processor_metrics(self):
+		"""Display stream processor metrics."""
+		processors = ESStreamProcessor.query.all()
+		
+		# Get processing metrics for each processor
+		processor_metrics = []
+		for processor in processors:
+			# Get recent processing history
+			history = ESEventProcessingHistory.query.filter_by(processor_id=processor.processor_id)\
+				.filter(ESEventProcessingHistory.started_at >= datetime.utcnow() - timedelta(hours=24))\
+				.all()
+			
+			# Calculate metrics
+			total_processed = len(history)
+			successful = len([h for h in history if h.status == 'COMPLETED'])
+			failed = len([h for h in history if h.status == 'FAILED'])
+			avg_duration = sum(h.processing_duration_ms or 0 for h in history) / total_processed if total_processed > 0 else 0
+			
+			processor_metrics.append({
+				'processor': processor,
+				'total_processed': total_processed,
+				'successful': successful,
+				'failed': failed,
+				'success_rate': successful / total_processed if total_processed > 0 else 0,
+				'avg_duration_ms': avg_duration
+			})
+		
+		return self.render_template(
+			'processor_metrics.html',
+			processor_metrics=processor_metrics,
+			title="Stream Processor Metrics"
+		)
+	
+	@expose('/schema_registry')
+	@has_access
+	def schema_registry(self):
+		"""Schema registry dashboard."""
+		schemas = ESEventSchema.query.all()
+		
+		# Group schemas by event type
+		schema_groups = {}
+		for schema in schemas:
+			event_type = schema.event_type
+			if event_type not in schema_groups:
+				schema_groups[event_type] = []
+			schema_groups[event_type].append(schema)
+		
+		# Sort schemas within each group by version
+		for event_type in schema_groups:
+			schema_groups[event_type].sort(key=lambda s: s.schema_version, reverse=True)
+		
+		return self.render_template(
+			'schema_registry.html',
+			schema_groups=schema_groups,
+			title="Schema Registry Dashboard"
+		)
+
 # Export all views
 __all__ = [
 	'EventStreamView',
@@ -825,5 +1311,10 @@ __all__ = [
 	'ConsumerGroupView',
 	'SchemaView',
 	'MetricsView',
-	'StreamingDashboardView'
+	'StreamingDashboardView',
+	'EventSchemaView',
+	'StreamAssignmentView',
+	'EventProcessingHistoryView',
+	'StreamProcessorView',
+	'EnhancedStreamingDashboardView'
 ]

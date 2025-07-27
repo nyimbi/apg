@@ -1,0 +1,140 @@
+# APG Integration API Management - Docker ignore patterns
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+docs/
+*.md
+!requirements*.txt
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Local development
+.env.local
+.env.development
+config/development.toml
+config/local.toml
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Cache
+.cache/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Node modules (for frontend development)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts
+dist/
+build/
+
+# Deployment
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+Dockerfile*
+
+# Kubernetes
+k8s/
+kubernetes/
+manifests/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Helm
+charts/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Backup files
+*.bak
+*.backup
+
+# Archives
+*.tar
+*.tar.gz
+*.zip
+*.rar

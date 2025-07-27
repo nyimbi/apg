@@ -1,0 +1,385 @@
+# APG Multi-language Localization - Kubernetes ConfigMaps
+#
+# Configuration management for the multi-language localization capability
+# Includes application settings, feature flags, and environment configuration
+#
+# Author: Nyimbi Odero
+# Company: Datacraft
+# Copyright: © 2025 Datacraft. All rights reserved.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: localization-config
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+data:
+  # API Configuration
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  WORKERS: "4"
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+  
+  # Database Configuration
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_MAX_OVERFLOW: "30"
+  DATABASE_POOL_TIMEOUT: "30"
+  DATABASE_POOL_RECYCLE: "3600"
+  DATABASE_POOL_PRE_PING: "true"
+  
+  # Redis Configuration
+  REDIS_POOL_SIZE: "50"
+  REDIS_SOCKET_TIMEOUT: "5"
+  REDIS_SOCKET_CONNECT_TIMEOUT: "5"
+  REDIS_RETRY_ON_TIMEOUT: "true"
+  
+  # Performance Configuration
+  CACHE_TTL: "3600"
+  ENABLE_COMPRESSION: "true"
+  MAX_REQUEST_SIZE: "10485760"
+  REQUEST_TIMEOUT: "30"
+  
+  # Translation Features
+  ENABLE_AUTO_TRANSLATION: "true"
+  ENABLE_TRANSLATION_MEMORY: "true"
+  DEFAULT_LOCALE: "en-US"
+  FALLBACK_LANGUAGE: "en"
+  QUALITY_THRESHOLD: "7.0"
+  
+  # Supported Languages
+  SUPPORTED_LANGUAGES: |
+    en,es,fr,de,it,pt,nl,ru,zh,ja,ko,ar,he,hi,th,vi,pl,tr,sv,no,da,fi,cs,sk,hu,ro,bg,hr,sl,et,lv,lt,mt,ga,cy,eu,ca,gl
+  
+  # Translation Providers
+  TRANSLATION_PROVIDERS: |
+    google,azure,deepl,amazon
+  
+  # Content Types
+  SUPPORTED_CONTENT_TYPES: |
+    ui_text,email_template,sms_template,content,error_message,notification,marketing
+  
+  # Export Formats
+  SUPPORTED_EXPORT_FORMATS: |
+    csv,json,xliff,tmx,excel,gettext
+  
+  # Monitoring Configuration
+  PROMETHEUS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_INTERVAL: "30"
+  
+  # APG Platform Integration
+  APG_SERVICE_NAME: "multi-language-localization"
+  APG_SERVICE_VERSION: "1.0.0"
+  APG_SERVICE_DESCRIPTION: "Enterprise i18n/l10n service"
+  APG_CAPABILITY_TYPE: "general_cross_functional"
+  
+  # Feature Flags
+  FEATURE_MACHINE_TRANSLATION: "true"
+  FEATURE_BULK_TRANSLATION: "true"
+  FEATURE_REAL_TIME_COLLABORATION: "true"
+  FEATURE_TRANSLATION_MEMORY: "true"
+  FEATURE_QUALITY_ASSURANCE: "true"
+  FEATURE_CULTURAL_FORMATTING: "true"
+  FEATURE_RTL_SUPPORT: "true"
+  FEATURE_COMPLEX_SCRIPTS: "true"
+  
+  # Security Configuration
+  CORS_ORIGINS: |
+    ["https://app.example.com","https://admin.example.com","https://dashboard.example.com"]
+  ALLOWED_HOSTS: |
+    ["localization.example.com","api.localization.example.com"]
+  
+  # Rate Limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "1000"
+  RATE_LIMIT_BURST: "100"
+  
+  # File Upload Configuration
+  MAX_UPLOAD_SIZE: "52428800"  # 50MB
+  ALLOWED_FILE_TYPES: |
+    .csv,.json,.xliff,.tmx,.xlsx,.po,.properties,.xml
+  UPLOAD_PATH: "/app/uploads"
+  
+  # Background Task Configuration
+  CELERY_WORKERS: "4"
+  CELERY_CONCURRENCY: "2"
+  CELERY_MAX_RETRIES: "3"
+  CELERY_RETRY_DELAY: "60"
+  
+  # Notification Configuration
+  NOTIFICATION_ENABLED: "true"
+  EMAIL_NOTIFICATIONS: "true"
+  SLACK_NOTIFICATIONS: "false"
+  WEBHOOK_NOTIFICATIONS: "true"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: localization-nginx-config
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: nginx-config
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        # Logging format
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                       '$status $body_bytes_sent "$http_referer" '
+                       '"$http_user_agent" "$http_x_forwarded_for" '
+                       'rt=$request_time uct="$upstream_connect_time" '
+                       'uht="$upstream_header_time" urt="$upstream_response_time"';
+        
+        access_log /var/log/nginx/access.log main;
+        
+        # Basic settings
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        server_tokens off;
+        
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml;
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+        
+        # Upstream backend
+        upstream localization_backend {
+            least_conn;
+            server localization-api:8000 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+        
+        # Main server configuration
+        server {
+            listen 80;
+            server_name _;
+            
+            # Security headers
+            add_header X-Frame-Options DENY;
+            add_header X-Content-Type-Options nosniff;
+            add_header X-XSS-Protection "1; mode=block";
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+            
+            # Health check endpoint
+            location /health {
+                access_log off;
+                proxy_pass http://localization_backend/health;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            # Metrics endpoint (restricted)
+            location /metrics {
+                allow 10.0.0.0/8;
+                allow 172.16.0.0/12;
+                allow 192.168.0.0/16;
+                deny all;
+                
+                proxy_pass http://localization_backend/metrics;
+                proxy_set_header Host $host;
+            }
+            
+            # Authentication endpoints (rate limited)
+            location ~ ^/(auth|login|register) {
+                limit_req zone=auth burst=10 nodelay;
+                
+                proxy_pass http://localization_backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            # API endpoints (rate limited)
+            location /api/ {
+                limit_req zone=api burst=20 nodelay;
+                
+                proxy_pass http://localization_backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                # Timeouts
+                proxy_connect_timeout 30s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+                
+                # Buffer settings
+                proxy_buffering on;
+                proxy_buffer_size 4k;
+                proxy_buffers 8 4k;
+            }
+            
+            # Static files
+            location /static/ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+                try_files $uri $uri/ =404;
+            }
+            
+            # Main application
+            location / {
+                proxy_pass http://localization_backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                # WebSocket support
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+            }
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: localization-prometheus-config
+  namespace: localization
+  labels:
+    app.kubernetes.io/name: multi-language-localization
+    app.kubernetes.io/component: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'localization-cluster'
+        service: 'multi-language-localization'
+    
+    rule_files:
+      - "*.rules"
+    
+    scrape_configs:
+      # Localization API metrics
+      - job_name: 'localization-api'
+        static_configs:
+          - targets: ['localization-api:9090']
+        metrics_path: '/metrics'
+        scrape_interval: 30s
+        scrape_timeout: 10s
+        
+      # PostgreSQL metrics (if prometheus exporter is enabled)
+      - job_name: 'localization-postgres'
+        static_configs:
+          - targets: ['localization-db-exporter:9187']
+        scrape_interval: 30s
+        
+      # Redis metrics (if prometheus exporter is enabled)
+      - job_name: 'localization-redis'
+        static_configs:
+          - targets: ['localization-redis-exporter:9121']
+        scrape_interval: 30s
+        
+      # Nginx metrics (if prometheus exporter is enabled)
+      - job_name: 'localization-nginx'
+        static_configs:
+          - targets: ['localization-nginx-exporter:9113']
+        scrape_interval: 30s
+    
+    # Alerting configuration
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+  
+  localization.rules: |
+    groups:
+      - name: localization.rules
+        rules:
+          # High error rate
+          - alert: HighErrorRate
+            expr: rate(http_requests_total{job="localization-api",status=~"5.."}[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High error rate detected"
+              description: "Error rate is {{ $value }} errors per second"
+          
+          # High response time
+          - alert: HighResponseTime
+            expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="localization-api"}[5m])) > 1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High response time detected"
+              description: "95th percentile response time is {{ $value }} seconds"
+          
+          # Low cache hit rate
+          - alert: LowCacheHitRate
+            expr: translation_cache_hit_rate < 0.8
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Low translation cache hit rate"
+              description: "Cache hit rate is {{ $value }}, expected > 80%"
+          
+          # Database connection issues
+          - alert: DatabaseConnectionIssues
+            expr: up{job="localization-postgres"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Database connection down"
+              description: "PostgreSQL database is not responding"
+          
+          # Redis connection issues
+          - alert: RedisConnectionIssues
+            expr: up{job="localization-redis"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Redis connection down"
+              description: "Redis cache is not responding"

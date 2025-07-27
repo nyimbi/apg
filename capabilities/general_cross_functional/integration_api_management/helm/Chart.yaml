@@ -1,0 +1,42 @@
+apiVersion: v2
+name: integration-api-management
+description: APG Integration API Management - Enterprise API Gateway and Management Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+home: https://www.datacraft.co.ke
+sources:
+  - https://github.com/datacraft/apg-capabilities
+maintainers:
+  - name: Nyimbi Odero
+    email: nyimbi@gmail.com
+    url: https://www.datacraft.co.ke
+keywords:
+  - api-management
+  - api-gateway
+  - microservices
+  - apg-platform
+  - enterprise
+annotations:
+  category: Platform
+  licenses: Apache-2.0
+  apg.datacraft.co.ke/capability-id: integration-api-management
+  apg.datacraft.co.ke/capability-version: "1.0.0"
+  apg.datacraft.co.ke/platform-version: ">=1.0.0"
+dependencies:
+  - name: postgresql
+    version: "~12.1.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+  - name: redis
+    version: "~17.4.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+  - name: prometheus
+    version: "~19.0.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: monitoring.prometheus.enabled
+  - name: grafana
+    version: "~6.50.0"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: monitoring.grafana.enabled

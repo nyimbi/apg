@@ -1,0 +1,868 @@
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.translation-workbench {
+    padding: 20px 0;
+}
+
+.workbench-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 40px 0;
+    margin-bottom: 30px;
+    border-radius: 10px;
+}
+
+.workbench-header h1 {
+    color: white;
+    margin-bottom: 10px;
+}
+
+.workbench-header p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.filter-panel {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.translation-item {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+    padding: 20px;
+    transition: all 0.3s ease;
+}
+
+.translation-item:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.translation-item.untranslated {
+    border-left: 4px solid #dc3545;
+}
+
+.translation-item.draft {
+    border-left: 4px solid #ffc107;
+}
+
+.translation-item.pending {
+    border-left: 4px solid #fd7e14;
+}
+
+.translation-item.approved {
+    border-left: 4px solid #28a745;
+}
+
+.translation-key {
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.9rem;
+    color: #666;
+    background: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+
+.source-text {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.translation-text {
+    font-size: 1rem;
+    margin-bottom: 10px;
+    line-height: 1.5;
+    min-height: 40px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f9f9f9;
+}
+
+.translation-text.editable {
+    background: #fff;
+    cursor: text;
+}
+
+.translation-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 10px;
+}
+
+.translation-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.quick-translate-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.3s;
+}
+
+.quick-translate-btn:hover {
+    background: #0056b3;
+}
+
+.save-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.save-btn:hover {
+    background: #1e7e34;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.status-untranslated {
+    background: #dc3545;
+    color: white;
+}
+
+.status-draft {
+    background: #ffc107;
+    color: #212529;
+}
+
+.status-pending {
+    background: #fd7e14;
+    color: white;
+}
+
+.status-approved {
+    background: #28a745;
+    color: white;
+}
+
+.progress-summary {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.progress-bar-container {
+    position: relative;
+    height: 30px;
+    background: #e9ecef;
+    border-radius: 15px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.progress-segment {
+    position: absolute;
+    height: 100%;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.segment-translated {
+    background: #28a745;
+}
+
+.segment-draft {
+    background: #ffc107;
+}
+
+.segment-pending {
+    background: #fd7e14;
+}
+
+.segment-untranslated {
+    background: #dc3545;
+}
+
+.floating-actions {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+}
+
+.fab {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #007bff;
+    color: white;
+    border: none;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+}
+
+.fab:hover {
+    background: #0056b3;
+    transform: scale(1.1);
+}
+
+.language-switch {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    padding: 5px 15px;
+    margin: 0 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.language-switch.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.language-switch:hover:not(.active) {
+    background: #f8f9fa;
+}
+
+.language-flag {
+    width: 20px;
+    height: 15px;
+    border-radius: 2px;
+    background-size: cover;
+}
+
+.rtl-text {
+    direction: rtl;
+    text-align: right;
+}
+
+.search-panel {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.filter-select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    min-width: 120px;
+}
+
+.bulk-actions {
+    background: #f8f9fa;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 20px;
+    display: none;
+}
+
+.bulk-actions.show {
+    display: block;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="translation-workbench">
+    <!-- Header -->
+    <div class="workbench-header text-center">
+        <div class="container">
+            <h1><i class="fa fa-edit"></i> {{ _('Translation Workbench') }}</h1>
+            <p>{{ _('Streamlined interface for efficient translation management and review') }}</p>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Language Selection -->
+        <div class="text-center mb-4">
+            <h5>{{ _('Select Target Language') }}</h5>
+            <div class="language-switches">
+                {% for language in languages %}
+                <div class="language-switch {% if loop.first %}active{% endif %}" 
+                     data-language="{{ language.code }}"
+                     data-direction="{{ language.get('direction', 'ltr') }}">
+                    <span class="language-flag" 
+                          style="background-image: url('{{ url_for('static', filename='flags/' + language.code + '.png') }}')"></span>
+                    {{ language.native_name }}
+                    <small>({{ language.code }})</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Progress Summary -->
+        <div class="progress-summary">
+            <h5><i class="fa fa-chart-pie"></i> {{ _('Translation Progress') }}</h5>
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="progress-bar-container">
+                        <div class="progress-segment segment-translated" style="left: 0%; width: 60%;">
+                            {{ _('Translated') }} 60%
+                        </div>
+                        <div class="progress-segment segment-pending" style="left: 60%; width: 15%;">
+                            {{ _('Pending') }} 15%
+                        </div>
+                        <div class="progress-segment segment-draft" style="left: 75%; width: 10%;">
+                            {{ _('Draft') }} 10%
+                        </div>
+                        <div class="progress-segment segment-untranslated" style="left: 85%; width: 15%;">
+                            {{ _('Missing') }} 15%
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-right">
+                    <strong>2,850 / 3,200 {{ _('translations completed') }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-panel">
+            <div class="search-panel">
+                <input type="text" 
+                       class="search-input" 
+                       placeholder="{{ _('Search translation keys or content...') }}"
+                       id="searchInput">
+                
+                <select class="filter-select" id="namespaceFilter">
+                    <option value="">{{ _('All Namespaces') }}</option>
+                    {% for namespace in namespaces %}
+                    <option value="{{ namespace.name }}">{{ namespace.description or namespace.name }}</option>
+                    {% endfor %}
+                </select>
+                
+                <select class="filter-select" id="statusFilter">
+                    <option value="">{{ _('All Statuses') }}</option>
+                    <option value="untranslated">{{ _('Untranslated') }}</option>
+                    <option value="draft">{{ _('Draft') }}</option>
+                    <option value="pending">{{ _('Pending Review') }}</option>
+                    <option value="approved">{{ _('Approved') }}</option>
+                </select>
+                
+                <select class="filter-select" id="priorityFilter">
+                    <option value="">{{ _('All Priorities') }}</option>
+                    <option value="high">{{ _('High Priority') }}</option>
+                    <option value="medium">{{ _('Medium Priority') }}</option>
+                    <option value="low">{{ _('Low Priority') }}</option>
+                </select>
+                
+                <button class="btn btn-primary" id="applyFilters">
+                    <i class="fa fa-filter"></i> {{ _('Apply') }}
+                </button>
+                
+                <button class="btn btn-outline-secondary" id="clearFilters">
+                    <i class="fa fa-times"></i> {{ _('Clear') }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="bulk-actions" id="bulkActions">
+            <div class="d-flex justify-content-between align-items-center">
+                <span><span id="selectedCount">0</span> {{ _('items selected') }}</span>
+                <div>
+                    <button class="btn btn-sm btn-success" id="bulkApprove">
+                        <i class="fa fa-check"></i> {{ _('Approve Selected') }}
+                    </button>
+                    <button class="btn btn-sm btn-warning" id="bulkTranslate">
+                        <i class="fa fa-robot"></i> {{ _('Auto-translate Selected') }}
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" id="clearSelection">
+                        <i class="fa fa-times"></i> {{ _('Clear Selection') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Translation Items -->
+        <div id="translationItems">
+            <!-- Sample translation items - would be populated dynamically -->
+            <div class="translation-item untranslated" data-key="user.profile.edit_button" data-status="untranslated">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="translation-key">user.profile.edit_button</div>
+                    <input type="checkbox" class="item-checkbox" style="margin-left: 10px;">
+                </div>
+                
+                <div class="source-text">
+                    <strong>{{ _('Source') }}:</strong> Edit Profile
+                </div>
+                
+                <div class="translation-text editable" 
+                     contenteditable="true" 
+                     data-placeholder="{{ _('Enter translation...') }}">
+                </div>
+                
+                <div class="translation-meta">
+                    <div>
+                        <span class="status-badge status-untranslated">{{ _('Untranslated') }}</span>
+                        <span class="ml-2"><i class="fa fa-exclamation-triangle text-warning"></i> {{ _('High Priority') }}</span>
+                    </div>
+                    <div class="translation-actions">
+                        <button class="quick-translate-btn" data-action="auto-translate">
+                            <i class="fa fa-robot"></i> {{ _('Auto-translate') }}
+                        </button>
+                        <button class="save-btn" data-action="save" style="display: none;">
+                            <i class="fa fa-save"></i> {{ _('Save') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="translation-item draft" data-key="user.settings.notifications" data-status="draft">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="translation-key">user.settings.notifications</div>
+                    <input type="checkbox" class="item-checkbox" style="margin-left: 10px;">
+                </div>
+                
+                <div class="source-text">
+                    <strong>{{ _('Source') }}:</strong> Notification Settings
+                </div>
+                
+                <div class="translation-text editable" contenteditable="true">
+                    Configuración de Notificaciones
+                </div>
+                
+                <div class="translation-meta">
+                    <div>
+                        <span class="status-badge status-draft">{{ _('Draft') }}</span>
+                        <span class="ml-2"><small>{{ _('Last modified') }}: 2 hours ago</small></span>
+                    </div>
+                    <div class="translation-actions">
+                        <button class="save-btn" data-action="approve">
+                            <i class="fa fa-check"></i> {{ _('Approve') }}
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" data-action="reject">
+                            <i class="fa fa-times"></i> {{ _('Reject') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="translation-item approved" data-key="common.buttons.save" data-status="approved">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="translation-key">common.buttons.save</div>
+                    <input type="checkbox" class="item-checkbox" style="margin-left: 10px;">
+                </div>
+                
+                <div class="source-text">
+                    <strong>{{ _('Source') }}:</strong> Save
+                </div>
+                
+                <div class="translation-text">
+                    Guardar
+                </div>
+                
+                <div class="translation-meta">
+                    <div>
+                        <span class="status-badge status-approved">{{ _('Approved') }}</span>
+                        <span class="ml-2"><small>{{ _('Quality') }}: 9.2/10</small></span>
+                    </div>
+                    <div class="translation-actions">
+                        <button class="btn btn-sm btn-outline-primary" data-action="edit">
+                            <i class="fa fa-edit"></i> {{ _('Edit') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Load More -->
+        <div class="text-center mt-4">
+            <button class="btn btn-outline-primary" id="loadMore">
+                <i class="fa fa-chevron-down"></i> {{ _('Load More Translations') }}
+            </button>
+        </div>
+    </div>
+
+    <!-- Floating Action Buttons -->
+    <div class="floating-actions">
+        <button class="fab" title="{{ _('Scroll to Top') }}" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+            <i class="fa fa-arrow-up"></i>
+        </button>
+        <button class="fab" title="{{ _('Bulk Operations') }}" id="toggleBulkMode">
+            <i class="fa fa-check-square"></i>
+        </button>
+        <button class="fab" title="{{ _('Settings') }}" data-toggle="modal" data-target="#settingsModal">
+            <i class="fa fa-cog"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal fade" id="settingsModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ _('Workbench Settings') }}</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>{{ _('Items per page') }}</label>
+                    <select class="form-control" id="itemsPerPage">
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="autoSave" checked>
+                        <label class="form-check-label" for="autoSave">
+                            {{ _('Auto-save changes') }}
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="showMachineTranslation">
+                        <label class="form-check-label" for="showMachineTranslation">
+                            {{ _('Show machine translation suggestions') }}
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="highlightChanges" checked>
+                        <label class="form-check-label" for="highlightChanges">
+                            {{ _('Highlight unsaved changes') }}
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ _('Close') }}</button>
+                <button type="button" class="btn btn-primary" id="saveSettings">{{ _('Save Settings') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+$(document).ready(function() {
+    let currentLanguage = 'es'; // Default to Spanish
+    let bulkMode = false;
+    let selectedItems = new Set();
+    
+    // Language switching
+    $('.language-switch').click(function() {
+        $('.language-switch').removeClass('active');
+        $(this).addClass('active');
+        currentLanguage = $(this).data('language');
+        
+        // Update text direction for RTL languages
+        if ($(this).data('direction') === 'rtl') {
+            $('.translation-text').addClass('rtl-text');
+        } else {
+            $('.translation-text').removeClass('rtl-text');
+        }
+        
+        loadTranslations();
+    });
+    
+    // Editable translation text
+    $('.translation-text.editable').on('input', function() {
+        const $item = $(this).closest('.translation-item');
+        const $saveBtn = $item.find('[data-action="save"]');
+        $saveBtn.show();
+        
+        // Highlight changed item
+        $item.addClass('changed');
+    });
+    
+    // Auto-translate button
+    $(document).on('click', '[data-action="auto-translate"]', function() {
+        const $item = $(this).closest('.translation-item');
+        const $textArea = $item.find('.translation-text');
+        const sourceText = $item.find('.source-text').text().replace('Source: ', '');
+        
+        // Show loading state
+        $(this).html('<i class="fa fa-spinner fa-spin"></i> Translating...');
+        
+        // Simulate auto-translation
+        setTimeout(() => {
+            $textArea.text(translateText(sourceText, currentLanguage));
+            $item.find('[data-action="save"]').show();
+            $(this).html('<i class="fa fa-robot"></i> Auto-translate');
+            $item.removeClass('untranslated').addClass('draft');
+            $item.find('.status-badge').removeClass('status-untranslated').addClass('status-draft').text('Draft');
+        }, 1500);
+    });
+    
+    // Save translation
+    $(document).on('click', '[data-action="save"], [data-action="approve"]', function() {
+        const $item = $(this).closest('.translation-item');
+        const action = $(this).data('action');
+        const key = $item.data('key');
+        const content = $item.find('.translation-text').text();
+        
+        // Show saving state
+        $(this).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+        
+        // Simulate save
+        setTimeout(() => {
+            if (action === 'approve') {
+                $item.removeClass('draft pending').addClass('approved');
+                $item.find('.status-badge').removeClass('status-draft status-pending').addClass('status-approved').text('Approved');
+                $(this).html('<i class="fa fa-check"></i> Approved');
+            } else {
+                $item.removeClass('untranslated').addClass('draft');
+                $item.find('.status-badge').removeClass('status-untranslated').addClass('status-draft').text('Draft');
+                $(this).html('<i class="fa fa-save"></i> Saved');
+            }
+            
+            $item.removeClass('changed');
+            setTimeout(() => $(this).hide(), 2000);
+            
+            showNotification('Translation saved successfully', 'success');
+        }, 1000);
+    });
+    
+    // Bulk mode toggle
+    $('#toggleBulkMode').click(function() {
+        bulkMode = !bulkMode;
+        $('.item-checkbox').toggle(bulkMode);
+        if (!bulkMode) {
+            selectedItems.clear();
+            $('.item-checkbox').prop('checked', false);
+            $('#bulkActions').removeClass('show');
+        }
+        $(this).toggleClass('active', bulkMode);
+    });
+    
+    // Item selection
+    $(document).on('change', '.item-checkbox', function() {
+        const key = $(this).closest('.translation-item').data('key');
+        if ($(this).is(':checked')) {
+            selectedItems.add(key);
+        } else {
+            selectedItems.delete(key);
+        }
+        
+        $('#selectedCount').text(selectedItems.size);
+        $('#bulkActions').toggleClass('show', selectedItems.size > 0);
+    });
+    
+    // Bulk actions
+    $('#bulkApprove').click(function() {
+        if (selectedItems.size === 0) return;
+        
+        selectedItems.forEach(key => {
+            const $item = $(`.translation-item[data-key="${key}"]`);
+            $item.removeClass('draft pending').addClass('approved');
+            $item.find('.status-badge').removeClass('status-draft status-pending').addClass('status-approved').text('Approved');
+        });
+        
+        showNotification(`${selectedItems.size} translations approved`, 'success');
+        clearSelection();
+    });
+    
+    $('#bulkTranslate').click(function() {
+        if (selectedItems.size === 0) return;
+        
+        let completed = 0;
+        selectedItems.forEach(key => {
+            const $item = $(`.translation-item[data-key="${key}"]`);
+            if ($item.data('status') === 'untranslated') {
+                setTimeout(() => {
+                    const sourceText = $item.find('.source-text').text().replace('Source: ', '');
+                    $item.find('.translation-text').text(translateText(sourceText, currentLanguage));
+                    $item.removeClass('untranslated').addClass('draft');
+                    $item.find('.status-badge').removeClass('status-untranslated').addClass('status-draft').text('Draft');
+                    
+                    completed++;
+                    if (completed === selectedItems.size) {
+                        showNotification(`${completed} translations completed`, 'success');
+                        clearSelection();
+                    }
+                }, Math.random() * 2000);
+            }
+        });
+    });
+    
+    function clearSelection() {
+        selectedItems.clear();
+        $('.item-checkbox').prop('checked', false);
+        $('#bulkActions').removeClass('show');
+        $('#selectedCount').text('0');
+    }
+    
+    $('#clearSelection').click(clearSelection);
+    
+    // Filters
+    $('#applyFilters').click(function() {
+        const search = $('#searchInput').val();
+        const namespace = $('#namespaceFilter').val();
+        const status = $('#statusFilter').val();
+        const priority = $('#priorityFilter').val();
+        
+        filterTranslations(search, namespace, status, priority);
+    });
+    
+    $('#clearFilters').click(function() {
+        $('#searchInput, #namespaceFilter, #statusFilter, #priorityFilter').val('');
+        filterTranslations('', '', '', '');
+    });
+    
+    // Search as you type
+    $('#searchInput').on('input', debounce(function() {
+        $('#applyFilters').click();
+    }, 500));
+    
+    function filterTranslations(search, namespace, status, priority) {
+        $('.translation-item').each(function() {
+            let show = true;
+            
+            if (search && !$(this).text().toLowerCase().includes(search.toLowerCase())) {
+                show = false;
+            }
+            
+            if (status && $(this).data('status') !== status) {
+                show = false;
+            }
+            
+            $(this).toggle(show);
+        });
+    }
+    
+    function loadTranslations() {
+        // Simulate loading translations for the selected language
+        console.log('Loading translations for language:', currentLanguage);
+        // In real implementation, this would make an AJAX call
+    }
+    
+    function translateText(text, targetLang) {
+        // Simple mock translations
+        const translations = {
+            'es': {
+                'Edit Profile': 'Editar Perfil',
+                'Notification Settings': 'Configuración de Notificaciones',
+                'Save': 'Guardar'
+            },
+            'fr': {
+                'Edit Profile': 'Modifier le Profil',
+                'Notification Settings': 'Paramètres de Notification',
+                'Save': 'Enregistrer'
+            }
+        };
+        
+        return translations[targetLang]?.[text] || `[${targetLang.toUpperCase()}] ${text}`;
+    }
+    
+    function showNotification(message, type = 'info') {
+        // Create and show notification
+        const alertClass = type === 'success' ? 'alert-success' : 
+                          type === 'error' ? 'alert-danger' : 'alert-info';
+        
+        const $notification = $(`
+            <div class="alert ${alertClass} alert-dismissible fade show" 
+                 style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                ${message}
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            </div>
+        `);
+        
+        $('body').append($notification);
+        
+        setTimeout(() => {
+            $notification.alert('close');
+        }, 5000);
+    }
+    
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Auto-save functionality
+    setInterval(function() {
+        if ($('#autoSave').is(':checked')) {
+            $('.translation-item.changed [data-action="save"]:visible').click();
+        }
+    }, 30000); // Auto-save every 30 seconds
+    
+    // Keyboard shortcuts
+    $(document).keydown(function(e) {
+        // Ctrl+S to save current translation
+        if (e.ctrlKey && e.keyCode === 83) {
+            e.preventDefault();
+            $('.translation-text:focus').closest('.translation-item').find('[data-action="save"]:visible').click();
+        }
+        
+        // Ctrl+T to auto-translate current item
+        if (e.ctrlKey && e.keyCode === 84) {
+            e.preventDefault();
+            $('.translation-text:focus').closest('.translation-item').find('[data-action="auto-translate"]').click();
+        }
+    });
+});
+</script>
+{% endblock %}

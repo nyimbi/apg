@@ -23,12 +23,15 @@ from starlette.status import HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_404_NOT
 
 from .models import (
 	ESEvent, ESStream, ESSubscription, ESConsumerGroup, ESSchema, ESMetrics,
+	ESEventSchema, ESStreamAssignment, ESEventProcessingHistory, ESStreamProcessor,
 	EventConfig, StreamConfig, SubscriptionConfig, SchemaConfig,
-	EventStatus, StreamStatus, SubscriptionStatus, EventType
+	EventStatus, StreamStatus, SubscriptionStatus, EventType, EventPriority,
+	ConsumerStatus, ProcessorType, CompressionType, SerializationFormat
 )
 from .service import (
 	EventStreamingService, EventPublishingService, EventConsumptionService,
-	StreamProcessingService, EventSourcingService, SchemaRegistryService
+	StreamProcessingService, EventSourcingService, SchemaRegistryService,
+	StreamManagementService, ConsumerManagementService
 )
 
 # =============================================================================
@@ -47,6 +50,12 @@ class EventPublishRequest(BaseModel):
 	causation_id: Optional[str] = Field(None, max_length=100)
 	metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 	partition_key: Optional[str] = Field(None, max_length=200)
+	# Enhanced fields
+	priority: Optional[EventPriority] = Field(default=EventPriority.NORMAL)
+	compression_type: Optional[CompressionType] = Field(default=CompressionType.NONE)
+	serialization_format: Optional[SerializationFormat] = Field(default=SerializationFormat.JSON)
+	schema_id: Optional[str] = Field(None, max_length=100)
+	max_retries: Optional[int] = Field(default=3, ge=0, le=10)
 
 class EventBatchPublishRequest(BaseModel):
 	"""Request model for batch event publishing."""
@@ -84,6 +93,15 @@ class EventResponse(BaseModel):
 	metadata: Dict[str, Any]
 	status: EventStatus
 	stream_id: str
+	# Enhanced fields
+	priority: EventPriority
+	compression_type: CompressionType
+	serialization_format: SerializationFormat
+	schema_id: Optional[str]
+	processing_duration_ms: Optional[int]
+	retry_count: int
+	max_retries: int
+	error_message: Optional[str]
 
 class StreamMetricsResponse(BaseModel):
 	"""Response model for stream metrics."""
@@ -147,6 +165,9 @@ event_publishing_service = None
 event_consumption_service = None
 stream_processing_service = None
 schema_registry_service = None
+event_sourcing_service = None
+stream_management_service = None
+consumer_management_service = None
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -266,6 +287,27 @@ async def get_schema_registry_service():
 		schema_registry_service = SchemaRegistryService()
 	return schema_registry_service
 
+async def get_event_sourcing_service():
+	"""Get event sourcing service instance."""
+	global event_sourcing_service
+	if not event_sourcing_service:
+		event_sourcing_service = EventSourcingService()
+	return event_sourcing_service
+
+async def get_stream_management_service():
+	"""Get stream management service instance."""
+	global stream_management_service
+	if not stream_management_service:
+		stream_management_service = StreamManagementService()
+	return stream_management_service
+
+async def get_consumer_management_service():
+	"""Get consumer management service instance."""
+	global consumer_management_service
+	if not consumer_management_service:
+		consumer_management_service = ConsumerManagementService()
+	return consumer_management_service
+
 # =============================================================================
 # Event Publishing Endpoints
 # =============================================================================
@@ -287,7 +329,13 @@ async def publish_event(
 			correlation_id=request.correlation_id,
 			causation_id=request.causation_id,
 			partition_key=request.partition_key,
-			metadata=request.metadata
+			metadata=request.metadata,
+			# Enhanced configuration
+			priority=request.priority.value if request.priority else EventPriority.NORMAL.value,
+			compression_type=request.compression_type.value if request.compression_type else CompressionType.NONE.value,
+			serialization_format=request.serialization_format.value if request.serialization_format else SerializationFormat.JSON.value,
+			schema_id=request.schema_id,
+			max_retries=request.max_retries or 3
 		)
 		
 		# Publish event
@@ -310,7 +358,8 @@ async def publish_event(
 					"event_id": event.event_id,
 					"event_type": event.event_type,
 					"stream_id": event.stream_id,
-					"payload": event.payload
+					"payload": event.payload,
+					"priority": event.priority
 				}
 			)
 			await connection_manager.broadcast_to_stream(event.stream_id, message)
@@ -329,7 +378,16 @@ async def publish_event(
 			payload=event.payload,
 			metadata=event.metadata,
 			status=EventStatus(event.status),
-			stream_id=event.stream_id
+			stream_id=event.stream_id,
+			# Enhanced response fields
+			priority=EventPriority(event.priority),
+			compression_type=CompressionType(event.compression_type),
+			serialization_format=SerializationFormat(event.serialization_format),
+			schema_id=event.schema_id,
+			processing_duration_ms=event.processing_duration_ms,
+			retry_count=event.retry_count,
+			max_retries=event.max_retries,
+			error_message=event.error_message
 		)
 		
 	except Exception as e:
@@ -427,7 +485,16 @@ async def get_event(
 			payload=event.payload,
 			metadata=event.metadata,
 			status=EventStatus(event.status),
-			stream_id=event.stream_id
+			stream_id=event.stream_id,
+			# Enhanced response fields
+			priority=EventPriority(event.priority),
+			compression_type=CompressionType(event.compression_type),
+			serialization_format=SerializationFormat(event.serialization_format),
+			schema_id=event.schema_id,
+			processing_duration_ms=event.processing_duration_ms,
+			retry_count=event.retry_count,
+			max_retries=event.max_retries,
+			error_message=event.error_message
 		)
 		
 	except HTTPException:
@@ -489,7 +556,16 @@ async def query_events(
 				payload=event.payload,
 				metadata=event.metadata,
 				status=EventStatus(event.status),
-				stream_id=event.stream_id
+				stream_id=event.stream_id,
+				# Enhanced response fields
+				priority=EventPriority(event.priority),
+				compression_type=CompressionType(event.compression_type),
+				serialization_format=SerializationFormat(event.serialization_format),
+				schema_id=event.schema_id,
+				processing_duration_ms=event.processing_duration_ms,
+				retry_count=event.retry_count,
+				max_retries=event.max_retries,
+				error_message=event.error_message
 			))
 		
 		return {
@@ -876,6 +952,401 @@ async def websocket_monitoring(websocket: WebSocket):
 		connection_manager.disconnect(connection_id)
 
 # =============================================================================
+# Event Sourcing and CQRS Endpoints
+# =============================================================================
+
+class EventSourcingRequest(BaseModel):
+	"""Request model for event sourcing operations."""
+	aggregate_id: str = Field(..., min_length=1, max_length=100)
+	aggregate_type: str = Field(..., min_length=1, max_length=100)
+	expected_version: Optional[int] = Field(None, ge=0)
+	event_data: Dict[str, Any] = Field(...)
+	event_type: str = Field(..., min_length=1, max_length=100)
+	correlation_id: Optional[str] = Field(None, max_length=100)
+	metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+class AggregateReconstructionRequest(BaseModel):
+	"""Request model for aggregate reconstruction."""
+	aggregate_id: str = Field(..., min_length=1, max_length=100)
+	aggregate_type: str = Field(..., min_length=1, max_length=100)
+	update_snapshots: bool = Field(default=False)
+
+@app.post("/api/v1/event-sourcing/append", status_code=HTTP_201_CREATED)
+async def append_event(
+	request: EventSourcingRequest,
+	user: dict = Depends(get_current_user),
+	sourcing_service: EventSourcingService = Depends(get_event_sourcing_service)
+):
+	"""Append event to aggregate stream with optimistic concurrency control."""
+	try:
+		event_id = await sourcing_service.append_event(
+			aggregate_id=request.aggregate_id,
+			aggregate_type=request.aggregate_type,
+			event_data=request.event_data,
+			event_type=request.event_type,
+			expected_version=request.expected_version,
+			correlation_id=request.correlation_id,
+			metadata=request.metadata,
+			tenant_id=user["tenant_id"],
+			user_id=user["user_id"]
+		)
+		
+		return {
+			"event_id": event_id,
+			"message": "Event appended successfully"
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/event-sourcing/reconstruct")
+async def reconstruct_aggregate(
+	request: AggregateReconstructionRequest,
+	user: dict = Depends(get_current_user),
+	sourcing_service: EventSourcingService = Depends(get_event_sourcing_service)
+):
+	"""Reconstruct aggregate state from event stream."""
+	try:
+		aggregate_state = await sourcing_service.reconstruct_aggregate(
+			aggregate_id=request.aggregate_id,
+			aggregate_type=request.aggregate_type,
+			update_snapshots=request.update_snapshots,
+			tenant_id=user["tenant_id"]
+		)
+		
+		return {
+			"aggregate_id": request.aggregate_id,
+			"aggregate_type": request.aggregate_type,
+			"current_version": aggregate_state.get("version", 0),
+			"state": aggregate_state.get("data", {}),
+			"last_event_timestamp": aggregate_state.get("last_event_timestamp")
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/event-sourcing/aggregate/{aggregate_id}/events")
+async def get_aggregate_events(
+	aggregate_id: str,
+	aggregate_type: str = Query(...),
+	start_version: Optional[int] = Query(None, ge=0),
+	end_version: Optional[int] = Query(None, ge=0),
+	user: dict = Depends(get_current_user),
+	sourcing_service: EventSourcingService = Depends(get_event_sourcing_service)
+):
+	"""Get events for a specific aggregate."""
+	try:
+		events = await sourcing_service.get_aggregate_events(
+			aggregate_id=aggregate_id,
+			aggregate_type=aggregate_type,
+			start_version=start_version,
+			end_version=end_version,
+			tenant_id=user["tenant_id"]
+		)
+		
+		return {
+			"aggregate_id": aggregate_id,
+			"aggregate_type": aggregate_type,
+			"events": events,
+			"event_count": len(events)
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+# =============================================================================
+# Stream Processing Endpoints
+# =============================================================================
+
+class StreamProcessorRequest(BaseModel):
+	"""Request model for stream processor creation."""
+	processor_name: str = Field(..., min_length=1, max_length=100)
+	processor_description: Optional[str] = Field(None, max_length=500)
+	processor_type: ProcessorType = Field(...)
+	source_stream_id: str = Field(..., min_length=1, max_length=100)
+	target_stream_id: Optional[str] = Field(None, max_length=100)
+	processing_logic: Dict[str, Any] = Field(...)
+	state_store_config: Optional[Dict[str, Any]] = Field(default_factory=dict)
+	window_config: Optional[Dict[str, Any]] = Field(default_factory=dict)
+	parallelism: int = Field(default=1, ge=1, le=100)
+	error_handling_strategy: str = Field(default="retry")
+
+@app.post("/api/v1/stream-processors", status_code=HTTP_201_CREATED)
+async def create_stream_processor(
+	request: StreamProcessorRequest,
+	user: dict = Depends(get_current_user),
+	stream_service: StreamManagementService = Depends(get_stream_management_service)
+):
+	"""Create a new stream processor."""
+	try:
+		processor_id = await stream_service.create_stream_processor(
+			processor_config=request.dict(),
+			tenant_id=user["tenant_id"],
+			user_id=user["user_id"]
+		)
+		
+		return {
+			"processor_id": processor_id,
+			"message": "Stream processor created successfully"
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/v1/stream-processors")
+async def list_stream_processors(
+	user: dict = Depends(get_current_user),
+	stream_service: StreamManagementService = Depends(get_stream_management_service)
+):
+	"""List all stream processors for the tenant."""
+	try:
+		processors = await stream_service.list_stream_processors(tenant_id=user["tenant_id"])
+		return {"processors": processors}
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/stream-processors/{processor_id}/start")
+async def start_stream_processor(
+	processor_id: str,
+	user: dict = Depends(get_current_user),
+	stream_service: StreamManagementService = Depends(get_stream_management_service)
+):
+	"""Start a stream processor."""
+	try:
+		success = await stream_service.start_stream_processor(
+			processor_id=processor_id,
+			tenant_id=user["tenant_id"]
+		)
+		
+		if not success:
+			raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Processor not found")
+		
+		return {"message": "Stream processor started successfully"}
+		
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/stream-processors/{processor_id}/stop")
+async def stop_stream_processor(
+	processor_id: str,
+	user: dict = Depends(get_current_user),
+	stream_service: StreamManagementService = Depends(get_stream_management_service)
+):
+	"""Stop a stream processor."""
+	try:
+		success = await stream_service.stop_stream_processor(
+			processor_id=processor_id,
+			tenant_id=user["tenant_id"]
+		)
+		
+		if not success:
+			raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Processor not found")
+		
+		return {"message": "Stream processor stopped successfully"}
+		
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/stream-processors/{processor_id}/metrics")
+async def get_processor_metrics(
+	processor_id: str,
+	user: dict = Depends(get_current_user),
+	stream_service: StreamManagementService = Depends(get_stream_management_service)
+):
+	"""Get metrics for a specific stream processor."""
+	try:
+		metrics = await stream_service.get_processor_metrics(
+			processor_id=processor_id,
+			tenant_id=user["tenant_id"]
+		)
+		
+		if not metrics:
+			raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Processor not found")
+		
+		return metrics
+		
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+# =============================================================================
+# Enhanced Schema Registry Endpoints
+# =============================================================================
+
+class EnhancedSchemaRequest(BaseModel):
+	"""Request model for enhanced schema registration."""
+	schema_name: str = Field(..., min_length=1, max_length=100)
+	schema_version: str = Field(..., min_length=1, max_length=20)
+	json_schema: Dict[str, Any] = Field(...)
+	event_type: str = Field(..., min_length=1, max_length=100)
+	compatibility_level: str = Field(default="BACKWARD")
+	evolution_strategy: str = Field(default="COMPATIBLE")
+	validation_rules: Optional[Dict[str, Any]] = Field(default_factory=dict)
+	is_active: bool = Field(default=True)
+
+@app.post("/api/v1/schemas/enhanced", status_code=HTTP_201_CREATED)
+async def register_enhanced_schema(
+	request: EnhancedSchemaRequest,
+	user: dict = Depends(get_current_user),
+	schema_service: SchemaRegistryService = Depends(get_schema_registry_service)
+):
+	"""Register an enhanced event schema with evolution support."""
+	try:
+		schema_id = await schema_service.register_enhanced_schema(
+			schema_config=request.dict(),
+			tenant_id=user["tenant_id"],
+			created_by=user["user_id"]
+		)
+		
+		return {
+			"schema_id": schema_id,
+			"message": "Enhanced schema registered successfully"
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/schemas/{schema_id}/validate")
+async def validate_event_against_schema(
+	schema_id: str,
+	event_data: Dict[str, Any],
+	user: dict = Depends(get_current_user),
+	schema_service: SchemaRegistryService = Depends(get_schema_registry_service)
+):
+	"""Validate event data against a specific schema."""
+	try:
+		validation_result = await schema_service.validate_event(
+			schema_id=schema_id,
+			event_data=event_data,
+			tenant_id=user["tenant_id"]
+		)
+		
+		return validation_result
+		
+	except Exception as e:
+		raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/v1/schemas/evolution/{event_type}")
+async def get_schema_evolution(
+	event_type: str,
+	user: dict = Depends(get_current_user),
+	schema_service: SchemaRegistryService = Depends(get_schema_registry_service)
+):
+	"""Get schema evolution history for an event type."""
+	try:
+		evolution = await schema_service.get_schema_evolution(
+			event_type=event_type,
+			tenant_id=user["tenant_id"]
+		)
+		
+		return {
+			"event_type": event_type,
+			"evolution_history": evolution
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+# =============================================================================
+# Consumer Group Management Endpoints
+# =============================================================================
+
+class ConsumerGroupRequest(BaseModel):
+	"""Request model for consumer group management."""
+	group_name: str = Field(..., min_length=1, max_length=100)
+	group_description: Optional[str] = Field(None, max_length=500)
+	session_timeout_ms: int = Field(default=30000, ge=1000, le=300000)
+	heartbeat_interval_ms: int = Field(default=3000, ge=100, le=30000)
+	max_poll_interval_ms: int = Field(default=300000, ge=10000, le=1800000)
+	partition_assignment_strategy: str = Field(default="range")
+	rebalance_timeout_ms: int = Field(default=60000, ge=1000, le=600000)
+
+@app.post("/api/v1/consumer-groups", status_code=HTTP_201_CREATED)
+async def create_consumer_group(
+	request: ConsumerGroupRequest,
+	user: dict = Depends(get_current_user),
+	consumer_service: ConsumerManagementService = Depends(get_consumer_management_service)
+):
+	"""Create a new consumer group."""
+	try:
+		group_id = await consumer_service.create_consumer_group(
+			group_config=request.dict(),
+			tenant_id=user["tenant_id"],
+			user_id=user["user_id"]
+		)
+		
+		return {
+			"group_id": group_id,
+			"message": "Consumer group created successfully"
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/v1/consumer-groups")
+async def list_consumer_groups(
+	user: dict = Depends(get_current_user),
+	consumer_service: ConsumerManagementService = Depends(get_consumer_management_service)
+):
+	"""List all consumer groups for the tenant."""
+	try:
+		groups = await consumer_service.list_consumer_groups(tenant_id=user["tenant_id"])
+		return {"consumer_groups": groups}
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/consumer-groups/{group_id}/lag")
+async def get_consumer_group_lag(
+	group_id: str,
+	user: dict = Depends(get_current_user),
+	consumer_service: ConsumerManagementService = Depends(get_consumer_management_service)
+):
+	"""Get consumer lag for a specific group."""
+	try:
+		lag_info = await consumer_service.get_consumer_lag(
+			group_id=group_id,
+			tenant_id=user["tenant_id"]
+		)
+		
+		if not lag_info:
+			raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Consumer group not found")
+		
+		return lag_info
+		
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/consumer-groups/{group_id}/rebalance")
+async def trigger_consumer_rebalance(
+	group_id: str,
+	user: dict = Depends(get_current_user),
+	consumer_service: ConsumerManagementService = Depends(get_consumer_management_service)
+):
+	"""Trigger a rebalance for a consumer group."""
+	try:
+		success = await consumer_service.trigger_rebalance(
+			group_id=group_id,
+			tenant_id=user["tenant_id"]
+		)
+		
+		if not success:
+			raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Consumer group not found")
+		
+		return {"message": "Consumer group rebalance triggered successfully"}
+		
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+# =============================================================================
 # Health Check and Status Endpoints
 # =============================================================================
 
@@ -935,5 +1406,10 @@ __all__ = [
 	'EventBatchPublishRequest',
 	'EventQueryRequest',
 	'EventResponse',
-	'WebSocketMessage'
+	'WebSocketMessage',
+	'EventSourcingRequest',
+	'AggregateReconstructionRequest',
+	'StreamProcessorRequest',
+	'EnhancedSchemaRequest',
+	'ConsumerGroupRequest'
 ]

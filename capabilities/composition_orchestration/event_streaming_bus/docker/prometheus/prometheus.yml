@@ -1,0 +1,214 @@
+# APG Event Streaming Bus - Prometheus Configuration
+# Metrics collection and monitoring setup
+# © 2025 Datacraft. All rights reserved.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'apg-event-streaming-bus'
+    environment: 'development'
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Event Streaming Bus Application Metrics
+  - job_name: 'event-streaming-bus'
+    static_configs:
+      - targets: ['event-streaming-bus:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    honor_labels: true
+    params:
+      format: ['prometheus']
+
+  # Kafka Metrics (JMX Exporter)
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka:9101']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # PostgreSQL Metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Redis Metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Node Exporter (System Metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Prometheus Self-Monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Docker Container Metrics
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+# Recording Rules for Event Streaming Bus
+recording_rules:
+  # Event Throughput Rules
+  - name: esb_throughput
+    rules:
+      - record: esb:event_rate_5m
+        expr: rate(esb_events_published_total[5m])
+      
+      - record: esb:event_rate_1h
+        expr: rate(esb_events_published_total[1h])
+      
+      - record: esb:event_consumption_rate_5m
+        expr: rate(esb_events_consumed_total[5m])
+
+  # Latency Rules
+  - name: esb_latency
+    rules:
+      - record: esb:event_processing_latency_p95_5m
+        expr: histogram_quantile(0.95, rate(esb_event_processing_duration_seconds_bucket[5m]))
+      
+      - record: esb:event_processing_latency_p99_5m
+        expr: histogram_quantile(0.99, rate(esb_event_processing_duration_seconds_bucket[5m]))
+
+  # Error Rate Rules
+  - name: esb_errors
+    rules:
+      - record: esb:error_rate_5m
+        expr: rate(esb_events_failed_total[5m]) / rate(esb_events_total[5m])
+      
+      - record: esb:retry_rate_5m
+        expr: rate(esb_events_retried_total[5m])
+
+  # Consumer Lag Rules
+  - name: esb_consumer_lag
+    rules:
+      - record: esb:consumer_lag_total
+        expr: sum(esb_consumer_lag_messages) by (consumer_group)
+      
+      - record: esb:consumer_lag_max
+        expr: max(esb_consumer_lag_messages) by (consumer_group)
+
+  # Resource Utilization Rules
+  - name: esb_resources
+    rules:
+      - record: esb:cpu_usage_percentage
+        expr: rate(process_cpu_seconds_total[5m]) * 100
+      
+      - record: esb:memory_usage_percentage
+        expr: process_resident_memory_bytes / process_virtual_memory_max_bytes * 100
+
+# Alerting Rules
+alerting_rules:
+  # High Priority Alerts
+  - name: esb_critical_alerts
+    rules:
+      - alert: ESBHighErrorRate
+        expr: esb:error_rate_5m > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: event-streaming-bus
+        annotations:
+          summary: "High error rate in Event Streaming Bus"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      - alert: ESBHighLatency
+        expr: esb:event_processing_latency_p95_5m > 1
+        for: 3m
+        labels:
+          severity: warning
+          service: event-streaming-bus
+        annotations:
+          summary: "High processing latency in Event Streaming Bus"
+          description: "95th percentile latency is {{ $value }}s for the last 5 minutes"
+
+      - alert: ESBHighConsumerLag
+        expr: esb:consumer_lag_total > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: event-streaming-bus
+        annotations:
+          summary: "High consumer lag in Event Streaming Bus"
+          description: "Consumer lag is {{ $value }} messages for group {{ $labels.consumer_group }}"
+
+  # Resource Alerts
+  - name: esb_resource_alerts
+    rules:
+      - alert: ESBHighCPUUsage
+        expr: esb:cpu_usage_percentage > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: event-streaming-bus
+        annotations:
+          summary: "High CPU usage in Event Streaming Bus"
+          description: "CPU usage is {{ $value }}% for the last 5 minutes"
+
+      - alert: ESBHighMemoryUsage
+        expr: esb:memory_usage_percentage > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: event-streaming-bus
+        annotations:
+          summary: "High memory usage in Event Streaming Bus"
+          description: "Memory usage is {{ $value }}% for the last 5 minutes"
+
+  # Service Health Alerts
+  - name: esb_health_alerts
+    rules:
+      - alert: ESBServiceDown
+        expr: up{job="event-streaming-bus"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: event-streaming-bus
+        annotations:
+          summary: "Event Streaming Bus service is down"
+          description: "Event Streaming Bus service has been down for more than 1 minute"
+
+      - alert: ESBKafkaDown
+        expr: up{job="kafka"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: kafka
+        annotations:
+          summary: "Kafka service is down"
+          description: "Kafka service has been down for more than 2 minutes"
+
+      - alert: ESBDatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database has been down for more than 2 minutes"
