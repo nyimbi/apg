@@ -1,0 +1,115 @@
+# APG Financial Management General Ledger - Production Requirements
+# Revolutionary AI-powered General Ledger System
+# © 2025 Datacraft. All rights reserved.
+
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.13.1
+psycopg2-binary==2.9.9
+asyncpg==0.29.0
+
+# Caching & Session
+redis==5.0.1
+hiredis==2.2.3
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+cryptography==41.0.8
+
+# HTTP Client & Networking
+httpx==0.25.2
+aiohttp==3.9.1
+websockets==12.0
+
+# Data Processing
+pandas==2.1.4
+numpy==1.25.2
+openpyxl==3.1.2
+xlsxwriter==3.1.9
+
+# Date/Time Handling
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Validation & Serialization
+marshmallow==3.20.2
+marshmallow-sqlalchemy==0.29.0
+
+# AI & ML Libraries
+openai==1.3.8
+tiktoken==0.5.2
+scikit-learn==1.3.2
+fuzzywuzzy==0.18.0
+python-levenshtein==0.23.0
+
+# Natural Language Processing
+spacy==3.7.2
+textblob==0.17.1
+
+# Financial & Accounting
+python-accounting==0.4.2
+forex-python==1.8
+
+# Logging & Monitoring
+structlog==23.2.0
+prometheus-client==0.19.0
+sentry-sdk[fastapi]==1.38.0
+
+# Task Queue & Background Jobs
+celery==5.3.4
+kombu==5.3.4
+
+# File Processing
+pillow==10.1.0
+python-magic==0.4.27
+
+# Testing (for health checks)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Configuration
+python-dotenv==1.0.0
+click==8.1.7
+
+# Email
+aiosmtplib==3.0.1
+jinja2==3.1.2
+
+# Utilities
+python-slugify==8.0.1
+shortuuid==1.0.11
+uuid-extensions==0.1.3
+
+# Production WSGI/ASGI
+gunicorn==21.2.0
+
+# Monitoring & Observability
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-sqlalchemy==0.42b0
+opentelemetry-instrumentation-redis==0.42b0
+opentelemetry-exporter-prometheus==1.12.0rc1
+
+# Health Checks
+aiodns==3.1.1
+
+# Memory profiling (optional, for debugging)
+memory-profiler==0.61.0
+
+# Pin specific versions for security and stability
+certifi==2023.11.17
+urllib3==2.1.0
+requests==2.31.0
+
+# Lock down transitive dependencies for security
+setuptools>=68.0.0
+wheel>=0.42.0

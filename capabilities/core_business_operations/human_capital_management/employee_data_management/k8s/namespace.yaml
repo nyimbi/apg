@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apg-employee-management
+  labels:
+    app.kubernetes.io/name: apg-employee-management
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/version: "1.0.0"
+  annotations:
+    description: "APG Employee Data Management Platform"

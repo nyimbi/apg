@@ -1,10 +1,15 @@
 """
-Financial Reporting Service
+APG Financial Reporting Service - Revolutionary AI-Enhanced Financial Reporting
 
-Business logic for Financial Reporting operations including statement generation,
-consolidation, notes management, and analytical reporting functionality.
+Enhanced business logic for Financial Reporting operations with revolutionary AI capabilities,
+including intelligent statement generation, automated consolidation, AI-powered notes management,
+and advanced analytical reporting functionality.
+
+© 2025 Datacraft. All rights reserved.
+Author: Nyimbi Odero | APG Platform Architect
 """
 
+import asyncio
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, date, timedelta
 from decimal import Decimal
@@ -13,29 +18,160 @@ from sqlalchemy import and_, or_, desc, asc, func, text
 import json
 import pandas as pd
 from pathlib import Path
+from uuid_extensions import uuid7str
 
 from .models import (
 	CFRFReportTemplate, CFRFReportDefinition, CFRFReportLine, CFRFReportPeriod,
 	CFRFReportGeneration, CFRFFinancialStatement, CFRFConsolidation, CFRFNotes,
-	CFRFDisclosure, CFRFAnalyticalReport, CFRFReportDistribution
+	CFRFDisclosure, CFRFAnalyticalReport, CFRFReportDistribution,
+	ReportIntelligenceLevel, ConsolidationMethodType
 )
+from .revolutionary_report_engine import (
+	RevolutionaryReportEngine, ReportGenerationContext, ReportGenerationMode,
+	AdaptiveFormattingLevel, ValidationSeverity
+)
+from .nlp_engine import FinancialNLPEngine
+from .ai_assistant import AIFinancialAssistant
+from .predictive_engine import PredictiveFinancialEngine
 from ..general_ledger.models import CFGLAccount, CFGLJournalEntry, CFGLPosting
 from ...auth_rbac.models import db
 
 
 class FinancialReportingService:
-	"""Service class for Financial Reporting operations"""
+	"""Revolutionary AI-Enhanced Financial Reporting Service"""
 	
-	def __init__(self, tenant_id: str):
+	def __init__(self, tenant_id: str, openai_api_key: Optional[str] = None):
 		self.tenant_id = tenant_id
+		
+		# Initialize AI-powered components using APG AI services
+		ai_config = {
+			'primary_provider': 'openai' if openai_api_key else 'ollama',
+			'fallback_provider': 'ollama',
+			'model_preferences': {
+				'openai': 'gpt-4',
+				'ollama': 'llama2:13b'
+			},
+			'financial_domain_optimization': True,
+			'openai_api_key': openai_api_key
+		}
+		
+		self.revolutionary_engine = RevolutionaryReportEngine(tenant_id, ai_config)
+		self.nlp_engine = FinancialNLPEngine(tenant_id, ai_config)
+		self.ai_assistant = AIFinancialAssistant(tenant_id, ai_config)
+		self.predictive_engine = PredictiveFinancialEngine(tenant_id)
+		self.ai_enabled = True  # Always enabled with APG AI services
+		
+		# Performance optimization
+		self.report_cache = {}
+		self.template_cache = {}
+		self.calculation_cache = {}
 	
-	# Report Template Management
+	# Revolutionary AI-Enhanced Report Generation
+	
+	async def generate_ai_powered_report(self, user_query: str, user_id: str, 
+										session_id: Optional[str] = None) -> Dict[str, Any]:
+		"""Generate report using natural language AI interface."""
+		if not self.ai_enabled:
+			raise ValueError("AI features require OpenAI API key")
+		
+		session_id = session_id or uuid7str()
+		
+		return await self.revolutionary_engine.generate_conversational_report(
+			user_query, user_id, session_id
+		)
+	
+	async def generate_revolutionary_report(self, template_id: str, period_id: str, 
+										   user_id: str, 
+										   ai_enhancement_level: ReportIntelligenceLevel = ReportIntelligenceLevel.ENHANCED,
+										   generation_mode: ReportGenerationMode = ReportGenerationMode.AI_ENHANCED) -> Dict[str, Any]:
+		"""Generate revolutionary financial report with full AI capabilities."""
+		if not self.ai_enabled:
+			return await self._generate_standard_report(template_id, period_id, user_id)
+		
+		context = ReportGenerationContext(
+			generation_id=uuid7str(),
+			template_id=template_id,
+			period_id=period_id,
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			generation_mode=generation_mode,
+			ai_enhancement_level=ai_enhancement_level,
+			adaptive_formatting=AdaptiveFormattingLevel.REVOLUTIONARY,
+			real_time_updates=True,
+			include_predictions=True,
+			include_narratives=True,
+			include_insights=True
+		)
+		
+		return await self.revolutionary_engine.generate_revolutionary_report(context)
+	
+	async def perform_intelligent_consolidation(self, entity_ids: List[str], 
+											   consolidation_rules: Dict[str, Any],
+											   as_of_date: date) -> Dict[str, Any]:
+		"""Perform AI-powered real-time consolidation."""
+		if not self.ai_enabled:
+			return await self._perform_standard_consolidation(entity_ids, consolidation_rules, as_of_date)
+		
+		return await self.revolutionary_engine.perform_real_time_consolidation(
+			entity_ids, consolidation_rules, as_of_date
+		)
+	
+	async def generate_predictive_insights(self, statement_id: str, 
+										  analysis_depth: str = 'comprehensive') -> List[Dict[str, Any]]:
+		"""Generate AI-powered predictive insights for financial statements."""
+		if not self.ai_enabled:
+			raise ValueError("Predictive insights require AI features")
+		
+		return await self.ai_assistant.generate_intelligent_insights(statement_id, analysis_depth)
+	
+	async def validate_data_quality(self, data_source: str, 
+								   validation_rules: Optional[Dict] = None) -> List[Dict[str, Any]]:
+		"""Perform comprehensive AI-powered data quality validation."""
+		if not self.ai_enabled:
+			return await self._perform_basic_validation(data_source, validation_rules)
+		
+		validation_results = await self.revolutionary_engine.validate_financial_data_quality(
+			data_source, validation_rules
+		)
+		
+		# Convert validation results to dictionary format
+		return [
+			{
+				'validation_id': result.validation_id,
+				'severity': result.severity.value,
+				'rule_violated': result.rule_violated,
+				'description': result.description,
+				'affected_accounts': result.affected_accounts,
+				'recommended_actions': result.recommended_actions,
+				'auto_correctable': result.auto_correctable,
+				'correction_applied': result.correction_applied
+			}
+			for result in validation_results
+		]
+	
+	async def create_adaptive_template(self, base_template_id: str, 
+									  usage_patterns: Dict[str, Any],
+									  user_preferences: Dict[str, Any]) -> Dict[str, Any]:
+		"""Create adaptive template that learns from usage patterns."""
+		if not self.ai_enabled:
+			raise ValueError("Adaptive templates require AI features")
+		
+		return await self.revolutionary_engine.generate_adaptive_template(
+			base_template_id, usage_patterns, user_preferences
+		)
+	
+	# Enhanced Template Management with AI
 	
 	def create_report_template(self, template_data: Dict[str, Any]) -> CFRFReportTemplate:
-		"""Create a new financial report template"""
+		"""Create a new financial report template with optional AI enhancements"""
 		assert 'template_code' in template_data, "Template code is required"
 		assert 'template_name' in template_data, "Template name is required"
 		assert 'statement_type' in template_data, "Statement type is required"
+		
+		# Set AI enhancement defaults
+		ai_intelligence_level = template_data.get('ai_intelligence_level', 'standard')
+		if self.ai_enabled and ai_intelligence_level == 'auto':
+			ai_intelligence_level = 'enhanced'
 		
 		template = CFRFReportTemplate(
 			tenant_id=self.tenant_id,
@@ -52,11 +188,34 @@ class FinancialReportingService:
 			show_percentages=template_data.get('show_percentages', False),
 			show_variances=template_data.get('show_variances', False),
 			decimal_places=template_data.get('decimal_places', 2),
+			
+			# Revolutionary AI Enhancement Features
+			ai_intelligence_level=ai_intelligence_level,
+			auto_narrative_generation=template_data.get('auto_narrative_generation', self.ai_enabled),
+			predictive_insights_enabled=template_data.get('predictive_insights_enabled', self.ai_enabled),
+			adaptive_formatting=template_data.get('adaptive_formatting', self.ai_enabled),
+			natural_language_interface=template_data.get('natural_language_interface', self.ai_enabled),
+			voice_activation_enabled=template_data.get('voice_activation_enabled', False),
+			
+			# Real-Time Collaboration Features
+			real_time_collaboration=template_data.get('real_time_collaboration', True),
+			conflict_resolution_mode=template_data.get('conflict_resolution_mode', 'intelligent'),
+			version_control_enabled=template_data.get('version_control_enabled', True),
+			
+			# Advanced AI Configuration
+			ai_model_preferences=template_data.get('ai_model_preferences'),
+			natural_language_prompts=template_data.get('natural_language_prompts'),
+			predictive_model_config=template_data.get('predictive_model_config'),
+			personalization_data=template_data.get('personalization_data'),
+			
 			configuration=template_data.get('configuration')
 		)
 		
 		db.session.add(template)
 		db.session.commit()
+		
+		# Cache template for performance
+		self.template_cache[template.template_id] = template
 		
 		self._log_template_creation(template)
 		return template

@@ -1,882 +1,859 @@
 """
-Document Management Models
+Document Content Management - Comprehensive Pydantic Models
 
-Comprehensive database models for document management system including documents,
-versions, folders, permissions, workflows, reviews, retention policies, and audit trails.
+Enterprise-grade document management, content collaboration, knowledge management,
+and digital asset management supporting efficient content lifecycle management.
+
+Copyright © 2025 Datacraft
+Author: Nyimbi Odero <nyimbi@gmail.com>
+Website: www.datacraft.co.ke
 """
 
-from typing import Optional, List, Dict, Any
-from datetime import datetime, date
+from datetime import datetime, date, time
 from decimal import Decimal
 from enum import Enum
+from typing import Any, Dict, List, Optional, Union, Literal
+from uuid import UUID
 
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Date, Text, JSON, DECIMAL, ForeignKey, Index, UniqueConstraint, CheckConstraint
-from sqlalchemy.orm import relationship, backref
-from sqlalchemy.ext.declarative import declarative_base
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-
+from pydantic import BaseModel, Field, validator, root_validator
+from pydantic.config import ConfigDict
+from pydantic.types import EmailStr, HttpUrl, Json
 from uuid_extensions import uuid7str
 
-Base = declarative_base()
 
-class DocumentStatus(Enum):
-	"""Document status enumeration."""
+class ConfigDict(ConfigDict):
+	extra = 'forbid'
+	validate_by_name = True
+	validate_by_alias = True
+
+
+# Base Document Management Model
+class DCMBase(BaseModel):
+	model_config = ConfigDict()
+	
+	id: str = Field(default_factory=uuid7str, description="Unique identifier")
+	tenant_id: str = Field(..., description="Multi-tenant organization identifier")
+	created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
+	updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update timestamp")
+	created_by: str = Field(..., description="User ID who created the record")
+	updated_by: str = Field(..., description="User ID who last updated the record")
+	is_active: bool = Field(default=True, description="Active status flag")
+	metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional metadata")
+
+
+# Enumeration Types
+class DCMDocumentStatus(str, Enum):
 	DRAFT = "draft"
-	REVIEW = "review" 
+	REVIEW = "review"
 	APPROVED = "approved"
 	PUBLISHED = "published"
 	ARCHIVED = "archived"
 	OBSOLETE = "obsolete"
+	LOCKED = "locked"
+	CHECKED_OUT = "checked_out"
 
-class DocumentType(Enum):
-	"""Document type enumeration."""
-	POLICY = "policy"
-	PROCEDURE = "procedure"
+
+class DCMDocumentType(str, Enum):
+	TEXT_DOCUMENT = "text_document"
+	SPREADSHEET = "spreadsheet"
+	PRESENTATION = "presentation"
+	PDF = "pdf"
+	IMAGE = "image"
+	VIDEO = "video"
+	AUDIO = "audio"
+	ARCHIVE = "archive"
+	CAD_DRAWING = "cad_drawing"
 	CONTRACT = "contract"
 	INVOICE = "invoice"
-	REPORT = "report"
-	SPECIFICATION = "specification"
+	POLICY = "policy"
+	PROCEDURE = "procedure"
 	MANUAL = "manual"
-	CERTIFICATE = "certificate"
-	DRAWING = "drawing"
-	CORRESPONDENCE = "correspondence"
 	FORM = "form"
 	TEMPLATE = "template"
+	CUSTOM = "custom"
 
-class PermissionLevel(Enum):
-	"""Permission level enumeration."""
+
+class DCMPermissionLevel(str, Enum):
 	NONE = "none"
 	READ = "read"
 	WRITE = "write"
 	DELETE = "delete"
 	ADMIN = "admin"
+	OWNER = "owner"
 
-class WorkflowStatus(Enum):
-	"""Workflow status enumeration."""
-	PENDING = "pending"
+
+class DCMAccessType(str, Enum):
+	PRIVATE = "private"
+	INTERNAL = "internal"
+	CONFIDENTIAL = "confidential"
+	PUBLIC = "public"
+	RESTRICTED = "restricted"
+
+
+class DCMWorkflowStatus(str, Enum):
+	NOT_STARTED = "not_started"
 	IN_PROGRESS = "in_progress"
-	COMPLETED = "completed"
-	CANCELLED = "cancelled"
-	REJECTED = "rejected"
-
-class ReviewStatus(Enum):
-	"""Review status enumeration."""
-	PENDING = "pending"
-	IN_REVIEW = "in_review"
+	PENDING_REVIEW = "pending_review"
+	PENDING_APPROVAL = "pending_approval"
 	APPROVED = "approved"
 	REJECTED = "rejected"
-	CHANGES_REQUESTED = "changes_requested"
+	COMPLETED = "completed"
+	CANCELLED = "cancelled"
 
-class GCDMDocumentCategory(Model, AuditMixin):
-	"""Document categories for organization and classification."""
-	
-	__tablename__ = 'gc_dm_document_category'
-	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
-	
-	# Tenant isolation
-	tenant_id: str = Column(String(50), nullable=False, index=True)
-	
-	# Category details
-	name: str = Column(String(100), nullable=False)
-	description: str = Column(Text)
-	code: str = Column(String(20), nullable=False)
-	color: str = Column(String(7), default="#007bff")  # Hex color code
-	icon: str = Column(String(50), default="fa-folder")
-	
-	# Hierarchy
-	parent_category_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_document_category.id'))
-	level: int = Column(Integer, default=0, nullable=False)
-	path: str = Column(String(500))  # Hierarchical path
-	
-	# Configuration
-	auto_apply_retention: bool = Column(Boolean, default=False)
-	default_retention_years: Optional[int] = Column(Integer)
-	requires_approval: bool = Column(Boolean, default=False)
-	security_classification: str = Column(String(20), default="internal")
-	
-	# Status
-	is_active: bool = Column(Boolean, default=True, nullable=False)
-	sort_order: int = Column(Integer, default=0)
-	
-	# Relationships
-	parent_category = relationship("GCDMDocumentCategory", remote_side=[id])
-	documents = relationship("GCDMDocument", back_populates="category")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_category_tenant_code', 'tenant_id', 'code'),
-		Index('idx_gc_dm_category_parent', 'parent_category_id'),
-		Index('idx_gc_dm_category_path', 'path'),
-		UniqueConstraint('tenant_id', 'code', name='uq_gc_dm_category_tenant_code'),
-	)
 
-class GCDMDocumentType(Model, AuditMixin):
-	"""Document types for classification and behavior."""
-	
-	__tablename__ = 'gc_dm_document_type'
-	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
-	
-	# Tenant isolation
-	tenant_id: str = Column(String(50), nullable=False, index=True)
-	
-	# Type details
-	name: str = Column(String(100), nullable=False)
-	description: str = Column(Text)
-	code: str = Column(String(20), nullable=False)
-	
-	# File restrictions
-	allowed_extensions: str = Column(Text)  # JSON array of allowed file extensions
-	max_file_size_mb: int = Column(Integer, default=100)
-	requires_version_control: bool = Column(Boolean, default=True)
-	
-	# Workflow configuration
-	requires_approval: bool = Column(Boolean, default=False)
-	default_workflow_id: Optional[str] = Column(String(50))
-	auto_archive_days: Optional[int] = Column(Integer)
-	
-	# Retention
-	default_retention_years: int = Column(Integer, default=7)
-	retention_policy_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_retention_policy.id'))
-	
-	# Security
-	security_classification: str = Column(String(20), default="internal")
-	requires_encryption: bool = Column(Boolean, default=False)
-	watermark_enabled: bool = Column(Boolean, default=False)
-	
-	# Templates
-	has_template: bool = Column(Boolean, default=False)
-	template_file_path: Optional[str] = Column(String(500))
-	
-	# Status
-	is_active: bool = Column(Boolean, default=True, nullable=False)
-	
-	# Relationships
-	documents = relationship("GCDMDocument", back_populates="document_type")
-	retention_policy = relationship("GCDMRetentionPolicy")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_doctype_tenant_code', 'tenant_id', 'code'),
-		UniqueConstraint('tenant_id', 'code', name='uq_gc_dm_doctype_tenant_code'),
-	)
+class DCMContentFormat(str, Enum):
+	DOCX = "docx"
+	PDF = "pdf"
+	XLSX = "xlsx"
+	PPTX = "pptx"
+	TXT = "txt"
+	HTML = "html"
+	MD = "md"
+	JSON = "json"
+	XML = "xml"
+	CSV = "csv"
+	JPG = "jpg"
+	PNG = "png"
+	GIF = "gif"
+	MP4 = "mp4"
+	MP3 = "mp3"
+	ZIP = "zip"
+	OTHER = "other"
 
-class GCDMFolder(Model, AuditMixin):
-	"""Folder structure for document organization."""
-	
-	__tablename__ = 'gc_dm_folder'
-	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
-	
-	# Tenant isolation
-	tenant_id: str = Column(String(50), nullable=False, index=True)
-	
-	# Folder details
-	name: str = Column(String(200), nullable=False)
-	description: str = Column(Text)
-	folder_path: str = Column(String(1000), nullable=False)
-	
-	# Hierarchy
-	parent_folder_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_folder.id'))
-	level: int = Column(Integer, default=0, nullable=False)
-	full_path: str = Column(String(1000), nullable=False)
-	
-	# Configuration
-	is_system_folder: bool = Column(Boolean, default=False)
-	auto_create_subfolders: bool = Column(Boolean, default=False)
-	subfolder_template: Optional[str] = Column(Text)  # JSON template
-	
-	# Access control
-	inherit_permissions: bool = Column(Boolean, default=True)
-	public_read_access: bool = Column(Boolean, default=False)
-	
-	# Constraints
-	max_documents: Optional[int] = Column(Integer)
-	max_size_gb: Optional[Decimal] = Column(DECIMAL(10, 2))
-	allowed_document_types: Optional[str] = Column(Text)  # JSON array
-	
-	# Statistics
-	document_count: int = Column(Integer, default=0)
-	total_size_mb: Decimal = Column(DECIMAL(15, 2), default=0)
-	last_activity_date: Optional[datetime] = Column(DateTime)
-	
-	# Status
-	is_active: bool = Column(Boolean, default=True, nullable=False)
-	is_locked: bool = Column(Boolean, default=False)
-	
-	# Relationships
-	parent_folder = relationship("GCDMFolder", remote_side=[id])
-	documents = relationship("GCDMDocument", back_populates="folder")
-	permissions = relationship("GCDMPermission", back_populates="folder")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_folder_tenant_path', 'tenant_id', 'folder_path'),
-		Index('idx_gc_dm_folder_parent', 'parent_folder_id'),
-		Index('idx_gc_dm_folder_full_path', 'full_path'),
-		UniqueConstraint('tenant_id', 'folder_path', name='uq_gc_dm_folder_tenant_path'),
-	)
 
-class GCDMDocument(Model, AuditMixin):
-	"""Main document entity."""
-	
-	__tablename__ = 'gc_dm_document'
-	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
-	
-	# Tenant isolation
-	tenant_id: str = Column(String(50), nullable=False, index=True)
-	
-	# Document identification
-	document_number: str = Column(String(100), nullable=False)
-	title: str = Column(String(500), nullable=False)
-	description: str = Column(Text)
-	
-	# Classification
-	category_id: str = Column(String(50), ForeignKey('gc_dm_document_category.id'), nullable=False)
-	document_type_id: str = Column(String(50), ForeignKey('gc_dm_document_type.id'), nullable=False)
-	folder_id: str = Column(String(50), ForeignKey('gc_dm_folder.id'), nullable=False)
-	
-	# File information
-	file_name: str = Column(String(255), nullable=False)
-	file_path: str = Column(String(1000), nullable=False)
-	file_size_bytes: int = Column(Integer, default=0)
-	file_extension: str = Column(String(10))
-	mime_type: str = Column(String(100))
-	file_hash: str = Column(String(64))  # SHA-256 hash
-	
-	# Content
-	content_text: Optional[str] = Column(Text)  # Extracted text for search
-	keywords: Optional[str] = Column(Text)  # Comma-separated keywords
-	language: str = Column(String(10), default="en")
-	
-	# Version control
-	version_number: str = Column(String(20), default="1.0")
-	is_latest_version: bool = Column(Boolean, default=True, nullable=False)
-	parent_document_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_document.id'))
-	
-	# Status and workflow
-	status: str = Column(String(20), default=DocumentStatus.DRAFT.value, nullable=False)
-	workflow_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_workflow.id'))
-	
-	# Ownership
-	owner_user_id: str = Column(String(50), nullable=False)
-	author: str = Column(String(200))
-	department: Optional[str] = Column(String(100))
-	business_unit: Optional[str] = Column(String(100))
-	
-	# Dates
-	document_date: date = Column(Date, default=date.today, nullable=False)
-	effective_date: Optional[date] = Column(Date)
-	expiry_date: Optional[date] = Column(Date)
-	review_date: Optional[date] = Column(Date)
-	
-	# Security
-	security_classification: str = Column(String(20), default="internal")
-	is_confidential: bool = Column(Boolean, default=False)
-	is_encrypted: bool = Column(Boolean, default=False)
-	encryption_key_id: Optional[str] = Column(String(100))
-	
-	# Retention
-	retention_policy_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_retention_policy.id'))
-	retention_date: Optional[date] = Column(Date)
-	legal_hold: bool = Column(Boolean, default=False)
-	
-	# Access control
-	is_public: bool = Column(Boolean, default=False)
-	requires_checkout: bool = Column(Boolean, default=False)
-	is_checked_out: bool = Column(Boolean, default=False)
-	checked_out_by: Optional[str] = Column(String(50))
-	checked_out_date: Optional[datetime] = Column(DateTime)
-	
-	# Digital signatures
-	is_signed: bool = Column(Boolean, default=False)
-	signature_required: bool = Column(Boolean, default=False)
-	signatures_count: int = Column(Integer, default=0)
-	
-	# Statistics
-	view_count: int = Column(Integer, default=0)
-	download_count: int = Column(Integer, default=0)
-	last_viewed_date: Optional[datetime] = Column(DateTime)
-	
-	# External references
-	external_id: Optional[str] = Column(String(100))
-	source_system: Optional[str] = Column(String(50))
-	related_entity_type: Optional[str] = Column(String(50))
-	related_entity_id: Optional[str] = Column(String(50))
-	
-	# Custom fields
-	custom_fields: Optional[str] = Column(Text)  # JSON data
-	
-	# Status
-	is_active: bool = Column(Boolean, default=True, nullable=False)
-	is_deleted: bool = Column(Boolean, default=False)
-	deleted_date: Optional[datetime] = Column(DateTime)
-	
-	# Relationships
-	category = relationship("GCDMDocumentCategory", back_populates="documents")
-	document_type = relationship("GCDMDocumentType", back_populates="documents")
-	folder = relationship("GCDMFolder", back_populates="documents")
-	workflow = relationship("GCDMWorkflow", back_populates="documents")
-	retention_policy = relationship("GCDMRetentionPolicy")
-	parent_document = relationship("GCDMDocument", remote_side=[id])
-	
-	versions = relationship("GCDMDocumentVersion", back_populates="document")
-	permissions = relationship("GCDMPermission", back_populates="document")
-	checkouts = relationship("GCDMCheckout", back_populates="document")
-	reviews = relationship("GCDMReview", back_populates="document")
-	tags = relationship("GCDMTag", secondary="gc_dm_document_tag", back_populates="documents")
-	metadata_entries = relationship("GCDMMetadata", back_populates="document")
-	audit_logs = relationship("GCDMAuditLog", back_populates="document")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_document_tenant_number', 'tenant_id', 'document_number'),
-		Index('idx_gc_dm_document_category', 'category_id'),
-		Index('idx_gc_dm_document_type', 'document_type_id'),
-		Index('idx_gc_dm_document_folder', 'folder_id'),
-		Index('idx_gc_dm_document_status', 'status'),
-		Index('idx_gc_dm_document_owner', 'owner_user_id'),
-		Index('idx_gc_dm_document_dates', 'document_date', 'effective_date'),
-		Index('idx_gc_dm_document_checkout', 'is_checked_out', 'checked_out_by'),
-		Index('idx_gc_dm_document_search', 'title', 'keywords'),
-		UniqueConstraint('tenant_id', 'document_number', name='uq_gc_dm_document_tenant_number'),
-		CheckConstraint('file_size_bytes >= 0', name='ck_gc_dm_document_file_size'),
-		CheckConstraint('view_count >= 0', name='ck_gc_dm_document_view_count'),
-		CheckConstraint('download_count >= 0', name='ck_gc_dm_document_download_count'),
-	)
+class DCMNotificationType(str, Enum):
+	DOCUMENT_CREATED = "document_created"
+	DOCUMENT_UPDATED = "document_updated"
+	DOCUMENT_SHARED = "document_shared"
+	COMMENT_ADDED = "comment_added"
+	APPROVAL_REQUEST = "approval_request"
+	APPROVAL_GRANTED = "approval_granted"
+	APPROVAL_REJECTED = "approval_rejected"
+	WORKFLOW_ASSIGNED = "workflow_assigned"
+	DUE_DATE_REMINDER = "due_date_reminder"
+	RETENTION_NOTICE = "retention_notice"
 
-class GCDMDocumentVersion(Model, AuditMixin):
-	"""Document version history."""
-	
-	__tablename__ = 'gc_dm_document_version'
-	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
-	
-	# Document reference
-	document_id: str = Column(String(50), ForeignKey('gc_dm_document.id'), nullable=False)
-	
-	# Version information
-	version_number: str = Column(String(20), nullable=False)
-	version_label: Optional[str] = Column(String(100))
-	is_current: bool = Column(Boolean, default=False)
-	is_published: bool = Column(Boolean, default=False)
-	
-	# File information
-	file_name: str = Column(String(255), nullable=False)
-	file_path: str = Column(String(1000), nullable=False)
-	file_size_bytes: int = Column(Integer, default=0)
-	file_hash: str = Column(String(64))
-	
-	# Change information
-	change_description: str = Column(Text, nullable=False)
-	change_type: str = Column(String(20), default="minor")  # major, minor, patch
-	changed_by: str = Column(String(50), nullable=False)
-	change_reason: Optional[str] = Column(Text)
-	
-	# Status
-	status: str = Column(String(20), default="draft")
-	
-	# Approval
-	approved_by: Optional[str] = Column(String(50))
-	approved_date: Optional[datetime] = Column(DateTime)
-	approval_comments: Optional[str] = Column(Text)
-	
-	# Relationships
-	document = relationship("GCDMDocument", back_populates="versions")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_version_document', 'document_id'),
-		Index('idx_gc_dm_version_number', 'document_id', 'version_number'),
-		Index('idx_gc_dm_version_current', 'document_id', 'is_current'),
-		UniqueConstraint('document_id', 'version_number', name='uq_gc_dm_version_document_number'),
-	)
 
-class GCDMPermission(Model, AuditMixin):
-	"""Document and folder permissions."""
-	
-	__tablename__ = 'gc_dm_permission'
-	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
-	
-	# Tenant isolation
-	tenant_id: str = Column(String(50), nullable=False, index=True)
-	
-	# Resource reference (document or folder)
-	document_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_document.id'))
-	folder_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_folder.id'))
-	
-	# Permission subject (user, role, or group)
-	subject_type: str = Column(String(20), nullable=False)  # user, role, group
-	subject_id: str = Column(String(50), nullable=False)
-	
-	# Permission level
-	permission_level: str = Column(String(20), default=PermissionLevel.READ.value, nullable=False)
-	
-	# Specific permissions
-	can_read: bool = Column(Boolean, default=True)
-	can_write: bool = Column(Boolean, default=False)
-	can_delete: bool = Column(Boolean, default=False)
-	can_share: bool = Column(Boolean, default=False)
-	can_approve: bool = Column(Boolean, default=False)
-	can_administer: bool = Column(Boolean, default=False)
-	
-	# Permission scope
-	applies_to_children: bool = Column(Boolean, default=True)
-	inherited: bool = Column(Boolean, default=False)
-	inherited_from_id: Optional[str] = Column(String(50))
-	
-	# Time restrictions
-	effective_date: Optional[date] = Column(Date)
-	expiry_date: Optional[date] = Column(Date)
-	
-	# Status
-	is_active: bool = Column(Boolean, default=True, nullable=False)
-	
-	# Granted by
-	granted_by: str = Column(String(50), nullable=False)
-	grant_reason: Optional[str] = Column(Text)
-	
-	# Relationships
-	document = relationship("GCDMDocument", back_populates="permissions")
-	folder = relationship("GCDMFolder", back_populates="permissions")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_permission_document', 'document_id'),
-		Index('idx_gc_dm_permission_folder', 'folder_id'),
-		Index('idx_gc_dm_permission_subject', 'subject_type', 'subject_id'),
-		Index('idx_gc_dm_permission_level', 'permission_level'),
-		CheckConstraint('(document_id IS NOT NULL) OR (folder_id IS NOT NULL)', name='ck_gc_dm_permission_resource'),
-		CheckConstraint('(document_id IS NULL) OR (folder_id IS NULL)', name='ck_gc_dm_permission_single_resource'),
-	)
+# Core Document Models
+class DCMFolder(DCMBase):
+	"""Hierarchical folder structure for document organization"""
+	name: str = Field(..., description="Folder name")
+	description: Optional[str] = Field(default=None, description="Folder description")
+	parent_folder_id: Optional[str] = Field(default=None, description="Parent folder ID")
+	folder_path: str = Field(..., description="Full folder path")
+	level: int = Field(default=0, description="Hierarchy level (0 = root)")
+	color: Optional[str] = Field(default=None, description="Folder color for UI")
+	icon: Optional[str] = Field(default=None, description="Folder icon identifier")
+	is_system: bool = Field(default=False, description="System-generated folder")
+	is_template: bool = Field(default=False, description="Template folder")
+	access_type: DCMAccessType = Field(default=DCMAccessType.INTERNAL, description="Default access type")
+	inherited_permissions: bool = Field(default=True, description="Inherit permissions from parent")
+	custom_properties: Dict[str, Any] = Field(default_factory=dict, description="Custom folder properties")
+	sort_order: int = Field(default=0, description="Display sort order")
+	document_count: int = Field(default=0, description="Number of documents in folder")
+	subfolder_count: int = Field(default=0, description="Number of subfolders")
 
-class GCDMCheckout(Model, AuditMixin):
-	"""Document checkout tracking."""
-	
-	__tablename__ = 'gc_dm_checkout'
-	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
-	
-	# Document reference
-	document_id: str = Column(String(50), ForeignKey('gc_dm_document.id'), nullable=False)
-	
-	# Checkout information
-	checked_out_by: str = Column(String(50), nullable=False)
-	checkout_date: datetime = Column(DateTime, default=datetime.utcnow, nullable=False)
-	expected_return_date: Optional[datetime] = Column(DateTime)
-	
-	# Checkout details
-	checkout_reason: Optional[str] = Column(Text)
-	checkout_type: str = Column(String(20), default="exclusive")  # exclusive, shared
-	
-	# Return information
-	returned_date: Optional[datetime] = Column(DateTime)
-	return_comments: Optional[str] = Column(Text)
-	
-	# Status
-	is_active: bool = Column(Boolean, default=True, nullable=False)
-	is_overdue: bool = Column(Boolean, default=False)
-	
-	# Relationships
-	document = relationship("GCDMDocument", back_populates="checkouts")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_checkout_document', 'document_id'),
-		Index('idx_gc_dm_checkout_user', 'checked_out_by'),
-		Index('idx_gc_dm_checkout_active', 'is_active'),
-		Index('idx_gc_dm_checkout_overdue', 'is_overdue'),
-	)
 
-class GCDMWorkflow(Model, AuditMixin):
-	"""Document workflow definitions and instances."""
+class DCMDocument(DCMBase):
+	"""Core document entity with comprehensive metadata"""
+	name: str = Field(..., description="Document name")
+	title: str = Field(..., description="Document title")
+	description: Optional[str] = Field(default=None, description="Document description")
+	folder_id: Optional[str] = Field(default=None, description="Parent folder ID")
+	document_type: DCMDocumentType = Field(..., description="Type of document")
+	content_format: DCMContentFormat = Field(..., description="Content format/file type")
+	status: DCMDocumentStatus = Field(default=DCMDocumentStatus.DRAFT, description="Current document status")
+	access_type: DCMAccessType = Field(default=DCMAccessType.INTERNAL, description="Access classification")
 	
-	__tablename__ = 'gc_dm_workflow'
+	# File Information
+	file_name: str = Field(..., description="Original file name")
+	file_size: int = Field(..., description="File size in bytes")
+	file_hash: str = Field(..., description="File content hash (SHA-256)")
+	mime_type: str = Field(..., description="MIME type")
+	storage_path: str = Field(..., description="Storage location path")
 	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
+	# Version Control
+	version_number: str = Field(default="1.0", description="Current version number")
+	major_version: int = Field(default=1, description="Major version number")
+	minor_version: int = Field(default=0, description="Minor version number")
+	is_latest_version: bool = Field(default=True, description="Is this the latest version")
 	
-	# Tenant isolation
-	tenant_id: str = Column(String(50), nullable=False, index=True)
+	# Content Metadata
+	language: str = Field(default="en", description="Content language")
+	keywords: List[str] = Field(default_factory=list, description="Document keywords/tags")
+	categories: List[str] = Field(default_factory=list, description="Document categories")
+	subject: Optional[str] = Field(default=None, description="Document subject")
+	author: Optional[str] = Field(default=None, description="Document author")
 	
-	# Workflow definition
-	name: str = Column(String(200), nullable=False)
-	description: str = Column(Text)
-	workflow_type: str = Column(String(50), default="approval")  # approval, review, routing
+	# Dates and Lifecycle
+	published_date: Optional[datetime] = Field(default=None, description="Publication date")
+	expiry_date: Optional[date] = Field(default=None, description="Document expiry date")
+	review_date: Optional[date] = Field(default=None, description="Next review date")
+	retention_date: Optional[date] = Field(default=None, description="Retention/deletion date")
 	
-	# Workflow configuration
-	definition: str = Column(Text, nullable=False)  # JSON workflow definition
-	is_template: bool = Column(Boolean, default=False)
-	template_id: Optional[str] = Column(String(50))
+	# Analytics and Usage
+	view_count: int = Field(default=0, description="Number of times viewed")
+	download_count: int = Field(default=0, description="Number of times downloaded")
+	share_count: int = Field(default=0, description="Number of times shared")
+	last_viewed_at: Optional[datetime] = Field(default=None, description="Last view timestamp")
+	last_downloaded_at: Optional[datetime] = Field(default=None, description="Last download timestamp")
 	
-	# Instance information (if this is a workflow instance)
-	document_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_document.id'))
-	initiated_by: Optional[str] = Column(String(50))
-	initiated_date: Optional[datetime] = Column(DateTime)
+	# Collaboration
+	is_locked: bool = Field(default=False, description="Document locked for editing")
+	locked_by: Optional[str] = Field(default=None, description="User who locked the document")
+	locked_at: Optional[datetime] = Field(default=None, description="Lock timestamp")
+	checked_out_by: Optional[str] = Field(default=None, description="User who checked out document")
+	checked_out_at: Optional[datetime] = Field(default=None, description="Check-out timestamp")
 	
-	# Status
-	status: str = Column(String(20), default=WorkflowStatus.PENDING.value, nullable=False)
-	current_step: Optional[str] = Column(String(100))
-	current_assignee: Optional[str] = Column(String(50))
+	# Content Analysis
+	extracted_text: Optional[str] = Field(default=None, description="OCR/extracted text content")
+	content_summary: Optional[str] = Field(default=None, description="AI-generated content summary")
+	ai_tags: List[str] = Field(default_factory=list, description="AI-generated tags")
+	sentiment_score: Optional[float] = Field(default=None, description="Content sentiment score")
 	
-	# Completion
-	completed_date: Optional[datetime] = Column(DateTime)
-	completion_result: Optional[str] = Column(String(20))  # approved, rejected, cancelled
-	completion_comments: Optional[str] = Column(Text)
+	# Security and Compliance
+	is_encrypted: bool = Field(default=False, description="Document encryption status")
+	encryption_key_id: Optional[str] = Field(default=None, description="Encryption key identifier")
+	classification_level: Optional[str] = Field(default=None, description="Security classification")
+	compliance_tags: List[str] = Field(default_factory=list, description="Compliance requirement tags")
 	
-	# Time tracking
-	due_date: Optional[datetime] = Column(DateTime)
-	estimated_duration_hours: Optional[int] = Column(Integer)
-	actual_duration_hours: Optional[int] = Column(Integer)
-	
-	# Priority and escalation
-	priority: str = Column(String(20), default="medium")
-	escalation_rules: Optional[str] = Column(Text)  # JSON escalation configuration
-	
-	# Status
-	is_active: bool = Column(Boolean, default=True, nullable=False)
-	
-	# Relationships
-	documents = relationship("GCDMDocument", back_populates="workflow")
-	reviews = relationship("GCDMReview", back_populates="workflow")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_workflow_tenant', 'tenant_id'),
-		Index('idx_gc_dm_workflow_document', 'document_id'),
-		Index('idx_gc_dm_workflow_status', 'status'),
-		Index('idx_gc_dm_workflow_assignee', 'current_assignee'),
-		Index('idx_gc_dm_workflow_due', 'due_date'),
-	)
+	# Custom Properties
+	custom_properties: Dict[str, Any] = Field(default_factory=dict, description="Custom document properties")
+	business_metadata: Dict[str, Any] = Field(default_factory=dict, description="Business-specific metadata")
 
-class GCDMReview(Model, AuditMixin):
-	"""Document review tracking."""
+
+class DCMDocumentVersion(DCMBase):
+	"""Document version history and management"""
+	document_id: str = Field(..., description="Parent document ID")
+	version_number: str = Field(..., description="Version number (e.g., 1.0, 1.1, 2.0)")
+	major_version: int = Field(..., description="Major version number")
+	minor_version: int = Field(..., description="Minor version number")
+	version_label: Optional[str] = Field(default=None, description="Version label/name")
+	change_description: Optional[str] = Field(default=None, description="Description of changes")
+	change_type: str = Field(..., description="Type of change (major, minor, patch)")
 	
-	__tablename__ = 'gc_dm_review'
+	# File Information
+	file_name: str = Field(..., description="Version file name")
+	file_size: int = Field(..., description="File size in bytes")
+	file_hash: str = Field(..., description="File content hash")
+	storage_path: str = Field(..., description="Version storage location")
 	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
+	# Version Metadata
+	is_current: bool = Field(default=False, description="Is this the current version")
+	status: DCMDocumentStatus = Field(..., description="Version status")
+	approved_by: Optional[str] = Field(default=None, description="User who approved this version")
+	approved_at: Optional[datetime] = Field(default=None, description="Approval timestamp")
 	
-	# Document and workflow reference
-	document_id: str = Column(String(50), ForeignKey('gc_dm_document.id'), nullable=False)
-	workflow_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_workflow.id'))
+	# Content Changes
+	content_diff: Optional[Dict[str, Any]] = Field(default=None, description="Content differences from previous version")
+	word_count: Optional[int] = Field(default=None, description="Document word count")
+	page_count: Optional[int] = Field(default=None, description="Document page count")
 	
-	# Review information
-	review_type: str = Column(String(50), default="approval")  # approval, peer_review, quality_review
-	reviewer_user_id: str = Column(String(50), nullable=False)
-	reviewer_name: str = Column(String(200))
-	reviewer_role: Optional[str] = Column(String(100))
+	# Lifecycle
+	created_from_version: Optional[str] = Field(default=None, description="Source version ID")
+	branched_from: Optional[str] = Field(default=None, description="Branch source version ID")
+	merged_versions: List[str] = Field(default_factory=list, description="Merged version IDs")
 	
-	# Review details
-	assigned_date: datetime = Column(DateTime, default=datetime.utcnow, nullable=False)
-	due_date: Optional[datetime] = Column(DateTime)
-	started_date: Optional[datetime] = Column(DateTime)
-	completed_date: Optional[datetime] = Column(DateTime)
+	# Analytics
+	download_count: int = Field(default=0, description="Version download count")
+	restoration_count: int = Field(default=0, description="Times restored as current")
+
+
+class DCMDocumentPermission(DCMBase):
+	"""Document and folder access permissions"""
+	resource_id: str = Field(..., description="Document or folder ID")
+	resource_type: str = Field(..., description="Resource type (document/folder)")
+	subject_id: str = Field(..., description="User, group, or role ID")
+	subject_type: str = Field(..., description="Subject type (user/group/role)")
+	permission_level: DCMPermissionLevel = Field(..., description="Permission level")
 	
-	# Review outcome
-	status: str = Column(String(20), default=ReviewStatus.PENDING.value, nullable=False)
-	decision: Optional[str] = Column(String(20))  # approved, rejected, changes_requested
-	comments: Optional[str] = Column(Text)
-	detailed_feedback: Optional[str] = Column(Text)
+	# Permission Details
+	can_read: bool = Field(default=False, description="Read permission")
+	can_write: bool = Field(default=False, description="Write permission")
+	can_delete: bool = Field(default=False, description="Delete permission")
+	can_share: bool = Field(default=False, description="Share permission")
+	can_download: bool = Field(default=False, description="Download permission")
+	can_print: bool = Field(default=False, description="Print permission")
+	can_export: bool = Field(default=False, description="Export permission")
+	can_comment: bool = Field(default=False, description="Comment permission")
+	can_approve: bool = Field(default=False, description="Approval permission")
 	
-	# Review criteria
-	review_criteria: Optional[str] = Column(Text)  # JSON criteria checklist
-	criteria_scores: Optional[str] = Column(Text)  # JSON scores
-	overall_score: Optional[Decimal] = Column(DECIMAL(5, 2))
+	# Time-based Permissions
+	valid_from: Optional[datetime] = Field(default=None, description="Permission start date")
+	valid_until: Optional[datetime] = Field(default=None, description="Permission expiry date")
 	
-	# Escalation
-	is_escalated: bool = Column(Boolean, default=False)
-	escalated_to: Optional[str] = Column(String(50))
-	escalation_reason: Optional[str] = Column(Text)
+	# Conditional Permissions
+	ip_restrictions: List[str] = Field(default_factory=list, description="IP address restrictions")
+	device_restrictions: List[str] = Field(default_factory=list, description="Device restrictions")
+	location_restrictions: List[str] = Field(default_factory=list, description="Geographic restrictions")
 	
 	# Delegation
-	delegated_to: Optional[str] = Column(String(50))
-	delegation_reason: Optional[str] = Column(Text)
+	can_delegate: bool = Field(default=False, description="Can delegate permissions")
+	delegated_by: Optional[str] = Field(default=None, description="Delegating user ID")
+	delegation_level: int = Field(default=0, description="Delegation depth level")
 	
-	# Relationships
-	document = relationship("GCDMDocument", back_populates="reviews")
-	workflow = relationship("GCDMWorkflow", back_populates="reviews")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_review_document', 'document_id'),
-		Index('idx_gc_dm_review_workflow', 'workflow_id'),
-		Index('idx_gc_dm_review_reviewer', 'reviewer_user_id'),
-		Index('idx_gc_dm_review_status', 'status'),
-		Index('idx_gc_dm_review_due', 'due_date'),
-	)
+	# Audit
+	granted_by: str = Field(..., description="User who granted permission")
+	granted_at: datetime = Field(default_factory=datetime.utcnow, description="Permission grant timestamp")
+	last_accessed: Optional[datetime] = Field(default=None, description="Last access using this permission")
+	access_count: int = Field(default=0, description="Number of accesses")
 
-class GCDMTag(Model, AuditMixin):
-	"""Tags for document classification and search."""
-	
-	__tablename__ = 'gc_dm_tag'
-	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
-	
-	# Tenant isolation
-	tenant_id: str = Column(String(50), nullable=False, index=True)
-	
-	# Tag details
-	name: str = Column(String(100), nullable=False)
-	description: Optional[str] = Column(Text)
-	color: str = Column(String(7), default="#6c757d")  # Hex color code
-	
-	# Tag classification
-	category: Optional[str] = Column(String(50))
-	is_system_tag: bool = Column(Boolean, default=False)
-	auto_apply_rules: Optional[str] = Column(Text)  # JSON rules for auto-tagging
-	
-	# Usage statistics
-	usage_count: int = Column(Integer, default=0)
-	last_used_date: Optional[datetime] = Column(DateTime)
-	
-	# Status
-	is_active: bool = Column(Boolean, default=True, nullable=False)
-	
-	# Relationships
-	documents = relationship("GCDMDocument", secondary="gc_dm_document_tag", back_populates="tags")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_tag_tenant_name', 'tenant_id', 'name'),
-		Index('idx_gc_dm_tag_category', 'category'),
-		UniqueConstraint('tenant_id', 'name', name='uq_gc_dm_tag_tenant_name'),
-	)
 
-# Association table for document-tag many-to-many relationship
-class GCDMDocumentTag(Model):
-	"""Association table for document-tag relationships."""
+# Collaboration Models
+class DCMComment(DCMBase):
+	"""Document comments and annotations"""
+	document_id: str = Field(..., description="Document ID")
+	document_version: Optional[str] = Field(default=None, description="Specific document version")
+	parent_comment_id: Optional[str] = Field(default=None, description="Parent comment for threading")
+	comment_text: str = Field(..., description="Comment content")
+	comment_type: str = Field(default="general", description="Comment type (general, review, approval)")
 	
-	__tablename__ = 'gc_dm_document_tag'
+	# Positioning and Context
+	page_number: Optional[int] = Field(default=None, description="Page number for annotation")
+	position_data: Optional[Dict[str, Any]] = Field(default=None, description="Position/coordinate data")
+	highlighted_text: Optional[str] = Field(default=None, description="Highlighted/selected text")
+	context_snippet: Optional[str] = Field(default=None, description="Surrounding text context")
 	
-	document_id: str = Column(String(50), ForeignKey('gc_dm_document.id'), primary_key=True)
-	tag_id: str = Column(String(50), ForeignKey('gc_dm_tag.id'), primary_key=True)
+	# Status and Resolution
+	is_resolved: bool = Field(default=False, description="Comment resolved status")
+	resolved_by: Optional[str] = Field(default=None, description="User who resolved comment")
+	resolved_at: Optional[datetime] = Field(default=None, description="Resolution timestamp")
+	resolution_note: Optional[str] = Field(default=None, description="Resolution explanation")
 	
-	# Additional attributes
-	applied_by: str = Column(String(50), nullable=False)
-	applied_date: datetime = Column(DateTime, default=datetime.utcnow, nullable=False)
-	is_auto_applied: bool = Column(Boolean, default=False)
+	# Threading and Collaboration
+	thread_id: str = Field(default_factory=uuid7str, description="Comment thread identifier")
+	reply_count: int = Field(default=0, description="Number of replies")
+	mention_users: List[str] = Field(default_factory=list, description="Mentioned user IDs")
+	
+	# Rich Content
+	attachments: List[Dict[str, Any]] = Field(default_factory=list, description="Comment attachments")
+	formatting: Optional[Dict[str, Any]] = Field(default=None, description="Rich text formatting")
+	
+	# Visibility and Access
+	is_private: bool = Field(default=False, description="Private comment visibility")
+	visible_to: List[str] = Field(default_factory=list, description="Users with visibility")
+	
+	# Workflow Integration
+	workflow_step_id: Optional[str] = Field(default=None, description="Associated workflow step")
+	approval_decision: Optional[str] = Field(default=None, description="Approval decision (approve/reject)")
 
-class GCDMMetadata(Model, AuditMixin):
-	"""Custom metadata for documents."""
-	
-	__tablename__ = 'gc_dm_metadata'
-	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
-	
-	# Document reference
-	document_id: str = Column(String(50), ForeignKey('gc_dm_document.id'), nullable=False)
-	
-	# Metadata details
-	metadata_key: str = Column(String(100), nullable=False)
-	metadata_value: Optional[str] = Column(Text)
-	data_type: str = Column(String(20), default="string")  # string, number, date, boolean, json
-	
-	# Metadata classification
-	category: Optional[str] = Column(String(50))
-	is_system_metadata: bool = Column(Boolean, default=False)
-	is_searchable: bool = Column(Boolean, default=True)
-	
-	# Relationships
-	document = relationship("GCDMDocument", back_populates="metadata_entries")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_metadata_document', 'document_id'),
-		Index('idx_gc_dm_metadata_key', 'metadata_key'),
-		Index('idx_gc_dm_metadata_category', 'category'),
-		UniqueConstraint('document_id', 'metadata_key', name='uq_gc_dm_metadata_document_key'),
-	)
 
-class GCDMRetentionPolicy(Model, AuditMixin):
-	"""Document retention policies."""
+class DCMWorkflow(DCMBase):
+	"""Document workflow and approval processes"""
+	name: str = Field(..., description="Workflow name")
+	description: Optional[str] = Field(default=None, description="Workflow description")
+	workflow_type: str = Field(..., description="Type of workflow (review, approval, publication)")
+	is_template: bool = Field(default=False, description="Template workflow flag")
 	
-	__tablename__ = 'gc_dm_retention_policy'
+	# Workflow Definition
+	workflow_steps: List[Dict[str, Any]] = Field(..., description="Workflow step definitions")
+	step_sequence: List[str] = Field(..., description="Step execution sequence")
+	parallel_steps: List[List[str]] = Field(default_factory=list, description="Parallel step groups")
 	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
+	# Conditions and Rules
+	trigger_conditions: Dict[str, Any] = Field(default_factory=dict, description="Workflow trigger conditions")
+	escalation_rules: List[Dict[str, Any]] = Field(default_factory=list, description="Escalation rules")
+	timeout_rules: List[Dict[str, Any]] = Field(default_factory=list, description="Timeout handling rules")
 	
-	# Tenant isolation
-	tenant_id: str = Column(String(50), nullable=False, index=True)
+	# Participants
+	default_assignees: List[str] = Field(default_factory=list, description="Default step assignees")
+	escalation_contacts: List[str] = Field(default_factory=list, description="Escalation contacts")
+	notification_recipients: List[str] = Field(default_factory=list, description="Notification recipients")
 	
-	# Policy details
-	name: str = Column(String(200), nullable=False)
-	description: str = Column(Text)
-	policy_code: str = Column(String(50), nullable=False)
+	# Settings
+	auto_start: bool = Field(default=False, description="Automatically start workflow")
+	allow_parallel: bool = Field(default=False, description="Allow parallel execution")
+	require_completion: bool = Field(default=True, description="Require all steps to complete")
 	
-	# Retention rules
-	retention_period_years: int = Column(Integer, nullable=False)
-	retention_period_months: int = Column(Integer, default=0)
-	retention_period_days: int = Column(Integer, default=0)
+	# SLA and Timing
+	sla_hours: Optional[int] = Field(default=None, description="SLA in hours")
+	estimated_duration: Optional[int] = Field(default=None, description="Estimated duration in hours")
+	business_hours_only: bool = Field(default=True, description="Count only business hours")
 	
-	# Policy triggers
-	trigger_event: str = Column(String(50), default="creation_date")  # creation_date, effective_date, last_modified
-	trigger_offset_days: int = Column(Integer, default=0)
+	# Status and Analytics
+	is_enabled: bool = Field(default=True, description="Workflow enabled status")
+	usage_count: int = Field(default=0, description="Number of times used")
+	success_rate: float = Field(default=0.0, description="Completion success rate")
+	average_duration: Optional[float] = Field(default=None, description="Average completion time")
+
+
+class DCMWorkflowInstance(DCMBase):
+	"""Active workflow instance for a specific document"""
+	workflow_id: str = Field(..., description="Workflow template ID")
+	document_id: str = Field(..., description="Document ID")
+	instance_name: str = Field(..., description="Workflow instance name")
+	status: DCMWorkflowStatus = Field(default=DCMWorkflowStatus.NOT_STARTED, description="Workflow status")
 	
-	# Actions
-	auto_delete_enabled: bool = Column(Boolean, default=False)
-	auto_archive_enabled: bool = Column(Boolean, default=True)
-	require_approval_for_deletion: bool = Column(Boolean, default=True)
+	# Execution Details
+	started_by: str = Field(..., description="User who started workflow")
+	started_at: datetime = Field(default_factory=datetime.utcnow, description="Workflow start time")
+	completed_at: Optional[datetime] = Field(default=None, description="Workflow completion time")
+	duration_hours: Optional[float] = Field(default=None, description="Total duration in hours")
 	
-	# Legal hold
-	legal_hold_override: bool = Column(Boolean, default=True)
-	litigation_hold_exemption: bool = Column(Boolean, default=False)
+	# Current State
+	current_step_id: Optional[str] = Field(default=None, description="Current workflow step")
+	current_assignees: List[str] = Field(default_factory=list, description="Current step assignees")
+	next_step_id: Optional[str] = Field(default=None, description="Next workflow step")
+	
+	# Progress Tracking
+	completed_steps: List[str] = Field(default_factory=list, description="Completed step IDs")
+	pending_steps: List[str] = Field(default_factory=list, description="Pending step IDs")
+	skipped_steps: List[str] = Field(default_factory=list, description="Skipped step IDs")
+	
+	# Decisions and Outcomes
+	final_decision: Optional[str] = Field(default=None, description="Final workflow decision")
+	decision_rationale: Optional[str] = Field(default=None, description="Decision explanation")
+	outcome_data: Dict[str, Any] = Field(default_factory=dict, description="Workflow outcome data")
+	
+	# Escalation and Delays
+	escalation_count: int = Field(default=0, description="Number of escalations")
+	last_escalated_at: Optional[datetime] = Field(default=None, description="Last escalation time")
+	is_overdue: bool = Field(default=False, description="Workflow overdue status")
+	delay_reason: Optional[str] = Field(default=None, description="Delay explanation")
+	
+	# Variables and Context
+	workflow_variables: Dict[str, Any] = Field(default_factory=dict, description="Workflow variables")
+	context_data: Dict[str, Any] = Field(default_factory=dict, description="Additional context")
 	
 	# Notifications
-	notify_before_deletion_days: int = Column(Integer, default=30)
-	notification_recipients: Optional[str] = Column(Text)  # JSON array of emails/users
+	notification_log: List[Dict[str, Any]] = Field(default_factory=list, description="Notification history")
+	reminder_count: int = Field(default=0, description="Number of reminders sent")
+	last_reminder_at: Optional[datetime] = Field(default=None, description="Last reminder time")
+
+
+class DCMWorkflowStep(DCMBase):
+	"""Individual workflow step execution"""
+	workflow_instance_id: str = Field(..., description="Workflow instance ID")
+	step_id: str = Field(..., description="Step identifier")
+	step_name: str = Field(..., description="Step name")
+	step_type: str = Field(..., description="Step type (review, approval, notification)")
+	
+	# Assignment and Execution
+	assigned_to: List[str] = Field(..., description="Assigned user IDs")
+	assigned_at: datetime = Field(default_factory=datetime.utcnow, description="Assignment timestamp")
+	started_at: Optional[datetime] = Field(default=None, description="Step start time")
+	completed_at: Optional[datetime] = Field(default=None, description="Step completion time")
+	
+	# Status and Decision
+	status: DCMWorkflowStatus = Field(default=DCMWorkflowStatus.NOT_STARTED, description="Step status")
+	decision: Optional[str] = Field(default=None, description="Step decision")
+	decision_by: Optional[str] = Field(default=None, description="User who made decision")
+	decision_at: Optional[datetime] = Field(default=None, description="Decision timestamp")
+	
+	# Comments and Feedback
+	comments: List[str] = Field(default_factory=list, description="Step comment IDs")
+	feedback: Optional[str] = Field(default=None, description="Step feedback")
+	attachments: List[Dict[str, Any]] = Field(default_factory=list, description="Step attachments")
+	
+	# Timing and SLA
+	due_date: Optional[datetime] = Field(default=None, description="Step due date")
+	sla_hours: Optional[int] = Field(default=None, description="Step SLA in hours")
+	is_overdue: bool = Field(default=False, description="Step overdue status")
+	duration_hours: Optional[float] = Field(default=None, description="Step duration in hours")
+	
+	# Escalation and Delegation
+	escalated_to: Optional[str] = Field(default=None, description="Escalated to user ID")
+	escalated_at: Optional[datetime] = Field(default=None, description="Escalation timestamp")
+	delegated_to: Optional[str] = Field(default=None, description="Delegated to user ID")
+	delegated_by: Optional[str] = Field(default=None, description="Delegating user ID")
+	
+	# Step Configuration
+	step_config: Dict[str, Any] = Field(default_factory=dict, description="Step configuration")
+	required_approvers: int = Field(default=1, description="Number of required approvers")
+	approval_threshold: Optional[float] = Field(default=None, description="Approval threshold percentage")
+
+
+# Knowledge Management Models
+class DCMKnowledgeBase(DCMBase):
+	"""Knowledge base and wiki organization"""
+	name: str = Field(..., description="Knowledge base name")
+	description: Optional[str] = Field(default=None, description="Knowledge base description")
+	category: str = Field(..., description="Knowledge base category")
+	is_public: bool = Field(default=False, description="Public access flag")
+	
+	# Organization
+	parent_kb_id: Optional[str] = Field(default=None, description="Parent knowledge base ID")
+	knowledge_areas: List[str] = Field(default_factory=list, description="Knowledge area tags")
+	topics: List[str] = Field(default_factory=list, description="Topic classifications")
+	
+	# Content Management
+	article_count: int = Field(default=0, description="Number of articles")
+	page_count: int = Field(default=0, description="Number of wiki pages")
+	contributor_count: int = Field(default=0, description="Number of contributors")
+	
+	# Quality and Curation
+	quality_score: float = Field(default=0.0, description="Overall quality score")
+	last_reviewed_at: Optional[datetime] = Field(default=None, description="Last review timestamp")
+	next_review_date: Optional[date] = Field(default=None, description="Next review date")
+	curator_ids: List[str] = Field(default_factory=list, description="Content curator user IDs")
+	
+	# Usage Analytics
+	view_count: int = Field(default=0, description="Total view count")
+	search_count: int = Field(default=0, description="Number of searches")
+	contribution_count: int = Field(default=0, description="Number of contributions")
+	
+	# Settings
+	allow_comments: bool = Field(default=True, description="Allow comments on articles")
+	require_approval: bool = Field(default=False, description="Require approval for changes")
+	enable_versioning: bool = Field(default=True, description="Enable version control")
+	auto_categorize: bool = Field(default=True, description="Automatic categorization")
+
+
+class DCMKnowledgeArticle(DCMBase):
+	"""Knowledge base article or wiki page"""
+	knowledge_base_id: str = Field(..., description="Parent knowledge base ID")
+	title: str = Field(..., description="Article title")
+	slug: str = Field(..., description="URL-friendly slug")
+	content: str = Field(..., description="Article content (markdown/HTML)")
+	summary: Optional[str] = Field(default=None, description="Article summary")
+	
+	# Organization
+	category: str = Field(..., description="Article category")
+	tags: List[str] = Field(default_factory=list, description="Article tags")
+	keywords: List[str] = Field(default_factory=list, description="SEO keywords")
+	topics: List[str] = Field(default_factory=list, description="Topic classifications")
+	
+	# Authoring
+	author_id: str = Field(..., description="Primary author user ID")
+	contributors: List[str] = Field(default_factory=list, description="Contributor user IDs")
+	last_editor_id: Optional[str] = Field(default=None, description="Last editor user ID")
+	
+	# Status and Lifecycle
+	status: DCMDocumentStatus = Field(default=DCMDocumentStatus.DRAFT, description="Article status")
+	published_at: Optional[datetime] = Field(default=None, description="Publication timestamp")
+	last_reviewed_at: Optional[datetime] = Field(default=None, description="Last review timestamp")
+	next_review_date: Optional[date] = Field(default=None, description="Next review date")
+	
+	# Content Metrics
+	word_count: int = Field(default=0, description="Word count")
+	reading_time_minutes: int = Field(default=0, description="Estimated reading time")
+	complexity_score: Optional[float] = Field(default=None, description="Content complexity score")
+	
+	# Quality and Feedback
+	quality_score: float = Field(default=0.0, description="Article quality score")
+	usefulness_score: float = Field(default=0.0, description="User-rated usefulness")
+	feedback_count: int = Field(default=0, description="Number of feedback items")
+	
+	# Usage Analytics
+	view_count: int = Field(default=0, description="Article view count")
+	like_count: int = Field(default=0, description="Number of likes")
+	share_count: int = Field(default=0, description="Number of shares")
+	bookmark_count: int = Field(default=0, description="Number of bookmarks")
+	
+	# SEO and Discovery
+	meta_description: Optional[str] = Field(default=None, description="Meta description")
+	featured_image: Optional[str] = Field(default=None, description="Featured image URL")
+	is_featured: bool = Field(default=False, description="Featured article flag")
+	
+	# Related Content
+	related_articles: List[str] = Field(default_factory=list, description="Related article IDs")
+	referenced_documents: List[str] = Field(default_factory=list, description="Referenced document IDs")
+	external_links: List[str] = Field(default_factory=list, description="External reference URLs")
+	
+	# Collaboration
+	allow_comments: bool = Field(default=True, description="Allow comments")
+	comment_count: int = Field(default=0, description="Number of comments")
+	is_collaborative: bool = Field(default=False, description="Allow collaborative editing")
+
+
+# Digital Asset Management Models
+class DCMAsset(DCMBase):
+	"""Digital asset management for rich media content"""
+	name: str = Field(..., description="Asset name")
+	title: str = Field(..., description="Asset title")
+	description: Optional[str] = Field(default=None, description="Asset description")
+	asset_type: str = Field(..., description="Asset type (image, video, audio, 3d_model)")
+	category: str = Field(..., description="Asset category")
+	
+	# File Information
+	file_name: str = Field(..., description="Original file name")
+	file_size: int = Field(..., description="File size in bytes")
+	file_format: DCMContentFormat = Field(..., description="File format")
+	mime_type: str = Field(..., description="MIME type")
+	file_hash: str = Field(..., description="File content hash")
+	storage_path: str = Field(..., description="Storage location path")
+	
+	# Media Metadata
+	dimensions: Optional[Dict[str, int]] = Field(default=None, description="Asset dimensions (width, height)")
+	duration_seconds: Optional[float] = Field(default=None, description="Duration for time-based media")
+	resolution: Optional[str] = Field(default=None, description="Media resolution")
+	color_profile: Optional[str] = Field(default=None, description="Color profile")
+	bit_rate: Optional[int] = Field(default=None, description="Bit rate for audio/video")
+	frame_rate: Optional[float] = Field(default=None, description="Frame rate for video")
+	
+	# Brand and Rights Management
+	brand_guidelines: bool = Field(default=False, description="Follows brand guidelines")
+	usage_rights: str = Field(default="internal", description="Usage rights classification")
+	license_type: Optional[str] = Field(default=None, description="License type")
+	copyright_holder: Optional[str] = Field(default=None, description="Copyright holder")
+	expiry_date: Optional[date] = Field(default=None, description="Rights expiry date")
+	
+	# Asset Processing
+	preview_path: Optional[str] = Field(default=None, description="Preview/thumbnail path")
+	thumbnails: List[Dict[str, Any]] = Field(default_factory=list, description="Generated thumbnails")
+	processed_versions: Dict[str, str] = Field(default_factory=dict, description="Processed version paths")
+	ai_analysis: Optional[Dict[str, Any]] = Field(default=None, description="AI-generated analysis")
+	
+	# Usage and Distribution
+	download_count: int = Field(default=0, description="Download count")
+	usage_count: int = Field(default=0, description="Usage count in documents")
+	last_used_at: Optional[datetime] = Field(default=None, description="Last usage timestamp")
+	
+	# Metadata and Tagging
+	keywords: List[str] = Field(default_factory=list, description="Asset keywords")
+	tags: List[str] = Field(default_factory=list, description="User-defined tags")
+	ai_tags: List[str] = Field(default_factory=list, description="AI-generated tags")
+	color_palette: List[str] = Field(default_factory=list, description="Dominant colors")
+	
+	# Organization
+	collections: List[str] = Field(default_factory=list, description="Asset collection IDs")
+	campaigns: List[str] = Field(default_factory=list, description="Associated campaign IDs")
+	projects: List[str] = Field(default_factory=list, description="Associated project IDs")
+	
+	# Quality and Approval
+	quality_score: float = Field(default=0.0, description="Asset quality score")
+	is_approved: bool = Field(default=False, description="Approval status")
+	approved_by: Optional[str] = Field(default=None, description="Approving user ID")
+	approved_at: Optional[datetime] = Field(default=None, description="Approval timestamp")
+
+
+class DCMAssetCollection(DCMBase):
+	"""Collections for organizing digital assets"""
+	name: str = Field(..., description="Collection name")
+	description: Optional[str] = Field(default=None, description="Collection description")
+	collection_type: str = Field(..., description="Collection type (brand, campaign, project)")
+	is_public: bool = Field(default=False, description="Public collection flag")
+	
+	# Organization
+	parent_collection_id: Optional[str] = Field(default=None, description="Parent collection ID")
+	tags: List[str] = Field(default_factory=list, description="Collection tags")
+	categories: List[str] = Field(default_factory=list, description="Collection categories")
+	
+	# Content
+	asset_count: int = Field(default=0, description="Number of assets in collection")
+	featured_asset_id: Optional[str] = Field(default=None, description="Featured asset ID")
+	cover_image: Optional[str] = Field(default=None, description="Collection cover image")
+	
+	# Access and Sharing
+	access_type: DCMAccessType = Field(default=DCMAccessType.INTERNAL, description="Access level")
+	shared_with: List[str] = Field(default_factory=list, description="Shared with user/group IDs")
+	download_enabled: bool = Field(default=True, description="Enable asset downloads")
+	
+	# Usage and Analytics
+	view_count: int = Field(default=0, description="Collection view count")
+	download_count: int = Field(default=0, description="Total downloads from collection")
+	
+	# Settings
+	auto_organize: bool = Field(default=False, description="Automatic asset organization")
+	sort_order: str = Field(default="created_desc", description="Default sort order")
+
+
+# Audit and Compliance Models
+class DCMAuditLog(DCMBase):
+	"""Comprehensive audit logging for all document activities"""
+	resource_id: str = Field(..., description="Resource ID (document, folder, etc.)")
+	resource_type: str = Field(..., description="Resource type")
+	action: str = Field(..., description="Action performed")
+	action_category: str = Field(..., description="Action category (access, modify, admin)")
+	
+	# User and Session
+	user_id: str = Field(..., description="User who performed action")
+	session_id: Optional[str] = Field(default=None, description="User session ID")
+	impersonated_user: Optional[str] = Field(default=None, description="Impersonated user ID")
+	
+	# Context Information
+	ip_address: Optional[str] = Field(default=None, description="Client IP address")
+	user_agent: Optional[str] = Field(default=None, description="Client user agent")
+	device_info: Optional[Dict[str, Any]] = Field(default=None, description="Device information")
+	location: Optional[Dict[str, Any]] = Field(default=None, description="Geographic location")
+	
+	# Action Details
+	old_values: Optional[Dict[str, Any]] = Field(default=None, description="Previous values")
+	new_values: Optional[Dict[str, Any]] = Field(default=None, description="New values")
+	affected_fields: List[str] = Field(default_factory=list, description="Modified fields")
+	
+	# Result and Status
+	success: bool = Field(..., description="Action success status")
+	error_message: Optional[str] = Field(default=None, description="Error message if failed")
+	warning_message: Optional[str] = Field(default=None, description="Warning message")
+	
+	# Risk and Compliance
+	risk_level: str = Field(default="low", description="Risk level (low, medium, high)")
+	compliance_tags: List[str] = Field(default_factory=list, description="Compliance requirement tags")
+	data_classification: Optional[str] = Field(default=None, description="Data classification level")
+	
+	# Additional Context
+	business_context: Optional[str] = Field(default=None, description="Business context")
+	technical_details: Dict[str, Any] = Field(default_factory=dict, description="Technical details")
+	
+	# Retention and Archival
+	retention_category: str = Field(default="standard", description="Retention category")
+	archive_date: Optional[date] = Field(default=None, description="Archive date")
+	purge_date: Optional[date] = Field(default=None, description="Purge date")
+
+
+class DCMRetentionPolicy(DCMBase):
+	"""Document retention and lifecycle management policies"""
+	name: str = Field(..., description="Policy name")
+	description: Optional[str] = Field(default=None, description="Policy description")
+	policy_type: str = Field(..., description="Policy type (retention, deletion, archival)")
+	is_enabled: bool = Field(default=True, description="Policy enabled status")
+	
+	# Scope and Application
+	applies_to: List[str] = Field(..., description="Resource types this policy applies to")
+	folder_scope: List[str] = Field(default_factory=list, description="Folder IDs in scope")
+	document_types: List[DCMDocumentType] = Field(default_factory=list, description="Document types in scope")
+	
+	# Retention Rules
+	retention_period_days: int = Field(..., description="Retention period in days")
+	trigger_event: str = Field(..., description="Event that starts retention period")
+	grace_period_days: int = Field(default=0, description="Grace period before enforcement")
+	
+	# Actions
+	retention_action: str = Field(..., description="Action to take (archive, delete, notify)")
+	notification_before_days: int = Field(default=30, description="Notification period before action")
+	escalation_contacts: List[str] = Field(default_factory=list, description="Escalation contact user IDs")
+	
+	# Exceptions and Overrides
+	legal_hold_override: bool = Field(default=True, description="Legal hold overrides policy")
+	manual_override_allowed: bool = Field(default=False, description="Allow manual overrides")
+	override_approval_required: bool = Field(default=True, description="Require approval for overrides")
 	
 	# Compliance
-	regulatory_basis: Optional[str] = Column(Text)
-	compliance_framework: Optional[str] = Column(String(100))
-	citation_reference: Optional[str] = Column(String(200))
+	regulatory_basis: List[str] = Field(default_factory=list, description="Regulatory requirements")
+	compliance_tags: List[str] = Field(default_factory=list, description="Compliance tags")
+	audit_frequency: str = Field(default="quarterly", description="Audit frequency")
 	
-	# Application rules
-	applies_to_document_types: Optional[str] = Column(Text)  # JSON array
-	applies_to_categories: Optional[str] = Column(Text)  # JSON array
-	exclusion_rules: Optional[str] = Column(Text)  # JSON rules
+	# Execution
+	last_executed: Optional[datetime] = Field(default=None, description="Last execution timestamp")
+	next_execution: Optional[datetime] = Field(default=None, description="Next execution timestamp")
+	execution_status: str = Field(default="pending", description="Execution status")
+	
+	# Statistics
+	documents_affected: int = Field(default=0, description="Number of documents affected")
+	actions_taken: int = Field(default=0, description="Number of actions taken")
+	exceptions_granted: int = Field(default=0, description="Number of exceptions granted")
+
+
+class DCMNotification(DCMBase):
+	"""Notification system for document events"""
+	notification_type: DCMNotificationType = Field(..., description="Type of notification")
+	recipient_id: str = Field(..., description="Recipient user ID")
+	sender_id: Optional[str] = Field(default=None, description="Sender user ID (if applicable)")
+	
+	# Content
+	title: str = Field(..., description="Notification title")
+	message: str = Field(..., description="Notification message")
+	rich_content: Optional[Dict[str, Any]] = Field(default=None, description="Rich content data")
+	
+	# Related Resources
+	document_id: Optional[str] = Field(default=None, description="Related document ID")
+	workflow_id: Optional[str] = Field(default=None, description="Related workflow ID")
+	comment_id: Optional[str] = Field(default=None, description="Related comment ID")
+	
+	# Delivery
+	delivery_channels: List[str] = Field(..., description="Delivery channels (email, web, mobile)")
+	priority: str = Field(default="normal", description="Notification priority")
 	
 	# Status
-	is_active: bool = Column(Boolean, default=True, nullable=False)
-	effective_date: date = Column(Date, default=date.today, nullable=False)
-	expiry_date: Optional[date] = Column(Date)
+	is_read: bool = Field(default=False, description="Read status")
+	read_at: Optional[datetime] = Field(default=None, description="Read timestamp")
+	delivered_at: Optional[datetime] = Field(default=None, description="Delivery timestamp")
 	
-	# Relationships
-	documents = relationship("GCDMDocument", back_populates="retention_policy")
+	# Actions
+	action_required: bool = Field(default=False, description="Action required flag")
+	action_url: Optional[str] = Field(default=None, description="Action URL")
+	due_date: Optional[datetime] = Field(default=None, description="Action due date")
 	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_retention_tenant_code', 'tenant_id', 'policy_code'),
-		Index('idx_gc_dm_retention_active', 'is_active'),
-		Index('idx_gc_dm_retention_dates', 'effective_date', 'expiry_date'),
-		UniqueConstraint('tenant_id', 'policy_code', name='uq_gc_dm_retention_tenant_code'),
-	)
+	# Grouping and Threading
+	group_key: Optional[str] = Field(default=None, description="Notification group key")
+	thread_id: Optional[str] = Field(default=None, description="Thread identifier")
+	
+	# Preferences
+	dismissible: bool = Field(default=True, description="Can be dismissed by user")
+	auto_expire_hours: Optional[int] = Field(default=None, description="Auto-expiry in hours")
 
-class GCDMArchive(Model, AuditMixin):
-	"""Archived documents tracking."""
+
+# Search and Analytics Models
+class DCMSearchIndex(DCMBase):
+	"""Search index entries for full-text search"""
+	document_id: str = Field(..., description="Indexed document ID")
+	content_hash: str = Field(..., description="Content hash for change detection")
 	
-	__tablename__ = 'gc_dm_archive'
+	# Indexed Content
+	extracted_text: str = Field(..., description="Extracted text content")
+	metadata_text: str = Field(..., description="Searchable metadata")
+	title: str = Field(..., description="Document title")
+	tags: List[str] = Field(default_factory=list, description="Document tags")
 	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
+	# Index Metadata
+	language: str = Field(default="en", description="Content language")
+	word_count: int = Field(default=0, description="Word count")
+	index_version: str = Field(default="1.0", description="Index version")
 	
-	# Document reference
-	original_document_id: str = Column(String(50), nullable=False)
-	document_number: str = Column(String(100), nullable=False)
-	
-	# Archive information
-	archive_date: datetime = Column(DateTime, default=datetime.utcnow, nullable=False)
-	archived_by: str = Column(String(50), nullable=False)
-	archive_reason: str = Column(String(100), nullable=False)
-	archive_location: str = Column(String(500), nullable=False)
-	
-	# Original document metadata (snapshot)
-	original_metadata: str = Column(Text, nullable=False)  # JSON snapshot
-	
-	# Archive storage
-	storage_type: str = Column(String(50), default="file_system")  # file_system, cloud, tape
-	storage_path: str = Column(String(1000), nullable=False)
-	storage_size_bytes: int = Column(Integer, default=0)
-	storage_hash: str = Column(String(64))
-	
-	# Retrieval information
-	retrieval_instructions: Optional[str] = Column(Text)
-	estimated_retrieval_time_hours: Optional[int] = Column(Integer)
-	retrieval_cost: Optional[Decimal] = Column(DECIMAL(10, 2))
-	
-	# Retention
-	scheduled_destruction_date: Optional[date] = Column(Date)
-	destruction_method: Optional[str] = Column(String(50))
+	# Search Optimization
+	search_keywords: List[str] = Field(default_factory=list, description="Optimized search keywords")
+	stemmed_terms: List[str] = Field(default_factory=list, description="Stemmed terms")
+	phonetic_codes: List[str] = Field(default_factory=list, description="Phonetic codes for fuzzy search")
 	
 	# Status
-	is_retrievable: bool = Column(Boolean, default=True, nullable=False)
-	is_destroyed: bool = Column(Boolean, default=False)
-	destruction_date: Optional[datetime] = Column(DateTime)
-	destruction_certificate: Optional[str] = Column(String(200))
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_archive_original_doc', 'original_document_id'),
-		Index('idx_gc_dm_archive_number', 'document_number'),
-		Index('idx_gc_dm_archive_date', 'archive_date'),
-		Index('idx_gc_dm_archive_destruction', 'scheduled_destruction_date'),
-		Index('idx_gc_dm_archive_retrievable', 'is_retrievable'),
-	)
+	index_status: str = Field(default="indexed", description="Index status")
+	last_indexed: datetime = Field(default_factory=datetime.utcnow, description="Last index timestamp")
+	next_reindex: Optional[datetime] = Field(default=None, description="Next reindex timestamp")
 
-class GCDMAuditLog(Model, AuditMixin):
-	"""Comprehensive audit log for document activities."""
+
+class DCMAnalytics(DCMBase):
+	"""Analytics and usage statistics"""
+	resource_id: str = Field(..., description="Resource ID (document, folder, user)")
+	resource_type: str = Field(..., description="Resource type")
+	metric_name: str = Field(..., description="Metric name")
+	metric_value: float = Field(..., description="Metric value")
 	
-	__tablename__ = 'gc_dm_audit_log'
+	# Time and Context
+	measurement_date: date = Field(..., description="Measurement date")
+	time_period: str = Field(..., description="Time period (daily, weekly, monthly)")
+	context: Dict[str, Any] = Field(default_factory=dict, description="Additional context")
 	
-	# Primary key
-	id: str = Column(String(50), primary_key=True, default=uuid7str)
+	# Aggregation
+	aggregation_level: str = Field(..., description="Aggregation level (individual, team, organization)")
+	sample_size: Optional[int] = Field(default=None, description="Sample size for calculated metrics")
 	
-	# Tenant isolation
-	tenant_id: str = Column(String(50), nullable=False, index=True)
+	# Metadata
+	calculation_method: Optional[str] = Field(default=None, description="How metric was calculated")
+	data_source: str = Field(default="system", description="Data source")
+	confidence_level: Optional[float] = Field(default=None, description="Confidence level for estimates")
+
+
+# Validation Methods
+@validator('file_size')
+def validate_file_size(cls, v):
+	if v < 0:
+		raise ValueError("File size cannot be negative")
+	return v
+
+
+@validator('version_number')
+def validate_version_number(cls, v):
+	if not v or not isinstance(v, str):
+		raise ValueError("Version number must be a non-empty string")
+	return v
+
+
+@root_validator
+def validate_date_consistency(cls, values):
+	created_at = values.get('created_at')
+	updated_at = values.get('updated_at')
 	
-	# Document reference
-	document_id: Optional[str] = Column(String(50), ForeignKey('gc_dm_document.id'))
-	document_number: Optional[str] = Column(String(100))
+	if created_at and updated_at and updated_at < created_at:
+		raise ValueError("Updated time cannot be before creation time")
 	
-	# Activity details
-	activity_type: str = Column(String(50), nullable=False)  # view, download, edit, delete, etc.
-	activity_description: str = Column(Text, nullable=False)
-	activity_category: str = Column(String(50), default="document_access")
-	
-	# User information
-	user_id: str = Column(String(50), nullable=False)
-	user_name: str = Column(String(200))
-	user_ip_address: Optional[str] = Column(String(45))  # IPv6 compatible
-	user_agent: Optional[str] = Column(Text)
-	
-	# Session information
-	session_id: Optional[str] = Column(String(100))
-	request_id: Optional[str] = Column(String(100))
-	
-	# Activity context
-	before_values: Optional[str] = Column(Text)  # JSON before state
-	after_values: Optional[str] = Column(Text)  # JSON after state
-	affected_fields: Optional[str] = Column(Text)  # JSON array of changed fields
-	
-	# Technical details
-	operation_result: str = Column(String(20), default="success")  # success, failure, warning
-	error_message: Optional[str] = Column(Text)
-	processing_time_ms: Optional[int] = Column(Integer)
-	
-	# Risk assessment
-	risk_level: str = Column(String(20), default="low")  # low, medium, high, critical
-	compliance_flag: bool = Column(Boolean, default=False)
-	security_event: bool = Column(Boolean, default=False)
-	
-	# Additional context
-	workflow_id: Optional[str] = Column(String(50))
-	batch_id: Optional[str] = Column(String(50))
-	external_reference: Optional[str] = Column(String(200))
-	custom_data: Optional[str] = Column(Text)  # JSON additional data
-	
-	# Relationships
-	document = relationship("GCDMDocument", back_populates="audit_logs")
-	
-	# Indexes
-	__table_args__ = (
-		Index('idx_gc_dm_audit_tenant_date', 'tenant_id', 'created_on'),
-		Index('idx_gc_dm_audit_document', 'document_id'),
-		Index('idx_gc_dm_audit_user', 'user_id'),
-		Index('idx_gc_dm_audit_activity', 'activity_type'),
-		Index('idx_gc_dm_audit_risk', 'risk_level'),
-		Index('idx_gc_dm_audit_security', 'security_event'),
-		Index('idx_gc_dm_audit_workflow', 'workflow_id'),
-	)
+	return values
+
+
+@validator('keywords', 'tags', 'categories', pre=True)
+def validate_string_lists(cls, v):
+	if v is None:
+		return []
+	if isinstance(v, str):
+		return [tag.strip() for tag in v.split(',') if tag.strip()]
+	return v

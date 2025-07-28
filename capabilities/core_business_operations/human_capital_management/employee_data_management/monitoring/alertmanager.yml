@@ -1,0 +1,215 @@
+global:
+  smtp_smarthost: 'smtp.company.com:587'
+  smtp_from: 'alerts@company.com'
+  smtp_auth_username: 'alerts@company.com'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default'
+  routes:
+  # Critical alerts - immediate notification
+  - match:
+      severity: critical
+    receiver: 'critical-alerts'
+    group_wait: 0s
+    repeat_interval: 5m
+  
+  # Security alerts - immediate notification
+  - match:
+      category: security
+    receiver: 'security-alerts'
+    group_wait: 0s
+    repeat_interval: 15m
+  
+  # Database alerts - DBA team
+  - match:
+      service: postgres
+    receiver: 'database-team'
+    
+  # AI/ML alerts - AI team
+  - match:
+      component: ai-analysis
+    receiver: 'ai-team'
+    
+  # Business hours only for info alerts
+  - match:
+      severity: info
+    receiver: 'business-hours'
+    active_time_intervals:
+    - business-hours
+
+time_intervals:
+- name: business-hours
+  time_intervals:
+  - times:
+    - start_time: '09:00'
+      end_time: '17:00'
+    weekdays: ['monday:friday']
+    location: 'America/New_York'
+
+receivers:
+- name: 'default'
+  email_configs:
+  - to: 'ops-team@company.com'
+    subject: 'APG Employee Management Alert: {{ .GroupLabels.alertname }}'
+    body: |
+      {{ range .Alerts }}
+      Alert: {{ .Annotations.summary }}
+      Description: {{ .Annotations.description }}
+      
+      Labels:
+      {{ range .Labels.SortedPairs }}  {{ .Name }}: {{ .Value }}
+      {{ end }}
+      
+      {{ if .Annotations.runbook_url }}
+      Runbook: {{ .Annotations.runbook_url }}
+      {{ end }}
+      {{ end }}
+
+- name: 'critical-alerts'
+  slack_configs:
+  - channel: '#alerts-critical'
+    title: 'CRITICAL: APG Employee Management Alert'
+    text: |
+      {{ range .Alerts }}
+      🚨 *{{ .Annotations.summary }}*
+      
+      *Description:* {{ .Annotations.description }}
+      *Service:* {{ .Labels.service }}
+      *Severity:* {{ .Labels.severity }}
+      
+      {{ if .Annotations.runbook_url }}
+      📖 [Runbook]({{ .Annotations.runbook_url }})
+      {{ end }}
+      {{ end }}
+    send_resolved: true
+  
+  email_configs:
+  - to: 'oncall@company.com'
+    subject: 'CRITICAL: APG Employee Management Alert'
+    body: |
+      CRITICAL ALERT - Immediate attention required!
+      
+      {{ range .Alerts }}
+      Alert: {{ .Annotations.summary }}
+      Description: {{ .Annotations.description }}
+      Service: {{ .Labels.service }}
+      
+      {{ if .Annotations.runbook_url }}
+      Runbook: {{ .Annotations.runbook_url }}
+      {{ end }}
+      {{ end }}
+  
+  pagerduty_configs:
+  - routing_key: '${PAGERDUTY_ROUTING_KEY}'
+    description: 'APG Employee Management Critical Alert'
+    details:
+      alert_count: '{{ len .Alerts }}'
+      service: '{{ .GroupLabels.service }}'
+
+- name: 'security-alerts'
+  slack_configs:
+  - channel: '#security-alerts'
+    title: 'SECURITY: APG Employee Management Alert'
+    text: |
+      {{ range .Alerts }}
+      🔒 *Security Alert: {{ .Annotations.summary }}*
+      
+      *Description:* {{ .Annotations.description }}
+      *Severity:* {{ .Labels.severity }}
+      
+      {{ if .Annotations.runbook_url }}
+      📖 [Runbook]({{ .Annotations.runbook_url }})
+      {{ end }}
+      {{ end }}
+    send_resolved: true
+  
+  email_configs:
+  - to: 'security@company.com'
+    subject: 'SECURITY ALERT: APG Employee Management'
+    body: |
+      Security alert detected in APG Employee Management system.
+      
+      {{ range .Alerts }}
+      Alert: {{ .Annotations.summary }}
+      Description: {{ .Annotations.description }}
+      
+      {{ if .Annotations.runbook_url }}
+      Runbook: {{ .Annotations.runbook_url }}
+      {{ end }}
+      {{ end }}
+
+- name: 'database-team'
+  slack_configs:
+  - channel: '#database-alerts'
+    title: 'DATABASE: APG Employee Management Alert'
+    text: |
+      {{ range .Alerts }}
+      🗄️ *Database Alert: {{ .Annotations.summary }}*
+      
+      *Description:* {{ .Annotations.description }}
+      *Database:* {{ .Labels.datname }}
+      *Severity:* {{ .Labels.severity }}
+      
+      {{ if .Annotations.runbook_url }}
+      📖 [Runbook]({{ .Annotations.runbook_url }})
+      {{ end }}
+      {{ end }}
+    send_resolved: true
+  
+  email_configs:
+  - to: 'dba-team@company.com'
+    subject: 'Database Alert: APG Employee Management'
+
+- name: 'ai-team'
+  slack_configs:
+  - channel: '#ai-alerts'
+    title: 'AI/ML: APG Employee Management Alert'
+    text: |
+      {{ range .Alerts }}
+      🤖 *AI/ML Alert: {{ .Annotations.summary }}*
+      
+      *Description:* {{ .Annotations.description }}
+      *Component:* {{ .Labels.component }}
+      *Severity:* {{ .Labels.severity }}
+      
+      {{ if .Annotations.runbook_url }}
+      📖 [Runbook]({{ .Annotations.runbook_url })
+      {{ end }}
+      {{ end }}
+    send_resolved: true
+  
+  email_configs:
+  - to: 'ai-team@company.com'
+    subject: 'AI/ML Alert: APG Employee Management'
+
+- name: 'business-hours'
+  slack_configs:
+  - channel: '#alerts-info'
+    title: 'INFO: APG Employee Management'
+    text: |
+      {{ range .Alerts }}
+      ℹ️ *{{ .Annotations.summary }}*
+      
+      *Description:* {{ .Annotations.description }}
+      {{ end }}
+    send_resolved: false
+
+# Inhibit rules
+inhibit_rules:
+- source_match:
+    severity: 'critical'
+  target_match:
+    severity: 'warning'
+  equal: ['alertname', 'cluster', 'service']
+
+- source_match:
+    alertname: 'ServiceDown'
+  target_match_re:
+    alertname: 'High.*'
+  equal: ['service']

@@ -1,0 +1,248 @@
+# APG Time & Attendance Capability - Persistent Storage
+# Copyright © 2025 Datacraft
+
+# Storage Class for Time & Attendance data
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: time-attendance-storage
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: storage
+provisioner: kubernetes.io/aws-ebs  # Change based on cloud provider
+parameters:
+  type: gp3
+  encrypted: "true"
+  fsType: ext4
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+
+---
+# Persistent Volume Claim for application logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: time-attendance-logs
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: logs-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: time-attendance-storage
+  resources:
+    requests:
+      storage: 50Gi
+  volumeMode: Filesystem
+
+---
+# Persistent Volume Claim for temporary file storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: time-attendance-temp
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: temp-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: time-attendance-storage
+  resources:
+    requests:
+      storage: 20Gi
+  volumeMode: Filesystem
+
+---
+# Shared storage for multi-pod access (if needed)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: time-attendance-shared
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: shared-storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-storage  # Use EFS or similar for shared storage
+  resources:
+    requests:
+      storage: 100Gi
+  volumeMode: Filesystem
+
+---
+# Persistent Volume Claim for backup storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: time-attendance-backup
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: backup-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: time-attendance-storage
+  resources:
+    requests:
+      storage: 200Gi
+  volumeMode: Filesystem
+
+---
+# Volume Snapshot Class for backups
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: time-attendance-snapshot-class
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: backup
+driver: ebs.csi.aws.com  # Change based on CSI driver
+deletionPolicy: Retain
+parameters:
+  encrypted: "true"
+
+---
+# Scheduled Volume Snapshot for automated backups
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: time-attendance-logs-snapshot
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: backup
+    backup-schedule: daily
+spec:
+  volumeSnapshotClassName: time-attendance-snapshot-class
+  source:
+    persistentVolumeClaimName: time-attendance-logs
+
+---
+# CronJob for automated backups
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: time-attendance-backup
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: backup-job
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: apg-time-attendance
+            app.kubernetes.io/component: backup-job
+        spec:
+          serviceAccountName: time-attendance-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: alpine:3.18
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting backup at $(date)"
+              
+              # Create timestamp
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              
+              # Create backup directory
+              mkdir -p /backup/logs_$TIMESTAMP
+              
+              # Copy application logs
+              if [ -d "/app-logs" ]; then
+                cp -r /app-logs/* /backup/logs_$TIMESTAMP/
+                echo "Logs backed up to /backup/logs_$TIMESTAMP"
+              fi
+              
+              # Compress backup
+              cd /backup
+              tar -czf logs_$TIMESTAMP.tar.gz logs_$TIMESTAMP/
+              rm -rf logs_$TIMESTAMP/
+              
+              # Keep only last 7 days of backups
+              find /backup -name "logs_*.tar.gz" -mtime +7 -delete
+              
+              echo "Backup completed at $(date)"
+              ls -la /backup/
+            volumeMounts:
+            - name: logs-volume
+              mountPath: /app-logs
+              readOnly: true
+            - name: backup-volume
+              mountPath: /backup
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"
+          volumes:
+          - name: logs-volume
+            persistentVolumeClaim:
+              claimName: time-attendance-logs
+          - name: backup-volume
+            persistentVolumeClaim:
+              claimName: time-attendance-backup
+
+---
+# Storage monitoring and alerting
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-monitoring-rules
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: monitoring
+data:
+  storage-rules.yaml: |
+    groups:
+    - name: time-attendance-storage
+      rules:
+      - alert: PersistentVolumeUsageHigh
+        expr: (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "Persistent volume usage is high"
+          description: "PV {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is {{ $value }}% full"
+      
+      - alert: PersistentVolumeUsageCritical
+        expr: (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: storage
+        annotations:
+          summary: "Persistent volume is nearly full"
+          description: "PV {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is {{ $value }}% full"
+      
+      - alert: BackupJobFailed
+        expr: kube_job_status_failed{job_name=~"time-attendance-backup.*"} > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: backup
+        annotations:
+          summary: "Backup job failed"
+          description: "Backup job {{ $labels.job_name }} has failed"

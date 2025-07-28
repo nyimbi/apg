@@ -1,0 +1,21 @@
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "crm_development",
+    "user": "crm_user",
+    "password": "crm_password"
+  },
+  "migration_settings": {
+    "auto_rollback_on_failure": false,
+    "backup_before_migration": true,
+    "max_parallel_migrations": 1,
+    "migration_timeout_seconds": 300,
+    "validation_enabled": true
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "migrations.log"
+  }
+}

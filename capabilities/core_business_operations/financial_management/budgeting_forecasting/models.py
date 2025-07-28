@@ -16,7 +16,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, validator, root_validator
 from pydantic import ConfigDict
-from pydantic.types import EmailStr, PositiveFloat, PositiveInt
+from pydantic import EmailStr, PositiveFloat, PositiveInt
 from pydantic.functional_validators import AfterValidator
 from typing_extensions import Annotated
 

@@ -1,0 +1,149 @@
+# Time & Attendance Capability Dependencies
+# Revolutionary APG Time & Attendance capability with AI-powered features
+
+# Core framework dependencies
+pydantic>=2.5.0,<3.0.0           # Data validation and models with v2 features
+uuid_extensions>=0.7.0           # UUID7 support for APG compliance
+fastapi>=0.104.0                 # Modern async web framework
+flask-appbuilder>=4.3.0         # APG blueprint integration
+sqlalchemy>=2.0.0,<3.0.0        # Modern async ORM
+alembic>=1.12.0                  # Database migrations
+
+# Database connectivity
+asyncpg>=0.29.0                  # PostgreSQL async driver
+psycopg2-binary>=2.9.0           # PostgreSQL sync driver (for migrations)
+
+# Async and concurrency
+asyncio-pool>=0.6.0              # Async pool management
+aiofiles>=23.2.0                 # Async file operations
+aiohttp>=3.9.0                   # Async HTTP client for APG integrations
+
+# Caching and session management
+redis>=5.0.0                     # Redis client for caching
+hiredis>=2.2.0                   # High-performance Redis parser
+
+# Data processing and analytics
+pandas>=2.1.0                    # Data manipulation and analysis
+numpy>=1.24.0                    # Numerical computing
+scikit-learn>=1.3.0              # Machine learning algorithms
+joblib>=1.3.0                    # ML model persistence
+
+# Time and date handling
+python-dateutil>=2.8.0           # Advanced date parsing
+pytz>=2023.3                     # Timezone support
+croniter>=1.4.0                  # Cron schedule parsing
+
+# API and serialization
+marshmallow>=3.20.0              # Object serialization
+marshmallow-sqlalchemy>=0.29.0   # SQLAlchemy integration
+jsonschema>=4.19.0               # JSON schema validation
+
+# Authentication and security
+cryptography>=41.0.0             # Encryption and security
+PyJWT>=2.8.0                     # JWT token handling
+passlib>=1.7.0                   # Password hashing
+bcrypt>=4.0.0                    # Bcrypt password hashing
+
+# Image and biometric processing
+pillow>=10.0.0                   # Image processing for biometrics
+opencv-python>=4.8.0             # Computer vision integration
+face-recognition>=1.3.0          # Facial recognition algorithms
+fingerprint-enhancer>=0.1.0     # Fingerprint processing
+
+# Machine Learning and AI
+tensorflow>=2.13.0               # Deep learning framework
+torch>=2.1.0                     # PyTorch for ML models
+transformers>=4.35.0             # NLP and language models
+scikit-image>=0.21.0             # Image processing for ML
+
+# API integration and HTTP
+requests>=2.31.0                 # HTTP client for APG capability integrations
+httpx>=0.25.0                    # Modern async HTTP client
+aioredis>=2.0.0                  # Async Redis client
+
+# Configuration and environment
+python-dotenv>=1.0.0             # Environment variable management
+pydantic-settings>=2.0.0         # Pydantic-based configuration
+click>=8.1.0                     # Command-line interface
+
+# Monitoring and logging
+structlog>=23.2.0                # Structured logging
+prometheus-client>=0.18.0        # Metrics collection
+opentelemetry-api>=1.20.0        # Observability and tracing
+opentelemetry-instrumentation>=0.41b0  # Auto-instrumentation
+
+# Validation and data quality
+cerberus>=1.3.0                  # Data validation
+voluptuous>=0.13.0               # Data validation schemas
+email-validator>=2.1.0           # Email validation
+
+# File handling and storage
+boto3>=1.29.0                    # AWS SDK for cloud storage
+minio>=7.2.0                     # MinIO client for object storage
+
+# Geographic and location services
+geopy>=2.4.0                     # Geographic calculations
+shapely>=2.0.0                   # Geometric operations for geofencing
+
+# Communication and notifications
+twilio>=8.10.0                   # SMS notifications
+sendgrid>=6.11.0                 # Email notifications
+pyfcm>=1.5.0                     # Firebase push notifications
+
+# Testing dependencies
+pytest>=7.4.0                    # Testing framework
+pytest-asyncio>=0.21.0           # Async testing support
+pytest-cov>=4.1.0               # Coverage reporting
+pytest-mock>=3.12.0              # Mocking framework
+faker>=19.12.0                   # Test data generation
+factory-boy>=3.3.0               # Test object factories
+httpx-mock>=0.7.0                # HTTP mocking for tests
+
+# Development dependencies
+black>=23.9.0                    # Code formatting
+isort>=5.12.0                    # Import sorting
+flake8>=6.1.0                    # Code linting
+mypy>=1.6.0                      # Type checking
+pre-commit>=3.5.0                # Git hooks
+
+# Documentation
+sphinx>=7.2.0                    # Documentation generation
+sphinx-rtd-theme>=1.3.0          # ReadTheDocs theme
+mkdocs>=1.5.0                    # Modern documentation
+mkdocs-material>=9.4.0           # Material theme for MkDocs
+
+# Performance and profiling
+line-profiler>=4.1.0             # Line-by-line profiling
+memory-profiler>=0.61.0          # Memory usage profiling
+py-spy>=0.3.0                    # Sampling profiler
+
+# Data export and reporting
+openpyxl>=3.1.0                  # Excel file handling
+reportlab>=4.0.0                 # PDF generation
+jinja2>=3.1.0                    # Template engine
+
+# APG-specific dependencies
+# Note: These would be internal APG packages in a real implementation
+# apg-auth-rbac>=1.0.0            # APG Auth RBAC capability
+# apg-employee-data>=1.0.0        # APG Employee Data Management
+# apg-computer-vision>=1.0.0      # APG Computer Vision capability
+# apg-notification-engine>=1.0.0  # APG Notification Engine
+# apg-workflow-bpm>=1.0.0         # APG Workflow BPM capability
+# apg-iot-management>=1.0.0       # APG IoT Management capability
+# apg-data-analytics>=1.0.0       # APG Data Analytics capability
+
+# Production deployment
+gunicorn>=21.2.0                 # WSGI server
+uvicorn>=0.24.0                  # ASGI server for FastAPI
+celery>=5.3.0                    # Distributed task queue
+flower>=2.0.0                    # Celery monitoring
+
+# Kubernetes and cloud deployment
+kubernetes>=27.2.0               # Kubernetes client
+pyyaml>=6.0.0                    # YAML configuration
+
+# Additional utilities
+python-slugify>=8.0.0            # URL-safe string generation
+pendulum>=2.1.0                  # Modern datetime library
+rich>=13.6.0                     # Rich text and beautiful formatting
+typer>=0.9.0                     # Modern CLI framework

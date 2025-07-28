@@ -1,0 +1,660 @@
+{% extends "appbuilder/base.html" %}
+{% import 'appbuilder/baselib.html' as baselib %}
+
+{% block content %}
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-md-12">
+			<div class="panel panel-primary">
+				<div class="panel-heading">
+					<h3 class="panel-title">
+						<i class="fa fa-comments-o"></i> Revolutionary Conversational Report Builder
+					</h3>
+				</div>
+				<div class="panel-body">
+					
+					<!-- Voice Command Interface -->
+					<div class="row mb-4">
+						<div class="col-md-12">
+							<div class="card border-info">
+								<div class="card-header bg-info text-white">
+									<h5><i class="fa fa-microphone"></i> Voice-Activated Reporting</h5>
+								</div>
+								<div class="card-body">
+									<div class="text-center">
+										<button id="voiceActivateBtn" class="btn btn-primary btn-lg">
+											<i class="fa fa-microphone"></i> Start Voice Command
+										</button>
+										<button id="voiceStopBtn" class="btn btn-secondary btn-lg" style="display: none;">
+											<i class="fa fa-stop"></i> Stop Recording
+										</button>
+									</div>
+									<div id="voiceStatus" class="mt-3 text-center">
+										<span class="text-muted">Click to start voice command</span>
+									</div>
+									<div id="voiceTranscript" class="mt-3" style="display: none;">
+										<label class="form-label">Voice Transcript:</label>
+										<div class="alert alert-info" id="transcriptText"></div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Natural Language Query Interface -->
+					<div class="row mb-4">
+						<div class="col-md-12">
+							<div class="card">
+								<div class="card-header">
+									<h5><i class="fa fa-comments"></i> Natural Language Report Builder</h5>
+								</div>
+								<div class="card-body">
+									<form id="conversationalForm" method="POST" action="{{ url_for('ConversationalReportBuilderView.process_query') }}">
+										{{ form.hidden_tag() }}
+										
+										<div class="form-group">
+											{{ form.user_query.label(class="form-label") }}
+											{{ form.user_query(class="form-control", rows="4", placeholder="Describe the report you need in natural language...\n\nExamples:\n• Show me revenue trends for the last 6 months with variance analysis\n• Create a profit and loss statement for Q3 with predictive insights\n• Generate a cash flow forecast with risk assessment") }}
+											<small class="form-text text-muted">Use natural language to describe exactly what you need</small>
+										</div>
+
+										<div class="row">
+											<div class="col-md-6">
+												<div class="form-group">
+													{{ form.ai_enhancement_level.label(class="form-label") }}
+													{{ form.ai_enhancement_level(class="form-select") }}
+												</div>
+											</div>
+											<div class="col-md-6">
+												<div class="form-group">
+													{{ form.output_format.label(class="form-label") }}
+													{{ form.output_format(class="form-select") }}
+												</div>
+											</div>
+										</div>
+
+										<div class="row">
+											<div class="col-md-4">
+												<div class="form-check">
+													{{ form.include_voice_narration(class="form-check-input") }}
+													{{ form.include_voice_narration.label(class="form-check-label") }}
+												</div>
+											</div>
+											<div class="col-md-4">
+												<div class="form-check">
+													{{ form.include_predictions(class="form-check-input") }}
+													{{ form.include_predictions.label(class="form-check-label") }}
+												</div>
+											</div>
+											<div class="col-md-4">
+												<div class="form-check">
+													{{ form.enable_real_time_updates(class="form-check-input") }}
+													{{ form.enable_real_time_updates.label(class="form-check-label") }}
+												</div>
+											</div>
+										</div>
+
+										<div class="form-group mt-3">
+											<button type="submit" class="btn btn-primary btn-lg">
+												<i class="fa fa-magic"></i> Generate Report with AI
+											</button>
+											<button type="button" id="clearFormBtn" class="btn btn-secondary">
+												<i class="fa fa-eraser"></i> Clear
+											</button>
+										</div>
+									</form>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- AI Processing Status -->
+					<div id="processingStatus" class="row mb-4" style="display: none;">
+						<div class="col-md-12">
+							<div class="alert alert-info">
+								<div class="d-flex align-items-center">
+									<div class="spinner-border spinner-border-sm me-3" role="status">
+										<span class="sr-only">Processing...</span>
+									</div>
+									<div>
+										<strong>AI is processing your request...</strong><br>
+										<span id="processingStep">Analyzing natural language query...</span>
+									</div>
+								</div>
+								<div class="progress mt-2">
+									<div id="processingProgress" class="progress-bar progress-bar-striped progress-bar-animated" 
+										 role="progressbar" style="width: 0%"></div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- AI Response and Suggestions -->
+					<div id="aiResponseSection" class="row mb-4" style="display: none;">
+						<div class="col-md-12">
+							<div class="card border-success">
+								<div class="card-header bg-success text-white">
+									<h5><i class="fa fa-brain"></i> AI Understanding & Suggestions</h5>
+								</div>
+								<div class="card-body">
+									<div id="aiInterpretation"></div>
+									<div id="suggestedFollowUps" class="mt-3"></div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Report Preview -->
+					<div id="reportPreviewSection" class="row mb-4" style="display: none;">
+						<div class="col-md-12">
+							<div class="card">
+								<div class="card-header">
+									<h5><i class="fa fa-file-text-o"></i> Generated Report Preview</h5>
+									<div class="float-right">
+										<button class="btn btn-sm btn-outline-primary" id="fullScreenBtn">
+											<i class="fa fa-expand"></i> Full Screen
+										</button>
+										<button class="btn btn-sm btn-outline-success" id="downloadBtn">
+											<i class="fa fa-download"></i> Download
+										</button>
+									</div>
+								</div>
+								<div class="card-body" id="reportContent">
+									<!-- Dynamic report content will be loaded here -->
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Conversation History -->
+					<div class="row">
+						<div class="col-md-12">
+							<div class="card">
+								<div class="card-header">
+									<h5><i class="fa fa-history"></i> Conversation History</h5>
+									<button class="btn btn-sm btn-outline-danger float-right" id="clearHistoryBtn">
+										<i class="fa fa-trash"></i> Clear History
+									</button>
+								</div>
+								<div class="card-body">
+									<div id="conversationHistory" class="conversation-container">
+										<div class="text-muted text-center">
+											<i class="fa fa-comments-o fa-3x"></i>
+											<p class="mt-2">Your conversation history will appear here</p>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Voice Command Modal -->
+<div class="modal fade" id="voiceCommandModal" tabindex="-1" role="dialog">
+	<div class="modal-dialog modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title">Voice Command Interface</h5>
+				<button type="button" class="close" data-dismiss="modal">
+					<span>&times;</span>
+				</button>
+			</div>
+			<div class="modal-body text-center">
+				<div class="voice-animation">
+					<div class="pulse-ring"></div>
+					<div class="microphone-icon">
+						<i class="fa fa-microphone fa-3x"></i>
+					</div>
+				</div>
+				<h4 class="mt-3">Listening for your command...</h4>
+				<p class="text-muted">Speak clearly and describe the report you need</p>
+				<div id="liveTranscript" class="mt-3 p-3 bg-light rounded" style="min-height: 60px;">
+					<span class="text-muted">Transcript will appear here...</span>
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+				<button type="button" class="btn btn-primary" id="processVoiceBtn">Process Command</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<style>
+.conversation-container {
+	max-height: 400px;
+	overflow-y: auto;
+}
+
+.conversation-item {
+	margin-bottom: 15px;
+	padding: 10px;
+	border-radius: 8px;
+}
+
+.user-query {
+	background-color: #e3f2fd;
+	border-left: 4px solid #2196f3;
+}
+
+.ai-response {
+	background-color: #f3e5f5;
+	border-left: 4px solid #9c27b0;
+}
+
+.voice-animation {
+	position: relative;
+	display: inline-block;
+}
+
+.pulse-ring {
+	content: '';
+	width: 100px;
+	height: 100px;
+	border: 5px solid #007bff;
+	border-radius: 50%;
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	animation: pulsate 2s ease-out infinite;
+	opacity: 0;
+}
+
+.microphone-icon {
+	width: 80px;
+	height: 80px;
+	background-color: #007bff;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: white;
+	position: relative;
+	z-index: 1;
+}
+
+@keyframes pulsate {
+	0% { transform: translate(-50%, -50%) scale(0.1, 0.1); opacity: 0; }
+	50% { opacity: 1; }
+	100% { transform: translate(-50%, -50%) scale(1.2, 1.2); opacity: 0; }
+}
+
+.processing-steps {
+	font-size: 0.9em;
+	color: #666;
+}
+
+.report-metric {
+	padding: 15px;
+	border-radius: 8px;
+	background-color: #f8f9fa;
+	margin-bottom: 10px;
+}
+
+.report-metric h6 {
+	margin-bottom: 5px;
+	color: #495057;
+}
+
+.report-metric .value {
+	font-size: 1.5em;
+	font-weight: bold;
+	color: #007bff;
+}
+</style>
+
+<script>
+$(document).ready(function() {
+	let conversationSession = generateSessionId();
+	let isVoiceRecording = false;
+	let recognition;
+
+	// Initialize speech recognition if available
+	if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+		const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+		recognition = new SpeechRecognition();
+		recognition.continuous = true;
+		recognition.interimResults = true;
+		recognition.lang = 'en-US';
+
+		recognition.onstart = function() {
+			isVoiceRecording = true;
+			$('#voiceStatus').html('<span class="text-success"><i class="fa fa-microphone"></i> Recording... Speak now</span>');
+		};
+
+		recognition.onresult = function(event) {
+			let transcript = '';
+			for (let i = event.resultIndex; i < event.results.length; i++) {
+				transcript += event.results[i][0].transcript;
+			}
+			$('#liveTranscript').text(transcript);
+			$('#transcriptText').text(transcript);
+		};
+
+		recognition.onerror = function(event) {
+			console.error('Speech recognition error:', event.error);
+			$('#voiceStatus').html('<span class="text-danger">Error: ' + event.error + '</span>');
+		};
+
+		recognition.onend = function() {
+			isVoiceRecording = false;
+			$('#voiceActivateBtn').show();
+			$('#voiceStopBtn').hide();
+			$('#voiceStatus').html('<span class="text-muted">Click to start voice command</span>');
+		};
+	}
+
+	// Voice activation
+	$('#voiceActivateBtn').click(function() {
+		if (recognition) {
+			$('#voiceCommandModal').modal('show');
+			recognition.start();
+			$(this).hide();
+			$('#voiceStopBtn').show();
+		} else {
+			alert('Speech recognition not supported in this browser');
+		}
+	});
+
+	$('#voiceStopBtn').click(function() {
+		if (recognition && isVoiceRecording) {
+			recognition.stop();
+		}
+	});
+
+	// Process voice command
+	$('#processVoiceBtn').click(function() {
+		const transcript = $('#liveTranscript').text().trim();
+		if (transcript && transcript !== 'Transcript will appear here...') {
+			$('#user_query').val(transcript);
+			$('#voiceTranscript').show();
+			$('#voiceCommandModal').modal('hide');
+		}
+	});
+
+	// Form submission
+	$('#conversationalForm').on('submit', function(e) {
+		e.preventDefault();
+		const formData = $(this).serialize();
+		const userQuery = $('#user_query').val().trim();
+
+		if (!userQuery) {
+			alert('Please enter a query or use voice command');
+			return;
+		}
+
+		// Add to conversation history
+		addToConversationHistory('user', userQuery);
+
+		// Show processing status
+		showProcessingStatus();
+
+		// Submit form via AJAX
+		$.ajax({
+			url: $(this).attr('action'),
+			method: 'POST',
+			data: formData + '&session_id=' + conversationSession,
+			success: function(response) {
+				hideProcessingStatus();
+				handleAIResponse(response);
+			},
+			error: function(xhr, status, error) {
+				hideProcessingStatus();
+				showError('Error processing request: ' + error);
+			}
+		});
+	});
+
+	// Clear form
+	$('#clearFormBtn').click(function() {
+		$('#conversationalForm')[0].reset();
+		$('#voiceTranscript').hide();
+		hideAllSections();
+	});
+
+	// Clear conversation history
+	$('#clearHistoryBtn').click(function() {
+		if (confirm('Are you sure you want to clear the conversation history?')) {
+			$('#conversationHistory').html(`
+				<div class="text-muted text-center">
+					<i class="fa fa-comments-o fa-3x"></i>
+					<p class="mt-2">Your conversation history will appear here</p>
+				</div>
+			`);
+			conversationSession = generateSessionId();
+		}
+	});
+
+	function showProcessingStatus() {
+		$('#processingStatus').show();
+		$('#aiResponseSection, #reportPreviewSection').hide();
+		
+		const steps = [
+			'Analyzing natural language query...',
+			'Extracting report requirements...',
+			'Gathering financial data...',
+			'Applying AI enhancements...',
+			'Generating report...'
+		];
+
+		let currentStep = 0;
+		const stepInterval = setInterval(function() {
+			if (currentStep < steps.length) {
+				$('#processingStep').text(steps[currentStep]);
+				$('#processingProgress').css('width', ((currentStep + 1) / steps.length * 100) + '%');
+				currentStep++;
+			} else {
+				clearInterval(stepInterval);
+			}
+		}, 1000);
+	}
+
+	function hideProcessingStatus() {
+		$('#processingStatus').hide();
+	}
+
+	function handleAIResponse(response) {
+		if (response.error) {
+			showError(response.error);
+			return;
+		}
+
+		// Show AI interpretation
+		$('#aiInterpretation').html(`
+			<div class="alert alert-success">
+				<h6><i class="fa fa-brain"></i> AI Understanding:</h6>
+				<p>${response.ai_interpretation || response.ai_response}</p>
+			</div>
+		`);
+
+		// Show follow-up suggestions
+		if (response.follow_up_suggestions && response.follow_up_suggestions.length > 0) {
+			let suggestionsHtml = '<h6>Suggested Follow-ups:</h6><div class="row">';
+			response.follow_up_suggestions.forEach(function(suggestion) {
+				suggestionsHtml += `
+					<div class="col-md-6 mb-2">
+						<button class="btn btn-outline-primary btn-sm suggestion-btn" data-suggestion="${suggestion}">
+							<i class="fa fa-lightbulb-o"></i> ${suggestion}
+						</button>
+					</div>
+				`;
+			});
+			suggestionsHtml += '</div>';
+			$('#suggestedFollowUps').html(suggestionsHtml);
+		}
+
+		$('#aiResponseSection').show();
+
+		// Show report preview if available
+		if (response.report) {
+			displayReportPreview(response.report);
+			$('#reportPreviewSection').show();
+		}
+
+		// Add AI response to conversation history
+		addToConversationHistory('ai', response.ai_response || response.ai_interpretation);
+	}
+
+	function displayReportPreview(reportData) {
+		let reportHtml = `
+			<div class="report-header mb-4">
+				<h4>${reportData.title || 'Generated Financial Report'}</h4>
+				<p class="text-muted">Generated on: ${new Date().toLocaleDateString()}</p>
+			</div>
+		`;
+
+		if (reportData.summary_metrics) {
+			reportHtml += '<div class="row mb-4">';
+			Object.entries(reportData.summary_metrics).forEach(function([key, value]) {
+				reportHtml += `
+					<div class="col-md-3">
+						<div class="report-metric">
+							<h6>${key.replace(/_/g, ' ').toUpperCase()}</h6>
+							<div class="value">${formatValue(value)}</div>
+						</div>
+					</div>
+				`;
+			});
+			reportHtml += '</div>';
+		}
+
+		if (reportData.lines && reportData.lines.length > 0) {
+			reportHtml += `
+				<div class="table-responsive">
+					<table class="table table-striped">
+						<thead>
+							<tr>
+								<th>Line Item</th>
+								<th>Current Value</th>
+								<th>Prior Value</th>
+								<th>Variance</th>
+								<th>AI Confidence</th>
+							</tr>
+						</thead>
+						<tbody>
+			`;
+
+			reportData.lines.forEach(function(line) {
+				const variance = line.prior_value ? 
+					((line.current_value - line.prior_value) / line.prior_value * 100).toFixed(1) + '%' : 
+					'N/A';
+				
+				reportHtml += `
+					<tr>
+						<td>${line.line_name}</td>
+						<td>${formatValue(line.current_value)}</td>
+						<td>${formatValue(line.prior_value || 0)}</td>
+						<td class="${parseFloat(variance) > 0 ? 'text-success' : 'text-danger'}">${variance}</td>
+						<td>
+							<div class="progress" style="height: 20px;">
+								<div class="progress-bar" style="width: ${(line.ai_confidence || 0) * 100}%">
+									${((line.ai_confidence || 0) * 100).toFixed(0)}%
+								</div>
+							</div>
+						</td>
+					</tr>
+				`;
+			});
+
+			reportHtml += '</tbody></table></div>';
+		}
+
+		$('#reportContent').html(reportHtml);
+	}
+
+	function addToConversationHistory(type, content) {
+		const timestamp = new Date().toLocaleTimeString();
+		const itemClass = type === 'user' ? 'user-query' : 'ai-response';
+		const icon = type === 'user' ? 'fa-user' : 'fa-brain';
+		const label = type === 'user' ? 'You' : 'AI Assistant';
+
+		const historyItem = `
+			<div class="conversation-item ${itemClass}">
+				<div class="d-flex justify-content-between">
+					<strong><i class="fa ${icon}"></i> ${label}</strong>
+					<small class="text-muted">${timestamp}</small>
+				</div>
+				<div class="mt-2">${content}</div>
+			</div>
+		`;
+
+		if ($('#conversationHistory .text-muted.text-center').length > 0) {
+			$('#conversationHistory').html(historyItem);
+		} else {
+			$('#conversationHistory').prepend(historyItem);
+		}
+	}
+
+	function showError(message) {
+		$('#aiResponseSection').html(`
+			<div class="col-md-12">
+				<div class="alert alert-danger">
+					<h6><i class="fa fa-exclamation-triangle"></i> Error</h6>
+					<p>${message}</p>
+				</div>
+			</div>
+		`).show();
+	}
+
+	function hideAllSections() {
+		$('#processingStatus, #aiResponseSection, #reportPreviewSection').hide();
+	}
+
+	function formatValue(value) {
+		if (typeof value === 'number') {
+			return new Intl.NumberFormat('en-US', {
+				style: 'currency',
+				currency: 'USD'
+			}).format(value);
+		}
+		return value || 'N/A';
+	}
+
+	function generateSessionId() {
+		return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+	}
+
+	// Handle suggestion clicks
+	$(document).on('click', '.suggestion-btn', function() {
+		const suggestion = $(this).data('suggestion');
+		$('#user_query').val(suggestion);
+	});
+
+	// Full screen and download handlers
+	$('#fullScreenBtn').click(function() {
+		const reportContent = $('#reportContent').html();
+		const newWindow = window.open('', '_blank');
+		newWindow.document.write(`
+			<html>
+				<head>
+					<title>Financial Report</title>
+					<link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+				</head>
+				<body class="p-4">
+					${reportContent}
+				</body>
+			</html>
+		`);
+	});
+
+	$('#downloadBtn').click(function() {
+		const reportContent = $('#reportContent').html();
+		const blob = new Blob([reportContent], {type: 'text/html'});
+		const url = window.URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.style.display = 'none';
+		a.href = url;
+		a.download = 'financial_report_' + new Date().toISOString().slice(0, 10) + '.html';
+		document.body.appendChild(a);
+		a.click();
+		window.URL.revokeObjectURL(url);
+	});
+});
+</script>
+{% endblock %}

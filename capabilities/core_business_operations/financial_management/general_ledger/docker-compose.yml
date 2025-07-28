@@ -1,0 +1,282 @@
+# APG Financial Management General Ledger - Docker Compose Configuration
+# Revolutionary AI-powered General Ledger System
+# © 2025 Datacraft. All rights reserved.
+
+version: '3.8'
+
+services:
+  # General Ledger Application
+  gl-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_ENV: production
+        VERSION: "1.0.0"
+    image: apg/general-ledger:latest
+    container_name: apg-gl-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Database Configuration
+      - DATABASE_URL=postgresql://${DB_USER:-gl_user}:${DB_PASSWORD:-gl_password}@database:5432/${DB_NAME:-apg_gl}
+      
+      # Redis Configuration  
+      - REDIS_URL=redis://redis:6379
+      
+      # APG Platform Integration
+      - APG_PLATFORM_URL=${APG_PLATFORM_URL:-https://platform.company.com}
+      - APG_API_KEY=${APG_API_KEY}
+      
+      # Application Configuration
+      - ENVIRONMENT=production
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      
+      # AI Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-gpt-4}
+      - AI_CONFIDENCE_THRESHOLD=${AI_CONFIDENCE_THRESHOLD:-0.8}
+      
+      # Feature Flags
+      - ENABLE_AI_ASSISTANT=${ENABLE_AI_ASSISTANT:-true}
+      - ENABLE_REAL_TIME_COLLABORATION=${ENABLE_REAL_TIME_COLLABORATION:-true}
+      - ENABLE_SMART_RECONCILIATION=${ENABLE_SMART_RECONCILIATION:-true}
+      - ENABLE_PERIOD_CLOSE_AUTOMATION=${ENABLE_PERIOD_CLOSE_AUTOMATION:-true}
+      
+      # Performance Configuration
+      - WORKERS=4
+      - MAX_CONCURRENT_REQUESTS=1000
+      - REQUEST_TIMEOUT=30
+      
+      # Security Configuration
+      - ENABLE_RATE_LIMITING=true
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      
+    volumes:
+      - gl-logs:/var/log/gl
+      - gl-data:/var/lib/gl
+      - ./config:/app/config:ro
+    networks:
+      - apg-network
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  database:
+    image: postgres:14-alpine
+    container_name: apg-gl-database
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_NAME:-apg_gl}
+      - POSTGRES_USER=${DB_USER:-gl_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-gl_password}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - apg-network
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-gl_user} -d ${DB_NAME:-apg_gl}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: apg-gl-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - apg-network
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # NGINX Reverse Proxy
+  nginx:
+    image: nginx:1.24-alpine
+    container_name: apg-gl-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - gl-logs:/var/log/nginx
+    networks:
+      - apg-network
+    depends_on:
+      - gl-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: apg-gl-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - apg-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: apg-gl-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning:ro
+    networks:
+      - apg-network
+    depends_on:
+      - prometheus
+
+  # Log Aggregation with ELK Stack
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: apg-gl-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - apg-network
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: apg-gl-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - apg-network
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: apg-gl-logstash
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/logstash:/usr/share/logstash/pipeline:ro
+      - gl-logs:/var/log/gl:ro
+    networks:
+      - apg-network
+    depends_on:
+      - elasticsearch
+
+  # Background Task Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: apg/general-ledger:latest
+    container_name: apg-gl-worker
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-gl_user}:${DB_PASSWORD:-gl_password}@database:5432/${DB_NAME:-apg_gl}
+      - REDIS_URL=redis://redis:6379
+      - WORKER_MODE=true
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - gl-logs:/var/log/gl
+      - gl-data:/var/lib/gl
+    networks:
+      - apg-network
+    depends_on:
+      - database
+      - redis
+    command: ["python", "worker.py"]
+
+  # Backup Service
+  backup:
+    image: postgres:14-alpine
+    container_name: apg-gl-backup
+    restart: "no"
+    environment:
+      - PGPASSWORD=${DB_PASSWORD:-gl_password}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    networks:
+      - apg-network
+    depends_on:
+      - database
+    command: ["/backup.sh"]
+    profiles:
+      - backup
+
+# Named Volumes
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  gl-logs:
+    driver: local
+  gl-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  elasticsearch-data:
+    driver: local
+
+# Networks
+networks:
+  apg-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

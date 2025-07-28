@@ -1,0 +1,62 @@
+# APG Employee Data Management - Load Testing Dependencies
+
+# Core load testing framework
+locust==2.17.0
+
+# HTTP client enhancements
+requests==2.31.0
+urllib3==2.0.7
+
+# Data generation and manipulation
+faker==20.1.0
+numpy==1.24.4
+pandas==2.1.4
+
+# Performance monitoring
+psutil==5.9.6
+memory-profiler==0.61.0
+
+# Reporting and visualization
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.17.0
+
+# Configuration management
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Testing utilities
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-benchmark==4.0.0
+
+# Async support
+aiohttp==3.9.1
+asyncio==3.4.3
+
+# Data export
+openpyxl==3.1.2
+xlsxwriter==3.1.9
+
+# Time and date handling
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Logging enhancements
+colorlog==6.8.0
+structlog==23.2.0
+
+# System monitoring
+prometheus-client==0.19.0
+py-cpuinfo==9.0.0
+
+# Network utilities
+netaddr==0.10.1
+ipaddress==1.0.23
+
+# JSON handling
+ujson==5.8.0
+orjson==3.9.10
+
+# Environment detection
+platform==1.0.8

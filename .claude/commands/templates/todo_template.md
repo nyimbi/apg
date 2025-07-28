@@ -7,6 +7,48 @@
 - **Target Completion**: {TARGET_DATE}
 - **Priority**: {PRIORITY_LEVEL}
 
+
+## **Mandatory** Create APG File Structure as follows:
+```
+capabilities/{capability}/{sub_capability}/
+├── cap_spec.md              # APG-integrated capability specification
+├── todo.md                  # APG-integrated development plan
+├── __init__.py              # APG capability metadata and composition registration
+├── models.py                # APG-compatible data models (async, tabs, modern typing)
+├── service.py               # APG-integrated business logic (async, _log_ methods)
+├── views.py                 # APG Flask-AppBuilder views (Pydantic v2 models here)
+├── api.py                   # APG-compatible REST API (async endpoints)
+├── blueprint.py             # APG composition engine integrated blueprint
+├── docs/                    # APG documentation directory
+│   ├── user_guide.md        # APG-aware end-user documentation
+│   ├── developer_guide.md   # APG integration developer documentation
+│   ├── api_reference.md     # APG authentication-aware API documentation
+│   ├── installation_guide.md # APG infrastructure deployment guide
+│   └── troubleshooting_guide.md # APG capability troubleshooting guide
+├── tests/                   # APG-compatible test suite
+│   ├── __init__.py
+│   ├── test_models.py       # Async model tests (no @pytest.mark.asyncio)
+│   ├── test_service.py      # APG service integration tests
+│   ├── test_api.py          # pytest-httpserver API tests
+│   ├── test_views.py        # APG Flask-AppBuilder UI tests
+│   ├── test_performance.py  # APG multi-tenant performance tests
+│   ├── test_security.py     # APG auth_rbac security tests
+│   ├── test_integration.py  # APG capability integration tests
+│   ├── fixtures/            # APG-compatible test data
+│   ├── test_data/           # APG sample data patterns
+│   └── conftest.py          # APG test configuration
+├── static/                  # APG UI assets
+│   ├── css/                 # APG-compatible stylesheets
+│   ├── js/                  # APG JavaScript modules
+│   └── images/              # APG UI images and icons
+└── templates/               # APG Flask-Appbuilder Jinja2 templates
+    ├── base/                # APG base templates
+    ├── forms/               # APG form templates
+    └── dashboards/          # APG dashboard templates
+```
+
+**CRITICAL**: This structure MUST integrate with APG's existing `capabilities/` hierarchy and composition system!
+
 ## Phase 1: Analysis & Planning
 - [ ] **Requirement Analysis** (Priority: High)
   - [ ] Research industry leaders and best practices
@@ -175,7 +217,13 @@
   - [ ] Create troubleshooting guides
   - **Acceptance Criteria**: Integration documentation complete
 
-## Phase 8: Deployment & Launch
+## Phase 8: High Impact Functional improvements
+- [ ] **10 Functional Improvements** (Priority: High)
+  - [ ] Identify and justify 10 high impact functional improvements
+  - [ ] Fully implement the improvements
+
+
+## Phase 9: Deployment & Launch
 - [ ] **Deployment Preparation** (Priority: High)
   - [ ] Create deployment scripts
   - [ ] Set up monitoring and logging
@@ -223,3 +271,4 @@
 - Add any additional notes, assumptions, or constraints here
 - Track decisions and changes throughout development
 - Document lessons learned for future projects
+- Confirm that all features specified in the cap_spec.md have been fully developed.If not, identify the missing features, add them to the todo.md and prioritize their development.

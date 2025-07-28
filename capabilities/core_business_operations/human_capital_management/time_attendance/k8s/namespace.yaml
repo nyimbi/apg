@@ -1,0 +1,18 @@
+# APG Time & Attendance Capability - Kubernetes Namespace
+# Copyright © 2025 Datacraft
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: kubectl
+    environment: production
+    team: apg-core
+  annotations:
+    description: "APG Time & Attendance capability with AI-powered workforce management"
+    contact: "nyimbi@gmail.com"
+    documentation: "https://docs.datacraft.co.ke/apg/time-attendance"

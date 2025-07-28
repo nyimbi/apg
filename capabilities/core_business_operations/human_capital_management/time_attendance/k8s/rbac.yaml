@@ -1,0 +1,290 @@
+# APG Time & Attendance Capability - RBAC Configuration
+# Copyright © 2025 Datacraft
+
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: time-attendance-sa
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: serviceaccount
+automountServiceAccountToken: true
+
+---
+# ClusterRole for time-attendance operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: time-attendance-cluster-role
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: rbac
+rules:
+# Pod management for health checks and metrics
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods/status"]
+  verbs: ["get"]
+
+# Service discovery
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+
+# ConfigMaps and Secrets (read-only)
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
+
+# Metrics and monitoring
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+# Custom Resource Definitions (if needed for APG integration)
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Role for namespace-specific operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: apg-time-attendance
+  name: time-attendance-role
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: rbac
+rules:
+# Full access to resources in own namespace
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# ConfigMaps and Secrets management
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Events creation for monitoring
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+
+# Deployments and ReplicaSets
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Ingress management
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Service Monitors (Prometheus)
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: time-attendance-cluster-binding
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: rbac
+subjects:
+- kind: ServiceAccount
+  name: time-attendance-sa
+  namespace: apg-time-attendance
+roleRef:
+  kind: ClusterRole
+  name: time-attendance-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding for namespace operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: time-attendance-binding
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: rbac
+subjects:
+- kind: ServiceAccount
+  name: time-attendance-sa
+  namespace: apg-time-attendance
+roleRef:
+  kind: Role
+  name: time-attendance-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Pod Security Policy (if enabled in cluster)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: time-attendance-psp
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: security
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+
+---
+# ClusterRole to use the PSP
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: time-attendance-psp-user
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: security
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - time-attendance-psp
+
+---
+# Bind the PSP to the service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: time-attendance-psp-binding
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: security
+roleRef:
+  kind: ClusterRole
+  name: time-attendance-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: time-attendance-sa
+    namespace: apg-time-attendance
+
+---
+# Network Policy for enhanced security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: time-attendance-netpol
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: apg-time-attendance
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from nginx ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: nginx-ingress
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow ingress from prometheus for metrics
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow internal communication within namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-time-attendance
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9090
+  egress:
+  # Allow egress to PostgreSQL
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-database
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow egress to Redis
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-cache
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow egress to other APG services
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-core
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS to external services (APIs, webhooks)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

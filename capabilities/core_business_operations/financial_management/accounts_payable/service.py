@@ -21,6 +21,7 @@ from .models import (
 	VendorStatus, VendorType, InvoiceStatus, PaymentStatus, PaymentMethod,
 	ApprovalStatus, MatchingStatus, validate_vendor_data, validate_invoice_data
 )
+from .cache import APCacheService, cache_result, cache_invalidate, get_cache_service
 
 
 # APG Integration Services (placeholders for actual APG capability imports)
@@ -272,7 +273,12 @@ class APVendorService:
 	def __init__(self):
 		self.auth_service = APGAuthService()
 		self.audit_service = APGAuditService()
+		self.cache_service: APCacheService | None = None
 		# In real implementation, these would be dependency-injected APG services
+	
+	async def initialize_cache(self) -> None:
+		"""Initialize cache service for performance optimization"""
+		self.cache_service = await get_cache_service()
 	
 	async def create_vendor(
 		self, 
@@ -334,12 +340,13 @@ class APVendorService:
 		assert vendor.id is not None, "Vendor ID must be set after creation"
 		return vendor
 	
+	@cache_result(ttl_seconds=600, key_template="ap:vendor:{0}")
 	async def get_vendor(
 		self, 
 		vendor_id: str, 
 		user_context: Dict[str, Any]
 	) -> APVendor | None:
-		"""Get vendor by ID with permission check"""
+		"""Get vendor by ID with permission check and caching"""
 		assert vendor_id is not None, "Vendor ID must be provided"
 		assert user_context is not None, "User context required"
 		

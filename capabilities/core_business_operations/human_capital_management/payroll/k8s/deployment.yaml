@@ -1,0 +1,619 @@
+# APG Payroll Management - Kubernetes Deployment Configuration
+# © 2025 Datacraft. All rights reserved.
+# Author: Nyimbi Odero | APG Platform Architect
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apg-payroll
+  labels:
+    name: apg-payroll
+    component: payroll-management
+    version: v2.0.0
+
+---
+# ConfigMap for Application Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payroll-config
+  namespace: apg-payroll
+data:
+  FLASK_ENV: "production"
+  APG_TENANT_MODE: "multi"
+  APG_AUTH_TYPE: "jwt"
+  AI_ENABLED: "true"
+  REAL_TIME_ENABLED: "true"
+  ANALYTICS_ENABLED: "true"
+  CONVERSATIONAL_ENABLED: "true"
+  WORKERS: "4"
+  MAX_REQUESTS: "1000"
+  TIMEOUT: "120"
+  LOG_LEVEL: "INFO"
+
+---
+# Secret for Sensitive Configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: payroll-secrets
+  namespace: apg-payroll
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://apg_payroll_user:secure_password@payroll-db:5432/apg_payroll"
+  REDIS_URL: "redis://payroll-redis:6379/0"
+  APG_SECRET_KEY: "your-secret-key-change-in-production"
+  SECURITY_PASSWORD_SALT: "your-salt-change-in-production"
+  OPENAI_API_KEY: "your-openai-api-key"
+  SENTRY_DSN: "your-sentry-dsn"
+
+---
+# PostgreSQL Database Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payroll-db
+  namespace: apg-payroll
+  labels:
+    app: payroll-db
+    component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payroll-db
+  template:
+    metadata:
+      labels:
+        app: payroll-db
+        component: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: "apg_payroll"
+        - name: POSTGRES_USER
+          value: "apg_payroll_user"
+        - name: POSTGRES_PASSWORD
+          value: "secure_password"
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - apg_payroll_user
+            - -d
+            - apg_payroll
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - apg_payroll_user
+            - -d
+            - apg_payroll
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+      - name: init-scripts
+        configMap:
+          name: postgres-init-scripts
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: payroll-db
+  namespace: apg-payroll
+  labels:
+    app: payroll-db
+    component: database
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: payroll-db
+
+---
+# PostgreSQL PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: apg-payroll
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payroll-redis
+  namespace: apg-payroll
+  labels:
+    app: payroll-redis
+    component: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payroll-redis
+  template:
+    metadata:
+      labels:
+        app: payroll-redis
+        component: cache
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        command:
+        - redis-server
+        - --appendonly
+        - "yes"
+        - --maxmemory
+        - "512mb"
+        - --maxmemory-policy
+        - "allkeys-lru"
+        volumeMounts:
+        - name: redis-storage
+          mountPath: /data
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "300m"
+      volumes:
+      - name: redis-storage
+        persistentVolumeClaim:
+          claimName: redis-pvc
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: payroll-redis
+  namespace: apg-payroll
+  labels:
+    app: payroll-redis
+    component: cache
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: payroll-redis
+
+---
+# Redis PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: apg-payroll
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Payroll Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payroll-app
+  namespace: apg-payroll
+  labels:
+    app: payroll-app
+    component: application
+    version: v2.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: payroll-app
+  template:
+    metadata:
+      labels:
+        app: payroll-app
+        component: application
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      initContainers:
+      - name: wait-for-db
+        image: postgres:15-alpine
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h payroll-db -p 5432 -U apg_payroll_user; do
+            echo "Waiting for database..."
+            sleep 2
+          done
+      containers:
+      - name: payroll-app
+        image: apg/payroll-management:v2.0.0
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: FLASK_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: payroll-config
+              key: FLASK_ENV
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: payroll-secrets
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: payroll-secrets
+              key: REDIS_URL
+        - name: APG_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: payroll-secrets
+              key: APG_SECRET_KEY
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: payroll-secrets
+              key: OPENAI_API_KEY
+        envFrom:
+        - configMapRef:
+            name: payroll-config
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 45
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "1Gi"
+            cpu: "800m"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: uploads
+          mountPath: /app/uploads
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: uploads
+        persistentVolumeClaim:
+          claimName: uploads-pvc
+
+---
+# Payroll Application Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: payroll-app-service
+  namespace: apg-payroll
+  labels:
+    app: payroll-app
+    component: application
+spec:
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: payroll-app
+  type: ClusterIP
+
+---
+# Uploads PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploads-pvc
+  namespace: apg-payroll
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Celery Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payroll-worker
+  namespace: apg-payroll
+  labels:
+    app: payroll-worker
+    component: worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payroll-worker
+  template:
+    metadata:
+      labels:
+        app: payroll-worker
+        component: worker
+    spec:
+      containers:
+      - name: celery-worker
+        image: apg/payroll-management:v2.0.0
+        command:
+        - celery
+        - -A
+        - payroll.celery
+        - worker
+        - --loglevel=info
+        - --concurrency=4
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: payroll-secrets
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: payroll-secrets
+              key: REDIS_URL
+        - name: CELERY_BROKER_URL
+          value: "redis://payroll-redis:6379/1"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://payroll-redis:6379/2"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+
+---
+# Celery Beat Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payroll-beat
+  namespace: apg-payroll
+  labels:
+    app: payroll-beat
+    component: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payroll-beat
+  template:
+    metadata:
+      labels:
+        app: payroll-beat
+        component: scheduler
+    spec:
+      containers:
+      - name: celery-beat
+        image: apg/payroll-management:v2.0.0
+        command:
+        - celery
+        - -A
+        - payroll.celery
+        - beat
+        - --loglevel=info
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: payroll-secrets
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: payroll-secrets
+              key: REDIS_URL
+        - name: CELERY_BROKER_URL
+          value: "redis://payroll-redis:6379/1"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://payroll-redis:6379/2"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+
+---
+# Horizontal Pod Autoscaler for Application
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payroll-app-hpa
+  namespace: apg-payroll
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payroll-app
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Ingress Configuration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: payroll-ingress
+  namespace: apg-payroll
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - payroll.apg.datacraft.co.ke
+    secretName: payroll-tls
+  rules:
+  - host: payroll.apg.datacraft.co.ke
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: payroll-app-service
+            port:
+              number: 80
+
+---
+# Network Policy for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payroll-network-policy
+  namespace: apg-payroll
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+  - from:
+    - podSelector:
+        matchLabels:
+          component: application
+    ports:
+    - protocol: TCP
+      port: 5432
+  - from:
+    - podSelector:
+        matchLabels:
+          component: application
+    - podSelector:
+        matchLabels:
+          component: worker
+    ports:
+    - protocol: TCP
+      port: 6379
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

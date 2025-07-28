@@ -15,8 +15,21 @@ SUBCAPABILITY_META = {
 	'capability': 'core_financials',
 	'description': 'Manages vendor invoices, payments, and expenses, optimizing cash outflow.',
 	'industry_focus': 'All',
-	'dependencies': ['general_ledger'],
-	'optional_dependencies': ['cash_management', 'procurement', 'expense_management'],
+	'dependencies': [
+		'general_ledger',
+		'auth_rbac', 
+		'audit_compliance',
+		'document_management'
+	],
+	'optional_dependencies': [
+		'cash_management', 
+		'procurement', 
+		'expense_management',
+		'ai_orchestration',
+		'computer_vision',
+		'federated_learning',
+		'real_time_collaboration'
+	],
 	'database_tables': [
 		'cf_ap_vendor',
 		'cf_ap_invoice',

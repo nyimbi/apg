@@ -1,0 +1,164 @@
+# APG Time & Attendance Capability - Services
+# Copyright © 2025 Datacraft
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: time-attendance-app
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: application-service
+    app.kubernetes.io/version: "1.0.0"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "9090"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: metrics
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: application
+
+---
+# NGINX Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: time-attendance-nginx
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: nginx-service
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: nginx
+
+---
+# Load Balancer Service (for external access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: time-attendance-lb
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: load-balancer
+    app.kubernetes.io/version: "1.0.0"
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 80
+    protocol: TCP
+    name: https
+  selector:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: nginx
+  loadBalancerSourceRanges:
+  - 0.0.0.0/0  # In production, restrict to specific IP ranges
+
+---
+# Headless Service for StatefulSet components
+apiVersion: v1
+kind: Service
+metadata:
+  name: time-attendance-headless
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: headless-service
+spec:
+  clusterIP: None
+  ports:
+  - port: 8000
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: application
+
+---
+# PostgreSQL Service (assuming external PostgreSQL deployment)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-primary
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: database
+spec:
+  type: ExternalName
+  externalName: postgres.apg-database.svc.cluster.local
+  ports:
+  - port: 5432
+    name: postgresql
+
+---
+# Redis Service (assuming external Redis deployment)
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-master
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: cache
+spec:
+  type: ExternalName
+  externalName: redis.apg-cache.svc.cluster.local
+  ports:
+  - port: 6379
+    name: redis
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: time-attendance-metrics
+  namespace: apg-time-attendance
+  labels:
+    app.kubernetes.io/name: apg-time-attendance
+    app.kubernetes.io/component: service-monitor
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: apg-time-attendance
+      app.kubernetes.io/component: application-service
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+  namespaceSelector:
+    matchNames:
+    - apg-time-attendance

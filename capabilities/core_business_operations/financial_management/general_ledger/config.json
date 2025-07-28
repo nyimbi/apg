@@ -1,0 +1,208 @@
+{
+  "environment": "development",
+  "host": "0.0.0.0",
+  "port": 5000,
+  
+  "flask": {
+    "SECRET_KEY": "gl-dev-secret-key-change-in-production-2025",
+    "WTF_CSRF_ENABLED": true,
+    "WTF_CSRF_TIME_LIMIT": null,
+    "LANGUAGES": {
+      "en": "English",
+      "es": "Spanish", 
+      "fr": "French",
+      "de": "German"
+    },
+    "BABEL_DEFAULT_LOCALE": "en",
+    "BABEL_DEFAULT_TIMEZONE": "UTC"
+  },
+  
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "apg_general_ledger",
+    "username": "apg_gl_user",
+    "password": "secure_gl_password_2025",
+    "pool_size": 20,
+    "max_overflow": 30,
+    "pool_timeout": 30,
+    "pool_recycle": 3600,
+    "echo": false
+  },
+  
+  "integration": {
+    "discovery_service_url": "http://localhost:8081",
+    "event_streaming_url": "http://localhost:8082", 
+    "api_gateway_url": "http://localhost:8083",
+    "auth_service_url": "http://localhost:8080",
+    "localization_service_url": "http://localhost:8084",
+    "timeout_seconds": 30,
+    "retry_attempts": 3,
+    "retry_delay_seconds": 5
+  },
+  
+  "discovery": {
+    "service_registry_url": "http://localhost:8081",
+    "heartbeat_interval": 30,
+    "health_check_interval": 60,
+    "registration_retry_count": 5,
+    "registration_retry_delay": 10,
+    "auto_deregister_on_shutdown": true,
+    "tags": [
+      "financial",
+      "accounting", 
+      "general-ledger",
+      "multi-currency",
+      "compliance",
+      "real-time-reporting"
+    ],
+    "metadata": {
+      "compliance_frameworks": ["SOX", "GAAP", "IFRS", "Basel III"],
+      "supported_currencies": [
+        "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", 
+        "INR", "BRL", "MXN", "ZAR", "KRW", "SGD", "HKD"
+      ],
+      "supported_languages": ["en", "es", "fr", "de", "pt", "zh", "ja"],
+      "max_tenants": 1000,
+      "max_accounts_per_tenant": 10000,
+      "max_journal_entries_per_day": 100000,
+      "data_retention_days": 2555,
+      "backup_frequency": "daily",
+      "audit_trail_enabled": true,
+      "real_time_reporting": true,
+      "batch_processing": true,
+      "api_rate_limits": {
+        "accounts": "1000/hour",
+        "journal_entries": "500/hour", 
+        "reports": "200/hour",
+        "batch_operations": "100/hour"
+      }
+    }
+  },
+  
+  "security": {
+    "jwt_secret_key": "gl-jwt-secret-2025-change-in-production",
+    "jwt_expiration_hours": 24,
+    "password_hash_rounds": 12,
+    "session_timeout_minutes": 480,
+    "max_login_attempts": 5,
+    "lockout_duration_minutes": 30,
+    "require_ssl": true,
+    "csrf_protection": true,
+    "content_security_policy": {
+      "default-src": "'self'",
+      "script-src": "'self' 'unsafe-inline'",
+      "style-src": "'self' 'unsafe-inline'",
+      "img-src": "'self' data: https:",
+      "connect-src": "'self'"
+    }
+  },
+  
+  "performance": {
+    "cache_ttl_seconds": 300,
+    "max_page_size": 1000,
+    "default_page_size": 50,
+    "query_timeout_seconds": 30,
+    "bulk_operation_batch_size": 1000,
+    "async_task_timeout_seconds": 600,
+    "max_concurrent_requests": 100
+  },
+  
+  "business_rules": {
+    "require_balanced_entries": true,
+    "allow_backdated_entries": false,
+    "max_backdate_days": 30,
+    "require_approval_threshold": 10000.00,
+    "auto_close_periods": false,
+    "period_close_validation": true,
+    "currency_conversion_tolerance": 0.01,
+    "account_hierarchy_depth_limit": 10,
+    "journal_reference_required": true,
+    "duplicate_entry_prevention": true
+  },
+  
+  "reporting": {
+    "default_currency": "USD",
+    "default_date_format": "YYYY-MM-DD",
+    "default_number_format": "#,##0.00",
+    "export_formats": ["PDF", "Excel", "CSV", "JSON"],
+    "max_report_rows": 100000,
+    "report_cache_ttl_seconds": 1800,
+    "async_report_generation": true,
+    "scheduled_reports_enabled": true
+  },
+  
+  "notifications": {
+    "period_end_warning_days": 5,
+    "approval_timeout_hours": 48,
+    "failed_transaction_alerts": true,
+    "performance_degradation_alerts": true,
+    "system_maintenance_notifications": true,
+    "email_enabled": true,
+    "sms_enabled": false,
+    "in_app_notifications": true
+  },
+  
+  "monitoring": {
+    "metrics_enabled": true,
+    "metrics_interval_seconds": 60,
+    "performance_tracking": true,
+    "error_tracking": true,
+    "audit_logging": true,
+    "request_logging": true,
+    "slow_query_threshold_ms": 1000,
+    "memory_usage_alerts": true,
+    "disk_usage_alerts": true,
+    "health_check_endpoints": [
+      "/health",
+      "/health/database", 
+      "/health/dependencies",
+      "/health/performance"
+    ]
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
+    "file_logging": {
+      "enabled": true,
+      "log_file": "/var/log/apg/general_ledger.log",
+      "max_size_mb": 100,
+      "backup_count": 5,
+      "rotation": "daily"
+    },
+    "structured_logging": true,
+    "log_correlation_id": true,
+    "sensitive_data_masking": true,
+    "audit_log_retention_days": 2555
+  },
+  
+  "development": {
+    "debug_mode": true,
+    "auto_reload": true,
+    "profiling_enabled": false,
+    "test_data_enabled": true,
+    "mock_external_services": true,
+    "disable_auth_for_testing": false,
+    "sample_tenant_id": "dev_tenant_001"
+  },
+  
+  "production": {
+    "debug_mode": false,
+    "auto_reload": false,
+    "profiling_enabled": false,
+    "test_data_enabled": false,
+    "mock_external_services": false,
+    "ssl_cert_path": "/etc/ssl/certs/apg_gl.crt",
+    "ssl_key_path": "/etc/ssl/private/apg_gl.key",
+    "gunicorn": {
+      "workers": 4,
+      "worker_class": "gevent",
+      "worker_connections": 1000,
+      "max_requests": 10000,
+      "max_requests_jitter": 1000,
+      "timeout": 30,
+      "keepalive": 2
+    }
+  }
+}

@@ -1,0 +1,574 @@
+{% extends "appbuilder/general/widgets/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+	.conversational-container {
+		background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+		min-height: 100vh;
+		padding: 20px;
+	}
+	
+	.chat-interface {
+		max-width: 1200px;
+		margin: 0 auto;
+		background: rgba(255, 255, 255, 0.98);
+		border-radius: 20px;
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+		overflow: hidden;
+		backdrop-filter: blur(10px);
+	}
+	
+	.chat-header {
+		background: linear-gradient(145deg, #667eea, #764ba2);
+		color: white;
+		padding: 20px 30px;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+	}
+	
+	.chat-header h1 {
+		margin: 0;
+		font-size: 1.8rem;
+		font-weight: 600;
+	}
+	
+	.chat-header p {
+		margin: 5px 0 0 0;
+		opacity: 0.9;
+		font-size: 0.95rem;
+	}
+	
+	.chat-body {
+		height: 600px;
+		display: flex;
+		flex-direction: column;
+	}
+	
+	.chat-messages {
+		flex: 1;
+		padding: 20px;
+		overflow-y: auto;
+		background: #f8fafc;
+	}
+	
+	.message {
+		margin-bottom: 20px;
+		display: flex;
+		align-items: flex-start;
+	}
+	
+	.message.user {
+		justify-content: flex-end;
+	}
+	
+	.message.assistant {
+		justify-content: flex-start;
+	}
+	
+	.message-content {
+		max-width: 80%;
+		padding: 15px 20px;
+		border-radius: 18px;
+		position: relative;
+	}
+	
+	.message.user .message-content {
+		background: linear-gradient(145deg, #667eea, #764ba2);
+		color: white;
+		border-bottom-right-radius: 5px;
+	}
+	
+	.message.assistant .message-content {
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-bottom-left-radius: 5px;
+		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+	}
+	
+	.message-avatar {
+		width: 40px;
+		height: 40px;
+		border-radius: 50%;
+		margin: 0 10px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.2rem;
+		color: white;
+	}
+	
+	.message.user .message-avatar {
+		background: linear-gradient(145deg, #667eea, #764ba2);
+		order: 2;
+	}
+	
+	.message.assistant .message-avatar {
+		background: linear-gradient(145deg, #48bb78, #38a169);
+		order: 1;
+	}
+	
+	.chat-input-container {
+		padding: 20px;
+		background: white;
+		border-top: 1px solid #e2e8f0;
+	}
+	
+	.conversational-input {
+		width: 100%;
+		border: 2px solid #e2e8f0;
+		border-radius: 15px;
+		padding: 15px 20px;
+		font-size: 1rem;
+		resize: vertical;
+		min-height: 80px;
+		transition: all 0.3s ease;
+	}
+	
+	.conversational-input:focus {
+		border-color: #667eea;
+		box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+		outline: none;
+	}
+	
+	.chat-actions {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-top: 15px;
+	}
+	
+	.quick-commands {
+		display: flex;
+		gap: 10px;
+		flex-wrap: wrap;
+	}
+	
+	.quick-command {
+		background: #f7fafc;
+		border: 1px solid #e2e8f0;
+		border-radius: 20px;
+		padding: 8px 15px;
+		font-size: 0.85rem;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+	
+	.quick-command:hover {
+		background: #667eea;
+		color: white;
+		border-color: #667eea;
+	}
+	
+	.send-button {
+		background: linear-gradient(145deg, #667eea, #764ba2);
+		color: white;
+		border: none;
+		border-radius: 25px;
+		padding: 12px 30px;
+		font-size: 1rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.3s ease;
+	}
+	
+	.send-button:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+	}
+	
+	.send-button:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+		transform: none;
+		box-shadow: none;
+	}
+	
+	.typing-indicator {
+		display: none;
+		align-items: center;
+		color: #718096;
+		font-style: italic;
+		margin: 10px 0;
+	}
+	
+	.typing-dots {
+		display: inline-flex;
+		margin-left: 10px;
+	}
+	
+	.typing-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: #cbd5e0;
+		margin: 0 2px;
+		animation: typing 1.4s infinite;
+	}
+	
+	.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+	.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+	
+	@keyframes typing {
+		0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+		40% { transform: scale(1); opacity: 1; }
+	}
+	
+	.response-actions {
+		margin-top: 15px;
+		display: flex;
+		gap: 10px;
+	}
+	
+	.response-action {
+		background: #f7fafc;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		padding: 8px 12px;
+		font-size: 0.8rem;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+	
+	.response-action:hover {
+		background: #edf2f7;
+		border-color: #cbd5e0;
+	}
+	
+	.examples-section {
+		background: #f7fafc;
+		padding: 20px;
+		border-top: 1px solid #e2e8f0;
+	}
+	
+	.examples-title {
+		font-size: 1.1rem;
+		font-weight: 600;
+		color: #2d3748;
+		margin-bottom: 15px;
+	}
+	
+	.example-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 15px;
+	}
+	
+	.example-card {
+		background: white;
+		border-radius: 10px;
+		padding: 15px;
+		border: 1px solid #e2e8f0;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+	
+	.example-card:hover {
+		border-color: #667eea;
+		box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+	}
+	
+	.example-title {
+		font-weight: 600;
+		color: #2d3748;
+		margin-bottom: 5px;
+	}
+	
+	.example-text {
+		color: #718096;
+		font-size: 0.9rem;
+	}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="conversational-container">
+	<div class="chat-interface">
+		<div class="chat-header">
+			<h1><i class="fa fa-comments"></i> Conversational Payroll Assistant</h1>
+			<p>Ask me anything about payroll processing, analytics, compliance, or employee data. I understand natural language!</p>
+		</div>
+		
+		<div class="chat-body">
+			<div class="chat-messages" id="chatMessages">
+				<!-- Welcome message -->
+				<div class="message assistant">
+					<div class="message-avatar">
+						<i class="fa fa-robot"></i>
+					</div>
+					<div class="message-content">
+						<strong>Welcome to the APG Conversational Payroll Assistant!</strong><br><br>
+						I'm here to help you with all your payroll needs. You can ask me to:
+						<ul style="margin: 10px 0; padding-left: 20px;">
+							<li>Generate payroll reports and analytics</li>
+							<li>Check employee payroll status</li>
+							<li>Identify anomalies and issues</li>
+							<li>Calculate tax obligations</li>
+							<li>Monitor compliance requirements</li>
+							<li>Process complex payroll queries</li>
+						</ul>
+						Try asking me something like "Show me overtime costs for this month" or "Which employees have payroll errors?"
+					</div>
+				</div>
+			</div>
+			
+			<div class="typing-indicator" id="typingIndicator">
+				<i class="fa fa-robot"></i> Assistant is thinking
+				<div class="typing-dots">
+					<div class="typing-dot"></div>
+					<div class="typing-dot"></div>
+					<div class="typing-dot"></div>
+				</div>
+			</div>
+		</div>
+		
+		<div class="chat-input-container">
+			<form id="chatForm">
+				{{ form.hidden_tag() }}
+				{{ form.command(class="conversational-input", placeholder="Ask me anything about payroll... e.g., 'Show me all employees with overtime this period' or 'Calculate bonus payments for top performers'") }}
+				
+				<div class="chat-actions">
+					<div class="quick-commands">
+						<span class="quick-command" onclick="setQuickCommand('Show me payroll summary for this month')">Monthly Summary</span>
+						<span class="quick-command" onclick="setQuickCommand('Which employees have errors in their payroll?')">Find Errors</span>
+						<span class="quick-command" onclick="setQuickCommand('Calculate overtime costs by department')">Overtime Analysis</span>
+						<span class="quick-command" onclick="setQuickCommand('Show me compliance violations')">Compliance Check</span>
+						<span class="quick-command" onclick="setQuickCommand('Generate tax report for current period')">Tax Report</span>
+					</div>
+					
+					<button type="submit" class="send-button" id="sendButton">
+						<i class="fa fa-paper-plane"></i> Send
+					</button>
+				</div>
+			</form>
+		</div>
+		
+		<div class="examples-section">
+			<div class="examples-title">
+				<i class="fa fa-lightbulb"></i> Example Commands You Can Try
+			</div>
+			<div class="example-grid">
+				<div class="example-card" onclick="setQuickCommand('Show me the top 10 highest paid employees this month')">
+					<div class="example-title">Employee Analytics</div>
+					<div class="example-text">"Show me the top 10 highest paid employees this month"</div>
+				</div>
+				<div class="example-card" onclick="setQuickCommand('Calculate total payroll costs for Q4 2024')">
+					<div class="example-title">Cost Analysis</div>
+					<div class="example-text">"Calculate total payroll costs for Q4 2024"</div>
+				</div>
+				<div class="example-card" onclick="setQuickCommand('Which departments have budget overruns?')">
+					<div class="example-title">Budget Monitoring</div>
+					<div class="example-text">"Which departments have budget overruns?"</div>
+				</div>
+				<div class="example-card" onclick="setQuickCommand('Show me employees who need tax document updates')">
+					<div class="example-title">Compliance Tasks</div>
+					<div class="example-text">"Show me employees who need tax document updates"</div>
+				</div>
+				<div class="example-card" onclick="setQuickCommand('Generate year-end payroll report with tax summaries')">
+					<div class="example-title">Reporting</div>
+					<div class="example-text">"Generate year-end payroll report with tax summaries"</div>
+				</div>
+				<div class="example-card" onclick="setQuickCommand('Predict next month payroll costs based on current trends')">
+					<div class="example-title">AI Predictions</div>
+					<div class="example-text">"Predict next month payroll costs based on current trends"</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+	let isProcessing = false;
+	
+	document.getElementById('chatForm').addEventListener('submit', async function(e) {
+		e.preventDefault();
+		
+		if (isProcessing) return;
+		
+		const formData = new FormData(this);
+		const command = formData.get('command');
+		
+		if (!command.trim()) {
+			alert('Please enter a command');
+			return;
+		}
+		
+		// Add user message to chat
+		addMessage('user', command);
+		
+		// Clear input and show typing indicator
+		document.getElementById('command').value = '';
+		showTypingIndicator();
+		setProcessing(true);
+		
+		try {
+			const response = await fetch('{{ url_for("ConversationalPayrollView.process_command") }}', {
+				method: 'POST',
+				body: formData,
+				headers: {
+					'X-CSRFToken': '{{ csrf_token() }}'
+				}
+			});
+			
+			const result = await response.json();
+			
+			hideTypingIndicator();
+			
+			if (result.success) {
+				addMessage('assistant', result.response.message || result.response, result.response);
+			} else {
+				addMessage('assistant', 'Sorry, I encountered an error processing your request. Please try again.', null, true);
+			}
+		} catch (error) {
+			hideTypingIndicator();
+			addMessage('assistant', 'Sorry, I\'m having trouble connecting. Please check your connection and try again.', null, true);
+			console.error('Error:', error);
+		} finally {
+			setProcessing(false);
+		}
+	});
+	
+	function addMessage(type, content, data = null, isError = false) {
+		const messagesContainer = document.getElementById('chatMessages');
+		
+		const messageDiv = document.createElement('div');
+		messageDiv.className = `message ${type}`;
+		
+		const avatar = document.createElement('div');
+		avatar.className = 'message-avatar';
+		avatar.innerHTML = type === 'user' ? '<i class="fa fa-user"></i>' : '<i class="fa fa-robot"></i>';
+		
+		const messageContent = document.createElement('div');
+		messageContent.className = 'message-content';
+		
+		if (isError) {
+			messageContent.style.borderLeft = '4px solid #f56565';
+			messageContent.style.backgroundColor = '#fed7d7';
+		}
+		
+		// Format content with basic HTML support
+		messageContent.innerHTML = formatMessage(content);
+		
+		// Add response actions for assistant messages
+		if (type === 'assistant' && data && !isError) {
+			const actionsDiv = document.createElement('div');
+			actionsDiv.className = 'response-actions';
+			
+			if (data.actions) {
+				data.actions.forEach(action => {
+					const actionBtn = document.createElement('button');
+					actionBtn.className = 'response-action';
+					actionBtn.textContent = action.label;
+					actionBtn.onclick = () => executeAction(action);
+					actionsDiv.appendChild(actionBtn);
+				});
+			}
+			
+			// Default actions
+			const copyBtn = document.createElement('button');
+			copyBtn.className = 'response-action';
+			copyBtn.innerHTML = '<i class="fa fa-copy"></i> Copy';
+			copyBtn.onclick = () => copyToClipboard(content);
+			actionsDiv.appendChild(copyBtn);
+			
+			messageContent.appendChild(actionsDiv);
+		}
+		
+		messageDiv.appendChild(avatar);
+		messageDiv.appendChild(messageContent);
+		
+		messagesContainer.appendChild(messageDiv);
+		messagesContainer.scrollTop = messagesContainer.scrollHeight;
+	}
+	
+	function formatMessage(content) {
+		// Basic formatting for better readability
+		return content
+			.replace(/\n/g, '<br>')
+			.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+			.replace(/\*(.*?)\*/g, '<em>$1</em>')
+			.replace(/`(.*?)`/g, '<code style="background: #f1f5f9; padding: 2px 4px; border-radius: 3px; font-family: monospace;">$1</code>');
+	}
+	
+	function setQuickCommand(command) {
+		document.getElementById('command').value = command;
+		document.getElementById('command').focus();
+	}
+	
+	function showTypingIndicator() {
+		document.getElementById('typingIndicator').style.display = 'flex';
+		const messagesContainer = document.getElementById('chatMessages');
+		messagesContainer.scrollTop = messagesContainer.scrollHeight;
+	}
+	
+	function hideTypingIndicator() {
+		document.getElementById('typingIndicator').style.display = 'none';
+	}
+	
+	function setProcessing(processing) {
+		isProcessing = processing;
+		const sendButton = document.getElementById('sendButton');
+		sendButton.disabled = processing;
+		sendButton.innerHTML = processing ? 
+			'<i class="fa fa-spinner fa-spin"></i> Processing...' : 
+			'<i class="fa fa-paper-plane"></i> Send';
+	}
+	
+	function executeAction(action) {
+		// Handle action execution
+		console.log('Executing action:', action);
+		if (action.type === 'navigate') {
+			window.location.href = action.url;
+		} else if (action.type === 'command') {
+			setQuickCommand(action.command);
+		}
+	}
+	
+	function copyToClipboard(text) {
+		navigator.clipboard.writeText(text).then(() => {
+			// Show success feedback
+			const notification = document.createElement('div');
+			notification.style.cssText = `
+				position: fixed;
+				top: 20px;
+				right: 20px;
+				background: #48bb78;
+				color: white;
+				padding: 10px 20px;
+				border-radius: 5px;
+				z-index: 1000;
+				animation: slideIn 0.3s ease;
+			`;
+			notification.textContent = 'Copied to clipboard!';
+			document.body.appendChild(notification);
+			
+			setTimeout(() => {
+				notification.remove();
+			}, 2000);
+		});
+	}
+	
+	// Auto-resize textarea
+	document.getElementById('command').addEventListener('input', function() {
+		this.style.height = 'auto';
+		this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+	});
+	
+	// Handle Enter key (Shift+Enter for new line)
+	document.getElementById('command').addEventListener('keydown', function(e) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+		}
+	});
+</script>
+
+<style>
+	@keyframes slideIn {
+		from { transform: translateX(100%); opacity: 0; }
+		to { transform: translateX(0); opacity: 1; }
+	}
+</style>
+{% endblock %}

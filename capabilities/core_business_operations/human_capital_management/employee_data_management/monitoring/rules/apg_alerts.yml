@@ -1,0 +1,263 @@
+groups:
+- name: apg-employee-api
+  rules:
+  # High Error Rate
+  - alert: HighErrorRate
+    expr: (rate(http_requests_total{status=~"5.*",job="apg-employee-api"}[5m]) / rate(http_requests_total{job="apg-employee-api"}[5m])) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+      service: apg-employee-api
+    annotations:
+      summary: "High error rate detected for APG Employee API"
+      description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+      runbook_url: "https://docs.company.com/runbooks/high-error-rate"
+
+  # High Response Time
+  - alert: HighResponseTime
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="apg-employee-api"}[5m])) > 1.0
+    for: 5m
+    labels:
+      severity: warning
+      service: apg-employee-api
+    annotations:
+      summary: "High response time detected for APG Employee API"
+      description: "95th percentile response time is {{ $value }}s over the last 5 minutes"
+      runbook_url: "https://docs.company.com/runbooks/high-response-time"
+
+  # Service Down
+  - alert: ServiceDown
+    expr: up{job="apg-employee-api"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: apg-employee-api
+    annotations:
+      summary: "APG Employee API is down"
+      description: "APG Employee API has been down for more than 1 minute"
+      runbook_url: "https://docs.company.com/runbooks/service-down"
+
+  # High Memory Usage
+  - alert: HighMemoryUsage
+    expr: (container_memory_usage_bytes{name="apg-employee-api"} / container_spec_memory_limit_bytes{name="apg-employee-api"}) > 0.8
+    for: 10m
+    labels:
+      severity: warning
+      service: apg-employee-api
+    annotations:
+      summary: "High memory usage for APG Employee API"
+      description: "Memory usage is {{ $value | humanizePercentage }} of limit"
+      runbook_url: "https://docs.company.com/runbooks/high-memory-usage"
+
+  # High CPU Usage
+  - alert: HighCPUUsage
+    expr: rate(container_cpu_usage_seconds_total{name="apg-employee-api"}[5m]) > 0.8
+    for: 10m
+    labels:
+      severity: warning
+      service: apg-employee-api
+    annotations:
+      summary: "High CPU usage for APG Employee API"
+      description: "CPU usage is {{ $value | humanizePercentage }}"
+      runbook_url: "https://docs.company.com/runbooks/high-cpu-usage"
+
+  # AI Analysis Failures
+  - alert: AIAnalysisFailures
+    expr: rate(apg_ai_analysis_failures_total[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+      service: apg-employee-api
+      component: ai-analysis
+    annotations:
+      summary: "High AI analysis failure rate"
+      description: "AI analysis failure rate is {{ $value }} per second"
+      runbook_url: "https://docs.company.com/runbooks/ai-analysis-failures"
+
+- name: apg-database
+  rules:
+  # Database Down
+  - alert: DatabaseDown
+    expr: up{job="postgres"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: postgres
+    annotations:
+      summary: "PostgreSQL database is down"
+      description: "PostgreSQL database has been down for more than 1 minute"
+      runbook_url: "https://docs.company.com/runbooks/database-down"
+
+  # High Database Connections
+  - alert: HighDatabaseConnections
+    expr: pg_stat_database_numbackends{datname="apg_hr"} > 80
+    for: 5m
+    labels:
+      severity: warning
+      service: postgres
+    annotations:
+      summary: "High number of database connections"
+      description: "{{ $value }} active connections to apg_hr database"
+      runbook_url: "https://docs.company.com/runbooks/high-db-connections"
+
+  # Database Lock Wait Time
+  - alert: HighDatabaseLockWaitTime
+    expr: pg_stat_database_blk_read_time{datname="apg_hr"} > 1000
+    for: 5m
+    labels:
+      severity: warning
+      service: postgres
+    annotations:
+      summary: "High database lock wait time"
+      description: "Database lock wait time is {{ $value }}ms"
+      runbook_url: "https://docs.company.com/runbooks/high-db-lock-wait"
+
+  # Replication Lag
+  - alert: ReplicationLag
+    expr: pg_replication_lag_seconds > 300
+    for: 5m
+    labels:
+      severity: warning
+      service: postgres
+    annotations:
+      summary: "PostgreSQL replication lag is high"
+      description: "Replication lag is {{ $value }}s"
+      runbook_url: "https://docs.company.com/runbooks/replication-lag"
+
+- name: apg-redis
+  rules:
+  # Redis Down
+  - alert: RedisDown
+    expr: up{job="redis"} == 0
+    for: 1m
+    labels:
+      severity: warning
+      service: redis
+    annotations:
+      summary: "Redis is down"
+      description: "Redis has been down for more than 1 minute"
+      runbook_url: "https://docs.company.com/runbooks/redis-down"
+
+  # High Redis Memory Usage
+  - alert: HighRedisMemoryUsage
+    expr: (redis_memory_used_bytes / redis_memory_max_bytes) > 0.8
+    for: 10m
+    labels:
+      severity: warning
+      service: redis
+    annotations:
+      summary: "High Redis memory usage"
+      description: "Redis memory usage is {{ $value | humanizePercentage }}"
+      runbook_url: "https://docs.company.com/runbooks/high-redis-memory"
+
+  # Redis Connection Issues
+  - alert: RedisConnectionIssues
+    expr: rate(redis_rejected_connections_total[5m]) > 0
+    for: 5m
+    labels:
+      severity: warning
+      service: redis
+    annotations:
+      summary: "Redis connection rejections"
+      description: "Redis is rejecting {{ $value }} connections per second"
+      runbook_url: "https://docs.company.com/runbooks/redis-connection-issues"
+
+- name: apg-business-metrics
+  rules:
+  # Low Employee Creation Rate
+  - alert: LowEmployeeCreationRate
+    expr: rate(apg_employee_operations_total{operation="create"}[1h]) < 0.1
+    for: 30m
+    labels:
+      severity: info
+      service: apg-employee-api
+    annotations:
+      summary: "Low employee creation rate"
+      description: "Employee creation rate is {{ $value }} per hour"
+
+  # High AI Analysis Queue
+  - alert: HighAIAnalysisQueue
+    expr: apg_ai_analysis_queue_size > 100
+    for: 10m
+    labels:
+      severity: warning
+      service: apg-employee-api
+      component: ai-analysis
+    annotations:
+      summary: "High AI analysis queue size"
+      description: "AI analysis queue has {{ $value }} pending items"
+      runbook_url: "https://docs.company.com/runbooks/high-ai-queue"
+
+  # Unusual Data Quality Score
+  - alert: LowDataQualityScore
+    expr: apg_data_quality_score_average < 0.8
+    for: 15m
+    labels:
+      severity: warning
+      service: apg-employee-api
+      component: data-quality
+    annotations:
+      summary: "Low data quality score detected"
+      description: "Average data quality score is {{ $value }}"
+      runbook_url: "https://docs.company.com/runbooks/low-data-quality"
+
+- name: apg-infrastructure
+  rules:
+  # Disk Space Low
+  - alert: DiskSpaceLow
+    expr: (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"}) < 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low disk space"
+      description: "Disk space is {{ $value | humanizePercentage }} full on {{ $labels.device }}"
+      runbook_url: "https://docs.company.com/runbooks/low-disk-space"
+
+  # Load Average High
+  - alert: HighLoadAverage
+    expr: node_load1 > 0.8
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High load average"
+      description: "Load average is {{ $value }}"
+      runbook_url: "https://docs.company.com/runbooks/high-load-average"
+
+  # Container Restart
+  - alert: ContainerRestart
+    expr: increase(container_restart_count[1h]) > 0
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Container has restarted"
+      description: "Container {{ $labels.name }} has restarted {{ $value }} times in the last hour"
+      runbook_url: "https://docs.company.com/runbooks/container-restart"
+
+- name: apg-security
+  rules:
+  # Unusual Login Activity
+  - alert: UnusualLoginActivity
+    expr: rate(apg_login_attempts_total{status="failed"}[5m]) > 5
+    for: 5m
+    labels:
+      severity: warning
+      category: security
+    annotations:
+      summary: "Unusual login activity detected"
+      description: "{{ $value }} failed login attempts per second"
+      runbook_url: "https://docs.company.com/runbooks/unusual-login-activity"
+
+  # SSL Certificate Expiry
+  - alert: SSLCertificateExpiry
+    expr: probe_ssl_earliest_cert_expiry - time() < 7 * 24 * 3600
+    for: 1h
+    labels:
+      severity: warning
+      category: security
+    annotations:
+      summary: "SSL certificate expiring soon"
+      description: "SSL certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}"
+      runbook_url: "https://docs.company.com/runbooks/ssl-cert-expiry"
