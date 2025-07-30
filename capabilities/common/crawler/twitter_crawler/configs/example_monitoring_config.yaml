@@ -1,0 +1,68 @@
+# Twitter Crawler Monitoring Configuration Example
+# ================================================
+# Configuration for real-time Twitter monitoring and conflict detection
+
+# Core operation settings
+mode: "monitor"
+username: ""  # Your Twitter username (required for monitoring)
+password: ""  # Your Twitter password (required for monitoring)
+email: ""     # Your Twitter email
+
+# Monitoring parameters
+keywords: 
+  - "Ethiopia conflict"
+  - "Somalia violence"
+  - "Sudan crisis"
+  - "Horn of Africa"
+hashtags:
+  - "BreakingNews"
+  - "ConflictAlert"
+  - "HornofAfrica"
+users_to_monitor:
+  - "UN"
+  - "Reuters"
+  - "BBC"
+  - "CNN"
+
+# Alert settings
+alert_threshold: 10        # Number of tweets to trigger alert
+monitor_interval: 300      # Check every 5 minutes
+enable_alerts: true
+enable_conflict_detection: true
+
+# Search parameters for monitoring
+max_tweets: 200
+result_type: "recent"
+language: "en"
+include_retweets: false    # Focus on original content
+include_replies: false     # Focus on main tweets
+verified_only: false
+
+# Performance settings (conservative for monitoring)
+use_optimized: true
+max_concurrent: 5          # Lower for stability
+enable_caching: true
+cache_ttl: 300             # 5 minutes cache for monitoring
+connection_pool_size: 15
+rate_limit_per_minute: 25  # Conservative rate limiting
+
+# Analysis settings
+enable_sentiment: true
+confidence_threshold: 0.8  # Higher threshold for monitoring
+
+# Output settings
+output_format: "json"
+output_file: "alerts.jsonl"  # JSONL format for continuous monitoring
+export_user_data: true
+export_metadata: true
+pretty_print: false
+
+# Logging settings
+verbose: true
+quiet: false
+debug: false
+show_progress: false  # Don't show progress in monitoring mode
+
+# Session management
+save_session: true
+session_file: "twitter_monitoring_session.pkl"

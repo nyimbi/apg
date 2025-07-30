@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+"""
+Gen Crawler CLI Entry Point
+===========================
+
+Command-line interface executable for the generation crawler.
+
+Usage:
+    gen-crawler --help
+    gen-crawler crawl https://example.com --output ./results --format markdown
+    gen-crawler config --create --template news
+    gen-crawler export ./results.json --format markdown --output ./markdown/
+
+Author: Nyimbi Odero
+Company: Datacraft (www.datacraft.co.ke)
+Date: June 28, 2025
+"""
+
+import sys
+import os
+from pathlib import Path
+
+# Add the package directory to Python path
+package_dir = Path(__file__).parent.parent.parent.parent.parent
+sys.path.insert(0, str(package_dir))
+
+# Import and run the CLI
+try:
+    from gen_crawler.cli.main import cli_main
+    
+    if __name__ == "__main__":
+        cli_main()
+        
+except ImportError as e:
+    print(f"Error: Could not import gen_crawler CLI: {e}", file=sys.stderr)
+    print("Make sure the gen_crawler package is properly installed.", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f"Error: {e}", file=sys.stderr)
+    sys.exit(1)

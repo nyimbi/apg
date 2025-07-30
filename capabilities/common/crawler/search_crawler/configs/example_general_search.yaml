@@ -1,0 +1,43 @@
+# General Search Configuration Example
+# =====================================
+# Basic configuration for general-purpose web searching
+
+# Core search parameters
+mode: "general"
+query: "artificial intelligence trends 2025"
+engines:
+  - "google"
+  - "bing"
+  - "duckduckgo"
+  - "brave"
+max_results: 30
+max_results_per_engine: 10
+
+# Content settings
+download_content: false
+extract_content: false
+min_content_length: 100
+
+# Performance settings
+timeout: 30
+max_concurrent: 5
+retry_attempts: 3
+rate_limit_delay: 1.0
+enable_stealth: true
+
+# Quality settings
+min_relevance_score: 0.4
+enable_quality_filtering: true
+min_quality_score: 0.5
+deduplicate_results: true
+
+# Output settings
+output_format: "table"
+verbose: false
+quiet: false
+show_progress: true
+
+# Advanced settings
+enable_alerts: false
+batch_mode: false
+monitor_mode: false

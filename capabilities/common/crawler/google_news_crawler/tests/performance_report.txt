@@ -1,0 +1,115 @@
+================================================================================
+Google News Crawler - Performance Benchmark Report
+================================================================================
+Benchmark Date: 2025-06-28 17:47:29
+Python Version: 3.13.0
+Platform: darwin
+CPU Cores: 12
+Total Memory: 96.0 GB
+
+Performance Summary:
+------------------------------
+Average Test Duration: 0.010s
+Peak Operations/Second: 61951.7
+Total Memory Used: 2.91MB
+
+Detailed Benchmark Results:
+--------------------------------------------------
+
+🔥 Configuration Loading
+   Duration: 0.005s
+   Memory: 0.00MB (Peak: 25.89MB)
+   Operations/sec: 20380.4
+   CPU Usage: 100.0%
+
+🔥 Mock Database Storage
+   Duration: 0.000s
+   Memory: 0.00MB (Peak: 25.89MB)
+   Operations/sec: 61951.7
+   CPU Usage: 99.7%
+
+🔥 Country Validation
+   Duration: 0.040s
+   Memory: 0.34MB (Peak: 26.23MB)
+   Operations/sec: 25054.5
+   CPU Usage: 99.9%
+
+🔥 Date Parsing
+   Duration: 0.028s
+   Memory: 2.55MB (Peak: 28.78MB)
+   Operations/sec: 3584.5
+   CPU Usage: 99.2%
+
+🔥 Query Enhancement
+   Duration: 0.006s
+   Memory: 0.02MB (Peak: 28.80MB)
+   Operations/sec: 17458.6
+   CPU Usage: 100.0%
+
+🔥 Content Quality Scoring
+   Duration: 0.021s
+   Memory: 0.00MB (Peak: 28.80MB)
+   Operations/sec: 47338.5
+   CPU Usage: 100.0%
+
+🔥 Concurrent Operations
+   Duration: 0.002s
+   Memory: 0.00MB (Peak: 28.80MB)
+   Operations/sec: 4179.7
+   CPU Usage: 85.6%
+
+🔥 Large Dataset Processing
+   Duration: 0.013s
+   Memory: 0.00MB (Peak: 30.42MB)
+   Operations/sec: 377.8
+   CPU Usage: 100.0%
+
+🔥 Memory Efficiency (100 items)
+   Duration: 0.000s
+   Memory: 0.00MB (Peak: 30.44MB)
+   Operations/sec: 0.0
+   CPU Usage: 0.0%
+   Additional Metrics:
+     items_processed: 100
+     memory_per_item_kb: 0.0
+     data_size: 100
+
+🔥 Memory Efficiency (500 items)
+   Duration: 0.000s
+   Memory: 0.00MB (Peak: 30.44MB)
+   Operations/sec: 0.0
+   CPU Usage: 0.0%
+   Additional Metrics:
+     items_processed: 500
+     memory_per_item_kb: 0.0
+     data_size: 500
+
+🔥 Memory Efficiency (1000 items)
+   Duration: 0.000s
+   Memory: 0.00MB (Peak: 30.44MB)
+   Operations/sec: 0.0
+   CPU Usage: 0.0%
+   Additional Metrics:
+     items_processed: 1000
+     memory_per_item_kb: 0.0
+     data_size: 1000
+
+🔥 Memory Efficiency (2000 items)
+   Duration: 0.000s
+   Memory: 0.00MB (Peak: 31.38MB)
+   Operations/sec: 0.0
+   CPU Usage: 0.0%
+   Additional Metrics:
+     items_processed: 2000
+     memory_per_item_kb: 0.0
+     data_size: 2000
+
+==================================================
+PERFORMANCE GRADES
+==================================================
+Configuration Loading: A (20380.4 ops/sec)
+Database Operations: A (61951.7 ops/sec)
+Validation & Parsing: A (14319.5 ops/sec)
+Memory Efficiency: A (1.0MB avg)
+
+================================================================================

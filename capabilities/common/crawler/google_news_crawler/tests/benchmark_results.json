@@ -1,0 +1,126 @@
+[
+  {
+    "test_name": "Configuration Loading",
+    "duration_seconds": 0.0049066669889725745,
+    "memory_usage_mb": 0.0,
+    "operations_per_second": 20380.433443872127,
+    "peak_memory_mb": 25.890625,
+    "cpu_usage_percent": 99.98640647563666,
+    "additional_metrics": {}
+  },
+  {
+    "test_name": "Mock Database Storage",
+    "duration_seconds": 0.00016141601372510195,
+    "memory_usage_mb": 0.0,
+    "operations_per_second": 61951.721946438396,
+    "peak_memory_mb": 25.890625,
+    "cpu_usage_percent": 99.7422723337667,
+    "additional_metrics": {}
+  },
+  {
+    "test_name": "Country Validation",
+    "duration_seconds": 0.03991299995686859,
+    "memory_usage_mb": 0.34375,
+    "operations_per_second": 25054.493550488205,
+    "peak_memory_mb": 26.234375,
+    "cpu_usage_percent": 99.91982572870202,
+    "additional_metrics": {}
+  },
+  {
+    "test_name": "Date Parsing",
+    "duration_seconds": 0.027897541993297637,
+    "memory_usage_mb": 2.546875,
+    "operations_per_second": 3584.5451912582453,
+    "peak_memory_mb": 28.78125,
+    "cpu_usage_percent": 99.2058727132632,
+    "additional_metrics": {}
+  },
+  {
+    "test_name": "Query Enhancement",
+    "duration_seconds": 0.005727833020500839,
+    "memory_usage_mb": 0.015625,
+    "operations_per_second": 17458.609502421572,
+    "peak_memory_mb": 28.796875,
+    "cpu_usage_percent": 100.0203738393729,
+    "additional_metrics": {}
+  },
+  {
+    "test_name": "Content Quality Scoring",
+    "duration_seconds": 0.021124458988197148,
+    "memory_usage_mb": 0.0,
+    "operations_per_second": 47338.49044648808,
+    "peak_memory_mb": 28.796875,
+    "cpu_usage_percent": 99.99782721916132,
+    "additional_metrics": {}
+  },
+  {
+    "test_name": "Concurrent Operations",
+    "duration_seconds": 0.002392499998677522,
+    "memory_usage_mb": 0.0,
+    "operations_per_second": 4179.728319969739,
+    "peak_memory_mb": 28.796875,
+    "cpu_usage_percent": 85.64263327617974,
+    "additional_metrics": {}
+  },
+  {
+    "test_name": "Large Dataset Processing",
+    "duration_seconds": 0.013235207996331155,
+    "memory_usage_mb": 0.0,
+    "operations_per_second": 377.78023597256777,
+    "peak_memory_mb": 30.421875,
+    "cpu_usage_percent": 99.99842846193889,
+    "additional_metrics": {}
+  },
+  {
+    "test_name": "Memory Efficiency (100 items)",
+    "duration_seconds": 0,
+    "memory_usage_mb": 0.0,
+    "operations_per_second": 0,
+    "peak_memory_mb": 30.4375,
+    "cpu_usage_percent": 0,
+    "additional_metrics": {
+      "items_processed": 100,
+      "memory_per_item_kb": 0.0,
+      "data_size": 100
+    }
+  },
+  {
+    "test_name": "Memory Efficiency (500 items)",
+    "duration_seconds": 0,
+    "memory_usage_mb": 0.0,
+    "operations_per_second": 0,
+    "peak_memory_mb": 30.4375,
+    "cpu_usage_percent": 0,
+    "additional_metrics": {
+      "items_processed": 500,
+      "memory_per_item_kb": 0.0,
+      "data_size": 500
+    }
+  },
+  {
+    "test_name": "Memory Efficiency (1000 items)",
+    "duration_seconds": 0,
+    "memory_usage_mb": 0.0,
+    "operations_per_second": 0,
+    "peak_memory_mb": 30.4375,
+    "cpu_usage_percent": 0,
+    "additional_metrics": {
+      "items_processed": 1000,
+      "memory_per_item_kb": 0.0,
+      "data_size": 1000
+    }
+  },
+  {
+    "test_name": "Memory Efficiency (2000 items)",
+    "duration_seconds": 0,
+    "memory_usage_mb": 0.0,
+    "operations_per_second": 0,
+    "peak_memory_mb": 31.375,
+    "cpu_usage_percent": 0,
+    "additional_metrics": {
+      "items_processed": 2000,
+      "memory_per_item_kb": 0.0,
+      "data_size": 2000
+    }
+  }
+]

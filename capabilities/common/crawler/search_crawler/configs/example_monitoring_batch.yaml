@@ -1,0 +1,72 @@
+# Batch Monitoring Configuration Example
+# ========================================
+# Configuration for batch processing multiple queries
+
+# Core settings
+mode: "conflict"
+batch_mode: true
+engines:
+  - "google"
+  - "bing"
+  - "duckduckgo"
+  - "yandex"
+max_results: 50
+max_results_per_engine: 15
+
+# Batch queries (when batch_mode is true)
+batch_queries:
+  - "Ethiopia conflict 2025"
+  - "Somalia violence Al-Shabaab"
+  - "Sudan civil war refugees"
+  - "Eritrea border tensions"
+  - "Horn of Africa drought displacement"
+  - "Kenya Somalia border security"
+
+# Geographic settings
+target_countries:
+  - "ET"
+  - "SO"
+  - "ER"
+  - "DJ"
+  - "SD"
+  - "SS"
+  - "KE"
+  - "UG"
+conflict_regions:
+  - "horn_of_africa"
+enable_conflict_detection: true
+escalation_threshold: 0.75
+
+# Content settings
+download_content: true
+extract_content: false
+min_content_length: 150
+
+# Performance settings (optimized for batch)
+timeout: 40
+max_concurrent: 6
+retry_attempts: 3
+rate_limit_delay: 1.5
+enable_stealth: true
+
+# Quality settings
+min_relevance_score: 0.6
+enable_quality_filtering: true
+min_quality_score: 0.65
+deduplicate_results: true
+
+# Output settings
+output_format: "json"
+output_file: "batch_results_{timestamp}.json"
+verbose: false
+quiet: false
+show_progress: true
+
+# Advanced settings
+enable_alerts: true
+save_config: "last_batch_config.yaml"
+
+# Batch-specific settings
+batch_delay_between_queries: 5  # seconds
+batch_save_individual_results: true
+batch_results_directory: "./batch_results/"

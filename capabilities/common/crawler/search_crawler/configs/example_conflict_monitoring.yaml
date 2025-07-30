@@ -1,0 +1,60 @@
+# Conflict Monitoring Configuration Example
+# ==========================================
+# Optimized configuration for Horn of Africa conflict monitoring
+
+# Core search parameters
+mode: "conflict"
+query: "Ethiopia Somalia conflict violence"
+engines:
+  - "google"
+  - "bing"
+  - "duckduckgo"
+  - "yandex"
+  - "brave"
+  - "startpage"
+max_results: 100
+max_results_per_engine: 25
+
+# Geographic and conflict settings
+target_countries:
+  - "ET"  # Ethiopia
+  - "SO"  # Somalia
+  - "ER"  # Eritrea
+  - "DJ"  # Djibouti
+  - "SD"  # Sudan
+  - "SS"  # South Sudan
+  - "KE"  # Kenya
+  - "UG"  # Uganda
+conflict_regions:
+  - "horn_of_africa"
+enable_conflict_detection: true
+escalation_threshold: 0.7
+
+# Content settings
+download_content: true
+extract_content: false
+min_content_length: 200
+
+# Performance settings (conservative for reliability)
+timeout: 45
+max_concurrent: 8
+retry_attempts: 5
+rate_limit_delay: 2.0
+enable_stealth: true
+
+# Quality settings (strict for conflict monitoring)
+min_relevance_score: 0.6
+enable_quality_filtering: true
+min_quality_score: 0.7
+deduplicate_results: true
+
+# Output settings
+output_format: "json"
+verbose: true
+quiet: false
+show_progress: true
+
+# Advanced settings
+enable_alerts: true
+batch_mode: false
+monitor_mode: false

@@ -1,0 +1,31 @@
+# Log files
+*.log
+
+# Output files
+*.json
+*.csv
+*.txt
+
+# Cache directories
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Output directories
+crawler_output/
+results/
+data/
+
+# Environment files
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

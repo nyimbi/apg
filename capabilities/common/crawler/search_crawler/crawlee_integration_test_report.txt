@@ -1,0 +1,31 @@
+============================================================
+CRAWLEE INTEGRATION TEST REPORT
+============================================================
+Total Tests: 8
+Passed: 0 (0.0%)
+Failed: 8 (100.0%)
+Warnings: 0
+Success Rate: 0.0%
+
+Detailed Results:
+------------------------------
+❌ Import Core Classes
+    Import failed: attempted relative import beyond top-level package
+❌ Configuration Test
+    Configuration test failed: attempted relative import beyond top-level package
+❌ Crawler Initialization
+    Initialization test failed: attempted relative import beyond top-level package
+❌ Basic Search
+    Basic search failed: attempted relative import beyond top-level package
+❌ Content Extraction Methods
+    Test failed: attempted relative import beyond top-level package
+❌ Geographic and Conflict Analysis
+    Test failed: attempted relative import beyond top-level package
+❌ Quality Filtering
+    Test failed: attempted relative import beyond top-level package
+❌ Statistics and Monitoring
+    Test failed: attempted relative import beyond top-level package
+
+============================================================
+❌ NEEDS WORK: Crawlee integration has significant issues
+============================================================

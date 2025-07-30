@@ -1,0 +1,184 @@
+# YouTube Crawler Monitoring Configuration Example
+# ===============================================
+# Configuration for real-time YouTube content monitoring and alerts
+
+# Core operation settings
+mode: "monitor"
+youtube_api_key: ""  # Recommended for monitoring
+
+# Monitoring targets
+channels_to_monitor:
+  - "UC_x5XG1OV2P6uZZ5FSM9Ttw"  # Google AI
+  - "UCoxcjq-8xIDTYp3uz647V5A"  # Numberphile
+  - "UCsXVk37bltHxD1rDPwtNM8Q"  # Kurzgesagt
+keywords_to_monitor:
+  - "artificial intelligence"
+  - "machine learning"
+  - "deep learning"
+  - "neural networks"
+  - "AI breakthrough"
+hashtags_to_monitor:
+  - "#AI"
+  - "#MachineLearning"
+  - "#TechNews"
+  - "#Innovation"
+
+# Monitoring parameters
+monitor_interval: 300  # Check every 5 minutes
+check_new_uploads: true
+check_live_streams: true
+check_premieres: true
+check_shorts: false
+max_videos_per_check: 50
+
+# Content filtering for monitoring
+published_since_hours: 24  # Only check last 24 hours
+min_view_count: 0
+min_subscriber_count: 1000
+verified_channels_only: false
+language_filter: ["en", "es"]
+region_filter: ["US", "UK", "CA"]
+
+# Alert settings
+enable_alerts: true
+alert_threshold: 5  # Trigger alert after 5 matching videos
+alert_cooldown: 1800  # 30 minutes between alerts
+alert_methods:
+  - "log"
+  - "file"
+  - "webhook"  # If webhook_url provided
+
+# Advanced monitoring features
+trend_detection: true
+sentiment_monitoring: false
+engagement_tracking: true
+viral_content_detection: true
+viral_threshold_multiplier: 10  # 10x normal engagement
+
+# Performance settings (conservative for monitoring)
+use_optimized: true
+max_concurrent_requests: 10  # Lower for stability
+enable_caching: true
+cache_ttl: 300  # 5 minutes for monitoring
+rate_limit_requests_per_minute: 30  # Conservative
+adaptive_rate_limiting: false  # Stable rate for monitoring
+
+# Connection settings
+connection_timeout: 30.0
+read_timeout: 60.0
+max_retries: 3
+retry_delay: 5.0
+
+# Memory management (optimized for long-running)
+memory_cache_size: 500
+enable_memory_monitoring: true
+gc_threshold: 50  # More frequent GC for monitoring
+max_memory_usage_mb: 512
+
+# Data persistence
+save_monitoring_data: true
+data_retention_days: 30
+database_enabled: false
+database_url: ""  # Optional database connection
+export_interval: 3600  # Export data every hour
+
+# Alert conditions
+alert_conditions:
+  new_upload_from_monitored_channel: true
+  keyword_mention_spike: true
+  viral_content_detected: true
+  negative_sentiment_spike: false
+  engagement_anomaly: true
+
+# Notification settings
+webhook_url: ""  # Optional webhook for alerts
+webhook_timeout: 10
+webhook_retry_attempts: 3
+email_alerts: false
+email_config:
+  smtp_server: ""
+  smtp_port: 587
+  username: ""
+  password: ""
+  from_email: ""
+  to_emails: []
+
+# Content analysis during monitoring
+enable_content_analysis: true
+extract_key_topics: true
+track_sentiment_trends: false
+analyze_engagement_patterns: true
+detect_misinformation_signals: false
+
+# Output and reporting
+output_format: "json"
+output_file: "monitoring_alerts.jsonl"  # JSONL for streaming
+create_monitoring_reports: true
+report_interval: 86400  # Daily reports
+report_format: "json"
+include_analytics: true
+
+# Real-time features
+real_time_notifications: false
+streaming_output: false
+live_dashboard_enabled: false
+dashboard_port: 8080
+
+# Health monitoring
+health_check_interval: 600  # 10 minutes
+max_consecutive_failures: 10  # Higher tolerance for monitoring
+auto_restart_on_failure: false
+monitoring_uptime_tracking: true
+
+# Backup and recovery
+backup_monitoring_state: true
+state_backup_interval: 3600  # Hourly backups
+restore_from_backup: true
+backup_retention_days: 7
+
+# Rate limiting bypass (for high-volume monitoring)
+use_multiple_api_keys: false
+api_key_rotation: false
+api_keys: []  # List of API keys for rotation
+
+# Content categorization
+category_filters:
+  - "Technology"
+  - "Science & Technology"
+  - "Education"
+  - "News & Politics"
+exclude_categories:
+  - "Gaming"
+  - "Sports"
+  - "Music"
+
+# Geographic monitoring
+geographic_monitoring: false
+target_regions: ["US", "UK", "CA", "AU"]
+timezone_aware: true
+local_time_filtering: false
+
+# Integration features
+slack_integration: false
+slack_webhook: ""
+discord_integration: false
+discord_webhook: ""
+telegram_integration: false
+telegram_bot_token: ""
+telegram_chat_id: ""
+
+# Advanced analytics
+trending_analysis: true
+competitor_monitoring: false
+brand_mention_tracking: false
+influencer_tracking: false
+cross_platform_correlation: false
+
+# Logging and debugging
+verbose_monitoring: false
+quiet_monitoring: false
+debug_monitoring: false
+log_level: "INFO"
+log_file: "monitoring.log"
+log_rotation: true
+max_log_size_mb: 100

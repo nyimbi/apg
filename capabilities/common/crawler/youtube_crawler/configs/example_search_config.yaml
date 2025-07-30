@@ -1,0 +1,92 @@
+# YouTube Crawler Search Configuration Example
+# ===========================================
+# Configuration for YouTube search operations with content analysis
+
+# Core operation settings
+mode: "search"
+youtube_api_key: ""  # Your YouTube Data API key (optional)
+
+# Search parameters
+query: "artificial intelligence machine learning 2025"
+max_results: 100
+language: "en"
+region: "US"
+
+# Advanced search filters
+published_after: "2025-01-01"  # YYYY-MM-DD format
+published_before: ""           # Leave empty for no limit
+duration: "medium"             # short, medium, long, or leave empty
+order: "relevance"             # relevance, date, rating, title, viewCount
+video_type: "any"              # any, episode, movie
+
+# Content filtering
+include_live_content: false
+verified_channels_only: false
+exclude_shorts: false
+min_view_count: 1000
+max_view_count: 0  # 0 for no limit
+
+# Performance settings
+use_optimized: true
+max_concurrent_requests: 20
+max_concurrent_downloads: 5
+enable_caching: true
+cache_ttl: 3600
+connection_pool_size: 30
+rate_limit_requests_per_minute: 60
+
+# Rate limiting
+adaptive_rate_limiting: true
+rate_limit_burst_size: 10
+rate_limit_refill_rate: 1.0
+
+# Memory management
+memory_cache_size: 1000
+memory_cache_ttl: 3600
+enable_memory_monitoring: true
+gc_threshold: 100
+
+# Download settings (if download enabled)
+enable_video_download: false
+download_format: "best[height<=720]"
+download_audio_only: false
+download_subtitles: true
+download_thumbnails: true
+max_download_size_mb: 500
+output_directory: "./downloads"
+
+# Analysis settings
+fetch_video_details: true
+enable_sentiment_analysis: false
+extract_metadata: true
+analyze_comments: false
+max_comments_per_video: 50
+
+# Output settings
+output_format: "table"  # table, json, csv, excel, yaml
+output_file: ""         # Leave empty for stdout
+pretty_print: true
+export_detailed_metadata: true
+
+# Logging settings
+verbose: false
+quiet: false
+debug: false
+log_level: "INFO"
+show_progress: true
+
+# Health monitoring
+enable_performance_monitoring: true
+health_check_interval: 300
+max_consecutive_failures: 5
+
+# Advanced features
+enable_conflict_detection: false
+enable_trend_analysis: false
+geographical_focus: "global"  # global, US, UK, etc.
+
+# Export options
+export_formats:
+  - "json"
+save_raw_responses: false
+create_summary_report: true

@@ -1,0 +1,149 @@
+# YouTube Crawler Interactive Configuration Example
+# ================================================
+# Configuration for interactive exploration and analysis mode
+
+# Core operation settings
+mode: "interactive"
+youtube_api_key: ""  # Your YouTube Data API key
+
+# Default search settings for interactive mode
+default_search_params:
+  max_results: 10
+  language: "en"
+  region: "US"
+  order: "relevance"
+  
+# Interactive mode features
+enable_autocomplete: true
+show_video_previews: true
+enable_quick_actions: true
+remember_history: true
+max_history_items: 100
+
+# Display settings
+use_rich_interface: true
+show_thumbnails: false  # ASCII art thumbnails (experimental)
+color_scheme: "auto"    # auto, dark, light
+table_style: "grid"
+max_title_length: 50
+max_description_length: 100
+
+# Quick action settings
+enable_quick_download: true
+default_download_format: "best[height<=720]"
+quick_download_audio_only: false
+auto_create_download_dirs: true
+
+# Analysis features
+enable_inline_analysis: true
+show_engagement_metrics: true
+calculate_trending_score: true
+estimate_content_quality: false
+
+# Performance settings (optimized for interactivity)
+max_concurrent_requests: 5  # Lower for responsive UI
+enable_caching: true
+cache_ttl: 1800  # 30 minutes
+aggressive_caching: true
+preload_video_details: false
+
+# Session management
+save_session_state: true
+session_file: "interactive_session.json"
+auto_save_interval: 300  # 5 minutes
+restore_last_session: true
+
+# Keyboard shortcuts and commands
+shortcuts:
+  search: "s"
+  download: "d"
+  analyze: "a"
+  help: "h"
+  quit: "q"
+  clear: "c"
+  history: "hist"
+  config: "conf"
+
+# Command aliases
+aliases:
+  find: "search"
+  get: "download"
+  info: "analyze"
+  exit: "quit"
+  ls: "list"
+
+# Auto-completion settings
+autocomplete_sources:
+  - "search_history"
+  - "trending_topics"
+  - "suggested_queries"
+  - "channel_names"
+  
+# Context-aware suggestions
+enable_smart_suggestions: true
+suggestion_threshold: 3  # characters before showing suggestions
+max_suggestions: 10
+
+# Interactive download settings
+confirm_downloads: true
+show_download_progress: true
+pause_on_download_complete: false
+auto_play_audio: false  # Play downloaded audio (requires audio player)
+
+# Visualization features
+enable_ascii_charts: true
+show_trending_graphs: false  # Requires matplotlib
+chart_width: 60
+chart_height: 20
+
+# Educational features
+show_tips: true
+tip_frequency: "startup"  # startup, periodic, never
+explain_metrics: true
+show_youtube_insights: true
+
+# Export from interactive mode
+quick_export_formats: ["json", "csv"]
+auto_export_searches: false
+export_directory: "./interactive_exports"
+
+# Integration features
+enable_web_preview: false  # Open videos in browser
+browser_command: ""  # Custom browser command
+enable_clipboard_integration: true
+copy_urls_to_clipboard: false
+
+# Advanced interactive features
+enable_scripting: false  # Allow running custom scripts
+script_directory: "./scripts"
+enable_plugins: false
+plugin_directory: "./plugins"
+
+# Safety and moderation
+content_filtering: false
+block_explicit_content: false
+warn_on_long_videos: true
+long_video_threshold: 3600  # 1 hour
+
+# Logging in interactive mode
+log_interactive_commands: true
+log_file: "interactive.log"
+log_level: "INFO"
+verbose_logging: false
+
+# Performance monitoring in interactive mode
+show_performance_stats: false
+performance_update_interval: 30  # seconds
+memory_warning_threshold: 500  # MB
+
+# Backup and recovery
+auto_backup_session: true
+backup_interval: 1800  # 30 minutes
+max_backup_files: 5
+backup_directory: "./backups"
+
+# Experimental features
+experimental_ai_suggestions: false
+experimental_voice_commands: false
+experimental_gesture_controls: false
+beta_features_enabled: false

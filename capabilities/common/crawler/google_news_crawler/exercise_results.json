@@ -1,0 +1,163 @@
+{
+  "Imports": {
+    "Core Client Classes": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:09.547437"
+    },
+    "CLI Components": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:09.548875"
+    },
+    "Crawlee Integration": {
+      "success": true,
+      "details": "Available: False",
+      "timestamp": "2025-06-28T17:55:09.595481"
+    },
+    "Configuration System": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:09.599099"
+    },
+    "Parser Components": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:09.745170"
+    }
+  },
+  "Configuration": {
+    "Save/Load Cycle": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:09.745769"
+    },
+    "Data Validation": {
+      "success": true,
+      "details": "Countries: 3, Languages: 3",
+      "timestamp": "2025-06-28T17:55:09.745814"
+    }
+  },
+  "CLI": {
+    "Command Parsing": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:09.747169"
+    },
+    "Help Generation": {
+      "success": true,
+      "details": "Help length: 1541",
+      "timestamp": "2025-06-28T17:55:09.747475"
+    },
+    "Utility Functions": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:09.747559"
+    }
+  },
+  "Google News": {
+    "Client Initialization": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:14.814075"
+    },
+    "Search Method Available": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:14.814092"
+    },
+    "Statistics Tracking": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:14.814102"
+    },
+    "Client Cleanup": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:14.914722"
+    }
+  },
+  "Crawlee": {
+    "Configuration Creation": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:14.914808"
+    },
+    "Availability Check": {
+      "success": true,
+      "details": "Available: False",
+      "timestamp": "2025-06-28T17:55:14.914823"
+    },
+    "Enhancer Creation": {
+      "success": true,
+      "details": "Skipped - not available",
+      "timestamp": "2025-06-28T17:55:14.914843"
+    },
+    "Extractor Availability": {
+      "success": true,
+      "details": "1/4 extractors available",
+      "timestamp": "2025-06-28T17:55:14.914891"
+    }
+  },
+  "Data Processing": {
+    "Article Storage": {
+      "success": true,
+      "details": "Stored: 20",
+      "timestamp": "2025-06-28T17:55:14.914976"
+    },
+    "Content Filtering": {
+      "success": true,
+      "details": "Filtered: 20/20",
+      "timestamp": "2025-06-28T17:55:14.915035"
+    },
+    "Quality Scoring": {
+      "success": true,
+      "details": "Average quality: 0.80",
+      "timestamp": "2025-06-28T17:55:14.915069"
+    }
+  },
+  "Performance": {
+    "Country Validation Speed": {
+      "success": true,
+      "details": "0.000s for 200 items",
+      "timestamp": "2025-06-28T17:55:14.915154"
+    },
+    "Date Parsing Speed": {
+      "success": true,
+      "details": "0.000s for 100 items",
+      "timestamp": "2025-06-28T17:55:14.915305"
+    },
+    "Database Operations": {
+      "success": true,
+      "details": "0.000s for 1000 articles",
+      "timestamp": "2025-06-28T17:55:14.915524"
+    },
+    "Memory Efficiency": {
+      "success": true,
+      "details": "Memory increase: 0.0MB",
+      "timestamp": "2025-06-28T17:55:14.915786"
+    }
+  },
+  "Error Handling": {
+    "Invalid Country Codes": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:14.915882"
+    },
+    "Invalid Date Inputs": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:14.916607"
+    },
+    "Missing File Access": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:14.916652"
+    },
+    "Configuration Validation": {
+      "success": true,
+      "details": null,
+      "timestamp": "2025-06-28T17:55:14.916672"
+    }
+  }
+}

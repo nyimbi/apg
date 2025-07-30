@@ -1,0 +1,141 @@
+# YouTube Crawler Download Configuration Example
+# =============================================
+# Configuration for YouTube video downloading with yt-dlp integration
+
+# Core operation settings
+mode: "download"
+youtube_api_key: ""  # Optional for metadata enhancement
+
+# Download settings
+enable_video_download: true
+download_format: "best[height<=1080]"  # yt-dlp format selector
+download_audio_only: false
+output_directory: "./downloads"
+max_download_size_mb: 1000
+
+# Audio extraction settings
+audio_format: "mp3"
+audio_quality: "320"  # kbps for mp3
+extract_audio_separately: false
+
+# Subtitle settings
+download_subtitles: true
+download_auto_subtitles: true
+subtitle_languages: ["en", "es", "fr"]
+subtitle_format: "srt"
+
+# Thumbnail settings
+download_thumbnails: true
+thumbnail_format: "jpg"
+thumbnail_quality: "best"
+
+# Video quality preferences
+video_quality_preference:
+  - "1080p"
+  - "720p"
+  - "480p"
+  - "360p"
+fallback_to_audio: true  # If video fails, try audio
+
+# Advanced download options
+write_description: true
+write_info_json: true
+write_annotations: false
+keep_video_after_audio_extract: false
+prefer_free_formats: false
+
+# Concurrent processing
+max_concurrent_downloads: 5
+max_concurrent_metadata: 10
+download_timeout: 300  # seconds
+retry_attempts: 3
+retry_delay: 5  # seconds
+
+# Content filtering for downloads
+min_duration_seconds: 30
+max_duration_seconds: 3600  # 1 hour
+exclude_live_streams: true
+exclude_premieres: false
+
+# Batch processing
+batch_size: 10
+batch_delay: 2  # seconds between batches
+enable_queue_management: true
+resume_failed_downloads: true
+
+# File naming and organization
+output_template: "%(uploader)s/%(upload_date)s - %(title)s.%(ext)s"
+sanitize_filenames: true
+create_channel_directories: true
+avoid_filename_conflicts: true
+
+# Performance optimizations
+use_connection_pooling: true
+enable_download_resume: true
+buffer_size: "16K"
+fragment_retries: 10
+
+# Metadata enhancement
+fetch_extended_metadata: true
+save_metadata_to_file: true
+metadata_format: "json"  # json, yaml
+include_channel_metadata: true
+include_playlist_metadata: true
+
+# Rate limiting for downloads
+download_rate_limit: "5M"  # 5 MB/s, or empty for unlimited
+throttled_rate: "1M"      # Rate when throttling
+throttle_trigger_ratio: 0.8  # Throttle when queue is 80% full
+
+# Error handling
+continue_on_error: true
+ignore_download_errors: false
+log_download_errors: true
+skip_unavailable_videos: true
+
+# Post-processing
+enable_post_processing: false
+post_processor_args: []
+convert_to_mp4: false
+embed_subtitles: false
+embed_thumbnails: false
+
+# Archive and tracking
+write_download_archive: true
+archive_file: "download_archive.txt"
+track_download_history: true
+avoid_redownloads: true
+
+# Content analysis (post-download)
+analyze_downloaded_content: false
+extract_audio_features: false
+generate_video_preview: false
+create_content_summary: false
+
+# Cleanup settings
+cleanup_temp_files: true
+cleanup_failed_downloads: false
+max_temp_file_age: 3600  # seconds
+
+# Monitoring and reporting
+enable_download_monitoring: true
+create_download_report: true
+report_format: "json"
+real_time_progress: true
+
+# Integration settings
+webhook_url: ""  # Optional webhook for download completion
+notification_enabled: false
+email_notifications: false
+
+# Security and privacy
+use_proxy: false
+proxy_url: ""
+user_agent: "Enhanced-YouTube-Crawler/1.0"
+ignore_ssl_errors: false
+
+# Logging
+verbose_downloads: false
+quiet_downloads: false
+debug_downloads: false
+log_file: "download.log"

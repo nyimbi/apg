@@ -1,0 +1,65 @@
+================================================================================
+Google News Crawler - Comprehensive Test Report
+================================================================================
+Test Execution Date: 2025-06-28 17:46:06
+Total Duration: 7.18 seconds
+Total Tests: 16
+Passed: 13 (81.2%)
+Failed: 3 (18.8%)
+Success Rate: 81.2%
+
+Test Categories:
+--------------------------------------------------
+✅ Integration Tests         4/4 (100.0%) - 6.99s
+❌ Functional Tests          2/3 (66.7%) - 0.18s
+✅ Performance Tests         2/2 (100.0%) - 0.00s
+✅ Error Handling            3/3 (100.0%) - 0.00s
+✅ CLI Tests                 2/2 (100.0%) - 0.00s
+❌ Scenario Tests            0/2 (0.0%) - 0.00s
+
+
+Integration Tests Details:
+----------------------------------------
+  ✅ Google News Client Creation    6.943s
+  ✅ Crawlee Integration Check      0.043s
+  ✅ CLI Command Processing         0.001s
+  ✅ Configuration Management       0.001s
+
+Functional Tests Details:
+----------------------------------------
+  ❌ Article Data Structure         0.181s
+      Error: ArticleData.__init__() got an unexpected keyword argument 'source'
+  ✅ Search Query Enhancement       0.000s
+  ✅ Content Quality Scoring        0.000s
+
+Performance Tests Details:
+----------------------------------------
+  ✅ Configuration Loading Speed    0.001s
+  ✅ Mock Database Operations       0.001s
+
+Error Handling Details:
+----------------------------------------
+  ✅ Invalid Configuration          0.000s
+  ✅ Invalid Date Input             0.001s
+  ✅ Invalid Country Codes          0.000s
+
+CLI Tests Details:
+----------------------------------------
+  ✅ Argument Parsing               0.001s
+  ✅ Command Help Generation        0.001s
+
+Scenario Tests Details:
+----------------------------------------
+  ❌ Complete Search Workflow       0.000s
+      Error: 'MockDBManager' object has no attribute 'articles'
+  ❌ Monitoring Cycle Simulation    0.000s
+      Error: 'MockDBManager' object has no attribute 'articles'
+
+==================================================
+ERRORS SUMMARY
+==================================================
+❌ Functional Tests.Article Data Structure: ArticleData.__init__() got an unexpected keyword argument 'source'
+❌ Scenario Tests.Complete Search Workflow: 'MockDBManager' object has no attribute 'articles'
+❌ Scenario Tests.Monitoring Cycle Simulation: 'MockDBManager' object has no attribute 'articles'
+
+================================================================================

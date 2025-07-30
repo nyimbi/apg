@@ -1,0 +1,55 @@
+======================================================================
+Google News Crawler - Integration Test Report
+======================================================================
+Test Date: 2025-06-28 17:52:26
+Total Tests: 39
+Passed: 38 (97.4%)
+Failed: 1 (2.6%)
+Success Rate: 97.4%
+
+Detailed Results:
+----------------------------------------
+✅ Mock DB Manager Creation
+✅ Client Creation
+✅ Client has search_news method
+✅ Client has initialize method
+✅ Client has close method
+✅ Client has database manager
+✅ Client has session stats
+✅ Client Cleanup
+✅ Configuration File Created
+✅ Configuration Loading
+✅ Configuration Value Integrity
+✅ Configuration List Integrity
+✅ Configuration Integration with Components
+✅ Crawlee Availability Check
+✅ Crawlee Config Creation
+✅ Crawlee Config Values
+✅ Crawlee Config Flags
+✅ Crawlee Not Available (Expected)
+✅ CLI Parser Setup
+✅ Search Command Parsing
+✅ Search Query Parsing
+✅ Search Flag Parsing
+✅ Country Validation Integration
+✅ Monitor Command Parsing
+✅ Monitor Interval Parsing
+✅ Config Command Parsing
+✅ Config Show Flag Parsing
+✅ Article Storage Integration
+✅ Article Retrieval Integration
+✅ Query Processing Integration
+✅ Article Filtering Integration
+✅ Invalid Country Handling
+✅ Invalid Date Handling
+✅ Missing File Handling
+❌ Invalid Config Value Correction
+    Error: Assertion failed
+✅ Batch Validation Performance
+✅ Batch Storage Performance
+✅ Batch Storage Accuracy
+✅ Memory Efficiency
+
+======================================================================
+🎉 EXCELLENT: Integration tests show high quality
+======================================================================

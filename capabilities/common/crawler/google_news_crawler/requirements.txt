@@ -1,0 +1,112 @@
+# Enhanced Google News Crawler Requirements
+# ==========================================
+
+# Core dependencies
+aiohttp>=3.8.0
+asyncpg>=0.27.0
+feedparser>=6.0.10
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+python-dateutil>=2.8.2
+PyYAML>=6.0
+
+# Optional dependencies for enhanced features
+# ML and NLP features
+scikit-learn>=1.2.0
+textblob>=0.17.1
+langdetect>=1.0.9
+
+# Data processing
+pandas>=1.5.0
+numpy>=1.24.0
+
+# Web scraping and stealth
+cloudscraper>=1.2.60
+requests>=2.28.0
+requests-html>=0.10.0
+selenium>=4.8.0
+
+# Content extraction
+readability-lxml>=0.8.1
+newspaper3k>=0.2.8
+
+# Data validation
+pydantic>=1.10.0
+
+# Performance and monitoring
+prometheus-client>=0.16.0
+psutil>=5.9.0
+
+# Development dependencies (optional)
+pytest>=7.2.0
+pytest-asyncio>=0.20.0
+pytest-cov>=4.0.0
+black>=23.0.0
+flake8>=6.0.0
+isort>=5.12.0
+mypy>=1.0.0
+
+# Database drivers (optional alternatives)
+psycopg2-binary>=2.9.5
+redis>=4.5.0
+
+# Image processing (optional)
+Pillow>=9.4.0
+
+# Caching (optional)
+diskcache>=5.4.0
+
+# Logging and debugging
+structlog>=22.3.0
+rich>=13.3.0
+
+# Configuration management
+python-dotenv>=1.0.0
+click>=8.1.0
+
+# HTTP client alternatives
+httpx>=0.23.0
+
+# Content analysis (optional)
+spacy>=3.5.0
+nltk>=3.8.0
+
+# Encryption and security
+cryptography>=39.0.0
+bcrypt>=4.0.0
+
+# Date and time handling
+arrow>=1.2.3
+pendulum>=2.1.2
+
+# URL handling
+validators>=0.20.0
+tldextract>=3.4.0
+
+# HTML/XML parsing alternatives
+html5lib>=1.1
+selectolax>=0.3.0
+
+# JSON handling
+orjson>=3.8.0
+ujson>=5.7.0
+
+# Async utilities
+asyncio-throttle>=1.0.2
+aiofiles>=22.1.0
+
+# Testing utilities (dev only)
+factory-boy>=3.2.1
+freezegun>=1.2.2
+responses>=0.22.0
+aioresponses>=0.7.4
+
+# Documentation (dev only)
+sphinx>=6.1.0
+sphinx-rtd-theme>=1.2.0
+myst-parser>=0.19.0
+
+# Code quality (dev only)
+pre-commit>=3.1.0
+bandit>=1.7.4
+safety>=2.3.0

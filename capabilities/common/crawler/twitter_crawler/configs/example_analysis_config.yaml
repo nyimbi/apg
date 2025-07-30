@@ -1,0 +1,79 @@
+# Twitter Crawler Analysis Configuration Example
+# ==============================================
+# Configuration for advanced Twitter analytics and sentiment analysis
+
+# Core operation settings
+mode: "analyze"
+username: ""  # Your Twitter username
+password: ""  # Your Twitter password
+email: ""     # Your Twitter email
+
+# Analysis parameters
+analyze_users:
+  - "elonmusk"
+  - "twitter"
+  - "OpenAI"
+analyze_hashtags:
+  - "AI"
+  - "MachineLearning"
+  - "TechNews"
+query: "artificial intelligence trends 2025"
+
+# Search parameters for analysis
+max_tweets: 500
+result_type: "mixed"  # Get both popular and recent
+language: "en"
+include_retweets: true
+include_replies: true
+verified_only: false
+
+# Geographic filters for analysis
+location: ""
+radius: "50km"
+since_date: "2025-06-01"  # Last month
+until_date: ""
+
+# Analysis settings
+enable_sentiment: true
+enable_conflict_detection: false
+confidence_threshold: 0.7
+trend_analysis: true
+
+# Performance settings
+use_optimized: true
+max_concurrent: 15
+enable_caching: true
+cache_ttl: 7200  # 2 hours cache for analysis
+connection_pool_size: 25
+rate_limit_per_minute: 30
+
+# Output settings
+output_format: "json"
+output_file: "analysis_results.json"
+export_user_data: true
+export_metadata: true
+pretty_print: true
+
+# Advanced analysis options
+analyze_network: true
+extract_trends: true
+sentiment_breakdown: true
+user_influence_analysis: true
+
+# Logging settings
+verbose: true
+quiet: false
+debug: false
+show_progress: true
+
+# Session management
+save_session: true
+session_file: "twitter_analysis_session.pkl"
+
+# Export options
+export_formats:
+  - "json"
+  - "csv"
+  - "excel"
+create_visualizations: true
+save_raw_data: true

@@ -1,0 +1,54 @@
+# Twitter Crawler Search Configuration Example
+# ============================================
+# Configuration for general Twitter search operations
+
+# Core operation settings
+mode: "search"
+query: "machine learning artificial intelligence"
+username: ""  # Your Twitter username
+password: ""  # Your Twitter password
+email: ""     # Your Twitter email
+
+# Search parameters
+max_tweets: 100
+result_type: "recent"  # recent, popular, mixed
+language: "en"
+include_retweets: true
+include_replies: true
+verified_only: false
+
+# Geographic and temporal filters
+location: ""
+radius: "10km"
+since_date: ""  # YYYY-MM-DD format
+until_date: ""  # YYYY-MM-DD format
+
+# Performance settings
+use_optimized: true
+max_concurrent: 10
+enable_caching: true
+cache_ttl: 3600
+connection_pool_size: 20
+rate_limit_per_minute: 30
+
+# Analysis settings
+enable_sentiment: false
+enable_conflict_detection: false
+confidence_threshold: 0.7
+
+# Output settings
+output_format: "table"
+output_file: ""
+export_user_data: true
+export_metadata: true
+pretty_print: true
+
+# Advanced settings
+verbose: false
+quiet: false
+debug: false
+show_progress: true
+
+# Session management
+save_session: true
+session_file: "twitter_session.pkl"
