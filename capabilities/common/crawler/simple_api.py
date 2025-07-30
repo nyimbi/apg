@@ -26,6 +26,10 @@ from .engines.multi_source_orchestrator import (
 from .engines.stealth_engine import StealthMethod
 from .views import ContentCleaningConfig
 
+# Unified adapter system imports
+from .adapters.unified_adapter_manager import UnifiedAdapterManager, create_unified_manager
+from .adapters.base_adapter import CrawlerType, AdapterResult
+
 # =====================================================
 # SIMPLE API TYPES
 # =====================================================
@@ -41,6 +45,27 @@ class SimpleMarkdownResult:
     success: bool
     metadata: Dict[str, Any]
     error: Optional[str] = None
+    
+    @classmethod
+    def from_adapter_result(cls, adapter_result: AdapterResult) -> 'SimpleMarkdownResult':
+        """Convert AdapterResult to SimpleMarkdownResult"""
+        return cls(
+            url=adapter_result.url,
+            title=adapter_result.title,
+            markdown_content=adapter_result.content,
+            success=adapter_result.success,
+            metadata={
+                **adapter_result.specialized_metadata,
+                **adapter_result.processing_metadata,
+                'crawler_type': adapter_result.crawler_type.value,
+                'original_source': adapter_result.original_source,
+                'language': adapter_result.language,
+                'word_count': adapter_result.word_count,
+                'crawl_timestamp': adapter_result.crawl_timestamp.isoformat(),
+                'publish_date': adapter_result.publish_date.isoformat() if adapter_result.publish_date else None
+            },
+            error=adapter_result.error
+        )
 
 @dataclass
 class SimpleCrawlResults:
@@ -59,7 +84,8 @@ class SimpleCrawlResults:
 class GuaranteedSuccessCrawler:
     """Crawler that ABSOLUTELY SUCCEEDS using multiple fallback strategies"""
     
-    def __init__(self):
+    def __init__(self, tenant_id: str = "default"):
+        self.tenant_id = tenant_id
         self.orchestrator = MultiSourceOrchestrator(max_concurrent=5, max_sessions=10)
         self.default_config = ContentCleaningConfig(
             remove_navigation=True,
@@ -71,7 +97,11 @@ class GuaranteedSuccessCrawler:
             max_content_length=50000
         )
         
-        # Fallback strategies in order of preference
+        # Initialize unified adapter manager for specialized crawlers
+        self.adapter_manager: Optional[UnifiedAdapterManager] = None
+        self._adapter_initialized = False
+        
+        # Fallback strategies in order of preference (for direct crawling)
         self.fallback_strategies = [
             StealthMethod.HTTP_MIMICRY,      # Fastest, works for most sites
             StealthMethod.CLOUDSCRAPER,      # For Cloudflare-protected sites
@@ -79,19 +109,86 @@ class GuaranteedSuccessCrawler:
             StealthMethod.SELENIUM_STEALTH   # Last resort for difficult sites
         ]
     
+    async def _ensure_adapter_initialized(self):
+        """Ensure the unified adapter manager is initialized"""
+        if not self._adapter_initialized:
+            try:
+                self.adapter_manager = create_unified_manager(
+                    tenant_id=self.tenant_id,
+                    config={
+                        'enable_fallback': True,
+                        'adapters': {
+                            'search': {'max_results_per_engine': 10, 'parallel_searches': True},
+                            'google_news': {'max_results': 50, 'download_content': True},
+                            'gdelt': {'time_range': '1day', 'languages': ['english']},
+                            'twitter': {'max_tweets': 100, 'sentiment_analysis': True},
+                            'youtube': {'max_results': 50, 'include_transcripts': True}
+                        }
+                    }
+                )
+                await self.adapter_manager.initialize()
+                self._adapter_initialized = True
+                logger.info("Unified adapter manager initialized successfully")
+            except Exception as e:
+                logger.warning(f"Failed to initialize adapter manager: {e}. Will use direct crawling only.")
+                self.adapter_manager = None
+    
     async def scrape_single_page(self, url: str, 
                                 tenant_id: str = "default",
-                                timeout: int = 30) -> SimpleMarkdownResult:
+                                timeout: int = 30,
+                                preferred_crawler: Optional[str] = None) -> SimpleMarkdownResult:
         """
         Scrape a single page and return markdown content.
         GUARANTEES success by trying all available strategies.
+        
+        Args:
+            url: The URL to scrape
+            tenant_id: Tenant identifier
+            timeout: Request timeout in seconds
+            preferred_crawler: Preferred crawler type ('search', 'google_news', 'twitter', etc.)
+        
+        Returns:
+            SimpleMarkdownResult with guaranteed content
         """
-        logger.info(f"Scraping single page: {url}")
+        logger.info(f"Scraping single page: {url} (preferred: {preferred_crawler})")
         
         start_time = datetime.utcnow()
         last_error = None
         
-        # Try each strategy until one succeeds
+        # First try: Use unified adapter system for specialized crawling
+        await self._ensure_adapter_initialized()
+        
+        if self.adapter_manager:
+            try:
+                logger.info(f"Trying unified adapter system for: {url}")
+                
+                # Convert preferred_crawler string to CrawlerType enum
+                preferred_adapter = None
+                if preferred_crawler:
+                    try:
+                        preferred_adapter = CrawlerType(preferred_crawler.lower())
+                    except ValueError:
+                        logger.warning(f"Invalid preferred_crawler: {preferred_crawler}")
+                
+                # Use unified adapter manager
+                adapter_result = await self.adapter_manager.crawl_single(
+                    url, 
+                    preferred_adapter=preferred_adapter
+                )
+                
+                if adapter_result.success and len(adapter_result.content.strip()) > 20:
+                    logger.info(f"SUCCESS with unified adapter: {adapter_result.crawler_type.value}")
+                    return SimpleMarkdownResult.from_adapter_result(adapter_result)
+                else:
+                    last_error = f"Unified adapter failed: {adapter_result.error or 'No usable content'}"
+                    logger.warning(last_error)
+                    
+            except Exception as e:
+                last_error = f"Unified adapter exception: {str(e)}"
+                logger.warning(last_error)
+        
+        # Second try: Direct crawling fallback strategies
+        logger.info(f"Falling back to direct crawling strategies for: {url}")
         for strategy in self.fallback_strategies:
             try:
                 logger.info(f"Trying strategy: {strategy.value} for {url}")
@@ -206,22 +303,81 @@ class GuaranteedSuccessCrawler:
     async def crawl_multiple_pages(self, urls: List[str],
                                   tenant_id: str = "default",
                                   max_concurrent: int = 3,
-                                  timeout: int = 30) -> SimpleCrawlResults:
+                                  timeout: int = 30,
+                                  preferred_crawler: Optional[str] = None) -> SimpleCrawlResults:
         """
         Crawl multiple pages and return list of markdown results.
         Uses concurrent processing with guaranteed individual success.
+        
+        Args:
+            urls: List of URLs to crawl
+            tenant_id: Tenant identifier
+            max_concurrent: Maximum concurrent requests
+            timeout: Request timeout in seconds
+            preferred_crawler: Preferred crawler type for all URLs
+        
+        Returns:
+            SimpleCrawlResults with individual results
         """
-        logger.info(f"Crawling {len(urls)} pages with max_concurrent={max_concurrent}")
+        logger.info(f"Crawling {len(urls)} pages with max_concurrent={max_concurrent} (preferred: {preferred_crawler})")
         
         start_time = datetime.utcnow()
         
-        # Process URLs in batches to avoid overwhelming servers
+        # First try: Use unified adapter system for batch processing
+        await self._ensure_adapter_initialized()
+        
+        if self.adapter_manager and len(urls) > 1:
+            try:
+                logger.info(f"Trying unified adapter batch processing for {len(urls)} URLs")
+                
+                # Convert preferred_crawler string to CrawlerType enum
+                preferred_adapter = None
+                if preferred_crawler:
+                    try:
+                        preferred_adapter = CrawlerType(preferred_crawler.lower())
+                    except ValueError:
+                        logger.warning(f"Invalid preferred_crawler: {preferred_crawler}")
+                
+                # Use batch processing
+                adapter_results = await self.adapter_manager.crawl_batch(
+                    urls,
+                    max_concurrent=max_concurrent,
+                    preferred_adapter=preferred_adapter
+                )
+                
+                # Convert adapter results to simple results
+                simple_results = [
+                    SimpleMarkdownResult.from_adapter_result(result) 
+                    for result in adapter_results
+                ]
+                
+                # Check if we got reasonable success rate
+                success_count = sum(1 for r in simple_results if r.success)
+                if success_count >= len(urls) * 0.5:  # At least 50% success
+                    processing_time = (datetime.utcnow() - start_time).total_seconds()
+                    logger.info(f"Batch processing succeeded: {success_count}/{len(urls)} URLs")
+                    
+                    return SimpleCrawlResults(
+                        results=simple_results,
+                        success_count=success_count,
+                        total_count=len(simple_results),
+                        success_rate=success_count / len(simple_results) if simple_results else 0,
+                        processing_time=processing_time
+                    )
+                else:
+                    logger.warning(f"Batch processing had low success rate: {success_count}/{len(urls)}")
+                    
+            except Exception as e:
+                logger.warning(f"Batch processing failed: {e}. Falling back to individual processing.")
+        
+        # Fallback: Individual processing with semaphore
+        logger.info(f"Using individual crawling fallback for {len(urls)} URLs")
         results = []
         semaphore = asyncio.Semaphore(max_concurrent)
         
         async def crawl_with_semaphore(url):
             async with semaphore:
-                return await self.scrape_single_page(url, tenant_id, timeout)
+                return await self.scrape_single_page(url, tenant_id, timeout, preferred_crawler)
         
         # Create tasks for all URLs
         tasks = [crawl_with_semaphore(url) for url in urls]
@@ -264,6 +420,12 @@ class GuaranteedSuccessCrawler:
     async def cleanup(self):
         """Clean up resources"""
         await self.orchestrator.stop_crawling()
+        
+        # Clean up adapter manager
+        if self.adapter_manager:
+            await self.adapter_manager.cleanup()
+            self.adapter_manager = None
+            self._adapter_initialized = False
 
 
 # =====================================================
@@ -280,27 +442,37 @@ async def _get_crawler():
         _crawler_instance = GuaranteedSuccessCrawler()
     return _crawler_instance
 
-async def scrape_page(url: str, tenant_id: str = "default") -> SimpleMarkdownResult:
+async def scrape_page(url: str, 
+                     tenant_id: str = "default",
+                     preferred_crawler: Optional[str] = None) -> SimpleMarkdownResult:
     """
     Scrape a single page and return clean markdown content.
     
     Args:
         url: The URL to scrape
         tenant_id: Tenant identifier (optional)
+        preferred_crawler: Preferred crawler type ('search', 'google_news', 'twitter', 'youtube', 'gdelt')
     
     Returns:
         SimpleMarkdownResult with markdown content
     
-    Example:
+    Examples:
+        # Automatic crawler selection
         result = await scrape_page("https://example.com")
+        
+        # Use specific crawler
+        result = await scrape_page("https://news.example.com", preferred_crawler="google_news")
+        result = await scrape_page("https://twitter.com/user/status/123", preferred_crawler="twitter")
+        
         print(result.markdown_content)
     """
     crawler = await _get_crawler()
-    return await crawler.scrape_single_page(url, tenant_id)
+    return await crawler.scrape_single_page(url, tenant_id, timeout=30, preferred_crawler=preferred_crawler)
 
 async def crawl_site(urls: List[str], 
                     tenant_id: str = "default",
-                    max_concurrent: int = 3) -> SimpleCrawlResults:
+                    max_concurrent: int = 3,
+                    preferred_crawler: Optional[str] = None) -> SimpleCrawlResults:
     """
     Crawl multiple pages and return list of markdown results.
     
@@ -308,18 +480,25 @@ async def crawl_site(urls: List[str],
         urls: List of URLs to crawl
         tenant_id: Tenant identifier (optional)
         max_concurrent: Maximum concurrent requests (default: 3)
+        preferred_crawler: Preferred crawler type for all URLs
     
     Returns:
         SimpleCrawlResults with list of markdown results
     
-    Example:
+    Examples:
+        # Automatic crawler selection
         urls = ["https://example.com", "https://example.com/about"]
         results = await crawl_site(urls)
+        
+        # Use specific crawler for all URLs
+        news_urls = ["https://news1.com", "https://news2.com"]
+        results = await crawl_site(news_urls, preferred_crawler="google_news")
+        
         for result in results.results:
             print(f"{result.url}: {len(result.markdown_content)} chars")
     """
     crawler = await _get_crawler()
-    return await crawler.crawl_multiple_pages(urls, tenant_id, max_concurrent)
+    return await crawler.crawl_multiple_pages(urls, tenant_id, max_concurrent, timeout=30, preferred_crawler=preferred_crawler)
 
 async def crawl_site_from_homepage(base_url: str,
                                   max_pages: int = 10,
@@ -392,10 +571,102 @@ async def crawl_site_from_homepage(base_url: str,
 
 
 # =====================================================
+# SPECIALIZED CRAWLER FUNCTIONS
+# =====================================================
+
+async def search_web(query: str, 
+                    max_results: int = 20,
+                    tenant_id: str = "default") -> SimpleMarkdownResult:
+    """
+    Search the web using multiple search engines and return aggregated results.
+    
+    Args:
+        query: Search query string
+        max_results: Maximum number of search results
+        tenant_id: Tenant identifier
+        
+    Returns:
+        SimpleMarkdownResult with search results in markdown format
+    """
+    return await scrape_page(f"search://{query}", tenant_id, preferred_crawler="search")
+
+async def get_news(query: str,
+                  max_results: int = 50,
+                  tenant_id: str = "default") -> SimpleMarkdownResult:
+    """
+    Get news articles using Google News search.
+    
+    Args:
+        query: News search query
+        max_results: Maximum number of news articles
+        tenant_id: Tenant identifier
+        
+    Returns:
+        SimpleMarkdownResult with news articles in markdown format
+    """
+    return await scrape_page(f"news://{query}", tenant_id, preferred_crawler="google_news")
+
+async def monitor_events(query: str,
+                        time_range: str = "1day",
+                        tenant_id: str = "default") -> SimpleMarkdownResult:
+    """
+    Monitor global events using GDELT database.
+    
+    Args:
+        query: Event query or topic
+        time_range: Time range for events ('1hour', '1day', '1week', etc.)
+        tenant_id: Tenant identifier
+        
+    Returns:
+        SimpleMarkdownResult with global events in markdown format
+    """
+    return await scrape_page(f"events://{query}?time_range={time_range}", tenant_id, preferred_crawler="gdelt")
+
+async def analyze_social(query: str,
+                        max_tweets: int = 100,
+                        tenant_id: str = "default") -> SimpleMarkdownResult:
+    """
+    Analyze social media content using Twitter crawler.
+    
+    Args:
+        query: Social media query (hashtag, username, or search term)
+        max_tweets: Maximum number of tweets to analyze
+        tenant_id: Tenant identifier
+        
+    Returns:
+        SimpleMarkdownResult with social media analysis in markdown format
+    """
+    return await scrape_page(f"social://{query}?max_tweets={max_tweets}", tenant_id, preferred_crawler="twitter")
+
+async def extract_video_content(url_or_query: str,
+                               include_transcripts: bool = True,
+                               tenant_id: str = "default") -> SimpleMarkdownResult:
+    """
+    Extract content from YouTube videos including transcripts.
+    
+    Args:
+        url_or_query: YouTube URL or search query
+        include_transcripts: Whether to extract video transcripts
+        tenant_id: Tenant identifier
+        
+    Returns:
+        SimpleMarkdownResult with video content and metadata in markdown format
+    """
+    if url_or_query.startswith(('http://', 'https://')):
+        # Direct URL
+        return await scrape_page(url_or_query, tenant_id, preferred_crawler="youtube")
+    else:
+        # Search query
+        return await scrape_page(f"youtube://{url_or_query}?transcripts={include_transcripts}", tenant_id, preferred_crawler="youtube")
+
+
+# =====================================================
 # SYNCHRONOUS WRAPPER FUNCTIONS
 # =====================================================
 
-def scrape_page_sync(url: str, tenant_id: str = "default") -> SimpleMarkdownResult:
+def scrape_page_sync(url: str, 
+                    tenant_id: str = "default",
+                    preferred_crawler: Optional[str] = None) -> SimpleMarkdownResult:
     """Synchronous wrapper for scrape_page"""
     try:
         loop = asyncio.get_event_loop()
@@ -403,11 +674,12 @@ def scrape_page_sync(url: str, tenant_id: str = "default") -> SimpleMarkdownResu
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     
-    return loop.run_until_complete(scrape_page(url, tenant_id))
+    return loop.run_until_complete(scrape_page(url, tenant_id, preferred_crawler))
 
 def crawl_site_sync(urls: List[str], 
                    tenant_id: str = "default",
-                   max_concurrent: int = 3) -> SimpleCrawlResults:
+                   max_concurrent: int = 3,
+                   preferred_crawler: Optional[str] = None) -> SimpleCrawlResults:
     """Synchronous wrapper for crawl_site"""
     try:
         loop = asyncio.get_event_loop()
@@ -415,7 +687,28 @@ def crawl_site_sync(urls: List[str],
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     
-    return loop.run_until_complete(crawl_site(urls, tenant_id, max_concurrent))
+    return loop.run_until_complete(crawl_site(urls, tenant_id, max_concurrent, preferred_crawler))
+
+# Synchronous wrappers for specialized functions
+def search_web_sync(query: str, max_results: int = 20, tenant_id: str = "default") -> SimpleMarkdownResult:
+    """Synchronous wrapper for search_web"""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(search_web(query, max_results, tenant_id))
+
+def get_news_sync(query: str, max_results: int = 50, tenant_id: str = "default") -> SimpleMarkdownResult:
+    """Synchronous wrapper for get_news"""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(get_news(query, max_results, tenant_id))
 
 
 # =====================================================
@@ -475,14 +768,27 @@ __all__ = [
     'crawl_site', 
     'crawl_site_from_homepage',
     
+    # Specialized crawler functions
+    'search_web',
+    'get_news',
+    'monitor_events',
+    'analyze_social',
+    'extract_video_content',
+    
     # Sync wrappers
     'scrape_page_sync',
     'crawl_site_sync',
+    'search_web_sync',
+    'get_news_sync',
     
     # Result types
     'SimpleMarkdownResult',
     'SimpleCrawlResults',
     
     # Advanced usage
-    'GuaranteedSuccessCrawler'
+    'GuaranteedSuccessCrawler',
+    
+    # Adapter system integration
+    'UnifiedAdapterManager',
+    'CrawlerType'
 ]

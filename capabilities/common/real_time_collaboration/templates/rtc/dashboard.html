@@ -1,0 +1,178 @@
+{% extends "appbuilder/general/model/base.html" %}
+
+{% block title %}Real-Time Collaboration Dashboard{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.rtc-dashboard {
+	padding: 20px;
+}
+
+.rtc-stats-card {
+	background: #fff;
+	border-radius: 8px;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	padding: 20px;
+	margin-bottom: 20px;
+}
+
+.rtc-stats-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+	gap: 20px;
+	margin-bottom: 30px;
+}
+
+.rtc-stat-value {
+	font-size: 2.5em;
+	font-weight: bold;
+	color: #007bff;
+}
+
+.rtc-stat-label {
+	color: #666;
+	font-size: 0.9em;
+	margin-top: 5px;
+}
+
+.rtc-live-indicator {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	background: #28a745;
+	border-radius: 50%;
+	animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+	0% { opacity: 1; }
+	50% { opacity: 0.5; }
+	100% { opacity: 1; }
+}
+
+.rtc-activity-feed {
+	max-height: 400px;
+	overflow-y: auto;
+}
+
+.rtc-activity-item {
+	border-left: 3px solid #007bff;
+	padding: 10px 15px;
+	margin-bottom: 10px;
+	background: #f8f9fa;
+	border-radius: 0 8px 8px 0;
+}
+
+.rtc-activity-time {
+	font-size: 0.8em;
+	color: #666;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rtc-dashboard">
+	<div class="row">
+		<div class="col-12">
+			<h1><i class="fa fa-handshake"></i> Real-Time Collaboration Dashboard <span class="rtc-live-indicator"></span></h1>
+			<p class="lead">Monitor and manage real-time collaboration across your APG platform</p>
+		</div>
+	</div>
+
+	<!-- Statistics Cards -->
+	<div class="rtc-stats-grid">
+		<div class="rtc-stats-card">
+			<div class="rtc-stat-value">{{ stats.active_sessions }}</div>
+			<div class="rtc-stat-label">Active Sessions</div>
+		</div>
+		<div class="rtc-stats-card">
+			<div class="rtc-stat-value">{{ stats.total_participants }}</div>
+			<div class="rtc-stat-label">Total Participants</div>
+		</div>
+		<div class="rtc-stats-card">
+			<div class="rtc-stat-value">{{ stats.active_video_calls }}</div>
+			<div class="rtc-stat-label">Active Video Calls</div>
+		</div>
+		<div class="rtc-stats-card">
+			<div class="rtc-stat-value">{{ stats.total_pages_with_collaboration }}</div>
+			<div class="rtc-stat-label">Pages with Collaboration</div>
+		</div>
+	</div>
+
+	<div class="row">
+		<!-- Recent Sessions -->
+		<div class="col-md-6">
+			<div class="rtc-stats-card">
+				<h3><i class="fa fa-users"></i> Recent Sessions</h3>
+				<div class="rtc-activity-feed">
+					{% for session in recent_sessions %}
+					<div class="rtc-activity-item">
+						<strong>{{ session.session_name }}</strong>
+						<div class="rtc-activity-time">{{ session.created_at }}</div>
+						<small>{{ session.participant_count }} participants</small>
+					</div>
+					{% else %}
+					<div class="rtc-activity-item">
+						<em>No recent sessions</em>
+					</div>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
+
+		<!-- Active Video Calls -->
+		<div class="col-md-6">
+			<div class="rtc-stats-card">
+				<h3><i class="fa fa-video"></i> Active Video Calls</h3>
+				<div class="rtc-activity-feed">
+					{% for call in active_calls %}
+					<div class="rtc-activity-item">
+						<strong>{{ call.call_name }}</strong>
+						<div class="rtc-activity-time">Started: {{ call.started_at }}</div>
+						<small>{{ call.participants }} participants</small>
+						<div>
+							<a href="/rtc-video/meeting/{{ call.call_id }}" class="btn btn-sm btn-primary">Join</a>
+						</div>
+					</div>
+					{% else %}
+					<div class="rtc-activity-item">
+						<em>No active video calls</em>
+					</div>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Quick Actions -->
+	<div class="row mt-4">
+		<div class="col-12">
+			<div class="rtc-stats-card">
+				<h3><i class="fa fa-bolt"></i> Quick Actions</h3>
+				<div class="btn-group" role="group">
+					<a href="{{ url_for('RTCSessionModelView.add') }}" class="btn btn-primary">
+						<i class="fa fa-plus"></i> Start Session
+					</a>
+					<a href="{{ url_for('RTCVideoCallModelView.add') }}" class="btn btn-success">
+						<i class="fa fa-video"></i> Start Video Call
+					</a>
+					<a href="/rtc-dashboard/analytics/" class="btn btn-info">
+						<i class="fa fa-chart-line"></i> View Analytics
+					</a>
+					<a href="/rtc-dashboard/presence/" class="btn btn-warning">
+						<i class="fa fa-eye"></i> Presence Overview
+					</a>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+// Auto-refresh dashboard every 30 seconds
+setInterval(function() {
+	location.reload();
+}, 30000);
+</script>
+{% endblock %}
