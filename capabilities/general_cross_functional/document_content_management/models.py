@@ -12,10 +12,10 @@ Website: www.datacraft.co.ke
 from datetime import datetime, date, time
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List, Optional, Union, Literal, Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, validator, root_validator, AfterValidator
 from pydantic.config import ConfigDict
 from pydantic.types import EmailStr, HttpUrl, Json
 from uuid_extensions import uuid7str
@@ -48,6 +48,25 @@ class DCMDocumentStatus(str, Enum):
 	APPROVED = "approved"
 	PUBLISHED = "published"
 	ARCHIVED = "archived"
+
+class DCMOCRStatus(str, Enum):
+	PENDING = "pending"
+	PROCESSING = "processing"
+	COMPLETED = "completed"
+	FAILED = "failed"
+	SKIPPED = "skipped"
+
+class DCMOCRLanguage(str, Enum):
+	ENGLISH = "eng"
+	FRENCH = "fra"
+	GERMAN = "deu"
+	SPANISH = "spa"
+	ITALIAN = "ita"
+	PORTUGUESE = "por"
+	RUSSIAN = "rus"
+	CHINESE_SIMPLIFIED = "chi_sim"
+	JAPANESE = "jpn"
+	ARABIC = "ara"
 	OBSOLETE = "obsolete"
 	LOCKED = "locked"
 	CHECKED_OUT = "checked_out"
@@ -115,9 +134,21 @@ class DCMContentFormat(str, Enum):
 	JPG = "jpg"
 	PNG = "png"
 	GIF = "gif"
+	SVG = "svg"
+	WEBP = "webp"
+	AVIF = "avif"
 	MP4 = "mp4"
+	MOV = "mov"
+	AVI = "avi"
 	MP3 = "mp3"
+	WAV = "wav"
+	FLAC = "flac"
 	ZIP = "zip"
+	RAR = "rar"
+	7Z = "7z"
+	CAD = "cad"
+	DWG = "dwg"
+	STEP = "step"
 	OTHER = "other"
 
 
@@ -167,21 +198,21 @@ class DCMDocument(DCMBase):
 	
 	# File Information
 	file_name: str = Field(..., description="Original file name")
-	file_size: int = Field(..., description="File size in bytes")
+	file_size: ValidatedFileSize = Field(..., description="File size in bytes")
 	file_hash: str = Field(..., description="File content hash (SHA-256)")
 	mime_type: str = Field(..., description="MIME type")
 	storage_path: str = Field(..., description="Storage location path")
 	
 	# Version Control
-	version_number: str = Field(default="1.0", description="Current version number")
+	version_number: ValidatedVersionNumber = Field(default="1.0", description="Current version number")
 	major_version: int = Field(default=1, description="Major version number")
 	minor_version: int = Field(default=0, description="Minor version number")
 	is_latest_version: bool = Field(default=True, description="Is this the latest version")
 	
 	# Content Metadata
 	language: str = Field(default="en", description="Content language")
-	keywords: List[str] = Field(default_factory=list, description="Document keywords/tags")
-	categories: List[str] = Field(default_factory=list, description="Document categories")
+	keywords: ValidatedStringList = Field(default_factory=list, description="Document keywords/tags")
+	categories: ValidatedStringList = Field(default_factory=list, description="Document categories")
 	subject: Optional[str] = Field(default=None, description="Document subject")
 	author: Optional[str] = Field(default=None, description="Document author")
 	
@@ -617,6 +648,271 @@ class DCMAsset(DCMBase):
 	approved_at: Optional[datetime] = Field(default=None, description="Approval timestamp")
 
 
+# OCR (Optical Character Recognition) Models
+class DCMOCRResult(DCMBase):
+	"""OCR processing result with extracted text and metadata"""
+	
+	document_id: str = Field(..., description="Source document ID")
+	page_number: int = Field(default=1, description="Page number processed")
+	
+	# OCR Processing
+	ocr_status: DCMOCRStatus = Field(default=DCMOCRStatus.PENDING, description="OCR processing status")
+	language_detected: DCMOCRLanguage = Field(default=DCMOCRLanguage.ENGLISH, description="Detected language")
+	language_confidence: float = Field(default=0.0, description="Language detection confidence")
+	
+	# Extracted Content
+	text_content: str = Field(default="", description="Extracted text content")
+	confidence_score: float = Field(default=0.0, description="Overall OCR confidence score")
+	
+	# Text Structure and Layout
+	text_blocks: List[Dict[str, Any]] = Field(default_factory=list, description="Text blocks with coordinates")
+	layout_structure: Dict[str, Any] = Field(default_factory=dict, description="Document layout structure")
+	reading_order: List[int] = Field(default_factory=list, description="Reading order of text blocks")
+	
+	# Content Analysis
+	word_count: int = Field(default=0, description="Total word count")
+	character_count: int = Field(default=0, description="Total character count")
+	line_count: int = Field(default=0, description="Total line count")
+	paragraph_count: int = Field(default=0, description="Total paragraph count")
+	
+	# Image Processing
+	image_preprocessing: List[str] = Field(default_factory=list, description="Applied preprocessing steps")
+	image_quality: float = Field(default=0.0, description="Source image quality score")
+	image_dpi: Optional[int] = Field(default=None, description="Image DPI")
+	image_dimensions: Optional[Dict[str, int]] = Field(default=None, description="Image dimensions")
+	
+	# Processing Metadata
+	processing_engine: str = Field(default="tesseract", description="OCR engine used")
+	engine_version: Optional[str] = Field(default=None, description="OCR engine version")
+	processing_time_ms: int = Field(default=0, description="Processing time in milliseconds")
+	processing_config: Dict[str, Any] = Field(default_factory=dict, description="OCR configuration used")
+	
+	# AI Enhancement
+	ai_text_correction: Optional[str] = Field(default=None, description="AI-corrected text")
+	ai_entities: List[Dict[str, Any]] = Field(default_factory=list, description="AI-extracted entities")
+	ai_classification: Optional[Dict[str, Any]] = Field(default=None, description="AI content classification")
+	ai_confidence: float = Field(default=0.0, description="AI enhancement confidence")
+	
+	# Quality Metrics
+	text_quality_score: float = Field(default=0.0, description="Text quality assessment")
+	character_accuracy: float = Field(default=0.0, description="Character-level accuracy")
+	word_accuracy: float = Field(default=0.0, description="Word-level accuracy")
+	
+	# Error Handling
+	warnings: List[str] = Field(default_factory=list, description="Processing warnings")
+	errors: List[str] = Field(default_factory=list, description="Processing errors")
+	
+	# Post-Processing
+	spell_checked: bool = Field(default=False, description="Spell checking applied")
+	grammar_checked: bool = Field(default=False, description="Grammar checking applied")
+	manual_corrections: List[Dict[str, Any]] = Field(default_factory=list, description="Manual corrections applied")
+
+
+class DCMOCRBatch(DCMBase):
+	"""Batch OCR processing for multiple documents"""
+	
+	batch_name: str = Field(..., description="Batch processing name")
+	document_ids: List[str] = Field(..., description="Document IDs to process")
+	
+	# Batch Configuration
+	ocr_language: DCMOCRLanguage = Field(default=DCMOCRLanguage.ENGLISH, description="Target OCR language")
+	preprocessing_config: Dict[str, Any] = Field(default_factory=dict, description="Image preprocessing configuration")
+	ai_enhancement: bool = Field(default=True, description="Enable AI text enhancement")
+	parallel_processing: bool = Field(default=True, description="Enable parallel processing")
+	
+	# Batch Status
+	batch_status: DCMOCRStatus = Field(default=DCMOCRStatus.PENDING, description="Batch processing status")
+	total_documents: int = Field(default=0, description="Total documents in batch")
+	processed_documents: int = Field(default=0, description="Documents processed")
+	successful_documents: int = Field(default=0, description="Successfully processed documents")
+	failed_documents: int = Field(default=0, description="Failed document count")
+	
+	# Processing Metadata
+	started_at: Optional[datetime] = Field(default=None, description="Batch start time")
+	completed_at: Optional[datetime] = Field(default=None, description="Batch completion time")
+	estimated_completion: Optional[datetime] = Field(default=None, description="Estimated completion time")
+	processing_progress: float = Field(default=0.0, description="Processing progress percentage")
+	
+	# Results Summary
+	total_pages_processed: int = Field(default=0, description="Total pages processed")
+	total_text_extracted: int = Field(default=0, description="Total characters extracted")
+	average_confidence: float = Field(default=0.0, description="Average OCR confidence")
+	
+	# Resource Usage
+	processing_time_total_ms: int = Field(default=0, description="Total processing time")
+	cpu_time_ms: int = Field(default=0, description="CPU time used")
+	memory_usage_mb: float = Field(default=0.0, description="Peak memory usage")
+	
+	# Error Handling
+	batch_errors: List[str] = Field(default_factory=list, description="Batch-level errors")
+	document_errors: Dict[str, List[str]] = Field(default_factory=dict, description="Document-specific errors")
+
+
+class DCMOCRConfiguration(DCMBase):
+	"""OCR engine configuration settings"""
+	
+	config_name: str = Field(..., description="Configuration name")
+	description: Optional[str] = Field(default=None, description="Configuration description")
+	
+	# Engine Settings
+	ocr_engine: str = Field(default="tesseract", description="OCR engine to use")
+	engine_version: str = Field(..., description="OCR engine version")
+	
+	# Language Configuration
+	primary_language: DCMOCRLanguage = Field(default=DCMOCRLanguage.ENGLISH, description="Primary OCR language")
+	secondary_languages: List[DCMOCRLanguage] = Field(default_factory=list, description="Secondary languages")
+	language_detection: bool = Field(default=True, description="Enable automatic language detection")
+	
+	# Image Processing
+	image_preprocessing: bool = Field(default=True, description="Enable image preprocessing")
+	dpi_conversion: int = Field(default=300, description="Target DPI for processing")
+	max_image_size: int = Field(default=4096, description="Maximum image dimension")
+	
+	# Preprocessing Steps
+	grayscale_conversion: bool = Field(default=True, description="Convert to grayscale")
+	noise_reduction: bool = Field(default=True, description="Apply noise reduction")
+	contrast_enhancement: bool = Field(default=True, description="Enhance contrast")
+	deskewing: bool = Field(default=True, description="Correct skewed text")
+	border_removal: bool = Field(default=True, description="Remove borders")
+	
+	# OCR Parameters
+	page_segmentation_mode: int = Field(default=6, description="Tesseract PSM mode")
+	ocr_engine_mode: int = Field(default=3, description="Tesseract OEM mode")
+	confidence_threshold: float = Field(default=0.5, description="Minimum confidence threshold")
+	preserve_interword_spaces: bool = Field(default=True, description="Preserve spaces between words")
+	
+	# Performance Settings
+	parallel_processing: bool = Field(default=True, description="Enable parallel processing")
+	max_workers: int = Field(default=4, description="Maximum worker threads")
+	memory_limit_mb: int = Field(default=2048, description="Memory limit per worker")
+	timeout_seconds: int = Field(default=300, description="Processing timeout")
+	
+	# Output Settings
+	preserve_layout: bool = Field(default=True, description="Preserve document layout")
+	extract_tables: bool = Field(default=True, description="Extract table structures")
+	extract_images: bool = Field(default=False, description="Extract embedded images")
+	output_formats: List[str] = Field(default_factory=lambda: ["text", "json"], description="Output formats")
+	
+	# Quality Control
+	spell_checking: bool = Field(default=True, description="Enable spell checking")
+	grammar_checking: bool = Field(default=False, description="Enable grammar checking")
+	manual_review_threshold: float = Field(default=0.7, description="Threshold for manual review")
+	
+	# AI Enhancement
+	ai_text_correction: bool = Field(default=True, description="Enable AI text correction")
+	ai_entity_extraction: bool = Field(default=True, description="Enable AI entity extraction")
+	ai_classification: bool = Field(default=True, description="Enable AI content classification")
+	
+	# Configuration Metadata
+	is_default: bool = Field(default=False, description="Default configuration flag")
+	usage_count: int = Field(default=0, description="Configuration usage count")
+	last_updated_by: str = Field(..., description="Last updated by user ID")
+
+
+class DCMOCRQualityMetrics(DCMBase):
+	"""OCR quality assessment and metrics"""
+	
+	ocr_result_id: str = Field(..., description="OCR result ID")
+	document_id: str = Field(..., description="Source document ID")
+	
+	# Character-Level Metrics
+	character_accuracy: float = Field(default=0.0, description="Character-level accuracy")
+	character_precision: float = Field(default=0.0, description="Character precision")
+	character_recall: float = Field(default=0.0, description="Character recall")
+	character_f1_score: float = Field(default=0.0, description="Character F1 score")
+	
+	# Word-Level Metrics
+	word_accuracy: float = Field(default=0.0, description="Word-level accuracy")
+	word_precision: float = Field(default=0.0, description="Word precision")
+	word_recall: float = Field(default=0.0, description="Word recall")
+	word_f1_score: float = Field(default=0.0, description="Word F1 score")
+	
+	# Layout Metrics
+	layout_accuracy: float = Field(default=0.0, description="Layout preservation accuracy")
+	reading_order_accuracy: float = Field(default=0.0, description="Reading order accuracy")
+	table_detection_accuracy: float = Field(default=0.0, description="Table detection accuracy")
+	
+	# Content Quality
+	text_coherence_score: float = Field(default=0.0, description="Text coherence assessment")
+	language_consistency_score: float = Field(default=0.0, description="Language consistency score")
+	spelling_accuracy: float = Field(default=0.0, description="Spelling accuracy")
+	grammar_correctness: float = Field(default=0.0, description="Grammar correctness")
+	
+	# Error Analysis
+	substitution_errors: int = Field(default=0, description="Character substitution errors")
+	insertion_errors: int = Field(default=0, description="Character insertion errors")
+	deletion_errors: int = Field(default=0, description="Character deletion errors")
+	
+	# Document-Specific Metrics
+	document_type_score: float = Field(default=0.0, description="Document type-specific quality score")
+	domain_specific_score: float = Field(default=0.0, description="Domain-specific quality score")
+	
+	# Comparison Metrics (if ground truth available)
+	ground_truth_available: bool = Field(default=False, description="Ground truth data available")
+	levenshtein_distance: Optional[int] = Field(default=None, description="Edit distance from ground truth")
+	bleu_score: Optional[float] = Field(default=None, description="BLEU score vs ground truth")
+	
+	# Quality Assessment
+	overall_quality_score: float = Field(default=0.0, description="Overall quality assessment")
+	quality_grade: str = Field(default="unknown", description="Quality grade (A-F)")
+	manual_review_required: bool = Field(default=False, description="Requires manual review")
+	
+	# Confidence Intervals
+	confidence_interval_lower: float = Field(default=0.0, description="Confidence interval lower bound")
+	confidence_interval_upper: float = Field(default=1.0, description="Confidence interval upper bound")
+	statistical_significance: float = Field(default=0.0, description="Statistical significance level")
+
+
+class DCMOCRTrainingData(DCMBase):
+	"""OCR training data for model improvement"""
+	
+	training_name: str = Field(..., description="Training dataset name")
+	dataset_version: str = Field(..., description="Dataset version")
+	
+	# Source Data
+	source_document_id: str = Field(..., description="Source document ID")
+	page_number: int = Field(default=1, description="Page number")
+	
+	# Ground Truth
+	ground_truth_text: str = Field(..., description="Ground truth text content")
+	ground_truth_layout: Dict[str, Any] = Field(default_factory=dict, description="Ground truth layout")
+	annotation_quality: float = Field(default=1.0, description="Annotation quality score")
+	
+	# OCR Output
+	ocr_text: str = Field(..., description="OCR extracted text")
+	ocr_confidence: float = Field(default=0.0, description="OCR confidence score")
+	ocr_layout: Dict[str, Any] = Field(default_factory=dict, description="OCR layout output")
+	
+	# Image Data
+	image_path: str = Field(..., description="Training image path")
+	image_hash: str = Field(..., description="Image content hash")
+	image_quality: float = Field(default=0.0, description="Image quality score")
+	image_metadata: Dict[str, Any] = Field(default_factory=dict, description="Image processing metadata")
+	
+	# Training Metadata
+	training_purpose: str = Field(..., description="Training purpose/use case")
+	language: DCMOCRLanguage = Field(default=DCMOCRLanguage.ENGLISH, description="Content language")
+	document_type: str = Field(..., description="Document type category")
+	domain: str = Field(default="general", description="Content domain")
+	difficulty_level: str = Field(default="medium", description="OCR difficulty level")
+	
+	# Quality Control
+	annotator_id: str = Field(..., description="Annotator user ID")
+	reviewer_id: Optional[str] = Field(default=None, description="Reviewer user ID")
+	annotation_time_minutes: float = Field(default=0.0, description="Annotation time")
+	review_status: str = Field(default="pending", description="Review status")
+	
+	# Model Performance
+	baseline_accuracy: float = Field(default=0.0, description="Baseline model accuracy")
+	target_accuracy: float = Field(default=0.95, description="Target accuracy goal")
+	improvement_gained: float = Field(default=0.0, description="Accuracy improvement from training")
+	
+	# Usage Tracking
+	training_runs: int = Field(default=0, description="Number of times used in training")
+	last_used_in_training: Optional[datetime] = Field(default=None, description="Last training usage")
+	contribution_score: float = Field(default=0.0, description="Contribution to model improvement")
+
+
 class DCMAssetCollection(DCMBase):
 	"""Collections for organizing digital assets"""
 	name: str = Field(..., description="Collection name")
@@ -824,36 +1120,263 @@ class DCMAnalytics(DCMBase):
 	confidence_level: Optional[float] = Field(default=None, description="Confidence level for estimates")
 
 
+# APG AI/ML Integration Models
+class DCMIntelligentProcessing(DCMBase):
+	"""Intelligent Document Processing with self-learning AI"""
+	document_id: str = Field(..., description="Document ID")
+	processing_type: str = Field(..., description="Processing type (ocr, extraction, classification)")
+	model_version: str = Field(..., description="AI model version used")
+	
+	# APG AI/ML Integration
+	ai_model_id: str = Field(..., description="APG AI model identifier")
+	rag_context_id: Optional[str] = Field(default=None, description="RAG context identifier")
+	confidence_score: float = Field(..., description="Processing confidence score")
+	
+	# Processing Results
+	extracted_data: Dict[str, Any] = Field(default_factory=dict, description="Extracted structured data")
+	classification_results: List[Dict[str, Any]] = Field(default_factory=list, description="Classification results")
+	validation_status: str = Field(default="pending", description="Validation status")
+	
+	# Self-Learning Components
+	user_corrections: List[Dict[str, Any]] = Field(default_factory=list, description="User corrections for learning")
+	model_feedback: Optional[Dict[str, Any]] = Field(default=None, description="Model feedback data")
+	retraining_eligible: bool = Field(default=False, description="Eligible for model retraining")
+	
+	# Performance Metrics
+	processing_time_ms: int = Field(..., description="Processing time in milliseconds")
+	accuracy_score: Optional[float] = Field(default=None, description="Accuracy score if validated")
+	error_count: int = Field(default=0, description="Number of processing errors")
+
+
+class DCMSemanticSearch(DCMBase):
+	"""Contextual and semantic search with NLP"""
+	query_text: str = Field(..., description="Original search query")
+	user_id: str = Field(..., description="User who performed search")
+	
+	# APG NLP Integration
+	vector_embedding: List[float] = Field(default_factory=list, description="Query vector embedding")
+	semantic_expansion: List[str] = Field(default_factory=list, description="Semantically expanded terms")
+	intent_classification: str = Field(..., description="Classified user intent")
+	
+	# Search Results
+	result_document_ids: List[str] = Field(default_factory=list, description="Result document IDs")
+	relevance_scores: List[float] = Field(default_factory=list, description="Relevance scores")
+	context_matches: List[Dict[str, Any]] = Field(default_factory=list, description="Context match details")
+	
+	# Performance Metrics
+	response_time_ms: int = Field(..., description="Search response time")
+	result_count: int = Field(default=0, description="Number of results returned")
+	click_through_rate: Optional[float] = Field(default=None, description="Click-through rate")
+	user_satisfaction: Optional[int] = Field(default=None, description="User satisfaction rating 1-5")
+
+
+class DCMContentIntelligence(DCMBase):
+	"""AI-driven content analysis and intelligence"""
+	document_id: str = Field(..., description="Document ID")
+	analysis_type: str = Field(..., description="Analysis type (classification, sentiment, entities)")
+	
+	# APG AI Analysis Results
+	ai_classification: Dict[str, float] = Field(default_factory=dict, description="AI classification scores")
+	entity_extraction: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted entities")
+	sentiment_analysis: Optional[Dict[str, float]] = Field(default=None, description="Sentiment scores")
+	content_summary: Optional[str] = Field(default=None, description="AI-generated summary")
+	
+	# Content Relationships
+	similar_documents: List[str] = Field(default_factory=list, description="Similar document IDs")
+	related_concepts: List[str] = Field(default_factory=list, description="Related concept tags")
+	content_clusters: List[str] = Field(default_factory=list, description="Content cluster IDs")
+	
+	# Risk and Compliance Analysis
+	risk_assessment: Dict[str, float] = Field(default_factory=dict, description="Risk assessment scores")
+	compliance_flags: List[str] = Field(default_factory=list, description="Compliance issue flags")
+	sensitive_data_detected: bool = Field(default=False, description="Sensitive data detection flag")
+	
+	# Quality Metrics
+	content_quality_score: float = Field(default=0.0, description="Content quality score")
+	readability_score: Optional[float] = Field(default=None, description="Readability score")
+	completeness_score: float = Field(default=0.0, description="Content completeness score")
+
+
+class DCMGenerativeAI(DCMBase):
+	"""Generative AI integration for content interaction"""
+	document_id: str = Field(..., description="Document ID")
+	user_id: str = Field(..., description="User ID")
+	interaction_type: str = Field(..., description="Interaction type (summarize, qa, translate)")
+	
+	# User Request
+	user_prompt: str = Field(..., description="User's request or question")
+	context_documents: List[str] = Field(default_factory=list, description="Context document IDs")
+	rag_context: Optional[str] = Field(default=None, description="RAG context identifier")
+	
+	# APG Generative AI Response
+	genai_response: str = Field(..., description="Generated AI response")
+	response_sources: List[Dict[str, Any]] = Field(default_factory=list, description="Response source citations")
+	confidence_score: float = Field(..., description="Response confidence score")
+	
+	# Response Metadata
+	token_count: int = Field(default=0, description="Token count for response")
+	processing_time_ms: int = Field(..., description="Generation time in milliseconds")
+	model_version: str = Field(..., description="Generative model version used")
+	
+	# User Feedback
+	user_rating: Optional[int] = Field(default=None, description="User rating 1-5")
+	feedback_text: Optional[str] = Field(default=None, description="User feedback text")
+	response_used: bool = Field(default=False, description="Whether response was used")
+
+
+class DCMPredictiveAnalytics(DCMBase):
+	"""Predictive analytics for content value and risk"""
+	document_id: str = Field(..., description="Document ID")
+	prediction_type: str = Field(..., description="Prediction type (value, risk, usage)")
+	model_version: str = Field(..., description="Prediction model version")
+	
+	# Value Predictions
+	content_value_score: float = Field(default=0.0, description="Predicted content value score")
+	future_usage_prediction: Dict[str, float] = Field(default_factory=dict, description="Usage predictions")
+	business_impact_score: float = Field(default=0.0, description="Predicted business impact")
+	
+	# Risk Predictions
+	risk_probability: Dict[str, float] = Field(default_factory=dict, description="Risk probabilities")
+	compliance_risk_score: float = Field(default=0.0, description="Compliance risk score")
+	obsolescence_probability: float = Field(default=0.0, description="Content obsolescence probability")
+	
+	# Lifecycle Predictions
+	expected_lifespan_days: Optional[int] = Field(default=None, description="Expected content lifespan")
+	next_review_prediction: Optional[date] = Field(default=None, description="Predicted next review date")
+	archival_recommendation: Optional[date] = Field(default=None, description="Recommended archival date")
+	
+	# Confidence and Validation
+	prediction_confidence: float = Field(..., description="Prediction confidence score")
+	historical_accuracy: Optional[float] = Field(default=None, description="Historical model accuracy")
+	validation_status: str = Field(default="pending", description="Prediction validation status")
+
+
+class DCMBlockchainProvenance(DCMBase):
+	"""Blockchain-verified document provenance and integrity"""
+	document_id: str = Field(..., description="Document ID")
+	document_hash: str = Field(..., description="Document content hash")
+	transaction_hash: str = Field(..., description="Blockchain transaction hash")
+	
+	# Blockchain Details
+	blockchain_network: str = Field(..., description="Blockchain network used")
+	block_number: Optional[int] = Field(default=None, description="Block number")
+	block_timestamp: datetime = Field(..., description="Block timestamp")
+	
+	# Provenance Information
+	origin_proof: Dict[str, Any] = Field(..., description="Document origin proof")
+	chain_of_custody: List[Dict[str, Any]] = Field(default_factory=list, description="Chain of custody records")
+	integrity_checkpoints: List[Dict[str, Any]] = Field(default_factory=list, description="Integrity checkpoints")
+	
+	# Verification Status
+	verification_status: str = Field(..., description="Verification status")
+	last_verified_at: datetime = Field(..., description="Last verification timestamp")
+	verification_count: int = Field(default=0, description="Number of verifications performed")
+	
+	# Smart Contract Data
+	smart_contract_address: Optional[str] = Field(default=None, description="Smart contract address")
+	contract_method: Optional[str] = Field(default=None, description="Contract method used")
+	gas_used: Optional[int] = Field(default=None, description="Gas used for transaction")
+
+
+class DCMDataLossPrevention(DCMBase):
+	"""Active data loss prevention and insider risk mitigation"""
+	document_id: str = Field(..., description="Document ID")
+	user_id: str = Field(..., description="User ID involved in event")
+	event_type: str = Field(..., description="DLP event type")
+	
+	# Risk Assessment
+	risk_level: str = Field(..., description="Risk level (low, medium, high, critical)")
+	risk_score: float = Field(..., description="Numerical risk score")
+	behavioral_anomaly: bool = Field(default=False, description="Behavioral anomaly detected")
+	
+	# Event Details
+	access_pattern: Dict[str, Any] = Field(..., description="Access pattern analysis")
+	content_sensitivity: str = Field(..., description="Content sensitivity classification")
+	policy_violations: List[str] = Field(default_factory=list, description="Policy violations detected")
+	
+	# Response Actions
+	auto_response_taken: bool = Field(default=False, description="Automatic response taken")
+	response_actions: List[str] = Field(default_factory=list, description="Response actions taken")
+	alert_generated: bool = Field(default=False, description="Alert generated flag")
+	
+	# Incident Management
+	incident_id: Optional[str] = Field(default=None, description="Related incident ID")
+	escalation_level: int = Field(default=0, description="Escalation level")
+	resolution_status: str = Field(default="open", description="Resolution status")
+	false_positive: Optional[bool] = Field(default=None, description="False positive flag")
+
+
+# Extended Models for AI/ML Integration
+class DCMContentFabric(DCMBase):
+	"""Unified content fabric across multiple repositories"""
+	repository_id: str = Field(..., description="External repository ID")
+	repository_type: str = Field(..., description="Repository type (sharepoint, gdrive, s3)")
+	local_document_id: str = Field(..., description="Local document ID")
+	
+	# Synchronization
+	external_document_id: str = Field(..., description="External document ID")
+	external_path: str = Field(..., description="External document path")
+	sync_status: str = Field(..., description="Synchronization status")
+	last_sync_at: datetime = Field(..., description="Last synchronization timestamp")
+	
+	# Metadata Mapping
+	metadata_mapping: Dict[str, str] = Field(default_factory=dict, description="Metadata field mapping")
+	conflict_resolution: Optional[Dict[str, Any]] = Field(default=None, description="Conflict resolution data")
+	sync_direction: str = Field(default="bidirectional", description="Sync direction")
+	
+	# Performance Tracking
+	sync_duration_ms: Optional[int] = Field(default=None, description="Last sync duration")
+	error_count: int = Field(default=0, description="Synchronization error count")
+	last_error: Optional[str] = Field(default=None, description="Last synchronization error")
+
+
+class DCMProcessAutomation(DCMBase):
+	"""Intelligent process automation with dynamic routing"""
+	document_id: str = Field(..., description="Document ID")
+	process_instance_id: str = Field(..., description="Process instance ID")
+	routing_decision: str = Field(..., description="Routing decision made")
+	
+	# AI-Driven Routing
+	content_analysis: Dict[str, Any] = Field(..., description="Content analysis results")
+	routing_confidence: float = Field(..., description="Routing decision confidence")
+	alternative_routes: List[Dict[str, Any]] = Field(default_factory=list, description="Alternative routing options")
+	
+	# Dynamic Adaptation
+	process_adjustments: List[Dict[str, Any]] = Field(default_factory=list, description="Process adjustments made")
+	learning_data: Optional[Dict[str, Any]] = Field(default=None, description="Learning data for future routing")
+	performance_metrics: Dict[str, float] = Field(default_factory=dict, description="Process performance metrics")
+	
+	# Business Rules
+	applied_rules: List[str] = Field(default_factory=list, description="Applied business rules")
+	exception_handling: Optional[Dict[str, Any]] = Field(default=None, description="Exception handling data")
+	sla_compliance: bool = Field(default=True, description="SLA compliance status")
+
+
 # Validation Methods
-@validator('file_size')
-def validate_file_size(cls, v):
+def validate_file_size(v: int) -> int:
 	if v < 0:
 		raise ValueError("File size cannot be negative")
 	return v
 
-
-@validator('version_number')
-def validate_version_number(cls, v):
+def validate_version_number(v: str) -> str:
 	if not v or not isinstance(v, str):
 		raise ValueError("Version number must be a non-empty string")
 	return v
 
+def validate_confidence_score(v: float) -> float:
+	if not 0.0 <= v <= 1.0:
+		raise ValueError("Confidence score must be between 0.0 and 1.0")
+	return v
 
-@root_validator
-def validate_date_consistency(cls, values):
-	created_at = values.get('created_at')
-	updated_at = values.get('updated_at')
-	
-	if created_at and updated_at and updated_at < created_at:
-		raise ValueError("Updated time cannot be before creation time")
-	
-	return values
-
-
-@validator('keywords', 'tags', 'categories', pre=True)
-def validate_string_lists(cls, v):
+def validate_string_lists(v: Union[str, List[str], None]) -> List[str]:
 	if v is None:
 		return []
 	if isinstance(v, str):
 		return [tag.strip() for tag in v.split(',') if tag.strip()]
 	return v
+
+# Apply validators using Annotated types
+ValidatedFileSize = Annotated[int, AfterValidator(validate_file_size)]
+ValidatedVersionNumber = Annotated[str, AfterValidator(validate_version_number)]
+ValidatedConfidenceScore = Annotated[float, AfterValidator(validate_confidence_score)]
+ValidatedStringList = Annotated[List[str], AfterValidator(validate_string_lists)]

@@ -697,3 +697,182 @@ async def get_dlp_alerts(
 		"risk_score": 0.75,
 		"monitoring_status": "active"
 	}
+
+
+# OCR (Optical Character Recognition) Endpoints
+
+@router.post("/documents/{document_id}/ocr")
+async def process_document_ocr(
+	document_id: str,
+	options: Dict[str, Any] = None,
+	user_id: str = Depends(get_current_user),
+	tenant_id: str = Depends(get_tenant_id)
+):
+	"""Process document with OCR capabilities."""
+	
+	try:
+		# This would retrieve the actual file path from document metadata
+		file_path = f"/documents/{document_id}"
+		
+		# Process OCR using service
+		service = DocumentContentManagementService()
+		result = await service.process_document_ocr(
+			document_id=document_id,
+			file_path=file_path,
+			user_id=user_id,
+			tenant_id=tenant_id,
+			options=options or {}
+		)
+		
+		return {
+			"message": "OCR processing completed successfully",
+			"document_id": document_id,
+			"ocr_result": result
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
+
+
+@router.post("/ocr/batch")
+async def batch_ocr_processing(
+	request: Dict[str, Any],
+	user_id: str = Depends(get_current_user),
+	tenant_id: str = Depends(get_tenant_id)
+):
+	"""Process multiple documents with OCR in batch."""
+	
+	try:
+		document_ids = request.get('document_ids', [])
+		batch_name = request.get('batch_name')
+		options = request.get('options', {})
+		
+		if not document_ids:
+			raise HTTPException(status_code=400, detail="No document IDs provided")
+		
+		service = DocumentContentManagementService()
+		result = await service.batch_ocr_processing(
+			document_ids=document_ids,
+			user_id=user_id,
+			tenant_id=tenant_id,
+			batch_name=batch_name,
+			options=options
+		)
+		
+		return {
+			"message": "Batch OCR processing initiated",
+			"batch_result": result
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Batch OCR processing failed: {str(e)}")
+
+
+@router.get("/documents/{document_id}/ocr")
+async def get_document_ocr_result(
+	document_id: str,
+	user_id: str = Depends(get_current_user),
+	tenant_id: str = Depends(get_tenant_id)
+):
+	"""Get OCR results for a document."""
+	
+	try:
+		service = DocumentContentManagementService()
+		result = await service.get_ocr_result(
+			document_id=document_id,
+			user_id=user_id,
+			tenant_id=tenant_id
+		)
+		
+		if not result:
+			raise HTTPException(status_code=404, detail="OCR results not found")
+		
+		return {
+			"document_id": document_id,
+			"ocr_result": result
+		}
+		
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Error retrieving OCR results: {str(e)}")
+
+
+@router.get("/ocr/languages")
+async def get_supported_ocr_languages():
+	"""Get list of supported OCR languages."""
+	
+	try:
+		service = DocumentContentManagementService()
+		languages = await service.get_supported_ocr_languages()
+		
+		return {
+			"supported_languages": languages,
+			"language_codes": {
+				"eng": "English",
+				"fra": "French",
+				"deu": "German",
+				"spa": "Spanish",
+				"ita": "Italian",
+				"por": "Portuguese",
+				"rus": "Russian",
+				"chi_sim": "Chinese (Simplified)",
+				"jpn": "Japanese",
+				"ara": "Arabic"
+			}
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Error retrieving supported languages: {str(e)}")
+
+
+@router.put("/ocr/configuration/{config_name}")
+async def update_ocr_configuration(
+	config_name: str,
+	config_data: Dict[str, Any],
+	user_id: str = Depends(get_current_user),
+	tenant_id: str = Depends(get_tenant_id)
+):
+	"""Update OCR configuration settings."""
+	
+	try:
+		service = DocumentContentManagementService()
+		result = await service.update_ocr_configuration(
+			config_name=config_name,
+			config_data=config_data,
+			user_id=user_id,
+			tenant_id=tenant_id
+		)
+		
+		return {
+			"message": "OCR configuration updated successfully",
+			"configuration": result
+		}
+		
+	except ValidationError as e:
+		raise HTTPException(status_code=422, detail=f"Invalid configuration data: {str(e)}")
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Configuration update failed: {str(e)}")
+
+
+@router.get("/ocr/analytics")
+async def get_ocr_analytics(
+	user_id: str = Depends(get_current_user),
+	tenant_id: str = Depends(get_tenant_id)
+):
+	"""Get OCR processing analytics and metrics."""
+	
+	try:
+		service = DocumentContentManagementService()
+		analytics = await service._get_ocr_analytics()
+		
+		return {
+			"ocr_analytics": analytics,
+			"generated_at": datetime.utcnow().isoformat()
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Error retrieving OCR analytics: {str(e)}")
+
+
+# Health and system monitoring endpoints

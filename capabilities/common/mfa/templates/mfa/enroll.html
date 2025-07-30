@@ -1,0 +1,650 @@
+{% extends "mfa/base.html" %}
+
+{% block title %}Enroll MFA Method - APG Platform{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+        <i class="fas fa-plus me-2"></i>Enroll MFA Method
+    </h1>
+    <a href="{{ url_for('MFADashboardView.dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+    </a>
+</div>
+
+<!-- Enrollment Steps Progress -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card mfa-card">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col step-item active" id="step-1">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Choose Method</div>
+                    </div>
+                    <div class="col step-item" id="step-2">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Setup</div>
+                    </div>
+                    <div class="col step-item" id="step-3">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Verify</div>
+                    </div>
+                    <div class="col step-item" id="step-4">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">Complete</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Step 1: Choose Method -->
+<div id="enrollment-step-1" class="enrollment-step">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mfa-card">
+                <div class="card-header">
+                    <h5 class="mb-0">Choose Authentication Method</h5>
+                    <small class="text-muted">Select the type of multi-factor authentication you'd like to set up</small>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for option in enrollment_options %}
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <div class="card method-option h-100" data-method="{{ option.type }}" onclick="selectMethod('{{ option.type }}')">
+                                <div class="card-body text-center">
+                                    <div class="method-icon mb-3">
+                                        <i class="fas fa-{{ option.icon }}" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <h6 class="card-title">{{ option.name }}</h6>
+                                    <p class="card-text text-muted">{{ option.description }}</p>
+                                    <span class="badge bg-{{ 'success' if option.difficulty == 'Easy' else 'warning' if option.difficulty == 'Medium' else 'info' }}">
+                                        {{ option.difficulty }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Step 2: Setup (TOTP) -->
+<div id="enrollment-step-2-TOTP" class="enrollment-step" style="display: none;">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card mfa-card">
+                <div class="card-header">
+                    <h5 class="mb-0">Setup Authenticator App</h5>
+                    <small class="text-muted">Scan the QR code with your authenticator app</small>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="qr-code-container">
+                                <div id="qr-code-placeholder" class="text-center">
+                                    <i class="fas fa-spinner fa-spin" style="font-size: 3rem;"></i>
+                                    <p class="mt-2">Generating QR code...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center">
+                                <button class="btn btn-outline-primary btn-sm" onclick="toggleManualEntry()">
+                                    <i class="fas fa-keyboard me-1"></i>Enter code manually
+                                </button>
+                            </div>
+                            
+                            <div id="manual-entry" style="display: none;" class="mt-3">
+                                <div class="alert alert-info">
+                                    <strong>Manual entry code:</strong><br>
+                                    <code id="manual-secret" class="user-select-all">Loading...</code>
+                                    <button class="btn btn-sm btn-outline-primary ms-2" onclick="copySecret()">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6>Instructions:</h6>
+                            <ol>
+                                <li>Install an authenticator app on your mobile device:
+                                    <ul class="mt-2">
+                                        <li><strong>Google Authenticator</strong> (iOS/Android)</li>
+                                        <li><strong>Authy</strong> (iOS/Android/Desktop)</li>
+                                        <li><strong>Microsoft Authenticator</strong> (iOS/Android)</li>
+                                    </ul>
+                                </li>
+                                <li class="mt-2">Open the app and scan the QR code, or enter the code manually</li>
+                                <li class="mt-2">Enter the 6-digit code from your app below to verify</li>
+                            </ol>
+                            
+                            <div class="mt-4">
+                                <label for="totp-code" class="form-label">Verification Code</label>
+                                <input type="text" class="form-control" id="totp-code" placeholder="000000" maxlength="6">
+                                <div class="form-text">Enter the 6-digit code from your authenticator app</div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <button class="btn btn-primary" onclick="verifyTOTP()">
+                                    <i class="fas fa-check me-1"></i>Verify & Continue
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Step 2: Setup (SMS) -->
+<div id="enrollment-step-2-SMS" class="enrollment-step" style="display: none;">
+    <div class="row">
+        <div class="col-lg-6 mx-auto">
+            <div class="card mfa-card">
+                <div class="card-header">
+                    <h5 class="mb-0">Setup SMS Verification</h5>
+                    <small class="text-muted">Enter your phone number to receive verification codes</small>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="phone-number" class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" id="phone-number" placeholder="+1234567890">
+                        <div class="form-text">Include country code (e.g., +1 for US)</div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button class="btn btn-primary" onclick="sendSMSCode()">
+                            <i class="fas fa-sms me-1"></i>Send Verification Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Step 2: Setup (Face Recognition) -->
+<div id="enrollment-step-2-FACE_RECOGNITION" class="enrollment-step" style="display: none;">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card mfa-card">
+                <div class="card-header">
+                    <h5 class="mb-0">Setup Face Recognition</h5>
+                    <small class="text-muted">Position your face in the camera view and follow the instructions</small>
+                </div>
+                <div class="card-body text-center">
+                    <div class="biometric-preview mb-4" id="face-preview">
+                        <video id="face-video" autoplay muted style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: none;"></video>
+                        <div id="face-placeholder">
+                            <i class="fas fa-user" style="font-size: 4rem; color: #dee2e6;"></i>
+                        </div>
+                    </div>
+                    
+                    <div id="face-instructions" class="mb-4">
+                        <h6>Before we start:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Ensure good lighting</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Look directly at the camera</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Remove glasses if possible</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Keep a neutral expression</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="d-grid gap-2 col-6 mx-auto">
+                        <button class="btn btn-primary" onclick="startFaceEnrollment()">
+                            <i class="fas fa-video me-1"></i>Start Camera
+                        </button>
+                        <button class="btn btn-success" id="capture-face-btn" onclick="captureFace()" style="display: none;">
+                            <i class="fas fa-camera me-1"></i>Capture Face
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Step 3: Verification -->
+<div id="enrollment-step-3" class="enrollment-step" style="display: none;">
+    <div class="row">
+        <div class="col-lg-6 mx-auto">
+            <div class="card mfa-card">
+                <div class="card-header">
+                    <h5 class="mb-0">Verify Your Method</h5>
+                    <small class="text-muted">Complete the verification to activate your new authentication method</small>
+                </div>
+                <div class="card-body text-center">
+                    <div id="verification-content">
+                        <!-- Dynamic content based on method type -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Step 4: Complete -->
+<div id="enrollment-step-4" class="enrollment-step" style="display: none;">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card mfa-card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>Enrollment Complete!
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-shield-alt text-success" style="font-size: 4rem;"></i>
+                    <h4 class="mt-3">Your account is now more secure!</h4>
+                    <p class="text-muted">You've successfully enrolled a new MFA method. You can now use it to authenticate.</p>
+                    
+                    <div id="backup-codes-section" style="display: none;">
+                        <div class="alert alert-warning mt-4">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Save Your Backup Codes</h6>
+                            <p class="mb-3">These codes can be used if you lose access to your primary authentication method. Each code can only be used once.</p>
+                            <div id="backup-codes-display" class="text-center">
+                                <!-- Backup codes will be displayed here -->
+                            </div>
+                            <button class="btn btn-outline-primary btn-sm mt-2" onclick="copyBackupCodes()">
+                                <i class="fas fa-copy me-1"></i>Copy All Codes
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="{{ url_for('MFADashboardView.dashboard') }}" class="btn btn-primary me-2">
+                            <i class="fas fa-dashboard me-1"></i>Go to Dashboard
+                        </a>
+                        <button class="btn btn-outline-primary" onclick="enrollAnother()">
+                            <i class="fas fa-plus me-1"></i>Enroll Another Method
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.method-option {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.method-option:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.method-option.selected {
+    border-color: var(--primary-color);
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.step-item {
+    position: relative;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.step-item.active .step-circle {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.step-item.completed .step-circle {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.step-item.completed .step-circle::before {
+    content: '\f00c';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+}
+
+.step-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.step-item.active .step-label,
+.step-item.completed .step-label {
+    color: #212529;
+    font-weight: 500;
+}
+
+.enrollment-step {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#face-video {
+    transform: scaleX(-1); /* Mirror effect for natural feel */
+}
+
+.biometric-preview.active {
+    border-color: var(--primary-color);
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.backup-code {
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin: 0.25rem;
+    display: inline-block;
+    min-width: 100px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentStep = 1;
+let selectedMethod = null;
+let enrollmentData = {};
+
+function selectMethod(methodType) {
+    selectedMethod = methodType;
+    
+    // Update UI to show selected method
+    document.querySelectorAll('.method-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    document.querySelector(`[data-method="${methodType}"]`).classList.add('selected');
+    
+    // Auto-advance after short delay
+    setTimeout(() => {
+        nextStep();
+    }, 500);
+}
+
+function nextStep() {
+    // Hide current step
+    document.getElementById(`enrollment-step-${currentStep}`).style.display = 'none';
+    
+    // Update step indicators
+    document.getElementById(`step-${currentStep}`).classList.remove('active');
+    document.getElementById(`step-${currentStep}`).classList.add('completed');
+    
+    currentStep++;
+    
+    // Show next step
+    if (currentStep === 2) {
+        // Show method-specific setup
+        const stepElement = document.getElementById(`enrollment-step-2-${selectedMethod}`);
+        if (stepElement) {
+            stepElement.style.display = 'block';
+            initializeMethodSetup();
+        } else {
+            // Default to generic step 3
+            showStep(3);
+        }
+    } else {
+        showStep(currentStep);
+    }
+    
+    // Update step indicator
+    document.getElementById(`step-${currentStep}`).classList.add('active');
+}
+
+function showStep(stepNumber) {
+    // Hide all steps
+    document.querySelectorAll('.enrollment-step').forEach(step => {
+        step.style.display = 'none';
+    });
+    
+    // Show target step
+    document.getElementById(`enrollment-step-${stepNumber}`).style.display = 'block';
+    currentStep = stepNumber;
+}
+
+function initializeMethodSetup() {
+    switch(selectedMethod) {
+        case 'TOTP':
+            initializeTOTP();
+            break;
+        case 'SMS':
+            // SMS setup is ready
+            break;
+        case 'FACE_RECOGNITION':
+            // Face recognition setup is ready
+            break;
+        default:
+            console.log('Unknown method type:', selectedMethod);
+    }
+}
+
+function initializeTOTP() {
+    // Simulate API call to generate TOTP secret
+    MFA.apiCall('/enroll/TOTP/', 'POST', {})
+        .then(response => {
+            if (response.success) {
+                enrollmentData.totp = response;
+                
+                // Display QR code
+                const qrPlaceholder = document.getElementById('qr-code-placeholder');
+                qrPlaceholder.innerHTML = `<img src="${response.qr_code}" alt="QR Code" style="max-width: 200px;">`;
+                
+                // Display manual secret
+                document.getElementById('manual-secret').textContent = response.secret;
+            } else {
+                MFA.showAlert('Failed to generate TOTP secret: ' + response.error, 'danger');
+            }
+        });
+}
+
+function toggleManualEntry() {
+    const manualEntry = document.getElementById('manual-entry');
+    manualEntry.style.display = manualEntry.style.display === 'none' ? 'block' : 'none';
+}
+
+function copySecret() {
+    const secret = document.getElementById('manual-secret').textContent;
+    MFA.copyToClipboard(secret);
+}
+
+function verifyTOTP() {
+    const code = document.getElementById('totp-code').value;
+    
+    if (!code || code.length !== 6) {
+        MFA.showAlert('Please enter a 6-digit code', 'warning');
+        return;
+    }
+    
+    MFA.apiCall('/verify/', 'POST', {
+        method_id: enrollmentData.totp.method_id,
+        verification_code: code
+    })
+    .then(response => {
+        if (response.success && response.verified) {
+            // Show backup codes if provided
+            if (enrollmentData.totp.backup_codes) {
+                enrollmentData.backupCodes = enrollmentData.totp.backup_codes;
+            }
+            nextStep();
+            nextStep(); // Skip to completion
+            showEnrollmentComplete();
+        } else {
+            MFA.showAlert('Verification failed: ' + (response.message || 'Invalid code'), 'danger');
+        }
+    });
+}
+
+function sendSMSCode() {
+    const phoneNumber = document.getElementById('phone-number').value;
+    
+    if (!phoneNumber) {
+        MFA.showAlert('Please enter a phone number', 'warning');
+        return;
+    }
+    
+    MFA.apiCall('/enroll/SMS/', 'POST', {
+        phone_number: phoneNumber
+    })
+    .then(response => {
+        if (response.success) {
+            enrollmentData.sms = response;
+            showSMSVerification();
+        } else {
+            MFA.showAlert('Failed to send SMS: ' + response.error, 'danger');
+        }
+    });
+}
+
+function showSMSVerification() {
+    document.getElementById('verification-content').innerHTML = `
+        <div class="mb-3">
+            <h6>Enter SMS Code</h6>
+            <p class="text-muted">We've sent a verification code to your phone</p>
+            <input type="text" class="form-control" id="sms-code" placeholder="000000" maxlength="6">
+        </div>
+        <button class="btn btn-primary" onclick="verifySMS()">
+            <i class="fas fa-check me-1"></i>Verify Code
+        </button>
+        <button class="btn btn-outline-secondary ms-2" onclick="sendSMSCode()">
+            <i class="fas fa-redo me-1"></i>Resend Code
+        </button>
+    `;
+    nextStep();
+}
+
+function verifySMS() {
+    const code = document.getElementById('sms-code').value;
+    
+    if (!code || code.length !== 6) {
+        MFA.showAlert('Please enter a 6-digit code', 'warning');
+        return;
+    }
+    
+    // Simulate verification
+    MFA.showAlert('SMS method enrolled successfully!', 'success');
+    setTimeout(() => {
+        nextStep();
+        showEnrollmentComplete();
+    }, 1000);
+}
+
+function startFaceEnrollment() {
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            const video = document.getElementById('face-video');
+            const placeholder = document.getElementById('face-placeholder');
+            const preview = document.getElementById('face-preview');
+            const captureBtn = document.getElementById('capture-face-btn');
+            
+            video.srcObject = stream;
+            video.style.display = 'block';
+            placeholder.style.display = 'none';
+            preview.classList.add('active');
+            captureBtn.style.display = 'inline-block';
+            
+            // Update instructions
+            document.getElementById('face-instructions').innerHTML = `
+                <h6>Look directly at the camera</h6>
+                <p class="text-muted">Position your face in the center and click capture when ready</p>
+            `;
+        })
+        .catch(error => {
+            MFA.showAlert('Camera access denied. Please enable camera permissions.', 'danger');
+            console.error('Camera error:', error);
+        });
+}
+
+function captureFace() {
+    // Simulate face capture
+    MFA.showAlert('Face captured successfully! Processing...', 'info');
+    
+    setTimeout(() => {
+        // Stop camera
+        const video = document.getElementById('face-video');
+        const stream = video.srcObject;
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+        
+        MFA.showAlert('Face recognition enrolled successfully!', 'success');
+        setTimeout(() => {
+            nextStep();
+            nextStep(); // Skip verification for face
+            showEnrollmentComplete();
+        }, 1000);
+    }, 2000);
+}
+
+function showEnrollmentComplete() {
+    // Show backup codes if available
+    if (enrollmentData.backupCodes) {
+        const backupSection = document.getElementById('backup-codes-section');
+        const backupDisplay = document.getElementById('backup-codes-display');
+        
+        backupDisplay.innerHTML = enrollmentData.backupCodes
+            .map(code => `<span class="backup-code">${code}</span>`)
+            .join('');
+        
+        backupSection.style.display = 'block';
+    }
+}
+
+function copyBackupCodes() {
+    if (enrollmentData.backupCodes) {
+        MFA.copyToClipboard(enrollmentData.backupCodes.join('\n'));
+    }
+}
+
+function enrollAnother() {
+    // Reset enrollment process
+    currentStep = 1;
+    selectedMethod = null;
+    enrollmentData = {};
+    
+    // Reset UI
+    document.querySelectorAll('.enrollment-step').forEach(step => {
+        step.style.display = 'none';
+    });
+    
+    document.querySelectorAll('.step-item').forEach(step => {
+        step.classList.remove('active', 'completed');
+    });
+    
+    document.getElementById('enrollment-step-1').style.display = 'block';
+    document.getElementById('step-1').classList.add('active');
+    
+    // Reset method selection
+    document.querySelectorAll('.method-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+}
+</script>
+{% endblock %}

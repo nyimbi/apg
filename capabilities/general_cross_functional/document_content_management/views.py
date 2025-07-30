@@ -1,35 +1,149 @@
 """
-Document Management Views
+APG Document Content Management - Flask-AppBuilder Views
 
-Flask-AppBuilder views for document management user interface including
-document listing, upload, version management, permissions, and dashboard.
+Comprehensive web interface for all 10 revolutionary document management
+capabilities with responsive design and rich interactions.
+
+Copyright © 2025 Datacraft
+Author: Nyimbi Odero <nyimbi@gmail.com>
+Website: www.datacraft.co.ke
 """
 
-from typing import Optional, List, Dict, Any, Union
-from datetime import datetime, date
+import asyncio
 import json
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from flask import redirect, flash, request, url_for, send_file, jsonify, render_template_string
-from flask_appbuilder import ModelView, BaseView, has_access, expose
+from flask import flash, redirect, request, url_for, jsonify, render_template
+from flask_appbuilder import ModelView, BaseView, expose, has_access
 from flask_appbuilder.models.sqla.interface import SQLAInterface
-from flask_appbuilder.actions import action
 from flask_appbuilder.widgets import ListWidget, ShowWidget, EditWidget
 from flask_appbuilder.forms import DynamicForm
+from flask_appbuilder.fieldwidgets import BS3TextFieldWidget, BS3TextAreaFieldWidget, Select2Widget
 from flask_babel import lazy_gettext as _
-from wtforms import StringField, TextAreaField, SelectField, FileField, BooleanField
+from wtforms import StringField, TextAreaField, SelectField, FileField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, Length, Optional as OptionalValidator
-from wtforms.widgets import TextArea
-from sqlalchemy import and_, or_, desc, func
+from wtforms.widgets import TextArea, Select
 
 from .models import (
-	GCDMDocument, GCDMDocumentVersion, GCDMDocumentCategory, GCDMDocumentType,
-	GCDMFolder, GCDMPermission, GCDMCheckout, GCDMWorkflow, GCDMReview,
-	GCDMTag, GCDMRetentionPolicy, GCDMArchive, GCDMAuditLog
+	DCMDocument, DCMFolder, DCMDocumentVersion, DCMComment, DCMWorkflow,
+	DCMRetentionPolicy, DCMAnalytics, DCMDocumentType, DCMContentFormat,
+	DCMPermissionLevel, DCMNotification
 )
-from .service import DocumentService
+from .service import DocumentManagementService
 
 logger = logging.getLogger(__name__)
+
+
+class DocumentManagementBaseView(BaseView):
+	"""Base view for document management with common functionality"""
+	
+	default_view = 'list'
+	
+	def __init__(self):
+		super().__init__()
+		self.service = DocumentManagementService()
+		self.logger = logging.getLogger(__name__)
+
+
+class DocumentListWidget(ListWidget):
+	"""Custom list widget for documents with enhanced display"""
+	template = 'document_management/document_list.html'
+
+
+class DocumentShowWidget(ShowWidget):
+	"""Custom show widget for documents with AI insights"""
+	template = 'document_management/document_show.html'
+
+
+class DocumentEditWidget(EditWidget):
+	"""Custom edit widget for documents with upload capability"""
+	template = 'document_management/document_edit.html'
+
+
+class DocumentCreateForm(DynamicForm):
+	"""Document creation form with file upload"""
+	
+	name = StringField(
+		_('Document Name'),
+		validators=[DataRequired(), Length(min=1, max=255)],
+		widget=BS3TextFieldWidget(),
+		description=_('Enter document name')
+	)
+	
+	title = StringField(
+		_('Document Title'),
+		validators=[DataRequired(), Length(min=1, max=255)],
+		widget=BS3TextFieldWidget(),
+		description=_('Enter document title')
+	)
+	
+	description = TextAreaField(
+		_('Description'),
+		validators=[OptionalValidator(), Length(max=1000)],
+		widget=BS3TextAreaFieldWidget(),
+		description=_('Optional document description')
+	)
+	
+	document_type = SelectField(
+		_('Document Type'),
+		choices=[
+			('text_document', _('Text Document')),
+			('contract', _('Contract')),
+			('invoice', _('Invoice')),
+			('policy', _('Policy')),
+			('manual', _('Manual')),
+			('email', _('Email')),
+			('temporary', _('Temporary'))
+		],
+		validators=[DataRequired()],
+		widget=Select2Widget(),
+		description=_('Select document type')
+	)
+	
+	content_format = SelectField(
+		_('Content Format'),
+		choices=[
+			('pdf', _('PDF')),
+			('docx', _('Word Document')),
+			('xlsx', _('Excel Spreadsheet')),
+			('pptx', _('PowerPoint')),
+			('txt', _('Plain Text')),
+			('html', _('HTML')),
+			('json', _('JSON')),
+			('xml', _('XML'))
+		],
+		validators=[DataRequired()],
+		widget=Select2Widget(),
+		description=_('Select content format')
+	)
+	
+	file_upload = FileField(
+		_('Upload File'),
+		description=_('Select file to upload (optional)')
+	)
+	
+	keywords = StringField(
+		_('Keywords'),
+		validators=[OptionalValidator()],
+		widget=BS3TextFieldWidget(),
+		description=_('Comma-separated keywords')
+	)
+	
+	categories = StringField(
+		_('Categories'),
+		validators=[OptionalValidator()],
+		widget=BS3TextFieldWidget(),
+		description=_('Comma-separated categories')
+	)
+	
+	process_ai = BooleanField(
+		_('Enable AI Processing'),
+		default=True,
+		description=_('Enable automatic AI processing and analysis')
+	)
+
 
 class DocumentUploadForm(DynamicForm):
 	"""Form for document upload."""

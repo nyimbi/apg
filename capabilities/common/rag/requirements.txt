@@ -1,0 +1,130 @@
+# APG RAG Capability - Production Requirements
+
+# Core Framework
+asyncio
+asyncpg>=0.29.0
+pydantic>=2.0.0
+uuid-extensions>=0.1.0
+
+# Database & Vector Storage
+psycopg2-binary>=2.9.0
+pgvector>=0.2.0
+
+# Document Processing
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+python-magic>=0.4.27
+chardet>=5.2.0
+markdownify>=0.11.6
+
+# HTTP & API
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+httpx>=0.24.0
+flask-appbuilder>=4.3.0
+flask>=2.3.0
+marshmallow>=3.20.0
+werkzeug>=2.3.0
+
+# Security & Compliance
+cryptography>=41.0.0
+bcrypt>=4.0.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Performance & Monitoring
+psutil>=5.9.0
+prometheus-client>=0.17.0
+structlog>=23.1.0
+opentelemetry-api>=1.19.0
+opentelemetry-sdk>=1.19.0
+
+# Data Processing & ML
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+sentence-transformers>=2.2.0
+
+# Configuration & Utilities
+pyyaml>=6.0
+python-dotenv>=1.0.0
+click>=8.1.0
+rich>=13.5.0
+typer>=0.9.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-httpserver>=1.0.6
+pytest-cov>=4.1.0
+factory-boy>=3.3.0
+freezegun>=1.2.2
+
+# Development Tools
+black>=23.7.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.5.0
+pre-commit>=3.3.0
+
+# Production Deployment
+gunicorn>=21.2.0
+supervisor>=4.2.5
+nginx>=1.18.0
+docker>=6.1.0
+kubernetes>=27.2.0
+
+# Backup & Recovery
+pg_dump>=15.0
+restic>=0.16.0
+
+# Monitoring & Alerting
+grafana-api>=1.0.3
+alertmanager-webhook>=0.1.0
+
+# Caching
+redis>=4.6.0
+python-redis>=4.6.0
+
+# Queue Management
+celery>=5.3.0
+kombu>=5.3.0
+
+# File Storage
+boto3>=1.28.0  # For S3 compatible storage
+minio>=7.1.0
+
+# Logging
+python-json-logger>=2.0.7
+loguru>=0.7.0
+
+# Health Checks
+py-healthcheck>=1.10.1
+
+# Dependency Management
+pip-tools>=7.3.0
+
+# Optional: Advanced Analytics
+plotly>=5.15.0
+seaborn>=0.12.0
+matplotlib>=3.7.0
+
+# Optional: Advanced NLP
+spacy>=3.6.0
+nltk>=3.8.1
+textblob>=0.17.1
+
+# Optional: Enterprise Features
+ldap3>=2.9.1  # For LDAP integration
+python-saml>=1.15.0  # For SAML SSO
+oauthlib>=3.2.2  # For OAuth integration
+
+# Optional: Distributed Computing
+dask[complete]>=2023.8.0
+ray[default]>=2.6.0
+
+# Production Web Server
+gunicorn[gevent]>=21.2.0
+gevent>=23.7.0

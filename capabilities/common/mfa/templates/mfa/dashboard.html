@@ -1,0 +1,493 @@
+{% extends "mfa/base.html" %}
+
+{% block title %}MFA Dashboard - APG Platform{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+        <i class="fas fa-dashboard me-2"></i>MFA Dashboard
+    </h1>
+    <div>
+        <button class="btn btn-outline-primary" onclick="refreshDashboard()">
+            <i class="fas fa-refresh me-1"></i>Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Status Overview -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card mfa-card">
+            <div class="card-body text-center">
+                <div class="trust-score {{ mfa_status.trust_score | trust_score_class }}">
+                    {{ (mfa_status.trust_score * 100) | round | int }}%
+                </div>
+                <h6 class="card-title">Trust Score</h6>
+                <p class="card-text text-muted">Overall security rating</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card mfa-card">
+            <div class="card-body text-center">
+                <div class="display-6 text-primary">
+                    <i class="fas fa-{{ 'check-circle' if mfa_status.mfa_enabled else 'times-circle' }}"></i>
+                </div>
+                <h6 class="card-title">MFA Status</h6>
+                <p class="card-text">
+                    <span class="status-badge {{ 'success' if mfa_status.mfa_enabled else 'danger' }}">
+                        {{ 'Enabled' if mfa_status.mfa_enabled else 'Disabled' }}
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card mfa-card">
+            <div class="card-body text-center">
+                <div class="display-6 text-info">{{ mfa_status.methods | length }}</div>
+                <h6 class="card-title">Active Methods</h6>
+                <p class="card-text text-muted">Enrolled authentication methods</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card mfa-card">
+            <div class="card-body text-center">
+                <div class="display-6 text-{{ 'success' if mfa_status.backup_codes_available else 'warning' }}">
+                    <i class="fas fa-{{ 'shield-alt' if mfa_status.backup_codes_available else 'exclamation-triangle' }}"></i>
+                </div>
+                <h6 class="card-title">Backup Codes</h6>
+                <p class="card-text">
+                    <span class="status-badge {{ 'success' if mfa_status.backup_codes_available else 'warning' }}">
+                        {{ 'Available' if mfa_status.backup_codes_available else 'Generate' }}
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MFA Methods -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mfa-card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-key me-2"></i>Your MFA Methods
+                </h5>
+                <a href="{{ url_for('MFADashboardView.enroll') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i>Add Method
+                </a>
+            </div>
+            <div class="card-body">
+                {% if mfa_status.methods %}
+                    {% for method in mfa_status.methods %}
+                    <div class="method-card {{ 'primary' if method.primary else '' }} {{ 'verified' if method.verified else '' }}">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <div class="text-primary" style="font-size: 2rem;">
+                                    <i class="fas fa-{{ method_icon(method.type) }}"></i>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <h6 class="mb-1">{{ method.name }}</h6>
+                                <div class="d-flex align-items-center">
+                                    <span class="status-badge {{ 'success' if method.verified else 'warning' }} me-2">
+                                        {{ 'Verified' if method.verified else 'Pending' }}
+                                    </span>
+                                    {% if method.primary %}
+                                        <span class="badge bg-primary">Primary</span>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ method.type }}</small>
+                            </div>
+                            <div class="col-auto">
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                        Actions
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        {% if not method.verified %}
+                                        <li><a class="dropdown-item" href="#" onclick="verifyMethod('{{ method.id }}')">
+                                            <i class="fas fa-check me-1"></i>Verify
+                                        </a></li>
+                                        {% endif %}
+                                        {% if not method.primary %}
+                                        <li><a class="dropdown-item" href="#" onclick="setPrimaryMethod('{{ method.id }}')">
+                                            <i class="fas fa-star me-1"></i>Set as Primary
+                                        </a></li>
+                                        {% endif %}
+                                        <li><a class="dropdown-item" href="#" onclick="testMethod('{{ method.id }}')">
+                                            <i class="fas fa-test me-1"></i>Test
+                                        </a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="removeMethod('{{ method.id }}')">
+                                            <i class="fas fa-trash me-1"></i>Remove
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-key text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="mt-3">No MFA Methods Configured</h5>
+                        <p class="text-muted">Add your first authentication method to secure your account</p>
+                        <a href="{{ url_for('MFADashboardView.enroll') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Add MFA Method
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Security Insights -->
+    <div class="col-lg-4">
+        <div class="card mfa-card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Security Insights
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Trust Score Details -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Trust Score</span>
+                        <span class="fw-bold">{{ (mfa_status.trust_score * 100) | round | int }}%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" 
+                             style="width: {{ (mfa_status.trust_score * 100) | round | int }}%"
+                             aria-valuenow="{{ (mfa_status.trust_score * 100) | round | int }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                    <small class="text-muted">Based on authentication patterns and security practices</small>
+                </div>
+                
+                <!-- Security Recommendations -->
+                <div class="mb-3">
+                    <h6>Recommendations</h6>
+                    <ul class="list-unstyled">
+                        {% if not mfa_status.biometric_enrolled %}
+                        <li class="mb-2">
+                            <i class="fas fa-user text-warning me-2"></i>
+                            <small>Enable biometric authentication for enhanced security</small>
+                        </li>
+                        {% endif %}
+                        {% if not mfa_status.backup_codes_available %}
+                        <li class="mb-2">
+                            <i class="fas fa-shield-alt text-warning me-2"></i>
+                            <small>Generate backup codes for account recovery</small>
+                        </li>
+                        {% endif %}
+                        {% if mfa_status.methods | length < 2 %}
+                        <li class="mb-2">
+                            <i class="fas fa-plus text-info me-2"></i>
+                            <small>Add a secondary authentication method</small>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="d-grid gap-2">
+                    {% if not mfa_status.backup_codes_available %}
+                    <button class="btn btn-outline-warning btn-sm" onclick="generateBackupCodes()">
+                        <i class="fas fa-shield-alt me-1"></i>Generate Backup Codes
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-outline-primary btn-sm" onclick="securityTest()">
+                        <i class="fas fa-test me-1"></i>Test Security
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="card mfa-card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-history me-2"></i>Recent Activity
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if mfa_status.recent_events %}
+                    {% for event in mfa_status.recent_events[:5] %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3">
+                            <i class="fas fa-{{ event_icon(event.type) }} text-{{ event_color(event.status) }}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-medium">{{ event_title(event.type) }}</div>
+                            <small class="text-muted">{{ event.timestamp }}</small>
+                        </div>
+                        <div>
+                            <span class="status-badge {{ event_color(event.status) }}">
+                                {{ event.status }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="text-center mt-3">
+                        <a href="#" class="btn btn-outline-primary btn-sm">View All Activity</a>
+                    </div>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-history text-muted" style="font-size: 2rem;"></i>
+                        <p class="text-muted mt-2 mb-0">No recent activity</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Metrics (Admin View) -->
+{% if metrics %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card mfa-card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>System Metrics
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="text-center">
+                            <div class="display-6 text-primary">{{ metrics.total_users }}</div>
+                            <h6>Total Users</h6>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="text-center">
+                            <div class="display-6 text-success">{{ metrics.active_mfa_users }}</div>
+                            <h6>MFA Enabled</h6>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="text-center">
+                            <div class="display-6 text-info">{{ metrics.success_rate }}%</div>
+                            <h6>Success Rate</h6>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="text-center">
+                            <div class="display-6 text-warning">{{ (metrics.avg_risk_score * 100) | round | int }}%</div>
+                            <h6>Avg Risk Score</h6>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Dashboard-specific JavaScript
+function refreshDashboard() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    MFA.showLoading(btn);
+    
+    MFA.apiCall('/status/', 'GET')
+        .then(response => {
+            if (response.success) {
+                // Update dashboard with new data
+                location.reload(); // Simple refresh for now
+            } else {
+                MFA.showAlert('Failed to refresh dashboard: ' + response.error, 'danger');
+            }
+        })
+        .finally(() => {
+            MFA.hideLoading(btn, originalText);
+        });
+}
+
+function verifyMethod(methodId) {
+    const code = prompt('Enter verification code:');
+    if (code) {
+        MFA.apiCall('/verify/', 'POST', {
+            method_id: methodId,
+            verification_code: code
+        })
+        .then(response => {
+            if (response.success && response.verified) {
+                MFA.showAlert('Method verified successfully!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                MFA.showAlert('Verification failed: ' + (response.message || 'Invalid code'), 'danger');
+            }
+        });
+    }
+}
+
+function setPrimaryMethod(methodId) {
+    if (confirm('Set this method as your primary authentication method?')) {
+        MFA.apiCall('/methods/' + methodId + '/primary/', 'POST')
+            .then(response => {
+                if (response.success) {
+                    MFA.showAlert('Primary method updated successfully!', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    MFA.showAlert('Failed to update primary method: ' + response.error, 'danger');
+                }
+            });
+    }
+}
+
+function testMethod(methodId) {
+    MFA.showAlert('Testing authentication method...', 'info');
+    
+    MFA.apiCall('/methods/' + methodId + '/test/', 'POST')
+        .then(response => {
+            if (response.success) {
+                MFA.showAlert('Method test successful!', 'success');
+            } else {
+                MFA.showAlert('Method test failed: ' + response.error, 'danger');
+            }
+        });
+}
+
+function removeMethod(methodId) {
+    if (confirm('Are you sure you want to remove this authentication method? This action cannot be undone.')) {
+        MFA.apiCall('/remove/' + methodId + '/', 'DELETE')
+            .then(response => {
+                if (response.success) {
+                    MFA.showAlert('Method removed successfully!', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    MFA.showAlert('Failed to remove method: ' + response.error, 'danger');
+                }
+            });
+    }
+}
+
+function generateBackupCodes() {
+    if (confirm('Generate new backup codes? This will invalidate any existing codes.')) {
+        MFA.apiCall('/backup-codes/', 'POST')
+            .then(response => {
+                if (response.success) {
+                    showBackupCodesModal(response.backup_codes);
+                } else {
+                    MFA.showAlert('Failed to generate backup codes: ' + response.error, 'danger');
+                }
+            });
+    }
+}
+
+function securityTest() {
+    MFA.showAlert('Running security test...', 'info');
+    
+    MFA.apiCall('/security-test/', 'POST')
+        .then(response => {
+            if (response.success) {
+                MFA.showAlert('Security test completed. Score: ' + response.score + '/100', 'success');
+            } else {
+                MFA.showAlert('Security test failed: ' + response.error, 'danger');
+            }
+        });
+}
+
+function showBackupCodesModal(codes) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Backup Codes Generated</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Save these codes in a secure location. Each code can only be used once.
+                    </div>
+                    <div class="text-center">
+                        ${codes.map(code => `<span class="backup-code">${code}</span>`).join('')}
+                    </div>
+                    <div class="mt-3 text-center">
+                        <button class="btn btn-outline-primary" onclick="MFA.copyToClipboard('${codes.join('\\n')}')">
+                            <i class="fas fa-copy me-1"></i>Copy All Codes
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">I've Saved These Codes</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    modal.addEventListener('hidden.bs.modal', () => {
+        document.body.removeChild(modal);
+        location.reload();
+    });
+}
+
+// Template filters (would be implemented in Jinja2)
+function method_icon(method_type) {
+    const icons = {
+        'TOTP': 'mobile-alt',
+        'SMS': 'sms',
+        'EMAIL': 'envelope',
+        'FACE_RECOGNITION': 'user',
+        'VOICE_RECOGNITION': 'microphone',
+        'HARDWARE_TOKEN': 'key'
+    };
+    return icons[method_type] || 'key';
+}
+
+function event_icon(event_type) {
+    const icons = {
+        'authentication': 'sign-in-alt',
+        'method_added': 'plus',
+        'method_removed': 'minus',
+        'security_alert': 'exclamation-triangle'
+    };
+    return icons[event_type] || 'circle';
+}
+
+function event_color(status) {
+    const colors = {
+        'success': 'success',
+        'failure': 'danger',
+        'warning': 'warning'
+    };
+    return colors[status] || 'secondary';
+}
+
+function event_title(event_type) {
+    const titles = {
+        'authentication': 'Authentication',
+        'method_added': 'Method Added',
+        'method_removed': 'Method Removed',
+        'security_alert': 'Security Alert'
+    };
+    return titles[event_type] || 'Event';
+}
+
+// Start auto-refresh every 30 seconds
+startAutoRefresh(30000);
+</script>
+{% endblock %}

@@ -1,0 +1,41 @@
+# OCR Service Dependencies for APG Document Content Management
+# Additional requirements for OCR capabilities
+
+# Core OCR Dependencies
+pytesseract>=0.3.10
+pillow>=10.0.0
+opencv-python>=4.8.0
+pdf2image>=1.16.3
+
+# Image Processing
+numpy>=1.24.0
+scikit-image>=0.21.0
+
+# PDF Processing  
+PyPDF2>=3.0.1
+pdfplumber>=0.9.0
+
+# Additional OCR Engines (Optional)
+# easyocr>=1.7.0  # Alternative OCR engine
+# paddleocr>=2.7.0  # PaddleOCR for better accuracy
+
+# System-level dependencies that need to be installed separately:
+# 
+# Ubuntu/Debian:
+# sudo apt-get update
+# sudo apt-get install tesseract-ocr
+# sudo apt-get install tesseract-ocr-eng tesseract-ocr-fra tesseract-ocr-deu tesseract-ocr-spa
+# sudo apt-get install tesseract-ocr-ita tesseract-ocr-por tesseract-ocr-rus 
+# sudo apt-get install tesseract-ocr-chi-sim tesseract-ocr-jpn tesseract-ocr-ara
+# sudo apt-get install poppler-utils  # For pdf2image
+# sudo apt-get install libgl1-mesa-glx  # For OpenCV
+#
+# macOS:
+# brew install tesseract
+# brew install tesseract-lang  # For additional languages
+# brew install poppler  # For pdf2image
+#
+# Windows:
+# Download Tesseract from: https://github.com/UB-Mannheim/tesseract/wiki
+# Install poppler: https://blog.alivate.com.au/poppler-windows/
+# Set TESSDATA_PREFIX environment variable if needed

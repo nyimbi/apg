@@ -1,0 +1,360 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector and pgai extensions
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: apg-rag-postgres
+    environment:
+      POSTGRES_DB: apg_rag
+      POSTGRES_USER: apg_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apg_secure_password_2025}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./scripts/init-pgai.sql:/docker-entrypoint-initdb.d/02-pgai.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - apg-rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apg_user -d apg_rag"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Ollama Service for AI Models
+  ollama:
+    image: ollama/ollama:latest
+    container_name: apg-rag-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./scripts/init-models.sh:/init-models.sh
+    ports:
+      - "11434:11434"
+    networks:
+      - apg-rag-network
+    restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      bash -c "
+        ollama serve &
+        sleep 10 &&
+        ollama pull bge-m3 &&
+        ollama pull qwen3 &&
+        ollama pull deepseek-r1 &&
+        wait
+      "
+
+  # Redis for Caching
+  redis:
+    image: redis:7-alpine
+    container_name: apg-rag-redis
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    networks:
+      - apg-rag-network
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # APG RAG Main Service
+  rag-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: apg-rag-service
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://apg_user:${POSTGRES_PASSWORD:-apg_secure_password_2025}@postgres:5432/apg_rag
+      DATABASE_POOL_SIZE: 20
+      DATABASE_MAX_OVERFLOW: 30
+      
+      # Ollama Configuration
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_TIMEOUT: 60
+      OLLAMA_MAX_RETRIES: 3
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      
+      # Security Configuration
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      AUDIT_RETENTION_DAYS: 2555
+      ENABLE_SECURITY_MONITORING: "true"
+      
+      # Service Configuration
+      SERVICE_HOST: 0.0.0.0
+      SERVICE_PORT: 5000
+      ENABLE_HTTPS: ${ENABLE_HTTPS:-false}
+      SSL_CERT_PATH: ${SSL_CERT_PATH:-}
+      SSL_KEY_PATH: ${SSL_KEY_PATH:-}
+      
+      # Performance Configuration
+      MAX_CONCURRENT_OPERATIONS: 100
+      OPERATION_TIMEOUT_SECONDS: 300
+      MAX_MEMORY_MB: 4096
+      
+      # Monitoring Configuration
+      ENABLE_METRICS: "true"
+      METRICS_PORT: 9090
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # APG Configuration
+      TENANT_ID: ${TENANT_ID:-default}
+      CAPABILITY_ID: rag
+      
+      # Environment
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    volumes:
+      - rag_data:/app/data
+      - rag_logs:/app/logs
+      - ${SSL_CERT_PATH:-/dev/null}:/app/certs/cert.pem:ro
+      - ${SSL_KEY_PATH:-/dev/null}:/app/certs/key.pem:ro
+    ports:
+      - "5000:5000"
+      - "9090:9090"  # Metrics port
+    networks:
+      - apg-rag-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/rag/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '2.0'
+          memory: 2G
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: apg-rag-nginx
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx-rag.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${SSL_CERT_PATH:-/dev/null}:/etc/nginx/certs/cert.pem:ro
+      - ${SSL_KEY_PATH:-/dev/null}:/etc/nginx/certs/key.pem:ro
+      - nginx_logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - apg-rag-network
+    depends_on:
+      - rag-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Prometheus for Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: apg-rag-prometheus
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    networks:
+      - apg-rag-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    depends_on:
+      - rag-service
+
+  # Grafana for Monitoring Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: apg-rag-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin_password_2025}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+    networks:
+      - apg-rag-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # File Storage (MinIO for S3-compatible storage)
+  minio:
+    image: minio/minio:latest
+    container_name: apg-rag-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - apg-rag-network
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Backup Service
+  backup:
+    image: postgres:16-alpine
+    container_name: apg-rag-backup
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-apg_secure_password_2025}
+    volumes:
+      - backup_data:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    networks:
+      - apg-rag-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "
+        apk add --no-cache dcron &&
+        echo '0 2 * * * /backup.sh' | crontab - &&
+        crond -f
+      "
+
+# Network Configuration
+networks:
+  apg-rag-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volume Configuration
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/postgres
+  
+  ollama_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/ollama
+  
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/redis
+  
+  rag_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/rag
+  
+  rag_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/logs
+  
+  nginx_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/nginx-logs
+  
+  prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/prometheus
+  
+  grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/grafana
+  
+  minio_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/minio
+  
+  backup_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/backups
