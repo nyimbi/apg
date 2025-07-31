@@ -1,0 +1,765 @@
+# Adyen Integration Configuration - APG Payment Gateway
+# Complete configuration for all Adyen features and environments
+#
+# © 2025 Datacraft. All rights reserved.
+
+# Environment Configuration
+environment:
+  # Supported environments: test, live, live-us, live-au
+  current: "test"  # Change to "live" for production transactions
+  
+  test:
+    api_base_url: "https://checkout-test.adyen.com"
+    payment_api_url: "https://pal-test.adyen.com"
+    management_api_url: "https://management-test.adyen.com"
+    balance_platform_url: "https://balanceplatform-api-test.adyen.com"
+    legal_entity_url: "https://kyc-test.adyen.com"
+    pos_terminal_url: "https://postfmapi-test.adyen.com"
+    data_protection_url: "https://ca-test.adyen.com"
+    
+  live:
+    api_base_url: "https://checkout-live.adyen.com"
+    payment_api_url: "https://pal-live.adyen.com"
+    management_api_url: "https://management-live.adyen.com"
+    balance_platform_url: "https://balanceplatform-api-live.adyen.com"
+    legal_entity_url: "https://kyc-live.adyen.com"
+    pos_terminal_url: "https://postfmapi-live.adyen.com"
+    data_protection_url: "https://ca-live.adyen.com"
+    
+  live-us:
+    api_base_url: "https://checkout-live-us.adyen.com"
+    payment_api_url: "https://pal-live-us.adyen.com"
+    management_api_url: "https://management-live-us.adyen.com"
+    balance_platform_url: "https://balanceplatform-api-live-us.adyen.com"
+    legal_entity_url: "https://kyc-live-us.adyen.com"
+    pos_terminal_url: "https://postfmapi-live-us.adyen.com"
+    data_protection_url: "https://ca-live-us.adyen.com"
+    
+  live-au:
+    api_base_url: "https://checkout-live-au.adyen.com"
+    payment_api_url: "https://pal-live-au.adyen.com"
+    management_api_url: "https://management-live-au.adyen.com"
+    balance_platform_url: "https://balanceplatform-api-live-au.adyen.com"
+    legal_entity_url: "https://kyc-live-au.adyen.com"
+    pos_terminal_url: "https://postfmapi-live-au.adyen.com"
+    data_protection_url: "https://ca-live-au.adyen.com"
+
+# API Configuration
+api:
+  # Timeout settings (in seconds)
+  timeout:
+    connection: 30
+    read: 80
+    total: 120
+  
+  # Retry configuration
+  retry:
+    max_attempts: 3
+    backoff_factor: 2.0
+    status_forcelist: [408, 429, 500, 502, 503, 504]
+    
+  # Rate limiting
+  rate_limit:
+    requests_per_second: 50
+    burst_limit: 100
+    
+  # Request options
+  options:
+    compression: true
+    keep_alive: true
+    pool_connections: 10
+    pool_maxsize: 20
+
+# Authentication Configuration
+auth:
+  # API credentials (set via environment variables)
+  # ADYEN_API_KEY_TEST or ADYEN_API_KEY_LIVE
+  # ADYEN_CLIENT_KEY_TEST or ADYEN_CLIENT_KEY_LIVE
+  # ADYEN_HMAC_KEY_TEST or ADYEN_HMAC_KEY_LIVE
+  # ADYEN_MERCHANT_ACCOUNT
+  
+  # Webhook authentication
+  webhook:
+    username: "${ADYEN_WEBHOOK_USERNAME}"
+    password: "${ADYEN_WEBHOOK_PASSWORD}"
+  
+  # Live endpoint URL prefix (for regional endpoints)
+  live_endpoint_url_prefix: "${ADYEN_LIVE_ENDPOINT_URL_PREFIX}"
+
+# Payment Processing Configuration
+payments:
+  # Default settings
+  defaults:
+    currency: "USD"
+    country_code: "US"
+    locale: "en-US"
+    channel: "Web"
+    capture_delay_hours: 0  # 0 = immediate capture, max 7 days
+    
+  # Payment method configuration
+  payment_methods:
+    # Card payments
+    cards:
+      enabled: true
+      supported_brands:
+        - "visa"
+        - "mc"
+        - "amex"
+        - "diners"
+        - "discover"
+        - "jcb"
+        - "unionpay"
+      enable_cvc_check: true
+      enable_avs_check: true
+      
+    # Digital wallets
+    wallets:
+      enabled: true
+      supported_wallets:
+        - "applepay"
+        - "googlepay"
+        - "samsungpay"
+        - "paypal"
+      
+    # Buy now, pay later
+    bnpl:
+      enabled: true
+      supported_providers:
+        - "klarna"
+        - "klarna_paynow"
+        - "klarna_account"
+        - "afterpay_default"
+        - "clearpay"
+        - "affirm"
+        - "facilypay_3x"
+      
+    # Local payment methods
+    local_payments:
+      enabled: true
+      # European methods
+      europe:
+        - "ideal"           # Netherlands
+        - "directEbanking"  # Germany, Austria (Sofort)
+        - "bcmc"           # Belgium (Bancontact)
+        - "eps"            # Austria
+        - "giropay"        # Germany
+        - "multibanco"     # Portugal
+        - "mbway"          # Portugal
+        - "blik"           # Poland
+        - "dotpay"         # Poland
+        - "swish"          # Sweden
+        - "vipps"          # Norway
+        - "mobilepay"      # Denmark, Finland
+        - "sepadirectdebit" # SEPA Direct Debit
+      
+      # Asian methods
+      asia:
+        - "alipay"
+        - "wechatpay"
+        - "dana"
+        - "gcash"
+        - "kakaopay"
+        - "truemoney"
+        - "econtext_seven_eleven"  # Japan (Konbini)
+      
+      # American methods
+      americas:
+        - "ach"
+        - "oxxo"                          # Mexico
+        - "boletobancario_santander"     # Brazil
+      
+    # Alternative payment methods
+    alternative:
+      enabled: true
+      methods:
+        - "giftcard"
+        - "bitcoin"
+        - "bankTransfer"
+  
+  # 3D Secure configuration
+  three_d_secure:
+    enabled: true
+    version: "2.2"
+    challenge_indicator: "01"  # 01=No preference, 02=No challenge, 03=Challenge requested
+    exemption_engine: true
+    merchant_risk_indicator: "01"  # 01=Low risk, 02=Neutral, 03=High risk
+    
+  # Strong Customer Authentication (SCA)
+  sca:
+    enabled: true
+    exemption_types:
+      - "lowValue"           # Low value transactions
+      - "secureCorporate"    # Secure corporate payments
+      - "trustedBeneficiary" # Trusted beneficiary
+      - "transactionRiskAnalysis" # TRA exemption
+    low_value_threshold: 3000  # €30.00 in cents
+    
+  # Recurring payments
+  recurring:
+    enabled: true
+    contracts:
+      - "ONECLICK"     # One-click payments
+      - "RECURRING"    # Recurring payments
+      - "PAYOUT"       # Payout transactions
+    processing_models:
+      - "CardOnFile"
+      - "Subscription"
+      - "UnscheduledCardOnFile"
+    
+  # Risk management
+  risk:
+    enabled: true
+    fraud_offset: 0  # Risk scoring offset (-100 to +100)
+    velocity_checks: true
+    card_testing_protection: true
+    manual_review_threshold: 80  # Risk score 0-100
+    block_threshold: 95          # Auto-block threshold
+    
+    # Additional data collection
+    collect_browser_info: true
+    collect_device_fingerprint: true
+    collect_shopper_interaction: true
+
+# Marketplace Configuration (Adyen for Platforms)
+marketplace:
+  enabled: false  # Enable for marketplace implementations
+  
+  # Account holder settings
+  account_holders:
+    verification_required: true
+    auto_verification_enabled: false
+    supported_legal_entities:
+      - "Individual"
+      - "Organization"
+      - "SoleProprietorship"
+      - "Partnership"
+    
+  # Account management
+  accounts:
+    auto_account_creation: true
+    default_account_type: "AcquiringAccount"
+    supported_capabilities:
+      - "receivePayments"
+      - "sendPayments"
+      - "receiveFromPlatformPayments"
+      - "sendToTransferInstrument"
+    
+  # Payout settings
+  payouts:
+    enabled: true
+    auto_payout: false
+    minimum_payout_amount: 100  # In cents
+    payout_schedule: "daily"    # daily, weekly, monthly
+    supported_currencies:
+      - "USD"
+      - "EUR"
+      - "GBP"
+    
+  # Split payments
+  splits:
+    enabled: true
+    platform_fee_type: "commission"  # commission, markup
+    default_commission_rate: 0.025   # 2.5%
+    minimum_commission: 25           # $0.25 in cents
+    maximum_commission: null         # No maximum
+
+# Webhook Configuration
+webhooks:
+  # Webhook settings
+  timeout: 30  # seconds
+  retry_attempts: 5
+  retry_intervals: [60, 300, 1800, 3600, 7200]  # seconds: 1min, 5min, 30min, 1h, 2h
+  
+  # Standard webhook events
+  standard_events:
+    # Payment events
+    - "AUTHORISATION"
+    - "CAPTURE"
+    - "CAPTURE_FAILED"
+    - "CANCELLATION"
+    - "REFUND"
+    - "REFUND_FAILED"
+    - "CANCEL_OR_REFUND"
+    
+    # Dispute events
+    - "CHARGEBACK"
+    - "CHARGEBACK_REVERSED"
+    - "REQUEST_FOR_INFORMATION"
+    - "NOTIFICATION_OF_CHARGEBACK"
+    - "SECOND_CHARGEBACK"
+    - "PREARBITRATION"
+    - "ARBITRATION_WON"
+    - "ARBITRATION_LOST"
+    
+    # Recurring events
+    - "RECURRING_CONTRACT"
+    
+    # Report events
+    - "REPORT_AVAILABLE"
+    
+    # Order events
+    - "ORDER_OPENED"
+    - "ORDER_CLOSED"
+    
+    # Manual review events
+    - "MANUAL_REVIEW_ACCEPT"
+    - "MANUAL_REVIEW_REJECT"
+    
+    # Technical events
+    - "TECHNICAL_CANCEL"
+  
+  # Marketplace webhook events (when marketplace is enabled)
+  marketplace_events:
+    - "ACCOUNT_HOLDER_CREATED"
+    - "ACCOUNT_HOLDER_UPDATED"
+    - "ACCOUNT_HOLDER_STATUS_CHANGE"
+    - "ACCOUNT_HOLDER_VERIFICATION"
+    - "ACCOUNT_HOLDER_LIMIT_REACHED"
+    - "ACCOUNT_HOLDER_PAYOUT"
+    - "ACCOUNT_CREATED"
+    - "ACCOUNT_UPDATED"
+    - "ACCOUNT_CLOSED"
+    - "ACCOUNT_FUNDS_BELOW_THRESHOLD"
+    - "TRANSFER_FUNDS"
+    - "PAYOUT_THIRDPARTY"
+  
+  # Webhook endpoints
+  endpoints:
+    standard: "${ADYEN_WEBHOOK_ENDPOINT_URL}/adyen/webhook"
+    marketplace: "${ADYEN_WEBHOOK_ENDPOINT_URL}/adyen/marketplace-webhook"
+    
+  # Security
+  hmac_verification: true
+  ip_whitelist:
+    - "34.96.57.70"      # Adyen webhook IPs
+    - "34.96.112.31"
+    - "34.96.127.8"
+    - "34.96.203.47"
+    - "34.117.69.29"
+    - "34.117.186.192"
+  
+  # Notification processing
+  processing:
+    async_processing: true
+    batch_processing: false
+    max_processing_time: 30  # seconds
+    enable_business_logic: true
+
+# Security Configuration
+security:
+  # Encryption
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_rotation_days: 90
+    
+  # HMAC settings
+  hmac:
+    algorithm: "sha256"
+    encoding: "base64"
+    
+  # Request validation
+  validation:
+    validate_origin: true
+    validate_hmac: true
+    validate_timestamps: true
+    max_timestamp_drift: 300  # 5 minutes
+    
+  # IP security
+  ip_security:
+    enable_whitelist: true
+    allowed_ips:
+      - "127.0.0.1"         # Local development
+      - "0.0.0.0/0"          # Allow all (disable in production)
+    
+  # Data protection
+  data_protection:
+    gdpr_compliance: true
+    pci_compliance: true
+    data_retention_days: 2555  # 7 years
+    tokenization: true
+    
+  # Fraud prevention
+  fraud_prevention:
+    enable_velocity_checks: true
+    enable_card_testing_protection: true
+    enable_device_fingerprinting: true
+    blacklist_enabled: true
+
+# Monitoring and Logging
+monitoring:
+  # Logging configuration
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format: "json"
+    log_requests: true
+    log_responses: false  # Set to true for debugging
+    log_webhook_events: true
+    max_log_size_mb: 100
+    log_retention_days: 30
+    
+    # Sensitive data handling
+    mask_card_numbers: true
+    mask_cvv: true
+    mask_bank_account_numbers: true
+    
+  # Metrics collection
+  metrics:
+    enabled: true
+    include_latency: true
+    include_error_rates: true
+    include_success_rates: true
+    include_payment_method_breakdown: true
+    
+  # Health checks
+  health_checks:
+    enabled: true
+    interval_seconds: 30
+    timeout_seconds: 10
+    check_api_connectivity: true
+    check_webhook_processing: true
+    
+  # Alerting
+  alerts:
+    enabled: true
+    error_rate_threshold: 0.05      # 5%
+    latency_threshold_ms: 3000      # 3 seconds
+    webhook_failure_threshold: 0.10 # 10%
+    
+    # Alert channels
+    channels:
+      email: true
+      slack: false
+      webhook: true
+
+# Performance Configuration
+performance:
+  # Connection pooling
+  connection_pool:
+    size: 20
+    max_size: 50
+    keep_alive: true
+    keep_alive_timeout: 30
+    
+  # Caching
+  caching:
+    enabled: true
+    default_ttl: 300  # 5 minutes
+    max_size: 1000
+    
+    # Cache specific items
+    cache_payment_methods: true
+    cache_merchant_accounts: true
+    cache_exchange_rates: true
+    cache_country_configs: true
+    
+  # Request optimization
+  optimization:
+    compression: true
+    connection_reuse: true
+    async_processing: true
+    batch_requests: false  # Adyen doesn't support batch requests
+    
+  # Background processing
+  background_jobs:
+    enabled: true
+    max_workers: 5
+    retry_failed_jobs: true
+    job_timeout_seconds: 300
+
+# Localization and Regional Settings
+localization:
+  # Default locale
+  default_locale: "en-US"
+  
+  # Supported locales
+  supported_locales:
+    - "en-US"   # English (US)
+    - "en-GB"   # English (UK)
+    - "fr-FR"   # French (France)
+    - "de-DE"   # German (Germany)
+    - "es-ES"   # Spanish (Spain)
+    - "it-IT"   # Italian (Italy)
+    - "pt-BR"   # Portuguese (Brazil)
+    - "nl-NL"   # Dutch (Netherlands)
+    - "sv-SE"   # Swedish (Sweden)
+    - "da-DK"   # Danish (Denmark)
+    - "no-NO"   # Norwegian (Norway)
+    - "fi-FI"   # Finnish (Finland)
+    - "pl-PL"   # Polish (Poland)
+    - "ja-JP"   # Japanese (Japan)
+    - "zh-CN"   # Chinese (Simplified)
+    - "ko-KR"   # Korean (South Korea)
+    
+  # Currency settings
+  currencies:
+    # Primary currencies
+    primary:
+      - "USD"
+      - "EUR"
+      - "GBP"
+      - "JPY"
+      - "AUD"
+      - "CAD"
+      - "CHF"
+      - "SEK"
+      - "NOK"
+      - "DKK"
+      
+    # All supported currencies (Adyen supports 150+ currencies)
+    supported:
+      - "USD"   # US Dollar
+      - "EUR"   # Euro
+      - "GBP"   # British Pound
+      - "JPY"   # Japanese Yen
+      - "AUD"   # Australian Dollar
+      - "CAD"   # Canadian Dollar
+      - "CHF"   # Swiss Franc
+      - "SEK"   # Swedish Krona
+      - "NOK"   # Norwegian Krone
+      - "DKK"   # Danish Krone
+      - "PLN"   # Polish Zloty
+      - "CZK"   # Czech Koruna
+      - "HUF"   # Hungarian Forint
+      - "BGN"   # Bulgarian Lev
+      - "RON"   # Romanian Leu
+      - "HRK"   # Croatian Kuna
+      - "INR"   # Indian Rupee
+      - "SGD"   # Singapore Dollar
+      - "HKD"   # Hong Kong Dollar
+      - "CNY"   # Chinese Yuan
+      - "KRW"   # South Korean Won
+      - "THB"   # Thai Baht
+      - "MYR"   # Malaysian Ringgit
+      - "IDR"   # Indonesian Rupiah
+      - "PHP"   # Philippine Peso
+      - "VND"   # Vietnamese Dong
+      - "NZD"   # New Zealand Dollar
+      - "MXN"   # Mexican Peso
+      - "BRL"   # Brazilian Real
+      - "ARS"   # Argentine Peso
+      - "CLP"   # Chilean Peso
+      - "COP"   # Colombian Peso
+      - "PEN"   # Peruvian Sol
+      - "UYU"   # Uruguayan Peso
+      - "ZAR"   # South African Rand
+      - "NGN"   # Nigerian Naira
+      - "GHS"   # Ghanaian Cedi
+      - "KES"   # Kenyan Shilling
+      - "EGP"   # Egyptian Pound
+      - "MAD"   # Moroccan Dirham
+      - "TND"   # Tunisian Dinar
+      - "AED"   # UAE Dirham
+      - "SAR"   # Saudi Riyal
+      - "QAR"   # Qatari Riyal
+      - "BHD"   # Bahraini Dinar
+      - "KWD"   # Kuwaiti Dinar
+      - "OMR"   # Omani Rial
+      - "JOD"   # Jordanian Dinar
+      - "ILS"   # Israeli Shekel
+      - "TRY"   # Turkish Lira
+      - "RUB"   # Russian Ruble
+      - "UAH"   # Ukrainian Hryvnia
+
+# Business Rules and Limits
+business_rules:
+  # Transaction limits
+  transaction_limits:
+    # Per transaction limits (in cents)
+    min_amount_cents: 1      # $0.01
+    max_amount_cents: 99999999  # $999,999.99
+    
+    # Daily limits per shopper
+    daily_limit_cents: 500000   # $5,000
+    daily_transaction_count: 50
+    
+    # Monthly limits per shopper
+    monthly_limit_cents: 5000000  # $50,000
+    monthly_transaction_count: 500
+    
+  # Refund policies
+  refunds:
+    # Refund window (days after original transaction)
+    refund_window_days: 180
+    
+    # Partial refunds
+    partial_refunds: true
+    
+    # Multiple refunds
+    multiple_refunds: true
+    
+    # Same-day refunds
+    same_day_refunds: true
+    
+  # Chargeback handling
+  chargebacks:
+    # Auto-accept chargebacks under this amount
+    auto_accept_limit_cents: 2000  # $20
+    
+    # Dispute response deadline (days)
+    response_deadline_days: 7
+    
+    # Evidence collection
+    collect_evidence: true
+    auto_respond_enabled: false
+    
+  # Risk rules
+  risk_rules:
+    # Velocity limits
+    velocity_limits:
+      cards_per_hour: 5
+      amount_per_hour_cents: 100000  # $1,000
+      transactions_per_minute: 3
+      
+    # Geographic restrictions
+    geographic_restrictions:
+      blocked_countries: []  # Empty list means no restrictions
+      high_risk_countries:
+        - "XX"  # Replace with actual country codes if needed
+        
+    # Card testing protection
+    card_testing:
+      enabled: true
+      max_attempts_per_card: 3
+      lockout_period_minutes: 60
+
+# Reporting Configuration
+reporting:
+  # Scheduled reports
+  scheduled_reports:
+    enabled: true
+    
+    # Settlement reports
+    settlement_reports:
+      enabled: true
+      frequency: "daily"  # daily, weekly, monthly
+      format: "csv"       # csv, json, xml
+      include_fees: true
+      
+    # Transaction reports  
+    transaction_reports:
+      enabled: true
+      frequency: "daily"
+      format: "csv"
+      include_risk_data: true
+      
+    # Dispute reports
+    dispute_reports:
+      enabled: true
+      frequency: "weekly"
+      format: "csv"
+      
+  # Real-time reporting
+  real_time:
+    enabled: true
+    push_notifications: false
+    webhook_reports: true
+    
+  # Data retention
+  data_retention:
+    transaction_data_days: 2555  # 7 years
+    reporting_data_days: 1095    # 3 years
+    log_data_days: 365           # 1 year
+
+# Feature Flags
+features:
+  # Payment features
+  payment_links: true
+  stored_payment_methods: true
+  tokenization: true
+  
+  # Advanced features
+  dynamic_3ds: true
+  network_tokens: true
+  account_updater: true
+  
+  # Regional features
+  open_banking: true
+  local_payment_methods: true
+  alternative_payment_methods: true
+  
+  # Risk features
+  risk_profiling: true
+  fraud_detection: true
+  velocity_checking: true
+  
+  # Marketplace features (enabled when marketplace.enabled = true)
+  split_payments: false
+  marketplace_onboarding: false
+  payout_management: false
+  
+  # Mobile features
+  mobile_sdk: true
+  in_app_payments: true
+  contactless_payments: true
+  
+  # POS features
+  terminal_api: false
+  tap_to_pay: false
+
+# Development and Testing
+development:
+  # Test mode settings
+  test_mode:
+    enabled: true
+    use_test_cards: true
+    simulate_webhooks: true
+    
+  # Test payment methods
+  test_cards:
+    visa_success: "4111111111111111"
+    visa_cvc_decline: "4000000000000101"
+    visa_3ds_success: "4917610000000000"
+    mastercard_success: "5555555555554444"
+    amex_success: "378282246310005"
+    
+  # Webhook testing
+  webhook_testing:
+    test_notifications: true
+    simulate_delays: false
+    test_retries: true
+    
+  # Debug settings
+  debug:
+    log_all_requests: false
+    log_all_responses: false
+    detailed_errors: true
+    mock_external_services: false
+
+# Integration Settings  
+integrations:
+  # APG platform integration
+  apg:
+    enabled: true
+    tenant_isolation: true
+    multi_currency_support: true
+    
+  # External service integrations
+  external_services:
+    # Tax calculation services
+    avalara: false
+    taxjar: false
+    
+    # Fraud services (additional to Adyen's built-in)
+    kount: false
+    sift: false
+    
+    # Accounting systems
+    quickbooks: false
+    xero: false
+    
+    # CRM systems
+    salesforce: false
+    hubspot: false
+    
+  # Notification services
+  notifications:
+    email: true
+    sms: false
+    push: false
+    webhook: true
+    
+  # Analytics and reporting
+  analytics:
+    google_analytics: false
+    mixpanel: false
+    segment: false

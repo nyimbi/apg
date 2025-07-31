@@ -1,0 +1,220 @@
+groups:
+  - name: payment_gateway_alerts
+    rules:
+      # High-Priority Production Alerts
+      - alert: PaymentGatewayDown
+        expr: up{job="payment-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Payment Gateway is down"
+          description: "Payment Gateway has been down for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: rate(payment_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High payment error rate detected"
+          description: "Payment error rate is {{ $value }} errors per second over the last 5 minutes."
+
+      - alert: FraudDetectionDown
+        expr: up{job="payment-gateway", instance=~".*fraud.*"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Fraud detection system is down"
+          description: "Fraud detection system has been unavailable for 30 seconds."
+
+      # Transaction Volume Alerts
+      - alert: UnusuallyHighTransactionVolume
+        expr: rate(payment_transactions_total[1m]) > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusually high transaction volume"
+          description: "Transaction rate is {{ $value }} per second, which is above normal threshold."
+
+      - alert: TransactionVolumeDropped
+        expr: rate(payment_transactions_total[5m]) < 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Transaction volume has dropped significantly"
+          description: "Transaction rate is only {{ $value }} per second over the last 5 minutes."
+
+      # Performance Alerts
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(payment_request_duration_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High payment processing latency"
+          description: "95th percentile latency is {{ $value }} seconds."
+
+      - alert: DatabaseConnectionIssue
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection issue"
+          description: "PostgreSQL database has been unreachable for more than 1 minute."
+
+      - alert: RedisConnectionIssue
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis connection issue"
+          description: "Redis cache has been unreachable for more than 1 minute."
+
+      # Payment Processor Alerts
+      - alert: MPESAProcessorDown
+        expr: payment_processor_availability{processor="mpesa"} < 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MPESA processor is down"
+          description: "MPESA payment processor has been unavailable for 1 minute."
+
+      - alert: StripeProcessorDown
+        expr: payment_processor_availability{processor="stripe"} < 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Stripe processor is down"  
+          description: "Stripe payment processor has been unavailable for 1 minute."
+
+      - alert: ProcessorFailureRate
+        expr: rate(payment_processor_failures_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High processor failure rate"
+          description: "Processor {{ $labels.processor }} failure rate is {{ $value }} over the last 5 minutes."
+
+      # Security Alerts
+      - alert: HighFraudScore
+        expr: increase(fraud_detections_total[1m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of fraud detections"
+          description: "{{ $value }} potential fraud cases detected in the last minute."
+
+      - alert: SuspiciousActivity
+        expr: rate(suspicious_activities_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Suspicious activity detected"
+          description: "Suspicious activity rate is {{ $value }} per second."
+
+      # Business Metrics Alerts
+      - alert: LowSuccessRate
+        expr: (rate(payment_transactions_successful_total[5m]) / rate(payment_transactions_total[5m])) < 0.95
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Payment success rate is low"
+          description: "Payment success rate is {{ $value }}%, below the 95% threshold."
+
+      - alert: SettlementDelayed
+        expr: settlement_delay_seconds > 300
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Settlement processing is delayed"
+          description: "Settlement delay is {{ $value }} seconds."
+
+      # Resource Usage Alerts
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[1m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%."
+
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes / process_virtual_memory_max_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}%."
+
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value }}% available."
+
+  - name: ml_model_alerts
+    rules:
+      - alert: MLModelAccuracyDropped
+        expr: ml_model_accuracy < 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ML model accuracy has dropped"
+          description: "{{ $labels.model }} accuracy is {{ $value }}, below 85% threshold."
+
+      - alert: MLModelPredictionLatency
+        expr: histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m])) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ML model prediction latency is high"
+          description: "95th percentile prediction latency is {{ $value }} seconds."
+
+      - alert: MLModelNotUpdated
+        expr: time() - ml_model_last_updated_timestamp > 86400
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ML model has not been updated recently"
+          description: "{{ $labels.model }} has not been updated for more than 24 hours."
+
+  - name: settlement_alerts
+    rules:
+      - alert: SettlementFailure
+        expr: increase(settlement_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Settlement failure detected"
+          description: "{{ $value }} settlement failures in the last 5 minutes."
+
+      - alert: SettlementVolumeAnomaly
+        expr: abs(rate(settlement_amount_total[1h]) - rate(settlement_amount_total[1h] offset 24h)) / rate(settlement_amount_total[1h] offset 24h) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Settlement volume anomaly detected"
+          description: "Settlement volume has changed by {{ $value }}% compared to same time yesterday."

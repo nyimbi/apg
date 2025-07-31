@@ -1,0 +1,607 @@
+# Stripe Integration Configuration - APG Payment Gateway
+# Complete configuration for all Stripe features and environments
+#
+# © 2025 Datacraft. All rights reserved.
+
+# Environment Configuration
+environment:
+  # Supported environments: sandbox, production
+  current: "sandbox"  # Change to "production" for live transactions
+  
+  sandbox:
+    api_base_url: "https://api.stripe.com"
+    connect_base_url: "https://connect.stripe.com"
+    dashboard_url: "https://dashboard.stripe.com/test"
+    webhook_endpoint_secret_prefix: "whsec_test_"
+    
+  production:
+    api_base_url: "https://api.stripe.com"
+    connect_base_url: "https://connect.stripe.com"
+    dashboard_url: "https://dashboard.stripe.com"
+    webhook_endpoint_secret_prefix: "whsec_"
+
+# API Configuration
+api:
+  # API version - use latest stable version
+  version: "2023-10-16"
+  
+  # Timeout settings (in seconds)
+  timeout:
+    connection: 30
+    read: 80
+    total: 120
+  
+  # Retry configuration
+  retry:
+    max_attempts: 3
+    backoff_factor: 2.0
+    status_forcelist: [408, 429, 500, 502, 503, 504]
+    
+  # Rate limiting
+  rate_limit:
+    requests_per_second: 100
+    burst_limit: 200
+    
+  # Request options
+  options:
+    idempotency_keys: true
+    expand_responses: true
+    include_metadata: true
+
+# Authentication
+auth:
+  # API keys (set via environment variables)
+  # STRIPE_SECRET_KEY_SANDBOX or STRIPE_SECRET_KEY_PRODUCTION
+  # STRIPE_PUBLISHABLE_KEY_SANDBOX or STRIPE_PUBLISHABLE_KEY_PRODUCTION
+  
+  # OAuth settings for Connect
+  oauth:
+    client_id: "${STRIPE_CONNECT_CLIENT_ID}"
+    authorize_uri: "https://connect.stripe.com/oauth/authorize"
+    token_uri: "https://connect.stripe.com/oauth/token"
+    
+  # Webhook endpoint secrets (set via environment variables)
+  # STRIPE_WEBHOOK_SECRET_SANDBOX or STRIPE_WEBHOOK_SECRET_PRODUCTION
+
+# Payment Processing Configuration
+payments:
+  # Default payment settings
+  defaults:
+    currency: "usd"
+    capture_method: "automatic"  # automatic, manual
+    confirmation_method: "automatic"  # automatic, manual
+    setup_future_usage: null  # null, off_session, on_session
+    
+  # Payment method types
+  payment_method_types:
+    enabled:
+      - "card"
+      - "sepa_debit"
+      - "ideal"
+      - "sofort"
+      - "bancontact"
+      - "giropay"
+      - "eps"
+      - "p24"
+      - "alipay"
+      - "wechat_pay"
+      - "afterpay_clearpay"
+      - "klarna"
+      - "affirm"
+      - "us_bank_account"
+      - "cashapp"
+      - "link"
+    
+    # Regional availability
+    regional:
+      us: ["card", "us_bank_account", "cashapp", "link", "affirm"]
+      eu: ["card", "sepa_debit", "ideal", "sofort", "bancontact", "giropay", "eps", "p24"]
+      asia: ["card", "alipay", "wechat_pay"]
+      global: ["card", "afterpay_clearpay", "klarna"]
+  
+  # 3D Secure and Strong Customer Authentication
+  authentication:
+    # SCA requirements
+    sca:
+      enabled: true
+      challenge_required: "automatic"  # automatic, never, always
+      
+    # 3D Secure 2.0
+    three_d_secure:
+      enabled: true
+      version: "2.2"
+      challenge_indicator: "01"  # 01=No preference, 02=No challenge, 03=Challenge requested
+      
+  # Automatic payment methods
+  automatic_payment_methods:
+    enabled: true
+    allow_redirects: "always"  # always, never
+
+# Subscription Configuration
+subscriptions:
+  # Billing settings
+  billing:
+    default_cycle: "monthly"  # monthly, yearly, weekly, daily
+    prorate_upgrades: true
+    prorate_downgrades: false
+    
+  # Collection method
+  collection_method: "charge_automatically"  # charge_automatically, send_invoice
+  
+  # Payment behavior
+  payment_behavior: "default_incomplete"  # default_incomplete, pending_if_incomplete, error_if_incomplete
+  
+  # Invoice settings
+  invoices:
+    auto_advance: true
+    collection_method: "charge_automatically"
+    days_until_due: null  # Only for send_invoice collection method
+    
+  # Trials and discounts
+  trials:
+    default_trial_days: 0
+    allow_trial_extensions: false
+    
+  discounts:
+    allow_multiple: false
+    auto_apply_promotions: true
+
+# Customer Configuration
+customers:
+  # Default settings
+  defaults:
+    tax_exempt: "none"  # none, exempt, reverse
+    
+  # Data retention
+  data_retention:
+    inactive_period_months: 24
+    auto_delete_inactive: false
+    
+  # Customer portal
+  portal:
+    enabled: true
+    features:
+      subscription_cancel: true
+      subscription_pause: true
+      subscription_update: "allowed"
+      payment_method_update: true
+      invoice_history: true
+      customer_update: "allowed"
+
+# Connect Configuration (Multi-party payments)
+connect:
+  # Application info
+  application:
+    name: "APG Payment Gateway"
+    url: "https://www.datacraft.co.ke"
+    logo: null
+    
+  # Account types
+  account_types:
+    express: true
+    standard: true
+    custom: false
+    
+  # Onboarding
+  onboarding:
+    type: "express"  # express, standard, custom
+    collect_payments: true
+    collect_payouts: true
+    
+  # Platform fees
+  fees:
+    # Default platform fee percentage (0-100)
+    default_percentage: 2.5
+    # Minimum platform fee in cents
+    minimum_amount_cents: 25
+    # Maximum platform fee in cents
+    maximum_amount_cents: null
+    
+  # Transfers and payouts
+  transfers:
+    # Automatic transfers to connected accounts
+    automatic_transfers: true
+    # Transfer schedule: instant, daily, weekly, monthly
+    schedule: "daily"
+    
+  payouts:
+    # Payout schedule for connected accounts
+    schedule: "daily"  # instant, daily, weekly, monthly
+    # Minimum payout amount
+    minimum_amount_cents: 100
+
+# Webhook Configuration
+webhooks:
+  # Webhook settings
+  tolerance: 300  # Webhook tolerance in seconds
+  
+  # Events to listen for
+  events:
+    # Payment intents
+    - "payment_intent.succeeded"
+    - "payment_intent.payment_failed"
+    - "payment_intent.canceled"
+    - "payment_intent.processing"
+    - "payment_intent.requires_action"
+    - "payment_intent.amount_capturable_updated"
+    
+    # Charges
+    - "charge.succeeded"
+    - "charge.failed"
+    - "charge.captured"
+    - "charge.updated"
+    - "charge.dispute.created"
+    - "charge.dispute.updated"
+    - "charge.dispute.closed"
+    
+    # Payment methods
+    - "payment_method.attached"
+    - "payment_method.detached"
+    - "payment_method.updated"
+    - "setup_intent.succeeded"
+    - "setup_intent.setup_failed"
+    - "setup_intent.canceled"
+    
+    # Customers
+    - "customer.created"
+    - "customer.updated"
+    - "customer.deleted"
+    - "customer.source.created"
+    - "customer.source.updated"
+    - "customer.source.deleted"
+    - "customer.subscription.created"
+    - "customer.subscription.updated"
+    - "customer.subscription.deleted"
+    - "customer.subscription.trial_will_end"
+    
+    # Subscriptions
+    - "invoice.created"
+    - "invoice.finalized"
+    - "invoice.paid"
+    - "invoice.payment_failed"
+    - "invoice.payment_action_required"
+    - "invoice.upcoming"
+    - "invoice.updated"
+    - "subscription_schedule.created"
+    - "subscription_schedule.updated"
+    - "subscription_schedule.canceled"
+    
+    # Connect events
+    - "account.updated"
+    - "account.application.deauthorized"
+    - "capability.updated"
+    - "person.created"
+    - "person.updated"
+    - "transfer.created"
+    - "transfer.updated"
+    - "transfer.paid"
+    - "transfer.failed"
+    - "payout.created"
+    - "payout.updated"
+    - "payout.paid"
+    - "payout.failed"
+    
+    # Fraud and risk
+    - "radar.early_fraud_warning.created"
+    - "radar.early_fraud_warning.updated"
+    - "review.opened"
+    - "review.closed"
+    
+  # Webhook endpoints
+  endpoints:
+    primary: "${STRIPE_WEBHOOK_ENDPOINT_URL}/stripe/webhook"
+    connect: "${STRIPE_WEBHOOK_ENDPOINT_URL}/stripe/connect-webhook"
+    
+  # Security
+  signature_verification: true
+  ip_whitelist: []  # Empty means allow all IPs
+
+# Security Configuration
+security:
+  # Encryption
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_rotation_days: 90
+    
+  # API key security
+  api_keys:
+    rotation_enabled: true
+    rotation_interval_days: 180
+    store_encrypted: true
+    
+  # PCI compliance
+  pci_compliance:
+    level: "Level 1"
+    saq_level: "SAQ-A"
+    tokenization: true
+    
+  # Fraud detection
+  fraud_detection:
+    radar_enabled: true
+    risk_threshold: 65  # 0-100, higher = more restrictive
+    machine_learning: true
+    
+  # Data protection
+  data_protection:
+    gdpr_compliance: true
+    data_encryption_at_rest: true
+    data_encryption_in_transit: true
+    pii_tokenization: true
+
+# Monitoring and Logging
+monitoring:
+  # Logging configuration
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format: "json"
+    log_requests: true
+    log_responses: false  # Set to true for detailed debugging
+    log_webhook_events: true
+    max_log_size_mb: 100
+    log_retention_days: 30
+    
+  # Metrics collection
+  metrics:
+    enabled: true
+    include_latency: true
+    include_error_rates: true
+    include_throughput: true
+    
+  # Health checks
+  health_checks:
+    enabled: true
+    interval_seconds: 30
+    timeout_seconds: 10
+    
+  # Alerting
+  alerts:
+    error_rate_threshold: 0.05  # 5%
+    latency_threshold_ms: 2000
+    webhook_failure_threshold: 0.10  # 10%
+
+# Performance Configuration
+performance:
+  # Connection pooling
+  connection_pool:
+    size: 20
+    max_size: 100
+    keep_alive: true
+    keep_alive_timeout: 30
+    
+  # Caching
+  caching:
+    enabled: true
+    default_ttl: 300  # 5 minutes
+    max_size: 1000
+    
+    # Cache specific items
+    cache_customers: true
+    cache_payment_methods: true
+    cache_products: true
+    cache_prices: true
+    
+  # Request optimization
+  optimization:
+    compression: true
+    connection_reuse: true
+    async_processing: true
+    batch_operations: true
+    
+  # Background processing
+  background_jobs:
+    enabled: true
+    max_workers: 5
+    retry_failed_jobs: true
+    job_timeout_seconds: 300
+
+# Localization
+localization:
+  # Default locale
+  default_locale: "en-US"
+  
+  # Supported locales for Stripe elements and receipts
+  supported_locales:
+    - "en-US"
+    - "en-GB"
+    - "fr-FR"
+    - "de-DE"
+    - "es-ES"
+    - "it-IT"
+    - "pt-BR"
+    - "ja-JP"
+    - "zh-CN"
+    - "ko-KR"
+    
+  # Currency settings
+  currencies:
+    # Primary currencies
+    primary:
+      - "USD"
+      - "EUR"
+      - "GBP"
+      - "JPY"
+      - "CNY"
+      - "CAD"
+      - "AUD"
+      
+    # All supported currencies
+    supported:
+      - "USD"
+      - "EUR"
+      - "GBP"
+      - "JPY"
+      - "CNY"
+      - "CAD"
+      - "AUD"
+      - "CHF"
+      - "SEK"
+      - "NOK"
+      - "DKK"
+      - "PLN"
+      - "CZK"
+      - "HUF"
+      - "BGN"
+      - "RON"
+      - "HRK"
+      - "INR"
+      - "SGD"
+      - "HKD"
+      - "NZD"
+      - "MXN"
+      - "BRL"
+      - "ARS"
+      - "CLP"
+      - "COP"
+      - "PEN"
+      - "UYU"
+      - "ZAR"
+      - "KES"
+      - "NGN"
+      - "GHS"
+      - "EGP"
+      - "MAD"
+      - "TND"
+      - "AED"
+      - "SAR"
+      - "QAR"
+      - "BHD"
+      - "KWD"
+      - "OMR"
+      - "JOD"
+      - "ILS"
+      - "TRY"
+      - "RUB"
+      - "UAH"
+      - "THB"
+      - "MYR"
+      - "IDR"
+      - "PHP"
+      - "VND"
+      - "KRW"
+      - "TWD"
+
+# Business Rules
+business_rules:
+  # Payment limits
+  payment_limits:
+    # Per transaction limits (in cents)
+    min_amount_cents: 50  # $0.50
+    max_amount_cents: 99999999  # $999,999.99
+    
+    # Daily limits per customer
+    daily_limit_cents: 1000000  # $10,000
+    
+    # Monthly limits per customer
+    monthly_limit_cents: 10000000  # $100,000
+    
+  # Refund policies
+  refunds:
+    # Automatic refund approval limits
+    auto_approve_limit_cents: 10000  # $100
+    
+    # Refund window (days)
+    refund_window_days: 90
+    
+    # Partial refunds allowed
+    partial_refunds: true
+    
+  # Dispute handling
+  disputes:
+    # Auto-respond to disputes under this amount
+    auto_respond_limit_cents: 2500  # $25
+    
+    # Evidence submission deadline (days)
+    evidence_deadline_days: 7
+    
+  # Subscription rules
+  subscription_rules:
+    # Grace period for failed payments (days)
+    grace_period_days: 3
+    
+    # Maximum retry attempts for failed payments
+    max_retry_attempts: 4
+    
+    # Automatic cancellation after failed retries
+    auto_cancel_after_retries: true
+
+# Feature Flags
+features:
+  # Payment features
+  payment_links: true
+  checkout_sessions: true
+  setup_intents: true
+  
+  # Connect features
+  express_accounts: true
+  custom_accounts: false
+  
+  # Advanced features
+  radar_fraud_detection: true
+  terminal_payments: false
+  issuing_cards: false
+  
+  # Regional features
+  sepa_direct_debit: true
+  ach_payments: true
+  open_banking: true
+  
+  # Beta features
+  financial_connections: false
+  climate_contributions: false
+  tax_calculations: false
+
+# Development and Testing
+development:
+  # Test mode settings
+  test_mode:
+    enabled: true
+    use_test_cards: true
+    simulate_failures: true
+    
+  # Test cards for different scenarios
+  test_cards:
+    success: "4242424242424242"
+    decline: "4000000000000002"
+    authentication_required: "4000002500003155"
+    processing_error: "4000000000000119"
+    
+  # Webhook testing
+  webhook_testing:
+    use_test_events: true
+    simulate_delays: false
+    test_retries: true
+    
+  # Debug settings
+  debug:
+    log_all_requests: false
+    log_all_responses: false
+    detailed_errors: true
+    
+# Integration Settings
+integrations:
+  # APG platform integration
+  apg:
+    enabled: true
+    tenant_isolation: true
+    multi_currency_support: true
+    
+  # External service integrations
+  external_services:
+    # Accounting systems
+    quickbooks: false
+    xero: false
+    
+    # CRM systems
+    salesforce: false
+    hubspot: false
+    
+    # ERP systems
+    sap: false
+    oracle: false
+    
+  # Notification services
+  notifications:
+    email: true
+    sms: false
+    push: false
+    webhook: true

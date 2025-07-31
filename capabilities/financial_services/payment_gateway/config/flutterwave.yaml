@@ -1,0 +1,651 @@
+# Flutterwave Integration Configuration - APG Payment Gateway
+# Complete configuration for all Flutterwave features and environments
+#
+# © 2025 Datacraft. All rights reserved.
+
+# Environment Configuration
+environment:
+  # Supported environments: sandbox, live
+  current: "sandbox"  # Change to "live" for production transactions
+  
+  sandbox:
+    api_base_url: "https://api.flutterwave.com/v3"
+    public_key: "${FLUTTERWAVE_PUBLIC_KEY_SANDBOX}"
+    secret_key: "${FLUTTERWAVE_SECRET_KEY_SANDBOX}"
+    encryption_key: "${FLUTTERWAVE_ENCRYPTION_KEY_SANDBOX}"
+    webhook_secret: "${FLUTTERWAVE_WEBHOOK_SECRET_SANDBOX}"
+    
+  live:
+    api_base_url: "https://api.flutterwave.com/v3"
+    public_key: "${FLUTTERWAVE_PUBLIC_KEY_LIVE}"
+    secret_key: "${FLUTTERWAVE_SECRET_KEY_LIVE}"
+    encryption_key: "${FLUTTERWAVE_ENCRYPTION_KEY_LIVE}"
+    webhook_secret: "${FLUTTERWAVE_WEBHOOK_SECRET_LIVE}"
+
+# API Configuration
+api:
+  # Timeout settings (in seconds)
+  timeout:
+    connection: 30
+    read: 60
+    total: 90
+  
+  # Retry configuration  
+  retry:
+    max_attempts: 3
+    backoff_factor: 2.0
+    status_forcelist: [408, 429, 500, 502, 503, 504]
+    
+  # Rate limiting
+  rate_limit:
+    requests_per_second: 50
+    burst_limit: 100
+    
+  # Request options
+  options:
+    compression: true
+    keep_alive: true
+    pool_connections: 10
+    pool_maxsize: 20
+
+# Authentication Configuration
+auth:
+  # API credentials (set via environment variables)
+  # FLUTTERWAVE_PUBLIC_KEY_SANDBOX or FLUTTERWAVE_PUBLIC_KEY_LIVE
+  # FLUTTERWAVE_SECRET_KEY_SANDBOX or FLUTTERWAVE_SECRET_KEY_LIVE
+  # FLUTTERWAVE_ENCRYPTION_KEY_SANDBOX or FLUTTERWAVE_ENCRYPTION_KEY_LIVE
+  # FLUTTERWAVE_WEBHOOK_SECRET_SANDBOX or FLUTTERWAVE_WEBHOOK_SECRET_LIVE
+  
+  # Webhook authentication
+  webhook:
+    verify_signature: true
+    signature_header: "x-flw-signature"
+    timestamp_tolerance: 300  # 5 minutes
+
+# Payment Processing Configuration
+payments:
+  # Default settings
+  defaults:
+    currency: "NGN"
+    country_code: "NG"
+    payment_options: "card,account,mobilemoney,ussd"
+    redirect_url: "${FLUTTERWAVE_REDIRECT_URL}"
+    
+  # Payment method configuration
+  payment_methods:
+    # Card payments
+    cards:
+      enabled: true
+      supported_brands:
+        - "visa"
+        - "mastercard"
+        - "amex"
+        - "verve"
+        - "discover"
+      enable_3d_secure: true
+      enable_pin_bypass: false
+      
+    # Mobile money payments
+    mobile_money:
+      enabled: true
+      
+      # M-Pesa (Kenya, Tanzania, Uganda)
+      mpesa:
+        enabled: true
+        countries: ["KE", "TZ", "UG"]
+        currencies: ["KES", "TZS", "UGX"]
+        
+      # MTN Mobile Money
+      mtn:
+        enabled: true
+        countries: ["GH", "NG", "UG", "CM", "CI", "RW", "ZM", "MW"]
+        currencies: ["GHS", "NGN", "UGX", "XAF", "RWF", "ZMW", "MWK"]
+        
+      # Airtel Money
+      airtel:
+        enabled: true
+        countries: ["GH", "KE", "TZ", "UG", "ZM", "MW", "NG"]
+        currencies: ["GHS", "KES", "TZS", "UGX", "ZMW", "MWK", "NGN"]
+        
+      # Zambia Mobile Money
+      zambia:
+        enabled: true
+        countries: ["ZM"]
+        currencies: ["ZMW"]
+        
+      # Rwanda Mobile Money
+      rwanda:
+        enabled: true
+        countries: ["RW"]
+        currencies: ["RWF"]
+        
+      # Francophone Mobile Money
+      francophone:
+        enabled: true
+        countries: ["CI", "SN", "BF", "ML", "NE", "TD", "CM", "CF", "GA", "GQ", "CG"]
+        currencies: ["XAF", "XOF"]
+        
+    # Bank transfers
+    bank_transfers:
+      enabled: true
+      supported_countries:
+        - "NG"  # Nigeria
+        - "GH"  # Ghana  
+        - "KE"  # Kenya
+        - "UG"  # Uganda
+        - "TZ"  # Tanzania
+        - "ZA"  # South Africa
+        - "RW"  # Rwanda
+        - "ZM"  # Zambia
+        - "MW"  # Malawi
+        - "ZW"  # Zimbabwe
+      
+    # USSD payments
+    ussd:
+      enabled: true
+      supported_countries: ["NG", "GH", "KE"]
+      supported_banks:
+        # Nigeria
+        - code: "044"
+          name: "Access Bank"
+          ussd_code: "*901*000*amount*account#"
+        - code: "023"
+          name: "Citibank"
+          ussd_code: "*329*000*amount#"
+        - code: "050"
+          name: "Ecobank"
+          ussd_code: "*326*000*amount#"
+        - code: "011"
+          name: "First Bank"
+          ussd_code: "*894*000*amount#"
+        - code: "058"
+          name: "GTBank"
+          ussd_code: "*737*000*amount#"
+        - code: "076"
+          name: "Polaris Bank"
+          ussd_code: "*833*000*amount#"
+        - code: "221"
+          name: "Stanbic IBTC"
+          ussd_code: "*909*000*amount#"
+        - code: "232"
+          name: "Sterling Bank"
+          ussd_code: "*822*000*amount#"
+        - code: "032"
+          name: "Union Bank"
+          ussd_code: "*826*000*amount#"
+        - code: "033"
+          name: "UBA"
+          ussd_code: "*919*000*amount#"
+        - code: "035"
+          name: "Wema Bank"
+          ussd_code: "*945*000*amount#"
+        - code: "057"
+          name: "Zenith Bank"
+          ussd_code: "*966*000*amount#"
+          
+    # QR Code payments
+    qr_payments:
+      enabled: true
+      supported_countries: ["NG", "GH", "KE", "UG", "TZ"]
+      
+    # Virtual accounts
+    virtual_accounts:
+      enabled: true
+      supported_countries: ["NG"]
+      auto_settlement: true
+      
+    # Voucher payments
+    vouchers:
+      enabled: true
+      supported_countries: ["NG"]
+      
+    # Digital wallets
+    wallets:
+      enabled: true
+      # Apple Pay / Google Pay integration would require additional setup
+      applepay: false
+      googlepay: false
+
+# Supported Currencies and Countries
+localization:
+  # Primary currencies
+  primary_currencies:
+    - "NGN"  # Nigerian Naira
+    - "GHS"  # Ghanaian Cedi
+    - "KES"  # Kenyan Shilling
+    - "UGX"  # Ugandan Shilling
+    - "TZS"  # Tanzanian Shilling
+    - "ZAR"  # South African Rand
+    
+  # All supported currencies
+  supported_currencies:
+    - "NGN"  # Nigerian Naira
+    - "GHS"  # Ghanaian Cedi  
+    - "KES"  # Kenyan Shilling
+    - "UGX"  # Ugandan Shilling
+    - "TZS"  # Tanzanian Shilling
+    - "ZAR"  # South African Rand
+    - "RWF"  # Rwandan Franc
+    - "ZMW"  # Zambian Kwacha
+    - "MWK"  # Malawian Kwacha
+    - "ZWL"  # Zimbabwean Dollar
+    - "USD"  # US Dollar
+    - "EUR"  # Euro
+    - "GBP"  # British Pound
+    - "XAF"  # Central African Franc
+    - "XOF"  # West African Franc
+    - "MAD"  # Moroccan Dirham
+    - "TND"  # Tunisian Dinar
+    - "EGP"  # Egyptian Pound
+    - "ETB"  # Ethiopian Birr
+    - "LRD"  # Liberian Dollar
+    - "SLL"  # Sierra Leonean Leone
+    
+  # Supported countries
+  supported_countries:
+    - code: "NG"
+      name: "Nigeria"
+      currency: "NGN"
+      payment_methods: ["card", "account", "ussd", "qr", "mobilemoney"]
+    - code: "GH"
+      name: "Ghana"
+      currency: "GHS"
+      payment_methods: ["card", "account", "ussd", "mobilemoney"]
+    - code: "KE"
+      name: "Kenya"
+      currency: "KES"
+      payment_methods: ["card", "account", "mpesa", "mobilemoney"]
+    - code: "UG"
+      name: "Uganda"
+      currency: "UGX"
+      payment_methods: ["card", "account", "mpesa", "mobilemoney"]
+    - code: "TZ"
+      name: "Tanzania"
+      currency: "TZS"
+      payment_methods: ["card", "account", "mpesa", "mobilemoney"]
+    - code: "ZA"
+      name: "South Africa"
+      currency: "ZAR"
+      payment_methods: ["card", "account"]
+    - code: "RW"
+      name: "Rwanda"
+      currency: "RWF"
+      payment_methods: ["card", "account", "mobilemoney"]
+    - code: "ZM"
+      name: "Zambia"
+      currency: "ZMW"
+      payment_methods: ["card", "account", "mobilemoney"]
+    - code: "MW"
+      name: "Malawi"
+      currency: "MWK"
+      payment_methods: ["card", "account", "mobilemoney"]
+    - code: "ZW"
+      name: "Zimbabwe"
+      currency: "ZWL"
+      payment_methods: ["card", "account"]
+
+# Webhook Configuration
+webhooks:
+  # Webhook settings
+  timeout: 30  # seconds
+  retry_attempts: 5
+  retry_intervals: [60, 300, 1800, 3600, 7200]  # seconds: 1min, 5min, 30min, 1h, 2h
+  
+  # Webhook events
+  events:
+    # Payment events
+    - "charge.completed"
+    - "charge.failed"
+    - "charge.pending"
+    
+    # Transfer events
+    - "transfer.completed"
+    - "transfer.failed"
+    - "transfer.pending"
+    
+    # Subscription events
+    - "subscription.created"
+    - "subscription.cancelled"
+    - "subscription.activated"
+    
+    # Refund events
+    - "refund.completed"
+    - "refund.failed"
+    
+    # Customer events
+    - "customer.created"
+    - "customer.updated"
+    
+    # Plan events
+    - "plan.created"
+    - "plan.updated"
+    
+    # Settlement events
+    - "settlement.completed"
+    
+    # KYC events
+    - "kyc.verified"
+    - "kyc.failed"
+    
+  # Webhook endpoints
+  endpoints:
+    payment_webhook: "${FLUTTERWAVE_WEBHOOK_ENDPOINT_URL}/flutterwave/webhook"
+    
+  # Security
+  signature_verification: true
+  ip_whitelist:
+    - "52.74.14.9"      # Flutterwave webhook IPs
+    - "52.74.14.10" 
+    - "34.96.203.47"
+    - "34.96.57.70"
+    - "34.96.112.31"
+    - "34.96.127.8"
+    - "34.117.69.29"
+    - "34.117.186.192"
+    
+  # Processing options
+  processing:
+    async_processing: true
+    batch_processing: false
+    max_processing_time: 30  # seconds
+    enable_duplicate_detection: true
+
+# Security Configuration
+security:
+  # Encryption
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_rotation_days: 90
+    
+  # HMAC settings for webhooks
+  hmac:
+    algorithm: "sha256"
+    encoding: "hex"
+    
+  # Request validation
+  validation:
+    validate_origin: true
+    validate_signature: true
+    validate_timestamps: true
+    max_timestamp_drift: 300  # 5 minutes
+    
+  # IP security
+  ip_security:
+    enable_whitelist: false  # Disable for development
+    allowed_ips:
+      - "127.0.0.1"         # Local development
+      - "0.0.0.0/0"          # Allow all (disable in production)
+    
+  # Data protection
+  data_protection:
+    gdpr_compliance: true
+    pci_compliance: true
+    data_retention_days: 2555  # 7 years
+    tokenization: true
+    
+  # Fraud prevention
+  fraud_prevention:
+    enable_velocity_checks: true
+    enable_device_fingerprinting: true
+    risk_threshold: 80  # 0-100 scale
+
+# Monitoring and Logging
+monitoring:
+  # Logging configuration
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format: "json"
+    log_requests: true
+    log_responses: false  # Set to true for debugging
+    log_webhook_events: true
+    max_log_size_mb: 100
+    log_retention_days: 30
+    
+    # Sensitive data handling
+    mask_card_numbers: true
+    mask_cvv: true
+    mask_bank_account_numbers: true
+    mask_phone_numbers: false  # Phone numbers needed for mobile money
+    
+  # Metrics collection
+  metrics:
+    enabled: true
+    include_latency: true
+    include_error_rates: true
+    include_success_rates: true
+    include_payment_method_breakdown: true
+    include_country_breakdown: true
+    
+  # Health checks
+  health_checks:
+    enabled: true
+    interval_seconds: 30
+    timeout_seconds: 10
+    check_api_connectivity: true
+    check_webhook_processing: true
+    check_balance_access: true
+    
+  # Alerting
+  alerts:
+    enabled: true
+    error_rate_threshold: 0.05      # 5%
+    latency_threshold_ms: 3000      # 3 seconds
+    webhook_failure_threshold: 0.10 # 10%
+    low_balance_threshold: 1000     # Alert when balance below this
+    
+    # Alert channels
+    channels:
+      email: true
+      slack: false
+      webhook: true
+
+# Performance Configuration
+performance:
+  # Connection pooling
+  connection_pool:
+    size: 20
+    max_size: 50
+    keep_alive: true
+    keep_alive_timeout: 30
+    
+  # Caching
+  caching:
+    enabled: true
+    default_ttl: 300  # 5 minutes
+    max_size: 1000
+    
+    # Cache specific items
+    cache_exchange_rates: true
+    cache_bank_list: true
+    cache_country_configs: true
+    
+  # Request optimization
+  optimization:
+    compression: true
+    connection_reuse: true
+    async_processing: true
+    batch_requests: false  # Flutterwave doesn't support batch requests
+    
+  # Background processing
+  background_jobs:
+    enabled: true
+    max_workers: 5
+    retry_failed_jobs: true
+    job_timeout_seconds: 300
+
+# Business Rules and Limits
+business_rules:
+  # Transaction limits
+  transaction_limits:
+    # Per transaction limits (in major currency units)
+    min_amount: 1        # ₦1, GH₵1, KSh1, etc.
+    max_amount: 1000000  # ₦1M, GH₵1M, KSh1M, etc.
+    
+    # Daily limits per customer
+    daily_limit: 500000     # ₦500K, GH₵500K, etc.
+    daily_transaction_count: 50
+    
+    # Monthly limits per customer
+    monthly_limit: 5000000  # ₦5M, GH₵5M, etc.
+    monthly_transaction_count: 500
+    
+  # Refund policies
+  refunds:
+    # Refund window (days after original transaction)
+    refund_window_days: 180
+    
+    # Refund options
+    partial_refunds: true
+    multiple_refunds: true
+    same_day_refunds: true
+    
+  # Risk rules
+  risk_rules:
+    # Velocity limits
+    velocity_limits:
+      cards_per_hour: 5
+      amount_per_hour: 100000  # ₦100K, GH₵100K, etc.
+      transactions_per_minute: 3
+      
+    # Geographic restrictions
+    geographic_restrictions:
+      blocked_countries: []  # Empty list means no restrictions
+      high_risk_countries: []
+      
+    # Card testing protection
+    card_testing:
+      enabled: true
+      max_attempts_per_card: 3
+      lockout_period_minutes: 60
+
+# Reporting Configuration
+reporting:
+  # Scheduled reports
+  scheduled_reports:
+    enabled: true
+    
+    # Settlement reports
+    settlement_reports:
+      enabled: true
+      frequency: "daily"  # daily, weekly, monthly
+      format: "json"      # json, csv
+      include_fees: true
+      
+    # Transaction reports
+    transaction_reports:
+      enabled: true
+      frequency: "daily"
+      format: "json"
+      include_risk_data: true
+      include_customer_data: false
+      
+  # Real-time reporting
+  real_time:
+    enabled: true
+    push_notifications: false
+    webhook_reports: true
+    
+  # Data retention
+  data_retention:
+    transaction_data_days: 2555  # 7 years
+    reporting_data_days: 1095    # 3 years
+    log_data_days: 365           # 1 year
+
+# Feature Flags
+features:
+  # Payment features
+  payment_links: true
+  recurring_payments: true
+  subscriptions: true
+  
+  # Advanced features
+  split_payments: true
+  escrow_payments: false  # Requires special setup
+  bulk_transfers: true
+  
+  # Regional features
+  mobile_money_all_networks: true
+  ussd_all_banks: true
+  virtual_accounts: true
+  
+  # Risk features
+  fraud_detection: true
+  velocity_checking: true
+  device_fingerprinting: true
+  
+  # Mobile features
+  mobile_sdk: true
+  in_app_payments: true
+  
+  # API features
+  webhook_retries: true
+  idempotency_keys: true
+
+# Development and Testing
+development:
+  # Test mode settings
+  test_mode:
+    enabled: true
+    use_test_cards: true
+    simulate_webhooks: true
+    
+  # Test payment methods
+  test_cards:
+    visa_success: "4187427415564246"
+    visa_declined: "4084084084084081"
+    mastercard_success: "5531886652142950"
+    verve_success: "5060666666666666666"
+    
+  # Test mobile money numbers
+  test_mobile_money:
+    mpesa_success: "254708374149"
+    mtn_success: "233545454545"
+    airtel_success: "256780000000"
+    
+  # Webhook testing
+  webhook_testing:
+    test_notifications: true
+    simulate_delays: false
+    test_retries: true
+    
+  # Debug settings
+  debug:
+    log_all_requests: false
+    log_all_responses: false
+    detailed_errors: true
+    mock_external_services: false
+
+# Integration Settings
+integrations:
+  # APG platform integration
+  apg:
+    enabled: true
+    tenant_isolation: true
+    multi_currency_support: true
+    
+  # External service integrations
+  external_services:
+    # Fraud services (additional to built-in)
+    kount: false
+    sift: false
+    
+    # Accounting systems
+    quickbooks: false
+    xero: false
+    
+    # CRM systems
+    salesforce: false
+    hubspot: false
+    
+  # Notification services
+  notifications:
+    email: true
+    sms: true
+    push: false
+    webhook: true
+    
+  # Analytics and reporting
+  analytics:
+    google_analytics: false
+    mixpanel: false
+    segment: false

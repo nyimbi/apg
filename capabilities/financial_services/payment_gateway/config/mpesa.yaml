@@ -1,0 +1,210 @@
+# MPESA Configuration - APG Payment Gateway
+# Complete configuration for all MPESA features
+
+mpesa:
+  # Environment configuration
+  environment: "sandbox"  # Options: sandbox, production
+  
+  # API credentials (load from environment variables in production)
+  credentials:
+    consumer_key: "${MPESA_CONSUMER_KEY}"
+    consumer_secret: "${MPESA_CONSUMER_SECRET}"
+    business_short_code: "${MPESA_BUSINESS_SHORT_CODE:174379}"  # Default sandbox shortcode
+    passkey: "${MPESA_PASSKEY:bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919}"  # Default sandbox passkey
+    initiator_name: "${MPESA_INITIATOR_NAME:testapi}"  # Default sandbox initiator
+    security_credential: "${MPESA_SECURITY_CREDENTIAL}"  # Encrypted initiator password
+    
+  # Callback URLs
+  callback_urls:
+    base_url: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}"
+    stk_push_callback: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}/mpesa/stk-push-callback"
+    b2b_result: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}/mpesa/b2b-result"
+    b2c_result: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}/mpesa/b2c-result"
+    c2b_validation: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}/mpesa/c2b-validation"
+    c2b_confirmation: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}/mpesa/c2b-confirmation"
+    account_balance_result: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}/mpesa/account-balance-result"
+    transaction_status_result: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}/mpesa/transaction-status-result"
+    transaction_reversal_result: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}/mpesa/transaction-reversal-result"
+    timeout: "${MPESA_CALLBACK_BASE_URL:https://your-domain.com}/mpesa/timeout"
+  
+  # API endpoints for sandbox
+  sandbox_endpoints:
+    base_url: "https://sandbox.safaricom.co.ke"
+    oauth: "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+    stk_push: "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+    b2b: "https://sandbox.safaricom.co.ke/mpesa/b2b/v1/paymentrequest"
+    b2c: "https://sandbox.safaricom.co.ke/mpesa/b2c/v1/paymentrequest"
+    c2b_register: "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl"
+    c2b_simulate: "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/simulate"
+    account_balance: "https://sandbox.safaricom.co.ke/mpesa/accountbalance/v1/query"
+    transaction_status: "https://sandbox.safaricom.co.ke/mpesa/transactionstatus/v1/query"
+    reversal: "https://sandbox.safaricom.co.ke/mpesa/reversal/v1/request"
+  
+  # API endpoints for production
+  production_endpoints:
+    base_url: "https://api.safaricom.co.ke"
+    oauth: "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+    stk_push: "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+    b2b: "https://api.safaricom.co.ke/mpesa/b2b/v1/paymentrequest"
+    b2c: "https://api.safaricom.co.ke/mpesa/b2c/v1/paymentrequest"
+    c2b_register: "https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl"
+    c2b_simulate: "https://api.safaricom.co.ke/mpesa/c2b/v1/simulate"
+    account_balance: "https://api.safaricom.co.ke/mpesa/accountbalance/v1/query"
+    transaction_status: "https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query"
+    reversal: "https://api.safaricom.co.ke/mpesa/reversal/v1/request"
+  
+  # Transaction settings
+  transaction_settings:
+    stk_push:
+      enabled: true
+      max_amount: 500000  # KES 500,000
+      min_amount: 1       # KES 1
+      timeout_seconds: 60
+      auto_retry: true
+      retry_attempts: 3
+      retry_delay_seconds: 30
+    
+    b2b:
+      enabled: true
+      max_amount: 10000000  # KES 10,000,000
+      min_amount: 100       # KES 100
+      timeout_seconds: 120
+      auto_retry: true
+      retry_attempts: 2
+      allowed_command_ids:
+        - "BusinessPayment"
+        - "BusinessBuyGoods" 
+        - "DisburseFundsToBusiness"
+        - "BusinessToBusinessTransfer"
+    
+    b2c:
+      enabled: true
+      max_amount: 5000000   # KES 5,000,000
+      min_amount: 10        # KES 10
+      timeout_seconds: 120
+      auto_retry: true
+      retry_attempts: 2
+      allowed_command_ids:
+        - "SalaryPayment"
+        - "BusinessPayment"
+        - "PromotionPayment"
+    
+    c2b:
+      enabled: true
+      max_amount: 1000000   # KES 1,000,000
+      min_amount: 1         # KES 1
+      validation_enabled: true
+      confirmation_enabled: true
+      auto_register_urls: true
+      allowed_transaction_types:
+        - "CustomerPayBillOnline"
+        - "CustomerBuyGoodsOnline"
+    
+    account_balance:
+      enabled: true
+      auto_check_interval_minutes: 60
+      low_balance_threshold: 10000  # KES 10,000
+      alert_on_low_balance: true
+    
+    transaction_status:
+      enabled: true
+      auto_query_pending_after_minutes: 5
+      max_query_attempts: 3
+      query_interval_minutes: 2
+    
+    reversal:
+      enabled: true
+      max_reversal_amount: 1000000  # KES 1,000,000
+      reversal_window_hours: 24
+      require_approval: true
+      auto_retry: false
+  
+  # Security settings
+  security:
+    token_refresh_buffer_minutes: 5
+    max_concurrent_requests: 50
+    rate_limit_requests_per_minute: 100
+    request_timeout_seconds: 30
+    retry_on_network_error: true
+    validate_callback_signatures: true
+    callback_ip_whitelist:
+      - "196.201.214.200"   # Safaricom callback IP
+      - "196.201.214.206"   # Safaricom callback IP  
+      - "196.201.212.127"   # Safaricom callback IP
+      - "196.201.212.138"   # Safaricom callback IP
+    
+  # Monitoring and logging
+  monitoring:
+    enabled: true
+    log_all_requests: true
+    log_all_responses: true
+    log_callback_data: true
+    performance_tracking: true
+    health_check_interval_minutes: 5
+    alert_on_failures: true
+    failure_threshold_percentage: 10
+    metrics_retention_days: 30
+    
+  # Webhook settings
+  webhooks:
+    enabled: true
+    signature_validation: true
+    timeout_seconds: 30
+    retry_failed_webhooks: true
+    max_retry_attempts: 5
+    retry_delay_seconds: 60
+    store_webhook_logs: true
+    webhook_log_retention_days: 90
+    
+  # Business rules
+  business_rules:
+    duplicate_transaction_window_minutes: 5
+    max_daily_transaction_amount: 2000000  # KES 2,000,000
+    max_monthly_transaction_amount: 50000000  # KES 50,000,000
+    blocked_phone_numbers: []
+    allowed_phone_number_prefixes:
+      - "254"  # Kenya country code
+    
+    # Anti-fraud settings
+    fraud_detection:
+      enabled: true
+      velocity_checks: true
+      max_transactions_per_hour: 20
+      max_transactions_per_day: 100
+      suspicious_amount_threshold: 100000  # KES 100,000
+      unusual_time_window_start: "22:00"
+      unusual_time_window_end: "06:00"
+      
+  # Testing and development
+  development:
+    mock_mode: false
+    test_phone_numbers:
+      - "254708374149"  # Sandbox test number
+      - "254711XXXXXX"  # Additional test numbers
+    test_amounts:
+      success: [1, 10, 100, 1000]
+      failure: [2, 3, 4, 5]  # These amounts will simulate failures in sandbox
+    auto_confirm_test_transactions: true
+    
+  # Performance optimization
+  performance:
+    connection_pool_size: 20
+    connection_pool_maxsize: 100
+    connection_keep_alive: true
+    request_compression: true
+    response_caching: false  # Don't cache sensitive financial data
+    async_processing: true
+    batch_processing: false  # MPESA doesn't support batch operations
+    
+  # Error handling
+  error_handling:
+    auto_retry_on_network_error: true
+    auto_retry_on_server_error: true
+    auto_retry_on_timeout: true
+    max_total_retries: 3
+    backoff_strategy: "exponential"  # Options: fixed, exponential
+    base_delay_seconds: 5
+    max_delay_seconds: 300
+    circuit_breaker_enabled: true
+    circuit_breaker_failure_threshold: 10
+    circuit_breaker_recovery_timeout_seconds: 300

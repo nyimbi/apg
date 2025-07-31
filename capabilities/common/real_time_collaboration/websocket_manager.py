@@ -742,6 +742,36 @@ class WebSocketManager:
 			except Exception as e:
 				self._logger.error(f"Error in cleanup loop: {e}")
 	
+	async def _handle_page_leave(self, message: Dict[str, Any], connection: WebSocketConnection) -> None:
+		"""Handle user leaving a page"""
+		page_url = message.get('page_url')
+		if not page_url:
+			return
+		
+		# Remove connection from page tracking
+		if page_url in self._page_connections:
+			self._page_connections[page_url].discard(connection.connection_id)
+			
+			# Clean up empty page tracking
+			if not self._page_connections[page_url]:
+				del self._page_connections[page_url]
+		
+		# Update presence info
+		if connection.user_id:
+			user_pages = self._presence_info.get(connection.user_id, {}).get('pages', [])
+			if page_url in user_pages:
+				user_pages.remove(page_url)
+		
+		# Broadcast user left page
+		await self._broadcast_to_page(page_url, {
+			'type': MessageType.USER_LEAVE.value,
+			'user_id': connection.user_id,
+			'page_url': page_url,
+			'timestamp': datetime.utcnow().isoformat()
+		}, exclude_connection=connection.connection_id)
+		
+		self._logger.debug(f"User {connection.user_id} left page {page_url}")
+	
 	def get_connection_stats(self) -> Dict[str, Any]:
 		"""Get current connection statistics"""
 		return {

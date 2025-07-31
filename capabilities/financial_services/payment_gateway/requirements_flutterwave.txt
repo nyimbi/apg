@@ -1,0 +1,52 @@
+# Flutterwave Integration Dependencies
+# Complete Python SDK and dependencies for Flutterwave payments
+
+# Core Flutterwave SDK
+flutterwave-python>=1.2.0
+
+# HTTP client and async support
+requests>=2.31.0
+aiohttp>=3.8.0
+httpx>=0.25.0
+
+# Cryptography and security
+cryptography>=41.0.0
+pycryptodome>=3.19.0
+
+# Data validation and parsing
+pydantic>=2.0.0
+marshmallow>=3.20.0
+
+# Environment and configuration
+python-dotenv>=1.0.0
+PyYAML>=6.0
+
+# Async support
+asyncio
+aiofiles>=23.0.0
+
+# Date and time handling
+python-dateutil>=2.8.0
+
+# JSON handling and serialization
+orjson>=3.9.0
+
+# Utilities
+uuid
+hmac
+hashlib
+base64
+urllib3>=2.0.0
+
+# Logging and monitoring
+structlog>=23.0.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+
+# Optional: Additional features
+qrcode>=7.4.0  # For QR code generation
+Pillow>=10.0.0  # For image processing
+phonenumbers>=8.13.0  # For phone number validation

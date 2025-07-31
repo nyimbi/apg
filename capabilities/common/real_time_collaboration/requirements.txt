@@ -70,6 +70,47 @@ pytz>=2023.3
 click>=8.1.7
 rich>=13.7.0
 
+# WebRTC dependencies (already included)
+aiortc>=1.6.0
+av>=10.0.0
+opencv-python>=4.8.1
+
+# MQTT protocol dependencies
+paho-mqtt>=1.6.1
+asyncio-mqtt>=0.13.0
+
+# gRPC protocol dependencies
+grpcio>=1.59.2
+grpcio-tools>=1.59.2
+protobuf>=4.25.1
+
+# Socket.IO protocol dependencies
+python-socketio>=5.10.0
+aiohttp>=3.9.0
+aiohttp-cors>=0.7.0
+
+# XMPP protocol dependencies
+slixmpp>=1.8.4
+
+# SIP protocol dependencies
+aiortc>=1.6.0  # Also used for SIP media handling
+pyrtcio>=1.0.0  # Optional SIP library
+dnspython>=2.4.2
+
+# RTMP protocol dependencies
+av>=10.0.0  # Also used for RTMP media processing
+numpy>=1.24.3
+
+# Additional protocol utilities
+websockets>=12.0  # Enhanced WebSocket support
+aiofiles>=23.2.1  # Async file operations for media
+Pillow>=10.1.0  # Image processing for media streams
+scipy>=1.11.4  # Signal processing for audio/video
+
+# Network and media processing
+netifaces>=0.11.0  # Network interface detection
+psutil>=5.9.6  # System resource monitoring
+
 # Production deployment
 supervisor>=4.2.5
 nginx>=1.25.0  # For reference only

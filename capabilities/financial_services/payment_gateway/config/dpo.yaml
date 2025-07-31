@@ -1,0 +1,642 @@
+# DPO (Direct Pay Online) Integration Configuration - APG Payment Gateway
+# Complete configuration for all DPO features and environments
+#
+# © 2025 Datacraft. All rights reserved.
+
+# Environment Configuration
+environment:
+  # Supported environments: sandbox, live
+  current: "sandbox"  # Change to "live" for production transactions
+  
+  sandbox:
+    api_base_url: "https://secure.3gdirectpay.com"
+    company_token: "${DPO_COMPANY_TOKEN_SANDBOX}"
+    service_type: "${DPO_SERVICE_TYPE_SANDBOX:-3854}"
+    callback_url: "${DPO_CALLBACK_URL_SANDBOX}"
+    redirect_url: "${DPO_REDIRECT_URL_SANDBOX}"
+    
+  live:
+    api_base_url: "https://secure.3gdirectpay.com"
+    company_token: "${DPO_COMPANY_TOKEN_LIVE}"
+    service_type: "${DPO_SERVICE_TYPE_LIVE:-3854}"
+    callback_url: "${DPO_CALLBACK_URL_LIVE}"
+    redirect_url: "${DPO_REDIRECT_URL_LIVE}"
+
+# API Configuration
+api:
+  # Endpoints
+  endpoints:
+    create_token: "/payv2.php"
+    verify_token: "/API/v6/"
+    redirect: "/payv2.php"
+    
+  # Timeout settings (in seconds)
+  timeout:
+    connection: 30
+    read: 60
+    total: 90
+    
+  # Retry configuration
+  retry:
+    max_attempts: 3
+    backoff_factor: 2.0
+    status_forcelist: [408, 429, 500, 502, 503, 504]
+    
+  # Rate limiting
+  rate_limit:
+    requests_per_second: 10
+    burst_limit: 20
+    
+  # Request options
+  options:
+    compression: true
+    keep_alive: true
+    pool_connections: 5
+    pool_maxsize: 10
+
+# Authentication Configuration
+auth:
+  # API credentials (set via environment variables)
+  # DPO_COMPANY_TOKEN_SANDBOX or DPO_COMPANY_TOKEN_LIVE
+  # DPO_SERVICE_TYPE_SANDBOX or DPO_SERVICE_TYPE_LIVE
+  # DPO_CALLBACK_URL_SANDBOX or DPO_CALLBACK_URL_LIVE
+  # DPO_REDIRECT_URL_SANDBOX or DPO_REDIRECT_URL_LIVE
+  
+  # Service types (common values)
+  service_types:
+    online_payments: "3854"      # Default for online payments
+    mobile_payments: "5525"      # Mobile money payments
+    subscription: "27958"        # Recurring payments
+    marketplace: "29842"         # Marketplace payments
+
+# Payment Processing Configuration
+payments:
+  # Default settings
+  defaults:
+    currency: "KES"
+    country_code: "KE"
+    service_type: "3854"
+    payment_time_limit_hours: 5
+    company_ref_unique: false
+    
+  # Payment method configuration
+  payment_methods:
+    # Card payments
+    cards:
+      enabled: true
+      supported_brands:
+        - "VISA"
+        - "MASTERCARD"
+        - "AMEX"
+        - "DINERS"
+      enable_3d_secure: true
+      enable_cvv_check: true
+      
+    # Mobile money payments
+    mobile_money:
+      enabled: true
+      
+      # M-Pesa (Kenya, Tanzania, Uganda)
+      mpesa:
+        enabled: true
+        countries: ["KE", "TZ", "UG"]
+        currencies: ["KES", "TZS", "UGX"]
+        
+      # Airtel Money (Multiple African countries)
+      airtel_money:
+        enabled: true
+        countries: ["KE", "TZ", "UG", "GH", "NG", "ZM", "MW"]
+        currencies: ["KES", "TZS", "UGX", "GHS", "NGN", "ZMW", "MWK"]
+        
+      # MTN Mobile Money (Ghana, Uganda, Cameroon, etc.)
+      mtn_mobile_money:
+        enabled: true
+        countries: ["GH", "UG", "CM", "CI", "RW"]
+        currencies: ["GHS", "UGX", "XAF", "RWF"]
+        
+      # Orange Money (Francophone Africa)
+      orange_money:
+        enabled: true
+        countries: ["CI", "SN", "ML", "BF", "NE", "CM"]
+        currencies: ["XOF", "XAF"]
+        
+      # Tigo Pesa (Tanzania)
+      tigo_pesa:
+        enabled: true
+        countries: ["TZ"]
+        currencies: ["TZS"]
+        
+    # Bank transfers
+    bank_transfers:
+      enabled: true
+      supported_countries:
+        - "KE"  # Kenya
+        - "TZ"  # Tanzania  
+        - "UG"  # Uganda
+        - "GH"  # Ghana
+        - "NG"  # Nigeria
+        - "ZA"  # South Africa
+        - "BW"  # Botswana
+        - "ZM"  # Zambia
+        - "MW"  # Malawi
+        - "RW"  # Rwanda
+        - "ET"  # Ethiopia
+        
+    # Digital wallets
+    wallets:
+      enabled: true
+      # PayPal integration
+      paypal:
+        enabled: true
+        countries: ["KE", "TZ", "UG", "GH", "NG", "ZA"]
+        currencies: ["USD", "EUR", "GBP"]
+
+# Supported Countries and Currencies
+localization:
+  # Primary African countries
+  primary_countries:
+    - "KE"  # Kenya
+    - "TZ"  # Tanzania
+    - "UG"  # Uganda
+    - "GH"  # Ghana
+    - "NG"  # Nigeria
+    - "ZA"  # South Africa
+    - "BW"  # Botswana
+    - "ZM"  # Zambia
+    - "MW"  # Malawi
+    - "RW"  # Rwanda
+    - "ET"  # Ethiopia
+    
+  # All supported currencies
+  supported_currencies:
+    # African currencies
+    - "KES"  # Kenyan Shilling
+    - "TZS"  # Tanzanian Shilling
+    - "UGX"  # Ugandan Shilling
+    - "GHS"  # Ghanaian Cedi
+    - "NGN"  # Nigerian Naira
+    - "ZAR"  # South African Rand
+    - "BWP"  # Botswana Pula
+    - "ZMW"  # Zambian Kwacha
+    - "MWK"  # Malawian Kwacha
+    - "RWF"  # Rwandan Franc
+    - "ETB"  # Ethiopian Birr
+    - "XOF"  # West African Franc
+    - "XAF"  # Central African Franc
+    
+    # International currencies
+    - "USD"  # US Dollar
+    - "EUR"  # Euro
+    - "GBP"  # British Pound
+    
+  # Country-specific settings
+  countries:
+    - code: "KE"
+      name: "Kenya"
+      currency: "KES"
+      payment_methods: ["VISA", "MASTERCARD", "MPESA", "AIRTEL", "BANK"]
+    - code: "TZ"
+      name: "Tanzania"
+      currency: "TZS"
+      payment_methods: ["VISA", "MASTERCARD", "MPESA", "AIRTEL", "TIGO", "BANK"]
+    - code: "UG"
+      name: "Uganda"
+      currency: "UGX"
+      payment_methods: ["VISA", "MASTERCARD", "MPESA", "AIRTEL", "MTN", "BANK"]
+    - code: "GH"
+      name: "Ghana"
+      currency: "GHS"
+      payment_methods: ["VISA", "MASTERCARD", "AIRTEL", "MTN", "BANK"]
+    - code: "NG"
+      name: "Nigeria"
+      currency: "NGN"
+      payment_methods: ["VISA", "MASTERCARD", "AIRTEL", "BANK"]
+    - code: "ZA"
+      name: "South Africa"
+      currency: "ZAR"
+      payment_methods: ["VISA", "MASTERCARD", "BANK"]
+    - code: "BW"
+      name: "Botswana"
+      currency: "BWP"
+      payment_methods: ["VISA", "MASTERCARD", "BANK"]
+    - code: "ZM"
+      name: "Zambia"
+      currency: "ZMW"
+      payment_methods: ["VISA", "MASTERCARD", "AIRTEL", "BANK"]
+    - code: "MW"
+      name: "Malawi"
+      currency: "MWK"
+      payment_methods: ["VISA", "MASTERCARD", "AIRTEL", "BANK"]
+    - code: "RW"
+      name: "Rwanda"
+      currency: "RWF"
+      payment_methods: ["VISA", "MASTERCARD", "MTN", "BANK"]
+    - code: "ET"
+      name: "Ethiopia"
+      currency: "ETB"
+      payment_methods: ["VISA", "MASTERCARD", "BANK"]
+
+# Callback Configuration
+callbacks:
+  # Callback settings
+  enabled: true
+  timeout: 30  # seconds
+  retry_attempts: 5
+  retry_intervals: [60, 300, 1800, 3600, 7200]  # seconds: 1min, 5min, 30min, 1h, 2h
+  
+  # Callback types
+  notification_types:
+    - "PAYMENT_COMPLETE"
+    - "PAYMENT_FAILED" 
+    - "PAYMENT_CANCELLED"
+    
+  # Callback endpoints
+  endpoints:
+    callback_url: "${DPO_CALLBACK_URL}/dpo/callback"
+    redirect_url: "${DPO_REDIRECT_URL}/payment/complete"
+    
+  # Security
+  ip_validation: true
+  allowed_ips:
+    - "196.201.212.22"    # DPO callback servers
+    - "196.201.212.23"
+    - "41.77.11.170"
+    - "41.77.11.171"
+    - "127.0.0.1"         # Local development
+    - "::1"               # Local development IPv6
+    
+  # Processing options
+  processing:
+    async_processing: true
+    batch_processing: false
+    max_processing_time: 30  # seconds
+    enable_duplicate_detection: true
+    verify_with_api: true     # Always verify callbacks with DPO API
+
+# Security Configuration
+security:
+  # Encryption
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_rotation_days: 90
+    
+  # Request validation
+  validation:
+    validate_origin: true
+    validate_ip: true
+    validate_timestamps: true
+    max_timestamp_drift: 300  # 5 minutes
+    
+  # IP security
+  ip_security:
+    enable_whitelist: true
+    allowed_ips:
+      - "127.0.0.1"         # Local development
+      - "0.0.0.0/0"          # Allow all (disable in production)
+    
+  # Data protection
+  data_protection:
+    gdpr_compliance: true
+    pci_compliance: true
+    data_retention_days: 2555  # 7 years
+    tokenization: true
+    
+  # Fraud prevention
+  fraud_prevention:
+    enable_velocity_checks: true
+    enable_device_fingerprinting: false  # Not available in DPO
+    risk_threshold: 80  # 0-100 scale
+
+# Monitoring and Logging
+monitoring:
+  # Logging configuration
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format: "json"
+    log_requests: true
+    log_responses: false  # Set to true for debugging
+    log_callback_events: true
+    max_log_size_mb: 100
+    log_retention_days: 30
+    
+    # Sensitive data handling
+    mask_card_numbers: true
+    mask_cvv: true
+    mask_phone_numbers: false  # Phone numbers needed for mobile money
+    
+  # Metrics collection
+  metrics:
+    enabled: true
+    include_latency: true
+    include_error_rates: true
+    include_success_rates: true
+    include_payment_method_breakdown: true
+    include_country_breakdown: true
+    
+  # Health checks
+  health_checks:
+    enabled: true
+    interval_seconds: 30
+    timeout_seconds: 10
+    check_api_connectivity: true
+    check_callback_processing: true
+    
+  # Alerting
+  alerts:
+    enabled: true
+    error_rate_threshold: 0.05      # 5%
+    latency_threshold_ms: 3000      # 3 seconds
+    callback_failure_threshold: 0.10 # 10%
+    
+    # Alert channels
+    channels:
+      email: true
+      slack: false
+      webhook: true
+
+# Performance Configuration
+performance:
+  # Connection pooling
+  connection_pool:
+    size: 10
+    max_size: 20
+    keep_alive: true
+    keep_alive_timeout: 30
+    
+  # Caching
+  caching:
+    enabled: true
+    default_ttl: 300  # 5 minutes
+    max_size: 500
+    
+    # Cache specific items
+    cache_payment_methods: true
+    cache_country_configs: true
+    cache_exchange_rates: true
+    
+  # Request optimization
+  optimization:
+    compression: true
+    connection_reuse: true
+    async_processing: true
+    batch_requests: false  # DPO doesn't support batch requests
+    
+  # Background processing
+  background_jobs:
+    enabled: true
+    max_workers: 3
+    retry_failed_jobs: true
+    job_timeout_seconds: 300
+
+# Business Rules and Limits
+business_rules:
+  # Transaction limits
+  transaction_limits:
+    # Per transaction limits (in major currency units)
+    min_amount: 1        # KES 1, TZS 1, etc.
+    max_amount: 500000   # KES 500K, TZS 500K, etc.
+    
+    # Daily limits per customer
+    daily_limit: 100000     # KES 100K, TZS 100K, etc.
+    daily_transaction_count: 20
+    
+    # Monthly limits per customer
+    monthly_limit: 1000000  # KES 1M, TZS 1M, etc.
+    monthly_transaction_count: 200
+    
+  # Refund policies
+  refunds:
+    # Refund window (days after original transaction)
+    refund_window_days: 180
+    
+    # Refund options (DPO requires manual processing)
+    manual_processing_required: true
+    partial_refunds: true
+    multiple_refunds: true
+    same_day_refunds: false
+    
+  # Risk rules
+  risk_rules:
+    # Velocity limits
+    velocity_limits:
+      transactions_per_hour: 10
+      amount_per_hour: 100000  # KES 100K, TZS 100K, etc.
+      transactions_per_minute: 3
+      
+    # Geographic restrictions
+    geographic_restrictions:
+      blocked_countries: []  # Empty list means no restrictions
+      high_risk_countries: []
+      
+    # Transaction testing protection
+    testing_protection:
+      enabled: true
+      max_attempts_per_ip: 10
+      lockout_period_minutes: 30
+
+# Reporting Configuration
+reporting:
+  # Scheduled reports
+  scheduled_reports:
+    enabled: true
+    
+    # Transaction reports
+    transaction_reports:
+      enabled: true
+      frequency: "daily"  # daily, weekly, monthly
+      format: "json"      # json, csv, xml
+      include_customer_data: false
+      
+    # Settlement reports
+    settlement_reports:
+      enabled: true
+      frequency: "weekly"
+      format: "json"
+      include_fees: true
+      
+  # Real-time reporting
+  real_time:
+    enabled: true
+    push_notifications: false
+    callback_reports: true
+    
+  # Data retention
+  data_retention:
+    transaction_data_days: 2555  # 7 years
+    reporting_data_days: 1095    # 3 years
+    log_data_days: 365           # 1 year
+
+# Feature Flags
+features:
+  # Payment features
+  payment_links: true
+  recurring_payments: true
+  subscriptions: true
+  
+  # Advanced features
+  split_payments: false  # Not directly supported by DPO
+  escrow_payments: false
+  bulk_transfers: false
+  
+  # Regional features
+  mobile_money_all_networks: true
+  bank_transfers: true
+  international_cards: true
+  
+  # Risk features
+  fraud_detection: true
+  velocity_checking: true
+  
+  # API features
+  callback_retries: true
+  idempotency_keys: true
+
+# Development and Testing
+development:
+  # Test mode settings
+  test_mode:
+    enabled: true
+    use_test_credentials: true
+    simulate_callbacks: true
+    
+  # Test payment methods
+  test_cards:
+    visa_success: "4000000000000002"
+    visa_declined: "4000000000000069"
+    mastercard_success: "5555555555554444"
+    
+  # Test mobile money numbers
+  test_mobile_money:
+    mpesa_success: "254700000000"
+    airtel_success: "254700000001"
+    mtn_success: "256700000000"
+    
+  # Callback testing
+  callback_testing:
+    test_notifications: true
+    simulate_delays: false
+    test_retries: true
+    
+  # Debug settings
+  debug:
+    log_all_requests: false
+    log_all_responses: false
+    detailed_errors: true
+    mock_external_services: false
+
+# Integration Settings
+integrations:
+  # APG platform integration
+  apg:
+    enabled: true
+    tenant_isolation: true
+    multi_currency_support: true
+    
+  # External service integrations
+  external_services:
+    # Fraud services (additional to built-in)
+    kount: false
+    sift: false
+    
+    # Accounting systems
+    quickbooks: false
+    xero: false
+    
+    # CRM systems
+    salesforce: false
+    hubspot: false
+    
+  # Notification services
+  notifications:
+    email: true
+    sms: true
+    push: false
+    webhook: true
+    
+  # Analytics and reporting
+  analytics:
+    google_analytics: false
+    mixpanel: false
+    segment: false
+
+# Fees Configuration
+fees:
+  # Card payment fees
+  card_fees:
+    visa: 3.5          # 3.5%
+    mastercard: 3.5    # 3.5%
+    amex: 3.8          # 3.8%
+    diners: 3.6        # 3.6%
+    
+    # Fixed fees (in USD equivalent)
+    fixed_fee_usd: 5.00
+    
+  # Mobile money fees
+  mobile_money_fees:
+    mpesa: 2.5         # 2.5%
+    airtel_money: 2.5  # 2.5%
+    mtn_mobile_money: 2.5  # 2.5%
+    orange_money: 2.8  # 2.8%
+    tigo_pesa: 2.5     # 2.5%
+    
+  # Bank transfer fees
+  bank_transfer_fees:
+    domestic: 1.5      # 1.5%
+    international: 3.0 # 3.0%
+    fixed_fee_usd: 10.00
+    
+  # PayPal fees
+  paypal_fees:
+    percentage: 3.9    # 3.9%
+    fixed_fee_usd: 0.30
+
+# Compliance Configuration
+compliance:
+  # Regulatory compliance
+  regulations:
+    kenya_cbk: true      # Central Bank of Kenya
+    tanzania_bot: true   # Bank of Tanzania
+    uganda_bou: true     # Bank of Uganda
+    ghana_bog: true      # Bank of Ghana
+    nigeria_cbn: true    # Central Bank of Nigeria
+    south_africa_sarb: true  # South African Reserve Bank
+    
+  # Data protection
+  data_protection:
+    gdpr: true
+    ccpa: false
+    kenya_dpa: true      # Kenya Data Protection Act
+    south_africa_popia: true  # Protection of Personal Information Act
+    
+  # Financial compliance
+  financial:
+    aml: true            # Anti-Money Laundering
+    kyc: true            # Know Your Customer
+    cft: true            # Combating Financing of Terrorism
+    
+  # Reporting requirements
+  reporting:
+    suspicious_transactions: true
+    large_transactions: true
+    cross_border_transactions: true
+    threshold_amount: 1000000  # Report transactions above this amount (in local currency)
+
+# XML Processing Configuration
+xml:
+  # XML parser settings
+  parser:
+    use_defusedxml: true  # Use secure XML parser
+    max_xml_size: 1048576  # 1MB max XML size
+    strip_whitespace: true
+    
+  # XML generation settings
+  generation:
+    encoding: "utf-8"
+    xml_declaration: true
+    pretty_print: false  # Disable for production
+    
+  # Security settings
+  security:
+    disable_entities: true
+    disable_external_entities: true
+    disable_dtd_processing: true

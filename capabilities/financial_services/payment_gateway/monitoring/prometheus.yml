@@ -1,0 +1,137 @@
+# Prometheus Configuration for APG Payment Gateway
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'apg-payment-gateway'
+    environment: 'production'
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # APG Payment Gateway Application
+  - job_name: 'payment-gateway'
+    static_configs:
+      - targets: ['payment-gateway:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    params:
+      format: ['prometheus']
+
+  # PostgreSQL Database
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Redis Cache
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Nginx Load Balancer
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    metrics_path: '/nginx_status'
+    scrape_interval: 30s
+
+  # Node Exporter (System Metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # Blackbox Exporter (Health Checks)
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://your-domain.com/health
+        - https://your-domain.com/api/v1/status
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Payment Provider Health Checks
+  - job_name: 'payment-providers'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://api.stripe.com/healthcheck
+        - https://checkout-test.adyen.com/healthcheck
+        - https://api.flutterwave.com/healthcheck
+        - https://cybqa.pesapal.com/healthcheck
+        - https://secure.3gdirectpay.com/healthcheck
+        - https://sandbox.safaricom.co.ke/healthcheck
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+      - source_labels: [instance]
+        regex: '.*stripe.*'
+        target_label: provider
+        replacement: 'stripe'
+      - source_labels: [instance]
+        regex: '.*adyen.*'
+        target_label: provider
+        replacement: 'adyen'
+      - source_labels: [instance]
+        regex: '.*flutterwave.*'
+        target_label: provider
+        replacement: 'flutterwave'
+      - source_labels: [instance]
+        regex: '.*pesapal.*'
+        target_label: provider
+        replacement: 'pesapal'
+      - source_labels: [instance]
+        regex: '.*3gdirectpay.*'
+        target_label: provider
+        replacement: 'dpo'
+      - source_labels: [instance]
+        regex: '.*safaricom.*'
+        target_label: provider
+        replacement: 'mpesa'
+
+  # Custom Business Metrics
+  - job_name: 'business-metrics'
+    static_configs:
+      - targets: ['payment-gateway:8080']
+    metrics_path: '/api/v1/metrics/business'
+    scrape_interval: 60s
+
+  # ML Model Performance Metrics
+  - job_name: 'ml-models'
+    static_configs:
+      - targets: ['payment-gateway:8080']
+    metrics_path: '/api/v1/metrics/ml'
+    scrape_interval: 300s
+
+  # Payment Processor Health Checks
+  - job_name: 'processor-health'
+    static_configs:
+      - targets: ['payment-gateway:8080']
+    metrics_path: '/api/v1/metrics/processors'
+    scrape_interval: 60s

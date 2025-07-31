@@ -81,7 +81,9 @@ class CollaborationService:
 		"""Validate user permissions for collaboration action"""
 		# Integration with APG auth_rbac
 		# return await self.auth_service.check_permission(context.user_id, action, context.tenant_id)
-		return True  # Mock implementation
+		# In real implementation, this would integrate with APG auth_rbac
+		# return await self.auth_service.check_permission(context.user_id, action, context.tenant_id)
+		return True  # Mock implementation - would check actual permissions
 	
 	# Session Management
 	async def create_session(self, context: CollaborationContext, session_name: str, 
@@ -383,7 +385,7 @@ class CollaborationService:
 		# Start AI transcription if enabled
 		if recording.auto_transcription_enabled:
 			# await self.ai_service.start_transcription(recording.recording_id)
-			pass
+			self._logger.info(f"AI transcription would be started for recording {recording.recording_id}")
 		
 		self._log_operation("RECORDING_STARTED", context, f"Recording: {recording.recording_name}")
 		return recording
@@ -578,6 +580,138 @@ class CollaborationService:
 			elif integration.platform == "google_meet" and integration.auto_create_meetings:
 				# Create Google Meet
 				video_call.meet_url = f"https://meet.google.com/{uuid7str()}"
+	
+	# Additional methods referenced in api.py
+	async def get_session(self, session_id: str) -> RTCSession | None:
+		"""Get session by ID"""
+		result = await self.db.execute(
+			select(RTCSession).where(RTCSession.session_id == session_id)
+		)
+		return result.scalar_one_or_none()
+	
+	async def join_video_call(self, context: CollaborationContext, call_id: str, role: str) -> RTCVideoParticipant | None:
+		"""Join video call as participant"""
+		# Get video call
+		result = await self.db.execute(
+			select(RTCVideoCall).where(RTCVideoCall.call_id == call_id)
+		)
+		video_call = result.scalar_one_or_none()
+		
+		if not video_call:
+			return None
+		
+		# Create video participant
+		participant = RTCVideoParticipant(
+			video_participant_id=uuid7str(),
+			call_id=call_id,
+			tenant_id=context.tenant_id,
+			role=role,
+			joined_at=datetime.utcnow()
+		)
+		
+		self.db.add(participant)
+		video_call.current_participants += 1
+		await self.db.commit()
+		
+		return participant
+	
+	async def toggle_participant_audio(self, call_id: str, participant_id: str, enabled: bool, user_id: str) -> bool:
+		"""Toggle participant audio"""
+		# Get participant
+		result = await self.db.execute(
+			select(RTCVideoParticipant).where(
+				RTCVideoParticipant.video_participant_id == participant_id,
+				RTCVideoParticipant.call_id == call_id
+			)
+		)
+		participant = result.scalar_one_or_none()
+		
+		if participant:
+			participant.audio_enabled = enabled
+			await self.db.commit()
+			return True
+		
+		return False
+	
+	async def toggle_participant_video(self, call_id: str, participant_id: str, enabled: bool, user_id: str) -> bool:
+		"""Toggle participant video"""
+		# Get participant
+		result = await self.db.execute(
+			select(RTCVideoParticipant).where(
+				RTCVideoParticipant.video_participant_id == participant_id,
+				RTCVideoParticipant.call_id == call_id
+			)
+		)
+		participant = result.scalar_one_or_none()
+		
+		if participant:
+			participant.video_enabled = enabled
+			await self.db.commit()
+			return True
+		
+		return False
+	
+	async def toggle_hand_raised(self, call_id: str, participant_id: str, user_id: str) -> bool:
+		"""Toggle hand raised state"""
+		# Get participant
+		result = await self.db.execute(
+			select(RTCVideoParticipant).where(
+				RTCVideoParticipant.video_participant_id == participant_id,
+				RTCVideoParticipant.call_id == call_id
+			)
+		)
+		participant = result.scalar_one_or_none()
+		
+		if participant:
+			participant.hand_raised = not getattr(participant, 'hand_raised', False)
+			if participant.hand_raised:
+				participant.hand_raised_at = datetime.utcnow()
+			else:
+				participant.hand_raised_at = None
+			await self.db.commit()
+			return participant.hand_raised
+		
+		return False
+	
+	async def end_video_call(self, context: CollaborationContext, call_id: str) -> RTCVideoCall | None:
+		"""End video call"""
+		result = await self.db.execute(
+			select(RTCVideoCall).where(RTCVideoCall.call_id == call_id)
+		)
+		video_call = result.scalar_one_or_none()
+		
+		if video_call:
+			video_call.status = "ended"
+			video_call.ended_at = datetime.utcnow()
+			if video_call.started_at:
+				duration = video_call.ended_at - video_call.started_at
+				video_call.duration_minutes = duration.total_seconds() / 60
+			await self.db.commit()
+		
+		return video_call
+	
+	async def get_chat_messages(self, page_url: str, limit: int, tenant_id: str) -> List[Dict[str, Any]]:
+		"""Get chat messages for page"""
+		# In real implementation, would fetch from database
+		# For now, return mock data
+		return [
+			{
+				'message_id': uuid7str(),
+				'user_id': 'user1',
+				'username': 'User 1',
+				'message': 'Hello everyone!',
+				'message_type': 'text',
+				'timestamp': datetime.utcnow().isoformat()
+			},
+			{
+				'message_id': uuid7str(),
+				'user_id': 'user2',
+				'username': 'User 2',
+				'message': 'How can I help with this form?',
+				'message_type': 'text',
+				'timestamp': datetime.utcnow().isoformat()
+			}
+		][:limit]
 
 
 # Pydantic models for API

@@ -1,0 +1,189 @@
+version: '3.8'
+
+services:
+  payment-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: apg-payment-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - LOG_LEVEL=info
+      
+      # Database Configuration
+      - DATABASE_URL=postgresql://payment_user:${POSTGRES_PASSWORD}@postgres:5432/payment_gateway
+      - REDIS_URL=redis://redis:6379/0
+      
+      # Stripe Configuration
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      
+      # Adyen Configuration
+      - ADYEN_API_KEY=${ADYEN_API_KEY}
+      - ADYEN_MERCHANT_ACCOUNT=${ADYEN_MERCHANT_ACCOUNT}
+      - ADYEN_CLIENT_KEY=${ADYEN_CLIENT_KEY}
+      - ADYEN_HMAC_KEY=${ADYEN_HMAC_KEY}
+      - ADYEN_ENVIRONMENT=live
+      
+      # Flutterwave Configuration
+      - FLUTTERWAVE_PUBLIC_KEY=${FLUTTERWAVE_PUBLIC_KEY}
+      - FLUTTERWAVE_SECRET_KEY=${FLUTTERWAVE_SECRET_KEY}
+      - FLUTTERWAVE_ENCRYPTION_KEY=${FLUTTERWAVE_ENCRYPTION_KEY}
+      - FLUTTERWAVE_ENVIRONMENT=live
+      
+      # Pesapal Configuration
+      - PESAPAL_CONSUMER_KEY=${PESAPAL_CONSUMER_KEY}
+      - PESAPAL_CONSUMER_SECRET=${PESAPAL_CONSUMER_SECRET}
+      - PESAPAL_ENVIRONMENT=live
+      - PESAPAL_IPN_URL=https://your-domain.com/webhooks/pesapal
+      
+      # DPO Configuration
+      - DPO_COMPANY_TOKEN_LIVE=${DPO_COMPANY_TOKEN_LIVE}
+      - DPO_SERVICE_TYPE=${DPO_SERVICE_TYPE}
+      - DPO_ENVIRONMENT=live
+      - DPO_CALLBACK_URL=https://your-domain.com/webhooks/dpo
+      
+      # M-Pesa Configuration
+      - MPESA_CONSUMER_KEY=${MPESA_CONSUMER_KEY}
+      - MPESA_CONSUMER_SECRET=${MPESA_CONSUMER_SECRET}
+      - MPESA_BUSINESS_SHORTCODE=${MPESA_BUSINESS_SHORTCODE}
+      - MPESA_PASSKEY=${MPESA_PASSKEY}
+      - MPESA_ENVIRONMENT=live
+      - MPESA_CALLBACK_URL=https://your-domain.com/webhooks/mpesa
+      - MPESA_INITIATOR_NAME=${MPESA_INITIATOR_NAME}
+      - MPESA_SECURITY_CREDENTIAL=${MPESA_SECURITY_CREDENTIAL}
+      
+      # Monitoring & Observability
+      - SENTRY_DSN=${SENTRY_DSN}
+      - DATADOG_API_KEY=${DATADOG_API_KEY}
+      - PROMETHEUS_METRICS_ENABLED=true
+      - JAEGER_ENDPOINT=${JAEGER_ENDPOINT}
+      
+      # Security
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=100
+      
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - payment-network
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:15
+    container_name: apg-postgres
+    environment:
+      - POSTGRES_DB=payment_gateway
+      - POSTGRES_USER=payment_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    networks:
+      - payment-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_user -d payment_gateway"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: apg-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - payment-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:alpine
+    container_name: apg-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - payment-gateway
+    restart: unless-stopped
+    networks:
+      - payment-network
+
+  prometheus:
+    image: prom/prometheus
+    container_name: apg-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    networks:
+      - payment-network
+
+  grafana:
+    image: grafana/grafana
+    container_name: apg-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - payment-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: apg-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    restart: unless-stopped
+    networks:
+      - payment-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  payment-network:
+    driver: bridge

@@ -1,0 +1,10 @@
+# MPESA Integration Dependencies
+requests>=2.31.0
+cryptography>=41.0.0
+base64
+datetime
+json
+asyncio
+aiohttp>=3.8.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0

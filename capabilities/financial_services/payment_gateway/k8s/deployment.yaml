@@ -1,0 +1,177 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+	name: payment-gateway
+	namespace: apg-payment
+	labels:
+		app: payment-gateway
+		tier: backend
+		version: v1.0.0
+spec:
+	replicas: 3
+	strategy:
+		type: RollingUpdate
+		rollingUpdate:
+			maxUnavailable: 1
+			maxSurge: 1
+	selector:
+		matchLabels:
+			app: payment-gateway
+	template:
+		metadata:
+			labels:
+				app: payment-gateway
+				tier: backend
+		spec:
+			containers:
+			- name: payment-gateway
+				image: datacraft/payment-gateway:latest
+				ports:
+				- containerPort: 8080
+					name: http
+				env:
+				- name: FLASK_ENV
+					value: "production"
+				- name: DATABASE_URL
+					valueFrom:
+						secretKeyRef:
+							name: payment-gateway-secrets
+							key: database-url
+				- name: REDIS_URL
+					valueFrom:
+						secretKeyRef:
+							name: payment-gateway-secrets
+							key: redis-url
+				- name: SECRET_KEY
+					valueFrom:
+						secretKeyRef:
+							name: payment-gateway-secrets
+							key: secret-key
+				- name: MPESA_CONSUMER_KEY
+					valueFrom:
+						secretKeyRef:
+							name: payment-processor-secrets
+							key: mpesa-consumer-key
+				- name: MPESA_CONSUMER_SECRET
+					valueFrom:
+						secretKeyRef:
+							name: payment-processor-secrets
+							key: mpesa-consumer-secret
+				- name: STRIPE_SECRET_KEY
+					valueFrom:
+						secretKeyRef:
+							name: payment-processor-secrets
+							key: stripe-secret-key
+				resources:
+					requests:
+						memory: "512Mi"
+						cpu: "250m"
+					limits:
+						memory: "1Gi"
+						cpu: "500m"
+				livenessProbe:
+					httpGet:
+						path: /health
+						port: 8080
+					initialDelaySeconds: 60
+					periodSeconds: 30
+					timeoutSeconds: 10
+				readinessProbe:
+					httpGet:
+						path: /ready
+						port: 8080
+					initialDelaySeconds: 30
+					periodSeconds: 10
+					timeoutSeconds: 5
+				volumeMounts:
+				- name: logs
+					mountPath: /app/logs
+			volumes:
+			- name: logs
+				emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+	name: payment-gateway-service
+	namespace: apg-payment
+	labels:
+		app: payment-gateway
+spec:
+	selector:
+		app: payment-gateway
+	ports:
+	- port: 80
+		targetPort: 8080
+		protocol: TCP
+		name: http
+	type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+	name: payment-gateway-ingress
+	namespace: apg-payment
+	annotations:
+		nginx.ingress.kubernetes.io/rewrite-target: /
+		nginx.ingress.kubernetes.io/ssl-redirect: "true"
+		nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+		cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+	tls:
+	- hosts:
+		- payments.datacraft.co.ke
+		secretName: payment-gateway-tls
+	rules:
+	- host: payments.datacraft.co.ke
+		http:
+			paths:
+			- path: /
+				pathType: Prefix
+				backend:
+					service:
+						name: payment-gateway-service
+						port:
+							number: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+	name: payment-gateway-hpa
+	namespace: apg-payment
+spec:
+	scaleTargetRef:
+		apiVersion: apps/v1
+		kind: Deployment
+		name: payment-gateway
+	minReplicas: 3
+	maxReplicas: 20
+	metrics:
+	- type: Resource
+		resource:
+			name: cpu
+			target:
+				type: Utilization
+				averageUtilization: 70
+	- type: Resource
+		resource:
+			name: memory
+			target:
+				type: Utilization
+				averageUtilization: 80
+	behavior:
+		scaleUp:
+			stabilizationWindowSeconds: 60
+			policies:
+			- type: Percent
+				value: 50
+				periodSeconds: 60
+		scaleDown:
+			stabilizationWindowSeconds: 300
+			policies:
+			- type: Percent
+				value: 10
+				periodSeconds: 60

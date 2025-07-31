@@ -1,0 +1,304 @@
+# Base Configuration for APG Payment Gateway
+# This file contains default settings that apply to all environments
+# Environment-specific files override these settings as needed
+
+# Database Configuration
+database:
+  host: localhost
+  port: 5432
+  database: payment_gateway
+  username: pg_user
+  password: ""  # Set via environment variable or secrets manager
+  ssl_mode: prefer
+  pool_size: 20
+  max_overflow: 30
+  pool_timeout: 30
+  pool_recycle: 3600
+  echo: false
+
+# Redis Configuration
+redis:
+  host: localhost
+  port: 6379
+  password: ""  # Set via environment variable or secrets manager
+  db: 0
+  ssl: false
+  max_connections: 50
+  socket_timeout: 5
+  socket_connect_timeout: 5
+
+# Security Configuration
+security:
+  secret_key: ""  # Set via environment variable or secrets manager
+  jwt_secret: ""  # Set via environment variable or secrets manager
+  jwt_expiry_hours: 24
+  api_key_length: 32
+  webhook_signature_header: "X-Signature"
+  allowed_hosts: []
+  cors_origins: 
+    - "http://localhost:3000"
+    - "https://dashboard.datacraft.co.ke"
+  rate_limit_per_minute: 1000
+  max_request_size_mb: 10
+  encryption_key: ""  # Set via environment variable or secrets manager
+  password_min_length: 12
+  require_https: true
+  session_timeout_minutes: 30
+
+# Logging Configuration
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_path: "/var/log/payment_gateway/app.log"
+  max_file_size_mb: 100
+  backup_count: 5
+  log_to_console: true
+  log_to_file: true
+  structured_logging: true
+  audit_log_path: "/var/log/payment_gateway/audit.log"
+  performance_log_path: "/var/log/payment_gateway/performance.log"
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  metrics_port: 9090
+  health_check_port: 8080
+  prometheus_enabled: true
+  jaeger_enabled: false
+  jaeger_agent_host: localhost
+  jaeger_agent_port: 6831
+  sentry_dsn: ""  # Set via environment variable
+  datadog_api_key: ""  # Set via environment variable
+  custom_metrics_enabled: true
+  alert_thresholds:
+    error_rate_percent: 5.0
+    response_time_ms: 1000
+    fraud_score_threshold: 0.8
+    success_rate_percent: 95.0
+
+# Cache Configuration
+cache:
+  default_ttl_seconds: 3600
+  user_profile_ttl_seconds: 1800
+  fraud_rules_ttl_seconds: 300
+  processor_health_ttl_seconds: 60
+  analytics_cache_ttl_seconds: 900
+  max_memory_mb: 512
+  eviction_policy: "allkeys-lru"
+
+# Webhook Configuration
+webhook:
+  enabled: true
+  max_retry_attempts: 5
+  initial_retry_delay_seconds: 5
+  max_retry_delay_seconds: 3600
+  timeout_seconds: 30
+  batch_size: 100
+  worker_threads: 4
+  signature_algorithm: "hmac-sha256"
+  delivery_timeout_hours: 24
+
+# Fraud Detection Configuration
+fraud:
+  enabled: true
+  ml_models_enabled: true
+  real_time_scoring: true
+  score_threshold_review: 0.7
+  score_threshold_decline: 0.9
+  velocity_window_minutes: 60
+  device_fingerprint_enabled: true
+  geolocation_enabled: true
+  whitelist_enabled: true
+  blacklist_enabled: true
+  model_refresh_hours: 24
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  max_connections: 1000
+  keepalive_timeout: 75
+  client_timeout: 30
+  api_version: "v1"
+  docs_enabled: true
+  cors_enabled: true
+  compression_enabled: true
+  request_id_header: "X-Request-ID"
+
+# Payment Processors Configuration
+processors:
+  mpesa:
+    name: "mpesa"
+    type: "mpesa"
+    enabled: true
+    priority: 100
+    api_url: "https://sandbox.safaricom.co.ke"  # Will be overridden in production
+    api_key: ""  # Set via environment variable or secrets manager
+    secret_key: ""  # Set via environment variable or secrets manager
+    webhook_secret: ""  # Set via environment variable or secrets manager
+    supported_methods:
+      - "mpesa"
+    supported_currencies:
+      - "KES"
+    supported_countries:
+      - "KE"
+    rate_limits:
+      requests_per_minute: 60
+      requests_per_hour: 1000
+    timeout_seconds: 30
+    retry_attempts: 3
+    sandbox_mode: true  # Will be overridden in production
+    custom_config:
+      business_short_code: "174379"
+      passkey: ""  # Set via secrets manager
+      callback_url: "https://api.datacraft.co.ke/payments/webhooks/mpesa"
+      result_url: "https://api.datacraft.co.ke/payments/webhooks/mpesa/result"
+      queue_timeout_url: "https://api.datacraft.co.ke/payments/webhooks/mpesa/timeout"
+
+  stripe:
+    name: "stripe"
+    type: "stripe"
+    enabled: true
+    priority: 90
+    api_url: "https://api.stripe.com"
+    api_key: ""  # Set via environment variable or secrets manager
+    secret_key: ""  # Set via environment variable or secrets manager
+    webhook_secret: ""  # Set via environment variable or secrets manager
+    supported_methods:
+      - "credit_card"
+      - "debit_card"
+      - "digital_wallet"
+    supported_currencies:
+      - "USD"
+      - "EUR"
+      - "GBP"
+      - "KES"
+    supported_countries:
+      - "US"
+      - "EU"
+      - "GB"
+      - "KE"
+    rate_limits:
+      requests_per_minute: 100
+      requests_per_hour: 5000
+    timeout_seconds: 30
+    retry_attempts: 3
+    sandbox_mode: true  # Will be overridden in production
+    custom_config:
+      api_version: "2023-10-16"
+      webhook_tolerance: 300
+      connect_timeout: 10
+      read_timeout: 80
+
+  adyen:
+    name: "adyen"
+    type: "adyen"
+    enabled: true
+    priority: 85
+    api_url: "https://checkout-test.adyen.com"  # Will be overridden in production
+    api_key: ""  # Set via environment variable or secrets manager
+    secret_key: ""  # Set via environment variable or secrets manager
+    webhook_secret: ""  # Set via environment variable or secrets manager
+    supported_methods:
+      - "credit_card"
+      - "debit_card"
+      - "digital_wallet"
+      - "bank_transfer"
+    supported_currencies:
+      - "USD"
+      - "EUR"
+      - "GBP"
+      - "KES"
+    supported_countries:
+      - "US"
+      - "EU"
+      - "GB"
+      - "KE"
+    rate_limits:
+      requests_per_minute: 150
+      requests_per_hour: 7500
+    timeout_seconds: 30
+    retry_attempts: 3
+    sandbox_mode: true  # Will be overridden in production
+    custom_config:
+      merchant_account: ""  # Set via secrets manager
+      api_version: "v70"
+      live_endpoint_url_prefix: ""  # Set in production
+
+  paypal:
+    name: "paypal"
+    type: "paypal"
+    enabled: true
+    priority: 80
+    api_url: "https://api.sandbox.paypal.com"  # Will be overridden in production
+    api_key: ""  # Client ID - Set via environment variable or secrets manager
+    secret_key: ""  # Client Secret - Set via environment variable or secrets manager
+    webhook_secret: ""  # Set via environment variable or secrets manager
+    supported_methods:
+      - "paypal"
+      - "credit_card"
+      - "digital_wallet"
+    supported_currencies:
+      - "USD"
+      - "EUR"
+      - "GBP"
+    supported_countries:
+      - "US"
+      - "EU"
+      - "GB"
+    rate_limits:
+      requests_per_minute: 100
+      requests_per_hour: 5000
+    timeout_seconds: 30
+    retry_attempts: 3
+    sandbox_mode: true  # Will be overridden in production
+    custom_config:
+      webhook_id: ""  # Set via secrets manager
+      return_url: "https://dashboard.datacraft.co.ke/payments/success"
+      cancel_url: "https://dashboard.datacraft.co.ke/payments/cancel"
+
+# Custom Configuration
+custom:
+  # Feature flags
+  features:
+    smart_completion_enabled: true
+    conversational_payments_enabled: true
+    immersive_analytics_enabled: true
+    real_time_notifications_enabled: true
+    advanced_fraud_detection_enabled: true
+    multi_currency_support_enabled: true
+    
+  # Regional settings
+  regional:
+    default_country: "KE"
+    default_currency: "KES"
+    default_timezone: "Africa/Nairobi"
+    supported_languages:
+      - "en"
+      - "sw"  # Swahili
+    
+  # Business rules
+  business_rules:
+    max_transaction_amount_usd: 10000
+    min_transaction_amount_usd: 0.1
+    daily_transaction_limit_usd: 50000
+    fraud_review_queue_enabled: true
+    auto_capture_enabled: true
+    auto_capture_delay_hours: 24
+    
+  # Integration settings
+  integrations:
+    slack_webhook_url: ""  # For notifications
+    email_service_api_key: ""  # SendGrid, Mailgun, etc.
+    sms_service_api_key: ""  # Twilio, Africa's Talking, etc.
+    push_notification_service_key: ""  # Firebase, Pusher, etc.
+    
+  # Performance settings
+  performance:
+    max_concurrent_transactions: 10000
+    transaction_timeout_seconds: 300
+    batch_processing_size: 1000
+    async_webhook_processing: true
+    database_query_timeout_seconds: 30
+    cache_warm_up_enabled: true

@@ -1,0 +1,119 @@
+# APG Composition Core Dependencies
+# Production-ready dependencies with specific versions for stability
+
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.25.0
+pydantic==2.5.2
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.13.1
+psycopg2-binary==2.9.9
+asyncpg==0.29.0
+
+# Redis/Caching
+redis==5.0.1
+aioredis==2.0.1
+
+# HTTP Client
+httpx==0.25.2
+aiohttp==3.9.1
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+cryptography==41.0.8
+
+# Task Queue
+celery==5.3.4
+kombu==5.3.4
+
+# Workflow Engine
+prefect==2.14.21
+prefect-docker==0.4.6
+prefect-kubernetes==0.3.5
+
+# Container Management
+docker==6.1.3
+kubernetes==28.1.0
+
+# AWS SDK
+boto3==1.34.0
+botocore==1.34.0
+
+# Cloud Provider SDKs
+google-cloud-container==2.30.0
+azure-mgmt-containerservice==26.0.0
+
+# Monitoring & Observability
+prometheus-client==0.19.0
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-sqlalchemy==0.42b0
+opentelemetry-instrumentation-redis==0.42b0
+sentry-sdk[fastapi]==1.38.0
+
+# Logging
+structlog==23.2.0
+python-json-logger==2.0.7
+
+# Configuration
+dynaconf==3.2.4
+python-dotenv==1.0.0
+
+# Validation & Serialization
+marshmallow==3.20.1
+cerberus==1.3.5
+
+# Date/Time
+pendulum==2.1.2
+python-dateutil==2.8.2
+
+# Utilities
+click==8.1.7
+rich==13.7.0
+typer==0.9.0
+jinja2==3.1.2
+pyyaml==6.0.1
+toml==0.10.2
+
+# Testing (for production health checks)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# UUID Extensions
+uuid7==0.1.0
+
+# Machine Learning for AI features
+scikit-learn==1.3.2
+numpy==1.24.4
+pandas==2.1.4
+
+# Workflow Dependencies
+apache-airflow==2.7.3
+great-expectations==0.18.8
+
+# Message Queue
+pika==1.3.2
+confluent-kafka==2.3.0
+
+# Graph Database (for dependency resolution)
+neo4j==5.15.0
+
+# Search Engine
+elasticsearch==8.11.0
+
+# API Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==1.3.0
+
+# Deployment
+gunicorn==21.2.0
+gevent==23.9.1
+
+# Health Checks
+healthcheck==1.3.3

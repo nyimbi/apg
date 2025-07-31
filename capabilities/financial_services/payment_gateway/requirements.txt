@@ -1,0 +1,197 @@
+# APG Payment Gateway Capability - Production Dependencies
+# © 2025 Datacraft. All rights reserved.
+
+# Core APG Platform Dependencies
+flask-appbuilder>=4.3.0
+flask>=2.3.0
+sqlalchemy>=2.0.0
+alembic>=1.12.0
+celery>=5.3.0
+redis>=5.0.0
+
+# Python Core Dependencies (CLAUDE.md Standards)
+uuid7>=0.1.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+httpx>=0.25.0
+aiofiles>=23.2.0
+asyncpg>=0.29.0
+
+# Payment Processing Core
+stripe>=7.0.0
+adyen-python-api-library>=9.0.0
+square-python-sdk>=30.0.0
+paypal-python-sdk>=1.13.3
+authorizenet>=1.1.4
+
+# Payment Method Support
+cryptography>=41.0.0
+pycryptodome>=3.19.0
+jwcrypto>=1.5.0
+python-jose>=3.3.0
+
+# AI/ML and Fraud Detection
+scikit-learn>=1.3.0
+pandas>=2.1.0
+numpy>=1.25.0
+tensorflow>=2.14.0
+xgboost>=1.7.0
+lightgbm>=4.1.0
+
+# Real-time Processing
+websockets>=12.0
+socketio>=5.8.0
+kafka-python>=2.0.2
+pika>=1.3.2
+
+# Database and Caching
+psycopg2-binary>=2.9.7
+redis-py>=5.0.0
+elasticsearch>=8.9.0
+pymongo>=4.5.0
+
+# HTTP and API
+fastapi>=0.104.0
+uvicorn>=0.24.0
+gunicorn>=21.2.0
+httpx>=0.25.0
+requests>=2.31.0
+
+# Security and Compliance
+bcrypt>=4.0.1
+passlib>=1.7.4
+python-multipart>=0.0.6
+python-dotenv>=1.0.0
+marshmallow>=3.20.0
+
+# Monitoring and Observability
+prometheus-client>=0.17.0
+structlog>=23.1.0
+sentry-sdk>=1.32.0
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+
+# Data Processing and Analytics
+pandas>=2.1.0
+numpy>=1.25.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.17.0
+
+# International Support
+babel>=2.12.0
+pytz>=2023.3
+pycountry>=22.3.0
+forex-python>=1.8.0
+
+# Development and Testing Dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-httpserver>=1.0.8
+black>=23.7.0
+flake8>=6.0.0
+mypy>=1.5.0
+bandit>=1.7.5
+
+# Documentation
+sphinx>=7.1.0
+sphinx-rtd-theme>=1.3.0
+mkdocs>=1.5.0
+mkdocs-material>=9.2.0
+
+# Deployment and DevOps
+docker>=6.1.0
+kubernetes>=27.2.0
+helm>=0.1.0
+terraform>=1.5.0
+
+# APG-Specific Integration Libraries
+# Note: These would be actual APG platform libraries in production
+# apg-core>=3.0.0
+# apg-auth-rbac>=2.0.0  
+# apg-audit-compliance>=1.5.0
+# apg-ai-orchestration>=1.0.0
+# apg-notification-engine>=1.8.0
+# apg-computer-vision>=2.1.0
+# apg-federated-learning>=1.3.0
+# apg-time-series-analytics>=1.6.0
+# apg-document-management>=1.5.0
+# apg-real-time-collaboration>=1.4.0
+
+# Regional Payment Processors
+razorpay>=1.3.0
+payu-python>=1.0.0
+mercadopago-sdk>=2.2.0
+worldpay-python>=1.0.0
+
+# African Mobile Money
+# MPESA and other mobile money integrations
+safaricom-daraja>=1.0.0
+mpesa-python-sdk>=0.1.0
+flutterwave>=3.0.0
+paystack>=1.5.0
+
+# Blockchain and Cryptocurrency
+web3>=6.11.0
+bitcoin>=1.1.42
+ethereum>=2.3.2
+binance-python>=1.0.15
+
+# Business Intelligence and Reporting
+reportlab>=4.0.4
+xlswriter>=3.1.6
+openpyxl>=3.1.2
+jinja2>=3.1.2
+
+# Compliance and Regulatory
+pci-dss-toolkit>=1.0.0
+gdpr-compliance>=1.2.0
+sox-audit>=1.0.0
+aml-kyc>=2.1.0
+
+# Performance and Optimization
+gevent>=23.7.0
+greenlet>=2.0.2
+ujson>=5.8.0
+orjson>=3.9.0
+msgpack>=1.0.6
+
+# Networking and Communication
+dnspython>=2.4.0
+certifi>=2023.7.22
+urllib3>=2.0.4
+requests-oauthlib>=1.3.1
+
+# File Processing and Storage
+minio>=7.1.17
+boto3>=1.28.0
+azure-storage-blob>=12.17.0
+google-cloud-storage>=2.10.0
+
+# Image and Document Processing (for payment verification)
+pillow>=10.0.0
+pytesseract>=0.3.10
+opencv-python>=4.8.0
+pdf2image>=1.16.3
+
+# Phone and SMS for 2FA
+twilio>=8.5.0
+nexmo>=2.5.2
+phonenumbers>=8.13.0
+
+# Email Processing
+sendgrid>=6.10.0
+mailgun>=0.1.1
+ses-mailer>=1.0.0
+
+# API Documentation
+flasgger>=0.9.7
+apispec>=6.3.0
+marshmallow-apispec>=0.18.0
+
+# Load Testing and Performance
+locust>=2.16.0
+artillery>=1.0.0
+vegeta>=1.0.0

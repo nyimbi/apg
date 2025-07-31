@@ -1,0 +1,528 @@
+# Pesapal Integration Configuration - APG Payment Gateway
+# Complete configuration for all Pesapal features and environments
+#
+# © 2025 Datacraft. All rights reserved.
+
+# Environment Configuration
+environment:
+  # Supported environments: sandbox, live
+  current: "sandbox"  # Change to "live" for production transactions
+  
+  sandbox:
+    api_base_url: "https://cybqa.pesapal.com/pesapalv3/api"
+    auth_url: "https://cybqa.pesapal.com/pesapalv3/api/Auth/RequestToken"
+    consumer_key: "${PESAPAL_CONSUMER_KEY_SANDBOX}"
+    consumer_secret: "${PESAPAL_CONSUMER_SECRET_SANDBOX}"
+    callback_url: "${PESAPAL_CALLBACK_URL_SANDBOX}"
+    
+  live:
+    api_base_url: "https://pay.pesapal.com/v3/api"
+    auth_url: "https://pay.pesapal.com/v3/api/Auth/RequestToken"
+    consumer_key: "${PESAPAL_CONSUMER_KEY_LIVE}"
+    consumer_secret: "${PESAPAL_CONSUMER_SECRET_LIVE}"
+    callback_url: "${PESAPAL_CALLBACK_URL_LIVE}"
+
+# API Configuration
+api:
+  # Timeout settings (in seconds)
+  timeout:
+    connection: 30
+    read: 60
+    total: 90
+    
+  # Retry configuration
+  retry:
+    max_attempts: 3
+    backoff_factor: 2.0
+    status_forcelist: [408, 429, 500, 502, 503, 504]
+    
+  # Rate limiting
+  rate_limit:
+    requests_per_second: 10
+    burst_limit: 20
+    
+  # Request options
+  options:
+    compression: true
+    keep_alive: true
+    pool_connections: 5
+    pool_maxsize: 10
+
+# Authentication Configuration
+auth:
+  # OAuth settings
+  oauth_version: "1.0"
+  oauth_signature_method: "HMAC-SHA1"
+  
+  # Token management
+  token:
+    auto_refresh: true
+    refresh_buffer_minutes: 5  # Refresh token 5 minutes before expiry
+    
+  # API credentials (set via environment variables)
+  # PESAPAL_CONSUMER_KEY_SANDBOX or PESAPAL_CONSUMER_KEY_LIVE
+  # PESAPAL_CONSUMER_SECRET_SANDBOX or PESAPAL_CONSUMER_SECRET_LIVE
+  # PESAPAL_CALLBACK_URL_SANDBOX or PESAPAL_CALLBACK_URL_LIVE
+
+# Payment Processing Configuration
+payments:
+  # Default settings
+  defaults:
+    currency: "KES"
+    country_code: "KE"
+    callback_url: "${PESAPAL_CALLBACK_URL}"
+    
+  # Payment method configuration
+  payment_methods:
+    # Card payments
+    cards:
+      enabled: true
+      supported_brands:
+        - "VISA"
+        - "MASTERCARD"
+        - "AMEX"
+        - "DISCOVER"
+      enable_3d_secure: true
+      
+    # Mobile money payments
+    mobile_money:
+      enabled: true
+      
+      # M-Pesa (Kenya, Tanzania, Uganda)
+      mpesa:
+        enabled: true
+        countries: ["KE", "TZ", "UG"]
+        currencies: ["KES", "TZS", "UGX"]
+        
+      # Airtel Money (Kenya, Tanzania, Uganda)
+      airtel_money:
+        enabled: true
+        countries: ["KE", "TZ", "UG"]
+        currencies: ["KES", "TZS", "UGX"]
+        
+      # Equity Bank mobile
+      equity_bank:
+        enabled: true
+        countries: ["KE"]
+        currencies: ["KES"]
+        
+    # Bank transfers
+    bank_transfers:
+      enabled: true
+      supported_countries: ["KE", "UG", "TZ"]
+      
+    # Digital wallets
+    wallets:
+      enabled: true
+      # PayPal integration
+      paypal:
+        enabled: true
+        countries: ["KE", "UG", "TZ"]
+        currencies: ["USD", "EUR", "GBP"]
+
+# Supported Countries and Currencies
+localization:
+  # Primary countries (East Africa)
+  primary_countries:
+    - "KE"  # Kenya
+    - "UG"  # Uganda
+    - "TZ"  # Tanzania
+    
+  # Supported currencies
+  supported_currencies:
+    - "KES"  # Kenyan Shilling
+    - "UGX"  # Ugandan Shilling
+    - "TZS"  # Tanzanian Shilling
+    - "USD"  # US Dollar
+    - "EUR"  # Euro
+    - "GBP"  # British Pound
+    
+  # Country-specific settings
+  countries:
+    - code: "KE"
+      name: "Kenya"
+      currency: "KES"
+      payment_methods: ["VISA", "MASTERCARD", "MPESA", "AIRTEL_MONEY", "EQUITY_BANK", "BANK_TRANSFER"]
+      mobile_money_prefix: "254"
+    - code: "UG"
+      name: "Uganda"
+      currency: "UGX"
+      payment_methods: ["VISA", "MASTERCARD", "MPESA", "AIRTEL_MONEY", "BANK_TRANSFER"]
+      mobile_money_prefix: "256"
+    - code: "TZ"
+      name: "Tanzania"
+      currency: "TZS"
+      payment_methods: ["VISA", "MASTERCARD", "MPESA", "AIRTEL_MONEY", "BANK_TRANSFER"]
+      mobile_money_prefix: "255"
+
+# IPN (Instant Payment Notification) Configuration
+ipn:
+  # IPN settings
+  enabled: true
+  timeout: 30  # seconds
+  retry_attempts: 5
+  retry_intervals: [60, 300, 1800, 3600, 7200]  # seconds: 1min, 5min, 30min, 1h, 2h
+  
+  # IPN types
+  notification_types:
+    - "CHANGE"  # Transaction status change
+    - "REFUND"  # Refund notification
+    
+  # IPN endpoints
+  endpoints:
+    callback_url: "${PESAPAL_CALLBACK_URL}/pesapal/ipn"
+    notification_method: "GET"  # GET or POST
+    
+  # Security
+  signature_verification: true
+  
+  # Processing options
+  processing:
+    async_processing: true
+    batch_processing: false
+    max_processing_time: 30  # seconds
+    enable_duplicate_detection: true
+
+# Security Configuration
+security:
+  # Encryption
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_rotation_days: 90
+    
+  # HMAC settings for IPN
+  hmac:
+    algorithm: "sha1"
+    encoding: "hex"
+    
+  # Request validation
+  validation:
+    validate_origin: true
+    validate_signature: true
+    validate_timestamps: true
+    max_timestamp_drift: 300  # 5 minutes
+    
+  # IP security
+  ip_security:
+    enable_whitelist: false  # Disable for development
+    allowed_ips:
+      - "127.0.0.1"         # Local development
+      - "0.0.0.0/0"          # Allow all (disable in production)
+    
+  # Data protection
+  data_protection:
+    gdpr_compliance: true
+    pci_compliance: true
+    data_retention_days: 2555  # 7 years
+    tokenization: true
+    
+  # Fraud prevention
+  fraud_prevention:
+    enable_velocity_checks: true
+    enable_device_fingerprinting: false  # Not available in Pesapal
+    risk_threshold: 80  # 0-100 scale
+
+# Monitoring and Logging
+monitoring:
+  # Logging configuration
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format: "json"
+    log_requests: true
+    log_responses: false  # Set to true for debugging
+    log_ipn_events: true
+    max_log_size_mb: 100
+    log_retention_days: 30
+    
+    # Sensitive data handling
+    mask_card_numbers: true
+    mask_cvv: true
+    mask_phone_numbers: false  # Phone numbers needed for mobile money
+    
+  # Metrics collection
+  metrics:
+    enabled: true
+    include_latency: true
+    include_error_rates: true
+    include_success_rates: true
+    include_payment_method_breakdown: true
+    include_country_breakdown: true
+    
+  # Health checks
+  health_checks:
+    enabled: true
+    interval_seconds: 30
+    timeout_seconds: 10
+    check_api_connectivity: true
+    check_token_validity: true
+    check_ipn_registration: true
+    
+  # Alerting
+  alerts:
+    enabled: true
+    error_rate_threshold: 0.05      # 5%
+    latency_threshold_ms: 3000      # 3 seconds
+    ipn_failure_threshold: 0.10     # 10%
+    token_expiry_warning_hours: 1   # Alert 1 hour before token expires
+    
+    # Alert channels
+    channels:
+      email: true
+      slack: false
+      webhook: true
+
+# Performance Configuration
+performance:
+  # Connection pooling
+  connection_pool:
+    size: 10
+    max_size: 20
+    keep_alive: true
+    keep_alive_timeout: 30
+    
+  # Caching
+  caching:
+    enabled: true
+    default_ttl: 300  # 5 minutes
+    max_size: 500
+    
+    # Cache specific items
+    cache_access_tokens: true
+    cache_payment_methods: true
+    cache_country_configs: true
+    
+  # Request optimization
+  optimization:
+    compression: true
+    connection_reuse: true
+    async_processing: true
+    batch_requests: false  # Pesapal doesn't support batch requests
+    
+  # Background processing
+  background_jobs:
+    enabled: true
+    max_workers: 3
+    retry_failed_jobs: true
+    job_timeout_seconds: 300
+
+# Business Rules and Limits
+business_rules:
+  # Transaction limits
+  transaction_limits:
+    # Per transaction limits (in major currency units)
+    min_amount: 1        # KSh 1, UGX 1, etc.
+    max_amount: 500000   # KSh 500K, UGX 500K, etc.
+    
+    # Daily limits per customer
+    daily_limit: 100000     # KSh 100K, UGX 100K, etc.
+    daily_transaction_count: 20
+    
+    # Monthly limits per customer
+    monthly_limit: 1000000  # KSh 1M, UGX 1M, etc.
+    monthly_transaction_count: 200
+    
+  # Refund policies
+  refunds:
+    # Refund window (days after original transaction)
+    refund_window_days: 90
+    
+    # Refund options (Pesapal requires manual processing)
+    manual_processing_required: true
+    partial_refunds: true
+    multiple_refunds: false
+    same_day_refunds: false
+    
+  # Risk rules
+  risk_rules:
+    # Velocity limits
+    velocity_limits:
+      transactions_per_hour: 5
+      amount_per_hour: 50000  # KSh 50K, UGX 50K, etc.
+      transactions_per_minute: 2
+      
+    # Geographic restrictions
+    geographic_restrictions:
+      blocked_countries: []  # Empty list means no restrictions
+      high_risk_countries: []
+      
+    # Transaction testing protection
+    testing_protection:
+      enabled: true
+      max_attempts_per_ip: 10
+      lockout_period_minutes: 30
+
+# Reporting Configuration
+reporting:
+  # Scheduled reports
+  scheduled_reports:
+    enabled: true
+    
+    # Transaction reports
+    transaction_reports:
+      enabled: true
+      frequency: "daily"  # daily, weekly, monthly
+      format: "json"      # json, csv
+      include_customer_data: false
+      
+    # Settlement reports
+    settlement_reports:
+      enabled: true
+      frequency: "weekly"
+      format: "json"
+      include_fees: true
+      
+  # Real-time reporting
+  real_time:
+    enabled: true
+    push_notifications: false
+    ipn_reports: true
+    
+  # Data retention
+  data_retention:
+    transaction_data_days: 2555  # 7 years
+    reporting_data_days: 1095    # 3 years
+    log_data_days: 365           # 1 year
+
+# Feature Flags
+features:
+  # Payment features
+  payment_links: true
+  recurring_payments: true
+  subscriptions: false  # Not directly supported by Pesapal
+  
+  # Advanced features
+  split_payments: false  # Not supported by Pesapal
+  escrow_payments: false
+  bulk_transfers: false
+  
+  # Regional features
+  mobile_money_all_networks: true
+  bank_transfers: true
+  international_cards: true
+  
+  # Risk features
+  fraud_detection: true
+  velocity_checking: true
+  
+  # API features
+  ipn_retries: true
+  idempotency_keys: true
+
+# Development and Testing
+development:
+  # Test mode settings
+  test_mode:
+    enabled: true
+    use_test_credentials: true
+    simulate_ipn: true
+    
+  # Test payment methods
+  test_cards:
+    visa_success: "4000000000000002"
+    visa_declined: "4000000000000069"
+    mastercard_success: "5555555555554444"
+    
+  # Test mobile money numbers
+  test_mobile_money:
+    mpesa_success: "254700000000"
+    airtel_success: "254700000001"
+    
+  # IPN testing
+  ipn_testing:
+    test_notifications: true
+    simulate_delays: false
+    test_retries: true
+    
+  # Debug settings
+  debug:
+    log_all_requests: false
+    log_all_responses: false
+    detailed_errors: true
+    mock_external_services: false
+
+# Integration Settings
+integrations:
+  # APG platform integration
+  apg:
+    enabled: true
+    tenant_isolation: true
+    multi_currency_support: true
+    
+  # External service integrations
+  external_services:
+    # Fraud services (additional to built-in)
+    kount: false
+    sift: false
+    
+    # Accounting systems
+    quickbooks: false
+    xero: false
+    
+    # CRM systems
+    salesforce: false
+    hubspot: false
+    
+  # Notification services
+  notifications:
+    email: true
+    sms: true
+    push: false
+    webhook: true
+    
+  # Analytics and reporting
+  analytics:
+    google_analytics: false
+    mixpanel: false
+    segment: false
+
+# Fees Configuration
+fees:
+  # Card payment fees
+  card_fees:
+    visa: 3.5          # 3.5%
+    mastercard: 3.5    # 3.5%
+    amex: 3.8          # 3.8%
+    
+  # Mobile money fees
+  mobile_money_fees:
+    mpesa: 2.0         # 2.0%
+    airtel_money: 2.0  # 2.0%
+    equity_bank: 1.8   # 1.8%
+    
+  # Bank transfer fees
+  bank_transfer_fees:
+    domestic: 1.5      # 1.5%
+    international: 3.0 # 3.0%
+    
+  # Fixed fees (in local currency)
+  fixed_fees:
+    card_processing: 0    # No fixed fee
+    mobile_money: 0       # No fixed fee
+    bank_transfer: 50     # KSh 50, UGX 50, etc.
+
+# Compliance Configuration
+compliance:
+  # Regulatory compliance
+  regulations:
+    kenya_cbk: true      # Central Bank of Kenya
+    uganda_bou: true     # Bank of Uganda
+    tanzania_bot: true   # Bank of Tanzania
+    
+  # Data protection
+  data_protection:
+    gdpr: true
+    ccpa: false
+    kenya_dpa: true      # Kenya Data Protection Act
+    
+  # Financial compliance
+  financial:
+    aml: true            # Anti-Money Laundering
+    kyc: true            # Know Your Customer
+    cft: true            # Combating Financing of Terrorism
+    
+  # Reporting requirements
+  reporting:
+    suspicious_transactions: true
+    large_transactions: true
+    cross_border_transactions: true
+    threshold_amount: 1000000  # Report transactions above this amount

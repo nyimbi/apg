@@ -1,0 +1,280 @@
+# Staging Configuration for APG Payment Gateway
+# This file contains staging-specific overrides for pre-production testing
+
+environment: staging
+
+# Database Configuration - Staging
+database:
+  host: payment-gateway-staging.cluster-def456.us-east-1.rds.amazonaws.com
+  port: 5432
+  database: payment_gateway_staging
+  username: pg_staging_user
+  # password set via environment variable or secrets manager
+  ssl_mode: require
+  pool_size: 20
+  max_overflow: 40
+  pool_timeout: 45
+  pool_recycle: 3600
+  echo: false
+
+# Redis Configuration - Staging
+redis:
+  host: payment-gateway-staging.cache.amazonaws.com
+  port: 6379
+  # password set via environment variable or secrets manager
+  db: 0
+  ssl: true
+  max_connections: 100
+  socket_timeout: 8
+  socket_connect_timeout: 8
+
+# Security Configuration - Staging
+security:
+  # secrets set via environment variables or secrets manager
+  jwt_expiry_hours: 12
+  allowed_hosts:
+    - "staging-api.datacraft.co.ke"
+    - "staging-payments.datacraft.co.ke"
+    - "staging-dashboard.datacraft.co.ke"
+  cors_origins:
+    - "https://staging-dashboard.datacraft.co.ke"
+    - "https://staging-merchant.datacraft.co.ke"
+    - "https://staging-admin.datacraft.co.ke"
+  rate_limit_per_minute: 2000
+  max_request_size_mb: 8
+  require_https: true
+  session_timeout_minutes: 20
+
+# Logging Configuration - Staging
+logging:
+  level: INFO
+  file_path: "/var/log/payment_gateway/staging.log"
+  max_file_size_mb: 200
+  backup_count: 7
+  log_to_console: true
+  log_to_file: true
+  structured_logging: true
+
+# Monitoring Configuration - Staging
+monitoring:
+  enabled: true
+  metrics_port: 9090
+  health_check_port: 8080
+  prometheus_enabled: true
+  jaeger_enabled: true
+  jaeger_agent_host: jaeger-agent.staging.svc.cluster.local
+  jaeger_agent_port: 6831
+  custom_metrics_enabled: true
+  alert_thresholds:
+    error_rate_percent: 2.0
+    response_time_ms: 750
+    fraud_score_threshold: 0.85
+    success_rate_percent: 98.0
+    database_connection_pool_usage: 75.0
+    memory_usage_percent: 80.0
+    cpu_usage_percent: 75.0
+
+# Cache Configuration - Staging
+cache:
+  default_ttl_seconds: 3600
+  user_profile_ttl_seconds: 1800
+  fraud_rules_ttl_seconds: 300
+  processor_health_ttl_seconds: 45
+  analytics_cache_ttl_seconds: 900
+  max_memory_mb: 1024
+  eviction_policy: "allkeys-lru"
+
+# Webhook Configuration - Staging
+webhook:
+  enabled: true
+  max_retry_attempts: 7
+  initial_retry_delay_seconds: 3
+  max_retry_delay_seconds: 900
+  timeout_seconds: 20
+  batch_size: 200
+  worker_threads: 8
+  signature_algorithm: "hmac-sha256"
+  delivery_timeout_hours: 24
+
+# Fraud Detection Configuration - Staging
+fraud:
+  enabled: true
+  ml_models_enabled: true
+  real_time_scoring: true
+  score_threshold_review: 0.65
+  score_threshold_decline: 0.88
+  velocity_window_minutes: 45
+  device_fingerprint_enabled: true
+  geolocation_enabled: true
+  whitelist_enabled: true
+  blacklist_enabled: true
+  model_refresh_hours: 12
+
+# API Configuration - Staging
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 8
+  max_connections: 2000
+  keepalive_timeout: 70
+  client_timeout: 20
+  api_version: "v1"
+  docs_enabled: true  # Enabled in staging for testing
+  cors_enabled: true
+  compression_enabled: true
+  request_id_header: "X-Request-ID"
+
+# Payment Processors Configuration - Staging
+processors:
+  mpesa:
+    api_url: "https://sandbox.safaricom.co.ke"  # Still use sandbox in staging
+    sandbox_mode: true
+    priority: 100
+    rate_limits:
+      requests_per_minute: 120
+      requests_per_hour: 5000
+    timeout_seconds: 20
+    retry_attempts: 4
+    custom_config:
+      business_short_code: "174379"  # Sandbox short code
+      callback_url: "https://staging-api.datacraft.co.ke/payments/webhooks/mpesa"
+      result_url: "https://staging-api.datacraft.co.ke/payments/webhooks/mpesa/result"
+      queue_timeout_url: "https://staging-api.datacraft.co.ke/payments/webhooks/mpesa/timeout"
+
+  stripe:
+    api_url: "https://api.stripe.com"
+    sandbox_mode: true  # Use test mode in staging
+    priority: 90
+    rate_limits:
+      requests_per_minute: 200
+      requests_per_hour: 10000
+    timeout_seconds: 20
+    retry_attempts: 4
+    custom_config:
+      api_version: "2023-10-16"
+      webhook_tolerance: 300
+      connect_timeout: 8
+      read_timeout: 40
+
+  adyen:
+    api_url: "https://checkout-test.adyen.com"  # Test environment in staging
+    sandbox_mode: true
+    priority: 85
+    rate_limits:
+      requests_per_minute: 300
+      requests_per_hour: 15000
+    timeout_seconds: 20
+    retry_attempts: 4
+    custom_config:
+      api_version: "v70"
+
+  paypal:
+    api_url: "https://api.sandbox.paypal.com"  # Sandbox in staging
+    sandbox_mode: true
+    priority: 80
+    rate_limits:
+      requests_per_minute: 200
+      requests_per_hour: 10000
+    timeout_seconds: 20
+    retry_attempts: 4
+    custom_config:
+      return_url: "https://staging-merchant.datacraft.co.ke/payments/success"
+      cancel_url: "https://staging-merchant.datacraft.co.ke/payments/cancel"
+
+# Custom Configuration - Staging
+custom:
+  # Feature flags - Staging
+  features:
+    smart_completion_enabled: true
+    conversational_payments_enabled: true
+    immersive_analytics_enabled: true
+    real_time_notifications_enabled: true
+    advanced_fraud_detection_enabled: true
+    multi_currency_support_enabled: true
+    beta_features_enabled: true  # Test beta features in staging
+    
+  # Regional settings - Staging
+  regional:
+    default_country: "KE"
+    default_currency: "KES"
+    default_timezone: "Africa/Nairobi"
+    supported_languages:
+      - "en"
+      - "sw"
+      - "fr"  # Test additional languages
+    
+  # Business rules - Staging
+  business_rules:
+    max_transaction_amount_usd: 25000  # Higher than dev, lower than prod
+    min_transaction_amount_usd: 0.01
+    daily_transaction_limit_usd: 100000
+    fraud_review_queue_enabled: true
+    auto_capture_enabled: true
+    auto_capture_delay_hours: 6  # Faster than production for testing
+    high_value_transaction_threshold_usd: 5000
+    require_3ds_for_high_value: true
+    
+  # Integration settings - Staging
+  integrations:
+    slack_webhook_url: "https://hooks.slack.com/services/staging/webhook/url"
+    datadog_integration_enabled: true
+    pagerduty_integration_enabled: false  # Disabled to avoid noise
+    
+  # Performance settings - Staging
+  performance:
+    max_concurrent_transactions: 10000
+    transaction_timeout_seconds: 180
+    batch_processing_size: 1000
+    async_webhook_processing: true
+    database_query_timeout_seconds: 20
+    cache_warm_up_enabled: true
+    connection_pool_pre_ping: true
+    
+  # Testing and validation settings
+  testing:
+    load_testing_enabled: true
+    performance_testing_enabled: true
+    security_testing_enabled: true
+    integration_testing_enabled: true
+    chaos_engineering_enabled: false  # Can be enabled for resilience testing
+    synthetic_monitoring_enabled: true
+    
+  # Data management - Staging
+  data_management:
+    data_retention_days: 90  # Shorter retention in staging
+    audit_log_retention_days: 90
+    auto_data_cleanup_enabled: true
+    test_data_generation_enabled: true
+    data_masking_enabled: true  # Mask sensitive data
+    
+  # Quality assurance
+  quality_assurance:
+    automated_testing_enabled: true
+    regression_testing_enabled: true
+    user_acceptance_testing_enabled: true
+    performance_benchmarking_enabled: true
+    security_scanning_enabled: true
+    
+  # Deployment settings
+  deployment:
+    blue_green_deployment: true
+    canary_deployment_enabled: false
+    rollback_enabled: true
+    health_check_timeout_seconds: 60
+    deployment_validation_enabled: true
+    
+  # Monitoring and alerting - Staging specific
+  monitoring:
+    detailed_metrics_enabled: true
+    performance_profiling_enabled: true
+    error_tracking_enhanced: true
+    user_journey_tracking: true
+    business_metrics_tracking: true
+    
+  # Security testing
+  security_testing:
+    penetration_testing_enabled: false  # Schedule separately
+    vulnerability_scanning_enabled: true
+    dependency_scanning_enabled: true
+    secrets_scanning_enabled: true
+    compliance_testing_enabled: true

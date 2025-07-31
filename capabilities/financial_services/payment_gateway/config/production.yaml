@@ -1,0 +1,276 @@
+# Production Configuration for APG Payment Gateway
+# This file contains production-specific overrides
+# Secrets should be loaded from AWS Secrets Manager or environment variables
+
+environment: production
+
+# Database Configuration - Production
+database:
+  host: payment-gateway-prod.cluster-abc123.us-east-1.rds.amazonaws.com
+  port: 5432
+  database: payment_gateway_prod
+  username: pg_prod_user
+  ssl_mode: require
+  pool_size: 50
+  max_overflow: 100
+  pool_timeout: 60
+  pool_recycle: 1800
+  echo: false
+
+# Redis Configuration - Production
+redis:
+  host: payment-gateway-prod.cache.amazonaws.com
+  port: 6379
+  db: 0
+  ssl: true
+  max_connections: 200
+  socket_timeout: 10
+  socket_connect_timeout: 10
+
+# Security Configuration - Production
+security:
+  jwt_expiry_hours: 8  # Shorter expiry in production
+  allowed_hosts:
+    - "api.datacraft.co.ke"
+    - "payments.datacraft.co.ke"
+    - "dashboard.datacraft.co.ke"
+  cors_origins:
+    - "https://dashboard.datacraft.co.ke"
+    - "https://merchant.datacraft.co.ke"
+    - "https://admin.datacraft.co.ke"
+  rate_limit_per_minute: 5000
+  max_request_size_mb: 5
+  require_https: true
+  session_timeout_minutes: 15
+
+# Logging Configuration - Production
+logging:
+  level: WARNING
+  file_path: "/var/log/payment_gateway/production.log"
+  max_file_size_mb: 500
+  backup_count: 10
+  log_to_console: false
+  log_to_file: true
+  structured_logging: true
+
+# Monitoring Configuration - Production
+monitoring:
+  enabled: true
+  metrics_port: 9090
+  health_check_port: 8080
+  prometheus_enabled: true
+  jaeger_enabled: true
+  jaeger_agent_host: jaeger-agent.monitoring.svc.cluster.local
+  jaeger_agent_port: 6831
+  custom_metrics_enabled: true
+  alert_thresholds:
+    error_rate_percent: 1.0
+    response_time_ms: 500
+    fraud_score_threshold: 0.9
+    success_rate_percent: 99.0
+    database_connection_pool_usage: 80.0
+    memory_usage_percent: 85.0
+    cpu_usage_percent: 80.0
+
+# Cache Configuration - Production
+cache:
+  default_ttl_seconds: 7200
+  user_profile_ttl_seconds: 3600
+  fraud_rules_ttl_seconds: 600
+  processor_health_ttl_seconds: 30
+  analytics_cache_ttl_seconds: 1800
+  max_memory_mb: 2048
+  eviction_policy: "allkeys-lru"
+
+# Webhook Configuration - Production
+webhook:
+  enabled: true
+  max_retry_attempts: 10
+  initial_retry_delay_seconds: 2
+  max_retry_delay_seconds: 1800
+  timeout_seconds: 15
+  batch_size: 500
+  worker_threads: 16
+  signature_algorithm: "hmac-sha256"
+  delivery_timeout_hours: 48
+
+# Fraud Detection Configuration - Production
+fraud:
+  enabled: true
+  ml_models_enabled: true
+  real_time_scoring: true
+  score_threshold_review: 0.6
+  score_threshold_decline: 0.85
+  velocity_window_minutes: 30
+  device_fingerprint_enabled: true
+  geolocation_enabled: true
+  whitelist_enabled: true
+  blacklist_enabled: true
+  model_refresh_hours: 6
+
+# API Configuration - Production
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 16
+  max_connections: 5000
+  keepalive_timeout: 65
+  client_timeout: 15
+  api_version: "v1"
+  docs_enabled: false  # Disabled in production
+  cors_enabled: true
+  compression_enabled: true
+  request_id_header: "X-Request-ID"
+
+# Payment Processors Configuration - Production
+processors:
+  mpesa:
+    api_url: "https://api.safaricom.co.ke"
+    sandbox_mode: false
+    priority: 100
+    rate_limits:
+      requests_per_minute: 300
+      requests_per_hour: 10000
+    timeout_seconds: 15
+    retry_attempts: 5
+    custom_config:
+      business_short_code: "400200"  # Production short code
+      callback_url: "https://api.datacraft.co.ke/payments/webhooks/mpesa"
+      result_url: "https://api.datacraft.co.ke/payments/webhooks/mpesa/result"
+      queue_timeout_url: "https://api.datacraft.co.ke/payments/webhooks/mpesa/timeout"
+
+  stripe:
+    api_url: "https://api.stripe.com"
+    sandbox_mode: false
+    priority: 90
+    rate_limits:
+      requests_per_minute: 500
+      requests_per_hour: 25000
+    timeout_seconds: 15
+    retry_attempts: 5
+    custom_config:
+      api_version: "2023-10-16"
+      webhook_tolerance: 300
+      connect_timeout: 5
+      read_timeout: 25
+
+  adyen:
+    api_url: "https://checkout-live.adyen.com"
+    sandbox_mode: false
+    priority: 85
+    rate_limits:
+      requests_per_minute: 750
+      requests_per_hour: 37500
+    timeout_seconds: 15
+    retry_attempts: 5
+    custom_config:
+      api_version: "v70"
+
+  paypal:
+    api_url: "https://api.paypal.com"
+    sandbox_mode: false
+    priority: 80
+    rate_limits:
+      requests_per_minute: 500
+      requests_per_hour: 25000
+    timeout_seconds: 15
+    retry_attempts: 5
+    custom_config:
+      return_url: "https://merchant.datacraft.co.ke/payments/success"
+      cancel_url: "https://merchant.datacraft.co.ke/payments/cancel"
+
+# Custom Configuration - Production
+custom:
+  # Feature flags - Production
+  features:
+    smart_completion_enabled: true
+    conversational_payments_enabled: true
+    immersive_analytics_enabled: true
+    real_time_notifications_enabled: true
+    advanced_fraud_detection_enabled: true
+    multi_currency_support_enabled: true
+    beta_features_enabled: false
+    
+  # Regional settings - Production
+  regional:
+    default_country: "KE"
+    default_currency: "KES"
+    default_timezone: "Africa/Nairobi"
+    supported_languages:
+      - "en"
+      - "sw"
+      - "fr"  # Added French for expansion
+    
+  # Business rules - Production
+  business_rules:
+    max_transaction_amount_usd: 100000
+    min_transaction_amount_usd: 0.01
+    daily_transaction_limit_usd: 1000000
+    fraud_review_queue_enabled: true
+    auto_capture_enabled: true
+    auto_capture_delay_hours: 12
+    high_value_transaction_threshold_usd: 10000
+    require_3ds_for_high_value: true
+    
+  # Integration settings - Production
+  integrations:
+    slack_webhook_url: "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+    datadog_integration_enabled: true
+    pagerduty_integration_enabled: true
+    
+  # Performance settings - Production
+  performance:
+    max_concurrent_transactions: 50000
+    transaction_timeout_seconds: 120
+    batch_processing_size: 5000
+    async_webhook_processing: true
+    database_query_timeout_seconds: 15
+    cache_warm_up_enabled: true
+    connection_pool_pre_ping: true
+    
+  # Compliance settings - Production
+  compliance:
+    pci_dss_compliance_enabled: true
+    data_retention_days: 2555  # 7 years
+    audit_log_retention_days: 2555
+    gdpr_compliance_enabled: true
+    ccpa_compliance_enabled: true
+    auto_data_purge_enabled: true
+    
+  # High availability settings
+  high_availability:
+    multi_region_enabled: true
+    primary_region: "us-east-1"
+    backup_regions:
+      - "eu-west-1"
+      - "ap-southeast-1"
+    failover_enabled: true
+    health_check_interval_seconds: 30
+    circuit_breaker_enabled: true
+    
+  # Scaling settings
+  scaling:
+    auto_scaling_enabled: true
+    min_instances: 4
+    max_instances: 100
+    target_cpu_utilization: 70
+    target_memory_utilization: 80
+    scale_up_cooldown_seconds: 300
+    scale_down_cooldown_seconds: 600
+    
+  # Backup and recovery
+  backup:
+    database_backup_enabled: true
+    backup_retention_days: 30
+    point_in_time_recovery_enabled: true
+    cross_region_backup_enabled: true
+    backup_encryption_enabled: true
+    
+  # Load balancing
+  load_balancing:
+    algorithm: "round_robin"
+    health_check_path: "/health"
+    health_check_interval_seconds: 10
+    unhealthy_threshold: 3
+    healthy_threshold: 2
+    sticky_sessions_enabled: false

@@ -30,8 +30,17 @@ from .websocket_manager import websocket_manager
 
 # Mock dependencies (would be actual APG dependencies)
 async def get_async_session() -> AsyncSession:
-	"""Mock database session"""
-	pass
+	"""Get async database session"""
+	# In real implementation, this would return SQLAlchemy AsyncSession
+	# For now, return a mock session object
+	class MockAsyncSession:
+		async def commit(self):
+			pass
+		async def rollback(self):
+			pass
+		async def close(self):
+			pass
+	return MockAsyncSession()
 
 async def get_current_user(token: str = None) -> Dict[str, Any]:
 	"""Mock current user from APG auth"""
@@ -193,15 +202,21 @@ async def get_session(
 	db: AsyncSession = Depends(get_async_session)
 ):
 	"""Get session details"""
-	# Implementation would fetch session from database
+	# Fetch session from database
+	service = CollaborationService(db)
+	session = await service.get_session(session_id)
+	
+	if not session:
+		raise HTTPException(status_code=404, detail="Session not found")
+	
 	return SessionResponse(
-		session_id=session_id,
-		session_name="Mock Session",
-		session_type="page_collaboration",
-		owner_user_id=user['user_id'],
-		is_active=True,
-		created_at=datetime.utcnow(),
-		participant_count=1,
+		session_id=session.session_id,
+		session_name=session.session_name,
+		session_type=session.session_type,
+		owner_user_id=session.owner_user_id,
+		is_active=session.is_active,
+		created_at=session.actual_start or session.created_at,
+		participant_count=session.current_participant_count,
 		meeting_url=f"/rtc/join/{session_id}"
 	)
 
@@ -407,18 +422,30 @@ async def join_video_call(
 	db: AsyncSession = Depends(get_async_session)
 ):
 	"""Join video call as participant"""
-	# Implementation would create video participant
+	# Create video participant
+	context = CollaborationContext(
+		tenant_id=user['tenant_id'],
+		user_id=user['user_id'],
+		page_url="/video-call"
+	)
+	
+	service = CollaborationService(db)
+	participant = await service.join_video_call(context, call_id, "attendee")
+	
+	if not participant:
+		raise HTTPException(status_code=400, detail="Failed to join video call")
+	
 	return {
-		'participant_id': uuid7str(),
+		'participant_id': participant.participant_id,
 		'call_id': call_id,
 		'user_id': user['user_id'],
-		'role': 'attendee',
-		'joined_at': datetime.utcnow().isoformat(),
+		'role': participant.role,
+		'joined_at': participant.joined_at.isoformat() if participant.joined_at else datetime.utcnow().isoformat(),
 		'permissions': {
-			'can_share_screen': True,
+			'can_share_screen': participant.can_share_screen,
 			'can_unmute_self': True,
 			'can_start_video': True,
-			'can_chat': True
+			'can_chat': participant.can_chat
 		}
 	}
 
@@ -431,7 +458,22 @@ async def toggle_audio(
 	user: Dict[str, Any] = Depends(get_current_user)
 ):
 	"""Toggle participant audio"""
-	# Implementation would update participant audio state
+	# Update participant audio state
+	service = CollaborationService(None)
+	success = await service.toggle_participant_audio(call_id, participant_id, enabled, user['user_id'])
+	
+	if not success:
+		raise HTTPException(status_code=400, detail="Failed to toggle audio")
+	
+	# Broadcast audio state change to call participants
+	await websocket_manager._broadcast_to_page(f"/video-call/{call_id}", {
+		'type': 'participant_audio_toggle',
+		'participant_id': participant_id,
+		'audio_enabled': enabled,
+		'updated_by': user['user_id'],
+		'timestamp': datetime.utcnow().isoformat()
+	})
+	
 	return {
 		'participant_id': participant_id,
 		'audio_enabled': enabled,
@@ -447,7 +489,22 @@ async def toggle_video(
 	user: Dict[str, Any] = Depends(get_current_user)
 ):
 	"""Toggle participant video"""
-	# Implementation would update participant video state
+	# Update participant video state
+	service = CollaborationService(None)
+	success = await service.toggle_participant_video(call_id, participant_id, enabled, user['user_id'])
+	
+	if not success:
+		raise HTTPException(status_code=400, detail="Failed to toggle video")
+	
+	# Broadcast video state change to call participants
+	await websocket_manager._broadcast_to_page(f"/video-call/{call_id}", {
+		'type': 'participant_video_toggle',
+		'participant_id': participant_id,
+		'video_enabled': enabled,
+		'updated_by': user['user_id'],
+		'timestamp': datetime.utcnow().isoformat()
+	})
+	
 	return {
 		'participant_id': participant_id,
 		'video_enabled': enabled,
@@ -462,11 +519,23 @@ async def raise_hand(
 	user: Dict[str, Any] = Depends(get_current_user)
 ):
 	"""Raise or lower hand"""
-	# Implementation would toggle hand raised state
+	# Toggle hand raised state
+	service = CollaborationService(None)
+	hand_raised = await service.toggle_hand_raised(call_id, participant_id, user['user_id'])
+	
+	# Broadcast hand state change to call participants
+	await websocket_manager._broadcast_to_page(f"/video-call/{call_id}", {
+		'type': 'participant_hand_toggle',
+		'participant_id': participant_id,
+		'hand_raised': hand_raised,
+		'user_id': user['user_id'],
+		'timestamp': datetime.utcnow().isoformat()
+	})
+	
 	return {
 		'participant_id': participant_id,
-		'hand_raised': True,
-		'raised_at': datetime.utcnow().isoformat()
+		'hand_raised': hand_raised,
+		'raised_at': datetime.utcnow().isoformat() if hand_raised else None
 	}
 
 
@@ -478,7 +547,16 @@ async def send_reaction(
 	user: Dict[str, Any] = Depends(get_current_user)
 ):
 	"""Send reaction (emoji)"""
-	# Implementation would broadcast reaction
+	# Broadcast reaction to call participants
+	await websocket_manager._broadcast_to_page(f"/video-call/{call_id}", {
+		'type': 'participant_reaction',
+		'participant_id': participant_id,
+		'user_id': user['user_id'],
+		'username': user.get('username', 'Unknown'),
+		'reaction': reaction,
+		'timestamp': datetime.utcnow().isoformat()
+	})
+	
 	return {
 		'participant_id': participant_id,
 		'reaction': reaction,
@@ -493,10 +571,30 @@ async def end_video_call(
 	db: AsyncSession = Depends(get_async_session)
 ):
 	"""End video call"""
-	# Implementation would end call and cleanup
+	# End video call and cleanup
+	context = CollaborationContext(
+		tenant_id=user['tenant_id'],
+		user_id=user['user_id'],
+		page_url="/video-call"
+	)
+	
+	service = CollaborationService(db)
+	video_call = await service.end_video_call(context, call_id)
+	
+	if not video_call:
+		raise HTTPException(status_code=404, detail="Video call not found")
+	
+	# Broadcast call ended to all participants
+	await websocket_manager._broadcast_to_page(f"/video-call/{call_id}", {
+		'type': 'video_call_ended',
+		'call_id': call_id,
+		'ended_by': user['user_id'],
+		'timestamp': datetime.utcnow().isoformat()
+	})
+	
 	return {
 		'call_id': call_id,
-		'ended_at': datetime.utcnow().isoformat(),
+		'ended_at': video_call.ended_at.isoformat() if video_call.ended_at else datetime.utcnow().isoformat(),
 		'message': 'Video call ended successfully'
 	}
 
@@ -617,11 +715,24 @@ async def get_chat_messages(
 	user: Dict[str, Any] = Depends(get_current_user)
 ):
 	"""Get chat messages for page"""
-	# Implementation would fetch from database
+	# Fetch chat messages from database
+	service = CollaborationService(None)
+	messages = await service.get_chat_messages(page_url, limit, user['tenant_id'])
+	
 	return {
-		'messages': [],
+		'messages': [
+			{
+				'message_id': msg.get('message_id'),
+				'user_id': msg.get('user_id'),
+				'username': msg.get('username'),
+				'message': msg.get('message'),
+				'message_type': msg.get('message_type', 'text'),
+				'timestamp': msg.get('timestamp')
+			}
+			for msg in messages
+		],
 		'page_url': page_url,
-		'total_count': 0
+		'total_count': len(messages)
 	}
 
 

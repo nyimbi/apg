@@ -1,0 +1,401 @@
+# APG Composition Kubernetes Production Deployment
+# High-availability Kubernetes deployment with auto-scaling, monitoring, and security
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: composition-api
+  namespace: apg-composition
+  labels:
+    app: composition-api
+    version: v2.0.0
+    component: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: composition-api
+  template:
+    metadata:
+      labels:
+        app: composition-api
+        version: v2.0.0
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: composition-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: composition-api
+        image: apg/composition:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 8001
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENV
+          value: "production"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: composition-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: composition-secrets
+              key: redis-url
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: composition-secrets
+              key: secret-key
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: composition-secrets
+              key: jwt-secret
+        - name: APG_INTEGRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: apg-shared-secrets
+              key: integration-token
+        - name: SENTRY_DSN
+          valueFrom:
+            secretKeyRef:
+              name: composition-secrets
+              key: sentry-dsn
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: METRICS_ENABLED
+          value: "true"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: logs-volume
+          mountPath: /app/logs
+        - name: temp-volume
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: composition-config
+      - name: logs-volume
+        emptyDir: {}
+      - name: temp-volume
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - composition-api
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: "composition"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: composition-api-service
+  namespace: apg-composition
+  labels:
+    app: composition-api
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: metrics
+  selector:
+    app: composition-api
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: composition-api-hpa
+  namespace: apg-composition
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: composition-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: composition-api-pdb
+  namespace: apg-composition
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: composition-api
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: composition-api-network-policy
+  namespace: apg-composition
+spec:
+  podSelector:
+    matchLabels:
+      app: composition-api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-gateway
+    - namespaceSelector:
+        matchLabels:
+          name: apg-monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8001
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-database
+    - namespaceSelector:
+        matchLabels:
+          name: apg-cache
+    - namespaceSelector:
+        matchLabels:
+          name: apg-shared
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: composition-config
+  namespace: apg-composition
+data:
+  application.yml: |
+    server:
+      host: 0.0.0.0
+      port: 8000
+      workers: 4
+      timeout: 300
+      
+    database:
+      pool_size: 20
+      max_overflow: 50
+      pool_recycle: 3600
+      echo: false
+      
+    cache:
+      default_timeout: 3600
+      key_prefix: "apg:composition:"
+      
+    logging:
+      level: INFO
+      format: json
+      handlers:
+        - console
+        - file
+      
+    metrics:
+      enabled: true
+      port: 8001
+      path: /metrics
+      
+    security:
+      cors_origins:
+        - "https://apg.datacraft.co.ke"
+        - "https://*.apg.datacraft.co.ke"
+      rate_limiting:
+        enabled: true
+        default_limit: "100/minute"
+        
+    features:
+      ai_recommendations: true
+      workflow_integration: true
+      deployment_automation: true
+      
+  nginx.conf: |
+    upstream composition_api {
+        least_conn;
+        server composition-api-service:80 max_fails=3 fail_timeout=30s;
+    }
+    
+    server {
+        listen 80;
+        server_name composition.apg.datacraft.co.ke;
+        
+        location / {
+            proxy_pass http://composition_api;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+            
+            proxy_buffer_size 4k;
+            proxy_buffers 8 4k;
+            proxy_busy_buffers_size 8k;
+        }
+        
+        location /health {
+            access_log off;
+            proxy_pass http://composition_api/health;
+        }
+    }
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: composition-service-account
+  namespace: apg-composition
+  labels:
+    app: composition-api
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: apg-composition
+  name: composition-role
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: composition-role-binding
+  namespace: apg-composition
+subjects:
+- kind: ServiceAccount
+  name: composition-service-account
+  namespace: apg-composition
+roleRef:
+  kind: Role
+  name: composition-role
+  apiGroup: rbac.authorization.k8s.io
