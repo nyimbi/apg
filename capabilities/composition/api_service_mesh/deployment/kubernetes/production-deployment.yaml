@@ -1,0 +1,769 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apg-service-mesh
+  labels:
+    name: apg-service-mesh
+    environment: production
+
+---
+# =============================================================================
+# ConfigMaps
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apg-mesh-config
+  namespace: apg-service-mesh
+data:
+  environment: "production"
+  log_level: "INFO"
+  enable_ai_features: "true"
+  enable_voice_control: "true"
+  enable_3d_visualization: "true"
+  enable_federation: "true"
+  cluster_region: "us-west-2"
+  
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-models-config
+  namespace: apg-service-mesh
+data:
+  models.txt: |
+    llama3.2:3b
+    codellama:7b
+    nomic-embed-text
+
+---
+# =============================================================================
+# Secrets
+# =============================================================================
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: apg-mesh-secrets
+  namespace: apg-service-mesh
+type: Opaque
+data:
+  db-password: <base64-encoded-password>
+  redis-password: <base64-encoded-password>
+  grafana-password: <base64-encoded-password>
+  jwt-secret: <base64-encoded-jwt-secret>
+
+---
+# =============================================================================
+# PostgreSQL Database
+# =============================================================================
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: apg-service-mesh
+spec:
+  serviceName: postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          value: "apg_service_mesh"
+        - name: POSTGRES_USER
+          value: "apg_mesh_user"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: apg-mesh-secrets
+              key: db-password
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - apg_mesh_user
+            - -d
+            - apg_service_mesh
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - apg_mesh_user
+            - -d
+            - apg_service_mesh
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 20Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: apg-service-mesh
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+  type: ClusterIP
+
+---
+# =============================================================================
+# Redis Cache
+# =============================================================================
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: apg-service-mesh
+spec:
+  serviceName: redis-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        command:
+        - redis-server
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        - --maxmemory
+        - 2gb
+        - --maxmemory-policy
+        - allkeys-lru
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: apg-mesh-secrets
+              key: redis-password
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "500m"
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: apg-service-mesh
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+  type: ClusterIP
+
+---
+# =============================================================================
+# Ollama AI Model Server
+# =============================================================================
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ollama
+  namespace: apg-service-mesh
+spec:
+  serviceName: ollama-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      initContainers:
+      - name: setup-models
+        image: ollama/ollama:latest
+        command:
+        - sh
+        - -c
+        - |
+          ollama serve &
+          sleep 30
+          ollama pull llama3.2:3b
+          ollama pull codellama:7b
+          ollama pull nomic-embed-text
+          pkill ollama
+        volumeMounts:
+        - name: ollama-data
+          mountPath: /root/.ollama
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        env:
+        - name: OLLAMA_HOST
+          value: "0.0.0.0"
+        - name: OLLAMA_PORT
+          value: "11434"
+        ports:
+        - containerPort: 11434
+        volumeMounts:
+        - name: ollama-data
+          mountPath: /root/.ollama
+        livenessProbe:
+          httpGet:
+            path: /api/version
+            port: 11434
+          initialDelaySeconds: 180
+          periodSeconds: 60
+        readinessProbe:
+          httpGet:
+            path: /api/version
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1000m"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "8Gi"
+            cpu: "2000m"
+            nvidia.com/gpu: 1
+  volumeClaimTemplates:
+  - metadata:
+      name: ollama-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 50Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: apg-service-mesh
+spec:
+  selector:
+    app: ollama
+  ports:
+  - port: 11434
+    targetPort: 11434
+  type: ClusterIP
+
+---
+# =============================================================================
+# APG Service Mesh Control Plane
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apg-service-mesh
+  namespace: apg-service-mesh
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: apg-service-mesh
+  template:
+    metadata:
+      labels:
+        app: apg-service-mesh
+        version: v2.1.0
+    spec:
+      serviceAccountName: apg-mesh-service-account
+      containers:
+      - name: apg-service-mesh
+        image: apg/api-service-mesh:2.1.0
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DB_HOST
+          value: "postgres"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: "apg_service_mesh"
+        - name: DB_USER
+          value: "apg_mesh_user"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: apg-mesh-secrets
+              key: db-password
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: apg-mesh-secrets
+              key: redis-password
+        - name: OLLAMA_HOST
+          value: "ollama"
+        - name: OLLAMA_PORT
+          value: "11434"
+        - name: CLUSTER_ID
+          value: "k8s-prod-cluster"
+        - name: CLUSTER_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: apg-mesh-config
+              key: cluster_region
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8443
+          name: https
+        - containerPort: 50051
+          name: grpc
+        - containerPort: 9090
+          name: metrics
+        volumeMounts:
+        - name: mesh-certs
+          mountPath: /etc/service-mesh/certs
+        - name: mesh-config
+          mountPath: /etc/service-mesh/config
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+      volumes:
+      - name: mesh-certs
+        secret:
+          secretName: apg-mesh-tls-certs
+      - name: mesh-config
+        configMap:
+          name: apg-mesh-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apg-service-mesh
+  namespace: apg-service-mesh
+  labels:
+    app: apg-service-mesh
+spec:
+  selector:
+    app: apg-service-mesh
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: https
+    port: 8443
+    targetPort: 8443
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP
+
+---
+# =============================================================================
+# Load Balancer Service
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: apg-service-mesh-lb
+  namespace: apg-service-mesh
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+spec:
+  selector:
+    app: apg-service-mesh
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+  - name: https
+    port: 443
+    targetPort: 8443
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+  type: LoadBalancer
+
+---
+# =============================================================================
+# Horizontal Pod Autoscaler
+# =============================================================================
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: apg-service-mesh-hpa
+  namespace: apg-service-mesh
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: apg-service-mesh
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# =============================================================================
+# Service Account and RBAC
+# =============================================================================
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: apg-mesh-service-account
+  namespace: apg-service-mesh
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: apg-mesh-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "pods", "nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies", "ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: apg-mesh-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: apg-mesh-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: apg-mesh-service-account
+  namespace: apg-service-mesh
+
+---
+# =============================================================================
+# Monitoring Stack
+# =============================================================================
+
+# Prometheus
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: apg-service-mesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:latest
+        args:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--storage.tsdb.retention.time=30d'
+        - '--web.enable-lifecycle'
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+        - name: prometheus-data
+          mountPath: /prometheus
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+      - name: prometheus-data
+        persistentVolumeClaim:
+          claimName: prometheus-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: apg-service-mesh
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - port: 9090
+    targetPort: 9090
+  type: ClusterIP
+
+---
+# Grafana
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: apg-service-mesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: apg-mesh-secrets
+              key: grafana-password
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: "false"
+        ports:
+        - containerPort: 3000
+        volumeMounts:
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: grafana-data
+        persistentVolumeClaim:
+          claimName: grafana-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: apg-service-mesh
+spec:
+  selector:
+    app: grafana
+  ports:
+  - port: 3000
+    targetPort: 3000
+  type: ClusterIP
+
+---
+# =============================================================================
+# Persistent Volume Claims
+# =============================================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: apg-service-mesh
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: apg-service-mesh
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# =============================================================================
+# Network Policies
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: apg-mesh-network-policy
+  namespace: apg-service-mesh
+spec:
+  podSelector:
+    matchLabels:
+      app: apg-service-mesh
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-service-mesh
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8443
+    - protocol: TCP
+      port: 50051
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-service-mesh
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+
+---
+# =============================================================================
+# Pod Disruption Budget
+# =============================================================================
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: apg-service-mesh-pdb
+  namespace: apg-service-mesh
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: apg-service-mesh

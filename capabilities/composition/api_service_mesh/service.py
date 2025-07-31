@@ -494,22 +494,36 @@ class ASMService:
 	
 	async def _process_natural_language_intent(self, intent: str) -> Dict[str, Any]:
 		"""Process natural language intent using APG's AI orchestration."""
-		# Simulate APG AI orchestration integration
-		await asyncio.sleep(0.1)  # Simulate AI processing time
+		from .ai_engine import NaturalLanguagePolicyModel
+		
+		# Initialize and use real AI model
+		ai_model = NaturalLanguagePolicyModel()
+		result = await ai_model.classify_intent(intent)
+		
 		return {
-			"intent_type": "traffic_routing",
-			"extracted_entities": {"service": "payment-service", "percentage": 80, "version": "v2"},
-			"confidence": 0.92,
-			"processed_at": datetime.utcnow().isoformat()
+			"intent_type": result["intent"],
+			"extracted_entities": result.get("parameters", {}),
+			"confidence": result["confidence"],
+			"processed_at": datetime.utcnow().isoformat(),
+			"reasoning": result.get("reasoning", "")
 		}
 	
 	async def _compile_intent_to_rules(self, processed_intent: Dict[str, Any], strategy: str) -> Dict[str, Any]:
 		"""Compile processed intent to mesh configuration rules."""
-		await asyncio.sleep(0.05)  # Simulate compilation time
+		from .ai_engine import NaturalLanguagePolicyModel
+		
+		# Use AI model to compile intent to rules
+		ai_model = NaturalLanguagePolicyModel()
+		rules = await ai_model.generate_policy_rules(
+			processed_intent["intent_type"],
+			processed_intent.get("extracted_entities", {}),
+			strategy
+		)
+		
 		return {
-			"route_rules": [{"service": "payment-service", "v2_weight": 80, "v1_weight": 20}],
+			"route_rules": rules.get("rules", []),
 			"deployment_strategy": strategy or "canary",
-			"affected_services": ["payment-service"],
+			"affected_services": rules.get("services", []),
 			"compiled_at": datetime.utcnow().isoformat()
 		}
 	
@@ -520,8 +534,11 @@ class ASMService:
 	async def _deploy_natural_language_policy(self, policy: SMNaturalLanguagePolicy):
 		"""Deploy a natural language policy to the mesh."""
 		self._log_info(f"Deploying natural language policy: {policy.policy_name}")
-		# Simulate policy deployment
-		await asyncio.sleep(0.2)
+		
+		# Deploy policy to service mesh
+		from .ai_engine import PolicyDeploymentEngine
+		deployment_engine = PolicyDeploymentEngine(self.db_session, self.redis_client)
+		await deployment_engine.deploy_policy(policy)
 	
 	def _log_info(self, message: str):
 		"""Log info message."""
