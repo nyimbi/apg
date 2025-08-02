@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APG Workflow Orchestration - Interactive Documentation</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="docs-container">
+        <!-- Navigation Sidebar -->
+        <nav class="docs-nav" id="docsNav">
+            <div class="nav-header">
+                <h1 class="nav-title">
+                    <i class="fas fa-sitemap"></i>
+                    APG Workflow Orchestration
+                </h1>
+                <button class="nav-toggle" id="navToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            
+            <!-- Search -->
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search documentation..." class="search-input">
+                <i class="fas fa-search search-icon"></i>
+            </div>
+            
+            <!-- Navigation Menu -->
+            <ul class="nav-menu" id="navMenu">
+                <li class="nav-section">
+                    <h3 class="section-title">Getting Started</h3>
+                    <ul class="section-items">
+                        <li><a href="#overview" data-section="overview">Overview</a></li>
+                        <li><a href="#quick-start" data-section="quick-start">Quick Start</a></li>
+                        <li><a href="#installation" data-section="installation">Installation</a></li>
+                        <li><a href="#first-workflow" data-section="first-workflow">Your First Workflow</a></li>
+                    </ul>
+                </li>
+                
+                <li class="nav-section">
+                    <h3 class="section-title">Core Concepts</h3>
+                    <ul class="section-items">
+                        <li><a href="#workflows" data-section="workflows">Workflows</a></li>
+                        <li><a href="#components" data-section="components">Components</a></li>
+                        <li><a href="#connectors" data-section="connectors">Connectors</a></li>
+                        <li><a href="#templates" data-section="templates">Templates</a></li>
+                    </ul>
+                </li>
+                
+                <li class="nav-section">
+                    <h3 class="section-title">Interactive Demos</h3>
+                    <ul class="section-items">
+                        <li><a href="#api-explorer" data-section="api-explorer">API Explorer</a></li>
+                        <li><a href="#workflow-builder" data-section="workflow-builder">Workflow Builder</a></li>
+                        <li><a href="#template-gallery" data-section="template-gallery">Template Gallery</a></li>
+                        <li><a href="#code-examples" data-section="code-examples">Code Examples</a></li>
+                    </ul>
+                </li>
+                
+                <li class="nav-section">
+                    <h3 class="section-title">Advanced Topics</h3>
+                    <ul class="section-items">
+                        <li><a href="#performance" data-section="performance">Performance</a></li>
+                        <li><a href="#security" data-section="security">Security</a></li>
+                        <li><a href="#scaling" data-section="scaling">Scaling</a></li>
+                        <li><a href="#monitoring" data-section="monitoring">Monitoring</a></li>
+                    </ul>
+                </li>
+                
+                <li class="nav-section">
+                    <h3 class="section-title">Resources</h3>
+                    <ul class="section-items">
+                        <li><a href="#tutorials" data-section="tutorials">Tutorials</a></li>
+                        <li><a href="#examples" data-section="examples">Examples</a></li>
+                        <li><a href="#troubleshooting" data-section="troubleshooting">Troubleshooting</a></li>
+                        <li><a href="#support" data-section="support">Support</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+        
+        <!-- Main Content Area -->
+        <main class="docs-content" id="docsContent">
+            <!-- Overview Section -->
+            <section id="overview" class="content-section active">
+                <div class="section-header">
+                    <h1>APG Workflow Orchestration</h1>
+                    <p class="section-subtitle">Enterprise-grade workflow automation and orchestration platform</p>
+                </div>
+                
+                <div class="hero-section">
+                    <div class="hero-content">
+                        <h2>Build, Deploy, and Scale Workflows with Ease</h2>
+                        <p>APG Workflow Orchestration provides a comprehensive platform for designing, executing, and managing complex business processes through an intuitive visual interface.</p>
+                        
+                        <div class="hero-actions">
+                            <button class="btn btn-primary" onclick="showSection('quick-start')">
+                                <i class="fas fa-rocket"></i> Get Started
+                            </button>
+                            <button class="btn btn-secondary" onclick="showSection('api-explorer')">
+                                <i class="fas fa-code"></i> Try API
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="hero-visual">
+                        <div class="workflow-preview">
+                            <div class="workflow-node start">
+                                <i class="fas fa-play"></i>
+                                <span>Start</span>
+                            </div>
+                            <div class="workflow-arrow">→</div>
+                            <div class="workflow-node process">
+                                <i class="fas fa-cogs"></i>
+                                <span>Process</span>
+                            </div>
+                            <div class="workflow-arrow">→</div>
+                            <div class="workflow-node decision">
+                                <i class="fas fa-question"></i>
+                                <span>Decision</span>
+                            </div>
+                            <div class="workflow-arrow">→</div>
+                            <div class="workflow-node end">
+                                <i class="fas fa-flag-checkered"></i>
+                                <span>End</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-palette"></i>
+                        </div>
+                        <h3>Visual Designer</h3>
+                        <p>Drag-and-drop interface for building complex workflows without code</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-puzzle-piece"></i>
+                        </div>
+                        <h3>50+ Components</h3>
+                        <p>Pre-built components for data processing, integrations, and business logic</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h3>AI-Powered</h3>
+                        <p>Machine learning optimization and predictive analytics for better performance</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h3>Enterprise Security</h3>
+                        <p>Role-based access control, encryption, and compliance features</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3>Real-time Monitoring</h3>
+                        <p>Live dashboards, metrics, and alerting for workflow executions</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                        </div>
+                        <h3>Auto-scaling</h3>
+                        <p>Dynamic resource allocation and horizontal scaling capabilities</p>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Quick Start Section -->
+            <section id="quick-start" class="content-section">
+                <div class="section-header">
+                    <h1>Quick Start Guide</h1>
+                    <p class="section-subtitle">Get up and running with APG Workflow Orchestration in minutes</p>
+                </div>
+                
+                <div class="quick-start-steps">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Installation</h3>
+                            <p>Install APG Workflow Orchestration using pip or Docker</p>
+                            
+                            <div class="code-tabs">
+                                <div class="tab-buttons">
+                                    <button class="tab-button active" data-tab="pip">pip</button>
+                                    <button class="tab-button" data-tab="docker">Docker</button>
+                                    <button class="tab-button" data-tab="kubernetes">Kubernetes</button>
+                                </div>
+                                
+                                <div class="tab-content">
+                                    <div class="tab-pane active" id="pip">
+                                        <pre><code class="language-bash">pip install apg-workflow-orchestration
+apg-workflow init
+apg-workflow start</code></pre>
+                                    </div>
+                                    <div class="tab-pane" id="docker">
+                                        <pre><code class="language-bash">docker run -p 5000:5000 \
+  -e DATABASE_URL=postgresql://... \
+  -e REDIS_URL=redis://... \
+  datacraft/workflow-orchestration:latest</code></pre>
+                                    </div>
+                                    <div class="tab-pane" id="kubernetes">
+                                        <pre><code class="language-bash">kubectl apply -f https://raw.githubusercontent.com/datacraft/apg-workflow/main/k8s/deployment.yaml</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Create Your First Workflow</h3>
+                            <p>Use the visual designer or API to create a simple workflow</p>
+                            
+                            <div class="interactive-demo">
+                                <div class="demo-header">
+                                    <h4>Interactive Workflow Builder</h4>
+                                    <button class="btn btn-small" onclick="openWorkflowBuilder()">
+                                        <i class="fas fa-external-link-alt"></i> Open Builder
+                                    </button>
+                                </div>
+                                
+                                <div class="demo-preview">
+                                    <div class="workflow-canvas-mini">
+                                        <div class="mini-node">Start</div>
+                                        <div class="mini-arrow">→</div>
+                                        <div class="mini-node">HTTP Request</div>
+                                        <div class="mini-arrow">→</div>
+                                        <div class="mini-node">Transform</div>
+                                        <div class="mini-arrow">→</div>
+                                        <div class="mini-node">End</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Execute and Monitor</h3>
+                            <p>Run your workflow and monitor its execution in real-time</p>
+                            
+                            <div class="execution-demo">
+                                <div class="execution-status">
+                                    <div class="status-item">
+                                        <i class="fas fa-play-circle text-success"></i>
+                                        <span>Workflow Started</span>
+                                        <small>2024-01-15 10:30:00</small>
+                                    </div>
+                                    <div class="status-item">
+                                        <i class="fas fa-spinner fa-spin text-primary"></i>
+                                        <span>Processing Data</span>
+                                        <small>In Progress</small>
+                                    </div>
+                                    <div class="status-item pending">
+                                        <i class="fas fa-clock text-muted"></i>
+                                        <span>Transform Data</span>
+                                        <small>Pending</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="next-steps">
+                    <h3>Next Steps</h3>
+                    <div class="next-steps-grid">
+                        <a href="#templates" class="next-step-card" onclick="showSection('template-gallery')">
+                            <i class="fas fa-templates"></i>
+                            <h4>Explore Templates</h4>
+                            <p>Browse pre-built workflows for common use cases</p>
+                        </a>
+                        
+                        <a href="#api-explorer" class="next-step-card" onclick="showSection('api-explorer')">
+                            <i class="fas fa-code"></i>
+                            <h4>Try the API</h4>
+                            <p>Interact with the API using our built-in explorer</p>
+                        </a>
+                        
+                        <a href="#tutorials" class="next-step-card" onclick="showSection('tutorials')">
+                            <i class="fas fa-graduation-cap"></i>
+                            <h4>Follow Tutorials</h4>
+                            <p>Step-by-step guides for common scenarios</p>
+                        </a>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- API Explorer Section -->
+            <section id="api-explorer" class="content-section">
+                <div class="section-header">
+                    <h1>Interactive API Explorer</h1>
+                    <p class="section-subtitle">Test API endpoints directly in your browser</p>
+                </div>
+                
+                <div class="api-explorer">
+                    <div class="api-sidebar">
+                        <div class="api-search">
+                            <input type="text" placeholder="Search endpoints..." id="apiSearch">
+                        </div>
+                        
+                        <div class="api-categories">
+                            <div class="api-category">
+                                <h4>Workflows</h4>
+                                <ul class="api-endpoints">
+                                    <li><a href="#" data-endpoint="get-workflows" class="api-link get">GET /workflows</a></li>
+                                    <li><a href="#" data-endpoint="post-workflows" class="api-link post">POST /workflows</a></li>
+                                    <li><a href="#" data-endpoint="get-workflow" class="api-link get">GET /workflows/{id}</a></li>
+                                    <li><a href="#" data-endpoint="put-workflow" class="api-link put">PUT /workflows/{id}</a></li>
+                                    <li><a href="#" data-endpoint="delete-workflow" class="api-link delete">DELETE /workflows/{id}</a></li>
+                                    <li><a href="#" data-endpoint="execute-workflow" class="api-link post">POST /workflows/{id}/execute</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="api-category">
+                                <h4>Executions</h4>
+                                <ul class="api-endpoints">
+                                    <li><a href="#" data-endpoint="get-executions" class="api-link get">GET /executions</a></li>
+                                    <li><a href="#" data-endpoint="get-execution" class="api-link get">GET /executions/{id}</a></li>
+                                    <li><a href="#" data-endpoint="cancel-execution" class="api-link post">POST /executions/{id}/cancel</a></li>
+                                    <li><a href="#" data-endpoint="get-execution-logs" class="api-link get">GET /executions/{id}/logs</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="api-category">
+                                <h4>Templates</h4>
+                                <ul class="api-endpoints">
+                                    <li><a href="#" data-endpoint="get-templates" class="api-link get">GET /templates</a></li>
+                                    <li><a href="#" data-endpoint="get-template" class="api-link get">GET /templates/{id}</a></li>
+                                    <li><a href="#" data-endpoint="create-from-template" class="api-link post">POST /templates/{id}/create-workflow</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="api-main">
+                        <div class="api-endpoint-details" id="apiDetails">
+                            <div class="endpoint-placeholder">
+                                <i class="fas fa-code fa-3x"></i>
+                                <h3>Select an API endpoint</h3>
+                                <p>Choose an endpoint from the sidebar to see details and test it</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Template Gallery Section -->
+            <section id="template-gallery" class="content-section">
+                <div class="section-header">
+                    <h1>Template Gallery</h1>
+                    <p class="section-subtitle">Pre-built workflows for common use cases</p>
+                </div>
+                
+                <div class="template-filters">
+                    <div class="filter-group">
+                        <label>Category:</label>
+                        <select id="categoryFilter">
+                            <option value="">All Categories</option>
+                            <option value="data_processing">Data Processing</option>
+                            <option value="business_process">Business Process</option>
+                            <option value="integration">Integration</option>
+                            <option value="analytics">Analytics</option>
+                            <option value="devops">DevOps</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label>Complexity:</label>
+                        <select id="complexityFilter">
+                            <option value="">All Levels</option>
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <input type="text" id="templateSearch" placeholder="Search templates...">
+                    </div>
+                </div>
+                
+                <div class="template-grid" id="templateGrid">
+                    <!-- Templates will be loaded dynamically -->
+                </div>
+            </section>
+            
+            <!-- Workflow Builder Section -->
+            <section id="workflow-builder" class="content-section">
+                <div class="section-header">
+                    <h1>Interactive Workflow Builder</h1>
+                    <p class="section-subtitle">Build workflows visually with drag-and-drop</p>
+                </div>
+                
+                <div class="workflow-builder-container">
+                    <div class="builder-toolbar">
+                        <div class="toolbar-group">
+                            <button class="btn btn-primary" id="saveWorkflow">
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                            <button class="btn btn-secondary" id="validateWorkflow">
+                                <i class="fas fa-check-circle"></i> Validate
+                            </button>
+                            <button class="btn btn-success" id="runWorkflow">
+                                <i class="fas fa-play"></i> Run
+                            </button>
+                        </div>
+                        
+                        <div class="toolbar-group">
+                            <button class="btn btn-outline" id="undoAction">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                            <button class="btn btn-outline" id="redoAction">
+                                <i class="fas fa-redo"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="toolbar-group">
+                            <button class="btn btn-outline" id="zoomIn">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                            <button class="btn btn-outline" id="zoomOut">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button class="btn btn-outline" id="fitToScreen">
+                                <i class="fas fa-expand-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="builder-main">
+                        <div class="component-palette">
+                            <h4>Components</h4>
+                            
+                            <div class="palette-search">
+                                <input type="text" placeholder="Search components..." id="componentSearch">
+                            </div>
+                            
+                            <div class="component-categories">
+                                <div class="component-category">
+                                    <h5>Basic</h5>
+                                    <div class="component-list">
+                                        <div class="component-item" data-type="start">
+                                            <i class="fas fa-play"></i>
+                                            <span>Start</span>
+                                        </div>
+                                        <div class="component-item" data-type="end">
+                                            <i class="fas fa-stop"></i>
+                                            <span>End</span>
+                                        </div>
+                                        <div class="component-item" data-type="task">
+                                            <i class="fas fa-cog"></i>
+                                            <span>Task</span>
+                                        </div>
+                                        <div class="component-item" data-type="decision">
+                                            <i class="fas fa-question"></i>
+                                            <span>Decision</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="component-category">
+                                    <h5>Data</h5>
+                                    <div class="component-list">
+                                        <div class="component-item" data-type="transform">
+                                            <i class="fas fa-exchange-alt"></i>
+                                            <span>Transform</span>
+                                        </div>
+                                        <div class="component-item" data-type="filter">
+                                            <i class="fas fa-filter"></i>
+                                            <span>Filter</span>
+                                        </div>
+                                        <div class="component-item" data-type="aggregate">
+                                            <i class="fas fa-calculator"></i>
+                                            <span>Aggregate</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="component-category">
+                                    <h5>Integration</h5>
+                                    <div class="component-list">
+                                        <div class="component-item" data-type="http">
+                                            <i class="fas fa-globe"></i>
+                                            <span>HTTP</span>
+                                        </div>
+                                        <div class="component-item" data-type="database">
+                                            <i class="fas fa-database"></i>
+                                            <span>Database</span>
+                                        </div>
+                                        <div class="component-item" data-type="email">
+                                            <i class="fas fa-envelope"></i>
+                                            <span>Email</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="workflow-canvas" id="workflowCanvas">
+                            <!-- Canvas will be initialized by JavaScript -->
+                        </div>
+                        
+                        <div class="properties-panel" id="propertiesPanel">
+                            <h4>Properties</h4>
+                            <div class="properties-content">
+                                <p class="text-muted">Select a component to view its properties</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="assets/js/navigation.js"></script>
+    <script src="assets/js/api-explorer.js"></script>
+    <script src="assets/js/template-gallery.js"></script>
+    <script src="assets/js/workflow-builder.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

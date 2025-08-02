@@ -1,0 +1,469 @@
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block head_css %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/workflow_orchestration.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h2 mb-0">
+                    <i class="fas fa-tachometer-alt text-primary me-2"></i>
+                    {{ _('Workflow Orchestration Dashboard') }}
+                </h1>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-primary" onclick="refreshDashboard()">
+                        <i class="fas fa-sync-alt"></i> {{ _('Refresh') }}
+                    </button>
+                    <a href="{{ url_for('WODashboardView.charts') }}" class="btn btn-outline-info">
+                        <i class="fas fa-chart-bar"></i> {{ _('Analytics') }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                {{ _('Total Workflows') }}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ metrics.total_workflows }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-project-diagram fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                {{ _('Success Rate (30 days)') }}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ metrics.success_rate }}%
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-percentage fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                {{ _('Running Executions') }}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ metrics.running_executions }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-play fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                {{ _('Avg Duration') }}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ "%.1f"|format(metrics.avg_duration) }}s
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">{{ _('Execution Timeline (30 days)') }}</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" data-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow">
+                            <a class="dropdown-item" href="#" onclick="exportChart('timeline')">
+                                <i class="fas fa-download fa-sm fa-fw mr-2 text-gray-400"></i>
+                                {{ _('Export Chart') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">{{ _('Status Distribution') }}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie pt-4 pb-2">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                    <div class="mt-4 text-center small">
+                        <span class="mr-2">
+                            <i class="fas fa-circle text-success"></i> {{ _('Completed') }}
+                        </span>
+                        <span class="mr-2">
+                            <i class="fas fa-circle text-danger"></i> {{ _('Failed') }}
+                        </span>
+                        <span class="mr-2">
+                            <i class="fas fa-circle text-info"></i> {{ _('Running') }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Row -->
+    <div class="row">
+        <!-- Top Workflows -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{{ _('Most Executed Workflows') }}</h6>
+                </div>
+                <div class="card-body">
+                    {% if top_workflows %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>{{ _('Workflow Name') }}</th>
+                                        <th class="text-right">{{ _('Executions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for workflow in top_workflows %}
+                                    <tr>
+                                        <td>{{ workflow.name }}</td>
+                                        <td class="text-right">
+                                            <span class="badge badge-primary">{{ workflow.execution_count }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p>{{ _('No workflow executions found') }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Executions -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">{{ _('Recent Executions') }}</h6>
+                    <a href="{{ url_for('WOWorkflowInstanceView.list') }}" class="btn btn-sm btn-outline-primary">
+                        {{ _('View All') }}
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if recent_instances %}
+                        <div class="list-group list-group-flush">
+                            {% for instance in recent_instances %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <div>
+                                    <h6 class="mb-1">{{ instance.workflow.name }}</h6>
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock"></i>
+                                        {{ moment(instance.created_at).fromNow() }}
+                                    </small>
+                                </div>
+                                <div>
+                                    {% if instance.status == 'COMPLETED' %}
+                                        <span class="badge badge-success">
+                                            <i class="fas fa-check"></i> {{ _('Completed') }}
+                                        </span>
+                                    {% elif instance.status == 'FAILED' %}
+                                        <span class="badge badge-danger">
+                                            <i class="fas fa-times"></i> {{ _('Failed') }}
+                                        </span>
+                                    {% elif instance.status == 'RUNNING' %}
+                                        <span class="badge badge-info">
+                                            <i class="fas fa-play"></i> {{ _('Running') }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">{{ instance.status }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="fas fa-history fa-3x mb-3"></i>
+                            <p>{{ _('No recent executions found') }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h6 class="card-title">{{ _('Quick Actions') }}</h6>
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('WOWorkflowView.add') }}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> {{ _('Create Workflow') }}
+                        </a>
+                        <a href="{{ url_for('WOWorkflowView.new_workflow_designer') }}" class="btn btn-info">
+                            <i class="fas fa-drafting-compass"></i> {{ _('Workflow Designer') }}
+                        </a>
+                        <a href="{{ url_for('WOWorkflowInstanceView.list') }}" class="btn btn-success">
+                            <i class="fas fa-list"></i> {{ _('View Executions') }}
+                        </a>
+                        <a href="{{ url_for('WOSystemView.status') }}" class="btn btn-warning">
+                            <i class="fas fa-cog"></i> {{ _('System Status') }}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    
+    <script>
+        // Initialize charts
+        let timelineChart;
+        let statusChart;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            startAutoRefresh();
+        });
+
+        function initializeCharts() {
+            // Timeline Chart
+            const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+            timelineChart = new Chart(timelineCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '{{ _("Completed") }}',
+                        data: [],
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1
+                    }, {
+                        label: '{{ _("Failed") }}',
+                        data: [],
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Status Chart
+            const statusCtx = document.getElementById('statusChart').getContext('2d');
+            statusChart = new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['{{ _("Completed") }}', '{{ _("Failed") }}', '{{ _("Running") }}'],
+                    datasets: [{
+                        data: [{{ metrics.successful_executions }}, {{ metrics.failed_executions }}, {{ metrics.running_executions }}],
+                        backgroundColor: [
+                            '#28a745',
+                            '#dc3545',
+                            '#17a2b8'
+                        ],
+                        hoverBackgroundColor: [
+                            '#218838',
+                            '#c82333',
+                            '#138496'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    legend: {
+                        display: false
+                    },
+                    cutoutPercentage: 80
+                }
+            });
+
+            // Load timeline data
+            loadTimelineData();
+        }
+
+        function loadTimelineData() {
+            fetch('{{ url_for("WODashboardView.get_execution_timeline") }}')
+                .then(response => response.json())
+                .then(data => {
+                    const labels = Object.keys(data).sort();
+                    const completedData = labels.map(date => data[date].completed || 0);
+                    const failedData = labels.map(date => data[date].failed || 0);
+
+                    timelineChart.data.labels = labels.map(date => moment(date).format('MMM DD'));
+                    timelineChart.data.datasets[0].data = completedData;
+                    timelineChart.data.datasets[1].data = failedData;
+                    timelineChart.update();
+                })
+                .catch(error => {
+                    console.error('Error loading timeline data:', error);
+                });
+        }
+
+        function refreshDashboard() {
+            // Show loading indicator
+            const refreshBtn = document.querySelector('[onclick="refreshDashboard()"]');
+            const originalHtml = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> {{ _("Refreshing...") }}';
+            refreshBtn.disabled = true;
+
+            // Reload the page
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+
+        function exportChart(chartType) {
+            let chart;
+            let filename;
+            
+            if (chartType === 'timeline') {
+                chart = timelineChart;
+                filename = 'workflow_timeline.png';
+            } else if (chartType === 'status') {
+                chart = statusChart;
+                filename = 'workflow_status.png';
+            }
+
+            if (chart) {
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = chart.toBase64Image();
+                link.click();
+            }
+        }
+
+        function startAutoRefresh() {
+            // Auto-refresh dashboard every 5 minutes
+            setInterval(() => {
+                loadTimelineData();
+                
+                // Update metrics via API
+                fetch('{{ url_for("WODashboardView.get_dashboard_metrics") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update status chart with latest data
+                        if (data.month) {
+                            statusChart.data.datasets[0].data = [
+                                data.month.successful,
+                                data.month.failed,
+                                data.month.running
+                            ];
+                            statusChart.update();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating metrics:', error);
+                    });
+            }, 300000); // 5 minutes
+        }
+
+        // Utility function for moment.js (if not available globally)
+        function moment(date) {
+            return {
+                fromNow: function() {
+                    const now = new Date();
+                    const past = new Date(date);
+                    const diffMs = now - past;
+                    const diffMins = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMs / 3600000);
+                    const diffDays = Math.floor(diffMs / 86400000);
+                    
+                    if (diffMins < 60) return diffMins + ' minutes ago';
+                    if (diffHours < 24) return diffHours + ' hours ago';
+                    return diffDays + ' days ago';
+                },
+                format: function(fmt) {
+                    const d = new Date(date);
+                    if (fmt === 'MMM DD') {
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        return months[d.getMonth()] + ' ' + String(d.getDate()).padStart(2, '0');
+                    }
+                    return d.toLocaleDateString();
+                }
+            };
+        }
+    </script>
+{% endblock %}

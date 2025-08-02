@@ -1,0 +1,496 @@
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block head_css %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/workflow_orchestration.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h2 mb-0">
+                    <i class="fas fa-plug text-primary me-2"></i>
+                    {{ _('External System Integrations') }}
+                </h1>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('WOIntegrationsView.add') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> {{ _('Add Integration') }}
+                    </a>
+                    <button type="button" class="btn btn-outline-secondary" onclick="refreshIntegrations()">
+                        <i class="fas fa-sync-alt"></i> {{ _('Refresh') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                {{ _('Total Integrations') }}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ integrations|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-plug fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                {{ _('Active Integrations') }}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ integrations|selectattr('is_active')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                {{ _('Integration Types') }}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ integrations|map(attribute='type')|unique|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-layer-group fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                {{ _('Inactive Integrations') }}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ integrations|rejectattr('is_active')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-pause-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Integrations Table -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">{{ _('Integration List') }}</h6>
+        </div>
+        <div class="card-body">
+            {% if integrations %}
+            <div class="table-responsive">
+                <table class="table table-hover" id="integrationsTable">
+                    <thead>
+                        <tr>
+                            <th>{{ _('Name') }}</th>
+                            <th>{{ _('Type') }}</th>
+                            <th>{{ _('Endpoint') }}</th>
+                            <th>{{ _('Auth Type') }}</th>
+                            <th>{{ _('Tenant') }}</th>
+                            <th>{{ _('Status') }}</th>
+                            <th>{{ _('Actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for integration in integrations %}
+                        <tr data-integration-id="{{ integration.id }}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="integration-icon me-2">
+                                        {% if integration.type.value == 'rest_api' %}
+                                            <i class="fas fa-globe text-primary"></i>
+                                        {% elif integration.type.value == 'database' %}
+                                            <i class="fas fa-database text-info"></i>
+                                        {% elif integration.type.value == 'message_queue' %}
+                                            <i class="fas fa-stream text-warning"></i>
+                                        {% elif integration.type.value == 'webhook' %}
+                                            <i class="fas fa-webhook text-success"></i>
+                                        {% elif integration.type.value == 'apg_capability' %}
+                                            <i class="fas fa-cogs text-secondary"></i>
+                                        {% else %}
+                                            <i class="fas fa-plug text-muted"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <div class="font-weight-bold">{{ integration.name }}</div>
+                                        <small class="text-muted">{{ integration.id }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge badge-light">
+                                    {{ integration.type.value.replace('_', ' ').title() }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="text-truncate" style="max-width: 300px;" title="{{ integration.endpoint }}">
+                                    {{ integration.endpoint }}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge badge-secondary">
+                                    {{ integration.auth_type.value.replace('_', ' ').title() }}
+                                </span>
+                            </td>
+                            <td>{{ integration.tenant_id }}</td>
+                            <td>
+                                {% if integration.is_active %}
+                                    <span class="badge badge-success">
+                                        <i class="fas fa-check-circle"></i> {{ _('Active') }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-secondary">
+                                        <i class="fas fa-pause-circle"></i> {{ _('Inactive') }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-outline-info" 
+                                            onclick="testIntegration('{{ integration.id }}')" 
+                                            title="{{ _('Test Connection') }}">
+                                        <i class="fas fa-vial"></i>
+                                    </button>
+                                    <a href="{{ url_for('WOIntegrationsView.edit', integration_id=integration.id) }}" 
+                                       class="btn btn-outline-primary" title="{{ _('Edit') }}">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-outline-success" 
+                                            onclick="viewMetrics('{{ integration.id }}')" 
+                                            title="{{ _('View Metrics') }}">
+                                        <i class="fas fa-chart-line"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" 
+                                            onclick="deleteIntegration('{{ integration.id }}', '{{ integration.name }}')" 
+                                            title="{{ _('Delete') }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-plug fa-3x mb-3"></i>
+                <p>{{ _('No integrations configured yet.') }}</p>
+                <a href="{{ url_for('WOIntegrationsView.add') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> {{ _('Add Your First Integration') }}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Test Results Modal -->
+<div class="modal fade" id="testResultsModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ _('Integration Test Results') }}</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="testResultsContent">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-2">{{ _('Testing connection...') }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ _('Close') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Metrics Modal -->
+<div class="modal fade" id="metricsModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ _('Integration Metrics') }}</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="metricsContent">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-2">{{ _('Loading metrics...') }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ _('Close') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <script>
+        function refreshIntegrations() {
+            window.location.reload();
+        }
+
+        function testIntegration(integrationId) {
+            $('#testResultsModal').modal('show');
+            
+            fetch(`{{ url_for('WOIntegrationsView.test', integration_id='INTEGRATION_ID') }}`.replace('INTEGRATION_ID', integrationId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                let content = '';
+                if (data.success) {
+                    content = `
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i> {{ _('Connection successful!') }}
+                        </div>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>{{ _('Status Code') }}</span>
+                                <span class="badge badge-success">${data.status_code}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>{{ _('Response Time') }}</span>
+                                <span class="badge badge-info">${data.duration_ms}ms</span>
+                            </li>
+                        </ul>
+                    `;
+                } else {
+                    content = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle"></i> {{ _('Connection failed!') }}
+                        </div>
+                        <div class="text-muted">
+                            <strong>{{ _('Error:') }}</strong> ${data.error || data.error_message}
+                        </div>
+                        ${data.status_code ? `
+                        <ul class="list-group list-group-flush mt-3">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>{{ _('Status Code') }}</span>
+                                <span class="badge badge-danger">${data.status_code}</span>
+                            </li>
+                            ${data.duration_ms ? `
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>{{ _('Response Time') }}</span>
+                                <span class="badge badge-info">${data.duration_ms}ms</span>
+                            </li>
+                            ` : ''}
+                        </ul>
+                        ` : ''}
+                    `;
+                }
+                document.getElementById('testResultsContent').innerHTML = content;
+            })
+            .catch(error => {
+                document.getElementById('testResultsContent').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> {{ _('Test failed!') }}
+                    </div>
+                    <div class="text-muted">
+                        <strong>{{ _('Error:') }}</strong> ${error.message}
+                    </div>
+                `;
+            });
+        }
+
+        function viewMetrics(integrationId) {
+            $('#metricsModal').modal('show');
+            
+            fetch(`{{ url_for('WOIntegrationsView.get_integration_metrics', integration_id='INTEGRATION_ID') }}`.replace('INTEGRATION_ID', integrationId))
+            .then(response => response.json())
+            .then(data => {
+                if (data.metrics && data.metrics.length > 0) {
+                    let content = `
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <canvas id="metricsChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>{{ _('Date') }}</th>
+                                        <th>{{ _('Requests') }}</th>
+                                        <th>{{ _('Success Rate') }}</th>
+                                        <th>{{ _('Avg Response Time') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    data.metrics.forEach(metric => {
+                        content += `
+                            <tr>
+                                <td>${metric.date}</td>
+                                <td>${metric.total_requests}</td>
+                                <td>
+                                    <span class="badge ${metric.success_rate >= 95 ? 'badge-success' : metric.success_rate >= 80 ? 'badge-warning' : 'badge-danger'}">
+                                        ${metric.success_rate.toFixed(1)}%
+                                    </span>
+                                </td>
+                                <td>${metric.avg_response_time}ms</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    content += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                    
+                    document.getElementById('metricsContent').innerHTML = content;
+                    
+                    // Create chart
+                    const ctx = document.getElementById('metricsChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.metrics.map(m => m.date),
+                            datasets: [{
+                                label: '{{ _("Success Rate %") }}',
+                                data: data.metrics.map(m => m.success_rate),
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                tension: 0.1
+                            }, {
+                                label: '{{ _("Avg Response Time (ms)") }}',
+                                data: data.metrics.map(m => m.avg_response_time),
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                tension: 0.1,
+                                yAxisID: 'y1'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    max: 100
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    grid: {
+                                        drawOnChartArea: false,
+                                    },
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    document.getElementById('metricsContent').innerHTML = `
+                        <div class="text-center text-muted">
+                            <i class="fas fa-chart-line fa-3x mb-3"></i>
+                            <p>{{ _('No metrics data available for the last 7 days.') }}</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                document.getElementById('metricsContent').innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> {{ _('Failed to load metrics.') }}
+                    </div>
+                `;
+            });
+        }
+
+        function deleteIntegration(integrationId, integrationName) {
+            if (confirm(`{{ _('Are you sure you want to delete the integration') }} "${integrationName}"?`)) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `{{ url_for('WOIntegrationsView.delete', integration_id='INTEGRATION_ID') }}`.replace('INTEGRATION_ID', integrationId);
+                
+                // Add CSRF token if available
+                const csrfToken = document.querySelector('meta[name=csrf-token]');
+                if (csrfToken) {
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrf_token';
+                    csrfInput.value = csrfToken.getAttribute('content');
+                    form.appendChild(csrfInput);
+                }
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // Initialize DataTable if available
+        $(document).ready(function() {
+            if ($.fn.DataTable) {
+                $('#integrationsTable').DataTable({
+                    "pageLength": 25,
+                    "order": [[ 0, "asc" ]],
+                    "columnDefs": [
+                        { "orderable": false, "targets": -1 }
+                    ]
+                });
+            }
+        });
+    </script>
+{% endblock %}

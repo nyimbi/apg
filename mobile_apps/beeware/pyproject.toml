@@ -1,0 +1,227 @@
+[build-system]
+requires = [
+    "briefcase==0.3.17",
+    "setuptools>=61.0",
+    "wheel"
+]
+
+[project]
+name = "apg-workflow-mobile"
+formal_name = "APG Workflow Manager"
+version = "1.0.0"
+description = "Mobile workflow management application for APG (Application Programming Generator)"
+authors = [
+    {name = "Nyimbi Odero", email = "nyimbi@gmail.com"}
+]
+license = {text = "Copyright © 2025 Datacraft. All rights reserved."}
+readme = "README.md"
+keywords = ["workflow", "mobile", "apg", "python"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "toga>=0.4.0",
+    "toga-chart>=0.2.0",
+    "httpx>=0.25.0",
+    "pydantic>=2.5.0",
+    "python-dateutil>=2.8.0",
+    "cryptography>=41.0.0",
+    "keyring>=24.0.0",
+    "platformdirs>=3.0.0",
+    "websockets>=12.0",
+    "pillow>=10.0.0",
+    "qrcode>=7.0.0",
+    "pyjwt>=2.8.0",
+    "bidict>=0.22.0",
+    "asyncio-mqtt>=0.16.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+    "coverage>=7.0.0",
+]
+
+[project.urls]
+Homepage = "https://www.datacraft.co.ke"
+Repository = "https://github.com/datacraft/apg"
+Documentation = "https://docs.datacraft.co.ke/apg"
+
+[tool.briefcase]
+project_name = "APG Workflow Manager"
+bundle = "co.ke.datacraft"
+version = "1.0.0"
+url = "https://www.datacraft.co.ke/apg"
+license = "Proprietary"
+author = "Nyimbi Odero"
+author_email = "nyimbi@gmail.com"
+description = "Mobile workflow management application for APG"
+
+[tool.briefcase.app.apg_workflow_mobile]
+formal_name = "APG Workflow Manager"
+description = "Mobile workflow management application for APG"
+long_description = """
+APG Workflow Manager is a powerful mobile application that provides comprehensive 
+workflow management capabilities. Built with BeeWare and Python, it offers:
+
+• Complete workflow design and execution
+• Real-time collaboration and monitoring  
+• Task management and assignment
+• Offline-first architecture with sync
+• Biometric authentication and security
+• Cross-platform native performance
+• Integration with APG backend services
+"""
+sources = [
+    "src/apg_workflow_mobile",
+]
+test_sources = [
+    "tests",
+]
+
+icon = "resources/icon"
+splash = "resources/splash"
+
+permission.INTERNET = "Access APG backend services"
+permission.WRITE_EXTERNAL_STORAGE = "Store offline workflow data"
+permission.READ_EXTERNAL_STORAGE = "Access workflow files"
+permission.CAMERA = "Scan QR codes and capture images"
+permission.USE_BIOMETRIC = "Biometric authentication"
+permission.USE_FINGERPRINT = "Fingerprint authentication"
+permission.RECORD_AUDIO = "Voice commands and notes"
+permission.ACCESS_NETWORK_STATE = "Monitor network connectivity"
+
+[tool.briefcase.app.apg_workflow_mobile.macOS]
+universal_build = true
+sign_identity = null
+
+[tool.briefcase.app.apg_workflow_mobile.linux]
+flatpak_runtime = "org.freedesktop.Platform"
+flatpak_runtime_version = "22.08"
+flatpak_sdk = "org.freedesktop.Sdk"
+
+[tool.briefcase.app.apg_workflow_mobile.linux.system.debian]
+system_requires = [
+    "libgirepository1.0-dev",
+    "libcairo2-dev",
+    "libpango1.0-dev",
+    "libwebkit2gtk-4.0-dev",
+]
+
+[tool.briefcase.app.apg_workflow_mobile.linux.system.rhel]
+system_requires = [
+    "gobject-introspection-devel",
+    "cairo-devel",
+    "pango-devel",
+    "webkit2gtk3-devel",
+]
+
+[tool.briefcase.app.apg_workflow_mobile.linux.system.arch]
+system_requires = [
+    "gobject-introspection",
+    "cairo",
+    "pango",
+    "webkit2gtk",
+]
+
+[tool.briefcase.app.apg_workflow_mobile.windows]
+requires = []
+
+[tool.briefcase.app.apg_workflow_mobile.iOS]
+supported_device_families = ["1", "2"]  # iPhone and iPad
+ios_deployment_target = "12.0"
+
+[tool.briefcase.app.apg_workflow_mobile.android]
+build_gradle_dependencies = [
+    "androidx.biometric:biometric:1.1.0",
+    "androidx.work:work-runtime:2.8.1",
+    "com.google.android.material:material:1.9.0",
+]
+
+android_gradle_plugin_version = "8.1.0"
+gradle_version = "8.2"
+base_theme = "Theme.MaterialComponents.DayNight.DarkActionBar"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = [
+    "tests",
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+]

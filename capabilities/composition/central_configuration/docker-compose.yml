@@ -1,0 +1,379 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: cc_postgres
+    environment:
+      POSTGRES_DB: central_config
+      POSTGRES_USER: cc_admin
+      POSTGRES_PASSWORD: cc_secure_pass_2025
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cc_admin -d central_config"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Redis Cache & Pub/Sub
+  redis:
+    image: redis:7-alpine
+    container_name: cc_redis
+    command: redis-server --appendonly yes --requirepass cc_redis_pass_2025
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "cc_redis_pass_2025", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Ollama AI Models Server
+  ollama:
+    image: ollama/ollama:latest
+    container_name: cc_ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - cc_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Central Configuration API Service
+  cc_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: cc_api
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://cc_admin:cc_secure_pass_2025@postgres:5432/central_config
+      - REDIS_URL=redis://:cc_redis_pass_2025@redis:6379/0
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+      - WORKERS=4
+      - MAX_CONNECTIONS=100
+      - SECRET_KEY=cc_super_secret_key_2025_change_in_production
+      - JWT_SECRET_KEY=cc_jwt_secret_2025_change_in_production
+      - ENCRYPTION_KEY=cc_encryption_key_2025_32_chars_long
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      - ENABLE_DOCS=true
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+    volumes:
+      - ./ml_models:/app/ml_models
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+      - /tmp/prometheus_multiproc:/tmp/prometheus_multiproc
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - cc_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # Flask-AppBuilder Web Interface
+  cc_web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      target: production
+    container_name: cc_web
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql+asyncpg://cc_admin:cc_secure_pass_2025@postgres:5432/central_config
+      - REDIS_URL=redis://:cc_redis_pass_2025@redis:6379/1
+      - API_BASE_URL=http://cc_api:8000
+      - SECRET_KEY=cc_web_secret_key_2025_change_in_production
+      - SECURITY_PASSWORD_SALT=cc_password_salt_2025
+      - WTF_CSRF_SECRET_KEY=cc_csrf_secret_2025
+      - MAIL_SERVER=${MAIL_SERVER:-localhost}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USE_TLS=${MAIL_USE_TLS:-true}
+      - MAIL_USERNAME=${MAIL_USERNAME:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    ports:
+      - "8080:8080"
+    depends_on:
+      - cc_api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy & Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: cc_nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./static:/var/www/static:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - cc_api
+      - cc_web
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cc_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Grafana Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cc_grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=cc_grafana_admin_2025
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Elasticsearch for Logging
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: cc_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Kibana for Log Visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: cc_kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Logstash for Log Processing
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: cc_logstash
+    volumes:
+      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./monitoring/logstash/config:/usr/share/logstash/config:ro
+      - ./logs:/logs:ro
+    depends_on:
+      - elasticsearch
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Jaeger Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: cc_jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # GitOps Repository (Gitea)
+  gitea:
+    image: gitea/gitea:latest
+    container_name: cc_gitea
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=postgres:5432
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=cc_admin
+      - GITEA__database__PASSWD=cc_secure_pass_2025
+    volumes:
+      - gitea_data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3001:3000"
+      - "2222:22"
+    depends_on:
+      - postgres
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Backup Service
+  backup:
+    image: postgres:15-alpine
+    container_name: cc_backup
+    environment:
+      - PGPASSWORD=cc_secure_pass_2025
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    command: ["/bin/sh", "-c", "while true; do sleep 3600; /backup.sh; done"]
+    depends_on:
+      - postgres
+    networks:
+      - cc_network
+    restart: unless-stopped
+
+  # Load Testing with k6
+  k6:
+    image: grafana/k6:latest
+    container_name: cc_k6
+    volumes:
+      - ./tests/load:/scripts:ro
+      - ./reports:/reports
+    command: ["sleep", "infinity"]
+    networks:
+      - cc_network
+    profiles:
+      - testing
+
+  # Test Database (for CI/CD)
+  test_postgres:
+    image: postgres:15-alpine
+    container_name: cc_test_postgres
+    environment:
+      POSTGRES_DB: central_config_test
+      POSTGRES_USER: cc_test
+      POSTGRES_PASSWORD: cc_test_pass
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - cc_network
+    profiles:
+      - testing
+
+  # Test Redis (for CI/CD)
+  test_redis:
+    image: redis:7-alpine
+    container_name: cc_test_redis
+    command: redis-server --save ""
+    networks:
+      - cc_network
+    profiles:
+      - testing
+
+networks:
+  cc_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  ollama_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  gitea_data:
+    driver: local

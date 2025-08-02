@@ -1,0 +1,41 @@
+# Core BeeWare dependencies
+briefcase==0.3.17
+toga>=0.4.0
+toga-chart>=0.2.0
+
+# HTTP and networking
+httpx>=0.25.0
+websockets>=12.0
+
+# Data and serialization
+pydantic>=2.5.0
+python-dateutil>=2.8.0
+
+# Cryptography and security
+cryptography>=41.0.0
+keyring>=24.0.0
+pyjwt>=2.8.0
+
+# File and path handling
+platformdirs>=3.0.0
+pillow>=10.0.0
+qrcode>=7.0.0
+
+# Utilities
+bidict>=0.22.0
+python-multipart>=0.0.6
+
+# UUID extensions for better ID generation
+uuid-extensions>=0.1.0
+
+# Async utilities
+asyncio-mqtt>=0.16.0
+
+# Development dependencies (optional)
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.10.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.5.0
+coverage>=7.0.0

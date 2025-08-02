@@ -1,0 +1,798 @@
+/*
+APG Workflow Designer Styles
+
+Professional drag-and-drop workflow designer interface styles.
+
+© 2025 Datacraft. All rights reserved.
+Author: Nyimbi Odero <nyimbi@gmail.com>
+*/
+
+/* === Base Layout === */
+.designer-container {
+    background: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* === Toolbar === */
+.designer-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff;
+    border-bottom: 1px solid #dee2e6;
+    padding: 8px 16px;
+    height: 50px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.toolbar-left, .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toolbar-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background: #dee2e6;
+    margin: 0 8px;
+}
+
+.workflow-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 500;
+}
+
+#collaborator-count {
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    min-width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    margin-left: 4px;
+}
+
+/* === Main Layout === */
+.designer-main {
+    display: flex;
+    height: calc(100vh - 180px);
+}
+
+/* === Component Palette === */
+.component-palette {
+    width: 280px;
+    background: #fff;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+}
+
+.palette-header {
+    padding: 16px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.palette-header h6 {
+    margin: 0 0 12px 0;
+    font-weight: 600;
+    color: #495057;
+}
+
+.palette-search input {
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+}
+
+.palette-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.component-categories {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.category-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    transition: background-color 0.15s;
+}
+
+.category-item:hover {
+    background: #f8f9fa;
+}
+
+.category-item.active {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.category-item i {
+    width: 20px;
+    margin-right: 8px;
+}
+
+.component-list {
+    padding: 8px;
+}
+
+.component-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: grab;
+    transition: all 0.15s;
+    user-select: none;
+}
+
+.component-item:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0,123,255,0.15);
+}
+
+.component-item:active {
+    cursor: grabbing;
+}
+
+.component-item.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.component-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: white;
+}
+
+.component-icon.trigger { background: #e74c3c; }
+.component-icon.data { background: #3498db; }
+.component-icon.logic { background: #f39c12; }
+.component-icon.integration { background: #9b59b6; }
+.component-icon.ai { background: #1abc9c; }
+.component-icon.utility { background: #95a5a6; }
+
+.component-details {
+    flex: 1;
+}
+
+.component-name {
+    font-weight: 500;
+    font-size: 13px;
+    color: #495057;
+    margin: 0;
+}
+
+.component-description {
+    font-size: 11px;
+    color: #6c757d;
+    margin: 2px 0 0 0;
+    line-height: 1.3;
+}
+
+/* === Canvas === */
+.canvas-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.canvas-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff;
+    border-bottom: 1px solid #dee2e6;
+    padding: 8px 16px;
+    height: 40px;
+}
+
+.canvas-breadcrumb {
+    font-size: 14px;
+    color: #495057;
+    font-weight: 500;
+}
+
+.canvas-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.canvas-workspace {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #fafafa;
+}
+
+.workflow-canvas {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+.workflow-canvas.panning {
+    cursor: grabbing;
+}
+
+.canvas-grid {
+    opacity: 0.5;
+}
+
+.canvas-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.selection-rectangle {
+    position: absolute;
+    border: 2px dashed #007bff;
+    background: rgba(0,123,255,0.1);
+    pointer-events: none;
+}
+
+.connection-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* === Workflow Nodes === */
+.workflow-node {
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.workflow-node.selected .node-rect {
+    stroke: #007bff;
+    stroke-width: 2;
+}
+
+.workflow-node.dragging {
+    opacity: 0.8;
+}
+
+.node-rect {
+    fill: white;
+    stroke: #dee2e6;
+    stroke-width: 1;
+    rx: 8;
+}
+
+.node-rect.trigger { fill: #e74c3c; }
+.node-rect.data { fill: #3498db; }
+.node-rect.logic { fill: #f39c12; }
+.node-rect.integration { fill: #9b59b6; }
+.node-rect.ai { fill: #1abc9c; }
+.node-rect.utility { fill: #95a5a6; }
+
+.node-text {
+    fill: white;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+
+.node-icon {
+    fill: white;
+    font-family: 'Font Awesome 6 Free';
+    font-size: 14px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+
+.node-port {
+    fill: #6c757d;
+    stroke: white;
+    stroke-width: 2;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.node-port:hover {
+    fill: #007bff;
+    r: 6;
+}
+
+.node-port.source { fill: #28a745; }
+.node-port.target { fill: #dc3545; }
+
+/* === Connections === */
+.workflow-connection {
+    fill: none;
+    stroke: #6c757d;
+    stroke-width: 2;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.workflow-connection:hover {
+    stroke: #007bff;
+    stroke-width: 3;
+}
+
+.workflow-connection.selected {
+    stroke: #007bff;
+    stroke-width: 3;
+}
+
+.connection-arrow {
+    fill: #6c757d;
+}
+
+.connection-arrow.selected {
+    fill: #007bff;
+}
+
+/* === Properties Panel === */
+.properties-panel {
+    width: 320px;
+    background: #fff;
+    border-left: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.panel-header h6 {
+    margin: 0;
+    font-weight: 600;
+    color: #495057;
+}
+
+.panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.no-selection {
+    text-align: center;
+    color: #6c757d;
+    margin-top: 40px;
+}
+
+.no-selection i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.property-group {
+    margin-bottom: 24px;
+}
+
+.property-group-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: #495057;
+    margin-bottom: 12px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.property-item {
+    margin-bottom: 16px;
+}
+
+.property-label {
+    display: block;
+    font-weight: 500;
+    font-size: 13px;
+    color: #495057;
+    margin-bottom: 4px;
+}
+
+.property-description {
+    font-size: 11px;
+    color: #6c757d;
+    margin-bottom: 6px;
+    line-height: 1.3;
+}
+
+.property-input {
+    width: 100%;
+    font-size: 13px;
+}
+
+.property-error {
+    color: #dc3545;
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+/* === Bottom Panel === */
+.bottom-panel {
+    height: 200px;
+    background: #fff;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-tabs {
+    display: flex;
+    border-bottom: 1px solid #dee2e6;
+    background: #f8f9fa;
+}
+
+.tab-button {
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.tab-button:hover {
+    color: #495057;
+    background: #e9ecef;
+}
+
+.tab-button.active {
+    color: #007bff;
+    background: #fff;
+    border-bottom: 2px solid #007bff;
+}
+
+.tab-button .badge {
+    font-size: 10px;
+}
+
+.tab-content {
+    display: none;
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* === Validation Results === */
+.validation-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.validation-item.error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.validation-item.warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.validation-item.info {
+    background: #cce7ff;
+    border: 1px solid #b3d7ff;
+    color: #004085;
+}
+
+.validation-icon {
+    margin-right: 8px;
+    margin-top: 1px;
+}
+
+.validation-content {
+    flex: 1;
+}
+
+.validation-message {
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.validation-description {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+/* === Minimap === */
+.minimap {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    width: 200px;
+    height: 120px;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.minimap-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.minimap-viewport {
+    fill: rgba(0,123,255,0.2);
+    stroke: #007bff;
+    stroke-width: 2;
+    cursor: pointer;
+}
+
+/* === Context Menu === */
+.context-menu {
+    position: absolute;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    min-width: 150px;
+    padding: 4px 0;
+}
+
+.context-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #495057;
+    transition: background-color 0.15s;
+}
+
+.context-item:hover {
+    background: #f8f9fa;
+}
+
+.context-item i {
+    width: 16px;
+    margin-right: 8px;
+}
+
+.context-separator {
+    height: 1px;
+    background: #dee2e6;
+    margin: 4px 0;
+}
+
+/* === Collaboration === */
+.collaboration-panel {
+    display: flex;
+    height: 100%;
+    gap: 16px;
+}
+
+.collaborators-list {
+    flex: 1;
+}
+
+.collaborator-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    margin: 4px 0;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.collaborator-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 500;
+    font-size: 12px;
+}
+
+.collaborator-info {
+    flex: 1;
+}
+
+.collaborator-name {
+    font-weight: 500;
+    font-size: 13px;
+    margin: 0;
+}
+
+.collaborator-status {
+    font-size: 11px;
+    color: #6c757d;
+    margin: 2px 0 0 0;
+}
+
+.collaboration-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.chat-input {
+    display: flex;
+    gap: 8px;
+}
+
+.chat-input input {
+    flex: 1;
+}
+
+/* === Responsive Design === */
+@media (max-width: 1200px) {
+    .component-palette {
+        width: 240px;
+    }
+    
+    .properties-panel {
+        width: 280px;
+    }
+}
+
+@media (max-width: 992px) {
+    .designer-main {
+        flex-direction: column;
+    }
+    
+    .component-palette {
+        width: 100%;
+        height: 200px;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .properties-panel {
+        width: 100%;
+        height: 200px;
+        border-left: none;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .canvas-container {
+        height: calc(100vh - 400px);
+    }
+}
+
+/* === Dark Theme === */
+[data-theme="dark"] {
+    .designer-container {
+        background: #1a1a1a;
+        color: #e9ecef;
+    }
+    
+    .designer-toolbar,
+    .component-palette,
+    .properties-panel,
+    .bottom-panel {
+        background: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .canvas-workspace {
+        background: #1a202c;
+    }
+    
+    .canvas-grid {
+        opacity: 0.3;
+    }
+    
+    .workflow-node .node-rect {
+        fill: #2d3748;
+        stroke: #4a5568;
+    }
+    
+    .node-text {
+        fill: #e9ecef;
+    }
+    
+    .context-menu {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e9ecef;
+    }
+}
+
+/* === Animations === */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.loading {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* === Utilities === */
+.hidden { display: none !important; }
+.visible { display: block !important; }
+.pointer { cursor: pointer; }
+.no-select { user-select: none; }
+.full-width { width: 100%; }
+.text-center { text-align: center; }
+.text-muted { color: #6c757d; }
+.fw-bold { font-weight: 600; }
+.fs-small { font-size: 12px; }
+.mt-2 { margin-top: 8px; }
+.mb-2 { margin-bottom: 8px; }
+.p-2 { padding: 8px; }

@@ -1,0 +1,302 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workflow-service-account
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: service-account
+    app.kubernetes.io/part-of: apg-platform
+automountServiceAccountToken: true
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workflow-role
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: apg-platform
+rules:
+# Pod management
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "pods/status"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# ConfigMap and Secret access
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+# Service discovery
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+# Event creation
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "update", "patch"]
+# Job management for workflow execution
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Custom resources for workflow management
+- apiGroups: ["workflow.apg-platform.datacraft.co.ke"]
+  resources: ["workflows", "workflowruns", "workflowtemplates"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Metrics and monitoring
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-role-binding
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: apg-platform
+subjects:
+- kind: ServiceAccount
+  name: workflow-service-account
+  namespace: apg-workflow
+roleRef:
+  kind: Role
+  name: workflow-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Cluster-wide permissions for cross-namespace operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: workflow-cluster-role
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: apg-platform
+rules:
+# Node information for resource allocation
+- apiGroups: [""]
+  resources: ["nodes", "nodes/status"]
+  verbs: ["get", "list", "watch"]
+# Namespace discovery for multi-tenant operations
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+# Custom Resource Definitions
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+# Admission controllers and webhooks
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["validatingadmissionwebhooks", "mutatingadmissionwebhooks"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Service mesh integration (Istio)
+- apiGroups: ["networking.istio.io"]
+  resources: ["virtualservices", "destinationrules", "gateways"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Monitoring and observability
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors", "prometheusrules"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workflow-cluster-role-binding
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: apg-platform
+subjects:
+- kind: ServiceAccount
+  name: workflow-service-account
+  namespace: apg-workflow
+roleRef:
+  kind: ClusterRole
+  name: workflow-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Service account for monitoring and metrics
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workflow-monitoring-sa
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: apg-platform
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: workflow-monitoring-role
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: apg-platform
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "nodes/proxy", "services", "endpoints", "pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workflow-monitoring-binding
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: apg-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: workflow-monitoring-role
+subjects:
+- kind: ServiceAccount
+  name: workflow-monitoring-sa
+  namespace: apg-workflow
+
+---
+# Service account for backup operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workflow-backup-sa
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: apg-platform
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workflow-backup-role
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: apg-platform
+rules:
+- apiGroups: [""]
+  resources: ["persistentvolumes", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-backup-binding
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: apg-platform
+subjects:
+- kind: ServiceAccount
+  name: workflow-backup-sa
+  namespace: apg-workflow
+roleRef:
+  kind: Role
+  name: workflow-backup-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Pod Security Policy (if PSP is enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: workflow-psp
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - NET_BIND_SERVICE
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: true
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workflow-psp-role
+  namespace: apg-workflow
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - workflow-psp
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-psp-binding
+  namespace: apg-workflow
+roleRef:
+  kind: Role
+  name: workflow-psp-role
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: workflow-service-account
+  namespace: apg-workflow
+- kind: ServiceAccount
+  name: workflow-monitoring-sa
+  namespace: apg-workflow
+- kind: ServiceAccount
+  name: workflow-backup-sa
+  namespace: apg-workflow

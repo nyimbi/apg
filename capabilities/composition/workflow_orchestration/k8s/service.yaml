@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-service
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: application
+    app.kubernetes.io/part-of: apg-platform
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  - name: websocket
+    port: 8081
+    targetPort: websocket
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: application
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  type: ClusterIP
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: postgres
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  type: ClusterIP
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: redis
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/component: proxy
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9113
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/component: proxy
+
+---
+# Headless service for StatefulSet if needed
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-headless
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: headless
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  - name: websocket
+    port: 8081
+    targetPort: websocket
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: application
+
+---
+# Internal service for health checks
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-internal
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: internal
+    app.kubernetes.io/part-of: apg-platform
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  ports:
+  - name: health
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: application

@@ -1,0 +1,200 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: workflow-ingress
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: apg-platform
+  annotations:
+    # Ingress class
+    kubernetes.io/ingress.class: nginx
+    
+    # SSL/TLS
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit-connections: "20"
+    nginx.ingress.kubernetes.io/rate-limit-rps: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options DENY;
+      add_header X-Content-Type-Options nosniff;
+      add_header X-XSS-Protection "1; mode=block";
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+      add_header Referrer-Policy "strict-origin-when-cross-origin";
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: ws:; frame-ancestors 'none';";
+    
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://apg-platform.datacraft.co.ke"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    
+    # Session affinity for WebSocket
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "workflow-session"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+    
+    # Proxy settings
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-set-headers: |
+      X-Real-IP $remote_addr;
+      X-Forwarded-For $proxy_add_x_forwarded_for;
+      X-Forwarded-Proto $scheme;
+      Host $host;
+    
+    # Custom configuration for WebSocket
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /ws/ {
+        proxy_pass http://upstream_balancer;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 3600s;
+      }
+spec:
+  tls:
+  - hosts:
+    - workflow.apg-platform.datacraft.co.ke
+    - api.workflow.apg-platform.datacraft.co.ke
+    secretName: workflow-tls-secret
+  rules:
+  - host: workflow.apg-platform.datacraft.co.ke
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-service
+            port:
+              number: 80
+      - path: /api/
+        pathType: Prefix
+        backend:
+          service:
+            name: workflow-service
+            port:
+              number: 8080
+      - path: /ws/
+        pathType: Prefix
+        backend:
+          service:
+            name: workflow-service
+            port:
+              number: 8081
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: workflow-service
+            port:
+              number: 9090
+  - host: api.workflow.apg-platform.datacraft.co.ke
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: workflow-service
+            port:
+              number: 8080
+
+---
+# Internal ingress for admin/monitoring interfaces
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: workflow-admin-ingress
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: admin-ingress
+    app.kubernetes.io/part-of: apg-platform
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: admin-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - Admin Access'
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - admin.workflow.apg-platform.datacraft.co.ke
+    secretName: workflow-admin-tls-secret
+  rules:
+  - host: admin.workflow.apg-platform.datacraft.co.ke
+    http:
+      paths:
+      - path: /metrics
+        pathType: Prefix
+        backend:
+          service:
+            name: workflow-service
+            port:
+              number: 9090
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: workflow-service
+            port:
+              number: 8080
+      - path: /admin
+        pathType: Prefix
+        backend:
+          service:
+            name: workflow-service
+            port:
+              number: 8080
+
+---
+# Ingress for development/staging environments
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: workflow-dev-ingress
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: dev-ingress
+    app.kubernetes.io/part-of: apg-platform
+    environment: development
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  rules:
+  - host: dev.workflow.apg-platform.datacraft.co.ke
+    http:
+      paths:
+      - path: /workflow(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-service
+            port:
+              number: 80

@@ -1,0 +1,515 @@
+# Default values for apg-workflow
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration
+global:
+  imageRegistry: registry.datacraft.co.ke
+  imagePullSecrets:
+  - name: registry-credentials
+  storageClass: fast-ssd
+  # Domain configuration
+  domain: apg-platform.datacraft.co.ke
+  subdomain: workflow
+  # Environment
+  environment: production
+  timezone: UTC
+
+# Application configuration
+app:
+  name: apg-workflow
+  version: 1.0.0
+  
+  # Image configuration
+  image:
+    repository: apg/workflow
+    tag: 1.0.0
+    pullPolicy: Always
+  
+  # Replica configuration
+  replicaCount: 3
+  
+  # Container ports
+  ports:
+    http: 8080
+    websocket: 8081
+    metrics: 9090
+  
+  # Resource limits and requests
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  # Environment variables
+  env:
+    LOG_LEVEL: INFO
+    DEBUG: false
+    ENVIRONMENT: production
+    
+    # Feature flags
+    ENABLE_ADVANCED_ML: true
+    ENABLE_NEURAL_SEARCH: true
+    ENABLE_FEDERATED_LEARNING: true
+    ENABLE_REAL_TIME_COLLABORATION: true
+    ENABLE_PREDICTIVE_ANALYTICS: true
+    
+    # Performance configuration
+    WORKFLOW_ENGINE_WORKERS: 4
+    WORKFLOW_ENGINE_QUEUE_SIZE: 1000
+    WORKFLOW_ENGINE_TIMEOUT: 3600
+    ML_CACHE_SIZE: 1000
+    AUTOML_TIME_BUDGET: 3600
+    
+    # Security configuration
+    JWT_ALGORITHM: HS256
+    SESSION_TIMEOUT: 3600
+    API_RATE_LIMIT: 1000
+  
+  # Secrets (will be base64 encoded)
+  secrets:
+    DATABASE_PASSWORD: securePassword123
+    JWT_SECRET_KEY: mySecretJWTKey
+    REDIS_PASSWORD: redisSecurePassword
+    ENCRYPTION_KEY: encryptionKeyForAPGWorkflow
+
+# Database configuration
+database:
+  enabled: true
+  type: postgresql
+  
+  # External database (if not using embedded)
+  external:
+    enabled: false
+    host: ""
+    port: 5432
+    database: apg_workflow
+    username: apg_workflow
+    password: ""
+  
+  # Embedded PostgreSQL configuration
+  postgresql:
+    enabled: true
+    auth:
+      username: apg_workflow
+      password: securePassword123
+      database: apg_workflow
+    primary:
+      persistence:
+        enabled: true
+        size: 100Gi
+        storageClass: fast-ssd
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+# Redis configuration
+redis:
+  enabled: true
+  
+  # External Redis (if not using embedded)
+  external:
+    enabled: false
+    host: ""
+    port: 6379
+    password: ""
+  
+  # Embedded Redis configuration
+  auth:
+    enabled: true
+    password: redisSecurePassword
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: fast-ssd
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
+# Storage configuration
+storage:
+  # Application data storage
+  data:
+    enabled: true
+    size: 20Gi
+    storageClass: fast-ssd
+    accessMode: ReadWriteOnce
+  
+  # ML models storage
+  models:
+    enabled: true
+    size: 50Gi
+    storageClass: fast-ssd
+    accessMode: ReadWriteOnce
+  
+  # Shared templates storage
+  templates:
+    enabled: true
+    size: 5Gi
+    storageClass: nfs
+    accessMode: ReadWriteMany
+  
+  # Backup storage
+  backup:
+    enabled: true
+    size: 200Gi
+    storageClass: standard
+    accessMode: ReadWriteOnce
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  
+  # Main application ingress
+  main:
+    enabled: true
+    host: workflow.apg-platform.datacraft.co.ke
+    tls:
+      enabled: true
+      secretName: workflow-tls-secret
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rate-limit-rps: "100"
+      nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+  
+  # API-specific ingress
+  api:
+    enabled: true
+    host: api.workflow.apg-platform.datacraft.co.ke
+    tls:
+      enabled: true
+      secretName: workflow-api-tls-secret
+  
+  # Admin interface ingress
+  admin:
+    enabled: true
+    host: admin.workflow.apg-platform.datacraft.co.ke
+    tls:
+      enabled: true
+      secretName: workflow-admin-tls-secret
+    auth:
+      enabled: true
+      type: basic
+    whitelist:
+      enabled: true
+      sourceRange: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+# Proxy/Load Balancer configuration
+nginx:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: nginx
+    tag: 1.25-alpine
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  
+  # Custom nginx configuration
+  config:
+    clientMaxBodySize: 100m
+    proxyConnectTimeout: 60s
+    proxyReadTimeout: 60s
+    
+  # Metrics exporter
+  metrics:
+    enabled: true
+    image:
+      repository: nginx/nginx-prometheus-exporter
+      tag: 0.11
+    resources:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+
+# Auto-scaling configuration
+autoscaling:
+  # Horizontal Pod Autoscaler
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    metrics:
+      cpu:
+        enabled: true
+        targetUtilization: 70
+      memory:
+        enabled: true
+        targetUtilization: 80
+      custom:
+        enabled: true
+        metrics:
+        - name: workflow_requests_per_second
+          target: 100
+        - name: workflow_queue_length
+          target: 50
+  
+  # Vertical Pod Autoscaler
+  vpa:
+    enabled: false
+    updateMode: Auto
+    
+  # Pod Disruption Budget
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+# Security configuration
+security:
+  # Pod Security Context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  
+  # Container Security Context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL
+      add:
+      - NET_BIND_SERVICE
+  
+  # Network Policies
+  networkPolicy:
+    enabled: true
+    
+  # Pod Security Policy
+  podSecurityPolicy:
+    enabled: false
+
+# Service Account and RBAC
+serviceAccount:
+  create: true
+  name: workflow-service-account
+  annotations: {}
+
+rbac:
+  create: true
+  # Additional rules can be added here
+
+# Monitoring and Observability
+monitoring:
+  # Prometheus metrics
+  prometheus:
+    enabled: true
+    port: 9090
+    path: /metrics
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+  
+  # Grafana dashboards
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+  
+  # Logging
+  logging:
+    enabled: true
+    level: INFO
+    format: json
+  
+  # Tracing
+  tracing:
+    enabled: false
+    jaeger:
+      enabled: false
+    zipkin:
+      enabled: false
+
+# Service Mesh integration
+serviceMesh:
+  # Istio configuration
+  istio:
+    enabled: false
+    injection: enabled
+    
+    # Virtual Service
+    virtualService:
+      enabled: true
+      gateways:
+      - istio-system/workflow-gateway
+      
+    # Destination Rule
+    destinationRule:
+      enabled: true
+      trafficPolicy:
+        loadBalancer:
+          simple: LEAST_CONN
+    
+    # Gateway
+    gateway:
+      enabled: true
+      hosts:
+      - workflow.apg-platform.datacraft.co.ke
+  
+  # Linkerd configuration
+  linkerd:
+    enabled: false
+
+# Machine Learning configuration
+ml:
+  # Model storage
+  models:
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: fast-ssd
+  
+  # GPU support
+  gpu:
+    enabled: false
+    count: 1
+    type: nvidia.com/gpu
+  
+  # AutoML configuration
+  automl:
+    enabled: true
+    timeBudget: 3600
+    
+  # Federated Learning
+  federatedLearning:
+    enabled: true
+    minClients: 2
+    maxClients: 10
+
+# Backup and Recovery
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 30d
+  
+  # S3-compatible storage
+  s3:
+    enabled: false
+    bucket: ""
+    region: ""
+    accessKey: ""
+    secretKey: ""
+  
+  # Local storage
+  local:
+    enabled: true
+    path: /backup
+
+# High Availability
+ha:
+  enabled: true
+  
+  # Pod Anti-Affinity
+  podAntiAffinity:
+    enabled: true
+    type: preferred  # or required
+  
+  # Node Affinity
+  nodeAffinity:
+    enabled: false
+    
+  # Tolerations
+  tolerations: []
+
+# Development/Testing configuration
+development:
+  enabled: false
+  debugMode: false
+  hotReload: false
+  
+  # Override for development
+  ingress:
+    host: dev.workflow.apg-platform.datacraft.co.ke
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# External integrations
+integrations:
+  # APG Platform
+  apgPlatform:
+    enabled: true
+    url: http://apg-platform.apg-platform.svc.cluster.local
+  
+  # Authentication service
+  auth:
+    enabled: true
+    url: http://auth-service.apg-platform.svc.cluster.local
+  
+  # Audit service
+  audit:
+    enabled: true
+    url: http://audit-service.apg-platform.svc.cluster.local
+  
+  # External APIs
+  external:
+    openai:
+      enabled: false
+      apiKey: ""
+    slack:
+      enabled: false
+      webhookUrl: ""
+    teams:
+      enabled: false
+      webhookUrl: ""
+
+# Node Selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Additional labels
+labels: {}
+
+# Additional annotations
+annotations: {}
+
+# Configuration for testing
+tests:
+  enabled: true
+  image:
+    repository: busybox
+    tag: latest
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi

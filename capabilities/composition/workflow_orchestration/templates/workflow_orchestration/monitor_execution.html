@@ -1,0 +1,762 @@
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block head_css %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/workflow_orchestration.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .execution-monitor {
+            padding: 20px;
+        }
+        
+        .execution-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .status-badge {
+            font-size: 1.1rem;
+            padding: 8px 16px;
+            border-radius: 20px;
+        }
+        
+        .status-running {
+            background: #17a2b8;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-completed {
+            background: #28a745;
+        }
+        
+        .status-failed {
+            background: #dc3545;
+        }
+        
+        .status-cancelled {
+            background: #6c757d;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .execution-timeline {
+            position: relative;
+            padding-left: 40px;
+        }
+        
+        .timeline-line {
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #dee2e6;
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            left: -25px;
+            top: 20px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px #dee2e6;
+        }
+        
+        .timeline-marker.completed {
+            background: #28a745;
+            box-shadow: 0 0 0 2px #28a745;
+        }
+        
+        .timeline-marker.failed {
+            background: #dc3545;
+            box-shadow: 0 0 0 2px #dc3545;
+        }
+        
+        .timeline-marker.running {
+            background: #17a2b8;
+            box-shadow: 0 0 0 2px #17a2b8;
+            animation: pulse 2s infinite;
+        }
+        
+        .timeline-marker.pending {
+            background: #6c757d;
+            box-shadow: 0 0 0 2px #6c757d;
+        }
+        
+        .task-card {
+            padding: 20px;
+        }
+        
+        .task-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .task-title {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .task-duration {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        
+        .task-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .detail-group {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .detail-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .detail-value {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .progress-bar-container {
+            margin: 20px 0;
+        }
+        
+        .real-time-updates {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .update-indicator {
+            background: #17a2b8;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .update-indicator.show {
+            opacity: 1;
+        }
+        
+        .log-viewer {
+            background: #1a1a1a;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .log-level-info { color: #17a2b8; }
+        .log-level-warn { color: #ffc107; }
+        .log-level-error { color: #dc3545; }
+        .log-level-debug { color: #6c757d; }
+        
+        .metric-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
+        
+        .expandable-section {
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .section-header {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #dee2e6;
+            cursor: pointer;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+        
+        .section-content {
+            padding: 15px;
+            display: none;
+        }
+        
+        .section-content.expanded {
+            display: block;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="execution-monitor">
+    <!-- Real-time Update Indicator -->
+    <div class="real-time-updates">
+        <div id="updateIndicator" class="update-indicator">
+            <i class="fas fa-sync-alt fa-spin"></i> {{ _('Updating...') }}
+        </div>
+    </div>
+    
+    <!-- Execution Header -->
+    <div class="execution-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="mb-2">
+                    <i class="fas fa-play-circle me-2"></i>
+                    {{ instance.workflow.name }}
+                </h2>
+                <p class="mb-3 opacity-75">{{ instance.workflow.description or _('No description') }}</p>
+                <div class="d-flex flex-wrap gap-3">
+                    <span class="status-badge status-{{ instance.status.value.lower() if instance.status else 'unknown' }}">
+                        {% if instance.status == 'RUNNING' %}
+                            <i class="fas fa-play"></i>
+                        {% elif instance.status == 'COMPLETED' %}
+                            <i class="fas fa-check"></i>
+                        {% elif instance.status == 'FAILED' %}
+                            <i class="fas fa-times"></i>
+                        {% elif instance.status == 'CANCELLED' %}
+                            <i class="fas fa-stop"></i>
+                        {% else %}
+                            <i class="fas fa-clock"></i>
+                        {% endif %}
+                        {{ instance.status.value if instance.status else 'Unknown' }}
+                    </span>
+                    <span class="badge badge-light">
+                        <i class="fas fa-user"></i> {{ instance.created_by }}
+                    </span>
+                    <span class="badge badge-light">
+                        <i class="fas fa-calendar"></i> {{ moment(instance.started_at).format('YYYY-MM-DD HH:mm:ss') if instance.started_at else _('Not started') }}
+                    </span>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="btn-group" role="group">
+                    {% if instance.status == 'RUNNING' %}
+                        <a href="{{ url_for('WOWorkflowInstanceView.cancel_execution', instance_id=instance.id) }}" 
+                           class="btn btn-outline-light" 
+                           onclick="return confirm('{{ _('Are you sure you want to cancel this execution?') }}')">
+                            <i class="fas fa-stop"></i> {{ _('Cancel') }}
+                        </a>
+                    {% elif instance.status == 'FAILED' %}
+                        <a href="{{ url_for('WOWorkflowInstanceView.retry_execution', instance_id=instance.id) }}" 
+                           class="btn btn-outline-light">
+                            <i class="fas fa-redo"></i> {{ _('Retry') }}
+                        </a>
+                    {% endif %}
+                    <button type="button" class="btn btn-outline-light" onclick="toggleAutoRefresh()">
+                        <i id="autoRefreshIcon" class="fas fa-pause"></i>
+                        <span id="autoRefreshText">{{ _('Pause Updates') }}</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-light" onclick="refreshExecution()">
+                        <i class="fas fa-sync-alt"></i> {{ _('Refresh') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Execution Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">{{ task_executions|length }}</div>
+                <div class="metric-label">{{ _('Total Tasks') }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value text-success">
+                    {{ task_executions|selectattr('status', 'equalto', 'COMPLETED')|list|length }}
+                </div>
+                <div class="metric-label">{{ _('Completed') }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value text-danger">
+                    {{ task_executions|selectattr('status', 'equalto', 'FAILED')|list|length }}
+                </div>
+                <div class="metric-label">{{ _('Failed') }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">
+                    {% if instance.duration_seconds %}
+                        {{ "%.1f"|format(instance.duration_seconds) }}s
+                    {% else %}
+                        --
+                    {% endif %}
+                </div>
+                <div class="metric-label">{{ _('Duration') }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Progress Bar -->
+    {% if instance.status == 'RUNNING' %}
+    <div class="progress-bar-container">
+        <div class="d-flex justify-content-between mb-2">
+            <span>{{ _('Execution Progress') }}</span>
+            <span id="progressPercentage">{{ ((task_executions|selectattr('status', 'equalto', 'COMPLETED')|list|length / task_executions|length) * 100)|round(1) if task_executions|length > 0 else 0 }}%</span>
+        </div>
+        <div class="progress">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" 
+                 id="executionProgress"
+                 style="width: {{ ((task_executions|selectattr('status', 'equalto', 'COMPLETED')|list|length / task_executions|length) * 100)|round(1) if task_executions|length > 0 else 0 }}%">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Task Execution Timeline -->
+    <div class="row">
+        <div class="col-lg-8">
+            <h4 class="mb-3">
+                <i class="fas fa-tasks me-2"></i>
+                {{ _('Task Execution Timeline') }}
+            </h4>
+            
+            <div class="execution-timeline">
+                <div class="timeline-line"></div>
+                
+                {% for execution in task_executions %}
+                <div class="timeline-item" data-task-id="{{ execution.task_id }}">
+                    <div class="timeline-marker {{ execution.status.value.lower() if execution.status else 'pending' }}"></div>
+                    
+                    <div class="task-card">
+                        <div class="task-header">
+                            <div>
+                                <h6 class="task-title">{{ execution.task_id }}</h6>
+                                <small class="text-muted">
+                                    {{ execution.status.value if execution.status else 'Pending' }}
+                                    {% if execution.retry_count > 0 %} 
+                                        ({{ _('Retry') }} {{ execution.retry_count }})
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <div class="task-duration">
+                                {% if execution.duration_seconds %}
+                                    <i class="fas fa-clock"></i> {{ "%.2f"|format(execution.duration_seconds) }}s
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="task-details">
+                            <div class="detail-group">
+                                <div class="detail-label">{{ _('Started At') }}</div>
+                                <div class="detail-value">
+                                    {{ moment(execution.started_at).format('HH:mm:ss') if execution.started_at else '--' }}
+                                </div>
+                            </div>
+                            <div class="detail-group">
+                                <div class="detail-label">{{ _('Completed At') }}</div>
+                                <div class="detail-value">
+                                    {{ moment(execution.completed_at).format('HH:mm:ss') if execution.completed_at else '--' }}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Expandable Sections -->
+                        {% if execution.input_data %}
+                        <div class="expandable-section mt-3">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-sign-in-alt me-2"></i>{{ _('Input Data') }}</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <pre class="log-viewer">{{ execution.input_data | tojson(indent=2) }}</pre>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if execution.result %}
+                        <div class="expandable-section mt-2">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-sign-out-alt me-2"></i>{{ _('Result') }}</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <pre class="log-viewer">{{ execution.result | tojson(indent=2) }}</pre>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if execution.error_details %}
+                        <div class="expandable-section mt-2">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-exclamation-triangle me-2 text-danger"></i>{{ _('Error Details') }}</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <pre class="log-viewer log-level-error">{{ execution.error_details }}</pre>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if execution.logs %}
+                        <div class="expandable-section mt-2">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-file-alt me-2"></i>{{ _('Logs') }}</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <div class="log-viewer" id="logs-{{ execution.id }}">{{ execution.logs }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                
+                {% if not task_executions %}
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-clock fa-3x mb-3"></i>
+                    <p>{{ _('No task executions yet. Workflow is preparing to start.') }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Execution Context -->
+            {% if instance.execution_context %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        {{ _('Execution Context') }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <pre class="log-viewer">{{ instance.execution_context | tojson(indent=2) }}</pre>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Workflow Definition -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-project-diagram me-2"></i>
+                        {{ _('Workflow Info') }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">{{ _('Version') }}</dt>
+                        <dd class="col-sm-8">{{ instance.workflow.version }}</dd>
+                        
+                        <dt class="col-sm-4">{{ _('Tenant') }}</dt>
+                        <dd class="col-sm-8">{{ instance.workflow.tenant_id }}</dd>
+                        
+                        <dt class="col-sm-4">{{ _('Priority') }}</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge badge-{{ 'danger' if instance.priority == 'critical' else 'warning' if instance.priority == 'high' else 'info' }}">
+                                {{ instance.priority.title() if instance.priority else 'Normal' }}
+                            </span>
+                        </dd>
+                        
+                        <dt class="col-sm-4">{{ _('Created') }}</dt>
+                        <dd class="col-sm-8">{{ moment(instance.created_at).fromNow() }}</dd>
+                    </dl>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>
+                        {{ _('Quick Actions') }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('WOWorkflowView.workflow_designer', workflow_id=instance.workflow.id) }}" 
+                           class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-edit"></i> {{ _('Edit Workflow') }}
+                        </a>
+                        <a href="{{ url_for('WOWorkflowView.execute_workflow', workflow_id=instance.workflow.id) }}" 
+                           class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-play"></i> {{ _('New Execution') }}
+                        </a>
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="exportExecution()">
+                            <i class="fas fa-download"></i> {{ _('Export Data') }}
+                        </button>
+                        <a href="{{ url_for('WOWorkflowInstanceView.list') }}" 
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-list"></i> {{ _('All Executions') }}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    
+    <script>
+        let autoRefreshEnabled = true;
+        let refreshInterval;
+        let lastUpdateTime = new Date();
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            startAutoRefresh();
+            setupWebSocket();
+        });
+        
+        function startAutoRefresh() {
+            if (autoRefreshEnabled && ['RUNNING', 'PENDING'].includes('{{ instance.status.value if instance.status else '' }}')) {
+                refreshInterval = setInterval(refreshExecution, 5000); // Refresh every 5 seconds
+            }
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+        
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = !autoRefreshEnabled;
+            const icon = document.getElementById('autoRefreshIcon');
+            const text = document.getElementById('autoRefreshText');
+            
+            if (autoRefreshEnabled) {
+                icon.className = 'fas fa-pause';
+                text.textContent = '{{ _("Pause Updates") }}';
+                startAutoRefresh();
+            } else {
+                icon.className = 'fas fa-play';
+                text.textContent = '{{ _("Resume Updates") }}';
+                stopAutoRefresh();
+            }
+        }
+        
+        function refreshExecution() {
+            showUpdateIndicator();
+            
+            fetch('{{ url_for("WOWorkflowInstanceView.get_execution_status", instance_id=instance.id) }}')
+                .then(response => response.json())
+                .then(data => {
+                    updateExecutionStatus(data);
+                    hideUpdateIndicator();
+                })
+                .catch(error => {
+                    console.error('Error refreshing execution:', error);
+                    hideUpdateIndicator();
+                });
+        }
+        
+        function updateExecutionStatus(data) {
+            // Update progress bar
+            const progressBar = document.getElementById('executionProgress');
+            const progressPercentage = document.getElementById('progressPercentage');
+            
+            if (progressBar && data.task_executions) {
+                const completed = data.task_executions.filter(t => t.status === 'completed').length;
+                const total = data.task_executions.length;
+                const percentage = total > 0 ? (completed / total * 100).toFixed(1) : 0;
+                
+                progressBar.style.width = percentage + '%';
+                if (progressPercentage) {
+                    progressPercentage.textContent = percentage + '%';
+                }
+            }
+            
+            // Update timeline markers
+            data.task_executions.forEach(execution => {
+                const taskElement = document.querySelector(`[data-task-id="${execution.task_id}"]`);
+                if (taskElement) {
+                    const marker = taskElement.querySelector('.timeline-marker');
+                    if (marker) {
+                        marker.className = `timeline-marker ${execution.status.toLowerCase()}`;
+                    }
+                    
+                    // Update task status text
+                    const statusElement = taskElement.querySelector('.text-muted');
+                    if (statusElement) {
+                        let statusText = execution.status;
+                        if (execution.retry_count > 0) {
+                            statusText += ` ({{ _("Retry") }} ${execution.retry_count})`;
+                        }
+                        statusElement.textContent = statusText;
+                    }
+                    
+                    // Update duration
+                    const durationElement = taskElement.querySelector('.task-duration');
+                    if (durationElement && execution.duration_seconds) {
+                        durationElement.innerHTML = `<i class="fas fa-clock"></i> ${execution.duration_seconds.toFixed(2)}s`;
+                    }
+                }
+            });
+            
+            // Check if execution is complete
+            if (['completed', 'failed', 'cancelled'].includes(data.status.toLowerCase())) {
+                stopAutoRefresh();
+                
+                // Reload page to show final state
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+        }
+        
+        function showUpdateIndicator() {
+            const indicator = document.getElementById('updateIndicator');
+            indicator.classList.add('show');
+        }
+        
+        function hideUpdateIndicator() {
+            const indicator = document.getElementById('updateIndicator');
+            indicator.classList.remove('show');
+        }
+        
+        function toggleSection(header) {
+            const content = header.nextElementSibling;
+            const icon = header.querySelector('i:last-child');
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                icon.className = 'fas fa-chevron-down';
+            } else {
+                content.classList.add('expanded');
+                icon.className = 'fas fa-chevron-up';
+            }
+        }
+        
+        function exportExecution() {
+            const executionData = {
+                instance_id: '{{ instance.id }}',
+                workflow_name: '{{ instance.workflow.name }}',
+                status: '{{ instance.status.value if instance.status else "" }}',
+                started_at: '{{ instance.started_at.isoformat() if instance.started_at else "" }}',
+                completed_at: '{{ instance.completed_at.isoformat() if instance.completed_at else "" }}',
+                duration_seconds: {{ instance.duration_seconds or 'null' }},
+                task_executions: [
+                    {% for execution in task_executions %}
+                    {
+                        task_id: '{{ execution.task_id }}',
+                        status: '{{ execution.status.value if execution.status else "" }}',
+                        started_at: '{{ execution.started_at.isoformat() if execution.started_at else "" }}',
+                        completed_at: '{{ execution.completed_at.isoformat() if execution.completed_at else "" }}',
+                        duration_seconds: {{ execution.duration_seconds or 'null' }},
+                        retry_count: {{ execution.retry_count or 0 }},
+                        result: {{ execution.result | tojson if execution.result else 'null' }},
+                        error_details: {{ execution.error_details | tojson if execution.error_details else 'null' }}
+                    }{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ]
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(executionData, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `workflow_execution_${executionData.instance_id}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+        
+        function setupWebSocket() {
+            // WebSocket implementation for real-time updates would go here
+            // This would connect to a WebSocket endpoint that streams execution updates
+            console.log('WebSocket setup would be implemented here for real-time updates');
+        }
+        
+        // Utility function for moment.js
+        function moment(date) {
+            return {
+                format: function(fmt) {
+                    const d = new Date(date);
+                    if (fmt === 'YYYY-MM-DD HH:mm:ss') {
+                        return d.toISOString().slice(0, 19).replace('T', ' ');
+                    } else if (fmt === 'HH:mm:ss') {
+                        return d.toTimeString().slice(0, 8);
+                    }
+                    return d.toLocaleString();
+                },
+                fromNow: function() {
+                    const now = new Date();
+                    const past = new Date(date);
+                    const diffMs = now - past;
+                    const diffMins = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMs / 3600000);
+                    const diffDays = Math.floor(diffMs / 86400000);
+                    
+                    if (diffMins < 60) return diffMins + ' {{ _("minutes ago") }}';
+                    if (diffHours < 24) return diffHours + ' {{ _("hours ago") }}';
+                    return diffDays + ' {{ _("days ago") }}';
+                }
+            };
+        }
+        
+        // Auto-scroll to running task
+        document.addEventListener('DOMContentLoaded', function() {
+            const runningTask = document.querySelector('.timeline-marker.running');
+            if (runningTask) {
+                runningTask.closest('.timeline-item').scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,336 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apg-workflow-config
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: apg-workflow
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: apg-platform
+data:
+  # Application Configuration
+  APP_NAME: "APG Workflow Orchestration"
+  APP_VERSION: "1.0.0"
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  DEBUG: "false"
+  
+  # Database Configuration
+  DATABASE_TYPE: "postgresql"
+  DATABASE_HOST: "postgres-service.apg-workflow.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "apg_workflow"
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_MAX_OVERFLOW: "30"
+  DATABASE_POOL_TIMEOUT: "30"
+  
+  # Redis Configuration
+  REDIS_HOST: "redis-service.apg-workflow.svc.cluster.local"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_POOL_SIZE: "10"
+  
+  # Workflow Engine Configuration
+  WORKFLOW_ENGINE_WORKERS: "4"
+  WORKFLOW_ENGINE_QUEUE_SIZE: "1000"
+  WORKFLOW_ENGINE_TIMEOUT: "3600"
+  WORKFLOW_MAX_RETRIES: "3"
+  WORKFLOW_RETRY_DELAY: "60"
+  
+  # ML Engine Configuration
+  ML_ENGINE_ENABLED: "true"
+  ML_MODELS_PATH: "/app/models"
+  ML_CACHE_SIZE: "1000"
+  ML_TRAINING_TIMEOUT: "7200"
+  AUTOML_TIME_BUDGET: "3600"
+  
+  # Monitoring Configuration
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_INTERVAL: "30"
+  MONITORING_RETENTION_DAYS: "30"
+  
+  # Security Configuration
+  JWT_ALGORITHM: "HS256"
+  SESSION_TIMEOUT: "3600"
+  API_RATE_LIMIT: "1000"
+  CORS_ORIGINS: "*"
+  
+  # WebSocket Configuration
+  WEBSOCKET_ENABLED: "true"
+  WEBSOCKET_PORT: "8081"
+  WEBSOCKET_MAX_CONNECTIONS: "1000"
+  
+  # Performance Configuration
+  CACHE_TTL: "3600"
+  CONNECTION_POOL_SIZE: "20"
+  ASYNC_WORKERS: "8"
+  
+  # Feature Flags
+  ENABLE_ADVANCED_ML: "true"
+  ENABLE_NEURAL_SEARCH: "true"
+  ENABLE_FEDERATED_LEARNING: "true"
+  ENABLE_REAL_TIME_COLLABORATION: "true"
+  ENABLE_PREDICTIVE_ANALYTICS: "true"
+  
+  # Integration Configuration
+  APG_PLATFORM_URL: "http://apg-platform.apg-platform.svc.cluster.local"
+  AUTH_SERVICE_URL: "http://auth-service.apg-platform.svc.cluster.local"
+  AUDIT_SERVICE_URL: "http://audit-service.apg-platform.svc.cluster.local"
+  
+  # Kubernetes Configuration
+  CLUSTER_NAME: "apg-cluster"
+  NAMESPACE: "apg-workflow"
+  SERVICE_MESH_ENABLED: "true"
+  
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apg-workflow-templates
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: apg-workflow
+    app.kubernetes.io/component: templates
+    app.kubernetes.io/part-of: apg-platform
+data:
+  # Default workflow templates configuration
+  templates.yaml: |
+    default_templates:
+      - name: "Data Processing Pipeline"
+        category: "data"
+        enabled: true
+      - name: "ML Training Workflow"
+        category: "ml"
+        enabled: true
+      - name: "API Integration Flow"
+        category: "integration"
+        enabled: true
+      - name: "Notification Workflow"
+        category: "communication"
+        enabled: true
+    
+    template_categories:
+      - id: "data"
+        name: "Data Processing"
+        description: "Data ingestion, transformation, and analysis workflows"
+      - id: "ml"
+        name: "Machine Learning"
+        description: "ML training, inference, and model management workflows"
+      - id: "integration"
+        name: "System Integration"
+        description: "API integration and system connectivity workflows"
+      - id: "communication"
+        name: "Communication"
+        description: "Notification, messaging, and communication workflows"
+  
+  # Component library configuration
+  components.yaml: |
+    component_categories:
+      - id: "inputs"
+        name: "Input Components"
+        components:
+          - "file-input"
+          - "api-input"
+          - "database-input"
+          - "stream-input"
+      - id: "processors"
+        name: "Processing Components"
+        components:
+          - "data-transformer"
+          - "ml-processor"
+          - "aggregator"
+          - "filter"
+      - id: "outputs"
+        name: "Output Components"
+        components:
+          - "file-output"
+          - "api-output"
+          - "database-output"
+          - "notification"
+      - id: "ml"
+        name: "ML Components"
+        components:
+          - "model-trainer"
+          - "model-inference"
+          - "feature-extractor"
+          - "automl"
+    
+    connector_types:
+      - "rest-api"
+      - "graphql"
+      - "database"
+      - "file-system"
+      - "message-queue"
+      - "cloud-storage"
+  
+  # Monitoring configuration
+  monitoring.yaml: |
+    metrics:
+      collection_interval: 60
+      retention_days: 30
+      exporters:
+        - prometheus
+        - datadog
+    
+    alerts:
+      - name: "high_cpu_usage"
+        threshold: 80
+        duration: "5m"
+      - name: "high_memory_usage"
+        threshold: 85
+        duration: "5m"
+      - name: "workflow_failure_rate"
+        threshold: 10
+        duration: "10m"
+    
+    dashboards:
+      - name: "workflow-overview"
+        enabled: true
+      - name: "performance-metrics"
+        enabled: true
+      - name: "ml-model-metrics"
+        enabled: true
+  
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/component: proxy
+    app.kubernetes.io/part-of: apg-platform
+data:
+  nginx.conf: |
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        # Logging
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                       '$status $body_bytes_sent "$http_referer" '
+                       '"$http_user_agent" "$http_x_forwarded_for"';
+        access_log /var/log/nginx/access.log main;
+        
+        # Performance
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        client_max_body_size 100M;
+        
+        # Compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+        
+        # Security headers
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=websocket:10m rate=100r/s;
+        
+        upstream workflow_backend {
+            least_conn;
+            server workflow-service:8080 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+        
+        upstream websocket_backend {
+            ip_hash;
+            server workflow-service:8081 max_fails=3 fail_timeout=30s;
+        }
+        
+        # Main server block
+        server {
+            listen 80;
+            server_name _;
+            
+            # Health check
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+            
+            # API endpoints
+            location /api/ {
+                limit_req zone=api burst=20 nodelay;
+                
+                proxy_pass http://workflow_backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+                
+                proxy_buffer_size 4k;
+                proxy_buffers 8 4k;
+                proxy_busy_buffers_size 8k;
+            }
+            
+            # WebSocket endpoints
+            location /ws/ {
+                limit_req zone=websocket burst=100 nodelay;
+                
+                proxy_pass http://websocket_backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 3600s;
+            }
+            
+            # Static files
+            location /static/ {
+                alias /app/static/;
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+                
+                location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+                    expires 1y;
+                    add_header Cache-Control "public, immutable";
+                }
+            }
+            
+            # Main application
+            location / {
+                proxy_pass http://workflow_backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+            }
+        }
+    }

@@ -1,0 +1,833 @@
+/*!
+ * APG Workflow Orchestration Styles
+ * © 2025 Datacraft. All rights reserved.
+ */
+
+/* ==========================================================================
+   Base Styles
+   ========================================================================== */
+
+.workflow-orchestration {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ==========================================================================
+   Dashboard Styles
+   ========================================================================== */
+
+.dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.border-left-primary {
+    border-left: 4px solid #007bff !important;
+}
+
+.border-left-success {
+    border-left: 4px solid #28a745 !important;
+}
+
+.border-left-info {
+    border-left: 4px solid #17a2b8 !important;
+}
+
+.border-left-warning {
+    border-left: 4px solid #ffc107 !important;
+}
+
+/* ==========================================================================
+   Workflow List Styles
+   ========================================================================== */
+
+.workflow-list-item {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.workflow-list-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    border-color: #007bff;
+}
+
+.workflow-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.workflow-description {
+    color: #6c757d;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.workflow-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+}
+
+.workflow-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.workflow-status.active {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.workflow-status.inactive {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* ==========================================================================
+   Workflow Designer Styles
+   ========================================================================== */
+
+.designer-container {
+    height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+}
+
+.designer-toolbar {
+    background: white;
+    padding: 1rem 1.5rem;
+    border-bottom: 2px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.designer-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.component-palette {
+    width: 280px;
+    background: white;
+    border-right: 2px solid #e9ecef;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.palette-section {
+    margin-bottom: 2rem;
+}
+
+.palette-section h6 {
+    color: #495057;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.draggable-component {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    cursor: grab;
+    transition: all 0.3s ease;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.draggable-component:hover {
+    background: #f8f9fa;
+    border-color: #007bff;
+    transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+}
+
+.draggable-component:active {
+    cursor: grabbing;
+}
+
+.draggable-component i {
+    margin-right: 0.75rem;
+    width: 20px;
+    text-align: center;
+    font-size: 1rem;
+}
+
+.workflow-canvas {
+    flex: 1;
+    position: relative;
+    background: #fafbfc;
+    background-image: 
+        radial-gradient(circle at 1px 1px, rgba(0,0,0,.15) 1px, transparent 0);
+    background-size: 20px 20px;
+    overflow: auto;
+    min-height: 600px;
+}
+
+.canvas-component {
+    position: absolute;
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.25rem;
+    min-width: 180px;
+    cursor: move;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    font-size: 0.875rem;
+}
+
+.canvas-component:hover {
+    border-color: #007bff;
+    box-shadow: 0 8px 24px rgba(0, 123, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.canvas-component.selected {
+    border-color: #007bff;
+    box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25);
+}
+
+.canvas-component.error {
+    border-color: #dc3545;
+    background-color: #fff5f5;
+}
+
+.component-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.component-title {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.component-type {
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.component-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.canvas-component:hover .component-actions {
+    opacity: 1;
+}
+
+.component-actions button {
+    border: none;
+    background: #f8f9fa;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0.375rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.component-actions button:hover {
+    background: #e9ecef;
+    color: #495057;
+}
+
+.properties-panel {
+    width: 320px;
+    background: white;
+    border-left: 2px solid #e9ecef;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.properties-panel h5 {
+    color: #2c3e50;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+/* ==========================================================================
+   Execution Monitor Styles
+   ========================================================================== */
+
+.execution-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.status-badge {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-running {
+    background: #17a2b8;
+    animation: pulse 2s infinite;
+}
+
+.status-completed {
+    background: #28a745;
+}
+
+.status-failed {
+    background: #dc3545;
+}
+
+.status-cancelled {
+    background: #6c757d;
+}
+
+.status-pending {
+    background: #ffc107;
+    color: #212529;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.execution-timeline {
+    position: relative;
+    padding-left: 3rem;
+}
+
+.timeline-line {
+    position: absolute;
+    left: 1rem;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #e9ecef 0%, #dee2e6 100%);
+    border-radius: 2px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.timeline-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -1.75rem;
+    top: 1.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    border: 3px solid white;
+    box-shadow: 0 0 0 3px #e9ecef;
+    z-index: 2;
+}
+
+.timeline-marker.completed {
+    background: #28a745;
+    box-shadow: 0 0 0 3px #28a745;
+}
+
+.timeline-marker.failed {
+    background: #dc3545;
+    box-shadow: 0 0 0 3px #dc3545;
+}
+
+.timeline-marker.running {
+    background: #17a2b8;
+    box-shadow: 0 0 0 3px #17a2b8;
+    animation: pulse 2s infinite;
+}
+
+.timeline-marker.pending {
+    background: #6c757d;
+    box-shadow: 0 0 0 3px #6c757d;
+}
+
+.task-card {
+    padding: 1.5rem;
+}
+
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.task-title {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 1.125rem;
+    margin-bottom: 0.25rem;
+}
+
+.task-duration {
+    font-size: 0.875rem;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.task-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.detail-group {
+    background: #f8f9fa;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.detail-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.detail-value {
+    font-weight: 500;
+    color: #2c3e50;
+    font-size: 0.875rem;
+}
+
+/* ==========================================================================
+   Log Viewer Styles
+   ========================================================================== */
+
+.log-viewer {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+    font-size: 0.8rem;
+    padding: 1rem;
+    border-radius: 6px;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.4;
+    border: 1px solid #404040;
+}
+
+.log-viewer::-webkit-scrollbar {
+    width: 8px;
+}
+
+.log-viewer::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+.log-viewer::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+.log-viewer::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+.log-level-info { color: #4fc3f7; }
+.log-level-warn { color: #ffb74d; }
+.log-level-error { color: #ef5350; }
+.log-level-debug { color: #9e9e9e; }
+.log-level-success { color: #66bb6a; }
+
+/* ==========================================================================
+   Expandable Sections
+   ========================================================================== */
+
+.expandable-section {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+}
+
+.section-header {
+    background: #f8f9fa;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e9ecef;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.3s ease;
+    font-weight: 500;
+}
+
+.section-header:hover {
+    background: #e9ecef;
+}
+
+.section-content {
+    padding: 1rem;
+    display: none;
+    background: white;
+}
+
+.section-content.expanded {
+    display: block;
+}
+
+/* ==========================================================================
+   Form Styles
+   ========================================================================== */
+
+.form-control {
+    border-radius: 6px;
+    border: 1px solid #ced4da;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0.025em;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+/* ==========================================================================
+   Progress and Loading Styles
+   ========================================================================== */
+
+.progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #e9ecef;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+.progress-bar-striped {
+    background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
+        transparent
+    );
+    background-size: 1rem 1rem;
+}
+
+.progress-bar-animated {
+    animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+    0% {
+        background-position: 1rem 0;
+    }
+    100% {
+        background-position: 0 0;
+    }
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Charts and Visualizations
+   ========================================================================== */
+
+.chart-container {
+    position: relative;
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+}
+
+.chart-area {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.chart-pie {
+    position: relative;
+    height: 200px;
+    width: 100%;
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .designer-content {
+        flex-direction: column;
+    }
+    
+    .component-palette {
+        width: 100%;
+        height: 200px;
+        border-right: none;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .properties-panel {
+        width: 100%;
+        height: 250px;
+        border-left: none;
+        border-top: 2px solid #e9ecef;
+    }
+    
+    .workflow-canvas {
+        min-height: 400px;
+    }
+    
+    .task-details {
+        grid-template-columns: 1fr;
+    }
+    
+    .execution-timeline {
+        padding-left: 2rem;
+    }
+    
+    .timeline-marker {
+        left: -1.25rem;
+        width: 1rem;
+        height: 1rem;
+    }
+    
+    .metric-card {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .designer-toolbar {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .execution-header {
+        padding: 1.5rem;
+    }
+    
+    .status-badge {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .task-card {
+        padding: 1rem;
+    }
+    
+    .timeline-item {
+        margin-bottom: 1rem;
+    }
+}
+
+/* ==========================================================================
+   Dark Mode Support
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+    .workflow-canvas {
+        background: #2d3748;
+        background-image: 
+            radial-gradient(circle at 1px 1px, rgba(255,255,255,.15) 1px, transparent 0);
+    }
+    
+    .canvas-component {
+        background: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+    
+    .component-title {
+        color: #e2e8f0;
+    }
+    
+    .component-type {
+        color: #a0aec0;
+    }
+    
+    .metric-card {
+        background: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+    
+    .metric-value {
+        color: #e2e8f0;
+    }
+}
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
+.text-gradient {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.shadow-soft {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+}
+
+.shadow-strong {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+}
+
+.border-radius-lg {
+    border-radius: 12px !important;
+}
+
+.border-radius-xl {
+    border-radius: 16px !important;
+}
+
+.glass-effect {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}

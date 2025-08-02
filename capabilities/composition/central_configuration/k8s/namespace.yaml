@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: central-config
+  labels:
+    name: central-config
+    app.kubernetes.io/name: central-configuration
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: platform
+    app.kubernetes.io/part-of: apg-platform
+    app.kubernetes.io/managed-by: kubernetes
+  annotations:
+    description: "APG Central Configuration Management Platform"
+    owner: "platform-team"
+    environment: "production"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: central-config-quota
+  namespace: central-config
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    persistentvolumeclaims: "10"
+    pods: "50"
+    services: "20"
+    secrets: "30"
+    configmaps: "30"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: central-config-limits
+  namespace: central-config
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "2Gi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "256Mi"
+    type: Container
+  - max:
+      cpu: "4"
+      memory: "8Gi"
+    min:
+      cpu: "10m"
+      memory: "64Mi"
+    type: Container

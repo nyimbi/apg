@@ -1,0 +1,522 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('workflow_designer.static', filename='css/designer.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+    .components-gallery {
+        padding: 20px;
+    }
+    .component-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        background: white;
+        transition: all 0.15s;
+    }
+    .component-card:hover {
+        border-color: #007bff;
+        box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+    }
+    .component-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+    .component-preview {
+        width: 60px;
+        height: 40px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 12px;
+        font-size: 18px;
+    }
+    .component-details h5 {
+        margin: 0 0 4px 0;
+        font-size: 16px;
+        font-weight: 600;
+    }
+    .component-category {
+        font-size: 12px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .component-description {
+        color: #6c757d;
+        font-size: 14px;
+        line-height: 1.4;
+        margin-bottom: 12px;
+    }
+    .component-meta {
+        display: flex;
+        gap: 16px;
+        font-size: 12px;
+        color: #6c757d;
+    }
+    .component-ports {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+    .port-info {
+        background: #f8f9fa;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+    }
+    .port-info.input { border-left: 3px solid #dc3545; }
+    .port-info.output { border-left: 3px solid #28a745; }
+    .category-filter {
+        margin-bottom: 20px;
+    }
+    .search-header {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+        align-items: center;
+    }
+    .search-header input {
+        flex: 1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="components-gallery">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Component Library</h2>
+        <a href="{{ url_for('workflow_designer.designer') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> Back to Designer
+        </a>
+    </div>
+    
+    <div class="search-header">
+        <input type="text" id="component-search" class="form-control" placeholder="Search components...">
+        <select id="category-filter" class="form-control" style="width: 200px;">
+            <option value="">All Categories</option>
+            <option value="triggers">Triggers</option>
+            <option value="data">Data Processing</option>
+            <option value="logic">Logic & Control</option>
+            <option value="integrations">Integrations</option>
+            <option value="ai_ml">AI & Machine Learning</option>
+            <option value="utilities">Utilities</option>
+        </select>
+        <select id="sort-by" class="form-control" style="width: 150px;">
+            <option value="name">Sort by Name</option>
+            <option value="category">Sort by Category</option>
+            <option value="popularity">Sort by Popularity</option>
+        </select>
+    </div>
+    
+    <div id="components-container">
+        <!-- Components will be loaded here -->
+    </div>
+    
+    <div id="loading" class="text-center py-4" style="display: none;">
+        <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+        <p class="mt-2">Loading components...</p>
+    </div>
+    
+    <div id="no-results" class="text-center py-4" style="display: none;">
+        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+        <h5>No components found</h5>
+        <p class="text-muted">Try adjusting your search criteria.</p>
+    </div>
+</div>
+
+<!-- Component Detail Modal -->
+<div class="modal fade" id="component-detail-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="component-detail-title"></h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="component-detail-body">
+                <!-- Component details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="use-component-btn">
+                    <i class="fas fa-plus"></i> Use in Workflow
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadComponents();
+    setupEventHandlers();
+});
+
+let allComponents = [];
+let filteredComponents = [];
+
+function setupEventHandlers() {
+    // Search functionality
+    document.getElementById('component-search').addEventListener('input', filterComponents);
+    document.getElementById('category-filter').addEventListener('change', filterComponents);
+    document.getElementById('sort-by').addEventListener('change', sortAndRenderComponents);
+}
+
+async function loadComponents() {
+    try {
+        showLoading(true);
+        
+        const response = await fetch('/api/v1/workflow/components');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to load components');
+        }
+        
+        allComponents = result.components;
+        filteredComponents = [...allComponents];
+        
+        showLoading(false);
+        sortAndRenderComponents();
+        
+    } catch (error) {
+        console.error('Failed to load components:', error);
+        showError('Failed to load components: ' + error.message);
+        showLoading(false);
+    }
+}
+
+function filterComponents() {
+    const searchTerm = document.getElementById('component-search').value.toLowerCase();
+    const categoryFilter = document.getElementById('category-filter').value;
+    
+    filteredComponents = allComponents.filter(component => {
+        const matchesSearch = !searchTerm || 
+            component.name.toLowerCase().includes(searchTerm) ||
+            component.description.toLowerCase().includes(searchTerm) ||
+            (component.tags && component.tags.some(tag => tag.toLowerCase().includes(searchTerm)));
+        
+        const matchesCategory = !categoryFilter || component.category === categoryFilter;
+        
+        return matchesSearch && matchesCategory;
+    });
+    
+    sortAndRenderComponents();
+}
+
+function sortAndRenderComponents() {
+    const sortBy = document.getElementById('sort-by').value;
+    
+    switch (sortBy) {
+        case 'name':
+            filteredComponents.sort((a, b) => a.name.localeCompare(b.name));
+            break;
+        case 'category':
+            filteredComponents.sort((a, b) => {
+                const categoryCompare = a.category.localeCompare(b.category);
+                return categoryCompare !== 0 ? categoryCompare : a.name.localeCompare(b.name);
+            });
+            break;
+        case 'popularity':
+            filteredComponents.sort((a, b) => (b.usage_count || 0) - (a.usage_count || 0));
+            break;
+    }
+    
+    renderComponents();
+}
+
+function renderComponents() {
+    const container = document.getElementById('components-container');
+    const noResults = document.getElementById('no-results');
+    
+    if (filteredComponents.length === 0) {
+        container.style.display = 'none';
+        noResults.style.display = 'block';
+        return;
+    }
+    
+    container.style.display = 'block';
+    noResults.style.display = 'none';
+    
+    container.innerHTML = filteredComponents.map(component => createComponentCard(component)).join('');
+}
+
+function createComponentCard(component) {
+    const categoryColors = {
+        'triggers': '#e74c3c',
+        'data': '#3498db',
+        'logic': '#f39c12',
+        'integrations': '#9b59b6',
+        'ai_ml': '#1abc9c',
+        'utilities': '#95a5a6'
+    };
+    
+    const categoryIcons = {
+        'triggers': 'fa-play-circle',
+        'data': 'fa-database',
+        'logic': 'fa-code-branch',
+        'integrations': 'fa-plug',
+        'ai_ml': 'fa-brain',
+        'utilities': 'fa-tools'
+    };
+    
+    const color = categoryColors[component.category] || '#6c757d';
+    const icon = categoryIcons[component.category] || 'fa-cog';
+    
+    return `
+        <div class="component-card" onclick="showComponentDetail('${component.id}')">
+            <div class="component-header">
+                <div class="component-preview" style="background-color: ${color}20; color: ${color};">
+                    <i class="fas ${icon}"></i>
+                </div>
+                <div class="component-details">
+                    <h5>${component.name}</h5>
+                    <div class="component-category">${formatCategoryName(component.category)}</div>
+                </div>
+            </div>
+            
+            <div class="component-description">
+                ${component.description}
+            </div>
+            
+            <div class="component-meta">
+                <span><i class="fas fa-code"></i> Version ${component.version || '1.0.0'}</span>
+                <span><i class="fas fa-download"></i> Used ${component.usage_count || 0} times</span>
+                ${component.execution_type ? `<span><i class="fas fa-clock"></i> ${component.execution_type}</span>` : ''}
+            </div>
+            
+            ${renderComponentPorts(component)}
+        </div>
+    `;
+}
+
+function renderComponentPorts(component) {
+    let portsHtml = '';
+    
+    if (component.input_ports && component.input_ports.length > 0) {
+        portsHtml += '<div class="component-ports">';
+        portsHtml += component.input_ports.map(port => 
+            `<div class="port-info input">${port.name} (${port.type})</div>`
+        ).join('');
+        portsHtml += '</div>';
+    }
+    
+    if (component.output_ports && component.output_ports.length > 0) {
+        if (!portsHtml) portsHtml += '<div class="component-ports">';
+        portsHtml += component.output_ports.map(port => 
+            `<div class="port-info output">${port.name} (${port.type})</div>`
+        ).join('');
+        if (portsHtml.endsWith('<div class="component-ports">')) {
+            portsHtml += '</div>';
+        }
+    }
+    
+    if (portsHtml && !portsHtml.endsWith('</div>')) {
+        portsHtml += '</div>';
+    }
+    
+    return portsHtml;
+}
+
+function formatCategoryName(category) {
+    return category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function showComponentDetail(componentId) {
+    const component = allComponents.find(c => c.id === componentId);
+    if (!component) return;
+    
+    const modal = document.getElementById('component-detail-modal');
+    const title = document.getElementById('component-detail-title');
+    const body = document.getElementById('component-detail-body');
+    const useBtn = document.getElementById('use-component-btn');
+    
+    title.innerHTML = `
+        <i class="fas ${getCategoryIcon(component.category)}"></i>
+        ${component.name}
+        <small class="text-muted ml-2">v${component.version || '1.0.0'}</small>
+    `;
+    
+    body.innerHTML = createDetailContent(component);
+    
+    useBtn.onclick = () => {
+        window.open(`/workflow/designer?component=${componentId}`, '_blank');
+    };
+    
+    $(modal).modal('show');
+}
+
+function createDetailContent(component) {
+    return `
+        <div class="row">
+            <div class="col-md-8">
+                <h6>Description</h6>
+                <p>${component.description}</p>
+                
+                ${component.input_ports && component.input_ports.length > 0 ? `
+                <h6>Input Ports</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Required</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${component.input_ports.map(port => `
+                                <tr>
+                                    <td><code>${port.name}</code></td>
+                                    <td><span class="badge badge-info">${port.type}</span></td>
+                                    <td>${port.required ? '<span class="badge badge-danger">Yes</span>' : '<span class="badge badge-secondary">No</span>'}</td>
+                                    <td>${port.description || ''}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ` : ''}
+                
+                ${component.output_ports && component.output_ports.length > 0 ? `
+                <h6>Output Ports</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${component.output_ports.map(port => `
+                                <tr>
+                                    <td><code>${port.name}</code></td>
+                                    <td><span class="badge badge-success">${port.type}</span></td>
+                                    <td>${port.description || ''}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ` : ''}
+                
+                ${component.properties && component.properties.length > 0 ? `
+                <h6>Configuration Properties</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Type</th>
+                                <th>Required</th>
+                                <th>Default</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${component.properties.map(prop => `
+                                <tr>
+                                    <td><code>${prop.name}</code></td>
+                                    <td><span class="badge badge-primary">${prop.type}</span></td>
+                                    <td>${prop.required ? '<span class="badge badge-danger">Yes</span>' : '<span class="badge badge-secondary">No</span>'}</td>
+                                    <td>${prop.default_value !== undefined ? `<code>${prop.default_value}</code>` : '-'}</td>
+                                    <td>${prop.description || ''}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ` : ''}
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Component Info</h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="mb-0">
+                            <dt>Category</dt>
+                            <dd>${formatCategoryName(component.category)}</dd>
+                            
+                            <dt>Execution Type</dt>
+                            <dd>${component.execution_type || 'sync'}</dd>
+                            
+                            <dt>Usage Count</dt>
+                            <dd>${component.usage_count || 0} workflows</dd>
+                            
+                            ${component.tags && component.tags.length > 0 ? `
+                            <dt>Tags</dt>
+                            <dd>
+                                ${component.tags.map(tag => `<span class="badge badge-secondary badge-sm mr-1">${tag}</span>`).join('')}
+                            </dd>
+                            ` : ''}
+                            
+                            ${component.documentation_url ? `
+                            <dt>Documentation</dt>
+                            <dd><a href="${component.documentation_url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-external-link-alt"></i> View Docs
+                            </a></dd>
+                            ` : ''}
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getCategoryIcon(category) {
+    const iconMap = {
+        'triggers': 'fa-play-circle',
+        'data': 'fa-database',
+        'logic': 'fa-code-branch',
+        'integrations': 'fa-plug',
+        'ai_ml': 'fa-brain',
+        'utilities': 'fa-tools'
+    };
+    return iconMap[category] || 'fa-cog';
+}
+
+function showLoading(show) {
+    const loading = document.getElementById('loading');
+    const container = document.getElementById('components-container');
+    
+    if (show) {
+        loading.style.display = 'block';
+        container.style.display = 'none';
+    } else {
+        loading.style.display = 'none';
+        container.style.display = 'block';
+    }
+}
+
+function showError(message) {
+    const container = document.getElementById('components-container');
+    container.innerHTML = `
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle"></i>
+            ${message}
+        </div>
+    `;
+}
+</script>
+{% endblock %}

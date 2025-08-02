@@ -1,0 +1,577 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('workflow_designer.static', filename='css/designer.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+    .templates-gallery {
+        padding: 20px;
+    }
+    .template-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 0;
+        margin-bottom: 20px;
+        background: white;
+        transition: all 0.15s;
+        overflow: hidden;
+    }
+    .template-card:hover {
+        border-color: #007bff;
+        box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+        transform: translateY(-2px);
+    }
+    .template-preview {
+        height: 120px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 2rem;
+    }
+    .template-preview.business { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .template-preview.data { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .template-preview.ai { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .template-preview.automation { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .template-preview.integration { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }
+    .template-preview.analytics { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); }
+    
+    .template-content {
+        padding: 16px;
+    }
+    .template-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+    .template-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0;
+        color: #495057;
+    }
+    .template-category {
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 500;
+    }
+    .template-description {
+        color: #6c757d;
+        font-size: 14px;
+        line-height: 1.4;
+        margin-bottom: 12px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .template-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: #6c757d;
+        margin-bottom: 12px;
+    }
+    .template-stats {
+        display: flex;
+        gap: 12px;
+    }
+    .template-actions {
+        display: flex;
+        gap: 8px;
+    }
+    .template-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    .search-header {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 30px;
+        align-items: center;
+    }
+    .search-header input {
+        flex: 1;
+    }
+    .category-tabs {
+        border-bottom: 1px solid #dee2e6;
+        margin-bottom: 30px;
+    }
+    .category-tabs .nav-link {
+        border: none;
+        color: #6c757d;
+        border-bottom: 3px solid transparent;
+        transition: all 0.15s;
+    }
+    .category-tabs .nav-link.active {
+        color: #007bff;
+        border-bottom-color: #007bff;
+        background: none;
+    }
+    .featured-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: #ffc107;
+        color: #212529;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="templates-gallery">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Workflow Templates</h2>
+            <p class="text-muted">Pre-built workflows to get you started quickly</p>
+        </div>
+        <div>
+            <a href="{{ url_for('workflow_designer.designer') }}" class="btn btn-outline-primary mr-2">
+                <i class="fas fa-arrow-left"></i> Back to Designer
+            </a>
+            <a href="{{ url_for('workflow_designer.designer') }}?template=blank" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Create Blank Workflow
+            </a>
+        </div>
+    </div>
+    
+    <div class="search-header">
+        <input type="text" id="template-search" class="form-control" placeholder="Search templates...">
+        <select id="sort-by" class="form-control" style="width: 150px;">
+            <option value="name">Sort by Name</option>
+            <option value="category">Sort by Category</option>
+            <option value="popularity">Sort by Popularity</option>
+            <option value="recent">Sort by Recent</option>
+        </select>
+    </div>
+    
+    <ul class="nav nav-tabs category-tabs" id="category-tabs">
+        <li class="nav-item">
+            <a class="nav-link active" href="#" data-category="">All Templates</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-category="business">Business Process</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-category="data">Data Processing</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-category="ai">AI & Machine Learning</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-category="automation">Automation</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-category="integration">Integration</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-category="analytics">Analytics</a>
+        </li>
+    </ul>
+    
+    <div id="templates-container" class="template-grid">
+        <!-- Templates will be loaded here -->
+    </div>
+    
+    <div id="loading" class="text-center py-5" style="display: none;">
+        <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+        <p class="mt-3">Loading templates...</p>
+    </div>
+    
+    <div id="no-results" class="text-center py-5" style="display: none;">
+        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+        <h5>No templates found</h5>
+        <p class="text-muted">Try adjusting your search criteria or browse different categories.</p>
+    </div>
+</div>
+
+<!-- Template Preview Modal -->
+<div class="modal fade" id="template-preview-modal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="template-preview-title"></h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="template-preview-body">
+                <!-- Template preview will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="use-template-btn">
+                    <i class="fas fa-rocket"></i> Use This Template
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadTemplates();
+    setupEventHandlers();
+});
+
+let allTemplates = [];
+let filteredTemplates = [];
+let currentCategory = '';
+
+function setupEventHandlers() {
+    // Search functionality
+    document.getElementById('template-search').addEventListener('input', filterTemplates);
+    document.getElementById('sort-by').addEventListener('change', sortAndRenderTemplates);
+    
+    // Category tabs
+    document.querySelectorAll('.category-tabs .nav-link').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            // Update active tab
+            document.querySelectorAll('.category-tabs .nav-link').forEach(t => t.classList.remove('active'));
+            e.target.classList.add('active');
+            
+            // Filter by category
+            currentCategory = e.target.dataset.category;
+            filterTemplates();
+        });
+    });
+}
+
+async function loadTemplates() {
+    try {
+        showLoading(true);
+        
+        const response = await fetch('/api/v1/workflow/templates');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to load templates');
+        }
+        
+        allTemplates = result.templates;
+        filteredTemplates = [...allTemplates];
+        
+        showLoading(false);
+        sortAndRenderTemplates();
+        
+    } catch (error) {
+        console.error('Failed to load templates:', error);
+        showError('Failed to load templates: ' + error.message);
+        showLoading(false);
+    }
+}
+
+function filterTemplates() {
+    const searchTerm = document.getElementById('template-search').value.toLowerCase();
+    
+    filteredTemplates = allTemplates.filter(template => {
+        const matchesSearch = !searchTerm || 
+            template.name.toLowerCase().includes(searchTerm) ||
+            template.description.toLowerCase().includes(searchTerm) ||
+            (template.tags && template.tags.some(tag => tag.toLowerCase().includes(searchTerm)));
+        
+        const matchesCategory = !currentCategory || template.category === currentCategory;
+        
+        return matchesSearch && matchesCategory;
+    });
+    
+    sortAndRenderTemplates();
+}
+
+function sortAndRenderTemplates() {
+    const sortBy = document.getElementById('sort-by').value;
+    
+    switch (sortBy) {
+        case 'name':
+            filteredTemplates.sort((a, b) => a.name.localeCompare(b.name));
+            break;
+        case 'category':
+            filteredTemplates.sort((a, b) => {
+                const categoryCompare = a.category.localeCompare(b.category);
+                return categoryCompare !== 0 ? categoryCompare : a.name.localeCompare(b.name);
+            });
+            break;
+        case 'popularity':
+            filteredTemplates.sort((a, b) => (b.usage_count || 0) - (a.usage_count || 0));
+            break;
+        case 'recent':
+            filteredTemplates.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            break;
+    }
+    
+    renderTemplates();
+}
+
+function renderTemplates() {
+    const container = document.getElementById('templates-container');
+    const noResults = document.getElementById('no-results');
+    
+    if (filteredTemplates.length === 0) {
+        container.style.display = 'none';
+        noResults.style.display = 'block';
+        return;
+    }
+    
+    container.style.display = 'grid';
+    noResults.style.display = 'none';
+    
+    container.innerHTML = filteredTemplates.map(template => createTemplateCard(template)).join('');
+}
+
+function createTemplateCard(template) {
+    const categoryInfo = getCategoryInfo(template.category);
+    
+    return `
+        <div class="template-card" onclick="showTemplatePreview('${template.id}')">
+            <div class="template-preview ${template.category}">
+                ${template.featured ? '<div class="featured-badge">Featured</div>' : ''}
+                <i class="fas ${categoryInfo.icon}"></i>
+            </div>
+            
+            <div class="template-content">
+                <div class="template-header">
+                    <h5 class="template-title">${template.name}</h5>
+                    <span class="template-category badge" style="background-color: ${categoryInfo.color};">
+                        ${categoryInfo.name}
+                    </span>
+                </div>
+                
+                <div class="template-description">
+                    ${template.description}
+                </div>
+                
+                <div class="template-meta">
+                    <div class="template-stats">
+                        <span><i class="fas fa-download"></i> ${template.usage_count || 0}</span>
+                        <span><i class="fas fa-clock"></i> ${template.complexity || 'Medium'}</span>
+                        <span><i class="fas fa-layer-group"></i> ${template.component_count || 0} components</span>
+                    </div>
+                </div>
+                
+                <div class="template-actions">
+                    <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); showTemplatePreview('${template.id}')">
+                        <i class="fas fa-eye"></i> Preview
+                    </button>
+                    <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); useTemplate('${template.id}')">
+                        <i class="fas fa-rocket"></i> Use Template
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getCategoryInfo(category) {
+    const categories = {
+        'business': { name: 'Business', icon: 'fa-briefcase', color: '#e74c3c' },
+        'data': { name: 'Data', icon: 'fa-database', color: '#3498db' },
+        'ai': { name: 'AI/ML', icon: 'fa-brain', color: '#1abc9c' },
+        'automation': { name: 'Automation', icon: 'fa-robot', color: '#f39c12' },
+        'integration': { name: 'Integration', icon: 'fa-plug', color: '#9b59b6' },
+        'analytics': { name: 'Analytics', icon: 'fa-chart-line', color: '#e67e22' }
+    };
+    
+    return categories[category] || { name: 'Other', icon: 'fa-cog', color: '#95a5a6' };
+}
+
+function showTemplatePreview(templateId) {
+    const template = allTemplates.find(t => t.id === templateId);
+    if (!template) return;
+    
+    const modal = document.getElementById('template-preview-modal');
+    const title = document.getElementById('template-preview-title');
+    const body = document.getElementById('template-preview-body');
+    const useBtn = document.getElementById('use-template-btn');
+    
+    const categoryInfo = getCategoryInfo(template.category);
+    
+    title.innerHTML = `
+        <i class="fas ${categoryInfo.icon}" style="color: ${categoryInfo.color}"></i>
+        ${template.name}
+        ${template.featured ? '<span class="badge badge-warning ml-2">Featured</span>' : ''}
+    `;
+    
+    body.innerHTML = createPreviewContent(template);
+    
+    useBtn.onclick = () => {
+        $(modal).modal('hide');
+        useTemplate(templateId);
+    };
+    
+    $(modal).modal('show');
+}
+
+function createPreviewContent(template) {
+    return `
+        <div class="row">
+            <div class="col-md-8">
+                <div class="template-preview-image">
+                    <div class="workflow-diagram" style="height: 300px; background: #f8f9fa; border: 1px dashed #dee2e6; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #6c757d;">
+                        <div class="text-center">
+                            <i class="fas fa-project-diagram fa-3x mb-3"></i>
+                            <p>Workflow diagram would be displayed here</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>Description</h6>
+                    <p>${template.description}</p>
+                    
+                    ${template.components && template.components.length > 0 ? `
+                    <h6>Included Components</h6>
+                    <div class="row">
+                        ${template.components.map(component => `
+                            <div class="col-md-6 mb-2">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas ${getComponentIcon(component.type)} mr-2"></i>
+                                    <span>${component.name}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    ` : ''}
+                    
+                    ${template.use_cases && template.use_cases.length > 0 ? `
+                    <h6>Use Cases</h6>
+                    <ul>
+                        ${template.use_cases.map(useCase => `<li>${useCase}</li>`).join('')}
+                    </ul>
+                    ` : ''}
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Template Details</h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="mb-0">
+                            <dt>Category</dt>
+                            <dd>${getCategoryInfo(template.category).name}</dd>
+                            
+                            <dt>Complexity</dt>
+                            <dd>
+                                <span class="badge badge-${getComplexityColor(template.complexity)}">${template.complexity || 'Medium'}</span>
+                            </dd>
+                            
+                            <dt>Components</dt>
+                            <dd>${template.component_count || 0} components</dd>
+                            
+                            <dt>Estimated Setup Time</dt>
+                            <dd>${template.setup_time || '15-30 minutes'}</dd>
+                            
+                            <dt>Usage Count</dt>
+                            <dd>${template.usage_count || 0} times</dd>
+                            
+                            ${template.tags && template.tags.length > 0 ? `
+                            <dt>Tags</dt>
+                            <dd>
+                                ${template.tags.map(tag => `<span class="badge badge-secondary badge-sm mr-1">${tag}</span>`).join('')}
+                            </dd>
+                            ` : ''}
+                            
+                            ${template.documentation_url ? `
+                            <dt>Documentation</dt>
+                            <dd><a href="${template.documentation_url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-external-link-alt"></i> View Guide
+                            </a></dd>
+                            ` : ''}
+                        </dl>
+                    </div>
+                </div>
+                
+                ${template.requirements && template.requirements.length > 0 ? `
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Requirements</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="mb-0 pl-3">
+                            ${template.requirements.map(req => `<li>${req}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function getComponentIcon(type) {
+    const iconMap = {
+        'trigger': 'fa-play-circle',
+        'data': 'fa-database',
+        'logic': 'fa-code-branch',
+        'integration': 'fa-plug',
+        'ai': 'fa-brain',
+        'utility': 'fa-tools'
+    };
+    return iconMap[type] || 'fa-cog';
+}
+
+function getComplexityColor(complexity) {
+    const colorMap = {
+        'Simple': 'success',
+        'Medium': 'warning',
+        'Complex': 'danger'
+    };
+    return colorMap[complexity] || 'secondary';
+}
+
+function useTemplate(templateId) {
+    // Redirect to designer with template parameter
+    window.location.href = `/workflow/designer?template=${templateId}`;
+}
+
+function showLoading(show) {
+    const loading = document.getElementById('loading');
+    const container = document.getElementById('templates-container');
+    
+    if (show) {
+        loading.style.display = 'block';
+        container.style.display = 'none';
+    } else {
+        loading.style.display = 'none';
+        container.style.display = 'grid';
+    }
+}
+
+function showError(message) {
+    const container = document.getElementById('templates-container');
+    container.innerHTML = `
+        <div class="col-12">
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                ${message}
+            </div>
+        </div>
+    `;
+}
+</script>
+{% endblock %}

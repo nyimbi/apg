@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% if workflow %}{{ workflow.name }} - {% endif %}Workflow Designer | APG Workflow Orchestration</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="{{ url_for('static', filename='workflow_orchestration/fonts/roboto-v30-latin-regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+    
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='workflow_orchestration/css/workflow_canvas.css') }}">
+    
+    <!-- Meta tags for PWA -->
+    <meta name="theme-color" content="#1976d2">
+    <meta name="description" content="Visual workflow designer with drag-drop interface for APG Workflow Orchestration">
+    
+    <!-- Open Graph meta tags -->
+    <meta property="og:title" content="APG Workflow Designer">
+    <meta property="og:description" content="Visual workflow designer with drag-drop interface">
+    <meta property="og:type" content="website">
+    
+    <style>
+        /* Critical CSS for initial load */
+        #workflow-canvas-root {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #fafafa;
+        }
+        
+        .loading-spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+        }
+        
+        .loading-spinner::after {
+            content: '';
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1976d2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 9999;
+            background: white;
+            padding: 32px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-width: 400px;
+        }
+        
+        .error-icon {
+            font-size: 48px;
+            color: #f44336;
+            margin-bottom: 16px;
+        }
+        
+        .error-title {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .error-message {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 16px;
+        }
+        
+        .error-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .error-button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .error-button:hover {
+            background: #f5f5f5;
+        }
+        
+        .error-button.primary {
+            background: #1976d2;
+            color: white;
+            border-color: #1976d2;
+        }
+        
+        .error-button.primary:hover {
+            background: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Canvas Container -->
+    <div id="workflow-canvas-root" 
+         class="workflow-canvas-container"
+         data-workflow="{{ workflow | tojson | safe if workflow else '{}' }}"
+         data-readonly="{{ 'true' if readonly else 'false' }}"
+         data-collaborators="{{ collaborators | tojson | safe if collaborators else '[]' }}"
+         data-user-id="{{ current_user.id if current_user else 'anonymous' }}"
+         data-tenant-id="{{ current_user.tenant_id if current_user else 'default' }}">
+        
+        <!-- Loading Spinner -->
+        <div class="loading-spinner" id="loading-spinner"></div>
+    </div>
+    
+    <!-- Error Container (hidden by default) -->
+    <div class="error-container" id="error-container" style="display: none;">
+        <div class="error-icon">⚠️</div>
+        <div class="error-title">Failed to Load Workflow Designer</div>
+        <div class="error-message" id="error-message">
+            An unexpected error occurred while loading the workflow designer.
+        </div>
+        <div class="error-actions">
+            <button class="error-button" onclick="window.location.reload()">
+                Reload Page
+            </button>
+            <button class="error-button primary" onclick="window.history.back()">
+                Go Back
+            </button>
+        </div>
+    </div>
+    
+    <!-- Context Menu Template -->
+    <div id="context-menu-template" style="display: none;">
+        <div class="context-menu">
+            <div class="context-menu-item" data-action="copy">
+                <i class="material-icons">content_copy</i>
+                Copy
+            </div>
+            <div class="context-menu-item" data-action="paste">
+                <i class="material-icons">content_paste</i>
+                Paste
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" data-action="edit">
+                <i class="material-icons">edit</i>
+                Edit Properties
+            </div>
+            <div class="context-menu-item" data-action="duplicate">
+                <i class="material-icons">file_copy</i>
+                Duplicate
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" data-action="delete">
+                <i class="material-icons">delete</i>
+                Delete
+            </div>
+        </div>
+    </div>
+    
+    <!-- Workflow Data -->
+    <script type="application/json" id="workflow-data">
+        {
+            "workflow": {{ workflow | tojson | safe if workflow else 'null' }},
+            "templates": {{ templates | tojson | safe if templates else '[]' }},
+            "connectors": {{ connectors | tojson | safe if connectors else '[]' }},
+            "user": {
+                "id": "{{ current_user.id if current_user else 'anonymous' }}",
+                "name": "{{ current_user.name if current_user else 'Anonymous User' }}",
+                "email": "{{ current_user.email if current_user else '' }}",
+                "tenant_id": "{{ current_user.tenant_id if current_user else 'default' }}",
+                "permissions": {{ current_user.permissions | tojson | safe if current_user and current_user.permissions else '[]' }}
+            },
+            "config": {
+                "readonly": {{ 'true' if readonly else 'false' }},
+                "collaboration_enabled": {{ 'true' if collaboration_enabled else 'false' }},
+                "auto_save_interval": {{ auto_save_interval | default(30000) }},
+                "max_canvas_size": {
+                    "width": {{ max_canvas_width | default(5000) }},
+                    "height": {{ max_canvas_height | default(3000) }}
+                },
+                "grid_size": {{ grid_size | default(20) }},
+                "component_size": {
+                    "width": {{ component_width | default(120) }},
+                    "height": {{ component_height | default(80) }}
+                }
+            },
+            "api_endpoints": {
+                "workflows": "{{ url_for('WorkflowOrchestrationView.api_workflows') }}",
+                "templates": "{{ url_for('WorkflowOrchestrationView.api_templates') }}",
+                "connectors": "{{ url_for('WorkflowOrchestrationView.api_connectors') }}",
+                "execute": "{{ url_for('WorkflowOrchestrationView.api_execute') }}",
+                "validate": "{{ url_for('WorkflowOrchestrationView.api_validate') }}",
+                "websocket": "{{ websocket_url if websocket_url else '/ws/workflow' }}"
+            }
+        }
+    </script>
+    
+    <!-- Error Handling -->
+    <script>
+        // Global error handler
+        window.addEventListener('error', function(event) {
+            console.error('Global error:', event.error);
+            showError('JavaScript Error', event.error.message || 'An unexpected error occurred');
+        });
+        
+        // Unhandled promise rejection handler
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            showError('Promise Rejection', event.reason?.message || 'An unexpected error occurred');
+        });
+        
+        function showError(title, message) {
+            const errorContainer = document.getElementById('error-container');
+            const errorMessage = document.getElementById('error-message');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            
+            if (errorContainer && errorMessage) {
+                document.querySelector('.error-title').textContent = title;
+                errorMessage.textContent = message;
+                errorContainer.style.display = 'block';
+            }
+            
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+        
+        // Hide loading spinner when React app loads
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                const loadingSpinner = document.getElementById('loading-spinner');
+                if (loadingSpinner && !document.querySelector('.error-container[style*="block"]')) {
+                    loadingSpinner.style.display = 'none';
+                }
+            }, 1000);
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // Ctrl/Cmd + S to save
+            if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+                event.preventDefault();
+                // This will be handled by the React app
+                window.dispatchEvent(new CustomEvent('workflow:save'));
+            }
+            
+            // Ctrl/Cmd + Z to undo
+            if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+                event.preventDefault();
+                window.dispatchEvent(new CustomEvent('workflow:undo'));
+            }
+            
+            // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y to redo
+            if ((event.ctrlKey || event.metaKey) && 
+                ((event.shiftKey && event.key === 'Z') || event.key === 'y')) {
+                event.preventDefault();
+                window.dispatchEvent(new CustomEvent('workflow:redo'));
+            }
+            
+            // F11 for fullscreen
+            if (event.key === 'F11') {
+                event.preventDefault();
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    document.documentElement.requestFullscreen();
+                }
+            }
+        });
+        
+        // Prevent accidental page navigation
+        window.addEventListener('beforeunload', function(event) {
+            if (window.workflowHasUnsavedChanges) {
+                event.preventDefault();
+                event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                return event.returnValue;
+            }
+        });
+        
+        // Performance monitoring
+        if ('performance' in window) {
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    const perfData = performance.getEntriesByType('navigation')[0];
+                    if (perfData) {
+                        console.log('Page load performance:', {
+                            loadTime: Math.round(perfData.loadEventEnd - perfData.loadEventStart),
+                            domContentLoaded: Math.round(perfData.domContentLoadedEventEnd - perfData.domContentLoadedEventStart),
+                            totalTime: Math.round(perfData.loadEventEnd - perfData.fetchStart)
+                        });
+                    }
+                }, 100);
+            });
+        }
+    </script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/static/workflow_orchestration/sw.js')
+                    .then(function(registration) {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(function(error) {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+    </script>
+    
+    <!-- React Application Bundle -->
+    {% if config.ENV == 'development' %}
+        <!-- Development bundles -->
+        <script src="{{ url_for('static', filename='workflow_orchestration/js/vendors.js') }}"></script>
+        <script src="{{ url_for('static', filename='workflow_orchestration/js/react.js') }}"></script>
+        <script src="{{ url_for('static', filename='workflow_orchestration/js/mui.js') }}"></script>
+        <script src="{{ url_for('static', filename='workflow_orchestration/js/dnd.js') }}"></script>
+        <script src="{{ url_for('static', filename='workflow_orchestration/js/workflow_canvas.js') }}"></script>
+        <script src="{{ url_for('static', filename='workflow_orchestration/js/main.js') }}"></script>
+    {% else %}
+        <!-- Production bundles with content hashing -->
+        <script src="{{ url_for('static', filename='workflow_orchestration/dist/js/vendors.' + asset_hash + '.js') }}"></script>
+        <script src="{{ url_for('static', filename='workflow_orchestration/dist/js/react.' + asset_hash + '.js') }}"></script>  
+        <script src="{{ url_for('static', filename='workflow_orchestration/dist/js/mui.' + asset_hash + '.js') }}"></script>
+        <script src="{{ url_for('static', filename='workflow_orchestration/dist/js/dnd.' + asset_hash + '.js') }}"></script>
+        <script src="{{ url_for('static', filename='workflow_orchestration/dist/js/workflow_canvas.' + asset_hash + '.js') }}"></script>
+        <script src="{{ url_for('static', filename='workflow_orchestration/dist/js/main.' + asset_hash + '.js') }}"></script>
+    {% endif %}
+    
+    <!-- Analytics (if enabled) -->
+    {% if analytics_enabled %}
+    <script>
+        // Analytics tracking code would go here
+        console.log('Analytics tracking initialized');
+    </script>
+    {% endif %}
+</body>
+</html>

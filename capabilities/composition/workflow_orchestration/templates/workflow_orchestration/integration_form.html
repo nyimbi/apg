@@ -1,0 +1,542 @@
+{% extends "appbuilder/general/widgets/base.html" %}
+
+{% block head_css %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/workflow_orchestration.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .auth-config-section {
+            display: none;
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 0.375rem;
+            border: 1px solid #dee2e6;
+        }
+        
+        .auth-config-section.show {
+            display: block;
+        }
+        
+        .form-help-text {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+        
+        .endpoint-preview {
+            background-color: #e9ecef;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h2 mb-0">
+                    <i class="fas fa-plug text-primary me-2"></i>
+                    {{ title }}
+                </h1>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('WOIntegrationsView.list') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> {{ _('Back to Integrations') }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Integration Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-cog me-2"></i>
+                        {{ _('Integration Configuration') }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="integrationForm">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Basic Information -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.name.id }}" class="form-label">
+                                    {{ form.name.label.text }}
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.name(class="form-control") }}
+                                {% if form.name.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.name.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-help-text">
+                                    {{ _('A descriptive name for this integration') }}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="{{ form.type.id }}" class="form-label">
+                                    {{ form.type.label.text }}
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.type(class="form-control", onchange="updateTypeHelp()") }}
+                                {% if form.type.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.type.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-help-text" id="typeHelpText">
+                                    {{ _('Select the type of system you are integrating with') }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Endpoint Configuration -->
+                        <div class="mb-3">
+                            <label for="{{ form.endpoint.id }}" class="form-label">
+                                {{ form.endpoint.label.text }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.endpoint(class="form-control", placeholder="https://api.example.com/endpoint", oninput="updateEndpointPreview()") }}
+                            {% if form.endpoint.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.endpoint.errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-help-text">
+                                {{ _('The base URL or endpoint for the integration') }}
+                            </div>
+                            <div class="endpoint-preview" id="endpointPreview" style="display: none;">
+                                <strong>{{ _('Preview:') }}</strong> <span id="endpointPreviewText"></span>
+                            </div>
+                        </div>
+
+                        <!-- Tenant Configuration -->
+                        <div class="mb-3">
+                            <label for="{{ form.tenant_id.id }}" class="form-label">
+                                {{ form.tenant_id.label.text }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.tenant_id(class="form-control") }}
+                            {% if form.tenant_id.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.tenant_id.errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-help-text">
+                                {{ _('Tenant identifier for multi-tenant isolation') }}
+                            </div>
+                        </div>
+
+                        <!-- Authentication Section -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-shield-alt me-2"></i>
+                                    {{ _('Authentication Configuration') }}
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="{{ form.auth_type.id }}" class="form-label">
+                                        {{ form.auth_type.label.text }}
+                                    </label>
+                                    {{ form.auth_type(class="form-control", onchange="toggleAuthConfig()") }}
+                                    {% if form.auth_type.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.auth_type.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Authentication Configuration -->
+                                <div class="auth-config-section" id="authConfigSection">
+                                    <label for="{{ form.auth_config.id }}" class="form-label">
+                                        {{ form.auth_config.label.text }}
+                                    </label>
+                                    {{ form.auth_config(class="form-control", rows="6") }}
+                                    {% if form.auth_config.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.auth_config.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-help-text" id="authConfigHelp">
+                                        {{ _('Authentication configuration in JSON format') }}
+                                    </div>
+                                    
+                                    <!-- Auth Config Examples -->
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <a href="#" onclick="showAuthExample()" class="text-decoration-none">
+                                                <i class="fas fa-question-circle"></i> {{ _('Show examples') }}
+                                            </a>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- HTTP Headers -->
+                        <div class="mb-3">
+                            <label for="{{ form.headers.id }}" class="form-label">{{ form.headers.label.text }}</label>
+                            {{ form.headers(class="form-control", rows="4") }}
+                            {% if form.headers.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.headers.errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-help-text">
+                                {{ _('Default HTTP headers to include with requests (JSON format)') }}
+                            </div>
+                        </div>
+
+                        <!-- Performance Settings -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-tachometer-alt me-2"></i>
+                                    {{ _('Performance & Reliability Settings') }}
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label for="{{ form.timeout_seconds.id }}" class="form-label">
+                                            {{ form.timeout_seconds.label.text }}
+                                        </label>
+                                        {{ form.timeout_seconds(class="form-control") }}
+                                        {% if form.timeout_seconds.errors %}
+                                            <div class="text-danger small">
+                                                {% for error in form.timeout_seconds.errors %}
+                                                    <div>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-help-text">
+                                            {{ _('Request timeout in seconds') }}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.retry_attempts.id }}" class="form-label">
+                                            {{ form.retry_attempts.label.text }}
+                                        </label>
+                                        {{ form.retry_attempts(class="form-control") }}
+                                        {% if form.retry_attempts.errors %}
+                                            <div class="text-danger small">
+                                                {% for error in form.retry_attempts.errors %}
+                                                    <div>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-help-text">
+                                            {{ _('Number of retry attempts on failure') }}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.retry_delay_seconds.id }}" class="form-label">
+                                            {{ form.retry_delay_seconds.label.text }}
+                                        </label>
+                                        {{ form.retry_delay_seconds(class="form-control") }}
+                                        {% if form.retry_delay_seconds.errors %}
+                                            <div class="text-danger small">
+                                                {% for error in form.retry_delay_seconds.errors %}
+                                                    <div>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-help-text">
+                                            {{ _('Delay between retry attempts') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Status -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.is_active(class="form-check-input") }}
+                                <label class="form-check-label" for="{{ form.is_active.id }}">
+                                    {{ form.is_active.label.text }}
+                                </label>
+                            </div>
+                            <div class="form-help-text">
+                                {{ _('Enable or disable this integration') }}
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('WOIntegrationsView.list') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> {{ _('Cancel') }}
+                            </a>
+                            <div>
+                                <button type="button" class="btn btn-outline-info me-2" onclick="validateForm()">
+                                    <i class="fas fa-check-circle"></i> {{ _('Validate') }}
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> {{ _('Save Integration') }}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Panel -->
+        <div class="col-lg-4">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-question-circle me-2"></i>
+                        {{ _('Integration Help') }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="helpContent">
+                        <h6>{{ _('Getting Started') }}</h6>
+                        <p class="small text-muted">
+                            {{ _('Fill in the basic information and select the integration type to see specific configuration options.') }}
+                        </p>
+                        
+                        <h6 class="mt-3">{{ _('Authentication Types') }}</h6>
+                        <ul class="small text-muted">
+                            <li><strong>None:</strong> {{ _('No authentication required') }}</li>
+                            <li><strong>API Key:</strong> {{ _('Simple API key authentication') }}</li>
+                            <li><strong>Bearer Token:</strong> {{ _('OAuth 2.0 bearer token') }}</li>
+                            <li><strong>Basic Auth:</strong> {{ _('HTTP basic authentication') }}</li>
+                            <li><strong>JWT:</strong> {{ _('JSON Web Token authentication') }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auth Examples Modal Trigger -->
+            <div class="card shadow mt-3" style="display: none;" id="authExamplesCard">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-code me-2"></i>
+                        {{ _('Authentication Examples') }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="authExamples">
+                        <!-- Examples will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    
+    <script>
+        // Authentication configuration examples
+        const authExamples = {
+            'api_key': {
+                title: '{{ _("API Key Example") }}',
+                config: JSON.stringify({
+                    "key": "your-api-key-here",
+                    "header": "X-API-Key"
+                }, null, 2),
+                description: '{{ _("Configure API key authentication with custom header name") }}'
+            },
+            'bearer_token': {
+                title: '{{ _("Bearer Token Example") }}',
+                config: JSON.stringify({
+                    "token": "your-bearer-token-here"
+                }, null, 2),
+                description: '{{ _("Configure OAuth 2.0 bearer token authentication") }}'
+            },
+            'basic_auth': {
+                title: '{{ _("Basic Auth Example") }}',
+                config: JSON.stringify({
+                    "username": "your-username",
+                    "password": "your-password"
+                }, null, 2),
+                description: '{{ _("Configure HTTP basic authentication") }}'
+            },
+            'oauth2': {
+                title: '{{ _("OAuth 2.0 Example") }}',
+                config: JSON.stringify({
+                    "client_id": "your-client-id",
+                    "client_secret": "your-client-secret",
+                    "token_url": "https://auth.example.com/oauth/token",
+                    "scope": "read write"
+                }, null, 2),
+                description: '{{ _("Configure OAuth 2.0 client credentials flow") }}'
+            },
+            'jwt': {
+                title: '{{ _("JWT Example") }}',
+                config: JSON.stringify({
+                    "token": "your-jwt-token-here"
+                }, null, 2),
+                description: '{{ _("Configure JSON Web Token authentication") }}'
+            },
+            'custom': {
+                title: '{{ _("Custom Headers Example") }}',
+                config: JSON.stringify({
+                    "headers": {
+                        "Authorization": "Custom your-token",
+                        "X-Custom-Header": "custom-value"
+                    }
+                }, null, 2),
+                description: '{{ _("Configure custom authentication headers") }}'
+            }
+        };
+
+        // Integration type help texts
+        const typeHelpTexts = {
+            'rest_api': '{{ _("REST API integration for HTTP-based services") }}',
+            'graphql': '{{ _("GraphQL API integration for query-based services") }}',
+            'database': '{{ _("Direct database connection integration") }}',
+            'message_queue': '{{ _("Message queue integration (RabbitMQ, Kafka, etc.)") }}',
+            'file_system': '{{ _("File system integration for file operations") }}',
+            'cloud_service': '{{ _("Cloud service integration (AWS, Azure, GCP)") }}',
+            'webhook': '{{ _("Webhook integration for real-time notifications") }}',
+            'apg_capability': '{{ _("APG capability integration for internal services") }}'
+        };
+
+        function toggleAuthConfig() {
+            const authType = document.getElementById('{{ form.auth_type.id }}').value;
+            const authSection = document.getElementById('authConfigSection');
+            const authHelp = document.getElementById('authConfigHelp');
+            
+            if (authType === 'none') {
+                authSection.classList.remove('show');
+            } else {
+                authSection.classList.add('show');
+                
+                // Update help text based on auth type
+                if (authExamples[authType]) {
+                    authHelp.innerHTML = authExamples[authType].description;
+                }
+            }
+        }
+
+        function updateTypeHelp() {
+            const type = document.getElementById('{{ form.type.id }}').value;
+            const helpText = document.getElementById('typeHelpText');
+            
+            if (typeHelpTexts[type]) {
+                helpText.textContent = typeHelpTexts[type];
+            }
+        }
+
+        function updateEndpointPreview() {
+            const endpoint = document.getElementById('{{ form.endpoint.id }}').value;
+            const preview = document.getElementById('endpointPreview');
+            const previewText = document.getElementById('endpointPreviewText');
+            
+            if (endpoint) {
+                previewText.textContent = endpoint;
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        function showAuthExample() {
+            const authType = document.getElementById('{{ form.auth_type.id }}').value;
+            const examplesCard = document.getElementById('authExamplesCard');
+            const examplesDiv = document.getElementById('authExamples');
+            
+            if (authExamples[authType]) {
+                const example = authExamples[authType];
+                examplesDiv.innerHTML = `
+                    <h6>${example.title}</h6>
+                    <p class="small text-muted">${example.description}</p>
+                    <pre class="bg-light p-2 rounded"><code>${example.config}</code></pre>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="useExample('${authType}')">
+                        <i class="fas fa-copy"></i> {{ _('Use This Example') }}
+                    </button>
+                `;
+                examplesCard.style.display = 'block';
+            }
+        }
+
+        function useExample(authType) {
+            if (authExamples[authType]) {
+                document.getElementById('{{ form.auth_config.id }}').value = authExamples[authType].config;
+            }
+        }
+
+        function validateForm() {
+            const form = document.getElementById('integrationForm');
+            const formData = new FormData(form);
+            
+            // Basic validation
+            const name = formData.get('name');
+            const endpoint = formData.get('endpoint');
+            const tenantId = formData.get('tenant_id');
+            
+            if (!name || !endpoint || !tenantId) {
+                alert('{{ _("Please fill in all required fields.") }}');
+                return;
+            }
+            
+            // Validate JSON fields
+            const authConfig = formData.get('auth_config');
+            const headers = formData.get('headers');
+            
+            if (authConfig) {
+                try {
+                    JSON.parse(authConfig);
+                } catch (e) {
+                    alert('{{ _("Invalid JSON in authentication configuration.") }}');
+                    return;
+                }
+            }
+            
+            if (headers) {
+                try {
+                    JSON.parse(headers);
+                } catch (e) {
+                    alert('{{ _("Invalid JSON in headers configuration.") }}');
+                    return;
+                }
+            }
+            
+            alert('{{ _("Form validation passed! You can now save the integration.") }}');
+        }
+
+        // Initialize form
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleAuthConfig();
+            updateTypeHelp();
+            updateEndpointPreview();
+        });
+    </script>
+{% endblock %}

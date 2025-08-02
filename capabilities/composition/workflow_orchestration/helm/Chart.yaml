@@ -1,0 +1,81 @@
+apiVersion: v2
+name: apg-workflow
+description: APG Workflow Orchestration Platform - Advanced workflow automation and ML-driven orchestration system
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+home: https://github.com/datacraft-ke/apg-workflow
+sources:
+- https://github.com/datacraft-ke/apg-workflow
+- https://docs.apg-platform.datacraft.co.ke
+
+maintainers:
+- name: Nyimbi Odero
+  email: nyimbi@gmail.com
+  url: https://github.com/nyimbi
+
+keywords:
+- workflow
+- orchestration
+- automation
+- machine-learning
+- apg-platform
+- datacraft
+
+annotations:
+  category: Automation
+  licenses: MIT
+  images: |
+    - name: workflow
+      image: registry.datacraft.co.ke/apg/workflow:1.0.0
+    - name: postgres
+      image: postgres:15-alpine
+    - name: redis
+      image: redis:7-alpine
+    - name: nginx
+      image: nginx:1.25-alpine
+
+dependencies:
+- name: postgresql
+  version: 12.x.x
+  repository: https://charts.bitnami.com/bitnami
+  condition: postgresql.enabled
+  tags:
+  - database
+- name: redis
+  version: 17.x.x
+  repository: https://charts.bitnami.com/bitnami
+  condition: redis.enabled
+  tags:
+  - cache
+- name: nginx
+  version: 13.x.x
+  repository: https://charts.bitnami.com/bitnami
+  condition: nginx.enabled
+  tags:
+  - proxy
+- name: cert-manager
+  version: 1.x.x
+  repository: https://charts.jetstack.io
+  condition: certManager.enabled
+  tags:
+  - security
+- name: prometheus
+  version: 19.x.x
+  repository: https://prometheus-community.github.io/helm-charts
+  condition: monitoring.prometheus.enabled
+  tags:
+  - monitoring
+- name: grafana
+  version: 6.x.x
+  repository: https://grafana.github.io/helm-charts
+  condition: monitoring.grafana.enabled
+  tags:
+  - monitoring
+- name: istio-base
+  version: 1.x.x
+  repository: https://istio-release.storage.googleapis.com/charts
+  condition: serviceMesh.istio.enabled
+  tags:
+  - servicemesh

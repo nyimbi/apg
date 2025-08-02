@@ -1,0 +1,60 @@
+# APG Workflow Orchestration Testing Requirements
+# Comprehensive testing dependencies for unit, integration, and performance tests
+
+# Core testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-xdist>=3.3.0
+pytest-timeout>=2.1.0
+pytest-benchmark>=4.0.0
+
+# HTTP testing
+pytest-httpserver>=1.0.8
+httpx>=0.24.0
+requests-mock>=1.11.0
+
+# Database testing
+pytest-postgresql>=5.0.0
+pytest-redis>=3.0.0
+alembic>=1.11.0
+
+# Fake/Mock libraries  
+fakeredis>=2.18.0
+factory-boy>=3.3.0
+freezegun>=1.2.0
+
+# Performance testing
+locust>=2.16.0
+memory-profiler>=0.61.0
+
+# Code quality
+flake8>=6.0.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.5.0
+
+# Documentation testing
+sphinx>=7.1.0
+sphinx-autodoc-typehints>=1.24.0
+
+# APG-specific testing utilities
+pydantic>=2.0.0
+fastapi[all]>=0.100.0
+sqlalchemy[asyncio]>=2.0.0
+redis>=4.6.0
+uuid-extensions>=0.1.0
+
+# Additional testing utilities
+parameterized>=0.9.0
+responses>=0.23.0
+vcrpy>=5.1.0
+testcontainers>=3.7.0
+
+# Security testing
+bandit>=1.7.5
+safety>=2.3.0
+
+# Load testing
+artillery>=1.7.0

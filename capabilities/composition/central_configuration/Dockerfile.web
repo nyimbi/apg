@@ -1,0 +1,79 @@
+# APG Central Configuration - Flask-AppBuilder Web Interface Dockerfile
+
+# Stage 1: Base Python environment
+FROM python:3.11-slim as base
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    FLASK_APP=web_app.py
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    libpq-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd --gid 1000 webuser && \
+    useradd --uid 1000 --gid webuser --shell /bin/bash --create-home webuser
+
+# Stage 2: Dependencies
+FROM base as dependencies
+
+# Install Python dependencies for web interface
+COPY requirements-web.txt ./
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements-web.txt
+
+# Stage 3: Development
+FROM dependencies as development
+
+# Copy source code
+WORKDIR /app
+COPY --chown=webuser:webuser . .
+
+# Switch to non-root user
+USER webuser
+
+# Expose port
+EXPOSE 8080
+
+# Development command
+CMD ["flask", "run", "--host", "0.0.0.0", "--port", "8080", "--debug"]
+
+# Stage 4: Production
+FROM dependencies as production
+
+# Copy application code
+WORKDIR /app
+COPY --chown=webuser:webuser . .
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/uploads /app/static /app/templates && \
+    chown -R webuser:webuser /app
+
+# Switch to non-root user
+USER webuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose port
+EXPOSE 8080
+
+# Production command with Gunicorn
+CMD ["gunicorn", "web_app:app", \
+     "--workers", "2", \
+     "--bind", "0.0.0.0:8080", \
+     "--access-logfile", "/app/logs/web_access.log", \
+     "--error-logfile", "/app/logs/web_error.log", \
+     "--log-level", "info", \
+     "--timeout", "60", \
+     "--keep-alive", "2"]

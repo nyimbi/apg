@@ -1,0 +1,237 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workflow-pvc
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 20Gi
+  selector:
+    matchLabels:
+      type: workflow-data
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: models-pvc
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: ml-storage
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 50Gi
+  selector:
+    matchLabels:
+      type: ml-models
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database-storage
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 100Gi
+  selector:
+    matchLabels:
+      type: database
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache-storage
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      type: cache
+
+---
+# Shared storage for workflow templates and configurations
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-templates-pvc
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: shared-storage
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: nfs
+  resources:
+    requests:
+      storage: 5Gi
+  selector:
+    matchLabels:
+      type: shared-templates
+
+---
+# Backup storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-pvc
+  namespace: apg-workflow
+  labels:
+    app.kubernetes.io/name: workflow
+    app.kubernetes.io/component: backup-storage
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 200Gi
+  selector:
+    matchLabels:
+      type: backup
+
+---
+# Example PersistentVolume definitions (for reference)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: workflow-pv
+  labels:
+    type: workflow-data
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  capacity:
+    storage: 20Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fast-ssd
+  local:
+    path: /mnt/disks/workflow-data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - worker-node-1
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: models-pv
+  labels:
+    type: ml-models
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  capacity:
+    storage: 50Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fast-ssd
+  local:
+    path: /mnt/disks/ml-models
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - worker-node-1
+          - worker-node-2
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+  labels:
+    type: database
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fast-ssd
+  local:
+    path: /mnt/disks/postgres-data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - db-node-1
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-pv
+  labels:
+    type: cache
+    app.kubernetes.io/part-of: apg-platform
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fast-ssd
+  local:
+    path: /mnt/disks/redis-data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - worker-node-1
+          - worker-node-2

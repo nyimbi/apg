@@ -1,0 +1,533 @@
+name: APG Central Configuration CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: apg/central-configuration
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "18"
+
+jobs:
+  # Code Quality and Security
+  code-quality:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run code formatting check
+        run: |
+          black --check --diff .
+          isort --check-only --diff .
+
+      - name: Run linting
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run type checking
+        run: |
+          pyright .
+
+      - name: Run security scan
+        run: |
+          bandit -r . -f json -o bandit-report.json
+          safety check --json --output safety-report.json || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+
+  # Unit Tests
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Set up test environment
+        run: |
+          cp .env.example .env.test
+          echo "DATABASE_URL=postgresql+asyncpg://test_user:test_password@localhost:5432/test_db" >> .env.test
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env.test
+
+      - name: Run unit tests
+        env:
+          ENV_FILE: .env.test
+        run: |
+          pytest tests/unit/ -v --cov=. --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  # Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+      ollama:
+        image: ollama/ollama:latest
+        ports:
+          - 11434:11434
+        volumes:
+          - ollama_data:/root/.ollama
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Set up Ollama models
+        run: |
+          # Wait for Ollama to be ready
+          sleep 30
+          # Pull required models (small versions for CI)
+          docker exec ${{ job.services.ollama.id }} ollama pull llama3.2:1b || true
+          docker exec ${{ job.services.ollama.id }} ollama pull codellama:7b-instruct || true
+
+      - name: Set up test environment
+        run: |
+          cp .env.example .env.test
+          echo "DATABASE_URL=postgresql+asyncpg://test_user:test_password@localhost:5432/test_db" >> .env.test
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env.test
+          echo "OLLAMA_URL=http://localhost:11434" >> .env.test
+
+      - name: Run database migrations
+        env:
+          ENV_FILE: .env.test
+        run: |
+          python -m alembic upgrade head
+
+      - name: Run integration tests
+        env:
+          ENV_FILE: .env.test
+        run: |
+          pytest tests/integration/ -v --tb=short
+
+  # Build Docker Images
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [code-quality, unit-tests]
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push API image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.web
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}-web
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # Security Scanning
+  security-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    needs: [build-images]
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build-images.outputs.image-tag }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Load Testing
+  load-testing:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        run: |
+          cp .env.example .env.ci
+          echo "ENVIRONMENT=testing" >> .env.ci
+
+      - name: Start services
+        run: |
+          docker-compose -f docker-compose.yml -f docker-compose.ci.yml --env-file .env.ci up -d
+          sleep 60  # Wait for services to be ready
+
+      - name: Wait for health check
+        run: |
+          timeout 300 bash -c 'until curl -f http://localhost:8000/health; do sleep 5; done'
+
+      - name: Set up k6
+        run: |
+          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Run load tests
+        run: |
+          k6 run --env BASE_URL=http://localhost:8000 --env SCENARIO=smoke tests/load/api_load_test.js
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          docker-compose --env-file .env.ci logs > docker-logs.txt
+          
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-logs
+          path: docker-logs.txt
+
+      - name: Stop services
+        if: always()
+        run: |
+          docker-compose --env-file .env.ci down -v
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-images, security-scan]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name staging-cluster
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Update image tags in Kubernetes manifests
+          sed -i "s|IMAGE_TAG|${{ needs.build-images.outputs.image-tag }}|g" k8s/deployment.yaml
+          
+          # Apply Kubernetes manifests
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/secret.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/ingress.yaml
+          
+          # Wait for deployment
+          kubectl rollout status deployment/central-config-api -n central-config --timeout=600s
+
+      - name: Run smoke tests
+        run: |
+          # Get ingress URL
+          STAGING_URL=$(kubectl get ingress central-config-ingress -n central-config -o jsonpath='{.spec.rules[0].host}')
+          
+          # Wait for service to be ready
+          timeout 300 bash -c "until curl -f https://$STAGING_URL/health; do sleep 10; done"
+          
+          # Run basic smoke tests
+          curl -f "https://$STAGING_URL/health"
+          curl -f "https://$STAGING_URL/api/v1/workspaces"
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-images, security-scan, load-testing]
+    if: github.event_name == 'release' && github.event.action == 'published'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name production-cluster
+
+      - name: Create backup before deployment
+        run: |
+          # Trigger backup job
+          kubectl create job --from=cronjob/central-config-backup backup-pre-deploy-$(date +%Y%m%d-%H%M%S) -n central-config
+
+      - name: Deploy to Production
+        run: |
+          # Blue-green deployment strategy
+          
+          # Update image tags
+          sed -i "s|IMAGE_TAG|${{ needs.build-images.outputs.image-tag }}|g" k8s/deployment.yaml
+          
+          # Apply new deployment (blue-green)
+          kubectl apply -f k8s/deployment.yaml
+          
+          # Wait for new deployment
+          kubectl rollout status deployment/central-config-api -n central-config --timeout=900s
+          
+          # Health check
+          kubectl wait --for=condition=ready pod -l app=central-config-api -n central-config --timeout=300s
+
+      - name: Run production smoke tests
+        run: |
+          # Get production URL
+          PROD_URL=$(kubectl get ingress central-config-ingress -n central-config -o jsonpath='{.spec.rules[0].host}')
+          
+          # Run comprehensive smoke tests
+          timeout 300 bash -c "until curl -f https://$PROD_URL/health; do sleep 10; done"
+          
+          # Test key endpoints
+          curl -f "https://$PROD_URL/health"
+          curl -f "https://$PROD_URL/api/v1/workspaces"
+          curl -f "https://$PROD_URL/metrics"
+
+      - name: Update deployment status
+        if: success()
+        run: |
+          echo "Production deployment successful: ${{ github.event.release.tag_name }}"
+          # Post to Slack/Teams/etc if configured
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed, initiating rollback"
+          kubectl rollout undo deployment/central-config-api -n central-config
+          kubectl rollout status deployment/central-config-api -n central-config --timeout=600s
+
+  # Post-deployment monitoring
+  post-deployment:
+    name: Post-deployment Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always() && github.event_name == 'release'
+    
+    steps:
+      - name: Monitor deployment health
+        run: |
+          # Wait and monitor for 10 minutes after deployment
+          sleep 600
+          
+          # Check metrics and alerts
+          # This would integrate with your monitoring system
+          echo "Monitoring deployment health..."
+
+      - name: Send deployment notification
+        uses: 8398a7/action-slack@v3
+        if: always()
+        with:
+          status: ${{ job.status }}
+          text: |
+            APG Central Configuration deployment ${{ job.status }}
+            Version: ${{ github.event.release.tag_name }}
+            Environment: Production
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always()
+    
+    steps:
+      - name: Cleanup old images
+        run: |
+          # Clean up old container images to save space
+          echo "Cleaning up old container images"
+          # This would clean up old images from the registry

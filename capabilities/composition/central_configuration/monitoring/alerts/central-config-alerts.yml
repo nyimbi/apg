@@ -1,0 +1,318 @@
+# APG Central Configuration - Prometheus Alert Rules
+# Comprehensive alerting for production monitoring
+
+groups:
+  - name: central-config-health
+    rules:
+      - alert: CentralConfigServiceDown
+        expr: up{job="central-config-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: central-config
+          component: api
+        annotations:
+          summary: "Central Configuration API is down"
+          description: "Central Configuration API has been down for more than 1 minute."
+          runbook_url: "https://docs.apg.platform/runbooks/service-down"
+
+      - alert: CentralConfigWebDown
+        expr: up{job="central-config-web"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: central-config
+          component: web
+        annotations:
+          summary: "Central Configuration Web interface is down"
+          description: "Central Configuration Web interface has been down for more than 2 minutes."
+
+      - alert: CentralConfigHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="central-config-api"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: api
+        annotations:
+          summary: "Central Configuration API high latency"
+          description: "95th percentile latency is {{ $value }}s for the last 5 minutes."
+
+      - alert: CentralConfigErrorRate
+        expr: rate(http_requests_total{job="central-config-api",status=~"5.."}[5m]) / rate(http_requests_total{job="central-config-api"}[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          service: central-config
+          component: api
+        annotations:
+          summary: "Central Configuration API high error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes."
+
+  - name: central-config-ai
+    rules:
+      - alert: OllamaServiceDown
+        expr: up{job="ollama"} == 0
+        for: 3m
+        labels:
+          severity: warning
+          service: central-config
+          component: ai
+        annotations:
+          summary: "Ollama AI service is down"
+          description: "Ollama AI service has been down for more than 3 minutes. AI features will be unavailable."
+
+      - alert: AIRequestsHighLatency
+        expr: histogram_quantile(0.95, rate(ai_request_duration_seconds_bucket[10m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: ai
+        annotations:
+          summary: "AI requests have high latency"
+          description: "95th percentile AI request latency is {{ $value }}s for the last 10 minutes."
+
+      - alert: AIErrorRate
+        expr: rate(ai_requests_total{status="error"}[10m]) / rate(ai_requests_total[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: ai
+        annotations:
+          summary: "High AI request error rate"
+          description: "AI error rate is {{ $value | humanizePercentage }} for the last 10 minutes."
+
+  - name: central-config-database
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: central-config
+          component: database
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database has been down for more than 1 minute."
+          runbook_url: "https://docs.apg.platform/runbooks/postgres-down"
+
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: database
+        annotations:
+          summary: "PostgreSQL high connection usage"
+          description: "PostgreSQL connection usage is {{ $value }}% for the last 5 minutes."
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_database_tup_fetched[5m]) / rate(pg_stat_database_tup_returned[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: central-config
+          component: database
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Database query efficiency has decreased significantly."
+
+      - alert: PostgreSQLDiskSpaceHigh
+        expr: (node_filesystem_size_bytes{mountpoint="/var/lib/postgresql/data"} - node_filesystem_avail_bytes{mountpoint="/var/lib/postgresql/data"}) / node_filesystem_size_bytes{mountpoint="/var/lib/postgresql/data"} * 100 > 85
+        for: 5m
+        labels:
+          severity: critical
+          service: central-config
+          component: database
+        annotations:
+          summary: "PostgreSQL disk space critically high"
+          description: "Database disk usage is {{ $value }}% - immediate action required."
+
+  - name: central-config-cache
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: central-config
+          component: cache
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis cache has been down for more than 2 minutes. Performance will be degraded."
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_config_maxmemory * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: cache
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value }}% for the last 5 minutes."
+
+      - alert: RedisSlowCommands
+        expr: increase(redis_slowlog_length[5m]) > 10
+        for: 3m
+        labels:
+          severity: warning
+          service: central-config
+          component: cache
+        annotations:
+          summary: "Redis slow commands detected"
+          description: "{{ $value }} slow Redis commands in the last 5 minutes."
+
+  - name: central-config-resources
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+          service: central-config
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% on instance {{ $labels.instance }} for the last 10 minutes."
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          service: central-config
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% on instance {{ $labels.instance }} for the last 5 minutes."
+
+      - alert: DiskSpaceHigh
+        expr: (node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: system
+        annotations:
+          summary: "High disk usage detected"
+          description: "Disk usage is {{ $value }}% on {{ $labels.mountpoint }} for instance {{ $labels.instance }}."
+
+  - name: central-config-application
+    rules:
+      - alert: ConfigurationCreationFailure
+        expr: rate(central_config_configuration_creations_total{status="failed"}[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: application
+        annotations:
+          summary: "Configuration creation failures detected"
+          description: "Configuration creation failure rate is {{ $value }} per second for the last 10 minutes."
+
+      - alert: SearchPerformanceDegradation
+        expr: histogram_quantile(0.95, rate(central_config_search_duration_seconds_bucket[10m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: central-config
+          component: application
+        annotations:
+          summary: "Search performance degradation"
+          description: "95th percentile search latency is {{ $value }}s for the last 10 minutes."
+
+      - alert: AutomationEngineErrors
+        expr: rate(central_config_automation_errors_total[10m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: automation
+        annotations:
+          summary: "Automation engine errors detected"
+          description: "Automation error rate is {{ $value }} per second for the last 10 minutes."
+
+      - alert: ConfigurationVersioningIssues
+        expr: rate(central_config_version_conflicts_total[15m]) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+          service: central-config
+          component: versioning
+        annotations:
+          summary: "Configuration versioning issues detected"
+          description: "Version conflict rate is {{ $value }} per second for the last 15 minutes."
+
+  - name: central-config-security
+    rules:
+      - alert: AuthenticationFailures
+        expr: rate(central_config_auth_failures_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          service: central-config
+          component: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value }} per second for the last 5 minutes."
+
+      - alert: UnauthorizedAccessAttempts
+        expr: rate(central_config_unauthorized_access_total[10m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: central-config
+          component: security
+        annotations:
+          summary: "Unauthorized access attempts detected"
+          description: "Unauthorized access attempt rate is {{ $value }} per second for the last 10 minutes."
+
+      - alert: EncryptionErrors
+        expr: rate(central_config_encryption_errors_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: central-config
+          component: security
+        annotations:
+          summary: "Encryption errors detected"
+          description: "Encryption error rate is {{ $value }} per second. Data security may be compromised."
+
+  - name: central-config-capability-management
+    rules:
+      - alert: CapabilityHealthCheckFailures
+        expr: rate(central_config_capability_health_check_failures_total[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: capability-manager
+        annotations:
+          summary: "Capability health check failures"
+          description: "Capability health check failure rate is {{ $value }} per second for the last 10 minutes."
+
+      - alert: CrossCapabilityConfigurationErrors
+        expr: rate(central_config_cross_capability_errors_total[15m]) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+          service: central-config
+          component: capability-manager
+        annotations:
+          summary: "Cross-capability configuration errors"
+          description: "Cross-capability configuration error rate is {{ $value }} per second for the last 15 minutes."
+
+      - alert: ServiceMeshCommunicationFailures
+        expr: rate(central_config_service_mesh_failures_total[10m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: central-config
+          component: service-mesh
+        annotations:
+          summary: "Service mesh communication failures"
+          description: "Service mesh communication failure rate is {{ $value }} per second for the last 10 minutes."

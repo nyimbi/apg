@@ -1,0 +1,1052 @@
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block head_css %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/workflow_orchestration.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsplumb/2.15.5/css/jsplumbtoolkit-defaults.css">
+    <style>
+        .workflow-designer {
+            height: calc(100vh - 120px);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .designer-toolbar {
+            background: #f8f9fa;
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .designer-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        .component-palette {
+            width: 250px;
+            background: #fff;
+            border-right: 1px solid #dee2e6;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .workflow-canvas {
+            flex: 1;
+            position: relative;
+            background: #fafafa;
+            background-image: radial-gradient(circle, #ccc 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow: auto;
+        }
+        
+        .properties-panel {
+            width: 300px;
+            background: #fff;
+            border-left: 1px solid #dee2e6;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .component-category {
+            margin-bottom: 20px;
+        }
+        
+        .component-category h6 {
+            color: #495057;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+        
+        .draggable-component {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: grab;
+            transition: all 0.2s;
+        }
+        
+        .draggable-component:hover {
+            background: #e9ecef;
+            border-color: #007bff;
+            transform: translateX(2px);
+        }
+        
+        .draggable-component i {
+            margin-right: 8px;
+            width: 16px;
+        }
+        
+        .canvas-component {
+            position: absolute;
+            background: #fff;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            min-width: 150px;
+            cursor: move;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        
+        .canvas-component:hover {
+            border-color: #007bff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .canvas-component.selected {
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+        }
+        
+        .canvas-component.error {
+            border-color: #dc3545;
+        }
+        
+        .component-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .component-title {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .component-type {
+            font-size: 0.7rem;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        
+        .component-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .component-actions button {
+            border: none;
+            background: none;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 2px;
+            border-radius: 2px;
+        }
+        
+        .component-actions button:hover {
+            background: #e9ecef;
+            color: #495057;
+        }
+        
+        .connection-point {
+            position: absolue;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #007bff;
+            border-radius: 50%;
+            background: #fff;
+            cursor: crosshair;
+        }
+        
+        .input-point {
+            left: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .output-point {
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .zoom-controls button {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .zoom-controls button:hover {
+            background: #e9ecef;
+        }
+        
+        .validation-errors {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+            color: #721c24;
+        }
+        
+        .validation-errors ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="workflow-designer">
+    <!-- Toolbar -->
+    <div class="designer-toolbar">
+        <div class="d-flex align-items-center">
+            <h4 class="mb-0 me-3">
+                {% if workflow %}
+                    <i class="fas fa-edit text-primary me-2"></i>
+                    {{ _('Edit Workflow') }}: {{ workflow.name }}
+                {% else %}
+                    <i class="fas fa-plus text-success me-2"></i>
+                    {{ _('New Workflow') }}
+                {% endif %}
+            </h4>
+            <div id="validation-status" class="badge badge-secondary">
+                <i class="fas fa-check-circle"></i> {{ _('Valid') }}
+            </div>
+        </div>
+        
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-secondary" onclick="showWorkflowProperties()">
+                <i class="fas fa-cog"></i> {{ _('Properties') }}
+            </button>
+            <button type="button" class="btn btn-outline-info" onclick="validateWorkflow()">
+                <i class="fas fa-check-double"></i> {{ _('Validate') }}
+            </button>
+            <button type="button" class="btn btn-outline-success" onclick="saveWorkflow()">
+                <i class="fas fa-save"></i> {{ _('Save') }}
+            </button>
+            <button type="button" class="btn btn-outline-primary" onclick="testWorkflow()">
+                <i class="fas fa-play"></i> {{ _('Test') }}
+            </button>
+            <a href="{{ url_for('WOWorkflowView.list') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-times"></i> {{ _('Close') }}
+            </a>
+        </div>
+    </div>
+    
+    <!-- Main Designer Content -->
+    <div class="designer-content">
+        <!-- Component Palette -->
+        <div class="component-palette">
+            <h5 class="mb-3">{{ _('Components') }}</h5>
+            
+            <!-- Basic Tasks -->
+            <div class="component-category">
+                <h6>{{ _('Basic Tasks') }}</h6>
+                <div class="draggable-component" data-component-type="script">
+                    <i class="fas fa-code text-success"></i>
+                    <span>{{ _('Script Task') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="delay">
+                    <i class="fas fa-clock text-warning"></i>
+                    <span>{{ _('Delay') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="notification">
+                    <i class="fas fa-bell text-info"></i>
+                    <span>{{ _('Notification') }}</span>
+                </div>
+            </div>
+            
+            <!-- Flow Control -->
+            <div class="component-category">
+                <h6>{{ _('Flow Control') }}</h6>
+                <div class="draggable-component" data-component-type="condition">
+                    <i class="fas fa-code-branch text-primary"></i>
+                    <span>{{ _('Condition') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="loop">
+                    <i class="fas fa-redo text-secondary"></i>
+                    <span>{{ _('Loop') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="parallel">
+                    <i class="fas fa-arrows-alt-h text-info"></i>
+                    <span>{{ _('Parallel') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="join">
+                    <i class="fas fa-code-merge text-dark"></i>
+                    <span>{{ _('Join') }}</span>
+                </div>
+            </div>
+            
+            <!-- APG Connectors -->
+            <div class="component-category">
+                <h6>{{ _('APG Connectors') }}</h6>
+                <div class="draggable-component" data-component-type="auth_rbac">
+                    <i class="fas fa-shield-alt text-danger"></i>
+                    <span>{{ _('Auth RBAC') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="data_lake">
+                    <i class="fas fa-database text-primary"></i>
+                    <span>{{ _('Data Lake') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="real_time_collaboration">
+                    <i class="fas fa-users text-success"></i>
+                    <span>{{ _('Collaboration') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="nlp">
+                    <i class="fas fa-brain text-info"></i>
+                    <span>{{ _('NLP') }}</span>
+                </div>
+            </div>
+            
+            <!-- External Connectors -->
+            <div class="component-category">
+                <h6>{{ _('External Systems') }}</h6>
+                <div class="draggable-component" data-component-type="rest_api">
+                    <i class="fas fa-globe text-primary"></i>
+                    <span>{{ _('REST API') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="database">
+                    <i class="fas fa-table text-secondary"></i>
+                    <span>{{ _('Database') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="email">
+                    <i class="fas fa-envelope text-info"></i>
+                    <span>{{ _('Email') }}</span>
+                </div>
+                <div class="draggable-component" data-component-type="file_system">
+                    <i class="fas fa-folder text-warning"></i>
+                    <span>{{ _('File System') }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Canvas -->
+        <div class="workflow-canvas" id="workflowCanvas">
+            <!-- Workflow components will be added here dynamically -->
+            
+            <!-- Zoom Controls -->
+            <div class="zoom-controls">
+                <button type="button" onclick="zoomIn()" title="{{ _('Zoom In') }}">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button type="button" onclick="zoomOut()" title="{{ _('Zoom Out') }}">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button type="button" onclick="fitToScreen()" title="{{ _('Fit to Screen') }}">
+                    <i class="fas fa-expand-arrows-alt"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Properties Panel -->
+        <div class="properties-panel">
+            <h5 class="mb-3">{{ _('Properties') }}</h5>
+            
+            <div id="validation-errors" class="validation-errors" style="display: none;">
+                <h6>{{ _('Validation Errors') }}</h6>
+                <ul id="validation-error-list"></ul>
+            </div>
+            
+            <div id="no-selection" class="text-center text-muted">
+                <i class="fas fa-mouse-pointer fa-3x mb-3"></i>
+                <p>{{ _('Select a component to edit its properties') }}</p>
+            </div>
+            
+            <div id="workflow-properties" style="display: none;">
+                <h6>{{ _('Workflow Properties') }}</h6>
+                <form id="workflow-form">
+                    <div class="mb-3">
+                        <label class="form-label">{{ _('Name') }}</label>
+                        <input type="text" class="form-control" id="workflow-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ _('Description') }}</label>
+                        <textarea class="form-control" id="workflow-description" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ _('Tenant ID') }}</label>
+                        <input type="text" class="form-control" id="workflow-tenant" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ _('Version') }}</label>
+                        <input type="text" class="form-control" id="workflow-version" value="1.0">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="workflow-active" checked>
+                            <label class="form-check-label" for="workflow-active">
+                                {{ _('Active') }}
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div id="component-properties" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 id="component-title">{{ _('Component Properties') }}</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteSelectedComponent()">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <form id="component-form"></form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Component Configuration Modal -->
+<div class="modal fade" id="componentConfigModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ _('Component Configuration') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-component-form"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
+                <button type="button" class="btn btn-primary" onclick="saveComponentConfig()">{{ _('Save') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsplumb/2.15.5/js/jsplumb.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.10.19/interact.min.js"></script>
+    
+    <script>
+        // Global variables
+        let jsPlumbInstance;
+        let workflowData = {{ workflow.definition | tojson if workflow else '{}' }};
+        let selectedComponent = null;
+        let componentCounter = 0;
+        let canvasScale = 1;
+        let canvasOffset = { x: 0, y: 0 };
+        
+        // Initialize designer
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDesigner();
+            loadWorkflow();
+            setupEventListeners();
+        });
+        
+        function initializeDesigner() {
+            // Initialize jsPlumb
+            jsPlumbInstance = jsPlumb.getInstance({
+                Endpoint: ['Dot', { radius: 6 }],
+                Connector: 'StateMachine',
+                HoverPaintStyle: { stroke: '#1e88e5', strokeWidth: 2 },
+                ConnectionOverlays: [
+                    ['Arrow', {
+                        location: 1,
+                        id: 'arrow',
+                        length: 14,
+                        foldback: 0.8
+                    }],
+                    ['Label', { label: '', id: 'label', cssClass: 'connection-label' }]
+                ],
+                Container: 'workflowCanvas'
+            });
+            
+            // Setup drag and drop
+            setupDragAndDrop();
+            
+            // Setup canvas interactions
+            setupCanvasInteractions();
+        }
+        
+        function setupDragAndDrop() {
+            // Make palette components draggable
+            document.querySelectorAll('.draggable-component').forEach(component => {
+                interact(component).draggable({
+                    inertia: true,
+                    autoScroll: true,
+                    listeners: {
+                        start(event) {
+                            event.target.style.opacity = '0.5';
+                        },
+                        move(event) {
+                            // Visual feedback during drag
+                        },
+                        end(event) {
+                            event.target.style.opacity = '1';
+                        }
+                    }
+                });
+            });
+            
+            // Setup canvas drop zone
+            interact('#workflowCanvas').dropzone({
+                accept: '.draggable-component',
+                ondrop: function(event) {
+                    const componentType = event.relatedTarget.dataset.componentType;
+                    const canvasRect = event.target.getBoundingClientRect();
+                    const x = event.dragEvent.clientX - canvasRect.left;
+                    const y = event.dragEvent.clientY - canvasRect.top;
+                    
+                    addComponent(componentType, x, y);
+                }
+            });
+        }
+        
+        function setupCanvasInteractions() {
+            // Canvas component interactions
+            interact('.canvas-component').draggable({
+                listeners: {
+                    move(event) {
+                        const target = event.target;
+                        const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                        const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+                        
+                        target.style.transform = `translate(${x}px, ${y}px)`;
+                        target.setAttribute('data-x', x);
+                        target.setAttribute('data-y', y);
+                        
+                        // Update jsPlumb connections
+                        jsPlumbInstance.revalidate(target);
+                    }
+                }
+            }).on('tap', function(event) {
+                selectComponent(event.target);
+            });
+        }
+        
+        function addComponent(type, x, y) {
+            const componentId = `component_${++componentCounter}`;
+            const component = createComponentElement(componentId, type, x, y);
+            
+            document.getElementById('workflowCanvas').appendChild(component);
+            
+            // Make component a jsPlumb endpoint
+            jsPlumbInstance.draggable(componentId);
+            
+            // Add connection points
+            addConnectionPoints(componentId, type);
+            
+            // Update workflow data
+            updateWorkflowData();
+            
+            // Select the new component
+            selectComponent(component);
+        }
+        
+        function createComponentElement(id, type, x, y) {
+            const component = document.createElement('div');
+            component.id = id;
+            component.className = 'canvas-component';
+            component.dataset.componentType = type;
+            component.style.left = x + 'px';
+            component.style.top = y + 'px';
+            
+            const config = getComponentConfig(type);
+            
+            component.innerHTML = `
+                <div class="component-header">
+                    <div>
+                        <div class="component-title">${config.name}</div>
+                        <div class="component-type">${type}</div>
+                    </div>
+                    <div class="component-actions">
+                        <button onclick="configureComponent('${id}')" title="${'{{ _("Configure") }}'}">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <button onclick="deleteComponent('${id}')" title="${'{{ _("Delete") }}'}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="component-body">
+                    <small class="text-muted">${config.description}</small>
+                </div>
+            `;
+            
+            return component;
+        }
+        
+        function addConnectionPoints(componentId, type) {
+            const config = getComponentConfig(type);
+            
+            // Add input points
+            if (config.inputs > 0) {
+                for (let i = 0; i < config.inputs; i++) {
+                    jsPlumbInstance.addEndpoint(componentId, {
+                        anchor: 'Left',
+                        isTarget: true,
+                        maxConnections: -1,
+                        connector: ['StateMachine'],
+                        paintStyle: { fill: '#007bff', radius: 6 },
+                        hoverPaintStyle: { fill: '#0056b3' }
+                    });
+                }
+            }
+            
+            // Add output points
+            if (config.outputs > 0) {
+                for (let i = 0; i < config.outputs; i++) {
+                    jsPlumbInstance.addEndpoint(componentId, {
+                        anchor: 'Right',
+                        isSource: true,
+                        maxConnections: -1,
+                        connector: ['StateMachine'],
+                        paintStyle: { fill: '#28a745', radius: 6 },
+                        hoverPaintStyle: { fill: '#1e7e34' }
+                    });
+                }
+            }
+        }
+        
+        function getComponentConfig(type) {
+            const configs = {
+                'script': {
+                    name: '{{ _("Script Task") }}',
+                    description: '{{ _("Execute custom script") }}',
+                    inputs: 1,
+                    outputs: 1,
+                    icon: 'fas fa-code'
+                },
+                'condition': {
+                    name: '{{ _("Condition") }}',
+                    description: '{{ _("Conditional branching") }}',
+                    inputs: 1,
+                    outputs: 2,
+                    icon: 'fas fa-code-branch'
+                },
+                'rest_api': {
+                    name: '{{ _("REST API") }}',
+                    description: '{{ _("HTTP API call") }}',
+                    inputs: 1,
+                    outputs: 1,
+                    icon: 'fas fa-globe'
+                },
+                'auth_rbac': {
+                    name: '{{ _("Auth RBAC") }}',
+                    description: '{{ _("Authentication & authorization") }}',
+                    inputs: 1,
+                    outputs: 1,
+                    icon: 'fas fa-shield-alt'
+                }
+                // Add more component configurations
+            };
+            
+            return configs[type] || {
+                name: type,
+                description: '{{ _("Component") }}',
+                inputs: 1,
+                outputs: 1,
+                icon: 'fas fa-cube'
+            };
+        }
+        
+        function selectComponent(element) {
+            // Remove previous selection
+            document.querySelectorAll('.canvas-component.selected').forEach(comp => {
+                comp.classList.remove('selected');
+            });
+            
+            // Select new component
+            element.classList.add('selected');
+            selectedComponent = element;
+            
+            // Show properties panel
+            showComponentProperties(element);
+        }
+        
+        function showComponentProperties(component) {
+            const type = component.dataset.componentType;
+            const id = component.id;
+            
+            document.getElementById('no-selection').style.display = 'none';
+            document.getElementById('workflow-properties').style.display = 'none';
+            document.getElementById('component-properties').style.display = 'block';
+            
+            document.getElementById('component-title').textContent = 
+                getComponentConfig(type).name + ' Properties';
+            
+            // Generate property form based on component type
+            generateComponentForm(type, id);
+        }
+        
+        function showWorkflowProperties() {
+            selectedComponent = null;
+            document.querySelectorAll('.canvas-component.selected').forEach(comp => {
+                comp.classList.remove('selected');
+            });
+            
+            document.getElementById('no-selection').style.display = 'none';
+            document.getElementById('component-properties').style.display = 'none';
+            document.getElementById('workflow-properties').style.display = 'block';
+            
+            // Load workflow properties
+            {% if workflow %}
+            document.getElementById('workflow-name').value = '{{ workflow.name }}';
+            document.getElementById('workflow-description').value = '{{ workflow.description or "" }}';
+            document.getElementById('workflow-tenant').value = '{{ workflow.tenant_id }}';
+            document.getElementById('workflow-version').value = '{{ workflow.version }}';
+            document.getElementById('workflow-active').checked = {{ workflow.is_active | lower }};
+            {% endif %}
+        }
+        
+        function generateComponentForm(type, componentId) {
+            const form = document.getElementById('component-form');
+            form.innerHTML = '';
+            
+            // Basic properties
+            form.innerHTML += `
+                <div class="mb-3">
+                    <label class="form-label">${'{{ _("Task ID") }}'}</label>
+                    <input type="text" class="form-control" value="${componentId}" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">${'{{ _("Name") }}'}</label>
+                    <input type="text" class="form-control" id="component-name" value="${getComponentConfig(type).name}">
+                </div>
+            `;
+            
+            // Type-specific properties
+            if (type === 'script') {
+                form.innerHTML += `
+                    <div class="mb-3">
+                        <label class="form-label">${'{{ _("Script Code") }}'}</label>
+                        <textarea class="form-control" id="component-script" rows="5" placeholder="return {'result': 'success'}"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">${'{{ _("Timeout (seconds)") }}'}</label>
+                        <input type="number" class="form-control" id="component-timeout" value="30">
+                    </div>
+                `;
+            } else if (type === 'rest_api') {
+                form.innerHTML += `
+                    <div class="mb-3">
+                        <label class="form-label">${'{{ _("URL") }}'}</label>
+                        <input type="url" class="form-control" id="component-url" placeholder="https://api.example.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">${'{{ _("Method") }}'}</label>
+                        <select class="form-control" id="component-method">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">${'{{ _("Headers (JSON)") }}'}</label>
+                        <textarea class="form-control" id="component-headers" rows="3" placeholder='{"Content-Type": "application/json"}'></textarea>
+                    </div>
+                `;
+            }
+            
+            // Common properties
+            form.innerHTML += `
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="component-optional">
+                        <label class="form-check-label" for="component-optional">
+                            ${'{{ _("Optional (don\'t fail workflow)") }}'}
+                        </label>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">${'{{ _("Dependencies") }}'}</label>
+                    <input type="text" class="form-control" id="component-dependencies" placeholder="task1, task2">
+                    <small class="form-text text-muted">${'{{ _("Comma-separated list of task IDs") }}'}</small>
+                </div>
+            `;
+        }
+        
+        function validateWorkflow() {
+            const errors = [];
+            const components = document.querySelectorAll('.canvas-component');
+            
+            // Check if workflow has components
+            if (components.length === 0) {
+                errors.push('{{ _("Workflow must have at least one component") }}');
+            }
+            
+            // Check for orphaned components
+            components.forEach(component => {
+                const connections = jsPlumbInstance.getConnections({ source: component.id });
+                const incomingConnections = jsPlumbInstance.getConnections({ target: component.id });
+                
+                if (connections.length === 0 && incomingConnections.length === 0 && components.length > 1) {
+                    errors.push(`{{ _("Component") }} ${component.id} {{ _("is not connected") }}`);
+                }
+            });
+            
+            // Update validation status
+            const statusElement = document.getElementById('validation-status');
+            const errorsElement = document.getElementById('validation-errors');
+            const errorsList = document.getElementById('validation-error-list');
+            
+            if (errors.length === 0) {
+                statusElement.className = 'badge badge-success';
+                statusElement.innerHTML = '<i class="fas fa-check-circle"></i> {{ _("Valid") }}';
+                errorsElement.style.display = 'none';
+            } else {
+                statusElement.className = 'badge badge-danger';
+                statusElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i> {{ _("Invalid") }}';
+                errorsElement.style.display = 'block';
+                
+                errorsList.innerHTML = '';
+                errors.forEach(error => {
+                    const li = document.createElement('li');
+                    li.textContent = error;
+                    errorsList.appendChild(li);
+                });
+            }
+            
+            return errors.length === 0;
+        }
+        
+        function saveWorkflow() {
+            if (!validateWorkflow()) {
+                alert('{{ _("Please fix validation errors before saving") }}');
+                return;
+            }
+            
+            const workflowData = {
+                name: document.getElementById('workflow-name').value || 'Untitled Workflow',
+                description: document.getElementById('workflow-description').value || '',
+                tenant_id: document.getElementById('workflow-tenant').value || 'default',
+                version: document.getElementById('workflow-version').value || '1.0',
+                is_active: document.getElementById('workflow-active').checked,
+                definition: generateWorkflowDefinition()
+            };
+            
+            // Save workflow via API
+            const method = {{ 'PUT' if workflow else 'POST' }};
+            const url = {{ ('"/api/workflow/' + workflow.id|string + '/definition"') if workflow else '"/api/v1/workflows"' }};
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify(workflowData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('{{ _("Error saving workflow") }}: ' + data.error);
+                } else {
+                    alert('{{ _("Workflow saved successfully") }}');
+                    // Optionally redirect to workflow list
+                    // window.location.href = "{{ url_for('WOWorkflowView.list') }}";
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('{{ _("Error saving workflow") }}');
+            });
+        }
+        
+        function generateWorkflowDefinition() {
+            const components = document.querySelectorAll('.canvas-component');
+            const connections = jsPlumbInstance.getAllConnections();
+            
+            const tasks = [];
+            
+            components.forEach(component => {
+                const type = component.dataset.componentType;
+                const task = {
+                    id: component.id,
+                    name: component.querySelector('.component-title').textContent,
+                    task_type: type === 'script' ? 'script' : 'connector',
+                    config: getComponentConfiguration(component)
+                };
+                
+                // Add dependencies based on connections
+                const dependencies = connections
+                    .filter(conn => conn.target.id === component.id)
+                    .map(conn => conn.source.id);
+                
+                if (dependencies.length > 0) {
+                    task.depends_on = dependencies;
+                }
+                
+                tasks.push(task);
+            });
+            
+            return { tasks: tasks };
+        }
+        
+        function getComponentConfiguration(component) {
+            const type = component.dataset.componentType;
+            const config = {};
+            
+            // Extract configuration from form fields
+            // This would be more sophisticated in a real implementation
+            if (type === 'script') {
+                const scriptElement = document.getElementById('component-script');
+                if (scriptElement) {
+                    config.script = scriptElement.value;
+                }
+            } else if (type === 'rest_api') {
+                const urlElement = document.getElementById('component-url');
+                const methodElement = document.getElementById('component-method');
+                if (urlElement) config.url = urlElement.value;
+                if (methodElement) config.method = methodElement.value;
+            }
+            
+            return config;
+        }
+        
+        function testWorkflow() {
+            if (!validateWorkflow()) {
+                alert('{{ _("Please fix validation errors before testing") }}');
+                return;
+            }
+            
+            // Generate test execution context
+            const testContext = {
+                test_mode: true,
+                test_data: {}
+            };
+            
+            // Would redirect to execution page with test context
+            alert('{{ _("Test functionality would be implemented here") }}');
+        }
+        
+        function loadWorkflow() {
+            {% if workflow %}
+            // Load existing workflow definition
+            const definition = {{ workflow.definition | tojson }};
+            if (definition && definition.tasks) {
+                definition.tasks.forEach((task, index) => {
+                    const x = 100 + (index % 3) * 200;
+                    const y = 100 + Math.floor(index / 3) * 150;
+                    addComponent(task.task_type === 'script' ? 'script' : task.connector_type, x, y);
+                });
+            }
+            {% endif %}
+        }
+        
+        function deleteComponent(componentId) {
+            if (confirm('{{ _("Are you sure you want to delete this component?") }}')) {
+                // Remove all connections
+                jsPlumbInstance.removeAllEndpoints(componentId);
+                
+                // Remove element
+                const element = document.getElementById(componentId);
+                if (element) {
+                    element.remove();
+                }
+                
+                // Clear selection if this was selected
+                if (selectedComponent && selectedComponent.id === componentId) {
+                    selectedComponent = null;
+                    document.getElementById('component-properties').style.display = 'none';
+                    document.getElementById('no-selection').style.display = 'block';
+                }
+                
+                updateWorkflowData();
+            }
+        }
+        
+        function deleteSelectedComponent() {
+            if (selectedComponent) {
+                deleteComponent(selectedComponent.id);
+            }
+        }
+        
+        function updateWorkflowData() {
+            // Update internal workflow data structure
+            // This would be called whenever the workflow changes
+        }
+        
+        function zoomIn() {
+            canvasScale = Math.min(canvasScale * 1.2, 3);
+            applyCanvasTransform();
+        }
+        
+        function zoomOut() {
+            canvasScale = Math.max(canvasScale * 0.8, 0.3);
+            applyCanvasTransform();
+        }
+        
+        function fitToScreen() {
+            canvasScale = 1;
+            canvasOffset = { x: 0, y: 0 };
+            applyCanvasTransform();
+        }
+        
+        function applyCanvasTransform() {
+            const canvas = document.getElementById('workflowCanvas');
+            canvas.style.transform = `scale(${canvasScale}) translate(${canvasOffset.x}px, ${canvasOffset.y}px)`;
+            jsPlumbInstance.setZoom(canvasScale);
+        }
+        
+        function getCsrfToken() {
+            // Get CSRF token from meta tag or cookie
+            const token = document.querySelector('meta[name="csrf-token"]');
+            return token ? token.getAttribute('content') : '';
+        }
+        
+        function setupEventListeners() {
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function(event) {
+                if (event.ctrlKey || event.metaKey) {
+                    switch (event.key) {
+                        case 's':
+                            event.preventDefault();
+                            saveWorkflow();
+                            break;
+                        case 'z':
+                            if (event.shiftKey) {
+                                // Redo
+                            } else {
+                                // Undo
+                            }
+                            break;
+                        case 'Delete':
+                        case 'Backspace':
+                            if (selectedComponent) {
+                                deleteSelectedComponent();
+                            }
+                            break;
+                    }
+                }
+            });
+            
+            // Canvas click to deselect
+            document.getElementById('workflowCanvas').addEventListener('click', function(event) {
+                if (event.target === this) {
+                    // Clicked on empty canvas
+                    selectedComponent = null;
+                    document.querySelectorAll('.canvas-component.selected').forEach(comp => {
+                        comp.classList.remove('selected');
+                    });
+                    document.getElementById('component-properties').style.display = 'none';
+                    document.getElementById('workflow-properties').style.display = 'none';
+                    document.getElementById('no-selection').style.display = 'block';
+                }
+            });
+        }
+    </script>
+{% endblock %}

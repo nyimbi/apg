@@ -1,0 +1,636 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('workflow_designer.static', filename='css/designer.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+    .help-container {
+        padding: 30px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .help-sidebar {
+        position: sticky;
+        top: 20px;
+        height: fit-content;
+    }
+    .help-nav {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    .help-nav .nav-link {
+        color: #495057;
+        padding: 8px 0;
+        border: none;
+        font-size: 14px;
+    }
+    .help-nav .nav-link.active {
+        color: #007bff;
+        font-weight: 500;
+    }
+    .help-nav .nav-link:hover {
+        color: #007bff;
+    }
+    .help-content {
+        padding-left: 30px;
+    }
+    .help-section {
+        margin-bottom: 40px;
+        padding: 20px 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .help-section:last-child {
+        border-bottom: none;
+    }
+    .help-section h3 {
+        color: #495057;
+        margin-bottom: 20px;
+        font-weight: 600;
+    }
+    .help-section h4 {
+        color: #6c757d;
+        margin: 20px 0 10px 0;
+        font-weight: 500;
+    }
+    .shortcut-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin: 20px 0;
+    }
+    .shortcut-card {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 16px;
+    }
+    .shortcut-card h6 {
+        color: #495057;
+        margin-bottom: 12px;
+        font-weight: 600;
+    }
+    .shortcut-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-size: 13px;
+    }
+    .shortcut-key {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 3px;
+        padding: 2px 6px;
+        font-family: monospace;
+        font-size: 11px;
+        color: #495057;
+    }
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin: 20px 0;
+    }
+    .feature-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+    }
+    .feature-icon {
+        font-size: 2.5rem;
+        color: #007bff;
+        margin-bottom: 16px;
+    }
+    .feature-card h5 {
+        color: #495057;
+        margin-bottom: 12px;
+    }
+    .feature-card p {
+        color: #6c757d;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    .workflow-steps {
+        display: flex;
+        justify-content: space-between;
+        margin: 30px 0;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    .workflow-step {
+        text-align: center;
+        flex: 1;
+        position: relative;
+    }
+    .workflow-step:not(:last-child)::after {
+        content: '→';
+        position: absolute;
+        right: -20px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 24px;
+        color: #007bff;
+    }
+    .step-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: #007bff;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 12px;
+        font-size: 24px;
+    }
+    .step-title {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 8px;
+    }
+    .step-description {
+        font-size: 13px;
+        color: #6c757d;
+    }
+    .troubleshooting-item {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+    .troubleshooting-item h6 {
+        color: #856404;
+        margin-bottom: 8px;
+    }
+    .troubleshooting-item p {
+        color: #856404;
+        margin: 0;
+    }
+    .video-embed {
+        position: relative;
+        padding-bottom: 56.25%;
+        height: 0;
+        overflow: hidden;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin: 20px 0;
+    }
+    .video-placeholder {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="help-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Workflow Designer Help</h1>
+        <a href="{{ url_for('workflow_designer.designer') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> Back to Designer
+        </a>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-3">
+            <div class="help-sidebar">
+                <div class="help-nav">
+                    <h6 class="mb-3">Contents</h6>
+                    <nav class="nav flex-column">
+                        <a class="nav-link active" href="#getting-started">Getting Started</a>
+                        <a class="nav-link" href="#interface-overview">Interface Overview</a>
+                        <a class="nav-link" href="#creating-workflows">Creating Workflows</a>
+                        <a class="nav-link" href="#components">Components</a>
+                        <a class="nav-link" href="#connections">Connections</a>
+                        <a class="nav-link" href="#properties">Properties</a>
+                        <a class="nav-link" href="#collaboration">Collaboration</a>
+                        <a class="nav-link" href="#keyboard-shortcuts">Keyboard Shortcuts</a>
+                        <a class="nav-link" href="#troubleshooting">Troubleshooting</a>
+                        <a class="nav-link" href="#advanced-features">Advanced Features</a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <div class="help-content">
+                <!-- Getting Started -->
+                <section id="getting-started" class="help-section">
+                    <h3><i class="fas fa-rocket mr-2"></i>Getting Started</h3>
+                    
+                    <p>Welcome to the APG Workflow Designer! This powerful visual tool allows you to create, edit, and manage complex workflows with an intuitive drag-and-drop interface.</p>
+                    
+                    <div class="workflow-steps">
+                        <div class="workflow-step">
+                            <div class="step-icon">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                            <div class="step-title">Create Workflow</div>
+                            <div class="step-description">Start with a blank workflow or choose from templates</div>
+                        </div>
+                        <div class="workflow-step">
+                            <div class="step-icon">
+                                <i class="fas fa-puzzle-piece"></i>
+                            </div>
+                            <div class="step-title">Add Components</div>
+                            <div class="step-description">Drag components from the palette to the canvas</div>
+                        </div>
+                        <div class="workflow-step">
+                            <div class="step-icon">
+                                <i class="fas fa-link"></i>
+                            </div>
+                            <div class="step-title">Connect</div>
+                            <div class="step-description">Connect components to define the workflow flow</div>
+                        </div>
+                        <div class="workflow-step">
+                            <div class="step-icon">
+                                <i class="fas fa-play"></i>
+                            </div>
+                            <div class="step-title">Execute</div>
+                            <div class="step-description">Save, validate, and run your workflow</div>
+                        </div>
+                    </div>
+                    
+                    <h4>Quick Start Video</h4>
+                    <div class="video-embed">
+                        <div class="video-placeholder">
+                            <i class="fas fa-play-circle fa-3x mb-3"></i>
+                            <p>Quick Start Tutorial Video<br><small class="text-muted">Coming Soon</small></p>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Interface Overview -->
+                <section id="interface-overview" class="help-section">
+                    <h3><i class="fas fa-desktop mr-2"></i>Interface Overview</h3>
+                    
+                    <p>The workflow designer interface consists of several key areas:</p>
+                    
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <i class="fas fa-tools feature-icon"></i>
+                            <h5>Toolbar</h5>
+                            <p>Contains save, validate, export, undo/redo, and view controls. Access all main functions from here.</p>
+                        </div>
+                        
+                        <div class="feature-card">
+                            <i class="fas fa-th-list feature-icon"></i>
+                            <h5>Component Palette</h5>
+                            <p>Browse and search available components. Drag components to the canvas to add them to your workflow.</p>
+                        </div>
+                        
+                        <div class="feature-card">
+                            <i class="fas fa-project-diagram feature-icon"></i>
+                            <h5>Canvas</h5>
+                            <p>The main work area where you build your workflow by arranging and connecting components.</p>
+                        </div>
+                        
+                        <div class="feature-card">
+                            <i class="fas fa-cog feature-icon"></i>
+                            <h5>Properties Panel</h5>
+                            <p>Configure selected components and connections. Properties update automatically based on your selection.</p>
+                        </div>
+                        
+                        <div class="feature-card">
+                            <i class="fas fa-list-alt feature-icon"></i>
+                            <h5>Bottom Panel</h5>
+                            <p>View validation results, execution logs, and collaborate with team members in real-time.</p>
+                        </div>
+                        
+                        <div class="feature-card">
+                            <i class="fas fa-map feature-icon"></i>
+                            <h5>Minimap</h5>
+                            <p>Navigate large workflows easily. The minimap shows your current viewport and allows quick navigation.</p>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Creating Workflows -->
+                <section id="creating-workflows" class="help-section">
+                    <h3><i class="fas fa-plus-circle mr-2"></i>Creating Workflows</h3>
+                    
+                    <h4>Starting from Templates</h4>
+                    <p>Templates provide pre-built workflows for common use cases:</p>
+                    <ul>
+                        <li><strong>Business Process</strong> - Invoice processing, approval workflows, customer onboarding</li>
+                        <li><strong>Data Processing</strong> - ETL pipelines, data transformation, analytics workflows</li>
+                        <li><strong>AI & Machine Learning</strong> - Model training, inference pipelines, data preprocessing</li>
+                        <li><strong>Integration</strong> - API orchestration, system synchronization, event processing</li>
+                    </ul>
+                    
+                    <h4>Building from Scratch</h4>
+                    <ol>
+                        <li>Click "Create Blank Workflow" or start with an empty canvas</li>
+                        <li>Add a trigger component to define when the workflow starts</li>
+                        <li>Add processing components for your business logic</li>
+                        <li>Connect components to define the execution flow</li>
+                        <li>Configure each component's properties</li>
+                        <li>Validate and test your workflow</li>
+                    </ol>
+                </section>
+                
+                <!-- Components -->
+                <section id="components" class="help-section">
+                    <h3><i class="fas fa-puzzle-piece mr-2"></i>Components</h3>
+                    
+                    <p>Components are the building blocks of workflows. Each component performs a specific function:</p>
+                    
+                    <h4>Component Categories</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-play-circle text-danger mr-2"></i>Triggers</h6>
+                            <p>Start workflows based on events, schedules, or manual execution.</p>
+                            
+                            <h6><i class="fas fa-database text-primary mr-2"></i>Data Processing</h6>
+                            <p>Transform, filter, validate, and manipulate data.</p>
+                            
+                            <h6><i class="fas fa-code-branch text-warning mr-2"></i>Logic & Control</h6>
+                            <p>Add conditions, loops, and decision points to your workflows.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-plug text-purple mr-2"></i>Integrations</h6>
+                            <p>Connect to external systems, APIs, and services.</p>
+                            
+                            <h6><i class="fas fa-brain text-success mr-2"></i>AI & Machine Learning</h6>
+                            <p>Add AI capabilities like prediction, classification, and analysis.</p>
+                            
+                            <h6><i class="fas fa-tools text-secondary mr-2"></i>Utilities</h6>
+                            <p>Helper components for notifications, logging, and debugging.</p>
+                        </div>
+                    </div>
+                    
+                    <h4>Adding Components</h4>
+                    <ul>
+                        <li><strong>Drag & Drop:</strong> Drag components from the palette to the canvas</li>
+                        <li><strong>Double-click:</strong> Double-click a component to add it to the center of the canvas</li>
+                        <li><strong>Search:</strong> Use the search box to quickly find specific components</li>
+                    </ul>
+                </section>
+                
+                <!-- Connections -->
+                <section id="connections" class="help-section">
+                    <h3><i class="fas fa-link mr-2"></i>Connections</h3>
+                    
+                    <p>Connections define the flow of data and control between components.</p>
+                    
+                    <h4>Creating Connections</h4>
+                    <ol>
+                        <li>Click and drag from an output port (right side of component)</li>
+                        <li>Drag to an input port on another component (left side)</li>
+                        <li>Release to create the connection</li>
+                    </ol>
+                    
+                    <h4>Connection Types</h4>
+                    <ul>
+                        <li><strong>Data Connections:</strong> Pass data between components</li>
+                        <li><strong>Control Connections:</strong> Define execution order and conditions</li>
+                        <li><strong>Error Connections:</strong> Handle errors and exceptions</li>
+                    </ul>
+                    
+                    <h4>Managing Connections</h4>
+                    <ul>
+                        <li>Click a connection to select it</li>
+                        <li>Delete selected connections with the Delete key</li>
+                        <li>View connection properties in the properties panel</li>
+                        <li>Add conditions to control when connections are followed</li>
+                    </ul>
+                </section>
+                
+                <!-- Properties -->
+                <section id="properties" class="help-section">
+                    <h3><i class="fas fa-cog mr-2"></i>Properties</h3>
+                    
+                    <p>The properties panel allows you to configure components and connections.</p>
+                    
+                    <h4>Component Properties</h4>
+                    <ul>
+                        <li><strong>Basic Information:</strong> Name, description, and display settings</li>
+                        <li><strong>Configuration:</strong> Component-specific settings and parameters</li>
+                        <li><strong>Input/Output Ports:</strong> View available data inputs and outputs</li>
+                        <li><strong>Advanced Settings:</strong> Timeout, retry behavior, and error handling</li>
+                    </ul>
+                    
+                    <h4>Property Types</h4>
+                    <ul>
+                        <li><strong>Text:</strong> String values like names and descriptions</li>
+                        <li><strong>Numbers:</strong> Numeric values with validation</li>
+                        <li><strong>Dropdowns:</strong> Select from predefined options</li>
+                        <li><strong>Checkboxes:</strong> Boolean true/false values</li>
+                        <li><strong>JSON:</strong> Complex structured data</li>
+                    </ul>
+                </section>
+                
+                <!-- Collaboration -->
+                <section id="collaboration" class="help-section">
+                    <h3><i class="fas fa-users mr-2"></i>Collaboration</h3>
+                    
+                    <p>Work together with your team in real-time on workflow design.</p>
+                    
+                    <h4>Real-time Features</h4>
+                    <ul>
+                        <li><strong>Live Cursors:</strong> See where team members are working</li>
+                        <li><strong>Instant Updates:</strong> Changes appear immediately for all users</li>
+                        <li><strong>Chat:</strong> Communicate with team members without leaving the designer</li>
+                        <li><strong>Presence:</strong> See who's currently online and active</li>
+                    </ul>
+                    
+                    <h4>Collaboration Best Practices</h4>
+                    <ul>
+                        <li>Communicate changes before making major modifications</li>
+                        <li>Use descriptive component names for clarity</li>
+                        <li>Save frequently to avoid conflicts</li>
+                        <li>Use the chat feature to coordinate with team members</li>
+                    </ul>
+                </section>
+                
+                <!-- Keyboard Shortcuts -->
+                <section id="keyboard-shortcuts" class="help-section">
+                    <h3><i class="fas fa-keyboard mr-2"></i>Keyboard Shortcuts</h3>
+                    
+                    <div class="shortcut-grid">
+                        <div class="shortcut-card">
+                            <h6>General</h6>
+                            <div class="shortcut-item">
+                                <span>Save workflow</span>
+                                <span class="shortcut-key">Ctrl+S</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Undo</span>
+                                <span class="shortcut-key">Ctrl+Z</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Redo</span>
+                                <span class="shortcut-key">Ctrl+Shift+Z</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Select all</span>
+                                <span class="shortcut-key">Ctrl+A</span>
+                            </div>
+                        </div>
+                        
+                        <div class="shortcut-card">
+                            <h6>Editing</h6>
+                            <div class="shortcut-item">
+                                <span>Copy</span>
+                                <span class="shortcut-key">Ctrl+C</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Paste</span>
+                                <span class="shortcut-key">Ctrl+V</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Delete</span>
+                                <span class="shortcut-key">Delete</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Clear selection</span>
+                                <span class="shortcut-key">Escape</span>
+                            </div>
+                        </div>
+                        
+                        <div class="shortcut-card">
+                            <h6>Navigation</h6>
+                            <div class="shortcut-item">
+                                <span>Zoom in</span>
+                                <span class="shortcut-key">+</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Zoom out</span>
+                                <span class="shortcut-key">-</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Fit to screen</span>
+                                <span class="shortcut-key">0</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Pan mode</span>
+                                <span class="shortcut-key">Space</span>
+                            </div>
+                        </div>
+                        
+                        <div class="shortcut-card">
+                            <h6>Search & Help</h6>
+                            <div class="shortcut-item">
+                                <span>Focus search</span>
+                                <span class="shortcut-key">Ctrl+/</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Show shortcuts</span>
+                                <span class="shortcut-key">?</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span>Open help</span>
+                                <span class="shortcut-key">F1</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Troubleshooting -->
+                <section id="troubleshooting" class="help-section">
+                    <h3><i class="fas fa-question-circle mr-2"></i>Troubleshooting</h3>
+                    
+                    <div class="troubleshooting-item">
+                        <h6>Components won't connect</h6>
+                        <p>Make sure you're connecting compatible ports. Check that the output port type matches the input port type, and that you're not creating circular dependencies.</p>
+                    </div>
+                    
+                    <div class="troubleshooting-item">
+                        <h6>Workflow won't save</h6>
+                        <p>Check your network connection and ensure you have proper permissions. Look for validation errors in the bottom panel that might prevent saving.</p>
+                    </div>
+                    
+                    <div class="troubleshooting-item">
+                        <h6>Performance issues with large workflows</h6>
+                        <p>Try hiding the grid, disabling the minimap, or breaking large workflows into smaller sub-workflows using the workflow component.</p>
+                    </div>
+                    
+                    <div class="troubleshooting-item">
+                        <h6>Collaboration not working</h6>
+                        <p>Check that WebSocket connections are allowed through your firewall. Refresh the page if you're having connection issues.</p>
+                    </div>
+                    
+                    <div class="troubleshooting-item">
+                        <h6>Components missing from palette</h6>
+                        <p>Refresh the component library or check if you have the necessary permissions to access certain component categories.</p>
+                    </div>
+                </section>
+                
+                <!-- Advanced Features -->
+                <section id="advanced-features" class="help-section">
+                    <h3><i class="fas fa-graduation-cap mr-2"></i>Advanced Features</h3>
+                    
+                    <h4>Custom Components</h4>
+                    <p>Create your own components using the APG SDK. Custom components can be shared across your organization and added to the component library.</p>
+                    
+                    <h4>Workflow Templates</h4>
+                    <p>Save frequently used workflows as templates. Templates can include pre-configured components and connections to speed up development.</p>
+                    
+                    <h4>Version Control</h4>
+                    <p>Track changes to your workflows with built-in version control. Compare versions, restore previous states, and manage workflow deployments.</p>
+                    
+                    <h4>API Integration</h4>
+                    <p>Access the workflow designer programmatically using the REST API. Automate workflow creation, modification, and deployment.</p>
+                    
+                    <h4>Advanced Validation</h4>
+                    <p>Set up custom validation rules for your workflows. Ensure compliance with organizational standards and best practices.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('.help-nav .nav-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Update active link
+            document.querySelectorAll('.help-nav .nav-link').forEach(l => l.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Scroll to section
+            const targetId = this.getAttribute('href');
+            const targetElement = document.querySelector(targetId);
+            if (targetElement) {
+                targetElement.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
+    
+    // Update active navigation based on scroll position
+    window.addEventListener('scroll', function() {
+        const sections = document.querySelectorAll('.help-section');
+        const navLinks = document.querySelectorAll('.help-nav .nav-link');
+        
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop - 100;
+            if (window.pageYOffset >= sectionTop) {
+                current = section.getAttribute('id');
+            }
+        });
+        
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href') === '#' + current) {
+                link.classList.add('active');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
