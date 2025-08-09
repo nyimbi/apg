@@ -1,0 +1,670 @@
+{% extends "appbuilder/base.html" %}
+
+{% block title %}
+Asset Lineage - {{ asset.display_name or asset.name }} - APG
+{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.lineage-container {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.lineage-header {
+    background: #f8f9fa;
+    padding: 15px 20px;
+    border-bottom: 1px solid #ddd;
+    border-radius: 8px 8px 0 0;
+}
+
+.lineage-content {
+    padding: 20px;
+    min-height: 400px;
+}
+
+.asset-node {
+    background: #fff;
+    border: 2px solid #3498db;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: relative;
+    max-width: 200px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.asset-node:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.asset-node.source {
+    border-color: #27ae60;
+    background: linear-gradient(135deg, #fff 0%, #d5f4e6 100%);
+}
+
+.asset-node.target {
+    border-color: #e74c3c;
+    background: linear-gradient(135deg, #fff 0%, #fadbd8 100%);
+}
+
+.asset-node.current {
+    border-color: #f39c12;
+    background: linear-gradient(135deg, #fff 0%, #fef9e7 100%);
+    border-width: 3px;
+}
+
+.node-title {
+    font-weight: bold;
+    font-size: 0.9em;
+    margin-bottom: 5px;
+    word-break: break-word;
+}
+
+.node-type {
+    font-size: 0.75em;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.node-system {
+    font-size: 0.7em;
+    color: #6c757d;
+    margin-top: 3px;
+}
+
+.lineage-path {
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background: #f8f9fa;
+}
+
+.path-header {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #495057;
+}
+
+.path-steps {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.path-arrow {
+    font-size: 1.2em;
+    color: #6c757d;
+}
+
+.lineage-controls {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.control-group {
+    display: inline-block;
+    margin-right: 20px;
+}
+
+.no-lineage {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+}
+
+.lineage-stats {
+    background: #e3f2fd;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    font-size: 0.9em;
+}
+
+.transformation-info {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 8px;
+    margin-top: 5px;
+    font-size: 0.8em;
+}
+
+#lineage-graph {
+    width: 100%;
+    height: 500px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.graph-controls {
+    text-align: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}
+</style>
+{% endblock %}
+
+{% block head_js %}
+{{ super() }}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1><i class="fa fa-sitemap"></i> Asset Lineage</h1>
+            <div class="breadcrumb">
+                <a href="{{ url_for('MetadataBaseView.assets') }}">Assets</a> /
+                <a href="{{ url_for('MetadataBaseView.asset_detail', asset_id=asset.id) }}">{{ asset.display_name or asset.name }}</a> /
+                <span class="active">Lineage</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Asset Information -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="lineage-container">
+                <div class="lineage-header">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h3 style="margin: 0;">{{ asset.display_name or asset.name }}</h3>
+                            <span class="label label-primary">{{ asset.asset_type|title }}</span>
+                            {% if asset.source_system %}
+                            <span class="label label-default">{{ asset.source_system }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 text-right">
+                            {% if asset.quality_score %}
+                            <span class="label {{ 'label-success' if asset.quality_score >= 0.8 else 'label-warning' if asset.quality_score >= 0.6 else 'label-danger' }}">
+                                Quality: {{ "%.0f"|format(asset.quality_score * 100) }}%
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                {% if asset.description %}
+                <div style="padding: 15px 20px; border-bottom: 1px solid #ddd;">
+                    <p style="margin: 0; color: #495057;">{{ asset.description }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Lineage Controls -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="lineage-controls">
+                <div class="control-group">
+                    <label><strong>Direction:</strong></label>
+                    <select id="direction-select" class="form-control" style="width: auto; display: inline-block; margin-left: 10px;">
+                        <option value="both" {{ 'selected' if direction == 'both' }}>Both (Upstream & Downstream)</option>
+                        <option value="upstream" {{ 'selected' if direction == 'upstream' }}>Upstream Only</option>
+                        <option value="downstream" {{ 'selected' if direction == 'downstream' }}>Downstream Only</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label><strong>Max Depth:</strong></label>
+                    <select id="depth-select" class="form-control" style="width: auto; display: inline-block; margin-left: 10px;">
+                        <option value="1" {{ 'selected' if max_depth == 1 }}>1 Level</option>
+                        <option value="2" {{ 'selected' if max_depth == 2 }}>2 Levels</option>
+                        <option value="3" {{ 'selected' if max_depth == 3 }}>3 Levels</option>
+                        <option value="5" {{ 'selected' if max_depth == 5 }}>5 Levels</option>
+                        <option value="10" {{ 'selected' if max_depth == 10 }}>10 Levels</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-primary" onclick="refreshLineage()">
+                    <i class="fa fa-refresh"></i> Refresh
+                </button>
+                
+                <button class="btn btn-success" onclick="exportLineage()">
+                    <i class="fa fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lineage Visualization -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="lineage-container">
+                <div class="lineage-header">
+                    <h4 style="margin: 0;">
+                        <i class="fa fa-sitemap"></i> Lineage Graph
+                        {% if lineage_paths %}
+                        <small class="text-muted">({{ lineage_paths|length }} paths found)</small>
+                        {% endif %}
+                    </h4>
+                </div>
+                
+                {% if lineage_paths %}
+                <div id="lineage-graph"></div>
+                <div class="graph-controls">
+                    <button class="btn btn-sm btn-default" onclick="zoomIn()">
+                        <i class="fa fa-search-plus"></i> Zoom In
+                    </button>
+                    <button class="btn btn-sm btn-default" onclick="zoomOut()">
+                        <i class="fa fa-search-minus"></i> Zoom Out
+                    </button>
+                    <button class="btn btn-sm btn-default" onclick="resetZoom()">
+                        <i class="fa fa-expand"></i> Reset
+                    </button>
+                    <button class="btn btn-sm btn-info" onclick="toggleLayout()">
+                        <i class="fa fa-refresh"></i> Change Layout
+                    </button>
+                </div>
+                {% else %}
+                <div class="no-lineage">
+                    <i class="fa fa-sitemap fa-3x text-muted"></i>
+                    <h3>No Lineage Found</h3>
+                    <p>This asset doesn't have any lineage relationships yet.</p>
+                    <button class="btn btn-primary" onclick="discoverLineage()">
+                        <i class="fa fa-search"></i> Discover Lineage
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Lineage Paths Detail -->
+    {% if lineage_paths %}
+    <div class="row">
+        <div class="col-md-12">
+            <div class="lineage-container">
+                <div class="lineage-header">
+                    <h4 style="margin: 0;"><i class="fa fa-list"></i> Lineage Paths Detail</h4>
+                </div>
+                <div class="lineage-content">
+                    <div class="lineage-stats">
+                        <i class="fa fa-info-circle"></i> 
+                        Found {{ lineage_paths|length }} lineage path(s) within {{ max_depth }} level(s)
+                    </div>
+
+                    {% for path in lineage_paths %}
+                    <div class="lineage-path">
+                        <div class="path-header">
+                            Path {{ loop.index }}: 
+                            {% if path.direction == 'upstream' %}
+                            <span class="label label-info">Upstream</span>
+                            {% elif path.direction == 'downstream' %}
+                            <span class="label label-warning">Downstream</span>
+                            {% else %}
+                            <span class="label label-primary">Bidirectional</span>
+                            {% endif %}
+                            
+                            {% if path.confidence_score %}
+                            <span class="label label-default">
+                                Confidence: {{ "%.0f"|format(path.confidence_score * 100) }}%
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="path-steps">
+                            {% for step in path.steps %}
+                            <div class="asset-node {{ 'current' if step.asset_id == asset.id else 'source' if step.is_source else 'target' }}">
+                                <div class="node-title">{{ step.asset_name }}</div>
+                                <div class="node-type">{{ step.asset_type }}</div>
+                                {% if step.source_system %}
+                                <div class="node-system">{{ step.source_system }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            {% if not loop.last %}
+                            <div class="path-arrow">
+                                {% if path.direction == 'upstream' %}→{% else %}←{% endif %}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        {% if path.transformation_logic %}
+                        <div class="transformation-info">
+                            <strong>Transformation:</strong> {{ path.transformation_logic }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+let lineageData = {{ lineage_paths|tojson|safe }};
+let currentAssetId = "{{ asset.id }}";
+let svg, simulation, nodes, links;
+
+// Initialize lineage graph
+document.addEventListener('DOMContentLoaded', function() {
+    if (lineageData && lineageData.length > 0) {
+        initializeGraph();
+        drawLineageGraph();
+    }
+});
+
+function initializeGraph() {
+    const container = document.getElementById('lineage-graph');
+    const width = container.offsetWidth;
+    const height = 500;
+
+    svg = d3.select('#lineage-graph')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .call(d3.zoom().on('zoom', function(event) {
+            svg.select('g').attr('transform', event.transform);
+        }))
+        .append('g');
+
+    // Add arrow markers
+    svg.append('defs').selectAll('marker')
+        .data(['arrow'])
+        .enter().append('marker')
+        .attr('id', 'arrow')
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 20)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', '#666');
+}
+
+function drawLineageGraph() {
+    // Process lineage data into nodes and links
+    const nodeMap = new Map();
+    const linkSet = new Set();
+    
+    lineageData.forEach(path => {
+        path.steps.forEach((step, index) => {
+            if (!nodeMap.has(step.asset_id)) {
+                nodeMap.set(step.asset_id, {
+                    id: step.asset_id,
+                    name: step.asset_name,
+                    type: step.asset_type,
+                    system: step.source_system,
+                    isCurrent: step.asset_id === currentAssetId
+                });
+            }
+            
+            // Add links between consecutive steps
+            if (index > 0) {
+                const source = path.steps[index - 1];
+                const target = step;
+                const linkId = `${source.asset_id}-${target.asset_id}`;
+                
+                if (!linkSet.has(linkId)) {
+                    linkSet.add(linkId);
+                    links.push({
+                        source: source.asset_id,
+                        target: target.asset_id,
+                        type: path.direction || 'both'
+                    });
+                }
+            }
+        });
+    });
+
+    nodes = Array.from(nodeMap.values());
+    links = [];
+    
+    // Recreate links array
+    lineageData.forEach(path => {
+        path.steps.forEach((step, index) => {
+            if (index > 0) {
+                const source = path.steps[index - 1];
+                const target = step;
+                links.push({
+                    source: source.asset_id,
+                    target: target.asset_id,
+                    type: path.direction || 'both'
+                });
+            }
+        });
+    });
+
+    // Create force simulation
+    simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(400, 250));
+
+    // Draw links
+    const link = svg.selectAll('.link')
+        .data(links)
+        .enter().append('line')
+        .attr('class', 'link')
+        .attr('stroke', '#666')
+        .attr('stroke-width', 2)
+        .attr('marker-end', 'url(#arrow)');
+
+    // Draw nodes
+    const node = svg.selectAll('.node')
+        .data(nodes)
+        .enter().append('g')
+        .attr('class', 'node')
+        .call(d3.drag()
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended));
+
+    // Node circles
+    node.append('circle')
+        .attr('r', d => d.isCurrent ? 15 : 10)
+        .attr('fill', d => {
+            if (d.isCurrent) return '#f39c12';
+            return d.type === 'table' ? '#3498db' : 
+                   d.type === 'view' ? '#8e44ad' : 
+                   d.type === 'column' ? '#27ae60' : '#95a5a6';
+        })
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 2);
+
+    // Node labels
+    node.append('text')
+        .attr('dx', 20)
+        .attr('dy', 4)
+        .style('font-size', '12px')
+        .style('fill', '#333')
+        .text(d => d.name.length > 20 ? d.name.substring(0, 20) + '...' : d.name);
+
+    // Node tooltips
+    node.append('title')
+        .text(d => `${d.name}\nType: ${d.type}\nSystem: ${d.system || 'N/A'}`);
+
+    // Update positions on simulation tick
+    simulation.on('tick', () => {
+        link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+
+        node.attr('transform', d => `translate(${d.x},${d.y})`);
+    });
+
+    // Click handler for nodes
+    node.on('click', function(event, d) {
+        if (d.id !== currentAssetId) {
+            window.location.href = `/metadata/lineage/${d.id}`;
+        }
+    });
+}
+
+// Drag functions
+function dragstarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+}
+
+function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+}
+
+function dragended(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+}
+
+// Control functions
+function refreshLineage() {
+    const direction = document.getElementById('direction-select').value;
+    const maxDepth = document.getElementById('depth-select').value;
+    
+    const url = `{{ url_for('MetadataBaseView.lineage', asset_id=asset.id) }}?direction=${direction}&max_depth=${maxDepth}`;
+    window.location.href = url;
+}
+
+function zoomIn() {
+    svg.transition().call(
+        d3.zoom().transform,
+        d3.zoomTransform(svg.node()).scale(1.5)
+    );
+}
+
+function zoomOut() {
+    svg.transition().call(
+        d3.zoom().transform,
+        d3.zoomTransform(svg.node()).scale(0.5)
+    );
+}
+
+function resetZoom() {
+    svg.transition().call(
+        d3.zoom().transform,
+        d3.zoomIdentity
+    );
+}
+
+function toggleLayout() {
+    // Restart simulation with different forces
+    simulation.force('center', d3.forceCenter(400, 250))
+             .force('charge', d3.forceManyBody().strength(-300))
+             .alpha(1).restart();
+}
+
+function exportLineage() {
+    // Export lineage graph as SVG or PNG
+    const svg = d3.select('#lineage-graph svg');
+    const svgString = new XMLSerializer().serializeToString(svg.node());
+    
+    // Create download options modal or direct download
+    const exportFormat = prompt('Export format (svg/png):', 'svg');
+    
+    if (exportFormat === 'svg') {
+        // Export as SVG
+        const blob = new Blob([svgString], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'lineage-graph.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } else if (exportFormat === 'png') {
+        // Convert SVG to PNG and download
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = function() {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'lineage-graph.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        };
+        
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        img.src = svgUrl;
+    }
+}
+
+function discoverLineage() {
+    // Trigger automatic lineage discovery for selected asset
+    const selectedAsset = document.querySelector('input[name="asset_id"]').value;
+    
+    if (!selectedAsset) {
+        alert('Please select an asset first');
+        return;
+    }
+    
+    // Show loading indicator
+    const discoverBtn = document.querySelector('button[onclick="discoverLineage()"]');
+    const originalText = discoverBtn.innerText;
+    discoverBtn.innerText = 'Discovering...';
+    discoverBtn.disabled = true;
+    
+    // Call lineage discovery API
+    fetch('/metadata/api/lineage/discover', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ 
+            asset_id: selectedAsset,
+            discovery_type: 'full',
+            max_depth: 5
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Refresh lineage graph with new discoveries
+            location.reload();
+        } else {
+            alert('Discovery failed: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Discovery error:', error);
+        alert('Discovery failed. Please try again.');
+    })
+    .finally(() => {
+        // Restore button state
+        discoverBtn.innerText = originalText;
+        discoverBtn.disabled = false;
+    });
+}
+</script>
+{% endblock %}

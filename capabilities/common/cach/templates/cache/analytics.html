@@ -1,0 +1,254 @@
+{% extends "appbuilder/base.html" %}
+{% import "appbuilder/baselib.html" as baselib %}
+
+{% block head_css %}
+    {{ super() }}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .analytics-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        .analytics-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        }
+        .trend-indicator {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .trend-up { background: #d4edda; color: #155724; }
+        .trend-down { background: #f8d7da; color: #721c24; }
+        .insight-box {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Analytics Header -->
+    <div class="analytics-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-2"><i class="fas fa-chart-area me-3"></i>Advanced Analytics</h1>
+                <p class="mb-0 opacity-75">Deep insights into cache performance and usage patterns</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <button class="btn btn-outline-light me-2">
+                    <i class="fas fa-download"></i> Export Report
+                </button>
+                <button class="btn btn-light">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="analytics-card text-center">
+                <h3 class="text-primary">{{ "{:,}".format(analytics_data.summary.total_requests) }}</h3>
+                <p class="text-muted mb-0">Total Requests</p>
+                <span class="trend-indicator trend-up">{{ analytics_data.trends.throughput_trend }}</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card text-center">
+                <h3 class="text-success">{{ "{:,}".format(analytics_data.summary.cache_hits) }}</h3>
+                <p class="text-muted mb-0">Cache Hits</p>
+                <span class="trend-indicator trend-up">{{ analytics_data.trends.hit_rate_trend }}</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card text-center">
+                <h3 class="text-warning">{{ "{:,}".format(analytics_data.summary.cache_misses) }}</h3>
+                <p class="text-muted mb-0">Cache Misses</p>
+                <span class="trend-indicator trend-down">-5.2%</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card text-center">
+                <h3 class="text-info">{{ "%.1f".format(analytics_data.summary.data_served_gb) }}GB</h3>
+                <p class="text-muted mb-0">Data Served</p>
+                <span class="trend-indicator trend-up">+18.7%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <!-- Access Patterns -->
+        <div class="col-xl-6">
+            <div class="analytics-card">
+                <h5 class="mb-3"><i class="fas fa-chart-bar me-2 text-primary"></i>Access Patterns</h5>
+                <div id="accessPatternChart" style="height: 400px;"></div>
+                <div class="insight-box">
+                    <h6><i class="fas fa-lightbulb me-2"></i>AI Insight</h6>
+                    <p class="mb-0">Random access patterns dominate (45%), suggesting the need for advanced prefetching algorithms to improve hit rates.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Predictive Analytics -->
+        <div class="col-xl-6">
+            <div class="analytics-card">
+                <h5 class="mb-3"><i class="fas fa-crystal-ball me-2 text-primary"></i>Predictive Analytics</h5>
+                <div id="predictiveChart" style="height: 400px;"></div>
+                <div class="insight-box">
+                    <h6><i class="fas fa-robot me-2"></i>ML Prediction</h6>
+                    <p class="mb-0">Expecting 15% load increase in the next 8 hours. Recommend preemptive L1 cache expansion.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Analytics -->
+    <div class="row mb-4">
+        <!-- Efficiency Trends -->
+        <div class="col-xl-6">
+            <div class="analytics-card">
+                <h5 class="mb-3"><i class="fas fa-chart-line me-2 text-primary"></i>Efficiency Trends</h5>
+                <div id="efficiencyChart" style="height: 350px;"></div>
+            </div>
+        </div>
+        
+        <!-- Geographic Distribution -->
+        <div class="col-xl-6">
+            <div class="analytics-card">
+                <h5 class="mb-3"><i class="fas fa-globe me-2 text-primary"></i>Geographic Distribution</h5>
+                <div id="geoChart" style="height: 350px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Analysis -->
+    <div class="row">
+        <div class="col-12">
+            <div class="analytics-card">
+                <h5 class="mb-4"><i class="fas fa-microscope me-2 text-primary"></i>Detailed Performance Analysis</h5>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Cache Efficiency Metrics</h6>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Overall Hit Rate</span>
+                                <span class="badge bg-success">87.0%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>L1 Hit Rate</span>
+                                <span class="badge bg-success">92.3%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>L2 Hit Rate</span>
+                                <span class="badge bg-success">85.7%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>L3 Hit Rate</span>
+                                <span class="badge bg-warning">76.4%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Edge Hit Rate</span>
+                                <span class="badge bg-success">89.1%</span>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <h6>Performance Characteristics</h6>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Avg Response Time</span>
+                                <span class="text-success">2.3ms</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>P50 Latency</span>
+                                <span class="text-success">1.8ms</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>P95 Latency</span>
+                                <span class="text-warning">8.7ms</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>P99 Latency</span>
+                                <span class="text-danger">15.2ms</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Error Rate</span>
+                                <span class="text-success">0.002%</span>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <h6>Resource Utilization</h6>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Memory Usage</span>
+                                <span class="text-warning">67.8%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>CPU Usage</span>
+                                <span class="text-success">35.2%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Network I/O</span>
+                                <span class="text-success">45.6%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Disk I/O</span>
+                                <span class="text-success">23.1%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Connection Pool</span>
+                                <span class="text-success">42.3%</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Access pattern chart
+            var accessPatternChart = {{ access_pattern_chart|safe }};
+            Plotly.newPlot('accessPatternChart', accessPatternChart.data, accessPatternChart.layout, {responsive: true});
+            
+            // Predictive chart
+            var predictiveChart = {{ predictive_chart|safe }};
+            Plotly.newPlot('predictiveChart', predictiveChart.data, predictiveChart.layout, {responsive: true});
+            
+            // Efficiency trends chart
+            var efficiencyChart = {{ efficiency_trends|safe }};
+            Plotly.newPlot('efficiencyChart', efficiencyChart.data, efficiencyChart.layout, {responsive: true});
+            
+            // Geographic distribution chart
+            var geoChart = {{ geo_distribution|safe }};
+            Plotly.newPlot('geoChart', geoChart.data, geoChart.layout, {responsive: true});
+        });
+    </script>
+{% endblock %}

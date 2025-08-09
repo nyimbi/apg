@@ -19,7 +19,7 @@ When this command is issued, you must execute a comprehensive development lifecy
 **CRITICAL**: This is not standalone development - you are building within the APG ecosystem! The capability should both be able to be deployed and managed within the APG ecosystem, and be able to be deployed alone. It should be 10x better than the leader in the relevant gartner magic quadrant and generate a positive emotional response. It MUST solve real problems practitioners have, it should delight the end user.
 
 ## Delight the customer and end user
-**CRITICAL**: The design and functionality of the product must delight the user and be 10x better than the leader in the relevant gartner magic quadrant.It MUST solve real problems in a nuanced and careful way.
+**CRITICAL**: The design and functionality of the product must delight the user and be 10x better than the leader in the relevant gartner magic quadrant. It MUST solve real problems in a nuanced and careful way.
 
 1. **APG File System Operations**:
    - Create directories within APG's `capabilities/` structure
@@ -297,6 +297,7 @@ Requirements for this phase:
 - GraphQL API support compatible with APG's API infrastructure
 
 ## **Mandatory** APG File Structure to Create
+First create this directory structure
 ```
 capabilities/{capability}/{sub_capability}/
 ├── cap_spec.md              # APG-integrated capability specification
@@ -479,4 +480,4 @@ capabilities/{capability}/{sub_capability}/
 - **MANDATORY**: FOLLOW THE APG-INTEGRATED TODO.MD PLAN EXACTLY - IT IS YOUR AUTHORITATIVE GUIDE**
 
 
-Begin APG-integrated development immediately upon receiving the `/dev` command with a capability/sub-capability name. When you finish a phase immediately start on the next phase without delay. Make your responses succinct and to the point.When you have co
+Begin APG-integrated development immediately upon receiving the `/dev` command with a capability/sub-capability name. When you finish a phase immediately start on the next phase without delay. Make your responses succinct and to the point.When you have comment on anything. When you complete the development of a capability, ensure it is registered with the composition engine and tested thoroughly. Ensure that there is no technical debt, Finally git push.

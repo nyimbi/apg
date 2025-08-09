@@ -1,0 +1,82 @@
+# APG Workflow Mobile - Production Configuration
+# © 2025 Datacraft. All rights reserved.
+
+environment: production
+debug: false
+
+api:
+  # Production API URL - Set via APG_API__BASE_URL environment variable
+  base_url: "https://api.datacraft.co.ke/apg"
+  timeout: 30.0
+  retry_attempts: 3
+  retry_delay: 2.0
+  # API credentials must be set via environment variables:
+  # APG_API__API_KEY
+  # APG_API__CLIENT_ID  
+  # APG_API__CLIENT_SECRET
+
+database:
+  sqlite_path: "/opt/apg/data/offline.db"
+  cache_sqlite_path: "/opt/apg/data/cache.db"
+  cache_ttl: 3600  # 1 hour
+  pool_size: 20
+  pool_timeout: 45
+
+security:
+  # Security settings must be set via environment variables:
+  # APG_SECURITY__ENCRYPTION_KEY
+  # APG_SECURITY__JWT_SECRET
+  jwt_expiry: 3600  # 1 hour
+  jwt_refresh_threshold: 300  # 5 minutes
+  biometric_timeout: 30
+  password_min_length: 8
+  password_require_uppercase: true
+  password_require_lowercase: true
+  password_require_numbers: true
+  password_require_symbols: true
+
+sync:
+  sync_interval: 300  # 5 minutes
+  sync_batch_size: 100
+  sync_timeout: 120
+  max_sync_retries: 5
+  background_sync_enabled: true
+  background_sync_wifi_only: true  # Save mobile data
+
+files:
+  max_file_size: 104857600  # 100MB
+  max_total_storage: 1073741824  # 1GB
+  upload_chunk_size: 2097152  # 2MB chunks for better reliability
+  upload_timeout: 600  # 10 minutes
+  temp_file_cleanup_interval: 1800  # 30 minutes
+
+ui:
+  theme_mode: "auto"
+  animation_duration: 300
+  toast_duration: 4000
+  auto_refresh_interval: 300000  # 5 minutes
+
+logging:
+  log_level: "INFO"
+  console_log_level: "WARNING"
+  file_log_level: "INFO"
+  log_file_path: "/var/log/apg/workflow-mobile.log"
+  log_max_size: 52428800  # 50MB
+  log_backup_count: 10
+  colored_logs: false
+  structured_logging: true  # JSON format for production
+
+features:
+  biometric_auth_enabled: true
+  offline_mode_enabled: true
+  real_time_sync_enabled: true
+  push_notifications_enabled: true
+  file_upload_enabled: true
+  file_preview_enabled: true
+  analytics_enabled: true
+  crash_reporting_enabled: true
+  
+  # Debug features disabled in production
+  debug_mode_enabled: false
+  mock_api_enabled: false
+  verbose_logging_enabled: false

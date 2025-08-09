@@ -1,0 +1,47 @@
+# APG System Health Management (HLTH) - Requirements
+# Machine Learning and Advanced Analytics Dependencies
+
+# Core ML libraries
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# Advanced ML (optional)
+tensorflow>=2.13.0  # For deep learning models
+torch>=2.0.0  # PyTorch alternative
+xgboost>=1.7.0  # Gradient boosting
+
+# Time series forecasting
+statsmodels>=0.14.0
+prophet>=1.1.0  # Facebook Prophet for time series
+
+# Anomaly detection
+pyod>=1.1.0  # Outlier Detection
+
+# Data processing and visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.15.0
+
+# Performance optimization
+numba>=0.57.0  # JIT compilation for numerical functions
+
+# API and web framework support
+flask>=2.3.0
+flask-restful>=0.3.10
+marshmallow>=3.19.0
+
+# Utilities
+pydantic>=2.0.0
+uuid-extensions>=0.1.0
+python-dateutil>=2.8.0
+
+# Testing and development
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# Health monitoring integration (APG ecosystem)
+psutil>=5.9.0  # System resource monitoring
+requests>=2.31.0  # HTTP requests for health checks
+aiohttp>=3.8.0  # Async HTTP for health checks

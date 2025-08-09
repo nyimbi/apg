@@ -1,0 +1,266 @@
+{% extends "appbuilder/base.html" %}
+
+{% block title %}ETLP Dashboard - APG Platform{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.etlp-metric-card {
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	color: white;
+	border-radius: 10px;
+	padding: 20px;
+	margin-bottom: 20px;
+	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.etlp-metric-value {
+	font-size: 2.5rem;
+	font-weight: bold;
+	margin-bottom: 5px;
+}
+
+.etlp-metric-label {
+	font-size: 0.9rem;
+	opacity: 0.9;
+}
+
+.etlp-status-badge {
+	padding: 4px 8px;
+	border-radius: 4px;
+	font-size: 0.8rem;
+	font-weight: bold;
+}
+
+.pipeline-item {
+	border-left: 4px solid #007bff;
+	padding: 15px;
+	margin-bottom: 10px;
+	background: #f8f9fa;
+	border-radius: 0 8px 8px 0;
+}
+
+.execution-item {
+	padding: 10px 15px;
+	border-bottom: 1px solid #e9ecef;
+}
+
+.execution-item:last-child {
+	border-bottom: none;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-12">
+			<h1 class="page-header">
+				<i class="fa fa-dashboard"></i> ETLP Dashboard
+				<small>AI-Powered Data Processing Platform</small>
+			</h1>
+		</div>
+	</div>
+	
+	<!-- Metrics Cards -->
+	<div class="row">
+		<div class="col-md-3">
+			<div class="etlp-metric-card">
+				<div class="etlp-metric-value">{{ dashboard.total_pipelines }}</div>
+				<div class="etlp-metric-label">
+					<i class="fa fa-flow-chart"></i> Total Pipelines
+				</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="etlp-metric-card">
+				<div class="etlp-metric-value">{{ dashboard.active_pipelines }}</div>
+				<div class="etlp-metric-label">
+					<i class="fa fa-play-circle"></i> Active Pipelines
+				</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="etlp-metric-card">
+				<div class="etlp-metric-value">{{ dashboard.running_executions }}</div>
+				<div class="etlp-metric-label">
+					<i class="fa fa-cog fa-spin"></i> Running Now
+				</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="etlp-metric-card">
+				<div class="etlp-metric-value">{{ "%.1f"|format(dashboard.success_rate) }}%</div>
+				<div class="etlp-metric-label">
+					<i class="fa fa-check-circle"></i> Success Rate
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Quick Actions -->
+	<div class="row">
+		<div class="col-12">
+			<div class="panel panel-default">
+				<div class="panel-heading">
+					<h3 class="panel-title">Quick Actions</h3>
+				</div>
+				<div class="panel-body">
+					<div class="btn-group" role="group">
+						<a href="{{ url_for('etlp.create_pipeline') }}" class="btn btn-primary">
+							<i class="fa fa-plus"></i> New Pipeline
+						</a>
+						<a href="{{ url_for('etlp.designer') }}" class="btn btn-success">
+							<i class="fa fa-paint-brush"></i> Visual Designer
+						</a>
+						<a href="{{ url_for('etlp.list_pipelines') }}" class="btn btn-info">
+							<i class="fa fa-list"></i> All Pipelines
+						</a>
+						<a href="{{ url_for('etlp.monitoring_dashboard') }}" class="btn btn-warning">
+							<i class="fa fa-line-chart"></i> Monitoring
+						</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Recent Activity -->
+	<div class="row">
+		<div class="col-md-6">
+			<div class="panel panel-default">
+				<div class="panel-heading">
+					<h3 class="panel-title">
+						<i class="fa fa-flow-chart"></i> Recent Pipelines
+					</h3>
+				</div>
+				<div class="panel-body" style="max-height: 400px; overflow-y: auto;">
+					{% if dashboard.recent_pipelines %}
+						{% for pipeline in dashboard.recent_pipelines %}
+						<div class="pipeline-item">
+							<div class="row">
+								<div class="col-md-8">
+									<h5>
+										<a href="{{ url_for('etlp.view_pipeline', pipeline_id=pipeline.id) }}">
+											{{ pipeline.name }}
+										</a>
+									</h5>
+									<p class="text-muted">{{ helpers.truncate_text(pipeline.description, 80) }}</p>
+								</div>
+								<div class="col-md-4 text-right">
+									<span class="etlp-status-badge {{ helpers.get_status_badge_class(pipeline.status) }}">
+										{{ pipeline.status.value.upper() }}
+									</span>
+									<br><small class="text-muted">{{ pipeline.updated_at.strftime('%Y-%m-%d %H:%M') }}</small>
+								</div>
+							</div>
+						</div>
+						{% endfor %}
+					{% else %}
+						<div class="text-center text-muted">
+							<i class="fa fa-info-circle fa-3x"></i>
+							<p>No pipelines created yet.</p>
+							<a href="{{ url_for('etlp.create_pipeline') }}" class="btn btn-primary btn-sm">
+								Create Your First Pipeline
+							</a>
+						</div>
+					{% endif %}
+				</div>
+			</div>
+		</div>
+		
+		<div class="col-md-6">
+			<div class="panel panel-default">
+				<div class="panel-heading">
+					<h3 class="panel-title">
+						<i class="fa fa-play"></i> Recent Executions
+					</h3>
+				</div>
+				<div class="panel-body" style="max-height: 400px; overflow-y: auto;">
+					{% if dashboard.recent_executions %}
+						{% for execution in dashboard.recent_executions %}
+						<div class="execution-item">
+							<div class="row">
+								<div class="col-md-6">
+									<strong>
+										<a href="{{ url_for('etlp.view_execution', execution_id=execution.id) }}">
+											{{ execution.id[:8] }}...
+										</a>
+									</strong>
+									<br><small class="text-muted">{{ execution.pipeline_id[:8] }}...</small>
+								</div>
+								<div class="col-md-3">
+									<span class="etlp-status-badge {{ helpers.get_status_badge_class(execution.status) }}">
+										{{ execution.status.value.upper() }}
+									</span>
+								</div>
+								<div class="col-md-3 text-right">
+									<small>{{ helpers.format_duration(execution.duration_ms) }}</small>
+									<br><small class="text-muted">{{ execution.started_at.strftime('%H:%M') if execution.started_at else 'N/A' }}</small>
+								</div>
+							</div>
+						</div>
+						{% endfor %}
+					{% else %}
+						<div class="text-center text-muted">
+							<i class="fa fa-clock-o fa-3x"></i>
+							<p>No recent executions.</p>
+						</div>
+					{% endif %}
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- AI Insights Panel -->
+	<div class="row">
+		<div class="col-12">
+			<div class="panel panel-info">
+				<div class="panel-heading">
+					<h3 class="panel-title">
+						<i class="fa fa-brain"></i> AI Insights & Recommendations
+					</h3>
+				</div>
+				<div class="panel-body">
+					<div class="alert alert-info">
+						<i class="fa fa-lightbulb-o"></i>
+						<strong>Performance Tip:</strong> Consider enabling AI optimization on your pipelines for up to 40% better performance.
+					</div>
+					<div class="row">
+						<div class="col-md-4 text-center">
+							<i class="fa fa-rocket fa-3x text-primary"></i>
+							<h4>10x Performance</h4>
+							<p class="text-muted">AI-powered optimization delivers industry-leading speed</p>
+						</div>
+						<div class="col-md-4 text-center">
+							<i class="fa fa-shield fa-3x text-success"></i>
+							<h4>Self-Healing</h4>
+							<p class="text-muted">Automatic error recovery and pipeline optimization</p>
+						</div>
+						<div class="col-md-4 text-center">
+							<i class="fa fa-users fa-3x text-warning"></i>
+							<h4>Real-Time Collaboration</h4>
+							<p class="text-muted">Team-based pipeline development and monitoring</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+// Auto-refresh dashboard every 30 seconds
+setInterval(function() {
+	location.reload();
+}, 30000);
+
+// Initialize tooltips
+$(function () {
+	$('[data-toggle="tooltip"]').tooltip();
+});
+</script>
+{% endblock %}

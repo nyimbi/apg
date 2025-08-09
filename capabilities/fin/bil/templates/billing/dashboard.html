@@ -1,0 +1,275 @@
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-12">
+      <h1 class="page-header">
+        <i class="fa fa-credit-card"></i> {{ title }}
+        <small>APG Billing Analytics</small>
+      </h1>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="row">
+    <div class="col-lg-3 col-md-6">
+      <div class="panel panel-primary">
+        <div class="panel-heading">
+          <div class="row">
+            <div class="col-xs-3">
+              <i class="fa fa-dollar fa-5x"></i>
+            </div>
+            <div class="col-xs-9 text-right">
+              <div class="huge">${{ analytics.metrics.total_revenue|default('0') }}</div>
+              <div>Total Revenue</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+      <div class="panel panel-green">
+        <div class="panel-heading">
+          <div class="row">
+            <div class="col-xs-3">
+              <i class="fa fa-users fa-5x"></i>
+            </div>
+            <div class="col-xs-9 text-right">
+              <div class="huge">{{ status.customers|default('0') }}</div>
+              <div>Total Customers</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+      <div class="panel panel-yellow">
+        <div class="panel-heading">
+          <div class="row">
+            <div class="col-xs-3">
+              <i class="fa fa-refresh fa-5x"></i>
+            </div>
+            <div class="col-xs-9 text-right">
+              <div class="huge">{{ status.subscriptions.active|default('0') }}</div>
+              <div>Active Subscriptions</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+      <div class="panel panel-red">
+        <div class="panel-heading">
+          <div class="row">
+            <div class="col-xs-3">
+              <i class="fa fa-file-text fa-5x"></i>
+            </div>
+            <div class="col-xs-9 text-right">
+              <div class="huge">{{ status.invoices.pending|default('0') }}</div>
+              <div>Pending Invoices</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <i class="fa fa-bar-chart-o fa-fw"></i> Revenue Trend
+        </div>
+        <div class="panel-body">
+          <div id="revenue-chart"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-lg-4">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <i class="fa fa-pie-chart fa-fw"></i> Payment Status
+        </div>
+        <div class="panel-body">
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Count</th>
+                  <th>%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Paid</td>
+                  <td>{{ status.invoices.paid|default('0') }}</td>
+                  <td>
+                    {% set total = status.invoices.total|default(1) %}
+                    {% set paid = status.invoices.paid|default(0) %}
+                    {{ "%.1f"|format((paid / total * 100) if total > 0 else 0) }}%
+                  </td>
+                </tr>
+                <tr>
+                  <td>Pending</td>
+                  <td>{{ status.invoices.pending|default('0') }}</td>
+                  <td>
+                    {% set pending = status.invoices.pending|default(0) %}
+                    {{ "%.1f"|format((pending / total * 100) if total > 0 else 0) }}%
+                  </td>
+                </tr>
+                <tr>
+                  <td>Overdue</td>
+                  <td>{{ status.invoices.overdue|default('0') }}</td>
+                  <td>
+                    {% set overdue = status.invoices.overdue|default(0) %}
+                    {{ "%.1f"|format((overdue / total * 100) if total > 0 else 0) }}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subscription Status -->
+  <div class="row">
+    <div class="col-lg-6">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <i class="fa fa-refresh fa-fw"></i> Subscription Status
+        </div>
+        <div class="panel-body">
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Count</th>
+                  <th>Percentage</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="label label-success">Active</span></td>
+                  <td>{{ status.subscriptions.active|default('0') }}</td>
+                  <td>
+                    {% set total_subs = status.subscriptions.total|default(1) %}
+                    {% set active_subs = status.subscriptions.active|default(0) %}
+                    {{ "%.1f"|format((active_subs / total_subs * 100) if total_subs > 0 else 0) }}%
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="label label-info">Trial</span></td>
+                  <td>{{ status.subscriptions.trial|default('0') }}</td>
+                  <td>
+                    {% set trial_subs = status.subscriptions.trial|default(0) %}
+                    {{ "%.1f"|format((trial_subs / total_subs * 100) if total_subs > 0 else 0) }}%
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="label label-warning">Cancelled</span></td>
+                  <td>{{ status.subscriptions.cancelled|default('0') }}</td>
+                  <td>
+                    {% set cancelled_subs = status.subscriptions.cancelled|default(0) %}
+                    {{ "%.1f"|format((cancelled_subs / total_subs * 100) if total_subs > 0 else 0) }}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-lg-6">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <i class="fa fa-clock-o fa-fw"></i> Recent Activity
+        </div>
+        <div class="panel-body">
+          <div class="list-group">
+            <a href="#" class="list-group-item">
+              <i class="fa fa-plus text-success"></i>
+              New customer registration
+              <span class="pull-right text-muted small">2 minutes ago</span>
+            </a>
+            <a href="#" class="list-group-item">
+              <i class="fa fa-credit-card text-primary"></i>
+              Payment received
+              <span class="pull-right text-muted small">5 minutes ago</span>
+            </a>
+            <a href="#" class="list-group-item">
+              <i class="fa fa-file-text text-warning"></i>
+              Invoice generated
+              <span class="pull-right text-muted small">12 minutes ago</span>
+            </a>
+            <a href="#" class="list-group-item">
+              <i class="fa fa-refresh text-info"></i>
+              Subscription renewed
+              <span class="pull-right text-muted small">18 minutes ago</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <i class="fa fa-flash fa-fw"></i> Quick Actions
+        </div>
+        <div class="panel-body">
+          <div class="btn-group" role="group">
+            <a href="{{ url_for('BillingCustomerModelView.add') }}" class="btn btn-primary">
+              <i class="fa fa-plus"></i> Add Customer
+            </a>
+            <a href="{{ url_for('BillingPlanModelView.add') }}" class="btn btn-success">
+              <i class="fa fa-plus"></i> Create Plan
+            </a>
+            <a href="{{ url_for('BillingReportsView.revenue_report') }}" class="btn btn-info">
+              <i class="fa fa-bar-chart"></i> Revenue Report
+            </a>
+            <a href="{{ url_for('BillingCustomerPortalView.portal') }}" class="btn btn-warning">
+              <i class="fa fa-user"></i> Customer Portal
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Revenue chart
+{% if analytics.revenue_by_day %}
+var revenueData = [
+  {% for day, amount in analytics.revenue_by_day.items() %}
+  ['{{ day }}', {{ amount }}]{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+var chart = new google.visualization.AreaChart(document.getElementById('revenue-chart'));
+chart.draw(google.visualization.arrayToDataTable([
+  ['Date', 'Revenue'],
+  ...revenueData
+]), {
+  title: 'Daily Revenue',
+  hAxis: {title: 'Date'},
+  vAxis: {title: 'Revenue ($)'},
+  backgroundColor: 'transparent'
+});
+{% endif %}
+</script>
+{% endblock %}

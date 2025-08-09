@@ -1,0 +1,367 @@
+{% extends "appbuilder/base.html" %}
+
+{% block title %}
+Search Metadata Assets - APG
+{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.search-form {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.search-result {
+    background: #fff;
+    border: 1px solid #e3e6f0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.search-result:hover {
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.asset-type-badge {
+    display: inline-block;
+    background: #3498db;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75em;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.asset-type-table { background: #27ae60; }
+.asset-type-view { background: #8e44ad; }
+.asset-type-column { background: #f39c12; }
+.asset-type-schema { background: #e74c3c; }
+.asset-type-file { background: #95a5a6; }
+
+.quality-score {
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.quality-high { background: #d5f4e6; color: #27ae60; }
+.quality-medium { background: #fef9e7; color: #f39c12; }
+.quality-low { background: #fadbd8; color: #e74c3c; }
+
+.search-stats {
+    background: #f8f9fa;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.no-results {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+}
+
+.result-title {
+    margin: 0 0 8px 0;
+    font-size: 1.2em;
+}
+
+.result-meta {
+    font-size: 0.85em;
+    color: #6c757d;
+    margin-bottom: 8px;
+}
+
+.result-description {
+    margin-bottom: 10px;
+    color: #495057;
+}
+
+.result-tags {
+    margin-top: 10px;
+}
+
+.tag {
+    display: inline-block;
+    background: #e9ecef;
+    color: #495057;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    margin: 0 3px 3px 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1><i class="fa fa-search-plus"></i> Search Metadata Assets</h1>
+            <p class="lead">Natural language search with AI-powered intelligence</p>
+        </div>
+    </div>
+
+    <!-- Search Form -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="search-form">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ form.query_text.label(class="control-label") }}
+                                {{ form.query_text(class="form-control", placeholder="Search for tables, columns, files... e.g. 'customer data with PII'") }}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                {{ form.asset_types.label(class="control-label") }}
+                                {{ form.asset_types(class="form-control") }}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label class="control-label">&nbsp;</label>
+                                <div class="checkbox">
+                                    {{ form.enable_natural_language() }} {{ form.enable_natural_language.label }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-search"></i> Search Assets
+                            </button>
+                            <button type="button" class="btn btn-default" onclick="clearForm()">
+                                <i class="fa fa-times"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Results -->
+    {% if results %}
+    <div class="row">
+        <div class="col-md-12">
+            <div class="search-stats">
+                <i class="fa fa-info-circle"></i> Found {{ results|length }} assets matching your search
+            </div>
+
+            {% for result in results %}
+            <div class="search-result">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h3 class="result-title">
+                            <a href="{{ url_for('MetadataBaseView.asset_detail', asset_id=result.id) }}">
+                                {{ result.display_name or result.name }}
+                            </a>
+                        </h3>
+                        
+                        <div class="result-meta">
+                            <span class="asset-type-badge asset-type-{{ result.asset_type }}">
+                                {{ result.asset_type|title }}
+                            </span>
+                            
+                            {% if result.source_system %}
+                            <span style="margin-left: 10px;">
+                                <i class="fa fa-server"></i> {{ result.source_system }}
+                            </span>
+                            {% endif %}
+                            
+                            {% if result.updated_at %}
+                            <span style="margin-left: 10px;">
+                                <i class="fa fa-clock-o"></i> {{ format_timestamp(result.updated_at) }}
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        {% if result.description %}
+                        <div class="result-description">
+                            {{ result.description|truncate(200) }}
+                        </div>
+                        {% endif %}
+
+                        {% if result.tags %}
+                        <div class="result-tags">
+                            {% for tag in result.tags %}
+                            <span class="tag">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-4 text-right">
+                        {% if result.quality_score is not none %}
+                        <div class="quality-score quality-{{ 'high' if result.quality_score >= 0.8 else 'medium' if result.quality_score >= 0.6 else 'low' }}">
+                            Quality: {{ "%.0f"|format(result.quality_score * 100) }}%
+                        </div>
+                        {% endif %}
+                        
+                        <div style="margin-top: 10px;">
+                            <a href="{{ url_for('MetadataBaseView.asset_detail', asset_id=result.id) }}" 
+                               class="btn btn-sm btn-primary">
+                                <i class="fa fa-eye"></i> View Details
+                            </a>
+                            <a href="{{ url_for('MetadataBaseView.lineage', asset_id=result.id) }}" 
+                               class="btn btn-sm btn-info">
+                                <i class="fa fa-sitemap"></i> Lineage
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    {% elif request.method == 'POST' %}
+    <div class="row">
+        <div class="col-md-12">
+            <div class="no-results">
+                <i class="fa fa-search fa-3x text-muted"></i>
+                <h3>No Results Found</h3>
+                <p>Try adjusting your search terms or filters</p>
+                
+                <div style="margin-top: 20px;">
+                    <strong>Search Tips:</strong>
+                    <ul style="text-align: left; display: inline-block; margin-top: 10px;">
+                        <li>Use natural language: "customer data with PII"</li>
+                        <li>Search by asset type: "tables containing email"</li>
+                        <li>Search by system: "postgresql tables"</li>
+                        <li>Use partial matches: "user_" to find user_profile, user_orders</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Search Examples -->
+    <div class="row" style="margin-top: 30px;">
+        <div class="col-md-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4><i class="fa fa-lightbulb-o"></i> Search Examples</h4>
+                </div>
+                <div class="panel-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Natural Language Queries:</strong>
+                            <ul>
+                                <li><code>customer data with phone numbers</code></li>
+                                <li><code>tables containing sensitive information</code></li>
+                                <li><code>financial data from last month</code></li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Specific Searches:</strong>
+                            <ul>
+                                <li><code>user_profile</code> - Find exact matches</li>
+                                <li><code>email</code> - Find columns containing emails</li>
+                                <li><code>payment*</code> - Find assets starting with "payment"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function clearForm() {
+    document.querySelector('input[name="query_text"]').value = '';
+    document.querySelector('select[name="asset_types"]').value = '';
+    document.querySelector('input[name="enable_natural_language"]').checked = true;
+}
+
+// Auto-focus search input
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelector('input[name="query_text"]').focus();
+});
+
+// Search suggestions with AJAX autocomplete
+document.querySelector('input[name="query_text"]').addEventListener('input', function() {
+    const query = this.value.trim();
+    
+    // Only show suggestions for queries with 2+ characters
+    if (query.length >= 2) {
+        fetch('/metadata/api/search/suggestions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ query: query })
+        })
+        .then(response => response.json())
+        .then(data => {
+            showSearchSuggestions(data.suggestions || []);
+        })
+        .catch(error => {
+            console.log('Search suggestions not available:', error);
+        });
+    } else {
+        hideSearchSuggestions();
+    }
+});
+
+function showSearchSuggestions(suggestions) {
+    let suggestionBox = document.getElementById('search-suggestions');
+    if (!suggestionBox) {
+        suggestionBox = document.createElement('div');
+        suggestionBox.id = 'search-suggestions';
+        suggestionBox.className = 'position-absolute bg-white border rounded shadow-sm w-100';
+        suggestionBox.style.top = '100%';
+        suggestionBox.style.left = '0';
+        suggestionBox.style.zIndex = '1000';
+        document.querySelector('input[name="query_text"]').parentNode.style.position = 'relative';
+        document.querySelector('input[name="query_text"]').parentNode.appendChild(suggestionBox);
+    }
+    
+    if (suggestions.length > 0) {
+        const suggestionHTML = suggestions.slice(0, 5).map(suggestion => 
+            \`<div class="p-2 border-bottom cursor-pointer suggestion-item" data-suggestion="\${suggestion.text}">
+                <small class="text-muted">\${suggestion.type}</small><br>
+                <strong>\${suggestion.text}</strong>
+            </div>\`
+        ).join('');
+        
+        suggestionBox.innerHTML = suggestionHTML;
+        suggestionBox.style.display = 'block';
+        
+        // Add click handlers for suggestions
+        suggestionBox.querySelectorAll('.suggestion-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelector('input[name="query_text"]').value = this.dataset.suggestion;
+                hideSearchSuggestions();
+            });
+        });
+    }
+}
+
+function hideSearchSuggestions() {
+    const suggestionBox = document.getElementById('search-suggestions');
+    if (suggestionBox) {
+        suggestionBox.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

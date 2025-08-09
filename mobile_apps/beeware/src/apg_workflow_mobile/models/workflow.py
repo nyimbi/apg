@@ -9,7 +9,7 @@ from enum import Enum
 from typing import List, Optional, Dict, Any, Union
 from dataclasses import dataclass, field
 from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
+import uuid
 
 
 class WorkflowStatus(str, Enum):
@@ -46,7 +46,7 @@ class ScheduleType(str, Enum):
 @dataclass
 class WorkflowTrigger:
 	"""Workflow trigger configuration"""
-	id: str = field(default_factory=uuid7str)
+	id: str = field(default_factory=lambda: str(uuid.uuid4()))
 	name: str = ""
 	trigger_type: TriggerType = TriggerType.MANUAL
 	is_enabled: bool = True
@@ -84,7 +84,7 @@ class WorkflowTrigger:
 @dataclass
 class WorkflowSchedule:
 	"""Workflow schedule configuration"""
-	id: str = field(default_factory=uuid7str)
+	id: str = field(default_factory=lambda: str(uuid.uuid4()))
 	name: str = ""
 	schedule_type: ScheduleType = ScheduleType.ONCE
 	is_enabled: bool = True
@@ -127,7 +127,7 @@ class Workflow(BaseModel):
 		validate_by_alias=True
 	)
 	
-	id: str = Field(default_factory=uuid7str)
+	id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 	name: str = Field(..., min_length=1, max_length=200)
 	description: Optional[str] = None
 	version: str = "1.0.0"
@@ -344,7 +344,7 @@ class WorkflowInstance(BaseModel):
 		validate_by_alias=True
 	)
 	
-	id: str = Field(default_factory=uuid7str)
+	id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 	workflow_id: str = Field(..., min_length=1)
 	workflow_name: Optional[str] = None
 	workflow_version: str = "1.0.0"

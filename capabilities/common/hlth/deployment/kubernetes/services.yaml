@@ -1,0 +1,787 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hlth-api-gateway
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: hlth-core
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: hlth-api-gateway
+  template:
+    metadata:
+      labels:
+        app: hlth-api-gateway
+        app.kubernetes.io/name: apg-hlth
+        app.kubernetes.io/component: api-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: hlth-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: api-gateway
+        image: datacraft/apg-hlth-api-gateway:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://hlth:$(DB_PASSWORD)@postgres-service:5432/hlth"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: secret-key
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: db-password
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: encryption-key
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: jwt-secret
+        envFrom:
+        - configMapRef:
+            name: hlth-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hlth-api-gateway
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: api-gateway
+spec:
+  type: ClusterIP
+  selector:
+    app: hlth-api-gateway
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hlth-health-service
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: health-service
+    app.kubernetes.io/part-of: hlth-core
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: hlth-health-service
+  template:
+    metadata:
+      labels:
+        app: hlth-health-service
+        app.kubernetes.io/name: apg-hlth
+        app.kubernetes.io/component: health-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: hlth-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: health-service
+        image: datacraft/apg-hlth-health-service:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8081
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://hlth:$(DB_PASSWORD)@postgres-service:5432/hlth"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: db-password
+        - name: ML_MODELS_PATH
+          value: "/app/models"
+        envFrom:
+        - configMapRef:
+            name: hlth-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: models
+          mountPath: /app/models
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: models
+        persistentVolumeClaim:
+          claimName: hlth-models-pvc
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hlth-health-service
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: health-service
+spec:
+  type: ClusterIP
+  selector:
+    app: hlth-health-service
+  ports:
+  - name: http
+    port: 8081
+    targetPort: 8081
+    protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hlth-ml-engine
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: ml-engine
+    app.kubernetes.io/part-of: hlth-ai
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # ML engine needs exclusive access to models
+  selector:
+    matchLabels:
+      app: hlth-ml-engine
+  template:
+    metadata:
+      labels:
+        app: hlth-ml-engine
+        app.kubernetes.io/name: apg-hlth
+        app.kubernetes.io/component: ml-engine
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8082"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: hlth-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: ml-engine
+        image: datacraft/apg-hlth-ml-engine:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8082
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://hlth:$(DB_PASSWORD)@postgres-service:5432/hlth"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: db-password
+        - name: ML_MODELS_PATH
+          value: "/app/models"
+        - name: CUDA_VISIBLE_DEVICES
+          value: ""  # Disable GPU for now
+        envFrom:
+        - configMapRef:
+            name: hlth-config
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 120
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8082
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: models
+          mountPath: /app/models
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: models
+        persistentVolumeClaim:
+          claimName: hlth-models-pvc
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hlth-ml-engine
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: ml-engine
+spec:
+  type: ClusterIP
+  selector:
+    app: hlth-ml-engine
+  ports:
+  - name: http
+    port: 8082
+    targetPort: 8082
+    protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hlth-alert-engine
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: alert-engine
+    app.kubernetes.io/part-of: hlth-core
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: hlth-alert-engine
+  template:
+    metadata:
+      labels:
+        app: hlth-alert-engine
+        app.kubernetes.io/name: apg-hlth
+        app.kubernetes.io/component: alert-engine
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: hlth-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: alert-engine
+        image: datacraft/apg-hlth-alert-engine:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8083
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://hlth:$(DB_PASSWORD)@postgres-service:5432/hlth"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: db-password
+        - name: SMTP_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: hlth-notification-secrets
+              key: smtp-username
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hlth-notification-secrets
+              key: smtp-password
+        - name: SLACK_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: hlth-notification-secrets
+              key: slack-webhook-url
+        - name: WEBHOOK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hlth-notification-secrets
+              key: webhook-token
+        envFrom:
+        - configMapRef:
+            name: hlth-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8083
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hlth-alert-engine
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: alert-engine
+spec:
+  type: ClusterIP
+  selector:
+    app: hlth-alert-engine
+  ports:
+  - name: http
+    port: 8083
+    targetPort: 8083
+    protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hlth-remediation-engine
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: remediation-engine
+    app.kubernetes.io/part-of: hlth-automation
+spec:
+  replicas: 1  # Single replica to avoid conflicts
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: hlth-remediation-engine
+  template:
+    metadata:
+      labels:
+        app: hlth-remediation-engine
+        app.kubernetes.io/name: apg-hlth
+        app.kubernetes.io/component: remediation-engine
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8084"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: hlth-remediation-account
+      securityContext:
+        runAsNonRoot: false  # May need root for some remediation actions
+        runAsUser: 0
+        fsGroup: 0
+      containers:
+      - name: remediation-engine
+        image: datacraft/apg-hlth-remediation-engine:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8084
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://hlth:$(DB_PASSWORD)@postgres-service:5432/hlth"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: db-password
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: hlth-integration-secrets
+              key: aws-access-key-id
+              optional: true
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hlth-integration-secrets
+              key: aws-secret-access-key
+              optional: true
+        envFrom:
+        - configMapRef:
+            name: hlth-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8084
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: true  # May need for some remediation
+          readOnlyRootFilesystem: false
+          capabilities:
+            add:
+            - SYS_ADMIN  # For container management
+            - NET_ADMIN  # For network operations
+        volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+      - name: tmp
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hlth-remediation-engine
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: remediation-engine
+spec:
+  type: ClusterIP
+  selector:
+    app: hlth-remediation-engine
+  ports:
+  - name: http
+    port: 8084
+    targetPort: 8084
+    protocol: TCP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hlth-models-pvc
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: ml-storage
+spec:
+  accessModes:
+    - ReadWriteMany  # Multiple pods need access
+  storageClassName: nfs-storage  # Use NFS or similar for shared access
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hlth-service-account
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: service-account
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hlth-remediation-account
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: remediation-service-account
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hlth-remediation-role
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: remediation-rbac
+rules:
+# Pod management
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]
+# Service management
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Deployment management
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments/scale"]
+  verbs: ["get", "update", "patch"]
+# HPA management
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+# Node information
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+# Event creation
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hlth-remediation-binding
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: remediation-rbac
+subjects:
+- kind: ServiceAccount
+  name: hlth-remediation-account
+  namespace: hlth
+roleRef:
+  kind: ClusterRole
+  name: hlth-remediation-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hlth-service-role
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: service-rbac
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hlth-service-binding
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: service-rbac
+subjects:
+- kind: ServiceAccount
+  name: hlth-service-account
+  namespace: hlth
+roleRef:
+  kind: Role
+  name: hlth-service-role
+  apiGroup: rbac.authorization.k8s.io

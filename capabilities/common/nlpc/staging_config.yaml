@@ -1,0 +1,92 @@
+# APG NLP Staging Configuration
+# Staging environment configuration for testing and validation
+
+environment: staging
+debug: false
+log_level: DEBUG
+
+# Database Configuration
+database_url: "postgresql://apg_nlp:${DB_PASSWORD}@postgres-staging:5432/apg_nlp_staging"
+database_pool_size: 10
+database_pool_timeout: 30
+
+# Redis Configuration
+redis_url: "redis://redis-staging:6379/0"
+redis_pool_size: 8
+
+# Performance Settings
+max_workers: 4
+request_timeout: 300
+batch_size_limit: 100
+memory_limit_gb: 8.0
+
+# Security Settings
+enable_cors: true
+allowed_origins:
+  - "https://staging.datacraft.co.ke"
+  - "http://localhost:3000"
+api_rate_limit: 1000  # requests per minute
+
+# Monitoring Settings
+enable_metrics: true
+metrics_port: 9090
+health_check_interval: 60
+
+# Logging Settings
+log_format: json
+log_aggregation_enabled: true
+log_retention_days: 14
+
+# Caching Settings
+enable_caching: true
+cache_ttl_seconds: 1800  # 30 minutes
+cache_max_size: 1000
+
+# NLP Model Configuration
+models:
+  sentiment_analysis:
+    provider: transformers
+    model_name: "cardiffnlp/twitter-roberta-base-sentiment-latest"
+    max_length: 512
+    batch_size: 16
+    
+  named_entity_recognition:
+    provider: spacy
+    model_name: "en_core_web_sm"
+    batch_size: 32
+
+# Resource Limits
+resource_limits:
+  cpu_cores: 4
+  memory_gb: 8
+  storage_gb: 50
+
+# Auto-scaling Configuration
+autoscaling:
+  enabled: true
+  min_replicas: 2
+  max_replicas: 6
+  target_cpu_percent: 75
+  target_memory_percent: 85
+
+# Backup and Recovery
+backup:
+  enabled: true
+  schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+  retention_days: 7
+  storage_location: "s3://apg-nlp-backups/staging/"
+
+# Security Compliance
+compliance:
+  gdpr_enabled: true
+  audit_logging: true
+  data_encryption: false  # Disabled for staging
+  retention_policy_days: 30
+  
+# Alert Configuration
+alerts:
+  cpu_threshold: 85
+  memory_threshold: 90
+  disk_threshold: 95
+  error_rate_threshold: 10  # percent
+  response_time_threshold: 2000  # milliseconds

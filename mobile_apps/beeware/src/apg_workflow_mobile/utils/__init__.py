@@ -6,7 +6,7 @@ Utilities for APG Workflow Mobile
 
 from .constants import *
 from .exceptions import *
-from .logger import setup_logging
+from .logger import setup_logging, get_logger
 from .security import encrypt_data, decrypt_data, generate_device_id
 from .validators import validate_email, validate_workflow_name, validate_task_name
 from .formatters import format_datetime, format_duration, format_file_size
@@ -30,6 +30,7 @@ __all__ = [
 	
 	# Functions
 	"setup_logging",
+	"get_logger",
 	"encrypt_data",
 	"decrypt_data", 
 	"generate_device_id",

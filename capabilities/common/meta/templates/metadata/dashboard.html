@@ -1,0 +1,272 @@
+{% extends "appbuilder/base.html" %}
+
+{% block title %}
+Metadata Management Dashboard - APG
+{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.metric-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.metric-value {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.metric-label {
+    font-size: 0.9em;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    margin-top: 5px;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-running { background-color: #27ae60; }
+.status-degraded { background-color: #f39c12; }
+.status-error { background-color: #e74c3c; }
+.status-stopped { background-color: #95a5a6; }
+
+.capability-badge {
+    display: inline-block;
+    background: #3498db;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    margin: 2px;
+}
+
+.component-status {
+    padding: 8px;
+    border-radius: 4px;
+    margin: 5px 0;
+}
+
+.component-healthy {
+    background-color: #d5f4e6;
+    color: #27ae60;
+}
+
+.component-unhealthy {
+    background-color: #fadbd8;
+    color: #e74c3c;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1><i class="fa fa-database"></i> Metadata Management Dashboard</h1>
+            <p class="lead">World-class metadata management with AI-powered intelligence</p>
+        </div>
+    </div>
+
+    <!-- Service Status Row -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="metric-card">
+                <h3>Service Status</h3>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <span class="status-indicator status-{{ health.status }}"></span>
+                            <span class="metric-value">{{ health.status|title }}</span>
+                            <div class="metric-label">Overall Status</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="metric-value">{{ "%.1f"|format(health.uptime_seconds / 3600) }}h</div>
+                            <div class="metric-label">Uptime</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="metric-value">{{ health.metrics.total_assets }}</div>
+                            <div class="metric-label">Total Assets</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="metric-value">{{ "%.1f"|format(health.metrics.avg_response_time_ms) }}ms</div>
+                            <div class="metric-label">Avg Response</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics Row -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-value">{{ health.metrics.total_discoveries }}</div>
+                <div class="metric-label">Discoveries</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-value">{{ health.metrics.total_searches }}</div>
+                <div class="metric-label">Searches</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-value">{{ health.metrics.total_classifications }}</div>
+                <div class="metric-label">AI Classifications</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card text-center">
+                <div class="metric-value">{{ health.issues.error_count_24h }}</div>
+                <div class="metric-label">Errors (24h)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Components & Capabilities Row -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="metric-card">
+                <h3>Component Health</h3>
+                <div>
+                    <div class="component-status {{ 'component-healthy' if health.components.database else 'component-unhealthy' }}">
+                        <i class="fa {{ 'fa-check-circle' if health.components.database else 'fa-times-circle' }}"></i>
+                        Database Manager
+                    </div>
+                    <div class="component-status {{ 'component-healthy' if health.components.discovery else 'component-unhealthy' }}">
+                        <i class="fa {{ 'fa-check-circle' if health.components.discovery else 'fa-times-circle' }}"></i>
+                        Discovery Service
+                    </div>
+                    <div class="component-status {{ 'component-healthy' if health.components.ai_classifier else 'component-unhealthy' }}">
+                        <i class="fa {{ 'fa-check-circle' if health.components.ai_classifier else 'fa-times-circle' }}"></i>
+                        AI Classifier
+                    </div>
+                    <div class="component-status {{ 'component-healthy' if health.components.lineage_engine else 'component-unhealthy' }}">
+                        <i class="fa {{ 'fa-check-circle' if health.components.lineage_engine else 'fa-times-circle' }}"></i>
+                        Lineage Engine
+                    </div>
+                    <div class="component-status {{ 'component-healthy' if health.components.search_engine else 'component-unhealthy' }}">
+                        <i class="fa {{ 'fa-check-circle' if health.components.search_engine else 'fa-times-circle' }}"></i>
+                        Search Engine
+                    </div>
+                    <div class="component-status {{ 'component-healthy' if health.components.integrations else 'component-unhealthy' }}">
+                        <i class="fa {{ 'fa-check-circle' if health.components.integrations else 'fa-times-circle' }}"></i>
+                        APG Integrations
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="metric-card">
+                <h3>Revolutionary Capabilities</h3>
+                <div>
+                    {% for capability in capability_info.capabilities %}
+                    <span class="capability-badge">{{ capability|replace('_', ' ')|title }}</span>
+                    {% endfor %}
+                </div>
+                
+                <h4 style="margin-top: 20px;">APG Integrations</h4>
+                <div>
+                    {% for integration in capability_info.integrations %}
+                    <span class="capability-badge" style="background: #27ae60;">{{ integration|replace('_', ' ')|title }}</span>
+                    {% endfor %}
+                </div>
+
+                <h4 style="margin-top: 20px;">Supported Sources</h4>
+                <div>
+                    {% for source in capability_info.supported_sources %}
+                    <span class="capability-badge" style="background: #8e44ad;">{{ source|title }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions Row -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="metric-card">
+                <h3>Quick Actions</h3>
+                <div class="row">
+                    <div class="col-md-3">
+                        <a href="{{ url_for('MetadataBaseView.discovery') }}" class="btn btn-primary btn-block">
+                            <i class="fa fa-search"></i> Create Discovery
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('MetadataBaseView.search') }}" class="btn btn-info btn-block">
+                            <i class="fa fa-search-plus"></i> Search Assets
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('MetadataBaseView.assets') }}" class="btn btn-success btn-block">
+                            <i class="fa fa-table"></i> Browse Assets
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="/api/v1/docs/" class="btn btn-warning btn-block" target="_blank">
+                            <i class="fa fa-book"></i> API Docs
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if health.issues.warnings %}
+    <!-- Warnings Row -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-warning">
+                <h4><i class="fa fa-exclamation-triangle"></i> Warnings</h4>
+                <ul>
+                    {% for warning in health.issues.warnings %}
+                    <li>{{ warning }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if health.issues.last_error %}
+    <!-- Last Error Row -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-danger">
+                <h4><i class="fa fa-times-circle"></i> Last Error</h4>
+                <p>{{ health.issues.last_error }}</p>
+                <small class="text-muted">Last health check: {{ health.last_health_check }}</small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-refresh dashboard every 30 seconds
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

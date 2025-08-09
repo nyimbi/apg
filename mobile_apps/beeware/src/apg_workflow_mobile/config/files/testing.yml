@@ -1,0 +1,58 @@
+# APG Workflow Mobile - Testing Configuration
+# © 2025 Datacraft. All rights reserved.
+
+environment: testing
+debug: true
+
+api:
+  base_url: "http://localhost:5001"  # Test server
+  timeout: 5.0
+  retry_attempts: 1  # Fail fast in tests
+  api_key: "test-api-key-12345"
+
+database:
+  sqlite_path: ":memory:"  # In-memory database for tests
+  cache_sqlite_path: ":memory:"
+  cache_ttl: 60  # 1 minute for quick tests
+
+security:
+  encryption_key: "test-encryption-key-32-characters!"
+  jwt_secret: "test-jwt-secret"
+  jwt_expiry: 300  # 5 minutes for tests
+  biometric_timeout: 5
+  password_min_length: 4  # Minimal for tests
+
+sync:
+  sync_interval: 10  # 10 seconds for fast tests
+  sync_batch_size: 10
+  sync_timeout: 5
+  background_sync_enabled: false
+
+files:
+  max_file_size: 1048576  # 1MB for tests
+  upload_timeout: 30
+
+ui:
+  animation_duration: 0  # No animations in tests
+  toast_duration: 100
+  auto_refresh_interval: 5000  # 5 seconds
+
+logging:
+  log_level: "DEBUG"
+  console_log_level: "ERROR"  # Quiet console in tests
+  colored_logs: false
+  log_file_path: "/tmp/apg-test.log"
+
+features:
+  # Enable most features for comprehensive testing
+  biometric_auth_enabled: true
+  offline_mode_enabled: true
+  real_time_sync_enabled: true
+  push_notifications_enabled: false  # Disable notifications in tests
+  file_upload_enabled: true
+  
+  # Debug features enabled for testing
+  debug_mode_enabled: true
+  mock_api_enabled: true  # Use mocks in tests
+  verbose_logging_enabled: false
+  crash_reporting_enabled: false

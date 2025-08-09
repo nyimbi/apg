@@ -25,8 +25,11 @@ qrcode>=7.0.0
 bidict>=0.22.0
 python-multipart>=0.0.6
 
-# UUID extensions for better ID generation
-uuid-extensions>=0.1.0
+# Email validation
+email-validator>=2.0.0
+
+# Database support
+aiosqlite>=0.19.0
 
 # Async utilities
 asyncio-mqtt>=0.16.0

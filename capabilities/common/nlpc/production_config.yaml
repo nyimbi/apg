@@ -1,0 +1,101 @@
+# APG NLP Production Configuration
+# Production-ready configuration for enterprise deployment
+
+environment: production
+debug: false
+log_level: INFO
+
+# Database Configuration
+database_url: "postgresql://apg_nlp:${DB_PASSWORD}@postgres-cluster:5432/apg_nlp_prod"
+database_pool_size: 20
+database_pool_timeout: 30
+
+# Redis Configuration
+redis_url: "redis://redis-cluster:6379/0"
+redis_pool_size: 15
+
+# Performance Settings
+max_workers: 8
+request_timeout: 300
+batch_size_limit: 500
+memory_limit_gb: 16.0
+
+# Security Settings
+enable_cors: true
+allowed_origins:
+  - "https://app.datacraft.co.ke"
+  - "https://admin.datacraft.co.ke"
+api_rate_limit: 5000  # requests per minute
+
+# Monitoring Settings
+enable_metrics: true
+metrics_port: 9090
+health_check_interval: 30
+
+# Logging Settings
+log_format: json
+log_aggregation_enabled: true
+log_retention_days: 90
+
+# Caching Settings
+enable_caching: true
+cache_ttl_seconds: 7200  # 2 hours
+cache_max_size: 5000
+
+# NLP Model Configuration
+models:
+  sentiment_analysis:
+    provider: transformers
+    model_name: "cardiffnlp/twitter-roberta-base-sentiment-latest"
+    max_length: 512
+    batch_size: 32
+    
+  named_entity_recognition:
+    provider: spacy
+    model_name: "en_core_web_sm"
+    batch_size: 64
+    
+  text_classification:
+    provider: transformers
+    model_name: "microsoft/DialoGPT-medium"
+    max_length: 1024
+    batch_size: 16
+
+# Resource Limits
+resource_limits:
+  cpu_cores: 8
+  memory_gb: 16
+  gpu_memory_gb: 8
+  storage_gb: 100
+
+# Auto-scaling Configuration
+autoscaling:
+  enabled: true
+  min_replicas: 3
+  max_replicas: 20
+  target_cpu_percent: 70
+  target_memory_percent: 80
+  scale_up_delay: 300    # 5 minutes
+  scale_down_delay: 600  # 10 minutes
+
+# Backup and Recovery
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention_days: 30
+  storage_location: "s3://apg-nlp-backups/production/"
+
+# Security Compliance
+compliance:
+  gdpr_enabled: true
+  audit_logging: true
+  data_encryption: true
+  retention_policy_days: 2555  # 7 years
+  
+# Alert Configuration
+alerts:
+  cpu_threshold: 80
+  memory_threshold: 85
+  disk_threshold: 90
+  error_rate_threshold: 5  # percent
+  response_time_threshold: 1000  # milliseconds

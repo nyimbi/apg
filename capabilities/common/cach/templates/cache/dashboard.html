@@ -1,0 +1,421 @@
+{% extends "appbuilder/base.html" %}
+{% import "appbuilder/baselib.html" as baselib %}
+
+{% block head_css %}
+    {{ super() }}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .metrics-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .metrics-card.success { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .metrics-card.warning { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        .metrics-card.danger { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%); }
+        .metrics-card.info { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .metric-change {
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-healthy { background: #28a745; }
+        .status-warning { background: #ffc107; }
+        .status-error { background: #dc3545; }
+        
+        .alert-item {
+            padding: 12px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+        }
+        .alert-item.warning { border-color: #ffc107; background: #fff3cd; }
+        .alert-item.error { border-color: #dc3545; background: #f8d7da; }
+        
+        .recommendation-card {
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: white;
+        }
+        .recommendation-card.high-impact { border-color: #28a745; background: #d4edda; }
+        .recommendation-card.medium-impact { border-color: #ffc107; background: #fff3cd; }
+        
+        .top-keys-table {
+            font-size: 0.9rem;
+        }
+        .top-keys-table th {
+            border-top: none;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .real-time-indicator {
+            width: 8px;
+            height: 8px;
+            background: #28a745;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+            margin-right: 5px;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-2"><i class="fas fa-tachometer-alt me-3"></i>Cache Management Dashboard</h1>
+                <p class="mb-0 opacity-75">Real-time analytics and intelligent optimization</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="d-flex justify-content-end align-items-center">
+                    <span class="real-time-indicator"></span>
+                    <span class="me-3">Live Data</span>
+                    <span class="badge bg-success fs-6">System Healthy</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="metrics-card success">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="metric-value">{{ "%.1f"|format(metrics.hit_rate * 100) }}%</div>
+                        <div class="metric-label">Hit Rate</div>
+                        <div class="metric-change">
+                            <i class="fas fa-arrow-up"></i> +2.3% from yesterday
+                        </div>
+                    </div>
+                    <div class="fs-1 opacity-25">
+                        <i class="fas fa-bullseye"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="metrics-card info">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="metric-value">{{ metrics.latency_p95 }}ms</div>
+                        <div class="metric-label">P95 Latency</div>
+                        <div class="metric-change">
+                            <i class="fas fa-arrow-down"></i> -15% from yesterday
+                        </div>
+                    </div>
+                    <div class="fs-1 opacity-25">
+                        <i class="fas fa-stopwatch"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="metrics-card warning">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="metric-value">{{ "{:,.0f}".format(metrics.throughput_qps) }}</div>
+                        <div class="metric-label">QPS</div>
+                        <div class="metric-change">
+                            <i class="fas fa-arrow-up"></i> +8.5% from yesterday
+                        </div>
+                    </div>
+                    <div class="fs-1 opacity-25">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="metrics-card danger">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="metric-value">{{ "{:,.0f}".format(metrics.total_entries) }}</div>
+                        <div class="metric-label">Cache Entries</div>
+                        <div class="metric-change">
+                            <i class="fas fa-arrow-up"></i> +12% from yesterday
+                        </div>
+                    </div>
+                    <div class="fs-1 opacity-25">
+                        <i class="fas fa-database"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <!-- Performance Chart -->
+        <div class="col-xl-8">
+            <div class="chart-container">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0"><i class="fas fa-chart-area me-2 text-primary"></i>Performance Metrics</h5>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-primary active">1H</button>
+                        <button type="button" class="btn btn-outline-primary">6H</button>
+                        <button type="button" class="btn btn-outline-primary">24H</button>
+                        <button type="button" class="btn btn-outline-primary">7D</button>
+                    </div>
+                </div>
+                <div id="performanceChart" style="height: 400px;"></div>
+            </div>
+        </div>
+        
+        <!-- Tier Distribution -->
+        <div class="col-xl-4">
+            <div class="chart-container">
+                <h5 class="mb-3"><i class="fas fa-pie-chart me-2 text-primary"></i>Tier Distribution</h5>
+                <div id="tierDistributionChart" style="height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Charts Row -->
+    <div class="row mb-4">
+        <!-- Latency Histogram -->
+        <div class="col-xl-6">
+            <div class="chart-container">
+                <h5 class="mb-3"><i class="fas fa-chart-bar me-2 text-primary"></i>Latency Distribution</h5>
+                <div id="latencyHistogram" style="height: 300px;"></div>
+            </div>
+        </div>
+        
+        <!-- Throughput Timeline -->
+        <div class="col-xl-6">
+            <div class="chart-container">
+                <h5 class="mb-3"><i class="fas fa-chart-line me-2 text-primary"></i>Throughput Timeline</h5>
+                <div id="throughputTimeline" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Row - Tables and Info -->
+    <div class="row">
+        <!-- Top Keys -->
+        <div class="col-xl-4">
+            <div class="chart-container">
+                <h5 class="mb-3"><i class="fas fa-list me-2 text-primary"></i>Most Accessed Keys</h5>
+                <div class="table-responsive">
+                    <table class="table top-keys-table">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Hits</th>
+                                <th>Size</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key_info in metrics.top_keys %}
+                            <tr>
+                                <td><code class="text-primary">{{ key_info.key[:30] }}...</code></td>
+                                <td><span class="badge bg-success">{{ "{:,}".format(key_info.hits) }}</span></td>
+                                <td>{{ "%.1f"|format(key_info.size_kb) }}KB</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Health -->
+        <div class="col-xl-4">
+            <div class="chart-container">
+                <h5 class="mb-3"><i class="fas fa-heartbeat me-2 text-primary"></i>System Health</h5>
+                
+                {% for service, status in health_status.services_status.items() %}
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                        <span class="status-indicator {% if status == 'Running' %}status-healthy{% else %}status-error{% endif %}"></span>
+                        {{ service.replace('_', ' ').title() }}
+                    </div>
+                    <span class="badge {% if status == 'Running' %}bg-success{% else %}bg-danger{% endif %}">{{ status }}</span>
+                </div>
+                {% endfor %}
+                
+                <div class="mt-3">
+                    <h6>Resource Usage</h6>
+                    {% for resource, usage in health_status.resource_usage.items() %}
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <small>{{ resource.upper() }}</small>
+                            <small>{{ "%.1f"|format(usage) }}%</small>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar {% if usage > 80 %}bg-danger{% elif usage > 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                                 style="width: {{ usage }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- AI Recommendations -->
+        <div class="col-xl-4">
+            <div class="chart-container">
+                <h5 class="mb-3"><i class="fas fa-robot me-2 text-primary"></i>AI Recommendations</h5>
+                
+                {% for recommendation in recommendations %}
+                <div class="recommendation-card {% if recommendation.impact == 'High' %}high-impact{% elif recommendation.impact == 'Medium' %}medium-impact{% endif %}">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0">{{ recommendation.title }}</h6>
+                        <span class="badge bg-primary">{{ recommendation.type }}</span>
+                    </div>
+                    <p class="mb-2 text-muted">{{ recommendation.description }}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small>
+                            <span class="badge {% if recommendation.impact == 'High' %}bg-success{% elif recommendation.impact == 'Medium' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                {{ recommendation.impact }} Impact
+                            </span>
+                        </small>
+                        <small class="text-muted">Confidence: {{ "%.0f"|format(recommendation.confidence * 100) }}%</small>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('CacheDashboardView.optimization') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-cog me-1"></i> View All Optimizations
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Alerts -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="chart-container">
+                <h5 class="mb-3"><i class="fas fa-exclamation-triangle me-2 text-primary"></i>Recent Alerts</h5>
+                
+                {% if recent_alerts %}
+                    {% for alert in recent_alerts %}
+                    <div class="alert-item {% if alert.level == 'WARNING' %}warning{% elif alert.level == 'ERROR' %}error{% endif %}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ alert.level }}</strong> - {{ alert.message }}
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted">{{ alert.timestamp }}</small>
+                                {% if alert.resolved %}
+                                    <span class="badge bg-success ms-2">Resolved</span>
+                                {% else %}
+                                    <span class="badge bg-warning ms-2">Active</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-check-circle fs-1 mb-3 text-success"></i>
+                        <p>No recent alerts. System is running smoothly!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        // Initialize charts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Performance chart
+            var performanceChart = {{ performance_chart|safe }};
+            Plotly.newPlot('performanceChart', performanceChart.data, performanceChart.layout, {responsive: true});
+            
+            // Tier distribution chart
+            var tierChart = {{ tier_distribution_chart|safe }};
+            Plotly.newPlot('tierDistributionChart', tierChart.data, tierChart.layout, {responsive: true});
+            
+            // Latency histogram
+            var latencyChart = {{ latency_histogram|safe }};
+            Plotly.newPlot('latencyHistogram', latencyChart.data, latencyChart.layout, {responsive: true});
+            
+            // Throughput timeline
+            var throughputChart = {{ throughput_timeline|safe }};
+            Plotly.newPlot('throughputTimeline', throughputChart.data, throughputChart.layout, {responsive: true});
+            
+            // Auto-refresh every 30 seconds
+            setInterval(function() {
+                updateDashboardMetrics();
+            }, 30000);
+        });
+        
+        function updateDashboardMetrics() {
+            fetch('{{ url_for("CacheDashboardView.api_metrics") }}')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Update metrics display
+                        console.log('Metrics updated:', data.timestamp);
+                        // Would update the displayed metrics here
+                    }
+                })
+                .catch(error => console.error('Error updating metrics:', error));
+        }
+    </script>
+{% endblock %}

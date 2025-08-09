@@ -1,0 +1,116 @@
+# APG Real-Time Collaboration Dependencies
+
+# Core framework dependencies
+fastapi>=0.104.0
+flask-appbuilder>=4.3.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+gunicorn>=21.2.0
+
+# Database and ORM
+sqlalchemy>=2.0.23
+alembic>=1.12.1
+psycopg2-binary>=2.9.7
+asyncpg>=0.29.0
+
+# Caching and messaging
+redis>=5.0.1
+hiredis>=2.2.3
+
+# Data validation and serialization
+pydantic>=2.5.0
+uuid7>=0.1.0
+
+# APG integration dependencies (would be actual APG packages)
+# apg-auth-rbac>=1.0.0
+# apg-ai-orchestration>=1.0.0  
+# apg-notification-engine>=1.0.0
+
+# Third-party integrations
+requests>=2.31.0
+httpx>=0.25.2
+aiohttp>=3.9.0
+
+# Microsoft Graph (Teams integration)
+msal>=1.25.0
+msgraph-core>=0.2.2
+
+# Google APIs (Meet integration)
+google-auth>=2.23.4
+google-auth-oauthlib>=1.1.0
+google-api-python-client>=2.108.0
+
+# Zoom SDK
+zoomus>=1.1.3
+
+# Testing dependencies
+pytest>=7.4.3
+pytest-asyncio>=0.21.1
+pytest-mock>=3.12.0
+pytest-cov>=4.1.0
+httpx>=0.25.2
+
+# Development dependencies
+black>=23.11.0
+isort>=5.12.0
+mypy>=1.7.1
+flake8>=6.1.0
+
+# Monitoring and logging
+prometheus-client>=0.19.0
+structlog>=23.2.0
+
+# Security
+cryptography>=41.0.7
+bcrypt>=4.1.1
+
+# Utility libraries
+python-dateutil>=2.8.2
+pytz>=2023.3
+click>=8.1.7
+rich>=13.7.0
+
+# WebRTC dependencies (already included)
+aiortc>=1.6.0
+av>=10.0.0
+opencv-python>=4.8.1
+
+# MQTT protocol dependencies
+paho-mqtt>=1.6.1
+asyncio-mqtt>=0.13.0
+
+# gRPC protocol dependencies
+grpcio>=1.59.2
+grpcio-tools>=1.59.2
+protobuf>=4.25.1
+
+# Socket.IO protocol dependencies
+python-socketio>=5.10.0
+aiohttp>=3.9.0
+aiohttp-cors>=0.7.0
+
+# XMPP protocol dependencies
+slixmpp>=1.8.4
+
+# SIP protocol dependencies
+aiortc>=1.6.0  # Also used for SIP media handling
+pyrtcio>=1.0.0  # Optional SIP library
+dnspython>=2.4.2
+
+# RTMP protocol dependencies
+av>=10.0.0  # Also used for RTMP media processing
+numpy>=1.24.3
+
+# Additional protocol utilities
+websockets>=12.0  # Enhanced WebSocket support
+aiofiles>=23.2.1  # Async file operations for media
+Pillow>=10.1.0  # Image processing for media streams
+scipy>=1.11.4  # Signal processing for audio/video
+
+# Network and media processing
+netifaces>=0.11.0  # Network interface detection
+psutil>=5.9.6  # System resource monitoring
+
+# Production deployment
+supervisor>=4.2.5
+nginx>=1.25.0  # For reference only

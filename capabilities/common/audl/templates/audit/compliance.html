@@ -1,0 +1,540 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head %}
+	{{ super() }}
+	<style>
+		.compliance-container {
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+			padding: 20px;
+		}
+		
+		.compliance-header {
+			background: rgba(255, 255, 255, 0.95);
+			border-radius: 15px;
+			padding: 30px;
+			margin-bottom: 25px;
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+			backdrop-filter: blur(10px);
+		}
+		
+		.report-generator {
+			background: rgba(255, 255, 255, 0.95);
+			border-radius: 15px;
+			padding: 30px;
+			margin-bottom: 25px;
+			backdrop-filter: blur(10px);
+		}
+		
+		.framework-card {
+			border: 2px solid #e0e6ed;
+			border-radius: 15px;
+			padding: 20px;
+			margin-bottom: 15px;
+			cursor: pointer;
+			transition: all 0.3s ease;
+			background: rgba(255, 255, 255, 0.9);
+		}
+		
+		.framework-card:hover {
+			border-color: #667eea;
+			box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+			transform: translateY(-2px);
+		}
+		
+		.framework-card.selected {
+			border-color: #667eea;
+			background: linear-gradient(45deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+		}
+		
+		.framework-logo {
+			width: 60px;
+			height: 60px;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 1.5rem;
+			font-weight: bold;
+			color: white;
+			margin-right: 20px;
+		}
+		
+		.gdpr-logo { background: linear-gradient(45deg, #3498db, #2980b9); }
+		.sox-logo { background: linear-gradient(45deg, #e74c3c, #c0392b); }
+		.hipaa-logo { background: linear-gradient(45deg, #27ae60, #229954); }
+		.pci-logo { background: linear-gradient(45deg, #f39c12, #e67e22); }
+		.iso-logo { background: linear-gradient(45deg, #9b59b6, #8e44ad); }
+		
+		.framework-info h5 {
+			margin: 0;
+			color: #2c3e50;
+		}
+		
+		.framework-description {
+			color: #7f8c8d;
+			margin: 5px 0;
+		}
+		
+		.framework-requirements {
+			font-size: 0.9rem;
+			color: #34495e;
+		}
+		
+		.generate-button {
+			background: linear-gradient(45deg, #667eea, #764ba2);
+			color: white;
+			border: none;
+			padding: 15px 40px;
+			border-radius: 25px;
+			font-size: 1.2rem;
+			cursor: pointer;
+			transition: all 0.3s ease;
+			width: 100%;
+			margin-top: 20px;
+		}
+		
+		.generate-button:hover {
+			transform: scale(1.02);
+			box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+		}
+		
+		.generate-button:disabled {
+			background: #95a5a6;
+			cursor: not-allowed;
+			transform: none;
+		}
+		
+		.recent-reports {
+			background: rgba(255, 255, 255, 0.95);
+			border-radius: 15px;
+			padding: 25px;
+			backdrop-filter: blur(10px);
+		}
+		
+		.report-item {
+			display: flex;
+			align-items: center;
+			padding: 15px;
+			border: 1px solid #e0e6ed;
+			border-radius: 10px;
+			margin-bottom: 10px;
+			transition: all 0.3s ease;
+			background: rgba(255, 255, 255, 0.7);
+		}
+		
+		.report-item:hover {
+			box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+			transform: translateY(-2px);
+			background: rgba(255, 255, 255, 0.9);
+		}
+		
+		.report-icon {
+			width: 50px;
+			height: 50px;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			margin-right: 15px;
+			font-size: 1.2rem;
+			color: white;
+		}
+		
+		.status-completed { background: linear-gradient(45deg, #27ae60, #229954); }
+		.status-generating { background: linear-gradient(45deg, #f39c12, #e67e22); }
+		.status-failed { background: linear-gradient(45deg, #e74c3c, #c0392b); }
+		
+		.report-details h6 {
+			margin: 0;
+			color: #2c3e50;
+		}
+		
+		.report-meta {
+			color: #7f8c8d;
+			font-size: 0.9rem;
+		}
+		
+		.report-actions {
+			margin-left: auto;
+		}
+		
+		.btn-icon {
+			padding: 8px 12px;
+			border-radius: 8px;
+			border: none;
+			margin: 0 5px;
+			cursor: pointer;
+			transition: all 0.3s ease;
+		}
+		
+		.btn-download { background: #3498db; color: white; }
+		.btn-view { background: #27ae60; color: white; }
+		.btn-delete { background: #e74c3c; color: white; }
+		
+		.btn-icon:hover {
+			transform: scale(1.1);
+		}
+		
+		.compliance-stats {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+			gap: 20px;
+			margin-top: 30px;
+		}
+		
+		.stat-card {
+			background: rgba(255, 255, 255, 0.9);
+			border-radius: 10px;
+			padding: 20px;
+			text-align: center;
+		}
+		
+		.stat-value {
+			font-size: 2.5rem;
+			font-weight: bold;
+			margin-bottom: 5px;
+		}
+		
+		.stat-label {
+			color: #7f8c8d;
+			font-size: 0.9rem;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+		}
+		
+		.progress-ring {
+			width: 100px;
+			height: 100px;
+			margin: 0 auto 15px;
+		}
+		
+		.progress-ring circle {
+			fill: none;
+			stroke-width: 8;
+			stroke-linecap: round;
+			transform-origin: 50% 50%;
+			transform: rotate(-90deg);
+		}
+		
+		.progress-ring .background {
+			stroke: #e0e6ed;
+		}
+		
+		.progress-ring .progress {
+			stroke: #667eea;
+			stroke-dasharray: 0 251.2;
+			transition: stroke-dasharray 0.5s ease;
+		}
+		
+		@media (max-width: 768px) {
+			.compliance-container { padding: 10px; }
+			.compliance-header { padding: 20px; }
+			.report-generator { padding: 20px; }
+			.framework-card { padding: 15px; }
+			.framework-logo { width: 50px; height: 50px; margin-right: 15px; }
+		}
+	</style>
+{% endblock %}
+
+{% block content %}
+<div class="compliance-container">
+	<!-- Header -->
+	<div class="compliance-header">
+		<h1><i class="fas fa-balance-scale"></i> Compliance Reporting Center</h1>
+		<p class="lead">Automated compliance reports with evidence collection and executive summaries</p>
+		
+		<!-- Compliance Statistics -->
+		<div class="compliance-stats">
+			<div class="stat-card">
+				<div class="stat-value text-success">{{ recent_reports|selectattr('status', 'equalto', 'completed')|list|length }}</div>
+				<div class="stat-label">Reports Generated</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value text-warning">{{ recent_reports|selectattr('status', 'equalto', 'generating')|list|length }}</div>
+				<div class="stat-label">In Progress</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value text-primary">5</div>
+				<div class="stat-label">Frameworks Supported</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value text-info">24/7</div>
+				<div class="stat-label">Monitoring Active</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Report Generator -->
+	<div class="report-generator">
+		<h3><i class="fas fa-file-alt"></i> Generate New Compliance Report</h3>
+		<p class="text-muted mb-4">Select compliance framework and configure report parameters</p>
+		
+		<form method="POST" id="reportForm">
+			<!-- Framework Selection -->
+			<div class="mb-4">
+				<label class="form-label h5">Select Compliance Framework</label>
+				<div class="row">
+					<div class="col-md-6 mb-3">
+						<div class="framework-card" data-framework="GDPR" onclick="selectFramework('GDPR')">
+							<div class="d-flex align-items-center">
+								<div class="framework-logo gdpr-logo">GDPR</div>
+								<div class="framework-info flex-grow-1">
+									<h5>General Data Protection Regulation</h5>
+									<div class="framework-description">EU privacy and data protection regulation</div>
+									<div class="framework-requirements">
+										<i class="fas fa-check-circle text-success"></i> Data processing activities
+										<i class="fas fa-check-circle text-success ml-3"></i> Consent management
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="col-md-6 mb-3">
+						<div class="framework-card" data-framework="SOX" onclick="selectFramework('SOX')">
+							<div class="d-flex align-items-center">
+								<div class="framework-logo sox-logo">SOX</div>
+								<div class="framework-info flex-grow-1">
+									<h5>Sarbanes-Oxley Act</h5>
+									<div class="framework-description">Financial reporting and corporate governance</div>
+									<div class="framework-requirements">
+										<i class="fas fa-check-circle text-success"></i> Financial controls
+										<i class="fas fa-check-circle text-success ml-3"></i> Access management
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="col-md-6 mb-3">
+						<div class="framework-card" data-framework="HIPAA" onclick="selectFramework('HIPAA')">
+							<div class="d-flex align-items-center">
+								<div class="framework-logo hipaa-logo">HIPAA</div>
+								<div class="framework-info flex-grow-1">
+									<h5>Health Insurance Portability</h5>
+									<div class="framework-description">Healthcare data privacy and security</div>
+									<div class="framework-requirements">
+										<i class="fas fa-check-circle text-success"></i> PHI protection
+										<i class="fas fa-check-circle text-success ml-3"></i> Access logging
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="col-md-6 mb-3">
+						<div class="framework-card" data-framework="PCI_DSS" onclick="selectFramework('PCI_DSS')">
+							<div class="d-flex align-items-center">
+								<div class="framework-logo pci-logo">PCI</div>
+								<div class="framework-info flex-grow-1">
+									<h5>Payment Card Industry DSS</h5>
+									<div class="framework-description">Credit card data security standards</div>
+									<div class="framework-requirements">
+										<i class="fas fa-check-circle text-success"></i> Payment processing
+										<i class="fas fa-check-circle text-success ml-3"></i> Network security
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				{{ form.framework(style="display: none;") }}
+			</div>
+			
+			<!-- Report Configuration -->
+			<div class="row mb-4">
+				<div class="col-md-4">
+					<label class="form-label">Report Start Date</label>
+					{{ form.date_start(class="form-control") }}
+				</div>
+				<div class="col-md-4">
+					<label class="form-label">Report End Date</label>
+					{{ form.date_end(class="form-control") }}
+				</div>
+				<div class="col-md-4">
+					<label class="form-label">Export Format</label>
+					{{ form.format(class="form-control") }}
+				</div>
+			</div>
+			
+			<div class="row mb-4">
+				<div class="col-md-6">
+					<label class="form-label">Include Compliance Violations</label>
+					{{ form.include_violations(class="form-control") }}
+				</div>
+				<div class="col-md-6">
+					<label class="form-label">Include Recommendations</label>
+					{{ form.include_recommendations(class="form-control") }}
+				</div>
+			</div>
+			
+			<!-- Generate Button -->
+			<button type="submit" class="generate-button" id="generateBtn">
+				<i class="fas fa-magic"></i> Generate Compliance Report
+			</button>
+		</form>
+	</div>
+	
+	<!-- Recent Reports -->
+	<div class="recent-reports">
+		<div class="d-flex justify-content-between align-items-center mb-4">
+			<h3><i class="fas fa-history"></i> Recent Reports</h3>
+			<div>
+				<button class="btn btn-outline-primary" onclick="refreshReports()">
+					<i class="fas fa-sync-alt"></i> Refresh
+				</button>
+				<button class="btn btn-outline-info" onclick="viewAllReports()">
+					<i class="fas fa-list"></i> View All
+				</button>
+			</div>
+		</div>
+		
+		{% if recent_reports %}
+		{% for report in recent_reports %}
+		<div class="report-item">
+			<div class="report-icon status-{{ report.status }}">
+				{% if report.status == 'completed' %}
+				<i class="fas fa-check"></i>
+				{% elif report.status == 'generating' %}
+				<i class="fas fa-spinner fa-spin"></i>
+				{% else %}
+				<i class="fas fa-times"></i>
+				{% endif %}
+			</div>
+			
+			<div class="report-details flex-grow-1">
+				<h6>{{ report.framework }} Compliance Report</h6>
+				<div class="report-meta">
+					Generated: {{ moment(report.generated_at).fromNow() }} | 
+					Status: {{ report.status|title }} | 
+					Format: {{ report.format|upper }} |
+					Size: {{ report.file_size }}
+				</div>
+			</div>
+			
+			<div class="report-actions">
+				{% if report.status == 'completed' %}
+				<button class="btn-icon btn-download" onclick="downloadReport('{{ report.id }}')">
+					<i class="fas fa-download"></i>
+				</button>
+				<button class="btn-icon btn-view" onclick="viewReport('{{ report.id }}')">
+					<i class="fas fa-eye"></i>
+				</button>
+				{% endif %}
+				<button class="btn-icon btn-delete" onclick="deleteReport('{{ report.id }}')">
+					<i class="fas fa-trash"></i>
+				</button>
+			</div>
+		</div>
+		{% endfor %}
+		{% else %}
+		<div class="text-center py-5">
+			<i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+			<h5>No reports generated yet</h5>
+			<p class="text-muted">Generate your first compliance report using the form above</p>
+		</div>
+		{% endif %}
+	</div>
+</div>
+
+<script>
+let selectedFramework = null;
+
+function selectFramework(framework) {
+	// Remove previous selection
+	document.querySelectorAll('.framework-card').forEach(card => {
+		card.classList.remove('selected');
+	});
+	
+	// Select new framework
+	document.querySelector(`[data-framework="${framework}"]`).classList.add('selected');
+	document.getElementById('framework').value = framework;
+	selectedFramework = framework;
+	
+	// Update generate button
+	updateGenerateButton();
+}
+
+function updateGenerateButton() {
+	const btn = document.getElementById('generateBtn');
+	if (selectedFramework) {
+		btn.disabled = false;
+		btn.innerHTML = `<i class="fas fa-magic"></i> Generate ${selectedFramework} Report`;
+	} else {
+		btn.disabled = true;
+		btn.innerHTML = '<i class="fas fa-magic"></i> Select Framework First';
+	}
+}
+
+function refreshReports() {
+	location.reload();
+}
+
+function viewAllReports() {
+	// Navigate to all reports page
+	window.location.href = '/audit/compliance/all';
+}
+
+function downloadReport(reportId) {
+	window.location.href = `/audit/api/v1/compliance/reports/${reportId}/download`;
+}
+
+function viewReport(reportId) {
+	window.open(`/audit/api/v1/compliance/reports/${reportId}/view`, '_blank');
+}
+
+function deleteReport(reportId) {
+	if (confirm('Are you sure you want to delete this report?')) {
+		fetch(`/audit/api/v1/compliance/reports/${reportId}`, {
+			method: 'DELETE'
+		})
+		.then(response => response.json())
+		.then(data => {
+			if (data.success) {
+				location.reload();
+			} else {
+				alert('Failed to delete report');
+			}
+		})
+		.catch(error => {
+			console.error('Error:', error);
+			alert('Error deleting report');
+		});
+	}
+}
+
+// Form validation
+document.getElementById('reportForm').addEventListener('submit', function(e) {
+	if (!selectedFramework) {
+		e.preventDefault();
+		alert('Please select a compliance framework');
+		return;
+	}
+	
+	// Show generating state
+	const btn = document.getElementById('generateBtn');
+	btn.disabled = true;
+	btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Report...';
+	
+	// Form will submit normally
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+	updateGenerateButton();
+	
+	// Set default dates
+	const today = new Date();
+	const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+	
+	document.getElementById('date_end').value = today.toISOString().split('T')[0];
+	document.getElementById('date_start').value = thirtyDaysAgo.toISOString().split('T')[0];
+});
+
+// Auto-refresh generating reports every 30 seconds
+setInterval(function() {
+	const generatingReports = document.querySelectorAll('.status-generating').length;
+	if (generatingReports > 0) {
+		refreshReports();
+	}
+}, 30000);
+</script>
+{% endblock %}

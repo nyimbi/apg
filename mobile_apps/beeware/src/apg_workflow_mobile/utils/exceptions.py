@@ -4,7 +4,7 @@ Custom exceptions for APG Workflow Mobile
 © 2025 Datacraft. All rights reserved.
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 class APGException(Exception):
@@ -227,6 +227,25 @@ class PermissionException(APGException):
 			"required_permission": self.required_permission,
 			"resource_type": self.resource_type,
 			"resource_id": self.resource_id
+		})
+		return result
+
+
+class NavigationException(APGException):
+	"""Exception for navigation-related errors"""
+	
+	def __init__(self, message: str, screen_name: Optional[str] = None,
+				 route: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
+		super().__init__(message, details)
+		self.screen_name = screen_name
+		self.route = route
+	
+	def to_dict(self) -> Dict[str, Any]:
+		"""Convert exception to dictionary"""
+		result = super().to_dict()
+		result.update({
+			"screen_name": self.screen_name,
+			"route": self.route
 		})
 		return result
 

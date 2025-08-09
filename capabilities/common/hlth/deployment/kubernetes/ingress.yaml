@@ -1,0 +1,493 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hlth-ingress
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: hlth-network
+  annotations:
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/rate-limit-connections: "10"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self';" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    
+    # CORS configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://*.your-domain.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-Request-ID"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range,X-Request-ID"
+    nginx.ingress.kubernetes.io/cors-max-age: "1728000"
+    
+    # Load balancing
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
+    nginx.ingress.kubernetes.io/load-balance: "ewma"
+    
+    # Caching
+    nginx.ingress.kubernetes.io/proxy-cache: "on"
+    nginx.ingress.kubernetes.io/proxy-cache-valid: "200 302 10m"
+    nginx.ingress.kubernetes.io/proxy-cache-valid-404: "1m"
+    
+    # Custom error pages
+    nginx.ingress.kubernetes.io/custom-http-errors: "400,401,403,404,405,408,409,410,411,412,413,414,415,416,417,418,421,422,423,424,425,426,428,429,431,451,500,501,502,503,504,505,506,507,508,510,511"
+    nginx.ingress.kubernetes.io/default-backend: "hlth-error-pages"
+    
+    # Monitoring
+    nginx.ingress.kubernetes.io/enable-access-log: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Request-ID: $req_id";
+      access_log /var/log/nginx/hlth-access.log combined;
+      
+    # Certificate management (cert-manager)
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - hlth.your-domain.com
+    - api.hlth.your-domain.com
+    secretName: hlth-tls-certificate
+  rules:
+  # Main application domain
+  - host: hlth.your-domain.com
+    http:
+      paths:
+      # Health check endpoint (no authentication required)
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: hlth-api-gateway
+            port:
+              number: 8080
+      
+      # API routes
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: hlth-api-gateway
+            port:
+              number: 8080
+      
+      # Dashboard and UI (if implemented)
+      - path: /dashboard
+        pathType: Prefix
+        backend:
+          service:
+            name: hlth-api-gateway
+            port:
+              number: 8080
+      
+      # WebSocket endpoints for real-time updates
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: hlth-api-gateway
+            port:
+              number: 8080
+      
+      # Static assets
+      - path: /static
+        pathType: Prefix
+        backend:
+          service:
+            name: hlth-api-gateway
+            port:
+              number: 8080
+      
+      # Root path
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hlth-api-gateway
+            port:
+              number: 8080
+  
+  # API-specific subdomain
+  - host: api.hlth.your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hlth-api-gateway
+            port:
+              number: 8080
+
+---
+# Separate ingress for monitoring tools (internal access only)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hlth-monitoring-ingress
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: monitoring-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    
+    # Internal access only
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    
+    # Basic authentication for monitoring tools
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: hlth-monitoring-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'HLTH Monitoring - Authentication Required'
+    
+    # Disable rate limiting for monitoring
+    nginx.ingress.kubernetes.io/rate-limit: "0"
+
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - prometheus.hlth.your-domain.com
+    - grafana.hlth.your-domain.com
+    - jaeger.hlth.your-domain.com
+    secretName: hlth-monitoring-tls
+  rules:
+  # Prometheus
+  - host: prometheus.hlth.your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+  
+  # Grafana
+  - host: grafana.hlth.your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  
+  # Jaeger
+  - host: jaeger.hlth.your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jaeger
+            port:
+              number: 16686
+
+---
+# Error pages service for custom error handling
+apiVersion: v1
+kind: Service
+metadata:
+  name: hlth-error-pages
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: error-pages
+spec:
+  selector:
+    app: hlth-error-pages
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hlth-error-pages
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: error-pages
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hlth-error-pages
+  template:
+    metadata:
+      labels:
+        app: hlth-error-pages
+        app.kubernetes.io/name: apg-hlth
+        app.kubernetes.io/component: error-pages
+    spec:
+      containers:
+      - name: error-pages
+        image: nginx:alpine
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        volumeMounts:
+        - name: error-pages-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: error-pages-html
+          mountPath: /usr/share/nginx/html
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: error-pages-config
+        configMap:
+          name: hlth-error-pages-config
+      - name: error-pages-html
+        configMap:
+          name: hlth-error-pages-html
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hlth-error-pages-config
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: error-pages-config
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        sendfile on;
+        keepalive_timeout 65;
+        
+        server {
+            listen 8080;
+            server_name _;
+            
+            location = /healthz {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+            
+            location / {
+                root /usr/share/nginx/html;
+                try_files $uri /error.html;
+            }
+            
+            error_page 400 401 403 404 405 408 409 410 411 412 413 414 415 416 417 418 421 422 423 424 425 426 428 429 431 451 /4xx.html;
+            error_page 500 501 502 503 504 505 506 507 508 510 511 /5xx.html;
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hlth-error-pages-html
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: error-pages-html
+data:
+  error.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>HLTH - Service Unavailable</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 50px; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { color: #e74c3c; }
+            .error-code { font-size: 72px; font-weight: bold; color: #95a5a6; text-align: center; }
+            .support { background: #ecf0f1; padding: 20px; border-radius: 4px; margin-top: 20px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="error-code">ERROR</div>
+            <h1>APG Health Management - Service Unavailable</h1>
+            <p>We're experiencing technical difficulties. Our team has been notified and is working to resolve the issue.</p>
+            <div class="support">
+                <h3>Need Help?</h3>
+                <p>Contact our support team:</p>
+                <ul>
+                    <li>Email: <a href="mailto:hlth-support@datacraft.co.ke">hlth-support@datacraft.co.ke</a></li>
+                    <li>Documentation: <a href="https://docs.datacraft.co.ke/hlth">docs.datacraft.co.ke/hlth</a></li>
+                </ul>
+            </div>
+        </div>
+    </body>
+    </html>
+  
+  4xx.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>HLTH - Client Error</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 50px; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { color: #f39c12; }
+            .error-code { font-size: 72px; font-weight: bold; color: #95a5a6; text-align: center; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="error-code">4XX</div>
+            <h1>APG Health Management - Request Error</h1>
+            <p>There's an issue with your request. Please check the URL and try again.</p>
+            <p>If you believe this is an error, please contact our support team at <a href="mailto:hlth-support@datacraft.co.ke">hlth-support@datacraft.co.ke</a></p>
+        </div>
+    </body>
+    </html>
+  
+  5xx.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>HLTH - Server Error</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 50px; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { color: #e74c3c; }
+            .error-code { font-size: 72px; font-weight: bold; color: #95a5a6; text-align: center; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="error-code">5XX</div>
+            <h1>APG Health Management - Server Error</h1>
+            <p>We're experiencing technical difficulties. Our team has been automatically notified.</p>
+            <p>Please try again in a few minutes. If the problem persists, contact <a href="mailto:hlth-support@datacraft.co.ke">hlth-support@datacraft.co.ke</a></p>
+        </div>
+    </body>
+    </html>
+
+---
+# Secret for monitoring basic authentication
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hlth-monitoring-auth
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: monitoring-auth
+type: Opaque
+data:
+  # Default: admin:monitoring123 (change in production)
+  # Generated with: htpasswd -nb admin monitoring123 | base64 -w 0
+  auth: YWRtaW46JGFwcjEkWE5wNmlvZDIkNkZnUFQ0VTNZZTYyZnNrYktOdUF6LgoK
+
+---
+# Network Policy for ingress traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hlth-ingress-network-policy
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: ingress-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: apg-hlth
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow traffic from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8082
+    - protocol: TCP
+      port: 8083
+    - protocol: TCP
+      port: 8084
+  # Allow traffic from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 16686
+  # Allow internal communication
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8082
+    - protocol: TCP
+      port: 8083
+    - protocol: TCP
+      port: 8084
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379

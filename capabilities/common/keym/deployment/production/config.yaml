@@ -1,0 +1,565 @@
+# APG Key Management - Production Configuration
+# Author: Nyimbi Odero
+# Copyright: © 2025 Datacraft
+
+app:
+  name: "APG Key Management"
+  version: "1.0.0"
+  environment: "production"
+  debug: false
+  secret_key: "${KEYM_SECRET_KEY}"
+  
+  # Server configuration
+  host: "0.0.0.0"
+  port: 8080
+  workers: 4
+  max_requests: 1000
+  timeout: 60
+  keepalive: 2
+
+# Database configuration
+database:
+  url: "${KEYM_DATABASE_URL}"
+  pool_size: 50
+  max_overflow: 100
+  pool_timeout: 30
+  pool_recycle: 3600
+  pool_pre_ping: true
+  echo: false
+  
+  # Connection retry configuration
+  retry_attempts: 3
+  retry_delay: 1
+  
+  # SSL configuration for production
+  ssl_mode: "require"
+  ssl_cert: "/etc/keym/ssl/client-cert.pem"
+  ssl_key: "/etc/keym/ssl/client-key.pem"
+  ssl_ca: "/etc/keym/ssl/ca-cert.pem"
+
+# Cache configuration
+cache:
+  url: "${KEYM_CACHE_URL}"
+  default_timeout: 3600
+  key_prefix: "keym:prod:"
+  serialization: "pickle"
+  
+  # Redis cluster configuration
+  cluster_enabled: true
+  cluster_nodes:
+    - "redis-node-1:6379"
+    - "redis-node-2:6379"
+    - "redis-node-3:6379"
+  
+  # Connection pool
+  connection_pool_size: 50
+  socket_timeout: 5
+  socket_connect_timeout: 5
+  retry_on_timeout: true
+
+# Security configuration
+security:
+  encryption_key: "${KEYM_ENCRYPTION_KEY}"
+  jwt_secret: "${KEYM_JWT_SECRET}"
+  api_key_salt: "${KEYM_API_KEY_SALT}"
+  
+  # Password hashing
+  password_hash_algorithm: "bcrypt"
+  password_hash_rounds: 12
+  
+  # Session management
+  session_timeout: 3600
+  session_cookie_secure: true
+  session_cookie_httponly: true
+  session_cookie_samesite: "strict"
+  
+  # CORS configuration
+  cors_origins:
+    - "https://apg.datacraft.co.ke"
+    - "https://portal.datacraft.co.ke"
+  cors_methods: ["GET", "POST", "PUT", "DELETE"]
+  cors_headers: ["Authorization", "Content-Type"]
+  
+  # Rate limiting
+  rate_limits:
+    default: "1000/hour"
+    crypto_operations: "10000/hour"
+    batch_operations: "100/hour"
+    admin_operations: "500/hour"
+  
+  # IP allowlist for admin operations
+  admin_ip_allowlist:
+    - "10.0.0.0/8"
+    - "192.168.0.0/16"
+    - "172.16.0.0/12"
+
+# Hardware Security Module configuration
+hsm:
+  enabled: true
+  primary_hsm: "luna-hsm-1"
+  
+  hsms:
+    luna-hsm-1:
+      vendor: "thales"
+      library_path: "/usr/lib/pkcs11/libCryptoki2_64.so"
+      slot_id: 0
+      pin: "${KEYM_HSM_PRIMARY_PIN}"
+      label: "APG-KEYM-PRIMARY"
+      
+      # Connection settings
+      connection_timeout: 30
+      session_timeout: 300
+      max_sessions: 50
+      
+      # Backup configuration
+      backup_enabled: true
+      backup_schedule: "0 2 * * *"  # Daily at 2 AM
+    
+    luna-hsm-2:
+      vendor: "thales"
+      library_path: "/usr/lib/pkcs11/libCryptoki2_64.so"
+      slot_id: 1
+      pin: "${KEYM_HSM_SECONDARY_PIN}"
+      label: "APG-KEYM-SECONDARY"
+      role: "backup"
+      
+  # HSM clustering
+  cluster:
+    enabled: true
+    master: "luna-hsm-1"
+    workers: ["luna-hsm-2"]
+    sync_interval: 300
+    
+  # Hardware attestation
+  attestation:
+    enabled: true
+    interval: 3600  # Every hour
+    certificate_chain_validation: true
+
+# Multi-cloud federation configuration
+multi_cloud:
+  enabled: true
+  sync_interval: 300
+  encryption_in_transit: true
+  
+  # AWS KMS configuration
+  aws:
+    enabled: true
+    region: "us-east-1"
+    access_key_id: "${AWS_ACCESS_KEY_ID}"
+    secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+    role_arn: "${AWS_KMS_ROLE_ARN}"
+    
+    # KMS configuration
+    key_spec: "AES_256"
+    key_usage: "ENCRYPT_DECRYPT"
+    origin: "AWS_KMS"
+    
+    # Customer Managed Keys
+    cmk_policy: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::ACCOUNT:root"},
+            "Action": "kms:*",
+            "Resource": "*"
+          }
+        ]
+      }
+  
+  # Azure Key Vault configuration
+  azure:
+    enabled: true
+    tenant_id: "${AZURE_TENANT_ID}"
+    client_id: "${AZURE_CLIENT_ID}"
+    client_secret: "${AZURE_CLIENT_SECRET}"
+    subscription_id: "${AZURE_SUBSCRIPTION_ID}"
+    
+    # Key Vault settings
+    key_vault_url: "https://apg-keym-prod.vault.azure.net/"
+    key_type: "RSA"
+    key_size: 2048
+    key_operations: ["encrypt", "decrypt", "sign", "verify"]
+    
+    # HSM-backed keys
+    hsm_protected: true
+  
+  # Google Cloud KMS configuration
+  gcp:
+    enabled: true
+    project_id: "${GCP_PROJECT_ID}"
+    location: "global"
+    key_ring: "apg-keym-prod"
+    credentials_file: "/etc/keym/gcp/service-account.json"
+    
+    # Key configuration
+    algorithm: "GOOGLE_SYMMETRIC_ENCRYPTION"
+    protection_level: "HSM"
+
+# Quantum-safe cryptography configuration
+quantum_safe:
+  enabled: true
+  migration_mode: "hybrid"  # hybrid, quantum_only, classical_only
+  
+  # Post-quantum algorithms
+  algorithms:
+    kyber:
+      enabled: true
+      variants: ["KYBER_512", "KYBER_768", "KYBER_1024"]
+      default: "KYBER_768"
+    
+    dilithium:
+      enabled: true
+      variants: ["DILITHIUM_2", "DILITHIUM_3", "DILITHIUM_5"]
+      default: "DILITHIUM_3"
+    
+    falcon:
+      enabled: true
+      variants: ["FALCON_512", "FALCON_1024"]
+      default: "FALCON_512"
+  
+  # Migration settings
+  migration:
+    schedule: "gradual"  # immediate, gradual, scheduled
+    batch_size: 100
+    max_concurrent_migrations: 10
+    rollback_enabled: true
+
+# Monitoring and observability
+monitoring:
+  metrics_enabled: true
+  prometheus_port: 9090
+  prometheus_endpoint: "/metrics"
+  health_check_port: 8081
+  
+  # Custom metrics
+  custom_metrics:
+    - name: "keym_operations_total"
+      type: "counter"
+      description: "Total number of key operations"
+      labels: ["operation", "algorithm", "status"]
+    
+    - name: "keym_key_lifecycle_duration"
+      type: "histogram"
+      description: "Key lifecycle operation duration"
+      buckets: [0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+    
+    - name: "keym_hsm_operations_duration"
+      type: "histogram"
+      description: "HSM operation duration"
+      buckets: [0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
+  
+  # Alerting thresholds
+  alerts:
+    error_rate_threshold: 0.01
+    latency_p99_threshold: 2.0
+    memory_usage_threshold: 0.8
+    disk_usage_threshold: 0.9
+    hsm_availability_threshold: 0.99
+    
+    # Alert channels
+    channels:
+      email: "security-team@datacraft.co.ke"
+      slack: "${SLACK_WEBHOOK_URL}"
+      pagerduty: "${PAGERDUTY_SERVICE_KEY}"
+
+# Logging configuration
+logging:
+  version: 1
+  disable_existing_loggers: false
+  
+  formatters:
+    json:
+      format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "name": "%(name)s", "message": "%(message)s", "pathname": "%(pathname)s", "lineno": %(lineno)d, "funcName": "%(funcName)s"}'
+    
+    structured:
+      format: '[%(asctime)s] %(levelname)s in %(name)s: %(message)s [in %(pathname)s:%(lineno)d]'
+  
+  handlers:
+    console:
+      class: logging.StreamHandler
+      formatter: structured
+      stream: ext://sys.stdout
+      level: INFO
+    
+    application:
+      class: logging.handlers.RotatingFileHandler
+      formatter: json
+      filename: /var/log/keym/application.log
+      maxBytes: 104857600  # 100MB
+      backupCount: 10
+      level: INFO
+    
+    audit:
+      class: logging.handlers.RotatingFileHandler
+      formatter: json
+      filename: /var/log/keym/audit.log
+      maxBytes: 104857600  # 100MB
+      backupCount: 50  # Keep more audit logs
+      level: INFO
+    
+    security:
+      class: logging.handlers.RotatingFileHandler
+      formatter: json
+      filename: /var/log/keym/security.log
+      maxBytes: 104857600  # 100MB
+      backupCount: 30
+      level: WARNING
+    
+    performance:
+      class: logging.handlers.RotatingFileHandler
+      formatter: json
+      filename: /var/log/keym/performance.log
+      maxBytes: 52428800  # 50MB
+      backupCount: 20
+      level: INFO
+  
+  loggers:
+    root:
+      level: INFO
+      handlers: [console, application]
+    
+    keym:
+      level: INFO
+      handlers: [application]
+      propagate: false
+    
+    keym.audit:
+      level: INFO
+      handlers: [audit]
+      propagate: false
+    
+    keym.security:
+      level: WARNING
+      handlers: [security, audit]
+      propagate: false
+    
+    keym.performance:
+      level: INFO
+      handlers: [performance]
+      propagate: false
+    
+    keym.hsm:
+      level: INFO
+      handlers: [application, audit]
+      propagate: false
+
+# Performance configuration
+performance:
+  max_concurrent_operations: 1000
+  operation_timeout: 30
+  request_timeout: 60
+  connection_timeout: 10
+  
+  # Background task configuration
+  background_tasks:
+    enabled: true
+    max_workers: 10
+    task_timeout: 300
+    
+    # Scheduled tasks
+    schedules:
+      key_rotation_check: "0 2 * * *"      # Daily at 2 AM
+      cleanup_expired_keys: "0 3 * * *"    # Daily at 3 AM  
+      audit_log_rotation: "0 4 * * 0"      # Weekly on Sunday at 4 AM
+      hsm_health_check: "*/15 * * * *"     # Every 15 minutes
+      security_scan: "0 1 * * 1"           # Weekly on Monday at 1 AM
+      performance_analysis: "0 5 1 * *"    # Monthly on 1st at 5 AM
+      certificate_expiry_check: "0 6 1 * *" # Monthly on 1st at 6 AM
+  
+  # Caching configuration
+  caching:
+    enabled: true
+    default_ttl: 3600
+    
+    # Cache strategies
+    strategies:
+      key_metadata: "lru"
+      crypto_operations: "write_through"
+      user_sessions: "write_back"
+      
+    # Cache sizes (in number of items)
+    sizes:
+      key_metadata: 10000
+      crypto_operations: 5000
+      user_sessions: 1000
+
+# Backup and disaster recovery
+backup:
+  enabled: true
+  
+  # Database backup
+  database:
+    enabled: true
+    schedule: "0 1 * * *"  # Daily at 1 AM
+    retention_days: 90
+    compression: true
+    encryption: true
+    
+    # Backup destinations
+    destinations:
+      local: "/backup/keym/db"
+      s3: "s3://datacraft-keym-backups/db/"
+      azure: "https://storage.blob.core.windows.net/backups/keym/db/"
+  
+  # HSM backup
+  hsm:
+    enabled: true
+    metadata_only: true  # Only backup key metadata, not actual keys
+    schedule: "0 0 * * 0"  # Weekly on Sunday
+    retention_weeks: 52
+    encryption: true
+    
+    destinations:
+      local: "/backup/keym/hsm"
+      s3: "s3://datacraft-keym-backups/hsm/"
+  
+  # Configuration backup
+  config:
+    enabled: true
+    schedule: "0 23 * * *"  # Daily at 11 PM
+    retention_days: 30
+    include_secrets: false  # Never backup secrets
+    
+    destinations:
+      local: "/backup/keym/config"
+      git: "https://git.datacraft.co.ke/keym/config-backup.git"
+
+# Disaster recovery
+disaster_recovery:
+  enabled: true
+  
+  # RTO/RPO targets
+  rto_minutes: 60   # Recovery Time Objective: 1 hour
+  rpo_minutes: 15   # Recovery Point Objective: 15 minutes
+  
+  # Failover configuration
+  failover:
+    enabled: true
+    mode: "active_passive"  # active_passive, active_active
+    
+    # Secondary site configuration
+    secondary_site:
+      enabled: true
+      location: "us-west-2"
+      database_url: "${KEYM_DR_DATABASE_URL}"
+      cache_url: "${KEYM_DR_CACHE_URL}"
+      
+      # Data replication
+      replication:
+        mode: "streaming"  # streaming, logical
+        lag_threshold_seconds: 60
+        
+    # Failover triggers
+    triggers:
+      primary_site_down: true
+      database_unavailable: true
+      high_error_rate: true
+      manual_failover: true
+  
+  # Testing
+  testing:
+    enabled: true
+    schedule: "0 4 1 * *"  # Monthly on 1st at 4 AM
+    automated_failback: false
+
+# APG platform integration
+apg_integration:
+  enabled: true
+  tenant_id: "${APG_TENANT_ID}"
+  
+  # Service registry
+  registry:
+    url: "${APG_REGISTRY_URL}"
+    registration_interval: 300
+    health_check_interval: 60
+    
+    # Service metadata
+    metadata:
+      capability: "keym"
+      version: "1.0.0"
+      description: "Enterprise Key Management System"
+      endpoints: ["/keym/api/v1"]
+      dependencies: ["auth_rbac", "notification", "audit"]
+      tags: ["security", "cryptography", "enterprise"]
+  
+  # Event bus integration
+  event_bus:
+    url: "${APG_EVENT_BUS_URL}"
+    connection_timeout: 10
+    reconnect_interval: 5
+    
+    # Event publishing
+    publisher:
+      enabled: true
+      batch_size: 100
+      flush_interval: 5
+      
+    # Event subscription
+    subscriber:
+      enabled: true
+      consumer_group: "keym_production"
+      auto_commit: true
+  
+  # Configuration management
+  config_management:
+    url: "${APG_CONFIG_MANAGEMENT_URL}"
+    sync_interval: 300
+    
+    # Configuration sections to sync
+    sync_sections:
+      - "security"
+      - "hsm"
+      - "multi_cloud"
+      - "monitoring"
+
+# Compliance and audit
+compliance:
+  enabled: true
+  
+  # Compliance frameworks
+  frameworks:
+    - "SOC2_TYPE2"
+    - "ISO27001"
+    - "PCI_DSS"
+    - "FIPS_140_2"
+    - "COMMON_CRITERIA"
+  
+  # Audit configuration
+  audit:
+    enabled: true
+    log_all_operations: true
+    include_sensitive_data: false
+    
+    # Audit trail integrity
+    integrity_checks: true
+    digital_signatures: true
+    tamper_detection: true
+    
+    # Retention policies
+    retention:
+      security_events: 2555  # 7 years in days
+      key_operations: 2190   # 6 years in days
+      admin_actions: 1825    # 5 years in days
+      user_access: 365       # 1 year in days
+  
+  # Compliance reporting
+  reporting:
+    enabled: true
+    schedule: "0 8 1 * *"  # Monthly on 1st at 8 AM
+    formats: ["json", "pdf", "csv"]
+    
+    # Report distribution
+    distribution:
+      email: ["compliance@datacraft.co.ke", "security@datacraft.co.ke"]
+      s3: "s3://datacraft-compliance-reports/keym/"
+      
+# Development and testing (disabled in production)
+development:
+  enabled: false
+  debug_mode: false
+  mock_hsm: false
+  bypass_auth: false
+  test_data_enabled: false

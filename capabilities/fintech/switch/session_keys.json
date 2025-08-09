@@ -1,0 +1,8 @@
+{
+  "timestamp": "2025-01-14T12:04:39.616577",
+  "key_data": "{\"encrypted_zpk\": \"b1f16ddf1677c8f57dc95a40c9829c1b\", \"key_version\": \"6c\", \"control_info\": \"59200000000000000000000000000000000000000000000000000000000000\", \"kcv\": \"6c5920\"}",
+  "additional_data": {
+    "terminal_id": "10351254",
+    "response_code": "00"
+  }
+}

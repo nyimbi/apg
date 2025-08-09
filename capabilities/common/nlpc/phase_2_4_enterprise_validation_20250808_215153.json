@@ -1,0 +1,47 @@
+{
+  "validation_timestamp": "2025-08-08T21:51:53.794099",
+  "phase": "2.4 - Enterprise Features",
+  "total_components": 5,
+  "passed_components": 1,
+  "total_tests": 38,
+  "passed_tests": 10,
+  "success_rate": 26.31578947368421,
+  "component_results": [
+    {
+      "component": "Collaborative Annotation Workbench",
+      "status": "FAILED",
+      "error": "",
+      "tests_run": 8,
+      "tests_passed": 0
+    },
+    {
+      "component": "Model Training Workflows",
+      "status": "FAILED",
+      "error": "cannot import name 'OptimizationType' from 'training_workflows' (/Users/nyimbiodero/src/pjs/apg/capabilities/common/nlpc/training_workflows.py)",
+      "tests_run": 7,
+      "tests_passed": 0
+    },
+    {
+      "component": "Analytics Dashboard",
+      "status": "FAILED",
+      "error": "cannot import name 'ReportGenerator' from 'analytics_dashboard' (/Users/nyimbiodero/src/pjs/apg/capabilities/common/nlpc/analytics_dashboard.py)",
+      "tests_run": 8,
+      "tests_passed": 0
+    },
+    {
+      "component": "Security and Compliance Engine",
+      "status": "PASSED",
+      "tests_run": 10,
+      "tests_passed": 10,
+      "details": "All security and compliance features validated successfully"
+    },
+    {
+      "component": "Enterprise Component Integration",
+      "status": "FAILED",
+      "error": "'dataset_id'",
+      "tests_run": 5,
+      "tests_passed": 0
+    }
+  ],
+  "validation_status": "FAILED"
+}

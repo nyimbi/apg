@@ -1,0 +1,856 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: data-layer
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+    protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: data-layer
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        app.kubernetes.io/name: apg-hlth
+        app.kubernetes.io/component: database
+      annotations:
+        prometheus.io/scrape: "false"
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: POSTGRES_DB
+          value: "hlth"
+        - name: POSTGRES_USER
+          value: "hlth"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: db-password
+        - name: POSTGRES_INITDB_ARGS
+          value: "--encoding=UTF8 --locale=en_US.UTF-8"
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        ports:
+        - name: postgres
+          containerPort: 5432
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U hlth -d hlth
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U hlth -d hlth
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: postgres-config
+        configMap:
+          name: postgres-config
+      - name: init-scripts
+        configMap:
+          name: postgres-init-scripts
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+      labels:
+        app.kubernetes.io/name: apg-hlth
+        app.kubernetes.io/component: database
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd  # Use appropriate storage class
+      resources:
+        requests:
+          storage: 100Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: database-config
+data:
+  postgresql.conf: |
+    # Connection settings
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 200
+    
+    # Memory settings
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    maintenance_work_mem = 64MB
+    work_mem = 4MB
+    
+    # WAL settings
+    wal_buffers = 16MB
+    checkpoint_completion_target = 0.9
+    checkpoint_timeout = 10min
+    max_wal_size = 2GB
+    min_wal_size = 1GB
+    
+    # Query tuning
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = 'pg_log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_min_duration_statement = 1000
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    log_checkpoints = on
+    log_connections = on
+    log_disconnections = on
+    log_lock_waits = on
+    log_temp_files = 0
+    
+    # Performance monitoring
+    shared_preload_libraries = 'pg_stat_statements'
+    track_activities = on
+    track_counts = on
+    track_io_timing = on
+    track_functions = all
+    
+    # Security
+    ssl = off  # Handled at ingress level
+    password_encryption = scram-sha-256
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: database-init
+data:
+  01-extensions.sql: |
+    -- Enable required extensions
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+    CREATE EXTENSION IF NOT EXISTS "btree_gin";
+    CREATE EXTENSION IF NOT EXISTS "btree_gist";
+    CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+    
+    -- Create custom types
+    CREATE TYPE component_type_enum AS ENUM (
+        'service', 'database', 'cache', 'message_queue', 
+        'load_balancer', 'storage', 'network', 'container', 
+        'vm', 'bare_metal'
+    );
+    
+    CREATE TYPE health_dimension_enum AS ENUM (
+        'performance', 'availability', 'security', 'compliance',
+        'cost', 'user_experience', 'business_process'
+    );
+    
+    CREATE TYPE health_status_enum AS ENUM (
+        'healthy', 'warning', 'critical', 'unknown'
+    );
+    
+    CREATE TYPE severity_enum AS ENUM (
+        'low', 'medium', 'high', 'critical'
+    );
+    
+    CREATE TYPE alert_status_enum AS ENUM (
+        'active', 'acknowledged', 'resolved', 'suppressed'
+    );
+    
+    CREATE TYPE tenant_tier_enum AS ENUM (
+        'basic', 'professional', 'enterprise', 'enterprise_plus'
+    );
+    
+    CREATE TYPE compliance_framework_enum AS ENUM (
+        'soc2', 'hipaa', 'iso27001', 'pci_dss', 'gdpr', 'fedramp', 'nist'
+    );
+    
+    CREATE TYPE criticality_enum AS ENUM (
+        'low', 'medium', 'high', 'critical'
+    );
+
+  02-tables.sql: |
+    -- System Components table
+    CREATE TABLE system_components (
+        component_id VARCHAR(255) PRIMARY KEY,
+        tenant_id VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        component_type component_type_enum NOT NULL,
+        environment VARCHAR(50),
+        business_criticality criticality_enum DEFAULT 'medium',
+        owner_team VARCHAR(255),
+        dependencies TEXT[],
+        metadata JSONB DEFAULT '{}',
+        tags JSONB DEFAULT '{}',
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Health Metrics table (partitioned by timestamp)
+    CREATE TABLE health_metrics (
+        metric_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id VARCHAR(255) NOT NULL,
+        component_id VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        value DOUBLE PRECISION NOT NULL,
+        dimension health_dimension_enum NOT NULL,
+        unit VARCHAR(50),
+        timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        tags JSONB DEFAULT '{}',
+        business_context JSONB DEFAULT '{}',
+        quality_score DOUBLE PRECISION DEFAULT 1.0,
+        confidence_level DOUBLE PRECISION DEFAULT 1.0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    ) PARTITION BY RANGE (timestamp);
+
+    -- Health Baselines table
+    CREATE TABLE health_baselines (
+        baseline_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id VARCHAR(255) NOT NULL,
+        component_id VARCHAR(255) NOT NULL,
+        metric_name VARCHAR(255) NOT NULL,
+        dimension health_dimension_enum NOT NULL,
+        baseline_value DOUBLE PRECISION NOT NULL,
+        confidence_level DOUBLE PRECISION NOT NULL,
+        lower_bound DOUBLE PRECISION,
+        upper_bound DOUBLE PRECISION,
+        sample_size INTEGER NOT NULL,
+        seasonal_patterns JSONB DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(tenant_id, component_id, metric_name, dimension)
+    );
+
+    -- Health Alerts table
+    CREATE TABLE health_alerts (
+        alert_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id VARCHAR(255) NOT NULL,
+        component_id VARCHAR(255) NOT NULL,
+        rule_id VARCHAR(255),
+        title VARCHAR(500) NOT NULL,
+        description TEXT,
+        severity severity_enum NOT NULL,
+        status alert_status_enum DEFAULT 'active',
+        metric_info JSONB DEFAULT '{}',
+        correlation_info JSONB DEFAULT '{}',
+        business_impact JSONB DEFAULT '{}',
+        remediation_suggestions TEXT[],
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        acknowledged_at TIMESTAMP WITH TIME ZONE,
+        resolved_at TIMESTAMP WITH TIME ZONE,
+        acknowledged_by VARCHAR(255),
+        resolved_by VARCHAR(255),
+        resolution_notes TEXT
+    );
+
+    -- Health Rules table
+    CREATE TABLE health_rules (
+        rule_id VARCHAR(255) PRIMARY KEY,
+        tenant_id VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        condition TEXT NOT NULL,
+        severity severity_enum NOT NULL,
+        duration_minutes INTEGER DEFAULT 5,
+        enabled BOOLEAN DEFAULT true,
+        component_filter JSONB DEFAULT '{}',
+        notification_channels TEXT[],
+        tags JSONB DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Health Reports table
+    CREATE TABLE health_reports (
+        report_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id VARCHAR(255) NOT NULL,
+        report_type VARCHAR(50) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        time_period_start TIMESTAMP WITH TIME ZONE NOT NULL,
+        time_period_end TIMESTAMP WITH TIME ZONE NOT NULL,
+        overall_health_score DOUBLE PRECISION,
+        total_components INTEGER,
+        components_by_status JSONB DEFAULT '{}',
+        key_findings TEXT[],
+        recommendations TEXT[],
+        executive_summary TEXT,
+        detailed_analysis JSONB DEFAULT '{}',
+        generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        generated_by VARCHAR(255)
+    );
+
+    -- Enterprise Tenants table
+    CREATE TABLE enterprise_tenants (
+        tenant_id VARCHAR(255) PRIMARY KEY,
+        tenant_name VARCHAR(255) NOT NULL,
+        tier tenant_tier_enum NOT NULL DEFAULT 'basic',
+        compliance_frameworks compliance_framework_enum[],
+        custom_branding JSONB DEFAULT '{}',
+        sla_requirements JSONB DEFAULT '{}',
+        resource_quotas JSONB DEFAULT '{}',
+        feature_flags JSONB DEFAULT '{}',
+        isolation_config JSONB DEFAULT '{}',
+        audit_requirements JSONB DEFAULT '{}',
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- ML Models table
+    CREATE TABLE ml_models (
+        model_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id VARCHAR(255) NOT NULL,
+        model_type VARCHAR(100) NOT NULL,
+        model_name VARCHAR(255) NOT NULL,
+        version VARCHAR(50) NOT NULL,
+        algorithm VARCHAR(100),
+        parameters JSONB DEFAULT '{}',
+        training_data_info JSONB DEFAULT '{}',
+        performance_metrics JSONB DEFAULT '{}',
+        model_path VARCHAR(500),
+        status VARCHAR(50) DEFAULT 'active',
+        trained_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Remediation Actions table
+    CREATE TABLE remediation_actions (
+        action_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id VARCHAR(255) NOT NULL,
+        component_id VARCHAR(255) NOT NULL,
+        alert_id UUID REFERENCES health_alerts(alert_id),
+        action_type VARCHAR(100) NOT NULL,
+        action_name VARCHAR(255) NOT NULL,
+        description TEXT,
+        parameters JSONB DEFAULT '{}',
+        execution_status VARCHAR(50) DEFAULT 'pending',
+        execution_result JSONB DEFAULT '{}',
+        safety_checks JSONB DEFAULT '{}',
+        rollback_plan JSONB DEFAULT '{}',
+        executed_at TIMESTAMP WITH TIME ZONE,
+        completed_at TIMESTAMP WITH TIME ZONE,
+        executed_by VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Audit Logs table
+    CREATE TABLE audit_logs (
+        log_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id VARCHAR(255) NOT NULL,
+        user_id VARCHAR(255),
+        action VARCHAR(100) NOT NULL,
+        resource_type VARCHAR(100),
+        resource_id VARCHAR(255),
+        old_values JSONB,
+        new_values JSONB,
+        ip_address INET,
+        user_agent TEXT,
+        session_id VARCHAR(255),
+        compliance_tags TEXT[],
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+  03-indexes.sql: |
+    -- System Components indexes
+    CREATE INDEX idx_system_components_tenant ON system_components (tenant_id);
+    CREATE INDEX idx_system_components_type ON system_components (component_type);
+    CREATE INDEX idx_system_components_env ON system_components (environment);
+    CREATE INDEX idx_system_components_criticality ON system_components (business_criticality);
+    CREATE INDEX idx_system_components_active ON system_components (active);
+    CREATE INDEX idx_system_components_tags ON system_components USING gin (tags);
+
+    -- Health Metrics indexes (will be created on partitions)
+    CREATE INDEX idx_health_metrics_tenant_component ON health_metrics (tenant_id, component_id);
+    CREATE INDEX idx_health_metrics_name ON health_metrics (name);
+    CREATE INDEX idx_health_metrics_dimension ON health_metrics (dimension);
+    CREATE INDEX idx_health_metrics_timestamp ON health_metrics (timestamp DESC);
+    CREATE INDEX idx_health_metrics_tags ON health_metrics USING gin (tags);
+
+    -- Health Baselines indexes
+    CREATE INDEX idx_health_baselines_tenant_component ON health_baselines (tenant_id, component_id);
+    CREATE INDEX idx_health_baselines_metric ON health_baselines (metric_name, dimension);
+    CREATE INDEX idx_health_baselines_updated ON health_baselines (updated_at DESC);
+
+    -- Health Alerts indexes
+    CREATE INDEX idx_health_alerts_tenant ON health_alerts (tenant_id);
+    CREATE INDEX idx_health_alerts_component ON health_alerts (component_id);
+    CREATE INDEX idx_health_alerts_status ON health_alerts (status);
+    CREATE INDEX idx_health_alerts_severity ON health_alerts (severity);
+    CREATE INDEX idx_health_alerts_created ON health_alerts (created_at DESC);
+    CREATE INDEX idx_health_alerts_tenant_status ON health_alerts (tenant_id, status);
+
+    -- Health Rules indexes
+    CREATE INDEX idx_health_rules_tenant ON health_rules (tenant_id);
+    CREATE INDEX idx_health_rules_enabled ON health_rules (enabled);
+    CREATE INDEX idx_health_rules_severity ON health_rules (severity);
+
+    -- Health Reports indexes
+    CREATE INDEX idx_health_reports_tenant ON health_reports (tenant_id);
+    CREATE INDEX idx_health_reports_type ON health_reports (report_type);
+    CREATE INDEX idx_health_reports_generated ON health_reports (generated_at DESC);
+
+    -- Enterprise Tenants indexes
+    CREATE INDEX idx_enterprise_tenants_tier ON enterprise_tenants (tier);
+    CREATE INDEX idx_enterprise_tenants_active ON enterprise_tenants (active);
+    CREATE INDEX idx_enterprise_tenants_compliance ON enterprise_tenants USING gin (compliance_frameworks);
+
+    -- ML Models indexes
+    CREATE INDEX idx_ml_models_tenant ON ml_models (tenant_id);
+    CREATE INDEX idx_ml_models_type ON ml_models (model_type);
+    CREATE INDEX idx_ml_models_status ON ml_models (status);
+    CREATE INDEX idx_ml_models_trained ON ml_models (trained_at DESC);
+
+    -- Remediation Actions indexes
+    CREATE INDEX idx_remediation_actions_tenant ON remediation_actions (tenant_id);
+    CREATE INDEX idx_remediation_actions_component ON remediation_actions (component_id);
+    CREATE INDEX idx_remediation_actions_alert ON remediation_actions (alert_id);
+    CREATE INDEX idx_remediation_actions_status ON remediation_actions (execution_status);
+    CREATE INDEX idx_remediation_actions_executed ON remediation_actions (executed_at DESC);
+
+    -- Audit Logs indexes
+    CREATE INDEX idx_audit_logs_tenant ON audit_logs (tenant_id);
+    CREATE INDEX idx_audit_logs_user ON audit_logs (user_id);
+    CREATE INDEX idx_audit_logs_action ON audit_logs (action);
+    CREATE INDEX idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
+    CREATE INDEX idx_audit_logs_resource ON audit_logs (resource_type, resource_id);
+    CREATE INDEX idx_audit_logs_compliance ON audit_logs USING gin (compliance_tags);
+
+  04-partitions.sql: |
+    -- Create initial partitions for health_metrics table
+    -- Current year partitions
+    CREATE TABLE health_metrics_2024_01 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-01-01 00:00:00+00') TO ('2024-02-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_02 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-02-01 00:00:00+00') TO ('2024-03-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_03 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-03-01 00:00:00+00') TO ('2024-04-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_04 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-04-01 00:00:00+00') TO ('2024-05-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_05 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-05-01 00:00:00+00') TO ('2024-06-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_06 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-06-01 00:00:00+00') TO ('2024-07-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_07 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-07-01 00:00:00+00') TO ('2024-08-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_08 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-08-01 00:00:00+00') TO ('2024-09-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_09 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-09-01 00:00:00+00') TO ('2024-10-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_10 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-10-01 00:00:00+00') TO ('2024-11-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_11 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-11-01 00:00:00+00') TO ('2024-12-01 00:00:00+00');
+    CREATE TABLE health_metrics_2024_12 PARTITION OF health_metrics
+        FOR VALUES FROM ('2024-12-01 00:00:00+00') TO ('2025-01-01 00:00:00+00');
+
+    -- Next year partitions
+    CREATE TABLE health_metrics_2025_01 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-01-01 00:00:00+00') TO ('2025-02-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_02 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-02-01 00:00:00+00') TO ('2025-03-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_03 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-03-01 00:00:00+00') TO ('2025-04-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_04 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-04-01 00:00:00+00') TO ('2025-05-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_05 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-05-01 00:00:00+00') TO ('2025-06-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_06 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-06-01 00:00:00+00') TO ('2025-07-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_07 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-07-01 00:00:00+00') TO ('2025-08-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_08 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-08-01 00:00:00+00') TO ('2025-09-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_09 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-09-01 00:00:00+00') TO ('2025-10-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_10 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-10-01 00:00:00+00') TO ('2025-11-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_11 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-11-01 00:00:00+00') TO ('2025-12-01 00:00:00+00');
+    CREATE TABLE health_metrics_2025_12 PARTITION OF health_metrics
+        FOR VALUES FROM ('2025-12-01 00:00:00+00') TO ('2026-01-01 00:00:00+00');
+
+  05-functions.sql: |
+    -- Function to create monthly partitions automatically
+    CREATE OR REPLACE FUNCTION create_monthly_partition(table_name text, start_date date)
+    RETURNS void AS $$
+    DECLARE
+        partition_name text;
+        end_date date;
+    BEGIN
+        end_date := start_date + interval '1 month';
+        partition_name := table_name || '_' || to_char(start_date, 'YYYY_MM');
+        
+        EXECUTE format('CREATE TABLE IF NOT EXISTS %I PARTITION OF %I
+                        FOR VALUES FROM (%L) TO (%L)',
+                       partition_name, table_name, start_date, end_date);
+        
+        -- Create indexes on the new partition
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I (tenant_id, component_id)',
+                       partition_name || '_tenant_component_idx', partition_name);
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I (timestamp DESC)',
+                       partition_name || '_timestamp_idx', partition_name);
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I (name)',
+                       partition_name || '_name_idx', partition_name);
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I (dimension)',
+                       partition_name || '_dimension_idx', partition_name);
+    END;
+    $$ LANGUAGE plpgsql;
+
+    -- Function to drop old partitions (for data retention)
+    CREATE OR REPLACE FUNCTION drop_old_partitions(table_name text, retention_months integer)
+    RETURNS void AS $$
+    DECLARE
+        partition_name text;
+        cutoff_date date;
+    BEGIN
+        cutoff_date := date_trunc('month', CURRENT_DATE - interval '1 month' * retention_months);
+        
+        FOR partition_name IN 
+            SELECT schemaname||'.'||tablename 
+            FROM pg_tables 
+            WHERE tablename LIKE table_name || '_%' 
+            AND tablename < table_name || '_' || to_char(cutoff_date, 'YYYY_MM')
+        LOOP
+            EXECUTE format('DROP TABLE IF EXISTS %s', partition_name);
+            RAISE NOTICE 'Dropped partition: %', partition_name;
+        END LOOP;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    -- Function to calculate health score
+    CREATE OR REPLACE FUNCTION calculate_health_score(
+        p_component_id varchar,
+        p_tenant_id varchar,
+        p_window_hours integer DEFAULT 24
+    )
+    RETURNS double precision AS $$
+    DECLARE
+        health_score double precision;
+        dimension_scores jsonb := '{}';
+        dimension_weights jsonb := '{"performance": 0.3, "availability": 0.3, "security": 0.2, "compliance": 0.1, "cost": 0.05, "user_experience": 0.05}';
+        dim record;
+    BEGIN
+        -- Calculate scores for each dimension
+        FOR dim IN 
+            SELECT unnest(enum_range(NULL::health_dimension_enum)) as dimension
+        LOOP
+            SELECT AVG(CASE 
+                WHEN value <= 50 THEN 100 - value
+                WHEN value <= 80 THEN 100 - (value - 50) * 0.8
+                ELSE GREATEST(0, 100 - (value - 80) * 2)
+            END) INTO health_score
+            FROM health_metrics
+            WHERE component_id = p_component_id 
+            AND tenant_id = p_tenant_id
+            AND dimension = dim.dimension
+            AND timestamp >= NOW() - (p_window_hours || ' hours')::interval;
+            
+            dimension_scores := dimension_scores || jsonb_build_object(dim.dimension::text, COALESCE(health_score, 75));
+        END LOOP;
+        
+        -- Calculate weighted overall score
+        health_score := 0;
+        FOR dim IN 
+            SELECT key, value FROM jsonb_each_text(dimension_scores)
+        LOOP
+            health_score := health_score + 
+                (dim.value::double precision * COALESCE((dimension_weights->>dim.key)::double precision, 0.1));
+        END LOOP;
+        
+        RETURN GREATEST(0, LEAST(100, health_score));
+    END;
+    $$ LANGUAGE plpgsql;
+
+    -- Trigger function to update updated_at timestamp
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    -- Create triggers for updated_at
+    CREATE TRIGGER update_system_components_updated_at 
+        BEFORE UPDATE ON system_components 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    CREATE TRIGGER update_health_baselines_updated_at 
+        BEFORE UPDATE ON health_baselines 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    CREATE TRIGGER update_health_rules_updated_at 
+        BEFORE UPDATE ON health_rules 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    CREATE TRIGGER update_enterprise_tenants_updated_at 
+        BEFORE UPDATE ON enterprise_tenants 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    CREATE TRIGGER update_ml_models_updated_at 
+        BEFORE UPDATE ON ml_models 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: data-layer
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+    protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: data-layer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        app.kubernetes.io/name: apg-hlth
+        app.kubernetes.io/component: cache
+      annotations:
+        prometheus.io/scrape: "false"
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        imagePullPolicy: IfNotPresent
+        command: ["redis-server"]
+        args: ["/usr/local/etc/redis/redis.conf"]
+        ports:
+        - name: redis
+          containerPort: 6379
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: hlth-secrets
+              key: redis-password
+              optional: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        - name: redis-config
+          mountPath: /usr/local/etc/redis/redis.conf
+          subPath: redis.conf
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: redis-config
+        configMap:
+          name: redis-config
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-data-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data-pvc
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: cache-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: hlth
+  labels:
+    app.kubernetes.io/name: apg-hlth
+    app.kubernetes.io/component: cache-config
+data:
+  redis.conf: |
+    # Network
+    bind 0.0.0.0
+    port 6379
+    protected-mode no
+    
+    # General
+    daemonize no
+    supervised no
+    pidfile /var/run/redis_6379.pid
+    loglevel notice
+    logfile ""
+    
+    # Persistence
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir /data
+    
+    # Memory management
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
+    
+    # Append Only File
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+    no-appendfsync-on-rewrite no
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+    
+    # Slow log
+    slowlog-log-slower-than 10000
+    slowlog-max-len 128
+    
+    # Client output buffer limits
+    client-output-buffer-limit normal 0 0 0
+    client-output-buffer-limit replica 256mb 64mb 60
+    client-output-buffer-limit pubsub 32mb 8mb 60
+    
+    # Security
+    # requirepass will be set via environment if redis-password secret exists
+    
+    # Advanced
+    tcp-keepalive 300
+    timeout 0

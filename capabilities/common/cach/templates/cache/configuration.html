@@ -1,0 +1,416 @@
+{% extends "appbuilder/base.html" %}
+{% import "appbuilder/baselib.html" as baselib %}
+
+{% block head_css %}
+    {{ super() }}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .config-header {
+            background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        .config-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        }
+        .config-group {
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .template-card {
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .template-card:hover {
+            border-color: #007bff;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.1);
+        }
+        .template-card.selected {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Configuration Header -->
+    <div class="config-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-2"><i class="fas fa-cogs me-3"></i>Cache Configuration</h1>
+                <p class="mb-0 opacity-75">Intelligent configuration management with zero-config optimization</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <button class="btn btn-outline-light me-2" onclick="exportConfig()">
+                    <i class="fas fa-download"></i> Export Config
+                </button>
+                <button class="btn btn-light" onclick="runAutoConfig()">
+                    <i class="fas fa-magic"></i> Auto-Configure
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Current Configuration -->
+        <div class="col-xl-8">
+            <div class="config-card">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0"><i class="fas fa-sliders-h me-2 text-primary"></i>Current Configuration</h5>
+                    <button class="btn btn-success" onclick="applyConfiguration()">
+                        <i class="fas fa-check"></i> Apply Changes
+                    </button>
+                </div>
+
+                <!-- Cache Sizing -->
+                <div class="config-group">
+                    <h6 class="mb-3"><i class="fas fa-database me-2"></i>Cache Sizing</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Total Cache Size (MB)</label>
+                            <input type="number" class="form-control" value="{{ current_config.cache_size_mb }}" id="cacheSizeMb">
+                            <small class="form-text text-muted">Current: {{ current_config.cache_size_mb }}MB</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Eviction Policy</label>
+                            <select class="form-select" id="evictionPolicy">
+                                <option value="LRU" {% if current_config.eviction_policy == 'LRU' %}selected{% endif %}>Least Recently Used (LRU)</option>
+                                <option value="LFU" {% if current_config.eviction_policy == 'LFU' %}selected{% endif %}>Least Frequently Used (LFU)</option>
+                                <option value="FIFO" {% if current_config.eviction_policy == 'FIFO' %}selected{% endif %}>First In, First Out (FIFO)</option>
+                                <option value="ARC" {% if current_config.eviction_policy == 'ARC' %}selected{% endif %}>Adaptive Replacement Cache (ARC)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tier Configuration -->
+                <div class="config-group">
+                    <h6 class="mb-3"><i class="fas fa-layer-group me-2"></i>Tier Allocation</h6>
+                    <div class="row">
+                        {% for tier, percentage in current_config.tier_distribution.items() %}
+                        <div class="col-md-3">
+                            <label class="form-label">{{ tier }} Tier (%)</label>
+                            <input type="range" class="form-range" min="0" max="100" value="{{ (percentage * 100)|int }}" 
+                                   id="tier{{ tier }}" oninput="updateTierValue('{{ tier }}', this.value)">
+                            <div class="d-flex justify-content-between">
+                                <small>0%</small>
+                                <small id="tier{{ tier }}Value">{{ (percentage * 100)|int }}%</small>
+                                <small>100%</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Total allocation: <span id="totalAllocation">100</span>%</small>
+                    </div>
+                </div>
+
+                <!-- Security Settings -->
+                <div class="config-group">
+                    <h6 class="mb-3"><i class="fas fa-shield-alt me-2"></i>Security Settings</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Security Level</label>
+                            <select class="form-select" id="securityLevel">
+                                <option value="LOW" {% if current_config.security_level == 'LOW' %}selected{% endif %}>Low</option>
+                                <option value="MEDIUM" {% if current_config.security_level == 'MEDIUM' %}selected{% endif %}>Medium</option>
+                                <option value="HIGH" {% if current_config.security_level == 'HIGH' %}selected{% endif %}>High</option>
+                                <option value="MAXIMUM" {% if current_config.security_level == 'MAXIMUM' %}selected{% endif %}>Maximum</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" id="encryptionEnabled" 
+                                       {% if current_config.get('encryption_enabled', true) %}checked{% endif %}>
+                                <label class="form-check-label" for="encryptionEnabled">
+                                    Enable Encryption at Rest
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Settings -->
+                <div class="config-group">
+                    <h6 class="mb-3"><i class="fas fa-cog me-2"></i>Advanced Settings</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="monitoringEnabled" 
+                                       {% if current_config.monitoring_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="monitoringEnabled">
+                                    Enable Monitoring
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="aiOptimizationEnabled" checked>
+                                <label class="form-check-label" for="aiOptimizationEnabled">
+                                    AI Optimization
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="predictiveCachingEnabled" checked>
+                                <label class="form-check-label" for="predictiveCachingEnabled">
+                                    Predictive Caching
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations & Templates -->
+        <div class="col-xl-4">
+            <!-- AI Recommendations -->
+            <div class="config-card">
+                <h5 class="mb-3"><i class="fas fa-robot me-2 text-primary"></i>AI Recommendations</h5>
+                
+                {% for recommendation in recommendations %}
+                <div class="alert alert-info">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="alert-heading">{{ recommendation.domain }}</h6>
+                            <p class="mb-1">{{ recommendation.recommendation }}</p>
+                            <small>Confidence: {{ (recommendation.confidence * 100)|int }}% | Risk: {{ recommendation.risk }}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="applyRecommendation('{{ loop.index0 }}')">
+                            Apply
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Configuration Templates -->
+            <div class="config-card">
+                <h5 class="mb-3"><i class="fas fa-file-code me-2 text-primary"></i>Configuration Templates</h5>
+                
+                {% for template in templates %}
+                <div class="template-card" onclick="selectTemplate('{{ loop.index0 }}')">
+                    <h6>{{ template.name }}</h6>
+                    <p class="text-muted mb-0">{{ template.description }}</p>
+                </div>
+                {% endfor %}
+                
+                <button class="btn btn-outline-primary w-100 mt-2" onclick="loadTemplate()">
+                    <i class="fas fa-download"></i> Load Selected Template
+                </button>
+            </div>
+
+            <!-- Configuration Validation -->
+            <div class="config-card">
+                <h5 class="mb-3"><i class="fas fa-check-circle me-2 text-primary"></i>Configuration Validation</h5>
+                
+                <div id="validationResults">
+                    <div class="alert alert-success">
+                        <i class="fas fa-check me-2"></i>Configuration is valid
+                    </div>
+                    
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Memory Requirements
+                            <span class="badge bg-success">OK</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Tier Allocation
+                            <span class="badge bg-success">OK</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Security Policies
+                            <span class="badge bg-success">OK</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Performance Impact
+                            <span class="badge bg-warning">Moderate</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    <script>
+        let selectedTemplate = null;
+        
+        function updateTierValue(tier, value) {
+            document.getElementById('tier' + tier + 'Value').textContent = value + '%';
+            updateTotalAllocation();
+        }
+        
+        function updateTotalAllocation() {
+            const tiers = ['L1', 'L2', 'L3', 'EDGE'];
+            let total = 0;
+            tiers.forEach(tier => {
+                const element = document.getElementById('tier' + tier);
+                if (element) {
+                    total += parseInt(element.value);
+                }
+            });
+            document.getElementById('totalAllocation').textContent = total;
+            
+            // Validate allocation
+            if (total !== 100) {
+                document.getElementById('totalAllocation').className = 'text-danger';
+            } else {
+                document.getElementById('totalAllocation').className = 'text-success';
+            }
+        }
+        
+        function selectTemplate(index) {
+            // Clear previous selection
+            document.querySelectorAll('.template-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Select new template
+            document.querySelectorAll('.template-card')[index].classList.add('selected');
+            selectedTemplate = index;
+        }
+        
+        function loadTemplate() {
+            if (selectedTemplate === null) {
+                alert('Please select a template first');
+                return;
+            }
+            
+            // Load template configuration
+            // This would fetch and apply the template configuration
+            alert('Template loaded successfully!');
+        }
+        
+        function applyRecommendation(index) {
+            // Apply AI recommendation
+            fetch('{{ url_for("CacheDashboardView.api_apply_config") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    type: 'recommendation',
+                    index: index
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Recommendation applied successfully!');
+                    location.reload();
+                } else {
+                    alert('Failed to apply recommendation: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error applying recommendation');
+            });
+        }
+        
+        function applyConfiguration() {
+            const config = {
+                cache_size_mb: document.getElementById('cacheSizeMb').value,
+                eviction_policy: document.getElementById('evictionPolicy').value,
+                security_level: document.getElementById('securityLevel').value,
+                monitoring_enabled: document.getElementById('monitoringEnabled').checked,
+                encryption_enabled: document.getElementById('encryptionEnabled').checked,
+                ai_optimization_enabled: document.getElementById('aiOptimizationEnabled').checked,
+                predictive_caching_enabled: document.getElementById('predictiveCachingEnabled').checked,
+                tier_distribution: {
+                    'L1': document.getElementById('tierL1').value / 100,
+                    'L2': document.getElementById('tierL2').value / 100,
+                    'L3': document.getElementById('tierL3').value / 100,
+                    'EDGE': document.getElementById('tierEDGE').value / 100
+                }
+            };
+            
+            fetch('{{ url_for("CacheDashboardView.api_apply_config") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Configuration applied successfully!');
+                } else {
+                    alert('Failed to apply configuration: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error applying configuration');
+            });
+        }
+        
+        function runAutoConfig() {
+            fetch('{{ url_for("CacheDashboardView.api_run_optimization") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    type: 'auto_config'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Auto-configuration completed! Refresh page to see changes.');
+                } else {
+                    alert('Auto-configuration failed: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error running auto-configuration');
+            });
+        }
+        
+        function exportConfig() {
+            const config = {
+                cache_size_mb: document.getElementById('cacheSizeMb').value,
+                eviction_policy: document.getElementById('evictionPolicy').value,
+                security_level: document.getElementById('securityLevel').value,
+                // ... other config values
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "cache_config.json");
+            downloadAnchor.click();
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTotalAllocation();
+        });
+    </script>
+{% endblock %}

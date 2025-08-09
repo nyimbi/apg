@@ -1,0 +1,45 @@
+# APG Workflow Mobile - Development Configuration
+# © 2025 Datacraft. All rights reserved.
+
+environment: development
+debug: true
+
+api:
+  base_url: "http://localhost:5000"
+  timeout: 10.0
+  retry_attempts: 2
+  api_key: null  # Set via APG_API__API_KEY environment variable
+
+database:
+  sqlite_path: "~/.apg_workflow_mobile/dev/offline.db"
+  cache_sqlite_path: "~/.apg_workflow_mobile/dev/cache.db"
+  cache_ttl: 1800  # 30 minutes for faster development
+
+security:
+  jwt_expiry: 7200  # 2 hours for development convenience
+  biometric_timeout: 60
+  password_min_length: 6  # Relaxed for development
+
+sync:
+  sync_interval: 60  # 1 minute for faster development feedback
+  background_sync_enabled: false  # Disable for development
+
+files:
+  max_file_size: 50331648  # 50MB for development
+  upload_timeout: 120
+
+ui:
+  theme_mode: "auto"
+  animation_duration: 150  # Faster animations for development
+
+logging:
+  log_level: "DEBUG"
+  console_log_level: "DEBUG"
+  colored_logs: true
+  log_file_path: "~/.apg_workflow_mobile/dev/logs/app.log"
+
+features:
+  debug_mode_enabled: true
+  mock_api_enabled: false  # Set to true for offline development
+  verbose_logging_enabled: true
+  crash_reporting_enabled: false  # Disable in development

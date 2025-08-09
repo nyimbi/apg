@@ -9,7 +9,7 @@ from enum import Enum
 from typing import List, Optional, Dict, Any, Union
 from dataclasses import dataclass, field
 from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
+import uuid
 
 
 class TaskStatus(str, Enum):
@@ -80,7 +80,7 @@ class TaskAssignment:
 @dataclass
 class TaskComment:
 	"""Task comment"""
-	id: str = field(default_factory=uuid7str)
+	id: str = field(default_factory=lambda: str(uuid.uuid4()))
 	content: str = ""
 	author_id: str = ""
 	author_name: Optional[str] = None
@@ -93,7 +93,7 @@ class TaskComment:
 @dataclass  
 class TaskAttachment:
 	"""Task attachment"""
-	id: str = field(default_factory=uuid7str)
+	id: str = field(default_factory=lambda: str(uuid.uuid4()))
 	filename: str = ""
 	original_filename: str = ""
 	file_size: int = 0
@@ -113,7 +113,7 @@ class Task(BaseModel):
 		validate_by_alias=True
 	)
 	
-	id: str = Field(default_factory=uuid7str)
+	id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 	name: str = Field(..., min_length=1, max_length=200)
 	description: Optional[str] = None
 	task_type: TaskType = TaskType.MANUAL

@@ -1,0 +1,72 @@
+# APG Message Queue Event Bus (MQEB) Requirements
+# Core Python dependencies for MQEB capability
+
+# APG Platform Dependencies
+# Note: These would be provided by the APG platform
+# flask>=2.3.0
+# flask-appbuilder>=4.1.0
+# sqlalchemy>=2.0.0
+# pydantic>=2.0.0
+
+# Core Dependencies
+asyncio-mqtt>=0.16.0
+paho-mqtt>=1.6.0
+aiohttp>=3.9.0
+websockets>=12.0
+cryptography>=41.0.0
+uuid-extensions>=0.1.0
+
+# Database and Caching
+asyncpg>=0.29.0
+aioredis>=2.0.0
+aiocache>=0.12.0
+
+# Message Serialization and Compression
+msgpack>=1.0.0
+snappy>=0.6.0
+lz4>=4.3.0
+zstandard>=0.22.0
+
+# Monitoring and Observability  
+prometheus-client>=0.19.0
+opentelemetry-api>=1.21.0
+opentelemetry-sdk>=1.21.0
+opentelemetry-instrumentation-flask>=0.42b0
+
+# AI and ML Libraries (for intelligent routing)
+numpy>=1.24.0
+scikit-learn>=1.3.0
+
+# Testing Dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.12.0
+pytest-httpserver>=1.0.0
+
+# Development Dependencies
+black>=23.9.0
+isort>=5.12.0
+mypy>=1.6.0
+flake8>=6.1.0
+
+# Optional Performance Dependencies
+uvloop>=0.19.0; sys_platform != "win32"
+cython>=3.0.0
+
+# Security Dependencies (for quantum-safe cryptography)
+# Note: These are experimental and may not be available
+# liboqs-python>=0.9.0
+# pqcrypto>=0.18.0
+
+# Protocol-specific Dependencies
+grpcio>=1.59.0
+grpcio-tools>=1.59.0
+
+# Edge Computing Dependencies
+docker>=6.1.0
+kubernetes>=28.1.0
+
+# Multi-cloud SDK Dependencies (optional)
+boto3>=1.34.0  # AWS
+google-cloud-pubsub>=2.18.0  # Google Cloud
+azure-servicebus>=7.11.0  # Azure

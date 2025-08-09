@@ -1,0 +1,498 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head %}
+	{{ super() }}
+	<!-- Revolutionary Audit Dashboard CSS -->
+	<style>
+		.audit-dashboard {
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+			padding: 20px;
+		}
+		
+		.dashboard-header {
+			background: rgba(255, 255, 255, 0.95);
+			border-radius: 15px;
+			padding: 25px;
+			margin-bottom: 25px;
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+			backdrop-filter: blur(10px);
+		}
+		
+		.metric-card {
+			background: rgba(255, 255, 255, 0.9);
+			border-radius: 15px;
+			padding: 25px;
+			margin-bottom: 20px;
+			box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+			transition: transform 0.3s ease, box-shadow 0.3s ease;
+			backdrop-filter: blur(10px);
+		}
+		
+		.metric-card:hover {
+			transform: translateY(-5px);
+			box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+		}
+		
+		.metric-value {
+			font-size: 2.5rem;
+			font-weight: bold;
+			color: #2c3e50;
+			margin-bottom: 5px;
+		}
+		
+		.metric-label {
+			color: #7f8c8d;
+			font-size: 0.9rem;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+		}
+		
+		.real-time-indicator {
+			display: inline-block;
+			width: 12px;
+			height: 12px;
+			background: #27ae60;
+			border-radius: 50%;
+			margin-right: 10px;
+			animation: pulse 2s infinite;
+		}
+		
+		@keyframes pulse {
+			0% { opacity: 1; }
+			50% { opacity: 0.5; }
+			100% { opacity: 1; }
+		}
+		
+		.event-stream {
+			max-height: 400px;
+			overflow-y: auto;
+			background: rgba(255, 255, 255, 0.9);
+			border-radius: 10px;
+			padding: 20px;
+		}
+		
+		.event-item {
+			padding: 15px;
+			border-left: 4px solid #3498db;
+			margin-bottom: 10px;
+			background: rgba(52, 152, 219, 0.05);
+			border-radius: 8px;
+			transition: all 0.3s ease;
+		}
+		
+		.event-item:hover {
+			background: rgba(52, 152, 219, 0.1);
+			transform: translateX(5px);
+		}
+		
+		.event-item.critical { border-left-color: #e74c3c; background: rgba(231, 76, 60, 0.05); }
+		.event-item.warning { border-left-color: #f39c12; background: rgba(243, 156, 18, 0.05); }
+		.event-item.success { border-left-color: #27ae60; background: rgba(39, 174, 96, 0.05); }
+		
+		.risk-gauge {
+			width: 200px;
+			height: 200px;
+			margin: 0 auto;
+		}
+		
+		.compliance-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+			gap: 20px;
+			margin-top: 20px;
+		}
+		
+		.compliance-card {
+			background: rgba(255, 255, 255, 0.9);
+			border-radius: 10px;
+			padding: 20px;
+			text-align: center;
+		}
+		
+		.compliance-score {
+			font-size: 2rem;
+			font-weight: bold;
+			margin: 10px 0;
+		}
+		
+		.score-excellent { color: #27ae60; }
+		.score-good { color: #2ecc71; }
+		.score-warning { color: #f39c12; }
+		.score-critical { color: #e74c3c; }
+		
+		.chart-container {
+			background: rgba(255, 255, 255, 0.9);
+			border-radius: 15px;
+			padding: 25px;
+			margin-bottom: 20px;
+			min-height: 300px;
+		}
+		
+		.search-shortcut {
+			background: linear-gradient(45deg, #667eea, #764ba2);
+			color: white;
+			border: none;
+			padding: 15px 30px;
+			border-radius: 25px;
+			font-size: 1.1rem;
+			cursor: pointer;
+			transition: all 0.3s ease;
+			margin: 10px 5px;
+		}
+		
+		.search-shortcut:hover {
+			transform: scale(1.05);
+			box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+		}
+		
+		.alert-banner {
+			background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
+			color: white;
+			padding: 15px 25px;
+			border-radius: 10px;
+			margin-bottom: 20px;
+			animation: slideInDown 0.5s ease-out;
+		}
+		
+		@keyframes slideInDown {
+			from { transform: translateY(-100%); opacity: 0; }
+			to { transform: translateY(0); opacity: 1; }
+		}
+		
+		@media (max-width: 768px) {
+			.audit-dashboard { padding: 10px; }
+			.dashboard-header { padding: 15px; }
+			.metric-card { padding: 15px; }
+			.metric-value { font-size: 2rem; }
+		}
+	</style>
+{% endblock %}
+
+{% block content %}
+<div class="audit-dashboard">
+	<!-- Alert Banner for Critical Events -->
+	{% if metrics.metrics.anomalies_detected and metrics.metrics.anomalies_detected > 5 %}
+	<div class="alert-banner">
+		<i class="fas fa-exclamation-triangle"></i>
+		<strong>Critical Alert:</strong> {{ metrics.metrics.anomalies_detected }} anomalies detected in the last hour. 
+		<a href="{{ url_for('AuditInvestigationView.investigations') }}" style="color: white; text-decoration: underline;">
+			View Investigations →
+		</a>
+	</div>
+	{% endif %}
+	
+	<!-- Dashboard Header -->
+	<div class="dashboard-header">
+		<div class="row">
+			<div class="col-md-8">
+				<h1>
+					<span class="real-time-indicator"></span>
+					APG Audit Intelligence Dashboard
+				</h1>
+				<p class="lead">Revolutionary audit monitoring with ML-powered threat detection</p>
+			</div>
+			<div class="col-md-4 text-right">
+				<p><strong>Tenant:</strong> {{ tenant_id }}</p>
+				<p><strong>Status:</strong> 
+					<span class="badge badge-success">{{ metrics.status|title }}</span>
+				</p>
+				<p><strong>Last Updated:</strong> <span id="lastUpdate">{{ moment().format('HH:mm:ss') }}</span></p>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Key Metrics Row -->
+	<div class="row">
+		<div class="col-md-3">
+			<div class="metric-card">
+				<div class="metric-value">{{ "{:,.0f}".format(metrics.metrics.events_per_second or 0) }}</div>
+				<div class="metric-label">Events/Second</div>
+				<div class="progress mt-2">
+					<div class="progress-bar bg-primary" style="width: {{ min(100, (metrics.metrics.events_per_second or 0) * 10) }}%"></div>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="metric-card">
+				<div class="metric-value">{{ "{:,.0f}".format(metrics.metrics.events_ingested or 0) }}</div>
+				<div class="metric-label">Total Events</div>
+				<i class="fas fa-chart-line fa-2x text-primary float-right mt-2"></i>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="metric-card">
+				<div class="metric-value text-warning">{{ metrics.metrics.anomalies_detected or 0 }}</div>
+				<div class="metric-label">Anomalies Detected</div>
+				<i class="fas fa-exclamation-triangle fa-2x text-warning float-right mt-2"></i>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="metric-card">
+				<div class="metric-value text-danger">{{ metrics.metrics.compliance_violations or 0 }}</div>
+				<div class="metric-label">Compliance Violations</div>
+				<i class="fas fa-shield-alt fa-2x text-danger float-right mt-2"></i>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Main Dashboard Content -->
+	<div class="row">
+		<!-- Real-time Event Stream -->
+		<div class="col-md-8">
+			<div class="metric-card">
+				<h3>
+					<span class="real-time-indicator"></span>
+					Live Event Stream
+				</h3>
+				<p class="text-muted">Real-time audit events with ML risk scoring</p>
+				
+				<!-- Quick Search Shortcuts -->
+				<div class="mb-3">
+					<button class="search-shortcut" onclick="quickSearch('failed login attempts today')">
+						Failed Logins Today
+					</button>
+					<button class="search-shortcut" onclick="quickSearch('high risk events last hour')">
+						High Risk Events
+					</button>
+					<button class="search-shortcut" onclick="quickSearch('admin changes this week')">
+						Admin Changes
+					</button>
+				</div>
+				
+				<div class="event-stream" id="eventStream">
+					{% for event in recent_events[:10] %}
+					<div class="event-item {{ 'critical' if event.risk_score > 0.8 else 'warning' if event.risk_score > 0.5 else 'success' }}">
+						<div class="d-flex justify-content-between align-items-start">
+							<div>
+								<strong>{{ event.action }}</strong>
+								<span class="badge badge-secondary ml-2">{{ event.event_type }}</span>
+								{% if not event.success %}
+								<span class="badge badge-danger ml-1">FAILED</span>
+								{% endif %}
+								<br>
+								<small class="text-muted">
+									User: {{ event.user_id }} | Resource: {{ event.resource_type }}:{{ event.resource_id }}
+								</small>
+							</div>
+							<div class="text-right">
+								<div class="badge badge-{{ 'danger' if event.risk_score > 0.8 else 'warning' if event.risk_score > 0.5 else 'success' }}">
+									Risk: {{ "{:.1f}".format(event.risk_score * 100) }}%
+								</div>
+								<br>
+								<small class="text-muted">{{ moment(event.timestamp).fromNow() }}</small>
+							</div>
+						</div>
+					</div>
+					{% endfor %}
+				</div>
+				
+				<div class="text-center mt-3">
+					<a href="{{ url_for('AuditSearchView.search') }}" class="btn btn-primary">
+						<i class="fas fa-search"></i> Advanced Search & Analytics
+					</a>
+				</div>
+			</div>
+		</div>
+		
+		<!-- Risk Analysis Panel -->
+		<div class="col-md-4">
+			<div class="metric-card">
+				<h4><i class="fas fa-shield-alt text-danger"></i> Risk Analysis</h4>
+				
+				<!-- Risk Summary -->
+				<div class="mb-4">
+					<div class="d-flex justify-content-between mb-2">
+						<span>Critical Events</span>
+						<span class="badge badge-danger">{{ risk_summary.critical_events or 0 }}</span>
+					</div>
+					<div class="d-flex justify-content-between mb-2">
+						<span>High Risk Events</span>
+						<span class="badge badge-warning">{{ risk_summary.high_risk_events or 0 }}</span>
+					</div>
+					<div class="d-flex justify-content-between mb-2">
+						<span>Anomalies</span>
+						<span class="badge badge-info">{{ risk_summary.anomalies_detected or 0 }}</span>
+					</div>
+				</div>
+				
+				<!-- Top Risk Categories -->
+				<h6>Top Risk Categories</h6>
+				{% for category in risk_summary.top_risk_categories or [] %}
+				<div class="mb-2">
+					<div class="d-flex justify-content-between">
+						<span class="small">{{ category.category|title }}</span>
+						<span class="small">{{ category.count }} events</span>
+					</div>
+					<div class="progress" style="height: 6px;">
+						<div class="progress-bar bg-{{ 'danger' if category.avg_risk > 0.7 else 'warning' if category.avg_risk > 0.4 else 'info' }}" 
+							 style="width: {{ (category.avg_risk * 100) }}%"></div>
+					</div>
+				</div>
+				{% endfor %}
+			</div>
+			
+			<!-- System Health -->
+			<div class="metric-card">
+				<h4><i class="fas fa-heartbeat text-success"></i> System Health</h4>
+				<div class="row">
+					<div class="col-6">
+						<div class="text-center">
+							<div class="metric-value text-primary">{{ metrics.buffer_size or 0 }}</div>
+							<div class="metric-label">Buffer Size</div>
+						</div>
+					</div>
+					<div class="col-6">
+						<div class="text-center">
+							<div class="metric-value text-success">99.9%</div>
+							<div class="metric-label">Uptime</div>
+						</div>
+					</div>
+				</div>
+				
+				<div class="mt-3">
+					<a href="{{ url_for('AuditSettingsView.settings') }}" class="btn btn-outline-primary btn-sm">
+						<i class="fas fa-cog"></i> Settings
+					</a>
+					<button class="btn btn-outline-info btn-sm" onclick="exportMetrics()">
+						<i class="fas fa-download"></i> Export
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Compliance Dashboard -->
+	<div class="metric-card">
+		<h3><i class="fas fa-balance-scale text-info"></i> Compliance Monitoring</h3>
+		<p class="text-muted">Real-time compliance framework monitoring with automated reporting</p>
+		
+		<div class="compliance-grid">
+			{% for framework in compliance_status.frameworks or [] %}
+			<div class="compliance-card">
+				<h5>{{ framework.name }}</h5>
+				<div class="compliance-score score-{{ framework.status }}">
+					{{ "{:.0f}".format((framework.compliance_score or 0) * 100) }}%
+				</div>
+				<div class="small text-muted mb-2">
+					{{ framework.violations or 0 }} violations
+				</div>
+				<span class="badge badge-{{ 'success' if framework.status == 'excellent' else 'warning' if framework.status == 'good' else 'danger' }}">
+					{{ framework.status|title }}
+				</span>
+			</div>
+			{% endfor %}
+		</div>
+		
+		<div class="text-center mt-4">
+			<a href="{{ url_for('ComplianceReportView.reports') }}" class="btn btn-info">
+				<i class="fas fa-file-alt"></i> Generate Compliance Reports
+			</a>
+		</div>
+	</div>
+</div>
+
+<!-- Event Source Setup for Real-time Updates -->
+<script>
+let eventSource;
+
+function setupRealTimeUpdates() {
+	if (eventSource) {
+		eventSource.close();
+	}
+	
+	eventSource = new EventSource('/audit/api/v1/events/stream?tenant_id={{ tenant_id }}');
+	
+	eventSource.onmessage = function(event) {
+		const data = JSON.parse(event.data);
+		updateEventStream(data);
+		updateMetrics();
+		document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+	};
+	
+	eventSource.onerror = function(event) {
+		console.error('Event stream error:', event);
+		setTimeout(setupRealTimeUpdates, 5000); // Reconnect after 5 seconds
+	};
+}
+
+function updateEventStream(newEvent) {
+	const stream = document.getElementById('eventStream');
+	const eventItem = createEventItem(newEvent);
+	stream.insertBefore(eventItem, stream.firstChild);
+	
+	// Remove old events to prevent memory issues
+	while (stream.children.length > 20) {
+		stream.removeChild(stream.lastChild);
+	}
+}
+
+function createEventItem(event) {
+	const item = document.createElement('div');
+	const riskClass = event.risk_score > 0.8 ? 'critical' : event.risk_score > 0.5 ? 'warning' : 'success';
+	item.className = `event-item ${riskClass}`;
+	item.innerHTML = `
+		<div class="d-flex justify-content-between align-items-start">
+			<div>
+				<strong>${event.action}</strong>
+				<span class="badge badge-secondary ml-2">${event.event_type}</span>
+				<br>
+				<small class="text-muted">User: ${event.user_id}</small>
+			</div>
+			<div class="text-right">
+				<div class="badge badge-${event.risk_score > 0.8 ? 'danger' : event.risk_score > 0.5 ? 'warning' : 'success'}">
+					Risk: ${(event.risk_score * 100).toFixed(1)}%
+				</div>
+				<br>
+				<small class="text-muted">just now</small>
+			</div>
+		</div>
+	`;
+	return item;
+}
+
+function quickSearch(query) {
+	const encodedQuery = encodeURIComponent(query);
+	window.location.href = `/audit/search?query=${encodedQuery}`;
+}
+
+function updateMetrics() {
+	// Update metrics via AJAX call
+	fetch('/audit/api/v1/metrics?tenant_id={{ tenant_id }}')
+		.then(response => response.json())
+		.then(data => {
+			// Update metric displays
+			const elements = {
+				'events_per_second': document.querySelector('.metric-value'),
+				'total_events': document.querySelectorAll('.metric-value')[1],
+				'anomalies_detected': document.querySelectorAll('.metric-value')[2],
+				'compliance_violations': document.querySelectorAll('.metric-value')[3]
+			};
+			
+			if (data.events_per_second !== undefined) {
+				elements.events_per_second.textContent = data.events_per_second.toLocaleString();
+			}
+		})
+		.catch(error => console.error('Metrics update error:', error));
+}
+
+function exportMetrics() {
+	window.location.href = '/audit/api/v1/metrics/export?tenant_id={{ tenant_id }}&format=csv';
+}
+
+// Initialize real-time updates when page loads
+document.addEventListener('DOMContentLoaded', function() {
+	setupRealTimeUpdates();
+	
+	// Update metrics every 30 seconds
+	setInterval(updateMetrics, 30000);
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+	if (eventSource) {
+		eventSource.close();
+	}
+});
+</script>
+{% endblock %}

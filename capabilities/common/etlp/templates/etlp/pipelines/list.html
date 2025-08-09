@@ -1,0 +1,373 @@
+{% extends "appbuilder/base.html" %}
+
+{% block title %}Pipelines - ETLP - APG Platform{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+.pipeline-card {
+	border: 1px solid #e9ecef;
+	border-radius: 8px;
+	padding: 20px;
+	margin-bottom: 20px;
+	background: white;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	transition: all 0.3s ease;
+}
+
+.pipeline-card:hover {
+	box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+	transform: translateY(-2px);
+}
+
+.pipeline-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 15px;
+}
+
+.pipeline-title {
+	margin: 0;
+	color: #2c3e50;
+}
+
+.pipeline-meta {
+	display: flex;
+	gap: 15px;
+	margin-top: 10px;
+	font-size: 0.9rem;
+	color: #6c757d;
+}
+
+.pipeline-actions {
+	display: flex;
+	gap: 10px;
+}
+
+.filter-panel {
+	background: #f8f9fa;
+	padding: 20px;
+	border-radius: 8px;
+	margin-bottom: 20px;
+}
+
+.tag-list {
+	display: flex;
+	gap: 5px;
+	flex-wrap: wrap;
+}
+
+.tag {
+	background: #e7f3ff;
+	color: #0066cc;
+	padding: 2px 8px;
+	border-radius: 12px;
+	font-size: 0.8rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-12">
+			<div class="page-header">
+				<h1>
+					<i class="fa fa-flow-chart"></i> Data Pipelines
+					<small>Manage and monitor your data processing workflows</small>
+				</h1>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Action Bar -->
+	<div class="row">
+		<div class="col-12">
+			<div class="btn-toolbar mb-3" role="toolbar">
+				<div class="btn-group mr-2" role="group">
+					<a href="{{ url_for('etlp.create_pipeline') }}" class="btn btn-primary">
+						<i class="fa fa-plus"></i> New Pipeline
+					</a>
+					<a href="{{ url_for('etlp.designer') }}" class="btn btn-success">
+						<i class="fa fa-paint-brush"></i> Visual Designer
+					</a>
+				</div>
+				<div class="btn-group mr-2" role="group">
+					<button type="button" class="btn btn-outline-secondary" onclick="refreshPipelines()">
+						<i class="fa fa-refresh"></i> Refresh
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Filters -->
+	<div class="row">
+		<div class="col-12">
+			<div class="filter-panel">
+				<form method="GET" class="form-inline">
+					<div class="form-group mr-3">
+						<label for="status" class="mr-2">Status:</label>
+						<select name="status" id="status" class="form-control form-control-sm">
+							<option value="">All Statuses</option>
+							<option value="draft" {% if filters.status == 'draft' %}selected{% endif %}>Draft</option>
+							<option value="active" {% if filters.status == 'active' %}selected{% endif %}>Active</option>
+							<option value="paused" {% if filters.status == 'paused' %}selected{% endif %}>Paused</option>
+							<option value="scheduled" {% if filters.status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+						</select>
+					</div>
+					<div class="form-group mr-3">
+						<label for="search" class="mr-2">Search:</label>
+						<input type="text" name="search" id="search" class="form-control form-control-sm" 
+							   placeholder="Pipeline name..." value="{{ filters.search or '' }}">
+					</div>
+					<div class="form-group mr-3">
+						<label for="tags" class="mr-2">Tags:</label>
+						<input type="text" name="tags" id="tags" class="form-control form-control-sm" 
+							   placeholder="tag1,tag2..." value="{{ filters.tags or '' }}">
+					</div>
+					<button type="submit" class="btn btn-sm btn-primary">
+						<i class="fa fa-search"></i> Filter
+					</button>
+					<a href="{{ url_for('etlp.list_pipelines') }}" class="btn btn-sm btn-outline-secondary ml-2">
+						<i class="fa fa-times"></i> Clear
+					</a>
+				</form>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Pipeline List -->
+	<div class="row">
+		<div class="col-12">
+			{% if pipelines %}
+				{% for pipeline in pipelines %}
+				<div class="pipeline-card">
+					<div class="pipeline-header">
+						<h3 class="pipeline-title">
+							<a href="{{ url_for('etlp.view_pipeline', pipeline_id=pipeline.id) }}">
+								{{ pipeline.name }}
+							</a>
+						</h3>
+						<div class="pipeline-actions">
+							<span class="etlp-status-badge {{ helpers.get_status_badge_class(pipeline.status) }}">
+								{{ pipeline.status.value.upper() }}
+							</span>
+							<div class="btn-group" role="group">
+								<a href="{{ url_for('etlp.view_pipeline', pipeline_id=pipeline.id) }}" 
+								   class="btn btn-sm btn-outline-primary" data-toggle="tooltip" title="View Details">
+									<i class="fa fa-eye"></i>
+								</a>
+								<a href="{{ url_for('etlp.edit_pipeline', pipeline_id=pipeline.id) }}" 
+								   class="btn btn-sm btn-outline-secondary" data-toggle="tooltip" title="Edit">
+									<i class="fa fa-edit"></i>
+								</a>
+								<button type="button" class="btn btn-sm btn-outline-success" 
+										onclick="executePipeline('{{ pipeline.id }}')" 
+										data-toggle="tooltip" title="Execute">
+									<i class="fa fa-play"></i>
+								</button>
+								<div class="dropdown">
+									<button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+											type="button" data-toggle="dropdown">
+										<i class="fa fa-ellipsis-v"></i>
+									</button>
+									<div class="dropdown-menu">
+										<a class="dropdown-item" href="{{ url_for('etlp.clone_pipeline', pipeline_id=pipeline.id) }}">
+											<i class="fa fa-copy"></i> Clone
+										</a>
+										<a class="dropdown-item" href="{{ url_for('etlp.export_pipeline', pipeline_id=pipeline.id) }}">
+											<i class="fa fa-download"></i> Export
+										</a>
+										<div class="dropdown-divider"></div>
+										<a class="dropdown-item text-danger" href="#" onclick="deletePipeline('{{ pipeline.id }}', '{{ pipeline.name }}')">
+											<i class="fa fa-trash"></i> Delete
+										</a>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					
+					<div class="pipeline-description">
+						<p class="text-muted">{{ helpers.truncate_text(pipeline.description, 200) or 'No description provided.' }}</p>
+					</div>
+					
+					<div class="pipeline-meta">
+						<span><i class="fa fa-cogs"></i> {{ pipeline.steps|length }} steps</span>
+						<span><i class="fa fa-exchange"></i> {{ pipeline.transformations|length }} transformations</span>
+						<span><i class="fa fa-database"></i> {{ pipeline.data_sources|length }} sources</span>
+						<span><i class="fa fa-shield"></i> {{ pipeline.quality_rules|length }} quality rules</span>
+						<span><i class="fa fa-calendar"></i> {{ pipeline.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+						<span><i class="fa fa-user"></i> {{ pipeline.created_by }}</span>
+					</div>
+					
+					{% if pipeline.tags %}
+					<div class="pipeline-tags mt-2">
+						<div class="tag-list">
+							{% for tag in pipeline.tags %}
+							<span class="tag">{{ tag }}</span>
+							{% endfor %}
+						</div>
+					</div>
+					{% endif %}
+					
+					{% if pipeline.ai_optimization_enabled %}
+					<div class="mt-2">
+						<span class="badge badge-info">
+							<i class="fa fa-brain"></i> AI Optimized
+						</span>
+					</div>
+					{% endif %}
+				</div>
+				{% endfor %}
+				
+				<!-- Pagination -->
+				<div class="row">
+					<div class="col-12">
+						<nav aria-label="Pipeline pagination">
+							<ul class="pagination justify-content-center">
+								{% if page > 1 %}
+								<li class="page-item">
+									<a class="page-link" href="?page={{ page - 1 }}&per_page={{ per_page }}">Previous</a>
+								</li>
+								{% endif %}
+								
+								{% for p in range(1, (pipelines|length / per_page)|int + 2) %}
+									{% if p == page %}
+									<li class="page-item active">
+										<span class="page-link">{{ p }}</span>
+									</li>
+									{% else %}
+									<li class="page-item">
+										<a class="page-link" href="?page={{ p }}&per_page={{ per_page }}">{{ p }}</a>
+									</li>
+									{% endif %}
+								{% endfor %}
+								
+								<li class="page-item">
+									<a class="page-link" href="?page={{ page + 1 }}&per_page={{ per_page }}">Next</a>
+								</li>
+							</ul>
+						</nav>
+					</div>
+				</div>
+				
+			{% else %}
+				<div class="text-center py-5">
+					<i class="fa fa-flow-chart fa-5x text-muted mb-3"></i>
+					<h3 class="text-muted">No pipelines found</h3>
+					<p class="text-muted">Create your first data processing pipeline to get started.</p>
+					<a href="{{ url_for('etlp.create_pipeline') }}" class="btn btn-primary btn-lg">
+						<i class="fa fa-plus"></i> Create Pipeline
+					</a>
+				</div>
+			{% endif %}
+		</div>
+	</div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title">Confirm Deletion</h5>
+				<button type="button" class="close" data-dismiss="modal">
+					<span>&times;</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<p>Are you sure you want to delete pipeline <strong id="pipelineName"></strong>?</p>
+				<div class="alert alert-warning">
+					<i class="fa fa-warning"></i>
+					This action cannot be undone. All execution history will be preserved.
+				</div>
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" id="hardDelete">
+					<label class="form-check-label" for="hardDelete">
+						Permanently delete (removes all data)
+					</label>
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+				<button type="button" class="btn btn-danger" id="confirmDelete">Delete Pipeline</button>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script>
+let pipelineToDelete = null;
+
+function executePipeline(pipelineId) {
+	if (confirm('Execute this pipeline now?')) {
+		fetch(`/etlp/pipelines/${pipelineId}/execute`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-CSRFToken': $('meta[name=csrf-token]').attr('content')
+			}
+		})
+		.then(response => response.json())
+		.then(data => {
+			if (data.success) {
+				alert('Pipeline execution started!');
+				location.reload();
+			} else {
+				alert('Error: ' + data.message);
+			}
+		})
+		.catch(error => {
+			alert('Error starting pipeline: ' + error.message);
+		});
+	}
+}
+
+function deletePipeline(pipelineId, pipelineName) {
+	pipelineToDelete = pipelineId;
+	document.getElementById('pipelineName').textContent = pipelineName;
+	$('#deleteModal').modal('show');
+}
+
+document.getElementById('confirmDelete').addEventListener('click', function() {
+	if (pipelineToDelete) {
+		const hardDelete = document.getElementById('hardDelete').checked;
+		
+		fetch(`/etlp/pipelines/${pipelineToDelete}?hard_delete=${hardDelete}`, {
+			method: 'DELETE',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-CSRFToken': $('meta[name=csrf-token]').attr('content')
+			}
+		})
+		.then(response => response.json())
+		.then(data => {
+			if (data.success) {
+				$('#deleteModal').modal('hide');
+				location.reload();
+			} else {
+				alert('Error: ' + data.message);
+			}
+		})
+		.catch(error => {
+			alert('Error deleting pipeline: ' + error.message);
+		});
+	}
+});
+
+function refreshPipelines() {
+	location.reload();
+}
+
+// Initialize tooltips
+$(function () {
+	$('[data-toggle="tooltip"]').tooltip();
+});
+</script>
+{% endblock %}

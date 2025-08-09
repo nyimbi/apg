@@ -1,0 +1,13 @@
+graph TD
+    A[Client] -->|ISO8583 Message| B[Network Communication Handler]
+    B <--> C[ISO8583 Message Parser/Builder]
+    B --> D[Transaction Processor]
+    D <--> E[Routing Engine]
+    D <--> F[Database Interface]
+    G[Configuration Management] --> B
+    G --> D
+    G --> E
+    H[Logging and Monitoring] --> B
+    H --> D
+    H --> E
+    H --> F

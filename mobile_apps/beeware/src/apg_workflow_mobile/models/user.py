@@ -9,7 +9,7 @@ from enum import Enum
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
+import uuid
 
 
 class UserRole(str, Enum):
@@ -40,9 +40,9 @@ class User(BaseModel):
 		validate_by_alias=True
 	)
 	
-	id: str = Field(default_factory=uuid7str)
+	id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 	username: str = Field(..., min_length=3, max_length=50)
-	email: str = Field(..., regex=r'^[^@]+@[^@]+\.[^@]+$')
+	email: str = Field(..., pattern=r'^[^@]+@[^@]+\.[^@]+$')
 	first_name: str = Field(..., min_length=1, max_length=50)
 	last_name: str = Field(..., min_length=1, max_length=50)
 	full_name: Optional[str] = None

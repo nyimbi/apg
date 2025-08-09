@@ -1,0 +1,91 @@
+# APG NLP Development Configuration
+# Local development environment configuration
+
+environment: development
+debug: true
+log_level: DEBUG
+
+# Database Configuration
+database_url: "postgresql://apg_nlp:password@localhost:5432/apg_nlp_dev"
+database_pool_size: 5
+database_pool_timeout: 15
+
+# Redis Configuration
+redis_url: "redis://localhost:6379/0"
+redis_pool_size: 5
+
+# Performance Settings
+max_workers: 2
+request_timeout: 120
+batch_size_limit: 50
+memory_limit_gb: 4.0
+
+# Security Settings
+enable_cors: true
+allowed_origins:
+  - "http://localhost:3000"
+  - "http://localhost:8080"
+  - "http://127.0.0.1:3000"
+api_rate_limit: 100  # requests per minute
+
+# Monitoring Settings
+enable_metrics: true
+metrics_port: 9091
+health_check_interval: 120
+
+# Logging Settings
+log_format: text
+log_aggregation_enabled: false
+log_retention_days: 3
+
+# Caching Settings
+enable_caching: true
+cache_ttl_seconds: 300  # 5 minutes
+cache_max_size: 100
+
+# NLP Model Configuration
+models:
+  sentiment_analysis:
+    provider: transformers
+    model_name: "cardiffnlp/twitter-roberta-base-sentiment-latest"
+    max_length: 256
+    batch_size: 8
+    
+  named_entity_recognition:
+    provider: spacy
+    model_name: "en_core_web_sm"
+    batch_size: 16
+
+# Resource Limits
+resource_limits:
+  cpu_cores: 2
+  memory_gb: 4
+  storage_gb: 20
+
+# Auto-scaling Configuration
+autoscaling:
+  enabled: false
+  min_replicas: 1
+  max_replicas: 2
+
+# Backup and Recovery
+backup:
+  enabled: false
+  schedule: "0 4 * * 6"  # Weekly on Saturday at 4 AM
+  retention_days: 3
+  storage_location: "/tmp/apg-nlp-backups/dev/"
+
+# Security Compliance
+compliance:
+  gdpr_enabled: false  # Disabled for development
+  audit_logging: false
+  data_encryption: false
+  retention_policy_days: 7
+  
+# Alert Configuration
+alerts:
+  cpu_threshold: 90
+  memory_threshold: 95
+  disk_threshold: 98
+  error_rate_threshold: 20  # percent
+  response_time_threshold: 5000  # milliseconds
