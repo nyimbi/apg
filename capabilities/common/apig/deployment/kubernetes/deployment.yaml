@@ -1,0 +1,434 @@
+# APG Intelligent Gateway - Kubernetes Deployment
+# Version: 1.0.0
+# Date: August 11, 2025
+# Status: Production Ready
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apig-gateway
+  namespace: apg-production
+  labels:
+    app: apig-gateway
+    component: api-gateway
+    version: v1.0.0
+    tier: production
+    managed-by: apg-platform
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: apig-gateway
+  template:
+    metadata:
+      labels:
+        app: apig-gateway
+        component: api-gateway
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: apig-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: apig
+        image: apig:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        # APG Platform Configuration
+        - name: APG_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: apig-secrets
+              key: apg-api-key
+        - name: APG_TENANT_ID
+          value: "production"
+        - name: APG_AUTH_SERVICE_URL
+          value: "https://auth.apg.datacraft.co.ke"
+        - name: APG_MONITORING_SERVICE_URL
+          value: "https://monitoring.apg.datacraft.co.ke"
+        - name: APG_CONFIG_SERVICE_URL
+          value: "https://config.apg.datacraft.co.ke"
+        - name: APG_AI_ORCHESTRATION_SERVICE_URL
+          value: "https://ai.apg.datacraft.co.ke"
+        - name: APG_MESSAGE_QUEUE_SERVICE_URL
+          value: "https://queue.apg.datacraft.co.ke"
+        - name: APG_AUDIT_COMPLIANCE_SERVICE_URL
+          value: "https://audit.apg.datacraft.co.ke"
+        
+        # AI Configuration
+        - name: OLLAMA_URL
+          value: "http://ollama-service:11434"
+        - name: OLLAMA_MODEL
+          value: "llama3.2:latest"
+        - name: OLLAMA_TIMEOUT
+          value: "60"
+        - name: OLLAMA_MAX_RETRIES
+          value: "3"
+        
+        # Caching Configuration
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: CACHE_TTL_SECONDS
+          value: "300"
+        - name: INTELLIGENT_CACHE_ENABLED
+          value: "true"
+        
+        # Performance Configuration
+        - name: MAX_CONNECTIONS
+          value: "10000"
+        - name: CONNECTION_TIMEOUT
+          value: "30000"
+        - name: REQUEST_TIMEOUT
+          value: "60000"
+        - name: WORKER_PROCESSES
+          value: "4"
+        
+        # Security Configuration
+        - name: TLS_ENABLED
+          value: "true"
+        - name: THREAT_DETECTION_ENABLED
+          value: "true"
+        - name: RATE_LIMITING_ENABLED
+          value: "true"
+        
+        # WASM Configuration
+        - name: WASM_RUNTIME_ENABLED
+          value: "true"
+        - name: WASM_MAX_MODULES
+          value: "100"
+        - name: WASM_EXECUTION_TIMEOUT
+          value: "5000"
+        - name: WASM_MEMORY_LIMIT_MB
+          value: "64"
+        
+        # Logging Configuration
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: LOG_FORMAT
+          value: "json"
+        - name: STRUCTURED_LOGGING
+          value: "true"
+        
+        # Kubernetes-specific
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+            
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: wasm-modules
+          mountPath: /app/wasm_modules
+          readOnly: true
+        - name: ssl-certs
+          mountPath: /app/ssl
+          readOnly: true
+        - name: temp-storage
+          mountPath: /app/temp
+        - name: logs
+          mountPath: /app/logs
+          
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+          
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+          
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+          
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            
+      volumes:
+      - name: config
+        configMap:
+          name: apig-config
+      - name: wasm-modules
+        configMap:
+          name: apig-wasm-modules
+      - name: ssl-certs
+        secret:
+          secretName: apig-tls
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: logs
+        emptyDir:
+          sizeLimit: 2Gi
+          
+      # Pod anti-affinity for high availability
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - apig-gateway
+              topologyKey: kubernetes.io/hostname
+              
+      # Tolerations for dedicated nodes
+      tolerations:
+      - key: "apg-workload"
+        operator: "Equal"
+        value: "gateway"
+        effect: "NoSchedule"
+        
+      # Node selector for performance nodes
+      nodeSelector:
+        node-type: "high-performance"
+        workload: "apg-gateway"
+        
+      terminationGracePeriodSeconds: 30
+      
+      # DNS configuration for service discovery
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "2"
+        - name: edns0
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apig-service
+  namespace: apg-production
+  labels:
+    app: apig-gateway
+    component: api-gateway
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: apig-gateway
+  sessionAffinity: None
+  
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apig-metrics-service
+  namespace: apg-production
+  labels:
+    app: apig-gateway
+    component: metrics
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: apig-gateway
+    
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: apig-hpa
+  namespace: apg-production
+  labels:
+    app: apig-gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: apig-gateway
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: apig_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "1000"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 2
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: apig-pdb
+  namespace: apg-production
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: apig-gateway
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: apig-network-policy
+  namespace: apg-production
+spec:
+  podSelector:
+    matchLabels:
+      app: apig-gateway
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-ingress
+    - podSelector:
+        matchLabels:
+          app: nginx-ingress
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow APG platform services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow Ollama and Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ollama
+    ports:
+    - protocol: TCP
+      port: 11434
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379

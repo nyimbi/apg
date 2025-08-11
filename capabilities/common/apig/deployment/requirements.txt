@@ -1,0 +1,89 @@
+# APG Intelligent Gateway (APIG) - Production Requirements
+# Generated: August 11, 2025
+# Status: Production Ready
+
+# Core Framework
+aiohttp>=3.9.0,<4.0.0
+asyncio-throttle>=1.0.2
+
+# Data Validation & Models  
+pydantic>=2.5.0,<3.0.0
+pydantic-settings>=2.1.0
+
+# APG Platform Integration
+PyJWT>=2.8.0
+cryptography>=41.0.0
+
+# AI Integration (Ollama)
+httpx>=0.25.0
+ollama>=0.1.7
+
+# WebAssembly Runtime
+wasmtime-py>=14.0.0
+
+# Caching & Storage (Optional)
+aioredis>=2.0.1
+redis>=5.0.0
+
+# Monitoring & Observability
+prometheus-client>=0.19.0
+structlog>=23.2.0
+
+# Development & Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.1
+pytest-httpserver>=1.0.8
+pytest-cov>=4.1.0
+
+# Utilities
+python-dateutil>=2.8.0
+typing-extensions>=4.8.0
+
+# UUID Extensions
+uuid7>=0.1.0
+
+# Optional: Enhanced Features
+# Uncomment based on deployment needs
+
+# Geographic/DNS Features
+# dnspython>=2.4.0
+# geoip2>=4.7.0
+
+# Advanced Security
+# python-jose[cryptography]>=3.3.0
+# bcrypt>=4.1.0
+
+# Enhanced Monitoring
+# opentelemetry-api>=1.20.0
+# opentelemetry-sdk>=1.20.0
+# opentelemetry-instrumentation-aiohttp-client>=0.41b0
+
+# Database Connectivity (if needed)
+# asyncpg>=0.29.0
+# sqlalchemy[asyncio]>=2.0.0
+# alembic>=1.13.0
+
+# Message Queue Integration
+# aiormq>=6.8.0
+# aio-pika>=9.3.0
+
+# Enhanced HTTP Features  
+# multidict>=6.0.0
+# yarl>=1.9.0
+
+# Configuration Management
+# python-decouple>=3.8
+# pyyaml>=6.0.1
+
+# Production WSGI/ASGI
+# gunicorn>=21.2.0
+# uvicorn[standard]>=0.24.0
+
+# Container/K8s Support
+# kubernetes>=28.1.0
+# docker>=6.1.0
+
+# Performance Profiling (Development)
+# py-spy>=0.3.0
+# memory-profiler>=0.61.0
+# line-profiler>=4.1.0
