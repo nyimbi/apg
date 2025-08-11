@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-APG Data Virtualization (DVRL) REST API
-RESTful API endpoints for the DVRL capability
+APG Data Virtualization (DVRL) REST API - Flask-AppBuilder Implementation
+Real RESTful API endpoints using Flask-AppBuilder for the DVRL capability
 
 Author: APG Platform Team
 Copyright: © 2025 Datacraft
@@ -12,112 +12,96 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid_extensions import uuid7str
 
-# Mock Flask-like framework for APG
-class APGRequest:
-	"""Mock request object"""
-	def __init__(self, method: str = 'GET', json: Dict[str, Any] = None, args: Dict[str, str] = None):
-		self.method = method
-		self.json = json or {}
-		self.args = args or {}
+# Real Flask-AppBuilder imports
+from flask import Flask, Blueprint, request, jsonify, g, current_app
+from flask_appbuilder import AppBuilder, BaseView, ModelView, expose, has_access
+from flask_appbuilder.api import BaseApi, expose_api
+from flask_appbuilder.security.decorators import protect
+from flask_appbuilder.models.sqla.interface import SQLAInterface
+from flask_appbuilder.security import current_user
+from flask_appbuilder.baseviews import BaseModelView
+from werkzeug.exceptions import BadRequest, Unauthorized, NotFound, InternalServerError
+import json
 
-class APGResponse:
-	"""Mock response object"""
-	def __init__(self, data: Any, status_code: int = 200):
-		self.data = data
-		self.status_code = status_code
+# DVRL Flask-AppBuilder Blueprint
+dvrl_blueprint = Blueprint(
+	'dvrl_api',
+	__name__,
+	url_prefix='/api/v1/dvrl'
+)
 
-# DVRL API Controller
-class DVRLAPIController:
-	"""REST API controller for DVRL operations"""
+# DVRL API Controller using Flask-AppBuilder
+class DVRLAPIController(BaseApi):
+	"""Real REST API controller using Flask-AppBuilder for DVRL operations"""
+	
+	resource_name = 'dvrl'
+	allow_browser_login = True
 	
 	def __init__(self, dvrl_service):
+		super().__init__()
 		self.dvrl_service = dvrl_service
 		self.api_version = "v1"
 		
-	async def initialize(self) -> bool:
-		"""Initialize API and APG service integrations"""
+	def _execute_async(self, coro):
+		"""Execute async operation in event loop"""
+		loop = asyncio.new_event_loop()
+		asyncio.set_event_loop(loop)
 		try:
-			# Initialize APG service integrations
-			success = await self.dvrl_service.apg_service_manager.initialize_services()
-			if not success:
-				raise Exception("Failed to initialize APG services")
-			
-			await self._log_info("DVRL API initialized successfully")
-			return True
-			
-		except Exception as e:
-			await self._log_error("Failed to initialize DVRL API", e)
-			return False
+			return loop.run_until_complete(coro)
+		finally:
+			loop.close()
 	
 	# Data Source Management Endpoints
-	async def register_data_source(self, request: APGRequest) -> APGResponse:
-		"""
-		POST /api/v1/data-sources - Register new data source with comprehensive validation.
-		
-		Registers a new data source in the federation with automatic schema discovery,
-		connection validation, and APG security integration. Supports all major database
-		types and provides detailed error reporting for troubleshooting.
-		
-		Request Body:
-			{
-				"name": "string (required) - Human-readable data source name",
-				"type": "string (required) - Data source type (postgresql, mysql, etc.)",
-				"connection_config": {
-					"host": "string - Database host",
-					"port": "integer - Database port", 
-					"database": "string - Database/schema name",
-					"username": "string - Connection username",
-					"password": "string - Connection password"
-				},
-				"description": "string (optional) - Data source description",
-				"connection_pool_size": "integer (optional) - Connection pool size",
-				"query_timeout_seconds": "integer (optional) - Query timeout"
-			}
-			
-		Response:
-			200: {
-				"data_source_id": "string - Unique data source identifier",
-				"name": "string - Data source name",
-				"status": "string - Registration status (active/error)",
-				"schema_discovered": "boolean - Whether schema was discovered",
-				"tables_count": "integer - Number of tables/collections discovered"
-			}
-			400: {"error": "string - Validation error message"}
-			403: {"error": "Unauthorized"}
-			500: {"error": "string - Internal error message"}
-		"""
+	@expose_api('/data-sources', methods=['POST'])
+	@protect()
+	def register_data_source(self):
+		"""POST /api/v1/dvrl/data-sources - Register new data source"""
 		try:
-			source_config = request.json
+			if not request.is_json:
+				raise BadRequest("Content-Type must be application/json")
+			
+			source_config = request.get_json()
 			
 			# Validate required fields
 			if not source_config.get('name') or not source_config.get('type'):
-				return APGResponse({'error': 'Missing required fields: name, type'}, 400)
+				raise BadRequest('Missing required fields: name, type')
 			
-			# Check authorization
-			if not await self._check_access('data_sources', 'create'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Check authorization using Flask-AppBuilder security
+			if not self.appbuilder.sm.has_access('can_create', 'DataSourceModelView'):
+				raise Unauthorized()
 			
-			data_source = await self.dvrl_service.register_data_source(source_config)
+			# Execute async operation
+			data_source = self._execute_async(
+				self.dvrl_service.register_data_source(source_config)
+			)
 			
 			response_data = {
 				'data_source_id': data_source.id,
 				'name': data_source.name,
 				'type': data_source.type.value,
 				'status': data_source.status.value,
-				'created_at': data_source.created_at.isoformat()
+				'created_at': data_source.created_at.isoformat(),
+				'created_by': current_user.username if current_user else "system"
 			}
 			
-			return APGResponse(response_data, 201)
+			return jsonify(response_data), 201
 			
+		except BadRequest as e:
+			return jsonify({'error': str(e)}), 400
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error("Failed to register data source", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Data source registration failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
-	async def get_data_sources(self, request: APGRequest) -> APGResponse:
-		"""GET /api/v1/data-sources - List data sources"""
+	@expose_api('/data-sources', methods=['GET'])
+	@protect()
+	def get_data_sources(self):
+		"""GET /api/v1/dvrl/data-sources - List data sources"""
 		try:
-			if not await self._check_access('data_sources', 'read'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_list', 'DataSourceModelView'):
+				raise Unauthorized()
 			
 			data_sources = []
 			for source in self.dvrl_service.data_sources.values():
@@ -130,347 +114,403 @@ class DVRLAPIController:
 					'query_count': source.query_count
 				})
 			
-			return APGResponse({
+			return jsonify({
 				'data_sources': data_sources,
 				'total_count': len(data_sources)
 			})
 			
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error("Failed to get data sources", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Failed to get data sources: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
-	async def get_data_source_schema(self, request: APGRequest, source_id: str) -> APGResponse:
-		"""GET /api/v1/data-sources/{id}/schema - Get data source schema"""
+	@expose_api('/data-sources/<source_id>/schema', methods=['GET'])
+	@protect()
+	def get_data_source_schema(self, source_id: str):
+		"""GET /api/v1/dvrl/data-sources/{id}/schema - Get data source schema"""
 		try:
-			if not await self._check_access(f'data_source_{source_id}', 'read'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_show', 'DataSourceModelView'):
+				raise Unauthorized()
 			
-			connector = await self.dvrl_service.connector_manager.get_connector(source_id)
-			if not connector:
-				return APGResponse({'error': 'Data source not found'}, 404)
+			if source_id not in self.dvrl_service.data_sources:
+				raise NotFound('Data source not found')
 			
-			schema = await connector.discover_schema()
+			schema = self._execute_async(
+				self.dvrl_service.get_data_source_schema(source_id)
+			)
 			
-			return APGResponse({
+			return jsonify({
+				'schema_id': schema.id,
 				'data_source_id': source_id,
-				'schema': {
-					'schema_name': schema.schema_name,
-					'tables': schema.tables,
-					'discovery_method': schema.discovery_method,
-					'confidence_score': schema.confidence_score,
-					'discovered_at': schema.discovered_at.isoformat()
-				}
+				'schema_name': schema.schema_name,
+				'tables': schema.tables,
+				'discovery_method': schema.discovery_method,
+				'confidence_score': schema.confidence_score,
+				'created_at': schema.created_at.isoformat()
 			})
 			
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
+		except NotFound as e:
+			return jsonify({'error': 'Data source not found'}), 404
 		except Exception as e:
-			await self._log_error(f"Failed to get schema for {source_id}", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Failed to get schema for {source_id}: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
 	# Query Execution Endpoints
-	async def execute_sql_query(self, request: APGRequest) -> APGResponse:
-		"""
-		POST /api/v1/queries/sql - Execute federated SQL query with comprehensive optimization.
-		
-		Executes SQL queries across federated data sources with intelligent optimization,
-		caching, and performance monitoring. Supports complex queries with JOINs, subqueries,
-		and aggregations spanning multiple data sources.
-		
-		Request Body:
-			{
-				"sql": "string (required) - SQL query to execute",
-				"options": {
-					"cache_strategy": "string - aggressive/conservative/disabled",
-					"max_execution_time": "integer - Query timeout in seconds",
-					"result_format": "string - json/parquet/csv",
-					"streaming": "boolean - Enable result streaming",
-					"federation_strategy": "string - optimal/parallel/sequential"
-				}
-			}
-			
-		Response:
-			200: {
-				"query_id": "string - Unique execution identifier",
-				"status": "string - Query execution status",
-				"results": {
-					"columns": ["array of column definitions"],
-					"rows": ["array of result rows"],
-					"row_count": "integer - Total rows returned"
-				},
-				"execution_plan": "object - Detailed execution plan used",
-				"performance_metrics": {
-					"total_time_ms": "integer - Total execution time",
-					"planning_time_ms": "integer - Planning phase time",
-					"execution_time_ms": "integer - Execution phase time",
-					"data_sources_used": "array - Data sources accessed"
-				}
-			}
-			400: {"error": "Invalid SQL query"}
-			403: {"error": "Unauthorized"}
-			408: {"error": "Query timeout"}
-			500: {"error": "Execution error"}
-		"""
+	@expose_api('/query/execute', methods=['POST'])
+	@protect()
+	def execute_sql_query(self):
+		"""POST /api/v1/dvrl/query/execute - Execute federated SQL query"""
 		try:
-			sql_query = request.json.get('sql')
-			options = request.json.get('options', {})
+			if not request.is_json:
+				raise BadRequest("Content-Type must be application/json")
 			
-			if not sql_query:
-				return APGResponse({'error': 'Missing required field: sql'}, 400)
+			query_request = request.get_json()
 			
-			if not await self._check_access('queries', 'execute'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Validate required fields
+			if not query_request.get('sql'):
+				raise BadRequest('Missing required field: sql')
 			
-			# Execute query
-			federated_query = await self.dvrl_service.execute_federated_query(sql_query, options)
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_query', 'DVRLQueryView'):
+				raise Unauthorized()
 			
-			# Apply security masking to results
-			masked_query = await self._apply_security_masking(federated_query)
+			# Execute federated query
+			query_result = self._execute_async(
+				self.dvrl_service.execute_federated_query(
+					query_request['sql'],
+					query_request.get('parameters', {}),
+					query_request.get('options', {})
+				)
+			)
 			
 			response_data = {
-				'query_id': masked_query.id,
-				'status': masked_query.status.value,
-				'sql': masked_query.original_sql,
-				'execution_time_ms': masked_query.duration_ms,
-				'rows_returned': masked_query.rows_returned,
-				'bytes_processed': masked_query.bytes_processed,
-				'cache_used': masked_query.cache_used,
-				'complexity_score': masked_query.complexity_score,
-				'created_at': masked_query.created_at.isoformat()
+				'query_id': query_result.id,
+				'sql': query_result.original_sql,
+				'status': query_result.status.value,
+				'results': query_result.results if hasattr(query_result, 'results') else [],
+				'rows_returned': query_result.rows_returned,
+				'bytes_processed': query_result.bytes_processed,
+				'duration_ms': query_result.duration_ms,
+				'cache_used': query_result.cache_used,
+				'executed_at': query_result.created_at.isoformat(),
+				'executed_by': current_user.username if current_user else "system"
 			}
 			
-			if masked_query.completed_at:
-				response_data['completed_at'] = masked_query.completed_at.isoformat()
+			return jsonify(response_data)
 			
-			if masked_query.error_message:
-				response_data['error'] = masked_query.error_message
-			
-			return APGResponse(response_data)
-			
+		except BadRequest as e:
+			return jsonify({'error': str(e)}), 400
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error("Failed to execute SQL query", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Query execution failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
-	async def execute_natural_language_query(self, request: APGRequest) -> APGResponse:
-		"""POST /api/v1/queries/nl - Execute natural language query"""
+	@expose_api('/query/natural-language', methods=['POST'])
+	@protect()
+	def execute_natural_language_query(self):
+		"""POST /api/v1/dvrl/query/natural-language - Execute natural language query"""
 		try:
-			nl_query = request.json.get('query')
+			if not request.is_json:
+				raise BadRequest("Content-Type must be application/json")
 			
-			if not nl_query:
-				return APGResponse({'error': 'Missing required field: query'}, 400)
+			nl_request = request.get_json()
 			
-			if not await self._check_access('queries', 'execute'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Validate required fields
+			if not nl_request.get('query'):
+				raise BadRequest('Missing required field: query')
+			
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_query', 'DVRLQueryView'):
+				raise Unauthorized()
 			
 			# Execute natural language query
-			federated_query = await self.dvrl_service.execute_natural_language_query(nl_query)
-			
-			# Get NLP processing details
-			nlp_result = federated_query.user_context.get('nlp_processing_result', {})
+			result = self._execute_async(
+				self.dvrl_service.execute_natural_language_query(
+					nl_request['query'],
+					nl_request.get('data_sources', []),
+					nl_request.get('options', {})
+				)
+			)
 			
 			response_data = {
-				'query_id': federated_query.id,
-				'natural_query': nl_query,
-				'generated_sql': federated_query.original_sql,
-				'confidence_score': nlp_result.get('confidence_score', 0),
-				'status': federated_query.status.value,
-				'execution_time_ms': federated_query.duration_ms,
-				'rows_returned': federated_query.rows_returned,
-				'suggestions': nlp_result.get('suggestions', [])
+				'query_id': result.get('query_id'),
+				'natural_language_query': nl_request['query'],
+				'generated_sql': result.get('sql'),
+				'confidence': result.get('confidence'),
+				'results': result.get('results', []),
+				'execution_time_ms': result.get('execution_time_ms'),
+				'executed_by': current_user.username if current_user else "system"
 			}
 			
-			return APGResponse(response_data)
+			return jsonify(response_data)
 			
+		except BadRequest as e:
+			return jsonify({'error': str(e)}), 400
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error("Failed to execute NL query", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Natural language query failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
-	async def get_query_suggestions(self, request: APGRequest) -> APGResponse:
-		"""GET /api/v1/queries/suggestions - Get query suggestions"""
+	@expose_api('/query/suggestions', methods=['GET'])
+	@protect()
+	def get_query_suggestions(self):
+		"""GET /api/v1/dvrl/query/suggestions - Get query suggestions"""
 		try:
-			if not await self._check_access('queries', 'read'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_query', 'DVRLQueryView'):
+				raise Unauthorized()
 			
-			context = {
-				'domain': request.args.get('domain', 'business_intelligence'),
-				'user_level': request.args.get('level', 'intermediate')
-			}
+			context = request.args.get('context', '')
+			suggestions = self._execute_async(
+				self.dvrl_service.get_query_suggestions(context)
+			)
 			
-			suggestions = await self.dvrl_service.get_query_suggestions(context)
-			
-			return APGResponse({
+			return jsonify({
 				'suggestions': suggestions,
 				'context': context,
-				'total_suggestions': len(suggestions)
+				'generated_at': datetime.now(timezone.utc).isoformat()
 			})
 			
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error("Failed to get query suggestions", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Query suggestions failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
 	# Streaming Query Endpoints
-	async def start_streaming_query(self, request: APGRequest) -> APGResponse:
-		"""POST /api/v1/queries/stream - Start streaming query"""
+	@expose_api('/streaming/start', methods=['POST'])
+	@protect()
+	def start_streaming_query(self):
+		"""POST /api/v1/dvrl/streaming/start - Start streaming query"""
 		try:
-			sql_query = request.json.get('sql')
-			options = request.json.get('options', {})
+			if not request.is_json:
+				raise BadRequest("Content-Type must be application/json")
 			
-			if not sql_query:
-				return APGResponse({'error': 'Missing required field: sql'}, 400)
+			stream_request = request.get_json()
 			
-			if not await self._check_access('queries', 'stream'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Validate required fields
+			if not stream_request.get('sql'):
+				raise BadRequest('Missing required field: sql')
 			
-			stream_id = await self.dvrl_service.execute_streaming_query(sql_query, options)
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_stream', 'DVRLStreamView'):
+				raise Unauthorized()
 			
-			return APGResponse({
+			# Start streaming query
+			stream_id = self._execute_async(
+				self.dvrl_service.execute_streaming_query(
+					stream_request['sql'],
+					stream_request.get('options', {})
+				)
+			)
+			
+			return jsonify({
 				'stream_id': stream_id,
-				'sql': sql_query,
-				'status': 'streaming',
+				'status': 'started',
+				'started_by': current_user.username if current_user else "system",
 				'started_at': datetime.now(timezone.utc).isoformat()
 			})
 			
+		except BadRequest as e:
+			return jsonify({'error': str(e)}), 400
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error("Failed to start streaming query", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Streaming query start failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
-	async def stop_streaming_query(self, request: APGRequest, stream_id: str) -> APGResponse:
-		"""DELETE /api/v1/queries/stream/{id} - Stop streaming query"""
+	@expose_api('/streaming/<stream_id>/stop', methods=['POST'])
+	@protect()
+	def stop_streaming_query(self, stream_id: str):
+		"""POST /api/v1/dvrl/streaming/{stream_id}/stop - Stop streaming query"""
 		try:
-			if not await self._check_access('queries', 'stream'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_stream', 'DVRLStreamView'):
+				raise Unauthorized()
 			
-			result = await self.dvrl_service.stop_streaming_query(stream_id)
+			result = self._execute_async(
+				self.dvrl_service.streaming_executor.stop_streaming_query(stream_id)
+			)
 			
-			return APGResponse(result)
+			return jsonify(result)
 			
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error(f"Failed to stop streaming query {stream_id}", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Streaming query stop failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
 	# Virtual Table Management
-	async def create_virtual_table(self, request: APGRequest) -> APGResponse:
-		"""POST /api/v1/virtual-tables - Create virtual table"""
+	@expose_api('/virtual-tables', methods=['POST'])
+	@protect()
+	def create_virtual_table(self):
+		"""POST /api/v1/dvrl/virtual-tables - Create virtual table"""
 		try:
-			table_config = request.json
+			if not request.is_json:
+				raise BadRequest("Content-Type must be application/json")
 			
+			table_config = request.get_json()
+			
+			# Validate required fields
 			if not table_config.get('name'):
-				return APGResponse({'error': 'Missing required field: name'}, 400)
+				raise BadRequest('Missing required field: name')
 			
-			if not await self._check_access('virtual_tables', 'create'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_create', 'VirtualTableModelView'):
+				raise Unauthorized()
 			
-			virtual_table = await self.dvrl_service.create_virtual_table(table_config)
+			virtual_table = self._execute_async(
+				self.dvrl_service.create_virtual_table(table_config)
+			)
 			
 			response_data = {
-				'table_id': virtual_table.id,
+				'virtual_table_id': virtual_table.id,
 				'name': virtual_table.name,
-				'data_source_id': virtual_table.data_source_id,
+				'definition': virtual_table.definition,
 				'created_at': virtual_table.created_at.isoformat(),
-				'columns': len(virtual_table.columns)
+				'created_by': current_user.username if current_user else "system"
 			}
 			
-			return APGResponse(response_data, 201)
+			return jsonify(response_data), 201
 			
+		except BadRequest as e:
+			return jsonify({'error': str(e)}), 400
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error("Failed to create virtual table", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Virtual table creation failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
 	# Health and Monitoring Endpoints
-	async def get_health_status(self, request: APGRequest) -> APGResponse:
-		"""GET /api/v1/health - Get service health status"""
+	@expose_api('/health', methods=['GET'])
+	def get_health_status(self):
+		"""GET /api/v1/dvrl/health - Get system health status"""
 		try:
-			health_status = await self.dvrl_service.get_health_status()
-			return APGResponse(health_status)
+			health_status = self._execute_async(
+				self.dvrl_service.get_health_status()
+			)
+			
+			return jsonify(health_status)
 			
 		except Exception as e:
-			await self._log_error("Failed to get health status", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Health check failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
-	async def get_performance_metrics(self, request: APGRequest) -> APGResponse:
-		"""GET /api/v1/metrics - Get performance metrics"""
+	@expose_api('/metrics', methods=['GET'])
+	@protect()
+	def get_performance_metrics(self):
+		"""GET /api/v1/dvrl/metrics - Get performance metrics"""
 		try:
-			if not await self._check_access('metrics', 'read'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_metrics', 'DVRLAdminView'):
+				raise Unauthorized()
 			
-			metrics = await self.dvrl_service.get_performance_metrics()
+			metrics = self._execute_async(
+				self.dvrl_service.get_performance_metrics()
+			)
 			
-			# Add APG integration status
-			integration_status = await self.dvrl_service.apg_service_manager.get_integration_status()
-			metrics['apg_integrations'] = integration_status
+			return jsonify(metrics)
 			
-			return APGResponse(metrics)
-			
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error("Failed to get performance metrics", e)
-			return APGResponse({'error': str(e)}, 500)
+			current_app.logger.error(f"Metrics retrieval failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 	
-	async def get_connector_stats(self, request: APGRequest) -> APGResponse:
-		"""GET /api/v1/connectors/stats - Get connector statistics"""
+	@expose_api('/connectors/stats', methods=['GET'])
+	@protect()
+	def get_connector_stats(self):
+		"""GET /api/v1/dvrl/connectors/stats - Get connector statistics"""
 		try:
-			if not await self._check_access('connectors', 'read'):
-				return APGResponse({'error': 'Unauthorized'}, 403)
+			# Check authorization
+			if not self.appbuilder.sm.has_access('can_admin', 'DVRLAdminView'):
+				raise Unauthorized()
 			
-			connector_stats = await self.dvrl_service.get_connector_details()
-			return APGResponse(connector_stats)
+			connector_stats = self._execute_async(
+				self.dvrl_service.connector_manager.get_connector_stats()
+			)
 			
+			return jsonify(connector_stats)
+			
+		except Unauthorized as e:
+			return jsonify({'error': 'Unauthorized'}), 403
 		except Exception as e:
-			await self._log_error("Failed to get connector stats", e)
-			return APGResponse({'error': str(e)}, 500)
-	
-	# Security and Utility Methods
-	async def _check_access(self, resource: str, action: str) -> bool:
-		"""Check user access to resource/action"""
-		try:
-			return await self.dvrl_service.auth_service.check_access(resource, action)
-		except Exception:
-			return True  # Default allow for mock implementation
-	
-	async def _apply_security_masking(self, query_result: Any) -> Any:
-		"""Apply security masking to query results"""
-		try:
-			if hasattr(query_result, 'user_context'):
-				user_context = query_result.user_context
-				# Apply masking based on user permissions
-				return query_result
-			return query_result
-		except Exception:
-			return query_result
-	
-	async def _log_info(self, message: str):
-		print(f"[{datetime.now(timezone.utc).isoformat()}] API INFO: {message}")
-	
-	async def _log_error(self, message: str, error: Exception):
-		print(f"[{datetime.now(timezone.utc).isoformat()}] API ERROR: {message} | {str(error)}")
+			current_app.logger.error(f"Connector stats retrieval failed: {str(e)}")
+			return jsonify({'error': str(e)}), 500
 
+# Flask-AppBuilder Model Views for DVRL entities
+class DataSourceModelView(ModelView):
+	"""Data Source management view"""
+	datamodel = SQLAInterface()
+	list_columns = ['name', 'type', 'status', 'created_at']
+	show_columns = ['name', 'type', 'status', 'connection_config', 'created_at', 'updated_at']
+	add_columns = ['name', 'type', 'connection_config', 'description']
+	edit_columns = ['name', 'connection_config', 'description']
 
-# API Route Definitions
-API_ROUTES = {
-	# Data Source Management
-	'POST /api/v1/data-sources': 'register_data_source',
-	'GET /api/v1/data-sources': 'get_data_sources',
-	'GET /api/v1/data-sources/{id}/schema': 'get_data_source_schema',
+class DVRLQueryView(BaseView):
+	"""DVRL Query execution view"""
+	default_view = 'execute'
 	
-	# Query Execution
-	'POST /api/v1/queries/sql': 'execute_sql_query',
-	'POST /api/v1/queries/nl': 'execute_natural_language_query',
-	'GET /api/v1/queries/suggestions': 'get_query_suggestions',
-	
-	# Streaming Queries
-	'POST /api/v1/queries/stream': 'start_streaming_query',
-	'DELETE /api/v1/queries/stream/{id}': 'stop_streaming_query',
-	
-	# Virtual Tables
-	'POST /api/v1/virtual-tables': 'create_virtual_table',
-	
-	# Health and Monitoring
-	'GET /api/v1/health': 'get_health_status',
-	'GET /api/v1/metrics': 'get_performance_metrics',
-	'GET /api/v1/connectors/stats': 'get_connector_stats'
-}
+	@expose('/execute')
+	@has_access
+	def execute(self):
+		return self.render_template('dvrl/query_execute.html')
 
-# Export API components
+class DVRLStreamView(BaseView):
+	"""DVRL Streaming query view"""
+	default_view = 'manage'
+	
+	@expose('/manage')
+	@has_access
+	def manage(self):
+		return self.render_template('dvrl/stream_manage.html')
+
+class VirtualTableModelView(ModelView):
+	"""Virtual Table management view"""
+	datamodel = SQLAInterface()
+	list_columns = ['name', 'definition', 'created_at']
+
+class DVRLAdminView(BaseView):
+	"""DVRL Administration view"""
+	default_view = 'dashboard'
+	
+	@expose('/dashboard')
+	@has_access
+	def dashboard(self):
+		return self.render_template('dvrl/admin_dashboard.html')
+
+# Factory function to create and configure DVRL API
+def create_dvrl_api(app: Flask, dvrl_service) -> DVRLAPIController:
+	"""Create and configure DVRL API with Flask-AppBuilder"""
+	
+	appbuilder = AppBuilder(app, session=None)
+	
+	# Register API controller
+	api_controller = DVRLAPIController(dvrl_service)
+	appbuilder.add_api(api_controller)
+	
+	# Register Model Views
+	appbuilder.add_view(DataSourceModelView, "Data Sources", category="DVRL")
+	appbuilder.add_view(DVRLQueryView, "Query Interface", category="DVRL") 
+	appbuilder.add_view(DVRLStreamView, "Streaming Queries", category="DVRL")
+	appbuilder.add_view(VirtualTableModelView, "Virtual Tables", category="DVRL")
+	appbuilder.add_view(DVRLAdminView, "Administration", category="DVRL")
+	
+	return api_controller
+
 __all__ = [
 	"DVRLAPIController",
-	"APGRequest",
-	"APGResponse",
-	"API_ROUTES"
+	"DataSourceModelView",
+	"DVRLQueryView", 
+	"DVRLStreamView",
+	"VirtualTableModelView",
+	"DVRLAdminView",
+	"create_dvrl_api",
+	"dvrl_blueprint"
 ]

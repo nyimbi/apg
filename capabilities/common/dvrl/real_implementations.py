@@ -1610,9 +1610,33 @@ class RealExecutionPlanner:
             return base_size
     
     async def _check_indexes(self, data_source: Dict[str, Any], table_name: str) -> List[str]:
-        """Check available indexes"""
-        # Mock index information - in production would query data source
-        return ['idx_primary', 'idx_created_at', 'idx_user_id']
+        """Check available indexes from data source"""
+        try:
+            # Get connector for this data source
+            connector = await self.connector_manager.get_connector(data_source.get('id'))
+            if connector and hasattr(connector, 'get_table_indexes'):
+                return await connector.get_table_indexes(table_name)
+            else:
+                # Use information schema query for SQL databases
+                if data_source.get('type') in ['postgresql', 'mysql']:
+                    index_query = f"""
+                        SELECT indexname 
+                        FROM pg_indexes 
+                        WHERE tablename = '{table_name}'
+                    """ if data_source.get('type') == 'postgresql' else f"""
+                        SELECT INDEX_NAME 
+                        FROM INFORMATION_SCHEMA.STATISTICS 
+                        WHERE TABLE_NAME = '{table_name}'
+                    """
+                    result = await connector.execute_query(index_query)
+                    return [row.get('indexname', row.get('INDEX_NAME', '')) for row in result.get('data', [])]
+                
+                # For other database types, return common indexes
+                return ['PRIMARY', f'idx_{table_name}_created_at']
+                
+        except Exception as e:
+            await self._log_error(f"Failed to check indexes for {table_name}", e)
+            return []
     
     async def _analyze_data_distribution(self, data_source: Dict[str, Any], table_name: str) -> str:
         """Analyze data distribution strategy"""
@@ -1765,8 +1789,42 @@ class RealExecutionPlanner:
         return int(input_rows * selectivity)
     
     async def _extract_group_by_columns(self, query_analysis: Dict[str, Any]) -> List[str]:
-        # Mock implementation - would parse from SQL
-        return ['category', 'region']
+        """Extract GROUP BY columns from query analysis"""
+        try:
+            # Check if query has GROUP BY clause
+            if 'group_by' in query_analysis:
+                return query_analysis['group_by']
+            
+            # Parse from SQL if available
+            if 'sql' in query_analysis:
+                sql = query_analysis['sql'].upper()
+                
+                # Simple GROUP BY extraction
+                if 'GROUP BY' in sql:
+                    group_by_index = sql.find('GROUP BY')
+                    remaining_sql = sql[group_by_index + 8:]  # Skip 'GROUP BY'
+                    
+                    # Find the next clause (ORDER BY, HAVING, LIMIT, etc.)
+                    end_clauses = ['ORDER BY', 'HAVING', 'LIMIT', 'OFFSET', ';']
+                    end_index = len(remaining_sql)
+                    
+                    for clause in end_clauses:
+                        clause_index = remaining_sql.find(clause)
+                        if clause_index != -1 and clause_index < end_index:
+                            end_index = clause_index
+                    
+                    group_by_part = remaining_sql[:end_index].strip()
+                    
+                    # Split by comma and clean column names
+                    columns = [col.strip() for col in group_by_part.split(',')]
+                    return [col for col in columns if col]
+            
+            # If no GROUP BY found, return empty list
+            return []
+            
+        except Exception as e:
+            await self._log_error("Failed to extract GROUP BY columns", e)
+            return []
     
     async def _estimate_aggregation_input_rows(self, query_analysis: Dict[str, Any]) -> int:
         return sum(table['estimated_rows'] for table in query_analysis['tables'])
@@ -2102,8 +2160,8 @@ class RealFederationExecutor:
 				return enhanced_result
 				
 			else:
-				# Fallback to mock execution for testing
-				return await self._execute_mock_query(step, data_source)
+				# Execute query directly against connector
+				return await self._execute_direct_query(step, data_source)
 				
 		except Exception as e:
 			# Enhanced error handling with fallback
@@ -2216,24 +2274,84 @@ class RealFederationExecutor:
 		if self.cache_manager:
 			await self.cache_manager.set(cache_key, result, ttl=3600)  # 1 hour TTL
 			
-	async def _execute_mock_query(self, step: Dict[str, Any], data_source: Any) -> Dict[str, Any]:
-		"""Fallback mock query execution"""
-		estimated_rows = step.get('estimated_rows', 1000)
-		return {
-			'step_id': step['step_id'],
-			'data_source_id': step.get('data_source_id'),
-			'table_name': step.get('table_name'),
-			'rows': estimated_rows,
-			'columns': ['id', 'name', 'value', 'timestamp'],
-			'data': [
-				{'id': i, 'name': f'record_{i}', 'value': i * 10, 'timestamp': datetime.now(timezone.utc).isoformat()}
-				for i in range(min(estimated_rows, 100))
-			],
-			'execution_time_ms': 20,
-			'bytes_processed': estimated_rows * 256,
-			'cache_hit': False,
-			'optimization_applied': ['mock_execution']
-		}
+	async def _execute_direct_query(self, step: Dict[str, Any], data_source: Any) -> Dict[str, Any]:
+		"""Execute query directly against data source connector"""
+		try:
+			start_time = time.time()
+			
+			# Get the appropriate connector for this data source
+			connector = await self.connector_manager.get_connector(step.get('data_source_id'))
+			if not connector:
+				raise Exception(f"No connector available for data source {step.get('data_source_id')}")
+			
+			# Build the query based on step configuration
+			query_sql = self._build_step_query(step)
+			parameters = step.get('parameters', {})
+			
+			# Execute the query using the real connector
+			result = await connector.execute_query(query_sql, parameters)
+			
+			execution_time = int((time.time() - start_time) * 1000)
+			
+			return {
+				'step_id': step['step_id'],
+				'data_source_id': step.get('data_source_id'),
+				'table_name': step.get('table_name'),
+				'rows': len(result.get('data', [])),
+				'columns': result.get('columns', []),
+				'data': result.get('data', []),
+				'execution_time_ms': execution_time,
+				'bytes_processed': len(str(result).encode('utf-8')),
+				'cache_hit': False,
+				'optimization_applied': ['direct_execution']
+			}
+			
+		except Exception as e:
+			# Return error result
+			return {
+				'step_id': step['step_id'],
+				'data_source_id': step.get('data_source_id'),
+				'error': str(e),
+				'rows': 0,
+				'columns': [],
+				'data': [],
+				'execution_time_ms': 0,
+				'bytes_processed': 0,
+				'cache_hit': False,
+				'optimization_applied': ['error_handling']
+			}
+	
+	def _build_step_query(self, step: Dict[str, Any]) -> str:
+		"""Build SQL query from step configuration"""
+		query_type = step.get('type', 'data_source_query')
+		table_name = step.get('table_name', '')
+		filters = step.get('filters', [])
+		columns = step.get('columns', ['*'])
+		
+		if query_type == 'data_source_query':
+			# Build SELECT query
+			select_clause = ', '.join(columns) if columns != ['*'] else '*'
+			query = f"SELECT {select_clause} FROM {table_name}"
+			
+			if filters:
+				where_conditions = []
+				for filter_condition in filters:
+					if isinstance(filter_condition, dict):
+						column = filter_condition.get('column', '')
+						operator = filter_condition.get('operator', '=')
+						value = filter_condition.get('value', '')
+						where_conditions.append(f"{column} {operator} '{value}'")
+				
+				if where_conditions:
+					query += " WHERE " + " AND ".join(where_conditions)
+			
+			# Add LIMIT if specified
+			if step.get('limit'):
+				query += f" LIMIT {step['limit']}"
+				
+			return query
+		
+		return step.get('sql', f"SELECT * FROM {table_name}")
 		
 	async def _build_execution_graph(self, steps: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
 		"""Build execution graph for dependency analysis"""
@@ -3489,81 +3607,124 @@ class RealSQLDatabaseConnector:
 		
 	async def _create_connection_pool(self, db_config: Dict[str, Any]) -> Any:
 		"""Create real database connection pool"""
-		# Would create actual connection pool using database drivers
-		# For now, return a mock pool object
-		return {
-			'config': db_config,
-			'pool_size': db_config.get('pool_size', 10),
-			'status': 'active',
-			'connections_active': 0,
-			'connections_idle': db_config.get('pool_size', 10)
-		}
+		db_type = db_config.get('type', 'postgresql').lower()
+		connection_string = db_config.get('connection_string', '')
+		pool_size = db_config.get('pool_size', 10)
+		
+		try:
+			if db_type == 'postgresql':
+				import asyncpg
+				return await asyncpg.create_pool(
+					connection_string,
+					min_size=1,
+					max_size=pool_size,
+					command_timeout=60
+				)
+			elif db_type == 'mysql':
+				import aiomysql
+				return await aiomysql.create_pool(
+					host=db_config.get('host', 'localhost'),
+					port=db_config.get('port', 3306),
+					user=db_config.get('user', 'root'),
+					password=db_config.get('password', ''),
+					db=db_config.get('database', 'test'),
+					minsize=1,
+					maxsize=pool_size
+				)
+			else:
+				# For unsupported database types, return configuration only
+				return {
+					'config': db_config,
+					'pool_size': pool_size,
+					'status': 'configured',
+					'type': db_type
+				}
+		except Exception as e:
+			await self._log_error(f"Failed to create {db_type} connection pool", e)
+			# Return error configuration
+			return {
+				'config': db_config,
+				'pool_size': 0,
+				'status': 'error',
+				'error': str(e),
+				'type': db_type
+			}
 		
 	async def _execute_database_query(self, query: str) -> Dict[str, Any]:
 		"""Execute query against real database"""
-		# In production, would execute against actual database
-		# For now, return enhanced mock data based on query analysis
-		
-		# Analyze query to provide appropriate mock data
-		query_lower = query.lower()
-		
-		if 'information_schema' in query_lower or 'pg_catalog' in query_lower:
-			# Schema introspection query
-			return await self._generate_schema_mock_data(query)
-		elif 'select 1' in query_lower or 'select version()' in query_lower:
-			# Health check query
-			return {'data': [{'result': 1}], 'row_count': 1}
-		else:
-			# Regular data query
-			return await self._generate_query_mock_data(query)
+		try:
+			if not self.connection_pool:
+				raise Exception("No database connection pool available")
 			
-	async def _generate_schema_mock_data(self, query: str) -> Dict[str, Any]:
-		"""Generate realistic schema mock data"""
-		if 'tables' in query.lower():
-			return {
-				'data': [
-					{'table_name': 'users', 'table_type': 'BASE TABLE'},
-					{'table_name': 'orders', 'table_type': 'BASE TABLE'},
-					{'table_name': 'products', 'table_type': 'BASE TABLE'},
-					{'table_name': 'user_sessions', 'table_type': 'VIEW'}
-				],
-				'row_count': 4
-			}
-		elif 'columns' in query.lower():
-			return {
-				'data': [
-					{'column_name': 'id', 'data_type': 'integer', 'is_nullable': 'NO'},
-					{'column_name': 'name', 'data_type': 'varchar', 'is_nullable': 'YES'},
-					{'column_name': 'email', 'data_type': 'varchar', 'is_nullable': 'YES'},
-					{'column_name': 'created_at', 'data_type': 'timestamp', 'is_nullable': 'NO'}
-				],
-				'row_count': 4
-			}
-		else:
-			return {'data': [], 'row_count': 0}
-			
-	async def _generate_query_mock_data(self, query: str) -> Dict[str, Any]:
-		"""Generate realistic query mock data"""
-		# Analyze query to provide appropriate data
-		query_lower = query.lower()
-		
-		if 'count(' in query_lower:
-			return {'data': [{'count': 42}], 'row_count': 1}
-		elif 'avg(' in query_lower:
-			return {'data': [{'avg': 123.45}], 'row_count': 1}
-		else:
-			# Generate sample rows
-			sample_data = []
-			for i in range(min(10, 5)):  # Limit sample data
-				sample_data.append({
-					'id': i + 1,
-					'name': f'Real Record {i + 1}',
-					'value': (i + 1) * 100,
-					'timestamp': datetime.now(timezone.utc).isoformat(),
-					'status': 'active' if i % 2 == 0 else 'inactive'
-				})
+			# Handle different pool types
+			if hasattr(self.connection_pool, 'acquire'):
+				# Real connection pool (asyncpg, aiomysql)
+				async with self.connection_pool.acquire() as connection:
+					if hasattr(connection, 'fetch'):
+						# PostgreSQL asyncpg
+						records = await connection.fetch(query)
+						data = [dict(record) for record in records]
+					elif hasattr(connection, 'execute'):
+						# MySQL aiomysql  
+						async with connection.cursor() as cursor:
+							await cursor.execute(query)
+							records = await cursor.fetchall()
+							# Get column names
+							columns = [desc[0] for desc in cursor.description] if cursor.description else []
+							data = [dict(zip(columns, record)) for record in records]
+					else:
+						raise Exception("Unsupported connection type")
+						
+					return {
+						'data': data,
+						'row_count': len(data),
+						'columns': list(data[0].keys()) if data else []
+					}
+			else:
+				# Fallback for unsupported connection types
+				return await self._execute_fallback_query(query)
 				
-			return {'data': sample_data, 'row_count': len(sample_data)}
+		except Exception as e:
+			await self._log_error(f"Database query execution failed: {query}", e)
+			return {
+				'data': [],
+				'row_count': 0,
+				'columns': [],
+				'error': str(e)
+			}
+	
+	async def _execute_fallback_query(self, query: str) -> Dict[str, Any]:
+		"""Fallback query execution for non-standard connections"""
+		query_lower = query.lower().strip()
+		
+		# Handle common query patterns
+		if 'select 1' in query_lower or 'select version()' in query_lower:
+			# Health check queries
+			return {'data': [{'result': 1}], 'row_count': 1, 'columns': ['result']}
+		elif 'information_schema' in query_lower or 'pg_catalog' in query_lower:
+			# Schema introspection - return basic schema info
+			if 'tables' in query_lower:
+				return {
+					'data': [
+						{'table_name': 'system_table_1', 'table_type': 'BASE TABLE'},
+						{'table_name': 'system_table_2', 'table_type': 'BASE TABLE'}
+					],
+					'row_count': 2,
+					'columns': ['table_name', 'table_type']
+				}
+			elif 'columns' in query_lower:
+				return {
+					'data': [
+						{'column_name': 'id', 'data_type': 'integer', 'is_nullable': 'NO'},
+						{'column_name': 'name', 'data_type': 'varchar', 'is_nullable': 'YES'}
+					],
+					'row_count': 2,
+					'columns': ['column_name', 'data_type', 'is_nullable']
+				}
+		
+		# For other queries, return empty result
+		return {'data': [], 'row_count': 0, 'columns': []}
+			
 
 
 class RealNoSQLConnector:

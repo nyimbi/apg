@@ -84,8 +84,13 @@ class SingerTapConnector(BaseConnector):
 	async def test_connection(self) -> Dict[str, Any]:
 		"""Test Singer tap connection"""
 		try:
+			# Measure actual connection time
+			start_time = asyncio.get_event_loop().time()
+			
 			# Run tap discovery to test connection
 			discovery_result = await self._discover_tap_catalog()
+			
+			connection_time_ms = int((asyncio.get_event_loop().time() - start_time) * 1000)
 			
 			if discovery_result and 'streams' in discovery_result:
 				stream_count = len(discovery_result['streams'])
@@ -93,7 +98,7 @@ class SingerTapConnector(BaseConnector):
 					'success': True,
 					'tap_name': self.tap_name,
 					'streams_discovered': stream_count,
-					'connection_time_ms': 500,  # Mock timing
+					'connection_time_ms': connection_time_ms,
 					'tap_version': await self._get_tap_version()
 				}
 			else:
@@ -441,28 +446,62 @@ class SingerTapManager:
 		}
 	
 	async def install_tap(self, tap_name: str) -> bool:
-		"""Install Singer tap (mock implementation)"""
+		"""Install Singer tap using pip"""
 		try:
 			await self._log_info(f"Installing Singer tap: {tap_name}")
 			
-			# In production, would actually install via pip
-			# pip install {tap_name}
+			# Real installation using subprocess
+			process = await asyncio.create_subprocess_exec(
+				'pip', 'install', tap_name,
+				stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE
+			)
 			
-			# Mock installation
-			# Installation completed
+			stdout, stderr = await process.communicate()
 			
-			self.installed_taps[tap_name] = {
-				'installed_at': datetime.now(timezone.utc).isoformat(),
-				'version': '1.0.0',
-				'status': 'installed'
-			}
-			
-			await self._log_info(f"Singer tap installed successfully: {tap_name}")
-			return True
+			if process.returncode == 0:
+				# Get installed version
+				version = await self._get_tap_version_real(tap_name)
+				
+				self.installed_taps[tap_name] = {
+					'installed_at': datetime.now(timezone.utc).isoformat(),
+					'version': version,
+					'status': 'installed',
+					'install_output': stdout.decode('utf-8')
+				}
+				
+				await self._log_info(f"Singer tap installed successfully: {tap_name} v{version}")
+				return True
+			else:
+				error_msg = stderr.decode('utf-8')
+				await self._log_error(f"Failed to install {tap_name}: {error_msg}", Exception(error_msg))
+				return False
 			
 		except Exception as e:
 			await self._log_error(f"Failed to install Singer tap: {tap_name}", e)
 			return False
+	
+	async def _get_tap_version_real(self, tap_name: str) -> str:
+		"""Get real installed version of Singer tap"""
+		try:
+			process = await asyncio.create_subprocess_exec(
+				'pip', 'show', tap_name,
+				stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE
+			)
+			
+			stdout, stderr = await process.communicate()
+			
+			if process.returncode == 0:
+				output = stdout.decode('utf-8')
+				for line in output.split('\n'):
+					if line.startswith('Version:'):
+						return line.split('Version:')[1].strip()
+			
+			return 'unknown'
+			
+		except Exception:
+			return 'unknown'
 	
 	async def create_tap_connector(self, tap_name: str, tap_config: Dict[str, Any]) -> Optional[SingerTapConnector]:
 		"""Create Singer tap connector instance"""
@@ -497,9 +536,46 @@ class SingerTapManager:
 			return None
 	
 	async def _discover_available_taps(self):
-		"""Discover available Singer taps"""
-		# Mock discovery - in production would query Singer tap registry
-		self.available_taps = {
+		"""Discover available Singer taps from Meltano Hub"""
+		try:
+			# Real discovery from Meltano Hub API
+			import httpx
+			
+			async with httpx.AsyncClient() as client:
+				response = await client.get(
+					'https://hub.meltano.com/api/v1/plugins/extractors',
+					timeout=30
+				)
+				
+				if response.status_code == 200:
+					hub_data = response.json()
+					
+					# Parse taps from Meltano Hub
+					discovered_taps = {}
+					for tap_info in hub_data.get('plugins', [])[:50]:  # Limit to first 50
+						tap_name = tap_info.get('name', '')
+						if tap_name.startswith('tap-'):
+							discovered_taps[tap_name] = {
+								'description': tap_info.get('description', ''),
+								'category': tap_info.get('category', 'unknown'),
+								'config_requirements': tap_info.get('settings', []),
+								'documentation': tap_info.get('docs', ''),
+								'repo_url': tap_info.get('repo', ''),
+								'pip_url': tap_info.get('pip_url', tap_name)
+							}
+					
+					self.available_taps.update(discovered_taps)
+					await self._log_info(f"Discovered {len(discovered_taps)} Singer taps from Meltano Hub")
+					
+				else:
+					await self._log_error(f"Failed to fetch from Meltano Hub: {response.status_code}")
+					
+		except Exception as e:
+			await self._log_error("Failed to discover taps from Meltano Hub", e)
+			
+		# Fallback to predefined taps if discovery fails
+		if not self.available_taps:
+			self.available_taps = {
 			'tap-postgres': {
 				'description': 'PostgreSQL database tap',
 				'category': 'database',
@@ -533,14 +609,38 @@ class SingerTapManager:
 		}
 	
 	async def _check_installed_taps(self):
-		"""Check which Singer taps are installed"""
-		# Mock check - in production would check actual installations
-		for tap_name in ['tap-postgres', 'tap-mysql']:
-			self.installed_taps[tap_name] = {
-				'installed_at': datetime.now(timezone.utc).isoformat(),
-				'version': '1.0.0',
-				'status': 'available'
-			}
+		"""Check which Singer taps are actually installed"""
+		try:
+			# Get list of installed packages using pip list
+			process = await asyncio.create_subprocess_exec(
+				'pip', 'list', '--format=json',
+				stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE
+			)
+			
+			stdout, stderr = await process.communicate()
+			
+			if process.returncode == 0:
+				import json
+				installed_packages = json.loads(stdout.decode('utf-8'))
+				
+				# Find Singer taps among installed packages
+				for package in installed_packages:
+					package_name = package.get('name', '').lower()
+					if package_name.startswith('tap-'):
+						self.installed_taps[package_name] = {
+							'installed_at': 'unknown',  # pip list doesn't provide install date
+							'version': package.get('version', 'unknown'),
+							'status': 'available'
+						}
+				
+				await self._log_info(f"Found {len(self.installed_taps)} installed Singer taps")
+				
+			else:
+				await self._log_error("Failed to check installed packages", Exception(stderr.decode('utf-8')))
+				
+		except Exception as e:
+			await self._log_error("Failed to check installed taps", e)
 	
 	async def _log_info(self, message: str):
 		print(f"[{datetime.now(timezone.utc).isoformat()}] SINGER INFO: {message}")

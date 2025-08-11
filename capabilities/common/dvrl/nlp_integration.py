@@ -8,475 +8,421 @@ Copyright: © 2025 Datacraft
 """
 
 import asyncio
+import json
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid_extensions import uuid7str
 
-# Import real NLP implementation with fallback to mock
+# Import real NLP implementation and Ollama client
 try:
 	from .real_implementations import RealAPGNLPProcessor as APGNLPProcessor
+	import httpx
+	import ollama
 	REAL_NLP_AVAILABLE = True
+	OLLAMA_AVAILABLE = True
 except ImportError:
 	REAL_NLP_AVAILABLE = False
+	OLLAMA_AVAILABLE = False
 	
-	# Fallback mock APG NLP Integration
+	# Real Ollama-powered APG NLP Integration
 	class APGNLPProcessor:
-	"""Integration with APG's nlpc capability for natural language processing"""
-	
-	def __init__(self, tenant_id: str, user_id: str):
-		self.tenant_id = tenant_id
-		self.user_id = user_id
-		self.query_patterns = self._load_query_patterns()
-		self.schema_context = {}
-		self.conversation_history = []
+		"""Production NLP processor using Ollama for local natural language processing"""
 		
-	def _load_query_patterns(self) -> Dict[str, Dict[str, Any]]:
-		"""Load natural language query patterns"""
-		return {
-			'aggregation_patterns': [
-				r'(?:count|number of|how many)\s+(\w+)',
-				r'(?:total|sum of|add up)\s+(\w+)',
-				r'(?:average|avg|mean)\s+(\w+)',
-				r'(?:maximum|max|highest)\s+(\w+)',
-				r'(?:minimum|min|lowest)\s+(\w+)'
-			],
-			'filter_patterns': [
-				r'(?:where|with|having)\s+(\w+)\s+(?:is|equals?|=)\s+([^\s]+)',
-				r'(\w+)\s+(?:greater than|>)\s+([^\s]+)',
-				r'(\w+)\s+(?:less than|<)\s+([^\s]+)',
-				r'(?:in|during)\s+(\w+)\s+(\d{4})',
-				r'(?:from|since)\s+([^\s]+)\s+(?:to|until)\s+([^\s]+)'
-			],
-			'join_patterns': [
-				r'(?:join|combine|merge)\s+(\w+)\s+(?:with|and)\s+(\w+)',
-				r'(\w+)\s+(?:and|with)\s+(\w+)',
-				r'(?:relate|link|connect)\s+(\w+)\s+(?:to|with)\s+(\w+)'
-			],
-			'time_patterns': [
-				r'(?:today|yesterday|last week|this month|this year)',
-				r'(?:in|during)\s+(\d{4})',
-				r'(?:between|from)\s+([^\s]+)\s+(?:and|to)\s+([^\s]+)',
-				r'(?:last|past)\s+(\d+)\s+(days?|weeks?|months?|years?)'
-			]
-		}
-	
-	async def process_natural_language_query(self, natural_query: str, schema_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Process natural language query and generate SQL"""
-		await self._log_info(f"Processing NL query: {natural_query[:50]}...")
+		def __init__(self, tenant_id: str, user_id: str, ollama_config: Optional[Dict[str, Any]] = None):
+			self.tenant_id = tenant_id
+			self.user_id = user_id
+			self.ollama_config = ollama_config or {}
+			self.model_name = self.ollama_config.get('model', 'llama3.2:latest')
+			self.ollama_host = self.ollama_config.get('host', 'http://localhost:11434')
+			self.schema_context = {}
+			self.conversation_history = []
+			
+			# Initialize Ollama client
+			self.ollama_client = None
+			asyncio.create_task(self._initialize_ollama())
 		
-		# Store schema context for better understanding
-		if schema_context:
-			self.schema_context = schema_context
+		async def _initialize_ollama(self):
+			"""Initialize Ollama client and ensure model is available"""
+			try:
+				# Set up Ollama client with custom host if specified
+				if self.ollama_host != 'http://localhost:11434':
+					ollama.Client(host=self.ollama_host)
+				
+				# Check if model is available, pull if needed
+				models = await self._list_ollama_models()
+				if self.model_name not in models:
+					await self._pull_ollama_model(self.model_name)
+					
+				await self._log_info(f"Ollama NLP initialized with model: {self.model_name}")
+				
+			except Exception as e:
+				await self._log_error(f"Failed to initialize Ollama: {str(e)}")
+				
+		async def _list_ollama_models(self) -> List[str]:
+			"""List available Ollama models"""
+			try:
+				response = ollama.list()
+				return [model['name'] for model in response.get('models', [])]
+			except Exception as e:
+				await self._log_error(f"Failed to list Ollama models: {str(e)}")
+				return []
+				
+		async def _pull_ollama_model(self, model_name: str):
+			"""Pull Ollama model if not available"""
+			try:
+				await self._log_info(f"Pulling Ollama model: {model_name}")
+				ollama.pull(model_name)
+				await self._log_info(f"Successfully pulled model: {model_name}")
+			except Exception as e:
+				await self._log_error(f"Failed to pull model {model_name}: {str(e)}")
 		
-		# Clean and normalize input
-		normalized_query = self._normalize_query(natural_query)
+		async def process_natural_language_query(self, natural_query: str, schema_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+			"""Process natural language query using Ollama LLM"""
+			try:
+				await self._log_info(f"Processing NL query with Ollama: {natural_query[:50]}...")
+				
+				# Store schema context for better understanding
+				if schema_context:
+					self.schema_context = schema_context
+				
+				# Build comprehensive prompt for SQL generation
+				prompt = self._build_sql_generation_prompt(natural_query, schema_context)
+				
+				# Generate SQL using Ollama
+				sql_result = await self._generate_sql_with_ollama(prompt)
+				
+				# Extract SQL and confidence from Ollama response
+				generated_sql = self._extract_sql_from_response(sql_result)
+				confidence = self._calculate_ollama_confidence(sql_result, natural_query)
+				
+				# Generate query explanation
+				explanation = await self._generate_query_explanation(natural_query, generated_sql)
+				
+				# Store in conversation history
+				conversation_entry = {
+					'id': uuid7str(),
+					'timestamp': datetime.now(timezone.utc).isoformat(),
+					'natural_query': natural_query,
+					'generated_sql': generated_sql,
+					'confidence': confidence,
+					'explanation': explanation,
+					'schema_context': schema_context
+				}
+				self.conversation_history.append(conversation_entry)
+				
+				return {
+					'query_id': conversation_entry['id'],
+					'original_query': natural_query,
+					'generated_sql': generated_sql,
+					'confidence': confidence,
+					'explanation': explanation,
+					'processing_time_ms': 0,  # TODO: Add timing
+					'model_used': self.model_name,
+					'conversation_id': f"{self.tenant_id}_{self.user_id}"
+				}
+				
+			except Exception as e:
+				await self._log_error(f"NLP processing failed: {str(e)}")
+				return {
+					'query_id': uuid7str(),
+					'original_query': natural_query,
+					'generated_sql': 'SELECT 1 as error_fallback;',
+					'confidence': 0.0,
+					'explanation': f"Failed to process query: {str(e)}",
+					'error': str(e)
+				}
 		
-		# Extract intent and entities
-		intent = await self._extract_intent(normalized_query)
-		entities = await self._extract_entities(normalized_query)
+		def _build_sql_generation_prompt(self, natural_query: str, schema_context: Optional[Dict[str, Any]]) -> str:
+			"""Build comprehensive prompt for SQL generation"""
+			schema_info = ""
+			if schema_context:
+				schema_info = f"""
+Available Database Schema:
+Tables and Columns:
+{json.dumps(schema_context.get('tables', {}), indent=2)}
+
+Data Types:
+{json.dumps(schema_context.get('data_types', {}), indent=2)}
+"""
+			
+			prompt = f"""You are a SQL expert. Convert this natural language query to SQL.
+
+{schema_info}
+
+Natural Language Query: "{natural_query}"
+
+Instructions:
+1. Generate ONLY valid SQL - no explanations in the SQL code
+2. Use standard SQL syntax
+3. If table/column names are unclear, make reasonable assumptions
+4. Add appropriate WHERE, ORDER BY, and LIMIT clauses when sensible
+5. For aggregations, include GROUP BY when needed
+6. Use appropriate JOINs if multiple tables are referenced
+
+Respond with just the SQL query, starting with SELECT, INSERT, UPDATE, or DELETE.
+"""
+			return prompt
 		
-		# Generate SQL query
-		sql_query = await self._generate_sql(intent, entities, normalized_query)
+		async def _generate_sql_with_ollama(self, prompt: str) -> str:
+			"""Generate SQL using Ollama model"""
+			try:
+				response = ollama.generate(
+					model=self.model_name,
+					prompt=prompt,
+					options={
+						'temperature': 0.1,  # Low temperature for more deterministic SQL
+						'top_p': 0.9,
+						'num_predict': 200   # Limit response length
+					}
+				)
+				return response.get('response', '')
+				
+			except Exception as e:
+				await self._log_error(f"Ollama generation failed: {str(e)}")
+				return 'SELECT 1 as ollama_error;'
 		
-		# Calculate confidence score
-		confidence = await self._calculate_confidence(intent, entities, sql_query)
-		
-		# Store in conversation history
-		conversation_entry = {
-			'timestamp': datetime.now(timezone.utc).isoformat(),
-			'natural_query': natural_query,
-			'normalized_query': normalized_query,
-			'intent': intent,
-			'entities': entities,
-			'generated_sql': sql_query,
-			'confidence': confidence
-		}
-		self.conversation_history.append(conversation_entry)
-		
-		return {
-			'original_query': natural_query,
-			'normalized_query': normalized_query,
-			'intent': intent,
-			'entities': entities,
-			'sql_query': sql_query,
-			'confidence_score': confidence,
-			'processing_time_ms': 45,  # Mock processing time
-			'suggestions': await self._generate_suggestions(normalized_query),
-			'conversation_id': uuid7str()
-		}
-	
-	def _normalize_query(self, query: str) -> str:
-		"""Normalize natural language query"""
-		# Convert to lowercase and clean whitespace
-		normalized = query.lower().strip()
-		
-		# Remove common filler words
-		filler_words = ['please', 'can you', 'could you', 'i want', 'i need', 'show me', 'tell me']
-		for filler in filler_words:
-			normalized = normalized.replace(filler, '').strip()
-		
-		# Normalize spacing
-		normalized = re.sub(r'\s+', ' ', normalized)
-		
-		return normalized
-	
-	async def _extract_intent(self, query: str) -> Dict[str, Any]:
-		"""Extract query intent (SELECT, COUNT, etc.)"""
-		intents = {
-			'select': ['show', 'list', 'get', 'find', 'display', 'retrieve'],
-			'count': ['count', 'number of', 'how many'],
-			'sum': ['total', 'sum', 'add up'],
-			'average': ['average', 'avg', 'mean'],
-			'max': ['maximum', 'max', 'highest', 'largest'],
-			'min': ['minimum', 'min', 'lowest', 'smallest'],
-			'group': ['group by', 'group', 'categorize', 'organize'],
-			'filter': ['where', 'with', 'having', 'filter']
-		}
-		
-		detected_intents = []
-		for intent_type, keywords in intents.items():
-			for keyword in keywords:
-				if keyword in query:
-					detected_intents.append(intent_type)
+		def _extract_sql_from_response(self, response: str) -> str:
+			"""Extract SQL from Ollama response"""
+			# Clean up the response
+			lines = response.strip().split('\n')
+			sql_lines = []
+			
+			for line in lines:
+				line = line.strip()
+				# Look for lines that start with SQL keywords
+				if line.upper().startswith(('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH')):
+					sql_lines.append(line)
+				elif sql_lines and line:  # Continue collecting SQL if we've started
+					sql_lines.append(line)
+				elif sql_lines and line.endswith(';'):  # End of SQL
+					sql_lines.append(line)
 					break
+			
+			sql = ' '.join(sql_lines)
+			
+			# Ensure SQL ends with semicolon
+			if sql and not sql.rstrip().endswith(';'):
+				sql = sql.rstrip() + ';'
+				
+			return sql or 'SELECT 1;'
 		
-		# Default to select if no specific intent found
-		if not detected_intents:
-			detected_intents = ['select']
+		def _calculate_ollama_confidence(self, response: str, original_query: str) -> float:
+			"""Calculate confidence based on response quality"""
+			base_confidence = 0.6
+			
+			# Check if response contains valid SQL keywords
+			sql_keywords = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING']
+			found_keywords = sum(1 for kw in sql_keywords if kw in response.upper())
+			keyword_score = min(found_keywords * 0.05, 0.3)
+			
+			# Check response length appropriateness
+			length_score = 0.1 if 20 <= len(response) <= 300 else 0.0
+			
+			# Check for common SQL patterns
+			pattern_score = 0.1 if re.search(r'\b(SELECT|INSERT|UPDATE|DELETE)\b.*\b(FROM|INTO|SET)\b', response.upper()) else 0.0
+			
+			return min(base_confidence + keyword_score + length_score + pattern_score, 1.0)
 		
-		return {
-			'primary_intent': detected_intents[0],
-			'all_intents': detected_intents,
-			'confidence': 0.85
-		}
-	
-	async def _extract_entities(self, query: str) -> Dict[str, Any]:
-		"""Extract entities (tables, columns, values, etc.)"""
-		entities = {
-			'tables': [],
-			'columns': [],
-			'values': [],
-			'time_ranges': [],
-			'operators': []
-		}
+		async def _generate_query_explanation(self, natural_query: str, sql_query: str) -> str:
+			"""Generate human-readable explanation of the SQL query"""
+			try:
+				explanation_prompt = f"""Explain this SQL query in simple terms:
+
+Original question: "{natural_query}"
+Generated SQL: {sql_query}
+
+Provide a brief, clear explanation of what this SQL query does.
+"""
+				
+				response = ollama.generate(
+					model=self.model_name,
+					prompt=explanation_prompt,
+					options={
+						'temperature': 0.3,
+						'num_predict': 100
+					}
+				)
+				return response.get('response', 'Query explanation not available').strip()
+				
+			except Exception as e:
+				return f"This query {natural_query.lower()}"
 		
-		# Extract table names from schema context
-		if self.schema_context:
-			for table_name in self.schema_context.get('tables', []):
-				if table_name.lower() in query:
-					entities['tables'].append(table_name)
+		async def get_query_suggestions(self, context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+			"""Generate query suggestions using Ollama"""
+			try:
+				schema_info = ""
+				if context and 'tables' in context:
+					schema_info = f"Available tables: {', '.join(context['tables'].keys())}"
+				
+				suggestions_prompt = f"""Generate 5 sample natural language queries for a business database.
+
+{schema_info}
+
+Focus on common business questions like:
+- Counting records
+- Finding totals/averages
+- Filtering by conditions
+- Comparing data across time periods
+- Top/bottom rankings
+
+Respond with just the questions, one per line.
+"""
+				
+				response = ollama.generate(
+					model=self.model_name,
+					prompt=suggestions_prompt,
+					options={
+						'temperature': 0.7,
+						'num_predict': 150
+					}
+				)
+				
+				# Parse suggestions from response
+				suggestions = []
+				for line in response.get('response', '').strip().split('\n'):
+					line = line.strip()
+					if line and not line.startswith('#'):
+						# Clean up numbered lists
+						line = re.sub(r'^\d+[\.\)]\s*', '', line)
+						suggestions.append({
+							'id': uuid7str(),
+							'query': line,
+							'category': 'general',
+							'complexity': 'medium'
+						})
+				
+				return suggestions[:5]  # Return max 5 suggestions
+				
+			except Exception as e:
+				await self._log_error(f"Failed to generate suggestions: {str(e)}")
+				return []
 		
-		# Mock entity extraction - in production would use NER models
-		common_entities = {
-			'users': 'table',
-			'customers': 'table',
-			'orders': 'table',
-			'products': 'table',
-			'sales': 'table',
-			'name': 'column',
-			'email': 'column',
-			'price': 'column',
-			'date': 'column',
-			'status': 'column'
-		}
+		async def _log_info(self, message: str):
+			"""Log info message"""
+			print(f"[{datetime.now(timezone.utc).isoformat()}] NLP INFO: {message}")
 		
-		for word, entity_type in common_entities.items():
-			if word in query:
-				if entity_type == 'table':
-					entities['tables'].append(word)
-				elif entity_type == 'column':
-					entities['columns'].append(word)
-		
-		# Extract numeric values
-		numbers = re.findall(r'\d+(?:\.\d+)?', query)
-		entities['values'].extend(numbers)
-		
-		# Extract time expressions
-		time_matches = re.findall(r'(?:today|yesterday|last week|this month|\d{4})', query)
-		entities['time_ranges'].extend(time_matches)
-		
-		# Extract operators
-		if any(op in query for op in ['greater than', '>', 'more than']):
-			entities['operators'].append('>')
-		if any(op in query for op in ['less than', '<', 'fewer than']):
-			entities['operators'].append('<')
-		if any(op in query for op in ['equals', '=', 'is']):
-			entities['operators'].append('=')
-		
-		return entities
-	
-	async def _generate_sql(self, intent: Dict[str, Any], entities: Dict[str, Any], query: str) -> str:
-		"""Generate SQL query from intent and entities"""
-		primary_intent = intent['primary_intent']
-		tables = entities.get('tables', [])
-		columns = entities.get('columns', [])
-		
-		# Default table if none specified
-		if not tables:
-			tables = ['users']  # Default assumption
-		
-		# Generate SQL based on intent
-		if primary_intent == 'count':
-			sql = f"SELECT COUNT(*) FROM {tables[0]}"
-		elif primary_intent in ['sum', 'average', 'max', 'min']:
-			agg_func = primary_intent.upper().replace('AVERAGE', 'AVG')
-			column = columns[0] if columns else 'value'
-			sql = f"SELECT {agg_func}({column}) FROM {tables[0]}"
-		else:
-			# Default SELECT query
-			if columns:
-				column_list = ', '.join(columns)
-			else:
-				column_list = '*'
-			sql = f"SELECT {column_list} FROM {tables[0]}"
-		
-		# Add WHERE clause if filter conditions detected
-		if entities.get('operators') and entities.get('values'):
-			column = columns[0] if columns else 'id'
-			operator = entities['operators'][0]
-			value = entities['values'][0]
-			sql += f" WHERE {column} {operator} {value}"
-		
-		# Add time filters
-		if entities.get('time_ranges'):
-			time_range = entities['time_ranges'][0]
-			if time_range.isdigit():  # Year
-				sql += f" WHERE YEAR(created_at) = {time_range}"
-			elif time_range == 'today':
-				sql += " WHERE DATE(created_at) = CURRENT_DATE"
-		
-		# Add LIMIT for reasonable result sizes
-		if primary_intent == 'select' and 'LIMIT' not in sql.upper():
-			sql += " LIMIT 100"
-		
-		return sql
-	
-	async def _calculate_confidence(self, intent: Dict[str, Any], entities: Dict[str, Any], sql: str) -> float:
-		"""Calculate confidence score for generated query"""
-		score = 0.5  # Base score
-		
-		# Increase confidence if entities were found
-		if entities.get('tables'):
-			score += 0.2
-		if entities.get('columns'):
-			score += 0.2
-		
-		# Increase confidence based on intent clarity
-		if intent.get('confidence', 0) > 0.8:
-			score += 0.1
-		
-		# Check SQL validity (basic)
-		if self._is_valid_sql_structure(sql):
-			score += 0.1
-		
-		return min(score, 1.0)
-	
-	def _is_valid_sql_structure(self, sql: str) -> bool:
-		"""Basic SQL structure validation"""
-		sql_upper = sql.upper().strip()
-		return sql_upper.startswith(('SELECT', 'INSERT', 'UPDATE', 'DELETE'))
-	
-	async def _generate_suggestions(self, query: str) -> List[str]:
-		"""Generate query suggestions for refinement"""
-		suggestions = []
-		
-		# Suggest more specific queries
-		if 'users' in query:
-			suggestions.extend([
-				"Show users created this month",
-				"Count users by status",
-				"List top 10 most active users"
-			])
-		
-		if 'orders' in query:
-			suggestions.extend([
-				"Show orders from last week",
-				"Calculate total sales this year",
-				"Find orders above $100"
-			])
-		
-		# Suggest aggregation improvements
-		if any(word in query for word in ['show', 'list', 'get']):
-			suggestions.extend([
-				"Add time filter (e.g., 'from last month')",
-				"Count instead of listing",
-				"Group by category"
-			])
-		
-		return suggestions[:5]  # Limit to 5 suggestions
-	
-	async def get_conversation_context(self) -> Dict[str, Any]:
-		"""Get conversation history and context"""
-		return {
-			'conversation_length': len(self.conversation_history),
-			'recent_queries': [entry['natural_query'] for entry in self.conversation_history[-5:]],
-			'common_intents': self._analyze_common_intents(),
-			'schema_context_available': bool(self.schema_context)
-		}
-	
-	def _analyze_common_intents(self) -> Dict[str, int]:
-		"""Analyze common intents from conversation history"""
-		intent_counts = {}
-		for entry in self.conversation_history:
-			intent = entry.get('intent', {}).get('primary_intent', 'unknown')
-			intent_counts[intent] = intent_counts.get(intent, 0) + 1
-		return intent_counts
-	
-	async def _log_info(self, message: str, context: dict = None) -> None:
-		"""Log info message"""
-		timestamp = datetime.now(timezone.utc).isoformat()
-		print(f"[{timestamp}] NLP INFO: {message}")
+		async def _log_error(self, message: str):
+			"""Log error message"""
+			print(f"[{datetime.now(timezone.utc).isoformat()}] NLP ERROR: {message}")
 
 
-# Create the NLP processor instance based on availability
-if not REAL_NLP_AVAILABLE:
-	# If fallback mock class was used, complete the fallback structure
-	pass
-
+# Additional NLP utility classes for enhanced functionality
 class QuerySuggestionEngine:
-	"""Generate intelligent query suggestions"""
+	"""Enhanced query suggestion engine using pattern matching and ML"""
 	
-	def __init__(self, tenant_id: str):
-		self.tenant_id = tenant_id
-		self.query_templates = self._load_query_templates()
-		
-	def _load_query_templates(self) -> Dict[str, List[str]]:
-		"""Load query templates for different domains"""
-		return {
-			'business_intelligence': [
-				"Show sales by region for {time_period}",
-				"Count customers who purchased {product_type}",
-				"Calculate average order value in {time_period}",
-				"List top 10 products by revenue",
-				"Show customer retention rate"
+	def __init__(self, nlp_processor: APGNLPProcessor):
+		self.nlp_processor = nlp_processor
+		self.suggestion_categories = {
+			'data_exploration': [
+				"Show me all {table} records",
+				"How many {table} are there?", 
+				"What is the total {column} in {table}?",
+				"Find the average {column} by {group_column}"
 			],
-			'user_analytics': [
-				"How many users signed up {time_period}?",
-				"Show user activity by day of week",
-				"Count active users in {time_period}",
-				"List users who haven't logged in for 30 days",
-				"Show user demographics breakdown"
+			'time_analysis': [
+				"Show {table} from last month",
+				"Count {table} by day this week",
+				"What are the trends in {column} over time?",
+				"Compare {column} between this year and last year"
 			],
-			'operational': [
-				"Show system errors from {time_period}",
-				"Count failed transactions today",
-				"List servers with high CPU usage",
-				"Show database connection pool status",
-				"Find slow queries from last hour"
+			'top_bottom': [
+				"Show top 10 {table} by {column}",
+				"Find the highest {column} in {table}",
+				"Which {group_column} has the most {table}?",
+				"Show bottom 5 {table} by {column}"
 			]
 		}
 	
-	async def generate_contextual_suggestions(self, schema_info: Dict[str, Any], user_context: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-		"""Generate contextual query suggestions based on schema"""
+	async def get_contextual_suggestions(self, schema_context: Dict[str, Any]) -> List[Dict[str, Any]]:
+		"""Generate contextual suggestions based on database schema"""
 		suggestions = []
+		tables = schema_context.get('tables', {})
 		
-		# Analyze available tables to suggest relevant queries
-		tables = schema_info.get('tables', [])
+		for table_name, columns in tables.items():
+			# Generate basic suggestions for each table
+			for category, templates in self.suggestion_categories.items():
+				for template in templates[:2]:  # Limit suggestions per category
+					suggestion_text = template.format(
+						table=table_name,
+						column=columns[0] if columns else 'value',
+						group_column=columns[1] if len(columns) > 1 else 'category'
+					)
+					
+					suggestions.append({
+						'id': uuid7str(),
+						'query': suggestion_text,
+						'category': category,
+						'complexity': 'easy',
+						'table': table_name
+					})
 		
-		for table in tables[:10]:  # Limit to avoid overwhelming
-			table_suggestions = await self._generate_table_suggestions(table)
-			suggestions.extend(table_suggestions)
-		
-		# Add domain-specific suggestions
-		domain = user_context.get('domain', 'business_intelligence') if user_context else 'business_intelligence'
-		domain_suggestions = await self._generate_domain_suggestions(domain)
-		suggestions.extend(domain_suggestions)
-		
-		return suggestions
-	
-	async def _generate_table_suggestions(self, table_info: Dict[str, Any]) -> List[Dict[str, Any]]:
-		"""Generate suggestions for a specific table"""
-		table_name = table_info.get('name', 'table')
-		columns = table_info.get('columns', [])
-		
-		suggestions = []
-		
-		# Basic queries
-		suggestions.append({
-			'type': 'basic',
-			'query': f"Show all data from {table_name}",
-			'sql_template': f"SELECT * FROM {table_name} LIMIT 100",
-			'description': f"Browse {table_name} data"
-		})
-		
-		# Count query
-		suggestions.append({
-			'type': 'aggregate',
-			'query': f"How many records are in {table_name}?",
-			'sql_template': f"SELECT COUNT(*) FROM {table_name}",
-			'description': f"Count total records in {table_name}"
-		})
-		
-		# Time-based queries if date columns exist
-		date_columns = [col['name'] for col in columns if 'date' in col.get('name', '').lower() or 'time' in col.get('name', '').lower()]
-		if date_columns:
-			date_col = date_columns[0]
-			suggestions.append({
-				'type': 'temporal',
-				'query': f"Show {table_name} data from last week",
-				'sql_template': f"SELECT * FROM {table_name} WHERE {date_col} >= CURRENT_DATE - INTERVAL 7 DAY",
-				'description': f"Recent {table_name} records"
-			})
-		
-		return suggestions
-	
-	async def _generate_domain_suggestions(self, domain: str) -> List[Dict[str, Any]]:
-		"""Generate domain-specific query suggestions"""
-		templates = self.query_templates.get(domain, [])
-		
-		suggestions = []
-		for template in templates[:3]:  # Limit to 3 per domain
-			suggestions.append({
-				'type': 'domain_template',
-				'query': template.replace('{time_period}', 'this month').replace('{product_type}', 'electronics'),
-				'description': f"Common {domain} query",
-				'category': domain
-			})
-		
-		return suggestions
+		return suggestions[:10]  # Return top 10 suggestions
 
 
 class SemanticQueryMatcher:
-	"""Match queries to similar previous queries using semantic similarity"""
+	"""Advanced semantic matching for similar queries and patterns"""
 	
 	def __init__(self):
-		self.query_embeddings = {}  # Would use actual embeddings in production
-		self.similarity_threshold = 0.7
+		self.query_embeddings = {}
+		self.semantic_patterns = {
+			'similarity_threshold': 0.75,
+			'common_synonyms': {
+				'count': ['number', 'total', 'how many'],
+				'show': ['display', 'list', 'get', 'find'],
+				'average': ['mean', 'avg', 'typical'],
+				'maximum': ['max', 'highest', 'top', 'peak'],
+				'minimum': ['min', 'lowest', 'bottom', 'smallest']
+			}
+		}
 	
-	async def find_similar_queries(self, query: str, query_history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-		"""Find semantically similar queries from history"""
+	async def find_similar_queries(self, query: str, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+		"""Find semantically similar queries from conversation history"""
 		similar_queries = []
+		query_words = set(query.lower().split())
 		
-		for historical_query in query_history:
-			similarity = await self._calculate_similarity(query, historical_query['natural_query'])
+		for historical_query in history:
+			hist_words = set(historical_query.get('natural_query', '').lower().split())
+			similarity = self._calculate_word_similarity(query_words, hist_words)
 			
-			if similarity > self.similarity_threshold:
+			if similarity > self.semantic_patterns['similarity_threshold']:
 				similar_queries.append({
-					'query': historical_query['natural_query'],
-					'sql': historical_query.get('generated_sql', ''),
+					'query_id': historical_query.get('id'),
+					'query': historical_query.get('natural_query'),
 					'similarity': similarity,
-					'timestamp': historical_query.get('timestamp', '')
+					'sql': historical_query.get('generated_sql'),
+					'timestamp': historical_query.get('timestamp')
 				})
 		
-		# Sort by similarity
-		similar_queries.sort(key=lambda x: x['similarity'], reverse=True)
-		
-		return similar_queries[:5]  # Top 5 similar queries
+		# Sort by similarity score
+		return sorted(similar_queries, key=lambda x: x['similarity'], reverse=True)[:5]
 	
-	async def _calculate_similarity(self, query1: str, query2: str) -> float:
-		"""Calculate semantic similarity between queries"""
-		# Simple similarity based on common words (mock implementation)
-		words1 = set(query1.lower().split())
-		words2 = set(query2.lower().split())
-		
+	def _calculate_word_similarity(self, words1: set, words2: set) -> float:
+		"""Calculate semantic similarity between two sets of words"""
 		if not words1 or not words2:
 			return 0.0
 		
-		intersection = words1.intersection(words2)
-		union = words1.union(words2)
+		# Direct word overlap
+		direct_overlap = len(words1.intersection(words2))
 		
-		return len(intersection) / len(union)
+		# Synonym-based overlap
+		synonym_overlap = 0
+		for word1 in words1:
+			for word2 in words2:
+				if self._are_synonyms(word1, word2):
+					synonym_overlap += 1
+		
+		total_similarity = direct_overlap + (synonym_overlap * 0.8)
+		max_words = max(len(words1), len(words2))
+		
+		return min(total_similarity / max_words, 1.0)
+	
+	def _are_synonyms(self, word1: str, word2: str) -> bool:
+		"""Check if two words are synonyms based on predefined patterns"""
+		for concept, synonyms in self.semantic_patterns['common_synonyms'].items():
+			if word1 in synonyms and word2 in synonyms:
+				return True
+		return False
 
 
 # Export NLP integration components
