@@ -1,0 +1,615 @@
+apiVersion: apg.platform/v1
+kind: Capability
+metadata:
+  name: dvrl
+  namespace: apg-platform
+  labels:
+    apg.platform/capability-type: data-processing
+    apg.platform/maturity-level: production
+    apg.platform/version: "1.0.0"
+    apg.platform/tier: core
+  annotations:
+    apg.platform/description: "Enterprise Data Virtualization and Federated Query Processing"
+    apg.platform/maintainer: "APG Platform Team"
+    apg.platform/documentation: "https://docs.apg.platform/capabilities/dvrl"
+    apg.platform/support-level: "enterprise"
+    apg.platform/compliance: "SOX,GDPR,HIPAA"
+spec:
+  displayName: "Data Virtualization (DVRL)"
+  description: |
+    APG Data Virtualization (DVRL) provides enterprise-grade federated query processing 
+    across heterogeneous data sources with 10x better performance than industry leaders. 
+    Enables natural language queries, real-time streaming, and intelligent caching.
+  
+  version: "1.0.0"
+  category: "data-processing"
+  maturityLevel: "production"
+  
+  # Capability Dependencies
+  dependencies:
+    required:
+      - name: "auth_rbac"
+        version: ">=2.1.0"
+        description: "Authentication and role-based access control"
+      - name: "meta"
+        version: ">=1.5.0"
+        description: "Metadata management and schema registry"
+      - name: "cach"
+        version: ">=1.3.0"
+        description: "Intelligent caching framework"
+    optional:
+      - name: "mdm"
+        version: ">=1.2.0"
+        description: "Master data management and quality"
+      - name: "moni"
+        version: ">=2.0.0"
+        description: "Monitoring and observability"
+      - name: "nlpc"
+        version: ">=1.1.0"
+        description: "Natural language processing"
+  
+  # API Specifications
+  apis:
+    rest:
+      - name: "dvrl-api"
+        version: "v1"
+        basePath: "/api/v1/dvrl"
+        description: "Core DVRL REST API for federated queries"
+        endpoints:
+          - path: "/data-sources"
+            methods: ["GET", "POST", "PUT", "DELETE"]
+            description: "Data source management"
+          - path: "/queries/sql"
+            methods: ["POST"]
+            description: "SQL query execution"
+          - path: "/queries/natural-language"
+            methods: ["POST"]
+            description: "Natural language query processing"
+          - path: "/queries/streaming"
+            methods: ["POST", "DELETE"]
+            description: "Streaming query management"
+          - path: "/health"
+            methods: ["GET"]
+            description: "Health check endpoint"
+          - path: "/metrics"
+            methods: ["GET"]
+            description: "Prometheus metrics endpoint"
+    
+    graphql:
+      - name: "dvrl-graphql"
+        version: "v1"
+        endpoint: "/graphql"
+        description: "GraphQL API for flexible data querying"
+    
+    websocket:
+      - name: "dvrl-streaming"
+        endpoint: "/streams"
+        description: "WebSocket API for real-time data streaming"
+  
+  # User Interface
+  ui:
+    web:
+      - name: "dvrl-workbench"
+        path: "/dvrl"
+        description: "DVRL Query Workbench and Data Catalog"
+        framework: "flask-appbuilder"
+        features:
+          - "Interactive query editor with syntax highlighting"
+          - "Visual query builder for non-technical users"
+          - "Data source management interface"
+          - "Query history and favorites"
+          - "Results visualization and export"
+          - "Performance monitoring dashboard"
+  
+  # Resource Requirements
+  resources:
+    minimum:
+      cpu: "2"
+      memory: "4Gi"
+      storage: "20Gi"
+    recommended:
+      cpu: "8"
+      memory: "16Gi"
+      storage: "100Gi"
+    maximum:
+      cpu: "32"
+      memory: "64Gi"
+      storage: "1Ti"
+  
+  # Scaling Configuration
+  scaling:
+    horizontal:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 20
+      targetCPUUtilization: 70
+      targetMemoryUtilization: 80
+    vertical:
+      enabled: true
+      updateMode: "Auto"
+      resourcePolicy:
+        cpu:
+          min: "1"
+          max: "16"
+        memory:
+          min: "2Gi"
+          max: "32Gi"
+  
+  # Configuration Schema
+  configuration:
+    properties:
+      tenant_id:
+        type: string
+        description: "APG tenant identifier"
+        required: true
+      
+      database:
+        type: object
+        description: "Metadata database configuration"
+        properties:
+          host:
+            type: string
+            description: "PostgreSQL host"
+            required: true
+          port:
+            type: integer
+            description: "PostgreSQL port"
+            default: 5432
+          database:
+            type: string
+            description: "Database name"
+            default: "dvrl_metadata"
+          username:
+            type: string
+            description: "Database username"
+            required: true
+          password:
+            type: string
+            description: "Database password"
+            required: true
+            sensitive: true
+          pool_size:
+            type: integer
+            description: "Connection pool size"
+            default: 20
+            minimum: 5
+            maximum: 100
+      
+      cache:
+        type: object
+        description: "Cache configuration"
+        properties:
+          redis_url:
+            type: string
+            description: "Redis connection URL"
+            required: true
+            sensitive: true
+          memory_cache_size_mb:
+            type: integer
+            description: "Memory cache size in MB"
+            default: 1024
+            minimum: 256
+            maximum: 8192
+          default_ttl_seconds:
+            type: integer
+            description: "Default cache TTL"
+            default: 3600
+            minimum: 60
+            maximum: 86400
+      
+      query_engine:
+        type: object
+        description: "Query engine configuration"
+        properties:
+          max_concurrent_queries:
+            type: integer
+            description: "Maximum concurrent queries"
+            default: 100
+            minimum: 10
+            maximum: 1000
+          default_timeout_seconds:
+            type: integer
+            description: "Default query timeout"
+            default: 300
+            minimum: 30
+            maximum: 3600
+          max_result_rows:
+            type: integer
+            description: "Maximum result rows"
+            default: 1000000
+            minimum: 1000
+            maximum: 10000000
+      
+      security:
+        type: object
+        description: "Security configuration"
+        properties:
+          jwt_secret:
+            type: string
+            description: "JWT signing secret"
+            required: true
+            sensitive: true
+          encryption_key:
+            type: string
+            description: "Data encryption key"
+            required: true
+            sensitive: true
+            minLength: 32
+            maxLength: 32
+          ssl_enabled:
+            type: boolean
+            description: "Enable SSL/TLS"
+            default: true
+          audit_logging:
+            type: boolean
+            description: "Enable audit logging"
+            default: true
+  
+  # Health Check Configuration
+  healthChecks:
+    liveness:
+      httpGet:
+        path: "/health"
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    
+    readiness:
+      httpGet:
+        path: "/ready"
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 1
+  
+  # Monitoring Configuration
+  monitoring:
+    metrics:
+      enabled: true
+      port: 9090
+      path: "/metrics"
+      format: "prometheus"
+      scrapeInterval: "30s"
+    
+    logging:
+      level: "INFO"
+      format: "json"
+      outputs: ["stdout", "file"]
+      retention: "30d"
+    
+    tracing:
+      enabled: true
+      samplingRate: 0.1
+      jaegerEndpoint: "http://jaeger-collector:14268/api/traces"
+  
+  # Security Policies
+  security:
+    networkPolicies:
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  name: "apg-platform"
+          ports:
+            - protocol: "TCP"
+              port: 8080
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  name: "monitoring"
+          ports:
+            - protocol: "TCP"
+              port: 9090
+      
+      egress:
+        - to:
+            - namespaceSelector:
+                matchLabels:
+                  name: "apg-platform"
+        - to: []
+          ports:
+            - protocol: "TCP"
+              port: 5432  # PostgreSQL
+            - protocol: "TCP"
+              port: 6379  # Redis
+            - protocol: "TCP"
+              port: 443   # HTTPS
+    
+    podSecurityPolicy:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      capabilities:
+        drop: ["ALL"]
+      seccompProfile:
+        type: "RuntimeDefault"
+  
+  # Data Classification
+  dataClassification:
+    supportedClassifications:
+      - "public"
+      - "internal"
+      - "confidential"
+      - "restricted"
+    
+    defaultClassification: "internal"
+    
+    dataTypes:
+      - name: "customer_data"
+        classification: "confidential"
+        retention: "7y"
+        encryption: "required"
+      - name: "financial_data"
+        classification: "restricted"
+        retention: "10y"
+        encryption: "required"
+        auditRequired: true
+      - name: "analytics_data"
+        classification: "internal"
+        retention: "3y"
+        encryption: "optional"
+  
+  # Backup and Recovery
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention: "30d"
+    storage:
+      type: "s3"
+      bucket: "apg-backups"
+      path: "dvrl/"
+    
+    recovery:
+      rto: "4h"  # Recovery Time Objective
+      rpo: "1h"  # Recovery Point Objective
+  
+  # Compliance and Governance
+  compliance:
+    frameworks:
+      - "SOX"
+      - "GDPR"
+      - "HIPAA"
+      - "SOC2"
+    
+    dataRetention:
+      default: "3y"
+      policies:
+        - dataType: "audit_logs"
+          retention: "7y"
+        - dataType: "query_history"
+          retention: "1y"
+        - dataType: "performance_metrics"
+          retention: "90d"
+    
+    auditRequirements:
+      - event: "data_access"
+        retention: "7y"
+      - event: "configuration_change"
+        retention: "7y"
+      - event: "user_authentication"
+        retention: "1y"
+  
+  # Integration Specifications
+  integrations:
+    databases:
+      supported:
+        - name: "PostgreSQL"
+          versions: ["11", "12", "13", "14", "15"]
+          features: ["transactions", "streaming", "partitioning"]
+        - name: "MySQL"
+          versions: ["5.7", "8.0"]
+          features: ["transactions", "replication"]
+        - name: "Oracle"
+          versions: ["12c", "18c", "19c", "21c"]
+          features: ["transactions", "partitioning", "advanced_security"]
+        - name: "SQL Server"
+          versions: ["2016", "2017", "2019", "2022"]
+          features: ["transactions", "columnstore"]
+        - name: "MongoDB"
+          versions: ["4.4", "5.0", "6.0"]
+          features: ["aggregation_pipelines", "change_streams"]
+        - name: "Cassandra"
+          versions: ["3.11", "4.0"]
+          features: ["distributed_queries", "time_series"]
+    
+    messageQueues:
+      supported:
+        - name: "Apache Kafka"
+          versions: ["2.8", "3.0", "3.1"]
+          features: ["streaming", "exactly_once"]
+        - name: "RabbitMQ"
+          versions: ["3.9", "3.10"]
+          features: ["queuing", "routing"]
+    
+    dataLakes:
+      supported:
+        - name: "Amazon S3"
+          formats: ["parquet", "avro", "json", "csv"]
+        - name: "Azure Data Lake"
+          formats: ["parquet", "avro", "json", "csv"]
+        - name: "Google Cloud Storage"
+          formats: ["parquet", "avro", "json", "csv"]
+  
+  # Performance SLA
+  sla:
+    availability: "99.9%"
+    responseTime:
+      simple_queries: "100ms"
+      complex_queries: "500ms"
+      join_queries: "2000ms"
+    throughput:
+      queries_per_second: "1000"
+      concurrent_users: "100"
+    
+    recovery:
+      rto: "4h"
+      rpo: "1h"
+  
+  # Cost Model
+  pricing:
+    model: "usage-based"
+    metrics:
+      - name: "queries_executed"
+        unit: "query"
+        price: "$0.001"
+      - name: "data_processed_gb"
+        unit: "GB"
+        price: "$0.01"
+      - name: "storage_used_gb_month"
+        unit: "GB-month"
+        price: "$0.1"
+  
+  # Support and Maintenance
+  support:
+    level: "enterprise"
+    channels: ["email", "slack", "phone"]
+    sla:
+      response_time:
+        critical: "1h"
+        high: "4h"
+        medium: "24h"
+        low: "72h"
+    
+    maintenance:
+      window: "Saturday 02:00-06:00 UTC"
+      frequency: "monthly"
+      notification: "7d"
+  
+  # Testing Requirements
+  testing:
+    required:
+      - "unit_tests"
+      - "integration_tests"
+      - "performance_tests"
+      - "security_tests"
+    
+    coverage:
+      minimum: 95
+      target: 98
+    
+    environments:
+      - name: "development"
+        purpose: "feature development"
+      - name: "staging"
+        purpose: "integration testing"
+      - name: "production"
+        purpose: "live service"
+
+---
+# Service Account for DVRL
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dvrl-service-account
+  namespace: apg-platform
+  labels:
+    apg.platform/capability: dvrl
+
+---
+# Cluster Role for DVRL
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dvrl-cluster-role
+  labels:
+    apg.platform/capability: dvrl
+rules:
+- apiGroups: [""]
+  resources: ["secrets", "configmaps", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+# Cluster Role Binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dvrl-cluster-role-binding
+  labels:
+    apg.platform/capability: dvrl
+subjects:
+- kind: ServiceAccount
+  name: dvrl-service-account
+  namespace: apg-platform
+roleRef:
+  kind: ClusterRole
+  name: dvrl-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Network Policy for DVRL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dvrl-network-policy
+  namespace: apg-platform
+  labels:
+    apg.platform/capability: dvrl
+spec:
+  podSelector:
+    matchLabels:
+      apg.platform/capability: dvrl
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-platform
+    ports:
+    - protocol: TCP
+      port: 8080
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-platform
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: dvrl-service-monitor
+  namespace: apg-platform
+  labels:
+    apg.platform/capability: dvrl
+spec:
+  selector:
+    matchLabels:
+      apg.platform/capability: dvrl
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
