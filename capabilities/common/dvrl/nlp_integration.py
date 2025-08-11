@@ -78,7 +78,10 @@ except ImportError:
 				await self._log_error(f"Failed to pull model {model_name}: {str(e)}")
 		
 		async def process_natural_language_query(self, natural_query: str, schema_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-			"""Process natural language query using Ollama LLM"""
+			"""Process natural language query using Ollama LLM with timing measurement"""
+			import time
+			start_time = time.perf_counter()
+			
 			try:
 				await self._log_info(f"Processing NL query with Ollama: {natural_query[:50]}...")
 				
@@ -117,7 +120,7 @@ except ImportError:
 					'generated_sql': generated_sql,
 					'confidence': confidence,
 					'explanation': explanation,
-					'processing_time_ms': 0,  # TODO: Add timing
+					'processing_time_ms': round((time.perf_counter() - start_time) * 1000, 2),
 					'model_used': self.model_name,
 					'conversation_id': f"{self.tenant_id}_{self.user_id}"
 				}

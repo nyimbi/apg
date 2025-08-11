@@ -29,7 +29,9 @@ from .nlp_integration import APGNLPProcessor, QuerySuggestionEngine, SemanticQue
 from .apg_integrations import APGServiceManager
 from .error_handling import (
 	DVRLErrorHandler, DVRLLoggingContext, DVRLPerformanceMonitor, 
-	DVRLRetryHandler, error_handler_decorator, safe_execute
+	DVRLRetryHandler, error_handler_decorator, safe_execute,
+	ServiceUnavailableError, OperationError, RegistrationError,
+	ConnectionError, QueryExecutionError, ValidationError
 )
 
 
@@ -2288,8 +2290,10 @@ class TransactionCoordinator:
 				connector = transaction['connectors'][ds_id]
 				try:
 					await connector.rollback_transaction(tx_handle)
-				except Exception:
-					pass  # Best effort cleanup
+					await self._log_info(f"Successfully rolled back transaction for data source: {ds_id}")
+				except Exception as e:
+					await self._log_warning(f"Failed to rollback transaction for data source {ds_id}: {str(e)}")
+					# Continue with cleanup for other data sources
 					
 		del self.active_transactions[transaction_id]
 	
@@ -2507,8 +2511,10 @@ class TransactionCoordinator:
 			try:
 				await self.rollback_federated_transaction(tx_id)
 				expired_count += 1
-			except Exception:
-				pass  # Best effort cleanup
+				await self._log_info(f"Successfully cleaned up expired transaction: {tx_id}")
+			except Exception as e:
+				await self._log_warning(f"Failed to cleanup expired transaction {tx_id}: {str(e)}")
+				# Continue with other expired transactions
 		
 		return expired_count
 
@@ -2771,17 +2777,29 @@ class DVRLService:
 		return await self.connector_manager.health_check_all()
 	
 	# Singer.io Integration Methods
-	async def get_available_singer_taps(self) -> Optional[Dict[str, Any]]:
-		"""Get available Singer.io taps for enhanced data connectivity"""
+	async def get_available_singer_taps(self) -> Dict[str, Any]:
+		"""
+		Get available Singer.io taps for enhanced data connectivity
+		
+		Returns:
+			Dict[str, Any]: Available Singer taps with metadata
+			
+		Raises:
+			ServiceUnavailableError: If Singer.io integration is not available
+			OperationError: If fetching taps fails
+		"""
 		if not self.singer_tap_manager:
-			await self._log_warning("Singer.io integration not available")
-			return None
+			await self._log_error("Singer.io integration not available")
+			raise ServiceUnavailableError("Singer.io integration is not configured or available")
 		
 		try:
-			return await self.singer_tap_manager.get_available_taps()
+			result = await self.singer_tap_manager.get_available_taps()
+			if result is None:
+				return {}  # Return empty dict instead of None
+			return result
 		except Exception as e:
 			await self._log_error("Failed to get available Singer taps", e)
-			return None
+			raise OperationError(f"Failed to retrieve available Singer taps: {str(e)}")
 	
 	async def install_singer_tap(self, tap_name: str) -> bool:
 		"""Install a Singer.io tap for data extraction"""
@@ -2798,11 +2816,25 @@ class DVRLService:
 			await self._log_error(f"Failed to install Singer tap: {tap_name}", e)
 			return False
 	
-	async def register_singer_tap_data_source(self, tap_name: str, tap_config: Dict[str, Any], source_name: Optional[str] = None) -> Optional[DataSource]:
-		"""Register Singer.io tap as data source"""
+	async def register_singer_tap_data_source(self, tap_name: str, tap_config: Dict[str, Any], source_name: Optional[str] = None) -> DataSource:
+		"""
+		Register Singer.io tap as data source
+		
+		Args:
+			tap_name (str): Name of the Singer tap to register
+			tap_config (Dict[str, Any]): Configuration for the tap
+			source_name (Optional[str]): Optional custom name for the data source
+			
+		Returns:
+			DataSource: The registered data source object
+			
+		Raises:
+			ServiceUnavailableError: If Singer.io integration is not available
+			RegistrationError: If data source registration fails
+		"""
 		if not self.singer_tap_manager:
 			await self._log_error("Singer.io integration not available")
-			return None
+			raise ServiceUnavailableError("Singer.io integration is not configured or available")
 		
 		try:
 			# Create Singer tap connector
@@ -2832,7 +2864,7 @@ class DVRLService:
 			
 		except Exception as e:
 			await self._log_error(f"Failed to register Singer tap data source: {tap_name}", e)
-			return None
+			raise RegistrationError(f"Failed to register Singer tap '{tap_name}' as data source: {str(e)}")
 	
 	# Query Processing
 	@error_handler_decorator("federated_query_execution")
@@ -3124,7 +3156,15 @@ class DVRLService:
 						)
 	
 	async def _check_query_cache(self, query_hash: str) -> Optional[Dict[str, Any]]:
-		"""Check if query result is available in APG cache service"""
+		"""
+		Check if query result is available in APG cache service
+		
+		Args:
+			query_hash (str): Unique hash of the query
+			
+		Returns:
+			Optional[Dict[str, Any]]: Cached result if found, None if not found
+		"""
 		try:
 			cache_key = f"dvrl_cache_{query_hash}"
 			
@@ -3132,7 +3172,7 @@ class DVRLService:
 			cached_value = await self.cache_service.get(cache_key)
 			
 			if cached_value:
-				await self._log_info(f"Cache hit for query hash: {query_hash}")
+				await self._log_info(f"APG cache hit for query hash: {query_hash}")
 				
 				# Update local cache entry if exists
 				if query_hash in self.query_cache:
@@ -3145,7 +3185,8 @@ class DVRLService:
 					'result': cached_value.get('result'),
 					'metadata': cached_value.get('metadata', {}),
 					'query_id': cached_value.get('query_id'),
-					'cache_key': cache_key
+					'cache_key': cache_key,
+					'cache_source': 'apg_cache_service'
 				}
 			
 			# Check local cache as fallback
@@ -3156,13 +3197,25 @@ class DVRLService:
 					cache_entry.hit_count += 1
 					cache_entry.last_accessed = datetime.now(timezone.utc)
 					
-					# Could return cached data if stored locally, but for now just indicate cache miss
-					# since we're migrating to APG cache service
-					pass
+					return {
+						'cached': True,
+						'result': cache_entry.result,
+						'metadata': cache_entry.metadata or {},
+						'query_id': cache_entry.query_id,
+						'cache_key': cache_key,
+						'cache_source': 'local_cache'
+					}
+				else:
+					# Cache entry expired, remove it
+					await self._log_info(f"Local cache entry expired for query hash: {query_hash}")
+					del self.query_cache[query_hash]
 					
 		except Exception as e:
 			await self._log_error(f"Error checking cache for query hash: {query_hash}", e)
+			# Don't re-raise, just return None for cache miss
 			
+		# Cache miss
+		await self._log_info(f"Cache miss for query hash: {query_hash}")
 		return None
 	
 	async def _execute_query_plan(self, plan: FederationPlan, query: FederatedQuery) -> Dict[str, Any]:

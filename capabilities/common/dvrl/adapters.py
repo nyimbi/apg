@@ -1571,27 +1571,15 @@ class DistributedFileSystemConnector(BaseConnector):
 			# Processing completed  # Simulate distributed processing
 			execution_end = datetime.now(timezone.utc)
 			
-			mock_results = [
-				{
-					'path': '/data/warehouse/events/year=2024/month=01',
-					'files': 45,
-					'size_gb': 2.3,
-					'records': 1000000
-				},
-				{
-					'path': '/data/warehouse/events/year=2024/month=02',
-					'files': 52,
-					'size_gb': 2.8,
-					'records': 1200000
-				}
-			]
+			# Parse the query to extract path patterns and filters
+			query_results = await self._execute_hdfs_scan(query, parameters or {})
 			
 			return {
 				'query': query,
 				'parameters': parameters or {},
-				'results': mock_results,
-				'partition_count': len(mock_results),
-				'total_records': sum(r['records'] for r in mock_results),
+				'results': query_results,
+				'partition_count': len(query_results),
+				'total_records': sum(r.get('records', 0) for r in query_results),
 				'execution_time_ms': int((execution_end - execution_start).total_seconds() * 1000),
 				'query_type': 'hdfs_scan'
 			}
@@ -1599,6 +1587,100 @@ class DistributedFileSystemConnector(BaseConnector):
 		except Exception as e:
 			await _log_error(f"HDFS query execution failed for {self.data_source.name}", e)
 			raise
+	
+	async def _execute_hdfs_scan(self, query: str, parameters: Dict[str, Any]) -> List[Dict[str, Any]]:
+		"""
+		Execute HDFS scan operation based on query
+		
+		Args:
+			query (str): Query string with path patterns
+			parameters (Dict[str, Any]): Query parameters
+			
+		Returns:
+			List[Dict[str, Any]]: List of directory scan results
+		"""
+		import re
+		
+		# Extract path patterns from query
+		path_patterns = self._extract_path_patterns(query)
+		if not path_patterns:
+			path_patterns = ['/']  # Default to root if no patterns found
+		
+		results = []
+		
+		for pattern in path_patterns:
+			try:
+				# List directory contents
+				status = self.hdfs_client.status(pattern, strict=False)
+				if status:
+					if status['type'] == 'DIRECTORY':
+						# Get directory listing
+						listing = self.hdfs_client.list(pattern, status=True)
+						total_files = len([f for f in listing if f[1]['type'] == 'FILE'])
+						total_size = sum(f[1].get('length', 0) for f in listing if f[1]['type'] == 'FILE')
+						
+						results.append({
+							'path': pattern,
+							'files': total_files,
+							'size_bytes': total_size,
+							'size_gb': round(total_size / (1024**3), 2),
+							'records': await self._estimate_record_count(pattern, total_size),
+							'last_modified': status.get('modification_time', 0)
+						})
+					else:
+						# Single file
+						results.append({
+							'path': pattern,
+							'files': 1,
+							'size_bytes': status.get('length', 0),
+							'size_gb': round(status.get('length', 0) / (1024**3), 2),
+							'records': await self._estimate_record_count(pattern, status.get('length', 0)),
+							'last_modified': status.get('modification_time', 0)
+						})
+				
+			except Exception as e:
+				await _log_warning(f"Failed to scan HDFS path {pattern}: {e}")
+				# Continue with other patterns
+				
+		return results
+	
+	def _extract_path_patterns(self, query: str) -> List[str]:
+		"""Extract HDFS path patterns from query string"""
+		import re
+		
+		# Look for path-like patterns in the query
+		path_patterns = re.findall(r'(/[/\w\-=\*\?]*)', query)
+		
+		# Filter out common SQL keywords that might match the pattern
+		sql_keywords = {'/select', '/from', '/where', '/and', '/or'}
+		path_patterns = [p for p in path_patterns if p.lower() not in sql_keywords]
+		
+		return path_patterns or ['/']
+	
+	async def _estimate_record_count(self, path: str, size_bytes: int) -> int:
+		"""
+		Estimate record count based on file size and type
+		
+		Args:
+			path (str): File or directory path
+			size_bytes (int): Total size in bytes
+			
+		Returns:
+			int: Estimated record count
+		"""
+		# Rough estimates based on common data formats
+		if path.endswith('.parquet'):
+			# Parquet files are usually well compressed
+			return max(1, int(size_bytes / 100))  # ~100 bytes per record
+		elif path.endswith('.json') or '.json' in path:
+			# JSON files are more verbose
+			return max(1, int(size_bytes / 500))  # ~500 bytes per record
+		elif path.endswith('.csv') or '.csv' in path:
+			# CSV files vary widely
+			return max(1, int(size_bytes / 200))  # ~200 bytes per record
+		else:
+			# Default estimation
+			return max(1, int(size_bytes / 300))  # ~300 bytes per record
 	
 	async def get_capabilities(self) -> List[ConnectionCapability]:
 		"""Get HDFS capabilities"""

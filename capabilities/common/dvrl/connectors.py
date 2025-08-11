@@ -69,9 +69,45 @@ class ConnectionHealth(str, Enum):
 
 
 class BaseConnector(ABC):
-	"""Abstract base class for all data source connectors"""
+	"""
+	Abstract base class for all data source connectors in the APG DVRL system.
+	
+	This class provides the foundational interface for all data source connectivity
+	implementations, supporting heterogeneous data sources including SQL databases,
+	NoSQL stores, APIs, cloud storage, and streaming platforms.
+	
+	The connector manages connection lifecycle, health monitoring, capability
+	discovery, and query execution while maintaining tenant isolation and
+	comprehensive error handling.
+	
+	Attributes:
+		data_source (DataSource): Data source configuration and metadata
+		tenant_id (str): APG tenant identifier for multi-tenancy
+		user_id (str): User identifier for audit and authorization
+		connection_pool: Database-specific connection pool instance
+		capabilities (List[ConnectionCapability]): Supported data source capabilities
+		health_status (ConnectionHealth): Current connection health status
+		last_health_check (datetime): Timestamp of last health check
+		connection_metadata (Dict[str, Any]): Connection-specific metadata and metrics
+	"""
 	
 	def __init__(self, data_source: DataSource, tenant_id: str, user_id: str):
+		"""
+		Initialize base connector with data source configuration and context.
+		
+		Sets up connection state, health monitoring, and capability tracking
+		while maintaining tenant isolation and user context for auditing.
+		
+		Args:
+			data_source (DataSource): Complete data source configuration including
+				connection parameters, credentials, and metadata
+			tenant_id (str): APG tenant identifier for multi-tenant isolation
+			user_id (str): User identifier for audit logging and authorization
+				
+		Note:
+			Connection is not established during initialization. Call connect()
+			method explicitly to establish the connection.
+		"""
 		self.data_source = data_source
 		self.tenant_id = tenant_id
 		self.user_id = user_id
@@ -83,36 +119,103 @@ class BaseConnector(ABC):
 		
 	@abstractmethod
 	async def connect(self) -> bool:
-		"""Establish connection to data source"""
-		pass
+		"""
+		Establish connection to data source
+		
+		Returns:
+			bool: True if connection successful, False otherwise
+			
+		Raises:
+			ConnectionError: If connection cannot be established
+		"""
+		raise NotImplementedError("Subclasses must implement connect method")
 		
 	@abstractmethod
 	async def disconnect(self) -> bool:
-		"""Close connection to data source"""
-		pass
+		"""
+		Close connection to data source
+		
+		Returns:
+			bool: True if disconnection successful, False otherwise
+		"""
+		raise NotImplementedError("Subclasses must implement disconnect method")
 		
 	@abstractmethod
 	async def test_connection(self) -> bool:
-		"""Test connection health"""
-		pass
+		"""
+		Test connection health
+		
+		Returns:
+			bool: True if connection is healthy, False otherwise
+		"""
+		raise NotImplementedError("Subclasses must implement test_connection method")
 		
 	@abstractmethod
 	async def discover_schema(self) -> DataSourceSchema:
-		"""Auto-discover data source schema"""
-		pass
+		"""
+		Auto-discover data source schema
+		
+		Returns:
+			DataSourceSchema: Discovered schema information
+			
+		Raises:
+			SchemaDiscoveryError: If schema cannot be discovered
+		"""
+		raise NotImplementedError("Subclasses must implement discover_schema method")
 		
 	@abstractmethod
 	async def execute_query(self, query: str, parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		"""Execute query against data source"""
-		pass
+		"""
+		Execute query against data source
+		
+		Args:
+			query (str): SQL or query string to execute
+			parameters (Optional[Dict[str, Any]]): Query parameters for safe execution
+			
+		Returns:
+			Dict[str, Any]: Query results including data, metadata, and execution info
+			
+		Raises:
+			QueryExecutionError: If query execution fails
+		"""
+		raise NotImplementedError("Subclasses must implement execute_query method")
 		
 	@abstractmethod
 	async def get_capabilities(self) -> List[ConnectionCapability]:
-		"""Get data source capabilities"""
-		pass
+		"""
+		Get data source capabilities
+		
+		Returns:
+			List[ConnectionCapability]: List of supported capabilities
+		"""
+		raise NotImplementedError("Subclasses must implement get_capabilities method")
 	
 	async def health_check(self) -> ConnectionHealth:
-		"""Perform health check"""
+		"""
+		Perform comprehensive health check on data source connection.
+		
+		Executes connection test and updates health status with detailed monitoring
+		information. Health checks are essential for connection pool management,
+		load balancing, and system reliability monitoring.
+		
+		Health status meanings:
+		- HEALTHY: Connection active and responsive
+		- DEGRADED: Connection works but with performance issues
+		- UNHEALTHY: Connection failed or unresponsive
+		- UNKNOWN: Health status not yet determined
+		
+		Returns:
+			ConnectionHealth: Current health status after check
+			
+		Note:
+			Health check results are cached in self.health_status and
+			self.last_health_check for monitoring and alerting systems.
+			
+		Example:
+			>>> status = await connector.health_check()
+			>>> if status == ConnectionHealth.HEALTHY:
+			...     print("Connection is ready for queries")
+		"""
 		try:
 			is_healthy = await self.test_connection()
 			self.health_status = ConnectionHealth.HEALTHY if is_healthy else ConnectionHealth.UNHEALTHY
@@ -124,7 +227,29 @@ class BaseConnector(ABC):
 			return self.health_status
 	
 	async def get_connection_stats(self) -> Dict[str, Any]:
-		"""Get connection statistics"""
+		"""
+		Get comprehensive connection statistics and performance metrics.
+		
+		Returns detailed information about the connector's current state,
+		performance characteristics, and capabilities for monitoring,
+		debugging, and optimization purposes.
+		
+		Returns:
+			Dict[str, Any]: Connection statistics containing:
+				- connector_type: Class name of the specific connector implementation
+				- data_source_id: Unique identifier for the data source
+				- data_source_name: Human-readable name of the data source
+				- health_status: Current health status (healthy/degraded/unhealthy/unknown)
+				- last_health_check: ISO timestamp of last health check
+				- capabilities: List of supported connection capabilities
+				- connection_metadata: Implementation-specific metadata and metrics
+				
+		Example:
+			>>> stats = await connector.get_connection_stats()
+			>>> print(f"Connector: {stats['connector_type']}")
+			>>> print(f"Health: {stats['health_status']}")
+			>>> print(f"Capabilities: {', '.join(stats['capabilities'])}")
+		"""
 		return {
 			'connector_type': self.__class__.__name__,
 			'data_source_id': self.data_source.id,
@@ -137,9 +262,47 @@ class BaseConnector(ABC):
 
 
 class SQLDatabaseConnector(BaseConnector):
-	"""Production SQL database connector with real client libraries"""
+	"""
+	Production SQL database connector with support for multiple database engines.
+	
+	Provides unified interface for SQL database connectivity with native async
+	client libraries. Supports PostgreSQL (asyncpg), MySQL (aiomysql),
+	Oracle (cx_Oracle), and SQL Server (pyodbc) with optimized connection
+	pooling, transaction management, and query execution.
+	
+	Features:
+	- Async connection pooling with configurable pool sizes
+	- Multi-database support with engine-specific optimizations
+	- Production-grade error handling and retry logic
+	- Schema introspection using INFORMATION_SCHEMA
+	- Query parameter binding for SQL injection prevention
+	- Connection health monitoring and automatic recovery
+	
+	Supported Databases:
+	- PostgreSQL 11+ (via asyncpg)
+	- MySQL 5.7+ (via aiomysql)
+	- Oracle 12c+ (via cx_Oracle with threading)
+	- SQL Server 2016+ (via pyodbc with connection pooling)
+	"""
 	
 	def __init__(self, data_source: DataSource, tenant_id: str, user_id: str):
+		"""
+		Initialize SQL database connector with engine-specific configuration.
+		
+		Sets up database-specific connection parameters, logging, connection
+		pooling configuration, and timeout settings based on data source type.
+		
+		Args:
+			data_source (DataSource): SQL database configuration with connection
+				parameters, credentials, and database-specific settings
+			tenant_id (str): Tenant identifier for multi-tenant isolation
+			user_id (str): User identifier for audit and connection tracking
+			
+		Note:
+			Connection string is built during initialization but actual connection
+			is established when connect() is called. Pool size and timeout can
+			be configured via data_source.connection_config.
+		"""
 		super().__init__(data_source, tenant_id, user_id)
 		self.logger = logging.getLogger(f"dvrl.connectors.{data_source.type.value}")
 		self.connection_pool = None

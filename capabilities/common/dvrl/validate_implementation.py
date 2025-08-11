@@ -20,7 +20,7 @@ def test_imports():
 	
 	try:
 		# Test NLP integration imports
-		from .nlp_integration import APGNLPProcessor, QuerySuggestionEngine, SemanticQueryMatcher
+		from nlp_integration import APGNLPProcessor, QuerySuggestionEngine, SemanticQueryMatcher
 		print("✓ NLP integration imports successful")
 	except Exception as e:
 		print(f"✗ NLP integration import failed: {e}")
@@ -28,7 +28,7 @@ def test_imports():
 	
 	try:
 		# Test Singer integration imports
-		from .singer_integration import SingerTapConnector, SingerTapManager
+		from singer_integration import SingerTapConnector, SingerTapManager
 		print("✓ Singer integration imports successful")
 	except Exception as e:
 		print(f"✗ Singer integration import failed: {e}")
@@ -36,7 +36,7 @@ def test_imports():
 	
 	try:
 		# Test views imports
-		from .views import DVRLDashboardView, DataSourceForm
+		from views import DVRLDashboardView, DataSourceForm
 		print("✓ Views imports successful")
 	except Exception as e:
 		print(f"✗ Views import failed: {e}")
@@ -44,7 +44,7 @@ def test_imports():
 	
 	try:
 		# Test API imports
-		from .api import DVRLAPIController
+		from api import DVRLAPIController
 		print("✓ API imports successful")
 	except Exception as e:
 		print(f"✗ API import failed: {e}")
@@ -52,7 +52,7 @@ def test_imports():
 	
 	try:
 		# Test service imports
-		from .service import DVRLService
+		from service import DVRLService
 		print("✓ Service imports successful")
 	except Exception as e:
 		print(f"✗ Service import failed: {e}")
@@ -60,7 +60,7 @@ def test_imports():
 	
 	try:
 		# Test models imports
-		from .models import DataSource, DataSourceType, DataSourceStatus
+		from models import DataSource, DataSourceType, DataSourceStatus
 		print("✓ Models imports successful")
 	except Exception as e:
 		print(f"✗ Models import failed: {e}")
@@ -68,7 +68,7 @@ def test_imports():
 	
 	try:
 		# Test connectors imports
-		from .connectors import SQLDatabaseConnector, ConnectorFactory
+		from connectors import SQLDatabaseConnector, ConnectorFactory
 		print("✓ Connectors imports successful")
 	except Exception as e:
 		print(f"✗ Connectors import failed: {e}")
@@ -82,7 +82,7 @@ async def test_nlp_integration():
 	print("\nTesting NLP integration...")
 	
 	try:
-		from .nlp_integration import APGNLPProcessor
+		from nlp_integration import APGNLPProcessor
 		
 		# Mock Ollama
 		with patch('ollama.list') as mock_list, patch('ollama.generate') as mock_generate:
@@ -122,8 +122,8 @@ async def test_singer_integration():
 	print("\nTesting Singer integration...")
 	
 	try:
-		from .singer_integration import SingerTapManager
-		from .models import DataSource, DataSourceType, DataSourceStatus
+		from singer_integration import SingerTapManager
+		from models import DataSource, DataSourceType, DataSourceStatus
 		
 		# Mock HTTP requests and subprocess
 		with patch('httpx.AsyncClient.get') as mock_get, \
@@ -173,7 +173,7 @@ def test_forms_validation():
 	print("\nTesting form validation...")
 	
 	try:
-		from .views import DataSourceForm, NaturalLanguageQueryForm, SQLQueryForm
+		from views import DataSourceForm, NaturalLanguageQueryForm, SQLQueryForm
 		
 		# Test DataSourceForm
 		valid_data = {
@@ -215,7 +215,7 @@ def test_models():
 	print("\nTesting models...")
 	
 	try:
-		from .models import DataSource, DataSourceType, DataSourceStatus
+		from models import DataSource, DataSourceType, DataSourceStatus
 		from datetime import datetime, timezone
 		
 		# Test DataSource creation
@@ -245,7 +245,7 @@ async def test_api_controller():
 	print("\nTesting API controller...")
 	
 	try:
-		from .api import DVRLAPIController
+		from api import DVRLAPIController
 		
 		# Mock service
 		mock_service = Mock()
@@ -275,7 +275,7 @@ def test_dashboard_view():
 	print("\nTesting dashboard view...")
 	
 	try:
-		from .views import DVRLDashboardView
+		from views import DVRLDashboardView
 		
 		# Mock service
 		mock_service = Mock()

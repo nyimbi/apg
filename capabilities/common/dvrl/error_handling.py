@@ -22,6 +22,68 @@ try:
 except ImportError:
 	REAL_ERROR_HANDLING_AVAILABLE = False
 
+
+# DVRL Exception Classes
+class DVRLException(Exception):
+	"""Base exception class for all DVRL errors"""
+	
+	def __init__(self, message: str, error_code: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
+		super().__init__(message)
+		self.message = message
+		self.error_code = error_code or self.__class__.__name__
+		self.context = context or {}
+		self.timestamp = datetime.now(timezone.utc)
+
+
+class ServiceUnavailableError(DVRLException):
+	"""Raised when a required service is unavailable"""
+	pass
+
+
+class OperationError(DVRLException):
+	"""Raised when an operation fails"""
+	pass
+
+
+class RegistrationError(DVRLException):
+	"""Raised when data source registration fails"""
+	pass
+
+
+class ConnectionError(DVRLException):
+	"""Raised when database connection fails"""
+	pass
+
+
+class QueryExecutionError(DVRLException):
+	"""Raised when query execution fails"""
+	pass
+
+
+class SchemaDiscoveryError(DVRLException):
+	"""Raised when schema discovery fails"""
+	pass
+
+
+class ValidationError(DVRLException):
+	"""Raised when data validation fails"""
+	pass
+
+
+class AuthenticationError(DVRLException):
+	"""Raised when authentication fails"""
+	pass
+
+
+class AuthorizationError(DVRLException):
+	"""Raised when authorization fails"""
+	pass
+
+
+class ConfigurationError(DVRLException):
+	"""Raised when configuration is invalid"""
+	pass
+
 class DVRLErrorHandler:
 	"""Enhanced DVRL error handler with production capabilities"""
 	
