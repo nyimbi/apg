@@ -35,6 +35,7 @@ class CompositionContext:
     
     # APG-specific context
     apg_agents: List[Dict[str, Any]] = field(default_factory=list)
+    apg_agent_teams: List[Dict[str, Any]] = field(default_factory=list)
     apg_digital_twins: List[Dict[str, Any]] = field(default_factory=list)
     apg_workflows: List[Dict[str, Any]] = field(default_factory=list)
     apg_databases: List[Dict[str, Any]] = field(default_factory=list)
@@ -63,6 +64,7 @@ class CompositionContext:
             
             # APG entities
             'agents': self.apg_agents,
+            'agent_teams': self.apg_agent_teams,
             'digital_twins': self.apg_digital_twins,
             'workflows': self.apg_workflows,
             'databases': self.apg_databases,
@@ -132,6 +134,7 @@ class APGASTAnalyzer:
             'required_capabilities': [],
             'optional_capabilities': [],
             'agents': [],
+            'agent_teams': [],
             'digital_twins': [],
             'workflows': [],
             'databases': [],
@@ -156,7 +159,10 @@ class APGASTAnalyzer:
         entity_info = {
             'name': getattr(entity, 'name', 'Unknown'),
             'type': getattr(entity, 'entity_type', 'Unknown'),
-            'properties': []
+            'properties': [],
+            'model': getattr(entity, 'model', None),
+            'tools': getattr(entity, 'tools', []),
+            'memory': str(getattr(entity, 'memory', '') or '')
         }
         
         # Extract keywords from entity
@@ -181,12 +187,21 @@ class APGASTAnalyzer:
             for method in entity.methods:
                 if hasattr(method, 'name'):
                     self._extract_keywords(method.name, characteristics['detected_keywords'])
+
+        for attr in ('model', 'role', 'system_prompt', 'tools'):
+            value = getattr(entity, attr, None)
+            if value:
+                self._extract_keywords(str(value), characteristics['detected_keywords'])
         
         # Categorize entity
         entity_type = getattr(entity, 'entity_type', None)
         if entity_type:
-            if entity_type.name == 'AGENT':
+            if entity_type.name in {'AGENT', 'AI_AGENT'}:
                 characteristics['agents'].append(entity_info)
+                self._extract_keywords('ai llm agent', characteristics['detected_keywords'])
+            elif entity_type.name == 'AGENT_TEAM':
+                characteristics['agent_teams'].append(entity_info)
+                self._extract_keywords('ai llm agent orchestration', characteristics['detected_keywords'])
             elif entity_type.name == 'DIGITAL_TWIN':
                 characteristics['digital_twins'].append(entity_info)
             elif entity_type.name == 'WORKFLOW':
@@ -220,6 +235,11 @@ class APGASTAnalyzer:
         # Always include basic auth for web apps
         if characteristics['agents'] or characteristics['workflows']:
             required_caps.add('auth_basic')
+
+        if characteristics['agents'] or characteristics['agent_teams']:
+            required_caps.add('ai/llm_integration')
+            if any('vector' in str(entity).lower() for entity in characteristics['agents']):
+                required_caps.add('data/vector_database')
         
         # If any database indicators, add PostgreSQL
         if any('database' in str(entity).lower() for entity in characteristics['databases']):
@@ -294,6 +314,7 @@ class CompositionEngine:
             base_template=base_template,
             capabilities=capabilities,
             apg_agents=analysis['agents'],
+            apg_agent_teams=analysis.get('agent_teams', []),
             apg_digital_twins=analysis['digital_twins'],
             apg_workflows=analysis['workflows'],
             apg_databases=analysis['databases']

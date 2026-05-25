@@ -12,6 +12,12 @@ from pathlib import Path
 from antlr4 import InputStream, CommonTokenStream, ParseTreeWalker
 from antlr4.error.ErrorListener import ErrorListener
 
+from .ai_agent_composition import (
+	AIAgentParseError,
+	looks_like_ai_agent_composition,
+	parse_ai_agent_composition,
+)
+
 # Import generated ANTLR parsers (these will be available after running antlr)
 sys.path.append(str(Path(__file__).parent.parent / "spec"))
 
@@ -96,6 +102,31 @@ class APGParser:
 		if not apgLexer or not apgParser:
 			raise RuntimeError("ANTLR parsers not available. Please generate them first.")
 		
+		if looks_like_ai_agent_composition(source_code):
+			try:
+				ast = parse_ai_agent_composition(source_code, source_name)
+				return {
+					'parse_tree': ast,
+					'ast': ast,
+					'tokens': None,
+					'errors': [],
+					'warnings': [],
+					'source_name': source_name,
+					'source_code': source_code,
+					'success': True
+				}
+			except AIAgentParseError as error:
+				return {
+					'parse_tree': None,
+					'ast': None,
+					'tokens': None,
+					'errors': [APGSyntaxError(error.message, error.line, error.column, source_name)],
+					'warnings': [],
+					'source_name': source_name,
+					'source_code': source_code,
+					'success': False
+				}
+
 		# Reset error listener
 		self.error_listener.errors.clear()
 		
@@ -119,7 +150,9 @@ class APGParser:
 			
 			return {
 				'parse_tree': parse_tree,
+				'ast': None,
 				'tokens': token_stream,
+				'warnings': [],
 				'errors': self.error_listener.errors.copy(),
 				'source_name': source_name,
 				'source_code': source_code,
@@ -129,7 +162,9 @@ class APGParser:
 		except Exception as e:
 			return {
 				'parse_tree': None,
+				'ast': None,
 				'tokens': token_stream,
+				'warnings': [],
 				'errors': [APGSyntaxError(f"Parser exception: {e}", 0, 0)],
 				'source_name': source_name,
 				'source_code': source_code,

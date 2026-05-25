@@ -18,7 +18,8 @@ from .ast_builder import (
 	ASTNode, ModuleDeclaration, EntityDeclaration, PropertyDeclaration,
 	MethodDeclaration, Parameter, TypeAnnotation, Expression, Statement,
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
-	AssignmentStatement, ReturnStatement, BlockStatement, EntityType
+	AssignmentStatement, ReturnStatement, BlockStatement, EntityType,
+	AIAgentDeclaration, AgentTeamDeclaration
 )
 
 
@@ -358,6 +359,7 @@ class SemanticAnalyzer:
 		"""Validate semantic rules"""
 		for entity in module.entities:
 			self._validate_entity_semantics(entity)
+		self._validate_agent_composition(module)
 	
 	def _validate_entity_semantics(self, entity: EntityDeclaration):
 		"""Validate entity-specific semantic rules"""
@@ -372,9 +374,11 @@ class SemanticAnalyzer:
 	
 	def _validate_entity_type_constraints(self, entity: EntityDeclaration):
 		"""Validate constraints specific to entity types"""
-		if entity.entity_type == EntityType.AGENT:
+		if entity.entity_type in {EntityType.AGENT, EntityType.AI_AGENT}:
 			# Agent-specific validations
 			self._validate_agent_constraints(entity)
+		elif entity.entity_type == EntityType.AGENT_TEAM:
+			self._validate_agent_team_constraints(entity)
 		elif entity.entity_type == EntityType.DIGITAL_TWIN:
 			# Digital twin-specific validations
 			self._validate_digital_twin_constraints(entity)
@@ -387,6 +391,20 @@ class SemanticAnalyzer:
 	
 	def _validate_agent_constraints(self, entity: EntityDeclaration):
 		"""Validate agent-specific constraints"""
+		if isinstance(entity, AIAgentDeclaration):
+			if not entity.model:
+				self.errors.append(SemanticError(
+					f"AI agent '{entity.name}' must declare a model",
+					entity
+				))
+			if not entity.system_prompt and not entity.role:
+				self.warnings.append(SemanticError(
+					f"AI agent '{entity.name}' should declare a role or system prompt",
+					entity,
+					"warning"
+				))
+			return
+
 		# Check for required 'process' method
 		has_process_method = any(
 			method.name == 'process' for method in entity.methods
@@ -397,6 +415,48 @@ class SemanticAnalyzer:
 				f"Agent '{entity.name}' should have a 'process' method",
 				entity,
 				"warning"
+			))
+
+	def _validate_agent_team_constraints(self, entity: EntityDeclaration):
+		"""Validate AI agent team shape before cross-reference checks."""
+		if isinstance(entity, AgentTeamDeclaration) and not entity.agents:
+			self.errors.append(SemanticError(
+				f"Agent team '{entity.name}' must include at least one agent",
+				entity
+			))
+
+	def _validate_agent_composition(self, module: ModuleDeclaration):
+		"""Validate references between first-class AI agents and teams."""
+		agent_names = {
+			entity.name for entity in module.entities
+			if isinstance(entity, AIAgentDeclaration) or entity.entity_type == EntityType.AI_AGENT
+		}
+
+		for entity in module.entities:
+			if isinstance(entity, AIAgentDeclaration):
+				for edge in entity.handoffs:
+					self._validate_agent_edge(edge.source, edge.target, agent_names, entity)
+			elif isinstance(entity, AgentTeamDeclaration):
+				for agent_name in entity.agents:
+					if agent_name not in agent_names:
+						self.errors.append(SemanticError(
+							f"Agent team '{entity.name}' references unknown agent '{agent_name}'",
+							entity
+						))
+				for edge in entity.flow:
+					self._validate_agent_edge(edge.source, edge.target, agent_names, entity)
+
+	def _validate_agent_edge(self, source: str, target: str, agent_names: Set[str], node: ASTNode):
+		"""Validate one handoff edge."""
+		if source not in agent_names:
+			self.errors.append(SemanticError(
+				f"Agent handoff references unknown source agent '{source}'",
+				node
+			))
+		if target not in agent_names:
+			self.errors.append(SemanticError(
+				f"Agent handoff references unknown target agent '{target}'",
+				node
 			))
 	
 	def _validate_digital_twin_constraints(self, entity: EntityDeclaration):

@@ -135,7 +135,7 @@ class APGCompiler:
 				return result
 			
 			# Phase 2: Build AST
-			ast = self._build_ast(parse_result, source_file)
+			ast = parse_result.get('ast') or self._build_ast(parse_result, source_file)
 			if not ast:
 				result.errors.append(SemanticError("Failed to build AST", None, "ast"))
 				result.compilation_time = time.time() - start_time
@@ -205,7 +205,7 @@ class APGCompiler:
 				return result
 			
 			# Phase 2: Build AST
-			ast = self.ast_builder.build_ast(parse_result['parse_tree'], module_name)
+			ast = parse_result.get('ast') or self.ast_builder.build_ast(parse_result['parse_tree'], module_name)
 			if not ast:
 				result.errors.append(SemanticError("Failed to build AST", None, "ast"))
 				result.compilation_time = time.time() - start_time

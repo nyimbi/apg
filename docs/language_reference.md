@@ -982,6 +982,31 @@ deployment_pattern CanaryDeployment {
 
 ### AI Agent Extensions
 
+AI agents can be declared as first-class executable composition units. Use `agent` for a single LLM-backed worker and `swarm`, `team`, or `agent_team` for the handoff graph.
+
+```apg
+agent Planner {
+    role: "planner";
+    model: "openai:gpt-4.1-mini";
+    system: "Break work into steps.";
+    tools: [docs.search, tickets.read];
+    memory: vector support_memory;
+}
+
+agent Writer {
+    role: "writer";
+    model: "openai:gpt-4.1-mini";
+    system: "Write terse customer-facing replies.";
+}
+
+swarm SupportCrew {
+    agents: [Planner, Writer];
+    flow: Planner -> Writer;
+}
+```
+
+The compiler validates agent references and emits `ai_agents.py` with `AI_AGENTS`, `AI_AGENT_TEAMS`, and lookup helpers. See [AI Agent Composition](./ai_agent_composition.md) for the executable contract.
+
 ```apg
 // Cognitive architecture
 @cognitive: {

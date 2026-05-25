@@ -19,7 +19,8 @@ from .ast_builder import (
 	MethodDeclaration, Parameter, TypeAnnotation, Expression, Statement,
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
 	AssignmentStatement, ReturnStatement, BlockStatement, EntityType,
-	DatabaseDeclaration, DatabaseSchema, TableDeclaration
+	DatabaseDeclaration, DatabaseSchema, TableDeclaration,
+	AIAgentDeclaration, AgentTeamDeclaration
 )
 
 # Import composable template system
@@ -50,6 +51,8 @@ class CodeGenConfig:
 	additional_capabilities: List[str] = None
 	exclude_capabilities: List[str] = None
 	template_output_mode: str = "complete_app"  # "complete_app", "models_only", "hybrid"
+	generate_docs: bool = False
+	verbose: bool = False
 	
 	def __post_init__(self):
 		if self.additional_capabilities is None:
@@ -113,7 +116,7 @@ class PythonCodeGenerator:
 			engine = CompositionEngine(composable_root)
 			
 			# Extract project information from AST
-			project_name = ast.module_name or "APGGeneratedApp"
+			project_name = ast.name or "APGGeneratedApp"
 			project_description = f"APG generated application with {len(ast.entities)} entities"
 			
 			# Compose the application
@@ -152,6 +155,7 @@ class PythonCodeGenerator:
 			
 			# Generate application files
 			generated_files = engine.generate_application_files(context)
+			generated_files.update(self._generate_ai_agent_files(ast))
 			
 			# Handle different output modes
 			if self.config.template_output_mode == "models_only":
@@ -205,12 +209,123 @@ class PythonCodeGenerator:
 		# Generate requirements.txt
 		requirements = self._generate_requirements()
 		files["requirements.txt"] = requirements
+		files.update(self._generate_ai_agent_files(ast))
 		
 		# Generate HTML templates
 		template_files = self._generate_templates(ast)
 		files.update(template_files)
 		
 		return files
+
+	def _generate_ai_agent_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Generate first-class AI agent composition runtime files."""
+		agents = [entity for entity in ast.entities if isinstance(entity, AIAgentDeclaration)]
+		teams = [entity for entity in ast.entities if isinstance(entity, AgentTeamDeclaration)]
+		if not agents and not teams:
+			return {}
+		return {"ai_agents.py": self._generate_ai_agents_runtime(agents, teams)}
+
+	def _generate_ai_agents_runtime(
+		self,
+		agents: List[AIAgentDeclaration],
+		teams: List[AgentTeamDeclaration],
+	) -> str:
+		"""Generate a dependency-free runtime manifest for AI agent composition."""
+		agent_specs = {
+			agent.name: {
+				"role": agent.role,
+				"model": agent.model,
+				"system": agent.system_prompt,
+				"tools": agent.tools,
+				"memory": (
+					{"kind": agent.memory.kind, "name": agent.memory.name}
+					if agent.memory else None
+				),
+				"inputs": agent.inputs,
+				"outputs": agent.outputs,
+				"handoffs": [
+					{"source": edge.source, "target": edge.target, "condition": edge.condition}
+					for edge in agent.handoffs
+				],
+			}
+			for agent in agents
+		}
+		team_specs = {
+			team.name: {
+				"agents": team.agents,
+				"flow": [
+					{"source": edge.source, "target": edge.target, "condition": edge.condition}
+					for edge in team.flow
+				],
+				"policy": team.policy,
+			}
+			for team in teams
+		}
+		return f'''"""
+AI Agent Composition Runtime
+============================
+
+Generated from first-class APG AI agent declarations.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+
+@dataclass(frozen=True)
+class AIAgentSpec:
+    name: str
+    role: Optional[str]
+    model: Optional[str]
+    system: Optional[str]
+    tools: List[str]
+    memory: Optional[Dict[str, Optional[str]]]
+    inputs: List[str]
+    outputs: List[str]
+    handoffs: List[Dict[str, str]]
+
+
+@dataclass(frozen=True)
+class AgentTeamSpec:
+    name: str
+    agents: List[str]
+    flow: List[Dict[str, str]]
+    policy: Dict[str, Any]
+
+
+AI_AGENT_DATA: Dict[str, Dict[str, Any]] = {agent_specs!r}
+AI_TEAM_DATA: Dict[str, Dict[str, Any]] = {team_specs!r}
+
+
+AI_AGENTS: Dict[str, AIAgentSpec] = {{
+    name: AIAgentSpec(name=name, **data)
+    for name, data in AI_AGENT_DATA.items()
+}}
+AI_AGENT_TEAMS: Dict[str, AgentTeamSpec] = {{
+    name: AgentTeamSpec(name=name, **data)
+    for name, data in AI_TEAM_DATA.items()
+}}
+
+
+def get_agent(name: str) -> AIAgentSpec:
+    return AI_AGENTS[name]
+
+
+def get_team(name: str) -> AgentTeamSpec:
+    return AI_AGENT_TEAMS[name]
+
+
+def describe_team(name: str) -> Dict[str, Any]:
+    team = get_team(name)
+    return {{
+        "name": team.name,
+        "agents": [AI_AGENTS[agent] for agent in team.agents],
+        "flow": team.flow,
+        "policy": team.policy,
+    }}
+'''
 	
 	def _generate_module(self, module: ModuleDeclaration) -> str:
 		"""Generate the main module Python file"""

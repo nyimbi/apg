@@ -29,6 +29,7 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 
 ### Capabilities & Features
 - [Capabilities Overview](./capabilities/README.md) - Complete capability catalog
+- [AI Agent Composition](./ai_agent_composition.md) - First-class AI agents, swarms, handoffs, and generated runtime manifests
 - [Workflow Orchestration](./capabilities/workflow-orchestration.md) - Advanced workflow automation
 - [Mobile Applications](./capabilities/mobile-apps.md) - Cross-platform mobile development
 - [Blockchain Services](./capabilities/blockchain.md) - Web3 and DeFi integration

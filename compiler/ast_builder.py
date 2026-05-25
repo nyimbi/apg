@@ -26,7 +26,7 @@ except ImportError:
 # AST Node Type Definitions
 # ========================================
 
-@dataclass
+@dataclass(kw_only=True)
 class ASTNode:
 	"""Base class for all AST nodes"""
 	line: int = 0
@@ -64,6 +64,9 @@ class ExportDeclaration(ASTNode):
 class EntityType(Enum):
 	"""Types of APG entities"""
 	AGENT = "agent"
+	AI_AGENT = "ai_agent"
+	AGENT_TEAM = "agent_team"
+	SWARM = "swarm"
 	DIGITAL_TWIN = "digital_twin"
 	WORKFLOW = "workflow"
 	DATABASE = "database"
@@ -81,6 +84,42 @@ class EntityDeclaration(ASTNode):
 	name: str
 	properties: List['PropertyDeclaration'] = field(default_factory=list)
 	methods: List['MethodDeclaration'] = field(default_factory=list)
+
+
+@dataclass
+class AgentMemory(ASTNode):
+	"""Memory attached to an AI agent"""
+	kind: str
+	name: Optional[str] = None
+
+
+@dataclass
+class AgentHandoff(ASTNode):
+	"""Directed handoff between two AI agents"""
+	source: str
+	target: str
+	condition: str = "done"
+
+
+@dataclass
+class AIAgentDeclaration(EntityDeclaration):
+	"""First-class AI agent declaration"""
+	role: Optional[str] = None
+	model: Optional[str] = None
+	system_prompt: Optional[str] = None
+	tools: List[str] = field(default_factory=list)
+	memory: Optional[AgentMemory] = None
+	inputs: List[str] = field(default_factory=list)
+	outputs: List[str] = field(default_factory=list)
+	handoffs: List[AgentHandoff] = field(default_factory=list)
+
+
+@dataclass
+class AgentTeamDeclaration(EntityDeclaration):
+	"""Composition of first-class AI agents"""
+	agents: List[str] = field(default_factory=list)
+	flow: List[AgentHandoff] = field(default_factory=list)
+	policy: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -262,7 +301,7 @@ class DictExpression(Expression):
 class LambdaExpression(Expression):
 	"""Lambda/anonymous function expression"""
 	parameters: List[Parameter] = field(default_factory=list)
-	body: Expression
+	body: Optional[Expression] = None
 
 
 # ========================================
@@ -331,7 +370,7 @@ class ProcedureDeclaration(ASTNode):
 	name: str
 	parameters: List[Parameter] = field(default_factory=list)
 	return_type: Optional[TypeAnnotation] = None
-	body: BlockStatement
+	body: BlockStatement = field(default_factory=BlockStatement)
 	language: str = "sql"
 
 

@@ -10,6 +10,8 @@ Language Server Protocol implementation for APG language features including:
 - Hover information and documentation
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
