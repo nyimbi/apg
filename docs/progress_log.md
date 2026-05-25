@@ -110,3 +110,25 @@ Next concrete slice:
 
 - Add or route `capabilities.common.agents` to the executable agent runtime.
 - Add the blockchain audit dependency or replace the Crypto dependency with stdlib-backed signing where appropriate.
+
+### 2026-05-26 02:55 EAT
+
+Completed checkpoint:
+
+- Added `capabilities.common.agents` as a compatibility capability with managed agent models, an in-memory `AgentManagerService`, orchestration/decision/communication helpers, capability registry, learning/template engines, and test service doubles.
+- Replaced the hard import requirement on `Crypto.*` in `capabilities.common.conf.blockchain_audit` with a stdlib HMAC-backed fallback while preserving pycryptodome when available.
+- Fixed invalid `dataclasses.field(...)` usage in blockchain audit models that was uncovered after import collection reached the module.
+- Preserved blockchain mining metrics with sufficient precision for fast local runs.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conf/blockchain_audit.py capabilities/common/agents/__init__.py capabilities/common/agents/models.py capabilities/common/agents/service.py capabilities/common/agents/orchestration_engine.py capabilities/common/agents/decision_engine.py capabilities/common/agents/communication_hub.py capabilities/common/agents/capability_framework.py capabilities/common/agents/learning_engine.py capabilities/common/agents/template_engine.py capabilities/common/agents/tests/test_utils.py`
+- `.venv/bin/python -m pytest --collect-only -q tests/test_agent_basic.py tests/test_blockchain_audit.py` -> 10 collected
+- `.venv/bin/python -m pytest -q tests/test_agent_basic.py tests/test_blockchain_audit.py` -> 10 passed
+- `.venv/bin/python -m pytest --collect-only -q tests` -> 204 collected
+- `.venv/bin/python -m pytest -q tests` -> 168 passed, 33 failed, 3 errors
+
+Current broader execution findings:
+
+- Root test collection is now clean.
+- Remaining failure clusters are AI enum compatibility, composable template root resolution, integrated code-generation AST constructor compatibility, parser/AST-builder coverage, semantic analyzer coverage, and final-verification fixtures.
