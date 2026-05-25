@@ -687,15 +687,15 @@ class VisionIoTIntegrationTest:
 			},
 			'detailed_results': self.test_results,
 			'capability_validation': {
-				'computer_vision_ready': self.test_results.get('test_computer_vision_capability_initialization', {}).get('status') == 'passed',
-				'iot_management_ready': self.test_results.get('test_iot_capability_initialization', {}).get('status') == 'passed',
-				'image_processing_working': self.test_results.get('test_computer_vision_image_processing', {}).get('status') == 'passed',
-				'video_processing_working': self.test_results.get('test_computer_vision_video_processing', {}).get('status') == 'passed',
-				'device_management_working': self.test_results.get('test_iot_device_management', {}).get('status') == 'passed',
-				'sensor_data_working': self.test_results.get('test_iot_sensor_data_management', {}).get('status') == 'passed',
-				'integrated_workflow_working': self.test_results.get('test_integrated_workflow_vision_iot', {}).get('status') == 'passed',
-				'performance_acceptable': self.test_results.get('test_performance_and_scalability', {}).get('status') == 'passed',
-				'error_handling_robust': self.test_results.get('test_error_handling_and_recovery', {}).get('status') == 'passed'
+				'computer_vision_ready': self.test_results.get('cv_initialization', {}).get('status') == 'passed',
+				'iot_management_ready': self.test_results.get('iot_initialization', {}).get('status') == 'passed',
+				'image_processing_working': self.test_results.get('cv_image_processing', {}).get('status') == 'passed',
+				'video_processing_working': self.test_results.get('cv_video_processing', {}).get('status') == 'passed',
+				'device_management_working': self.test_results.get('iot_device_management', {}).get('status') == 'passed',
+				'sensor_data_working': self.test_results.get('iot_sensor_data', {}).get('status') == 'passed',
+				'integrated_workflow_working': self.test_results.get('integrated_workflow', {}).get('status') == 'passed',
+				'performance_acceptable': self.test_results.get('performance_scalability', {}).get('status') == 'passed',
+				'error_handling_robust': self.test_results.get('error_handling', {}).get('status') == 'passed'
 			}
 		}
 		

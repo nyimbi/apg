@@ -453,6 +453,7 @@ class ValidationResult(BaseModel):
 	"""Configuration validation result"""
 	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
 	
+	resource_id: Optional[str] = Field(None, description="Resource identifier that was validated")
 	valid: bool = Field(..., description="Overall validation status")
 	errors: List[str] = Field(default_factory=list, description="Validation errors")
 	warnings: List[str] = Field(default_factory=list, description="Validation warnings")

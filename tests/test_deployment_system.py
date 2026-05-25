@@ -528,11 +528,11 @@ class DeploymentSystemTest:
 			},
 			'detailed_results': self.test_results,
 			'system_capabilities': {
-				'basic_deployment': 'passed' if self.test_results.get('test_basic_deployment', {}).get('status') == 'passed' else 'failed',
-				'production_scaling': 'passed' if self.test_results.get('test_production_deployment', {}).get('status') == 'passed' else 'failed',
-				'health_monitoring': 'passed' if self.test_results.get('test_health_monitoring', {}).get('status') == 'passed' else 'failed',
-				'project_generation': 'passed' if self.test_results.get('test_agent_project_generation', {}).get('status') == 'passed' else 'failed',
-				'multi_deployment': 'passed' if self.test_results.get('test_multiple_deployments', {}).get('status') == 'passed' else 'failed'
+				'basic_deployment': 'passed' if self.test_results.get('basic_deployment', {}).get('status') == 'passed' else 'failed',
+				'production_scaling': 'passed' if self.test_results.get('production_deployment', {}).get('status') == 'passed' else 'failed',
+				'health_monitoring': 'passed' if self.test_results.get('health_monitoring', {}).get('status') == 'passed' else 'failed',
+				'project_generation': 'passed' if self.test_results.get('project_generation', {}).get('status') == 'passed' else 'failed',
+				'multi_deployment': 'passed' if self.test_results.get('multiple_deployments', {}).get('status') == 'passed' else 'failed'
 			}
 		}
 		

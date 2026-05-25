@@ -44,7 +44,7 @@ Next concrete slice:
 
 ### 2026-05-26 01:38 EAT
 
-In progress:
+Completed checkpoint:
 
 - Reverified the 45 root `test_*.py` moves against their `tests/` copies with SHA-256 checksums; no differences were reported.
 - Moved root implementation reports into `docs/reports/`.
@@ -77,3 +77,36 @@ Next concrete slice:
 
 - Resolve the moved-test collection blockers by routing or implementing the missing runtime surfaces: `uuid_extensions`, `numpy`, `agents`, and `capabilities.edge_computing`.
 - Audit the unrelated dirty capability worktree before staging any further capability changes.
+
+### 2026-05-26 02:25 EAT
+
+In progress:
+
+- Added a provider-neutral AI agent integration layer under `agents.integrations`.
+- Added built-in runtime adapter specs for `local`, `codex`, `claude_code`, `opencode`, and `pi`.
+- Extended first-class APG `agent` declarations with terse `runtime:` / `runner:` syntax.
+- Updated generated `ai_agents.py` manifests so agent specs carry `runtime`.
+- Added tests for default adapter registration, CLI command construction, local backend execution, and APG runtime parsing/generation.
+- Resolved the earlier moved-test import/runtime blockers for `uuid_extensions`, `numpy`, `opencv-python`, `fastapi`, `agents`, `capabilities.edge_computing`, `capabilities.computer_vision`, and `capabilities.iot_management`.
+- Made root pytest async handling explicit with `pytest.ini`.
+- Made `capabilities.common` imports tolerate unavailable optional subcapabilities instead of breaking unrelated capability imports.
+
+Verification:
+
+- `.venv/bin/python -m py_compile agents/integrations.py agents/base_agent.py agents/__init__.py compiler/ast_builder.py compiler/ai_agent_composition.py compiler/code_generator.py compiler/semantic_analyzer.py`
+- `.venv/bin/python -m pytest -q tests/test_agent_integrations.py tests/test_ai_agent_composition.py tests/test_learning_system.py tests/test_deployment_system.py`
+- `.venv/bin/python -m pytest -q tests/test_blockchain_focused.py tests/test_ai_focused.py tests/test_final_integration.py tests/test_perf_focused.py tests/test_conf_isolated.py tests/test_conf_final.py tests/test_marketplace_system.py tests/test_edge_computing_simple.py tests/ci/test_edge_computing.py`
+- `.venv/bin/python -m pytest -q tests/test_agent_integrations.py tests/test_ai_agent_composition.py tests/test_blockchain_focused.py tests/test_ai_focused.py tests/test_final_integration.py tests/test_perf_focused.py tests/test_conf_isolated.py tests/test_conf_final.py tests/test_marketplace_system.py tests/test_edge_computing_simple.py tests/ci/test_edge_computing.py` -> 62 passed
+- `.venv/bin/python -m tests.test_learning_system`
+- `.venv/bin/python -m tests.test_deployment_system`
+- `.venv/bin/python -m tests.test_vision_iot_integration`
+
+Current broader collection findings:
+
+- `tests/` collection now reaches 191 tests before stopping on the next two blockers.
+- Remaining collection blockers are `capabilities.common.agents` not existing and missing `Crypto` for `capabilities.common.conf.blockchain_audit`.
+
+Next concrete slice:
+
+- Add or route `capabilities.common.agents` to the executable agent runtime.
+- Add the blockchain audit dependency or replace the Crypto dependency with stdlib-backed signing where appropriate.

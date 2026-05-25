@@ -16,6 +16,7 @@ module support version 1.0.0 {
 agent Planner {
     role: "planner";
     model: "openai:gpt-4.1-mini";
+    runtime: codex;
     system: "Break the ticket into concrete work.";
     tools: [tickets.read, docs.search];
     memory: vector support_memory;
@@ -52,6 +53,7 @@ def test_ai_agent_composition_parses_to_first_class_ast():
     crew = result["ast"].entities[2]
     assert isinstance(planner, AIAgentDeclaration)
     assert planner.model == "openai:gpt-4.1-mini"
+    assert planner.runtime == "codex"
     assert planner.tools == ["tickets.read", "docs.search"]
     assert planner.memory.kind == "vector"
     assert planner.memory.name == "support_memory"
@@ -92,3 +94,4 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert "'Planner'" in runtime
     assert "'SupportCrew'" in runtime
     assert "openai:gpt-4.1-mini" in runtime
+    assert "'runtime': 'codex'" in runtime

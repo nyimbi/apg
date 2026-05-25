@@ -403,6 +403,12 @@ class SemanticAnalyzer:
 					entity,
 					"warning"
 				))
+			if entity.runtime and entity.runtime not in {"local", "codex", "claude_code", "opencode", "pi"}:
+				self.warnings.append(SemanticError(
+					f"AI agent '{entity.name}' uses custom runtime '{entity.runtime}'; ensure an adapter is registered",
+					entity,
+					"warning"
+				))
 			return
 
 		# Check for required 'process' method

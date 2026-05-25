@@ -39,6 +39,14 @@ except ImportError:
             for k, v in kwargs.items():
                 setattr(self, k, v)
 
+if "GitOpsManifest" not in globals():
+    class GitOpsManifest:
+        """Lightweight manifest shape used for annotations without import cycles."""
+
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
 logger = logging.getLogger(__name__)
 
 

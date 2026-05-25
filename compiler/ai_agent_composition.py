@@ -166,6 +166,7 @@ def _parse_agent(name: str, body: str, source_name: str, line: int, column: int)
 		name=name,
 		role=_optional_string(props.get("role")),
 		model=_optional_string(props.get("model")),
+		runtime=_optional_string(props.get("runtime", props.get("runner"))),
 		system_prompt=_optional_string(props.get("system")),
 		tools=tools,
 		memory=memory,

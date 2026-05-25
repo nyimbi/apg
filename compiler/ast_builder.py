@@ -106,6 +106,7 @@ class AIAgentDeclaration(EntityDeclaration):
 	"""First-class AI agent declaration"""
 	role: Optional[str] = None
 	model: Optional[str] = None
+	runtime: Optional[str] = None
 	system_prompt: Optional[str] = None
 	tools: List[str] = field(default_factory=list)
 	memory: Optional[AgentMemory] = None

@@ -14,6 +14,7 @@ module support version 1.0.0 {
 agent Planner {
     role: "planner";
     model: "openai:gpt-4.1-mini";
+    runtime: codex;
     system: "Break the ticket into concrete work.";
     tools: [tickets.read, docs.search];
     memory: vector support_memory;
@@ -43,6 +44,7 @@ swarm SupportCrew {
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `model` | yes | Provider and model identifier, for example `openai:gpt-4.1-mini`. |
+| `runtime` / `runner` | no | Execution adapter, for example `codex`, `claude_code`, `opencode`, `pi`, or `local`. |
 | `role` | recommended | Short human-readable responsibility. |
 | `system` | recommended | System instruction used by the generated runtime manifest. |
 | `tools` | no | Tool or capability references available to the agent. |
@@ -95,6 +97,65 @@ The file contains:
 - `get_agent(name)`, `get_team(name)`, and `describe_team(name)` helpers.
 
 The runtime manifest is dependency-free. Provider SDK wiring belongs in the selected AI capability integration, while `ai_agents.py` remains the stable contract between APG syntax and application code.
+
+## Runtime Integration
+
+AI tooling changes faster than APG grammar should. Keep the APG declaration stable and swap the execution adapter:
+
+```apg
+agent CodeReviewer {
+    role: "reviewer";
+    model: "openai:gpt-5.4";
+    runtime: codex;
+    system: "Review the branch and return concrete defects.";
+    tools: [repo.read, tests.run];
+}
+
+agent Refactorer {
+    role: "executor";
+    model: "anthropic:claude-sonnet";
+    runtime: claude_code;
+    system: "Make the requested change and run verification.";
+}
+
+agent OSSCoder {
+    role: "executor";
+    model: "provider:selected";
+    runtime: opencode;
+}
+
+agent CustomerCoach {
+    role: "support";
+    model: "inflection:inflection_3_pi";
+    runtime: pi;
+}
+```
+
+The built-in `agents.integrations` registry includes:
+
+| Runtime | Kind | Purpose |
+| --- | --- | --- |
+| `local` | in-process | Deterministic offline execution for tests and simple automation. |
+| `codex` | CLI | Workspace-aware coding-agent execution through a local `codex` command. |
+| `claude_code` | CLI | Workspace-aware coding-agent execution through a local `claude` command. |
+| `opencode` | CLI | Workspace-aware execution through a local `opencode` command. |
+| `pi` | HTTP | Chat-agent execution through the Inflection API using `inflection_3_pi` when `INFLECTION_API_KEY` is present. |
+
+Register additional adapters in Python rather than adding grammar keywords:
+
+```python
+from agents.integrations import AgentBackendSpec, DEFAULT_AGENT_INTEGRATIONS
+
+DEFAULT_AGENT_INTEGRATIONS.register(AgentBackendSpec(
+    name="my_agent_tool",
+    kind="cli",
+    command="my-agent",
+    args=["run", "--model", "{model}", "{prompt}"],
+    supports_workspace=True,
+))
+```
+
+The adapter contract normalizes every runner into `AgentInvocation` and `AgentRunResult`. APG code should depend on those stable objects, not on a provider-specific SDK response shape.
 
 ## Capability Selection
 

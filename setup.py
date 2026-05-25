@@ -19,10 +19,11 @@ version = "1.0.0"
 # Define package requirements
 install_requires = [
     "antlr4-python3-runtime>=4.13.0",
-    "Flask>=2.3.0",
-    "Flask-AppBuilder>=4.3.0",
-    "Flask-SQLAlchemy>=3.0.0",
-    "SQLAlchemy>=2.0.0",
+	"Flask>=2.3.0",
+	"Flask-AppBuilder>=4.3.0",
+	"Flask-SQLAlchemy>=3.0.0",
+	"fastapi>=0.100.0",
+	"SQLAlchemy>=2.0.0",
     "click>=8.1.0",
     "rich>=13.0.0",
     "pydantic>=2.0.0",
@@ -34,12 +35,14 @@ install_requires = [
 
 # Development dependencies
 dev_requires = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "black>=23.7.0",
-    "flake8>=6.0.0",
-    "mypy>=1.5.0",
+	"pytest>=7.4.0",
+	"pytest-asyncio>=0.21.0",
+	"pytest-cov>=4.1.0",
+	"numpy>=1.24.0",
+	"opencv-python>=4.8.0",
+	"black>=23.7.0",
+	"flake8>=6.0.0",
+	"mypy>=1.5.0",
     "pre-commit>=3.3.0",
 ]
 
@@ -65,9 +68,10 @@ setup(
         "Tracker": "https://github.com/apg-lang/apg/issues",
     },
     
-    # Package configuration
-    packages=find_packages(),
-    python_requires=">=3.10",
+	# Package configuration
+	packages=find_packages(),
+	py_modules=["uuid_extensions"],
+	python_requires=">=3.10",
     install_requires=install_requires,
     extras_require={
         "dev": dev_requires,
@@ -76,14 +80,18 @@ setup(
             "pygls>=1.0.0",
             "lsprotocol>=2023.0.0"
         ],
-        "ai": [
-            "openai>=1.0.0",
-            "transformers>=4.30.0",
-            "sentence-transformers>=2.2.0",
-            "numpy>=1.24.0"
-        ],
-        "all": dev_requires + doc_requires,
-    },
+		"ai": [
+			"openai>=1.0.0",
+			"transformers>=4.30.0",
+			"sentence-transformers>=2.2.0",
+			"numpy>=1.24.0"
+		],
+		"vision": [
+			"numpy>=1.24.0",
+			"opencv-python>=4.8.0"
+		],
+		"all": dev_requires + doc_requires,
+	},
     
     # Entry points for CLI tools
     entry_points={

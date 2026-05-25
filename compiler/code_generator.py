@@ -235,6 +235,7 @@ class PythonCodeGenerator:
 			agent.name: {
 				"role": agent.role,
 				"model": agent.model,
+				"runtime": agent.runtime,
 				"system": agent.system_prompt,
 				"tools": agent.tools,
 				"memory": (
@@ -279,6 +280,7 @@ class AIAgentSpec:
     name: str
     role: Optional[str]
     model: Optional[str]
+    runtime: Optional[str]
     system: Optional[str]
     tools: List[str]
     memory: Optional[Dict[str, Optional[str]]]
