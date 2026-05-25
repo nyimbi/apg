@@ -41,3 +41,26 @@ Next concrete slice:
 - Move root reports and duplicate README variants into appropriate `docs/` subdirectories with an index.
 - Run targeted pytest collection/import checks for moved tests.
 - Commit and push the cleanup slice if verification is adequate.
+
+### 2026-05-26 01:38 EAT
+
+In progress:
+
+- Reverified the 45 root `test_*.py` moves against their `tests/` copies with SHA-256 checksums; no differences were reported.
+- Moved root implementation reports into `docs/reports/`.
+- Moved duplicate root README variants and planning/reference documents into `docs/archive/`.
+- Added indexes for the reports and archive directories, and linked them from `docs/README.md`.
+
+Verification still required before commit:
+
+- Stage only the root docs/tests cleanup paths.
+- Check that no moved root test content changed during routing.
+- Run pytest collection on the moved root tests, or record any collection blockers precisely.
+
+Verification result:
+
+- `git diff --cached --check` passed.
+- Pytest collection command found 104 tests under the moved `tests/test_*.py` paths, then stopped with 11 collection errors.
+- Collection blockers were missing runtime dependencies or modules: `uuid_extensions`, `numpy`, `agents`, and `capabilities.edge_computing`.
+- These blockers are recorded as executable-reality gaps for follow-up capability/dependency work; the file moves themselves are staged as `R100` renames.
+- `docs/README.md`, `docs/reports/README.md`, and `docs/archive/README.md` local links were checked; all linked files exist after tightening the docs index to current files.

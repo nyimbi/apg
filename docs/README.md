@@ -25,39 +25,33 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 - [Installation & Setup](./installation.md) - Getting started with APG
 - [Quick Start Guide](./quickstart.md) - Build your first APG application
 - [Architecture Overview](./architecture.md) - System design and components
-- [Configuration Guide](./configuration.md) - Environment and system configuration
+- [Language Reference](./language_reference.md) - APG syntax, constructs, and compilation model
+- [Workflow Reference](./workflow_reference.md) - Workflow-oriented language and runtime reference
 
 ### Capabilities & Features
 - [Capabilities Overview](./capabilities/README.md) - Complete capability catalog
 - [AI Agent Composition](./ai_agent_composition.md) - First-class AI agents, swarms, handoffs, and generated runtime manifests
-- [Workflow Orchestration](./capabilities/workflow-orchestration.md) - Advanced workflow automation
-- [Mobile Applications](./capabilities/mobile-apps.md) - Cross-platform mobile development
-- [Blockchain Services](./capabilities/blockchain.md) - Web3 and DeFi integration
-- [AI & Machine Learning](./capabilities/ai-ml.md) - Federated learning and AI orchestration
-- [Real-Time Collaboration](./capabilities/collaboration.md) - WebRTC and real-time features
-- [Security & Authentication](./capabilities/security.md) - Comprehensive security framework
+- [Proposed Capability Architecture](./proposed_capability_architecture.md) - Capability boundaries and platform architecture
+- [Marketplace Microservices Guide](./marketplace_microservices_guide.md) - Marketplace service design and integration
 
 ### Development
 - [API Reference](./api/README.md) - Complete API documentation
 - [Goal Progress Log](./progress_log.md) - Durable progress, verification evidence, and next work for the active APG closure goal
-- [Development Guide](./development.md) - Developer workflows and best practices
-- [Testing Guide](./testing.md) - Testing strategies and frameworks
 - [Deployment Guide](./deployment.md) - Production deployment strategies
+- [Reports](./reports/README.md) - Historical implementation and validation reports
+- [Documentation Archive](./archive/README.md) - Older root README variants and planning references
 
 ### Administration
-- [Operations Guide](./operations.md) - System administration and maintenance
-- [Monitoring & Analytics](./monitoring.md) - Performance monitoring and optimization
-- [Troubleshooting](./troubleshooting.md) - Common issues and solutions
-- [Migration Guide](./migration.md) - Upgrading and migration procedures
+- [Deployment Guide](./deployment.md) - Production deployment strategies
 
 ## 🎯 Quick Navigation
 
 | Category | Documentation |
 |----------|---------------|
-| **Getting Started** | [Installation](./installation.md) → [Quick Start](./quickstart.md) → [Tutorial](./tutorial.md) |
-| **Core Platform** | [Architecture](./architecture.md) → [Configuration](./configuration.md) → [API Reference](./api/README.md) |
-| **Capabilities** | [Workflow Orchestration](./capabilities/workflow-orchestration.md) → [Mobile Apps](./capabilities/mobile-apps.md) → [AI/ML](./capabilities/ai-ml.md) |
-| **Operations** | [Deployment](./deployment.md) → [Monitoring](./monitoring.md) → [Troubleshooting](./troubleshooting.md) |
+| **Getting Started** | [Installation](./installation.md) → [Quick Start](./quickstart.md) |
+| **Core Platform** | [Architecture](./architecture.md) → [Language Reference](./language_reference.md) → [API Reference](./api/README.md) |
+| **Capabilities** | [Capabilities](./capabilities/README.md) → [AI Agent Composition](./ai_agent_composition.md) → [Marketplace Guide](./marketplace_microservices_guide.md) |
+| **Operations** | [Deployment](./deployment.md) → [Reports](./reports/README.md) → [Progress Log](./progress_log.md) |
 
 ## 🏗️ System Requirements
 
@@ -108,7 +102,6 @@ All documentation follows these principles:
 
 - **Issues**: Report bugs and request features via GitHub Issues
 - **Discussions**: Join community discussions for questions and ideas
-- **Contributing**: See [Contributing Guide](./contributing.md) for development guidelines
 - **Contact**: nyimbi@gmail.com for direct support
 
 ## 📄 License
