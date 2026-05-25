@@ -37,7 +37,11 @@ def looks_like_ai_agent_composition(source: str) -> bool:
 	"""Return true when the source uses the first-class agentic surface."""
 	return bool(
 		re.search(r"\b(agent_team|team|swarm)\s+[A-Za-z_][\w]*\s*\{", source)
-		or re.search(r"\bagent\s+[A-Za-z_][\w]*\s*\{", source)
+		or re.search(
+			r"\bagent\s+[A-Za-z_][\w]*\s*\{[^}]*\b(role|model|runtime|runner|system|tools|handoff|inputs|outputs|memory)\s*:",
+			source,
+			re.DOTALL,
+		)
 	)
 
 

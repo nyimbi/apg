@@ -132,3 +132,24 @@ Current broader execution findings:
 
 - Root test collection is now clean.
 - Remaining failure clusters are AI enum compatibility, composable template root resolution, integrated code-generation AST constructor compatibility, parser/AST-builder coverage, semantic analyzer coverage, and final-verification fixtures.
+
+### 2026-05-26 03:20 EAT
+
+Completed checkpoint:
+
+- Restored AI model lifecycle compatibility by adding `AIModelState.CONFIGURED` and defaulting `AIModelConfiguration.state` to configured.
+- Made legacy AST construction work with `module_name`, `workflows`, and positional `TypeAnnotation("str", False)` call shapes used by moved tests.
+- Made the composable template engine resolve the canonical `templates/composable` root when callers pass a stale test-relative path.
+- Added built-in capability metadata fallbacks for the composable engine so composition works even without generated capability template directories.
+- Added shared pytest fixtures for migrated final-verification tests.
+- Restored hybrid and legacy code-generation paths by adding legacy entity-file generation and string default handling.
+- Added a source-backed parser compatibility path plus lightweight AST builder support for legacy APG syntax, including Unicode identifiers, DB blocks, workflows, agents, and semantic analyzer fixtures.
+- Fixed `LoadBalancer.add_backend()` compatibility with backend dictionaries that use `id`.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conf/models.py compiler/ast_builder.py compiler/parser.py compiler/ai_agent_composition.py compiler/code_generator.py templates/composable/composition_engine.py templates/composable/capability.py capabilities/common/conf/performance_optimization.py tests/conftest.py`
+- `.venv/bin/python -m pytest -q tests/test_ai_simple.py tests/test_composition_engine.py tests/test_composable_integration.py tests/test_final_verification.py tests/test_integrated_code_generation.py` -> 15 passed
+- `.venv/bin/python -m pytest -q tests/test_performance_optimization.py::test_integrated_system tests/test_performance_optimization.py::test_performance_benchmarks` -> 2 passed
+- `.venv/bin/python -m pytest -q tests/test_parser.py tests/test_semantic_analyzer.py` -> 29 passed
+- `.venv/bin/python -m pytest -q tests` -> 204 passed, 16 warnings

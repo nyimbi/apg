@@ -7,6 +7,7 @@ Provides a clean, typed representation of APG programs for semantic analysis and
 """
 
 import sys
+import re
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass, field
 from enum import Enum
@@ -37,14 +38,20 @@ class ASTNode:
 @dataclass
 class ModuleDeclaration(ASTNode):
 	"""APG module declaration"""
-	name: str
-	version: str
+	name: str = ""
+	version: str = "1.0.0"
 	description: Optional[str] = None
 	author: Optional[str] = None
 	license: Optional[str] = None
 	imports: List['ImportDeclaration'] = field(default_factory=list)
 	exports: List['ExportDeclaration'] = field(default_factory=list)
 	entities: List['EntityDeclaration'] = field(default_factory=list)
+	workflows: List[Any] = field(default_factory=list)
+	module_name: Optional[str] = None
+
+	def __post_init__(self) -> None:
+		if self.module_name and not self.name:
+			self.name = self.module_name
 
 
 @dataclass
@@ -159,6 +166,11 @@ class TypeAnnotation(ASTNode):
 	is_optional: bool = False
 	is_list: bool = False
 	is_dict: bool = False
+
+	def __post_init__(self) -> None:
+		if isinstance(self.generic_args, bool):
+			self.is_optional = self.generic_args
+			self.generic_args = []
 
 
 @dataclass
@@ -405,10 +417,169 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		self.errors.clear()
 		
 		try:
+			if isinstance(parse_tree, ModuleDeclaration):
+				parse_tree.source_file = source_file
+				return parse_tree
+			if hasattr(parse_tree, "source_code"):
+				return self._build_source_ast(parse_tree.source_code, source_file)
 			return self.visit(parse_tree)
 		except Exception as e:
 			self.errors.append(f"AST building failed: {e}")
 			return None
+
+	def _build_source_ast(self, source_code: str, source_file: Optional[str]) -> ModuleDeclaration:
+		"""Build a lightweight AST from APG source text for legacy grammar coverage."""
+
+		cleaned = self._strip_comments(source_code)
+		module_match = re.search(
+			r"\bmodule\s+(?P<name>[^\s{]+)\s+version\s+(?P<version>[^\s{]+)\s*\{",
+			cleaned,
+			re.UNICODE,
+		)
+		module = ModuleDeclaration(
+			name=module_match.group("name") if module_match else "main",
+			version=module_match.group("version") if module_match else "1.0.0",
+			source_file=source_file,
+		)
+
+		for kind, name, body in self._iter_source_entities(cleaned):
+			if kind == "module":
+				continue
+			properties, methods = self._parse_source_members(body, source_file)
+			entity_type = {
+				"agent": EntityType.AGENT,
+				"digital_twin": EntityType.DIGITAL_TWIN,
+				"workflow": EntityType.WORKFLOW,
+				"db": EntityType.DATABASE,
+			}.get(kind, EntityType.AGENT)
+			module.entities.append(EntityDeclaration(
+				entity_type=entity_type,
+				name=name,
+				properties=properties,
+				methods=methods,
+				source_file=source_file,
+			))
+
+		return module
+
+	def _strip_comments(self, source_code: str) -> str:
+		source_code = re.sub(r"/\*.*?\*/", "", source_code, flags=re.DOTALL)
+		return re.sub(r"//.*", "", source_code)
+
+	def _iter_source_entities(self, source_code: str):
+		pattern = re.compile(r"\b(module|agent|digital_twin|workflow|db)\s+([^\s{]+)\s*(?:version\s+[^\s{]+)?\s*\{", re.UNICODE)
+		position = 0
+		while True:
+			match = pattern.search(source_code, position)
+			if not match:
+				break
+			body_start = match.end()
+			depth = 1
+			index = body_start
+			while index < len(source_code) and depth:
+				if source_code[index] == "{":
+					depth += 1
+				elif source_code[index] == "}":
+					depth -= 1
+				index += 1
+			yield match.group(1), match.group(2), source_code[body_start:index - 1]
+			position = index
+
+	def _parse_source_members(self, body: str, source_file: Optional[str]):
+		properties: List[PropertyDeclaration] = []
+		methods: List[MethodDeclaration] = []
+
+		method_pattern = re.compile(
+			r"(?P<name>[^\W\d]\w*)\s*:\s*(?P<async>async\s*)?\((?P<params>[^)]*)\)\s*->\s*(?P<return>[^\s={;]+)",
+			re.UNICODE,
+		)
+		method_spans = []
+		for match in method_pattern.finditer(body):
+			method_spans.append(self._source_method_span(body, match))
+			methods.append(MethodDeclaration(
+				name=match.group("name"),
+				parameters=self._parse_source_parameters(match.group("params"), source_file),
+				return_type=self._parse_source_type(match.group("return"), source_file),
+				body=None,
+				is_async=bool(match.group("async")),
+				source_file=source_file,
+			))
+
+		property_body = body
+		for start, end in reversed(method_spans):
+			property_body = property_body[:start] + property_body[end:]
+
+		for line in property_body.splitlines():
+			match = re.match(
+				r"\s*(?P<name>[^\W\d]\w*)\s*:\s*(?P<type>[^=;{]+?)\s*(?:=\s*(?P<default>.*?))?\s*;\s*$",
+				line,
+				re.UNICODE,
+			)
+			if not match:
+				continue
+			type_text = match.group("type").strip()
+			if type_text.startswith("(") or type_text.startswith("async"):
+				continue
+			properties.append(PropertyDeclaration(
+				name=match.group("name"),
+				type_annotation=self._parse_source_type(type_text, source_file),
+				default_value=match.group("default"),
+				source_file=source_file,
+			))
+
+		return properties, methods
+
+	def _source_method_span(self, body: str, match: re.Match) -> tuple[int, int]:
+		brace_start = body.find("{", match.end())
+		if brace_start == -1:
+			return match.span()
+
+		depth = 1
+		index = brace_start + 1
+		while index < len(body) and depth:
+			if body[index] == "{":
+				depth += 1
+			elif body[index] == "}":
+				depth -= 1
+			index += 1
+
+		while index < len(body) and body[index].isspace():
+			index += 1
+		if index < len(body) and body[index] == ";":
+			index += 1
+		return match.start(), index
+
+	def _parse_source_parameters(self, params: str, source_file: Optional[str]) -> List[Parameter]:
+		parsed: List[Parameter] = []
+		for raw_param in [part.strip() for part in params.split(",") if part.strip()]:
+			name_type, _, default = raw_param.partition("=")
+			name, _, type_text = name_type.partition(":")
+			if name.strip() and type_text.strip():
+				parsed.append(Parameter(
+					name=name.strip(),
+					type_annotation=self._parse_source_type(type_text.strip(), source_file),
+					default_value=default.strip() or None,
+					source_file=source_file,
+				))
+		return parsed
+
+	def _parse_source_type(self, type_text: str, source_file: Optional[str]) -> TypeAnnotation:
+		type_text = type_text.strip()
+		generic_match = re.match(r"(?P<name>[^\[]+)\[(?P<args>.*)\]$", type_text)
+		if not generic_match:
+			return TypeAnnotation(type_name=type_text, source_file=source_file)
+		args = [
+			self._parse_source_type(part.strip(), source_file)
+			for part in generic_match.group("args").split(",")
+			if part.strip()
+		]
+		return TypeAnnotation(
+			type_name=generic_match.group("name").strip(),
+			generic_args=args,
+			is_list=generic_match.group("name").strip() == "list",
+			is_dict=generic_match.group("name").strip() == "dict",
+			source_file=source_file,
+		)
 	
 	def _get_position(self, ctx) -> tuple[int, int]:
 		"""Extract line and column position from parse tree context"""

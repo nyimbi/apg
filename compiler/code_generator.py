@@ -18,6 +18,8 @@ from .ast_builder import (
 	ASTNode, ModuleDeclaration, EntityDeclaration, PropertyDeclaration,
 	MethodDeclaration, Parameter, TypeAnnotation, Expression, Statement,
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
+	UnaryExpression, MemberExpression, IndexExpression, ListExpression,
+	DictExpression,
 	AssignmentStatement, ReturnStatement, BlockStatement, EntityType,
 	DatabaseDeclaration, DatabaseSchema, TableDeclaration,
 	AIAgentDeclaration, AgentTeamDeclaration
@@ -175,6 +177,16 @@ class PythonCodeGenerator:
 			print(f"Error in composable template generation: {e}")
 			print("Falling back to legacy generation...")
 			return self._generate_legacy_flask_app(ast)
+
+	def _generate_legacy_entities(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Generate the legacy entity files used by hybrid template mode."""
+
+		files = {"views.py": self._generate_views(ast)}
+		for entity in ast.entities:
+			if entity.entity_type == EntityType.DATABASE:
+				files["models.py"] = self._generate_database_models(entity)
+				files["model_views.py"] = self._generate_model_views(entity)
+		return files
 	
 	def _generate_legacy_flask_app(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Legacy Flask-AppBuilder generation method"""
@@ -754,6 +766,9 @@ def describe_team(name: str) -> Dict[str, Any]:
 	
 	def _generate_expression(self, expr: Expression) -> str:
 		"""Generate Python code for an expression"""
+		if isinstance(expr, str):
+			return expr
+
 		if isinstance(expr, LiteralExpression):
 			if expr.literal_type == "string":
 				return f'"{expr.value}"'

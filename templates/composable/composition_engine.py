@@ -281,6 +281,9 @@ class CompositionEngine:
     """Main composition engine that combines base templates with capabilities"""
     
     def __init__(self, composable_root: Path):
+        if not (composable_root / 'bases').exists():
+            composable_root = Path(__file__).resolve().parent
+
         self.composable_root = composable_root
         self.base_manager = BaseTemplateManager(composable_root / 'bases')
         self.capability_manager = CapabilityManager(composable_root / 'capabilities')

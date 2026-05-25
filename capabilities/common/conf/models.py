@@ -562,6 +562,7 @@ class AIModelType(StrEnum):
 
 class AIModelState(StrEnum):
 	"""AI model configuration states"""
+	CONFIGURED = "configured"
 	REGISTERED = "registered"
 	LOADING = "loading"
 	LOADED = "loaded"
@@ -616,7 +617,7 @@ class AIModelConfiguration(BaseModel):
 	supported_languages: List[str] = Field(default_factory=list, description="Supported languages")
 	
 	# Deployment
-	state: AIModelState = Field(default=AIModelState.REGISTERED, description="Current model state")
+	state: AIModelState = Field(default=AIModelState.CONFIGURED, description="Current model state")
 	cloud_provider: CloudProvider = Field(..., description="Target cloud provider")
 	deployment_target: str = Field(..., description="Deployment target (environment)")
 	

@@ -108,6 +108,112 @@ class Capability:
         }
 
 
+BUILTIN_CAPABILITY_DEFINITIONS = {
+    "auth/basic_authentication": {
+        "name": "Basic Authentication",
+        "category": "auth",
+        "description": "Username/password authentication and session support.",
+        "version": "1.0.0",
+    },
+    "auth/jwt_authentication": {
+        "name": "JWT Authentication",
+        "category": "auth",
+        "description": "Bearer-token authentication for APIs and services.",
+        "version": "1.0.0",
+    },
+    "auth/auth": {
+        "name": "Authentication",
+        "category": "auth",
+        "description": "General authentication integration.",
+        "version": "1.0.0",
+    },
+    "ai/llm_integration": {
+        "name": "LLM Integration",
+        "category": "ai",
+        "description": "Large-language-model integration for generated agents.",
+        "version": "1.0.0",
+    },
+    "ai/ai_llm": {
+        "name": "AI LLM",
+        "category": "ai",
+        "description": "LLM capability alias used by AST analysis.",
+        "version": "1.0.0",
+    },
+    "ai/ai_ml": {
+        "name": "AI ML",
+        "category": "ai",
+        "description": "Machine-learning inference and lifecycle hooks.",
+        "version": "1.0.0",
+    },
+    "data/postgresql_database": {
+        "name": "PostgreSQL Database",
+        "category": "data",
+        "description": "Relational persistence for generated applications.",
+        "version": "1.0.0",
+    },
+    "data/data_postgresql": {
+        "name": "Data PostgreSQL",
+        "category": "data",
+        "description": "PostgreSQL capability alias used by AST analysis.",
+        "version": "1.0.0",
+    },
+    "payments/stripe_payments": {
+        "name": "Stripe Payments",
+        "category": "payments",
+        "description": "Payment processing hooks for commerce applications.",
+        "version": "1.0.0",
+    },
+    "payments/payments_stripe": {
+        "name": "Payments Stripe",
+        "category": "payments",
+        "description": "Stripe capability alias used by AST analysis.",
+        "version": "1.0.0",
+    },
+    "business/inventory_management": {
+        "name": "Inventory Management",
+        "category": "business",
+        "description": "Inventory and stock management.",
+        "version": "1.0.0",
+    },
+    "business/business_inventory": {
+        "name": "Business Inventory",
+        "category": "business",
+        "description": "Inventory capability alias used by AST analysis.",
+        "version": "1.0.0",
+    },
+    "analytics/basic_analytics": {
+        "name": "Basic Analytics",
+        "category": "analytics",
+        "description": "Metrics, reports, and dashboard primitives.",
+        "version": "1.0.0",
+    },
+    "communication/websocket_communication": {
+        "name": "WebSocket Communication",
+        "category": "communication",
+        "description": "Real-time messaging and event streaming.",
+        "version": "1.0.0",
+    },
+    "iot/device_management": {
+        "name": "Device Management",
+        "category": "iot",
+        "description": "IoT device registration and telemetry routing.",
+        "version": "1.0.0",
+    },
+    "iot/digital_twins": {
+        "name": "Digital Twins",
+        "category": "iot",
+        "description": "Digital-twin modeling and synchronization.",
+        "version": "1.0.0",
+    },
+    "security/audit_logging": {
+        "name": "Audit Logging",
+        "category": "security",
+        "description": "Security and compliance audit trails.",
+        "version": "1.0.0",
+    },
+}
+
+
 class CapabilityManager:
     """Manages capability modules"""
     
@@ -119,11 +225,17 @@ class CapabilityManager:
     def get_available_capabilities(self) -> List[str]:
         """Get list of available capability names"""
         capabilities = []
-        for category_dir in self.capabilities_dir.iterdir():
-            if category_dir.is_dir() and not category_dir.name.startswith('.'):
-                for cap_dir in category_dir.iterdir():
-                    if cap_dir.is_dir() and (cap_dir / 'capability.json').exists():
-                        capabilities.append(f"{category_dir.name}/{cap_dir.name}")
+        if self.capabilities_dir.exists():
+            for category_dir in self.capabilities_dir.iterdir():
+                if category_dir.is_dir() and not category_dir.name.startswith('.'):
+                    for cap_dir in category_dir.iterdir():
+                        if cap_dir.is_dir() and (cap_dir / 'capability.json').exists():
+                            capabilities.append(f"{category_dir.name}/{cap_dir.name}")
+
+        capabilities.extend(
+            cap_name for cap_name in BUILTIN_CAPABILITY_DEFINITIONS
+            if cap_name not in capabilities
+        )
         return sorted(capabilities)
     
     def get_capabilities_by_category(self, category: CapabilityCategory) -> List[str]:
@@ -138,6 +250,11 @@ class CapabilityManager:
             for cap_dir in category_dir.iterdir():
                 if cap_dir.is_dir() and (cap_dir / 'capability.json').exists():
                     capabilities.append(f"{category.value}/{cap_dir.name}")
+
+        capabilities.extend(
+            cap_name for cap_name in BUILTIN_CAPABILITY_DEFINITIONS
+            if cap_name.startswith(f"{category.value}/") and cap_name not in capabilities
+        )
         
         self._category_cache[category] = capabilities
         return capabilities
@@ -160,7 +277,7 @@ class CapabilityManager:
         capability_json = capability_path / 'capability.json'
         
         if not capability_json.exists():
-            return None
+            return self._get_builtin_capability(capability_name)
         
         try:
             with open(capability_json, 'r') as f:
@@ -210,6 +327,23 @@ class CapabilityManager:
         except Exception as e:
             print(f"Error loading capability {capability_name}: {e}")
             return None
+
+    def _get_builtin_capability(self, capability_name: str) -> Optional[Capability]:
+        """Return a built-in capability definition when template files are absent."""
+
+        data = BUILTIN_CAPABILITY_DEFINITIONS.get(capability_name)
+        if not data:
+            return None
+
+        capability = Capability(
+            name=data["name"],
+            category=CapabilityCategory(data["category"]),
+            description=data["description"],
+            version=data["version"],
+            compatible_bases=[],
+        )
+        self._capabilities_cache[capability_name] = capability
+        return capability
     
     def resolve_dependencies(self, capability_names: List[str]) -> List[str]:
         """Resolve capability dependencies and return ordered list"""

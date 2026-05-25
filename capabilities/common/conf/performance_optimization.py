@@ -664,12 +664,17 @@ class LoadBalancer:
 	
 	def add_backend(
 		self,
-		backend_id: str,
-		endpoint: str,
+		backend_id: Optional[str] = None,
+		endpoint: str = "",
 		weight: int = 1,
-		metadata: Optional[Dict[str, Any]] = None
+		metadata: Optional[Dict[str, Any]] = None,
+		id: Optional[str] = None
 	) -> None:
 		"""Add backend server to load balancer"""
+		backend_id = backend_id or id
+		assert backend_id, "backend_id or id is required"
+		assert endpoint, "endpoint is required"
+
 		backend = {
 			"id": backend_id,
 			"endpoint": endpoint,
