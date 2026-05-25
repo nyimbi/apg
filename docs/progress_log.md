@@ -64,3 +64,16 @@ Verification result:
 - Collection blockers were missing runtime dependencies or modules: `uuid_extensions`, `numpy`, `agents`, and `capabilities.edge_computing`.
 - These blockers are recorded as executable-reality gaps for follow-up capability/dependency work; the file moves themselves are staged as `R100` renames.
 - `docs/README.md`, `docs/reports/README.md`, and `docs/archive/README.md` local links were checked; all linked files exist after tightening the docs index to current files.
+
+### 2026-05-26 01:45 EAT
+
+Completed and pushed:
+
+- Committed and pushed the verified root docs/tests cleanup slice as `0ae9214` (`Move root docs and tests into canonical directories`).
+- Root `test_*.py` files now live under `tests/`.
+- Root reports, duplicate README variants, and reference notes now live under `docs/reports/` or `docs/archive/`.
+
+Next concrete slice:
+
+- Resolve the moved-test collection blockers by routing or implementing the missing runtime surfaces: `uuid_extensions`, `numpy`, `agents`, and `capabilities.edge_computing`.
+- Audit the unrelated dirty capability worktree before staging any further capability changes.
