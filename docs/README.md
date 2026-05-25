@@ -39,6 +39,7 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 
 ### Development
 - [API Reference](./api/README.md) - Complete API documentation
+- [Goal Progress Log](./progress_log.md) - Durable progress, verification evidence, and next work for the active APG closure goal
 - [Development Guide](./development.md) - Developer workflows and best practices
 - [Testing Guide](./testing.md) - Testing strategies and frameworks
 - [Deployment Guide](./deployment.md) - Production deployment strategies
