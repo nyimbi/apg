@@ -7,7 +7,12 @@ Create comprehensive security and compliance capabilities for enterprise applica
 """
 
 import json
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
 from templates.composable.capability import Capability, CapabilityCategory, CapabilityDependency, CapabilityIntegration
 
 def create_oauth2_sso_capability():
@@ -262,7 +267,7 @@ def save_security_capabilities():
 	]
 	
 	# Save each capability to the auth category (security/auth related)
-	base_dir = Path(__file__).parent / 'templates' / 'composable' / 'capabilities' / 'auth'
+	base_dir = REPO_ROOT / 'templates' / 'composable' / 'capabilities' / 'auth'
 	base_dir.mkdir(parents=True, exist_ok=True)
 	
 	for capability in capabilities:

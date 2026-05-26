@@ -9,8 +9,13 @@ publishing, and discovery mechanisms.
 
 import json
 import hashlib
+import sys
 from pathlib import Path
 from datetime import datetime
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
 from templates.composable.capability import Capability, CapabilityCategory, CapabilityDependency, CapabilityIntegration
 
 def create_capability_validator():
@@ -240,7 +245,7 @@ def save_community_capabilities():
 	]
 	
 	# Save capabilities to appropriate categories
-	base_dir = Path(__file__).parent / 'templates' / 'composable' / 'capabilities'
+	base_dir = REPO_ROOT / 'templates' / 'composable' / 'capabilities'
 	
 	for capability in capabilities:
 		# Determine directory based on category
@@ -742,7 +747,7 @@ def create_capability_schema():
 	}
 	
 	# Save schema to file
-	schema_path = Path(__file__).parent / 'templates' / 'composable' / 'capability_schema.json'
+	schema_path = REPO_ROOT / 'templates' / 'composable' / 'capability_schema.json'
 	schema_path.parent.mkdir(parents=True, exist_ok=True)
 	
 	with open(schema_path, 'w') as f:

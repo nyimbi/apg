@@ -1513,3 +1513,20 @@ Current broader Bytewax migration findings:
 
 - The repo-wide targeted search is clean for the legacy stream-runtime identifiers.
 - Some generated prose may now read mechanically and should receive a later editorial pass, but the platform direction is now consistent: Bytewax is the stream/dataflow runtime.
+
+### 2026-05-26 18:04 EAT
+
+Completed checkpoint:
+
+- Started root-directory cleanup by moving executable demo, capability-generation, template-generation, and migration utilities out of the repository root.
+- Moved the complete demonstration entry point to `examples/complete_demo.py`.
+- Moved capability generators to `scripts/capability_generation/`, template generators to `scripts/template_generation/`, and the v2 migration tool to `scripts/migrations/`.
+- Updated moved scripts to resolve the repository root before importing APG modules or writing generated template/capability assets.
+- Added `scripts/README.md` to document the utility-script layout.
+
+Verification:
+
+- `find . -maxdepth 1 -type f | sort`
+- `find scripts -maxdepth 2 -type f | sort`
+- `.venv/bin/python -m py_compile examples/complete_demo.py scripts/capability_generation/create_advanced_ai_capabilities.py scripts/capability_generation/create_business_intelligence_capabilities.py scripts/capability_generation/create_cloud_capabilities.py scripts/capability_generation/create_community_system.py scripts/capability_generation/create_iot_capabilities.py scripts/capability_generation/create_performance_capabilities.py scripts/capability_generation/create_security_capabilities.py scripts/template_generation/create_template_structure.py scripts/template_generation/setup_composable_templates.py scripts/migrations/migration_to_v2.py`
+- `git diff --check`

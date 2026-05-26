@@ -7,7 +7,12 @@ Create comprehensive cloud integration capabilities for AWS, Azure, and GCP.
 """
 
 import json
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
 from templates.composable.capability import Capability, CapabilityCategory, CapabilityDependency, CapabilityIntegration
 
 def create_aws_integration_capability():
@@ -272,7 +277,7 @@ def save_cloud_capabilities():
 	]
 	
 	# Save each capability to the data category (since they're infrastructure/data related)
-	base_dir = Path(__file__).parent / 'templates' / 'composable' / 'capabilities' / 'data'
+	base_dir = REPO_ROOT / 'templates' / 'composable' / 'capabilities' / 'data'
 	base_dir.mkdir(parents=True, exist_ok=True)
 	
 	for capability in capabilities:

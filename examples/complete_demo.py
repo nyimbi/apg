@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 # Add APG modules to path
-apg_root = Path(__file__).parent
+apg_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(apg_root))
 
 # Rich console for beautiful output

@@ -7,7 +7,12 @@ Create comprehensive performance monitoring, profiling, and optimization capabil
 """
 
 import json
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
 from templates.composable.capability import Capability, CapabilityCategory, CapabilityDependency, CapabilityIntegration
 
 def create_application_profiler():
@@ -269,7 +274,7 @@ def save_performance_capabilities():
 	]
 	
 	# Save each capability to appropriate category
-	base_dir = Path(__file__).parent / 'templates' / 'composable' / 'capabilities'
+	base_dir = REPO_ROOT / 'templates' / 'composable' / 'capabilities'
 	
 	for capability in capabilities:
 		# Determine directory based on category

@@ -13,7 +13,9 @@ from typing import Dict, List, Any
 
 # Import our composable system
 import sys
-sys.path.insert(0, str(Path(__file__).parent))
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
 
 from templates.composable.base_template import (
     BaseTemplateManager, BaseTemplateType, BASE_TEMPLATES
@@ -27,7 +29,7 @@ def setup_base_templates():
     """Set up all base templates"""
     print("🏗️  Setting up base templates...")
     
-    composable_root = Path(__file__).parent / 'templates' / 'composable'
+    composable_root = REPO_ROOT / 'templates' / 'composable'
     bases_dir = composable_root / 'bases'
     bases_dir.mkdir(parents=True, exist_ok=True)
     
@@ -48,7 +50,7 @@ def setup_capabilities():
     """Set up all core capabilities"""
     print("\n🔧 Setting up core capabilities...")
     
-    composable_root = Path(__file__).parent / 'templates' / 'composable'
+    composable_root = REPO_ROOT / 'templates' / 'composable'
     capabilities_dir = composable_root / 'capabilities'
     capabilities_dir.mkdir(parents=True, exist_ok=True)
     
@@ -77,7 +79,7 @@ def setup_integration_patterns():
     """Set up common integration patterns"""
     print("\n🔗 Setting up integration patterns...")
     
-    composable_root = Path(__file__).parent / 'templates' / 'composable'
+    composable_root = REPO_ROOT / 'templates' / 'composable'
     integrations_dir = composable_root / 'integrations'
     integrations_dir.mkdir(parents=True, exist_ok=True)
     
@@ -218,7 +220,7 @@ def create_system_overview():
     """Create system overview documentation"""
     print("\n📚 Creating system overview...")
     
-    composable_root = Path(__file__).parent / 'templates' / 'composable'
+    composable_root = REPO_ROOT / 'templates' / 'composable'
     
     overview_content = """# APG Composable Template System
 
@@ -358,7 +360,7 @@ def verify_system():
     """Verify the composable system is properly set up"""
     print("\n🔍 Verifying composable template system...")
     
-    composable_root = Path(__file__).parent / 'templates' / 'composable'
+    composable_root = REPO_ROOT / 'templates' / 'composable'
     
     # Check base templates
     bases_dir = composable_root / 'bases'
@@ -428,7 +430,7 @@ def main():
         print("4. Create additional capabilities")
         print("5. Build community contribution system")
         
-        print(f"\n📁 System Location: {Path(__file__).parent / 'templates' / 'composable'}")
+        print(f"\n📁 System Location: {REPO_ROOT / 'templates' / 'composable'}")
         
     except Exception as e:
         print(f"\n💥 Setup failed: {e}")

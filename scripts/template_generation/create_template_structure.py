@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 from typing import Dict, List
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 # Template definitions with metadata
 TEMPLATES = {
     'basic/simple_agent': {
@@ -329,7 +331,7 @@ TEMPLATES = {
 
 def create_template_structure():
     """Create the complete template structure"""
-    base_path = Path(__file__).parent / 'templates' / 'application_templates'
+    base_path = REPO_ROOT / 'templates' / 'application_templates'
     
     for template_id, metadata in TEMPLATES.items():
         template_path = base_path / template_id

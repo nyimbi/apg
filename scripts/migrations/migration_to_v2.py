@@ -8,9 +8,9 @@ structure to the enhanced v2.0 architecture with minimal disruption.
 Author: Nyimbi Odero <nyimbi@gmail.com>
 
 Usage:
-    python migration_to_v2.py --action plan     # Plan migration without executing
-    python migration_to_v2.py --action migrate  # Execute migration
-    python migration_to_v2.py --action rollback # Rollback migration
+    python scripts/migrations/migration_to_v2.py --action plan     # Plan migration without executing
+    python scripts/migrations/migration_to_v2.py --action migrate  # Execute migration
+    python scripts/migrations/migration_to_v2.py --action rollback # Rollback migration
 """
 
 import os
