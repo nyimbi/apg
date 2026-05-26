@@ -502,3 +502,24 @@ Current broader ETLP/DVRL execution findings:
 - ETLP contract discovery/registration now works despite a pre-existing eager API-controller import failure for a missing `get_pipeline_logs` handler.
 - DVRL contract discovery/registration now returns the same executable configuration/rules/UI/theme surface as the rest of the data backbone.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 09:05 EAT
+
+Completed checkpoint:
+
+- Made the APIG integration capability executable as a first-class APG capability with tenant-scoped routing, security, traffic, observability, edge, UI, and theme configuration.
+- Added deterministic APIG gateway-governance rules for tenant context, registered upstream services, public-route auth policy, unsafe-method threat policy, signed WASM filters, and high-quota review.
+- Made the REGY integration capability executable as a first-class APG capability with tenant-scoped registration, discovery, health, governance, routing, UI, and theme configuration.
+- Added deterministic REGY registry-governance rules for tenant context, service ownership, health endpoints, duplicate service names, breaking-change compatibility review, and cross-tenant discovery blocking.
+- Exposed APIG and REGY contract helpers through package registration/info surfaces for lightweight composition-time discovery.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/apig/__init__.py capabilities/common/apig/capability_contract.py capabilities/common/apig/test_capability_contract.py capabilities/common/regy/__init__.py capabilities/common/regy/capability_contract.py capabilities/common/regy/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/apig/test_capability_contract.py capabilities/common/regy/test_capability_contract.py` -> 6 passed, 15 warnings
+
+Current broader APIG/REGY execution findings:
+
+- APIG and REGY contract discovery/registration now provide executable configuration/rules/UI/theme surfaces without starting gateway or registry runtime services.
+- Focused APIG and REGY contract tests live outside existing heavyweight runtime test folders.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

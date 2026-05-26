@@ -12,6 +12,10 @@ Copyright: © 2025 Datacraft
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from uuid_extensions import uuid7str
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
 
 # APG Composition Engine Registration
 CAPABILITY_METADATA = {
@@ -144,7 +148,65 @@ async def get_capability_info() -> Dict[str, Any]:
 	Returns:
 		Complete capability metadata and configuration
 	"""
-	return CAPABILITY_METADATA
+	info = CAPABILITY_METADATA.copy()
+	info['contract'] = get_capability_contract()
+	return info
+
+
+def register_capability() -> Dict[str, Any]:
+	"""Register APIG with the APG composition engine."""
+	contract = get_capability_contract()
+	required = [
+		dep['capability'] for dep in CAPABILITY_METADATA['dependencies']
+		if dep.get('required')
+	]
+	optional = [
+		dep['capability'] for dep in CAPABILITY_METADATA['dependencies']
+		if not dep.get('required')
+	]
+	return {
+		'name': 'apig',
+		'aliases': ['api_gateway', 'intelligent_gateway', 'gateway'],
+		'display_name': CAPABILITY_METADATA['display_name'],
+		'description': CAPABILITY_METADATA['description'],
+		'version': CAPABILITY_METADATA['version'],
+		'dependencies': required,
+		'optional_dependencies': optional,
+		'configuration': contract['configuration'],
+		'configuration_schema': contract['configuration_schema'],
+		'rule_engine': contract['rule_engine'],
+		'capabilities': {
+			'intelligent_routing': 'Route traffic to registered upstream services',
+			'traffic_management': 'Apply rate limits, quotas, circuit breakers, and canaries',
+			'security_gateway': 'Attach auth, threat, mTLS, and edge filter policies',
+			'edge_filters': 'Manage signed WebAssembly gateway filters',
+			'capability_rules': 'Evaluate deterministic gateway governance rules',
+			'visual_theming': 'Apply gateway-console theme tokens and components'
+		},
+		'endpoints': {
+			'routes': '/apig/api/v1/routes',
+			'traffic': '/apig/api/v1/traffic',
+			'upstreams': '/apig/api/v1/upstreams',
+			'security': '/apig/api/v1/security',
+			'edge': '/apig/api/v1/edge',
+			'analytics': '/apig/api/v1/analytics'
+		},
+		'ui_components': {
+			route['name']: route['path']
+			for route in contract['ui']['routes']
+		},
+		'ui_manifest': contract['ui'],
+		'theme': contract['theme'],
+		'permissions': [
+			'apig:view',
+			'apig:manage_routes',
+			'apig:manage_traffic',
+			'apig:manage_security',
+			'apig:manage_edge',
+			'apig:view_metrics',
+			'apig:admin'
+		]
+	}
 
 # Version Information
 __version__ = "1.0.0"
@@ -157,6 +219,9 @@ __all__ = [
 	'CAPABILITY_METADATA',
 	'health_check',
 	'get_capability_info',
+	'register_capability',
+	'get_capability_contract',
+	'evaluate_capability_rules',
 	'__version__',
 	'__author__'
 ]

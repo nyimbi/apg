@@ -13,6 +13,10 @@ Website: www.datacraft.co.ke
 
 from .models import *
 from .service import *
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
 
 __version__ = "1.0.0"
 __capability_name__ = "Registry (regy)"
@@ -82,3 +86,59 @@ APG_CAPABILITY_METADATA = {
 		]
 	}
 }
+
+
+def register_capability() -> dict:
+	"""Register REGY with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "regy",
+		"aliases": ["service_registry", "api_registry", "service_discovery"],
+		"display_name": "API/Service Registry",
+		"description": __capability_description__,
+		"version": __version__,
+		"dependencies": APG_CAPABILITY_METADATA["dependencies"],
+		"optional_dependencies": [],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"service_registration": "Register tenant-scoped services and API contracts",
+			"service_discovery": "Discover healthy service instances for callers and gateway sync",
+			"health_monitoring": "Track active health checks and registration status",
+			"api_versioning": "Govern compatible and breaking service versions",
+			"capability_rules": "Evaluate deterministic registry governance rules",
+			"visual_theming": "Apply service-catalog theme tokens and components"
+		},
+		"endpoints": {
+			"services": "/regy/api/v1/services",
+			"registration": "/regy/api/v1/register",
+			"discovery": "/regy/api/v1/discover",
+			"health": "/regy/api/v1/health",
+			"versions": "/regy/api/v1/versions",
+			"gateway_sync": "/regy/api/v1/gateway-sync"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"regy:view",
+			"regy:view_services",
+			"regy:register_service",
+			"regy:discover",
+			"regy:view_health",
+			"regy:manage_versions",
+			"regy:sync_gateway",
+			"regy:admin"
+		]
+	}
+
+
+def get_capability_info() -> dict:
+	"""Get REGY capability information for composition and marketplace discovery."""
+	info = APG_CAPABILITY_METADATA.copy()
+	info["contract"] = get_capability_contract()
+	return info
