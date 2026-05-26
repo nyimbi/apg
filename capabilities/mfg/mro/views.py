@@ -21,6 +21,7 @@ from .models import (
 	PMAsset, PMHealthRecord, PMFailurePrediction,
 	PMMaintenanceRecord, PMMaintenanceAlert
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 
 
 class PredictiveMaintenanceBaseView(BaseView):
@@ -32,12 +33,11 @@ class PredictiveMaintenanceBaseView(BaseView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID from security context"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def _format_health_score(self, score: float) -> str:
 		"""Format health score for display"""
@@ -244,7 +244,7 @@ class PMAssetModelView(ModelView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class PMHealthRecordModelView(ModelView):
@@ -456,8 +456,7 @@ class PMFailurePredictionModelView(ModelView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _create_maintenance_work_order(self, prediction: PMFailurePrediction) -> str:
 		"""Create maintenance work order from prediction"""
@@ -592,7 +591,7 @@ class PMMaintenanceRecordModelView(ModelView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class PMMaintenanceAlertModelView(ModelView):
@@ -709,8 +708,7 @@ class PMMaintenanceAlertModelView(ModelView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 
 
 class PredictiveMaintenanceDashboardView(PredictiveMaintenanceBaseView):

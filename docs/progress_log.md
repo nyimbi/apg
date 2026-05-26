@@ -2148,3 +2148,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_fam_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|Get current tenant ID - placeholder implementation|TODO: Implement proper tenant context" capabilities/fin/fam/fixed_asset_management/api.py capabilities/fin/fam/fixed_asset_management/views.py capabilities/fin/fam/fixed_asset_management/tenant.py` -> no matches
 - `git diff --check -- capabilities/fin/fam/fixed_asset_management/api.py capabilities/fin/fam/fixed_asset_management/views.py capabilities/fin/fam/fixed_asset_management/tenant.py tests/test_fin_fam_tenant_resolution.py` -> no issues
+
+### 2026-05-26 22:30 EAT
+
+Completed checkpoint:
+
+- Replaced Predictive Maintenance/MRO view tenant and current-user placeholders with shared request-context helpers.
+- MRO views now resolve tenant IDs from payload, Flask context/current user, tenant headers, query args, request environment, and `APG_DEFAULT_TENANT_ID` fallback.
+- MRO current-user helpers now use Flask context/header/environment values before falling back to Flask-AppBuilder security.
+- Added focused regression coverage that rejects hardcoded tenant/user helper bodies and exercises tenant/user precedence.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/mfg/mro/views.py capabilities/mfg/mro/context.py tests/test_mfg_mro_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_mfg_mro_context_resolution.py` -> 2 passed
+- `.venv/bin/python -m pytest -q tests/test_mfg_mro_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|return str\(current_user\.id\).*is_authenticated|from flask_appbuilder.security import current_user" capabilities/mfg/mro/views.py` -> no matches
+- `git diff --check -- capabilities/mfg/mro/views.py capabilities/mfg/mro/context.py tests/test_mfg_mro_context_resolution.py` -> no issues
