@@ -117,7 +117,7 @@ class TestESStream:
 			)
 	
 	def test_stream_name_bytewax_compliance(self):
-		"""Test stream name Bytewax topic naming compliance."""
+		"""Test stream name Bytewax stream naming compliance."""
 		with pytest.raises(ValueError, match="can only contain alphanumeric"):
 			stream = ESStream(
 				stream_name="invalid@name!",

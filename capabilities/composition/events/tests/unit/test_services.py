@@ -616,7 +616,7 @@ class TestEventStreamingService:
 			source_capability="test_capability"
 		)
 		
-		# Mock Bytewax topic creation
+		# Mock Bytewax stream creation
 		streaming_service._create_bytewax_stream = AsyncMock(return_value=True)
 		
 		stream_id = await streaming_service.create_stream(

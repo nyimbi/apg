@@ -252,7 +252,7 @@ DELETE /api/v1/subscriptions/{sub_id}    # Cancel subscription
 ### Message Queue Integration
 ```
 AMQP   amqp://esb.apg.local:5672        # RabbitMQ compatibility
-Bytewax  bytewax://esb.apg.local:9092       # Native Bytewax protocol
+Bytewax  flow:apg-event-streaming       # APG-hosted Bytewax dataflow
 Redis  redis://esb.apg.local:6379       # Redis streams
 ```
 
@@ -299,7 +299,7 @@ Redis  redis://esb.apg.local:6379       # Redis streams
 
 ### Phase 1: Core Event Streaming (Weeks 1-2)
 - Event store and basic streaming
-- Bytewax cluster setup and management
+- Bytewax dataflow setup, worker configuration, and recovery management
 - Basic publish/subscribe functionality
 - Schema registry implementation
 

@@ -24,7 +24,7 @@ Building a comprehensive event streaming platform for the APG ecosystem with ent
 - [ ] Metadata and audit models
 - [ ] PostgreSQL schema design
 - [ ] Redis data structures
-- [ ] Bytewax topic configurations
+- [ ] Bytewax flow and stream configurations
 - [ ] Event versioning strategy
 
 ### 🔄 Phase 3: Service Layer Implementation

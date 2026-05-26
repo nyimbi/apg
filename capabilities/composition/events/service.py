@@ -1537,26 +1537,26 @@ class StreamManagementService:
 				flow_id=self.bytewax_config.get('flow_id', 'apg-event-streaming')
 			)
 			
-			topic = BytewaxStreamDefinition(
+			stream_definition = BytewaxStreamDefinition(
 				name=bytewax_stream_name,
 				num_partitions=partitions,
 				replication_factor=replication_factor,
 				topic_configs=config
 			)
 			
-			result = admin_client.create_topics([topic])
+			result = admin_client.create_topics([stream_definition])
 			
-			# Wait for topic creation
-			for topic, future in result.items():
+			# Wait for stream registration
+			for stream_name, future in result.items():
 				try:
 					future.result()
-					logger.info(f"Created Bytewax stream: {topic}")
+					logger.info(f"Created Bytewax stream: {stream_name}")
 					return True
 				except BytewaxStreamAlreadyExistsError:
-					logger.info(f"Bytewax stream already exists: {topic}")
+					logger.info(f"Bytewax stream already exists: {stream_name}")
 					return True
 				except Exception as e:
-					logger.error(f"Failed to create topic {topic}: {e}")
+					logger.error(f"Failed to register Bytewax stream {stream_name}: {e}")
 					return False
 		
 		except Exception as e:

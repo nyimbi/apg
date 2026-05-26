@@ -386,7 +386,7 @@ class DisasterRecoveryTester:
 			)
 	
 	async def test_bytewax_backup_recovery(self) -> RecoveryTestResult:
-		"""Test Bytewax topic backup and recovery."""
+		"""Test Bytewax stream backup and recovery."""
 		logger.info("Testing Bytewax backup and recovery...")
 		
 		start_time = datetime.now(timezone.utc)
@@ -398,15 +398,15 @@ class DisasterRecoveryTester:
 				client_id='dr_test_admin'
 			)
 			
-			# Create test topic
+			# Create test stream
 			test_topic = "dr-test-topic"
 			topic_list = [BytewaxStreamDefinition(name=test_topic, num_partitions=3, replication_factor=1)]
 			
 			try:
 				admin_client.create_topics(topic_list)
-				await asyncio.sleep(2)  # Wait for topic creation
+				await asyncio.sleep(2)  # Wait for stream registration
 			except Exception:
-				pass  # Topic might already exist
+				pass  # Stream might already exist
 			
 			# Produce test messages
 			producer = BytewaxProducer(

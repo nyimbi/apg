@@ -1766,3 +1766,22 @@ Verification:
 - `.venv/bin/python -c "import yaml, pathlib; ..."` -> parsed 2 YAML files
 - `rg -n -i "kafka|confluent|redpanda|bootstrap\\.servers|bootstrap_servers|BYTEWAX_BROKERS|Bytewax broker|Bytewax brokers|broker connection string" --glob '!uploads/**' --glob '!tmp/**' --glob '!node_modules/**' --glob '!**/swagger-ui-bundle.js' --glob '!**/.venv/**' --glob '!**/.git/**' --glob '!docs/progress_log.md' --glob '!tests/test_repository_hygiene.py' .` -> no matches
 - `rg -n "Bytewax 3\\.0|bytewax\\.yaml|bytewax:9101|Bytewax cluster|docker-compose up -d postgres redis bytewax" capabilities/composition/events/README.md capabilities/composition/events/docs/deployment.md capabilities/composition/events/docker/prometheus/prometheus.yml capabilities/composition/events/.github/workflows/ci-cd.yml` -> no matches
+
+### 2026-05-26 20:09 EAT
+
+Completed checkpoint:
+
+- Tightened remaining Event Streaming Bytewax wording from broker-era cluster/topic/service language to flow, stream, and recovery language.
+- Removed the stale Prometheus alert that referenced the deleted external Bytewax scrape job.
+- Renamed local Event Streaming service variables/comments around Bytewax stream registration so the code no longer describes stream creation as topic creation.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed
+- `.venv/bin/python -m py_compile capabilities/composition/events/service.py capabilities/composition/events/tests/production/disaster_recovery_tests.py capabilities/composition/events/tests/unit/test_services.py capabilities/composition/events/tests/unit/test_models.py`
+- `.venv/bin/python -c "import yaml, pathlib; ..."` -> parsed Prometheus YAML
+- `rg -n "Bytewax cluster|Bytewax service|external Bytewax|bytewax\\.yaml|bytewax:9101|Bytewax 3\\.0|docker-compose up -d .*bytewax|bytewax://.*9092|Bytewax topic|topic backup|Mock Bytewax topic|topic creation" capabilities/composition/events --glob '!**/__pycache__/**'` -> no matches
+
+Known blocker:
+
+- A targeted Event Streaming unit-test invocation stops during collection because `capabilities.composition.__init__` imports missing `capabilities.composition.capability_registry`; that import gap is outside this Bytewax wording slice and remains a follow-up executable-reality issue.

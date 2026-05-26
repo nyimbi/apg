@@ -186,16 +186,6 @@ alerting_rules:
           summary: "Event Streaming Bus service is down"
           description: "Event Streaming Bus service has been down for more than 1 minute"
 
-      - alert: ESBBytewaxDown
-        expr: up{job="bytewax"} == 0
-        for: 2m
-        labels:
-          severity: critical
-          service: bytewax
-        annotations:
-          summary: "Bytewax service is down"
-          description: "Bytewax service has been down for more than 2 minutes"
-
       - alert: ESBDatabaseDown
         expr: up{job="postgres"} == 0
         for: 2m
