@@ -1,8 +1,8 @@
 """
 APG Workflow Orchestration Message Queue Connectors
 
-High-performance message queue connectors for Kafka, RabbitMQ, Redis, and other
-messaging systems with producer/consumer support and reliable delivery.
+High-performance message queue connectors for Bytewax, RabbitMQ, Redis, and
+other messaging systems with producer/consumer support and reliable delivery.
 
 © 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero <nyimbi@gmail.com>
@@ -10,13 +10,9 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 import asyncio
 import json
-from typing import Dict, List, Optional, Any, Union, Callable
+from typing import Dict, List, Optional, Any, Callable, Set
 from datetime import datetime, timezone
 import logging
-
-# Kafka
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
-from aiokafka.errors import KafkaError
 
 # RabbitMQ
 import aio_pika
@@ -26,31 +22,20 @@ from aio_pika.exceptions import AMQPException
 import redis.asyncio as redis
 from redis.exceptions import RedisError
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import Field
 
 from .base_connector import BaseConnector, ConnectorConfiguration
 
 logger = logging.getLogger(__name__)
 
-class KafkaConfiguration(ConnectorConfiguration):
-	"""Kafka message queue configuration."""
-	
-	bootstrap_servers: List[str] = Field(..., description="Kafka bootstrap servers")
-	security_protocol: str = Field(default="PLAINTEXT", regex="^(PLAINTEXT|SSL|SASL_PLAINTEXT|SASL_SSL)$")
-	sasl_mechanism: Optional[str] = Field(default=None, regex="^(PLAIN|SCRAM-SHA-256|SCRAM-SHA-512|GSSAPI)$")
-	sasl_username: Optional[str] = Field(default=None)
-	sasl_password: Optional[str] = Field(default=None)
-	ssl_cafile: Optional[str] = Field(default=None, description="SSL CA certificate file path")
-	ssl_certfile: Optional[str] = Field(default=None, description="SSL certificate file path")
-	ssl_keyfile: Optional[str] = Field(default=None, description="SSL key file path")
-	client_id: str = Field(default="apg-workflow-orchestration")
-	group_id: Optional[str] = Field(default=None, description="Consumer group ID")
-	auto_offset_reset: str = Field(default="latest", regex="^(earliest|latest)$")
-	enable_auto_commit: bool = Field(default=True)
-	max_poll_records: int = Field(default=500, ge=1, le=10000)
-	session_timeout_ms: int = Field(default=30000, ge=1000, le=300000)
-	heartbeat_interval_ms: int = Field(default=3000, ge=1000, le=30000)
-	compression_type: str = Field(default="none", regex="^(none|gzip|snappy|lz4|zstd)$")
+class BytewaxConfiguration(ConnectorConfiguration):
+	"""Bytewax stream connector configuration."""
+
+	stream_names: List[str] = Field(default_factory=lambda: ["workflow-events"], description="Bytewax stream names")
+	flow_id: str = Field(default="apg-workflow-orchestration")
+	consumer_name: Optional[str] = Field(default=None, description="Logical consumer name")
+	max_records: int = Field(default=500, ge=1, le=10000)
+	replay_from_start: bool = Field(default=False)
 
 class RabbitMQConfiguration(ConnectorConfiguration):
 	"""RabbitMQ message queue configuration."""
@@ -90,303 +75,173 @@ class RedisQueueConfiguration(ConnectorConfiguration):
 	consumer_group: str = Field(default="workflow-orchestration")
 	consumer_name: str = Field(default="consumer-1")
 
-class KafkaConnector(BaseConnector):
-	"""High-performance Kafka message queue connector."""
+class BytewaxConnector(BaseConnector):
+	"""Dependency-light Bytewax stream connector."""
 	
-	def __init__(self, config: KafkaConfiguration):
+	def __init__(self, config: BytewaxConfiguration):
 		super().__init__(config)
-		self.config: KafkaConfiguration = config
-		self.producer: Optional[AIOKafkaProducer] = None
-		self.consumer: Optional[AIOKafkaConsumer] = None
-		self.message_handlers: Dict[str, Callable] = {}
+		self.config: BytewaxConfiguration = config
+		self.streams: Dict[str, List[Dict[str, Any]]] = {}
+		self.subscribed_streams: Set[str] = set()
+		self.stream_cursors: Dict[str, int] = {}
+		self.message_handlers: Dict[str, Callable[[Dict[str, Any]], Any]] = {}
 		self.consumer_task: Optional[asyncio.Task] = None
 		self.is_consuming = False
 	
 	async def _connect(self) -> None:
-		"""Initialize Kafka producer and consumer."""
-		
-		# Common connection parameters
-		kafka_params = {
-			"bootstrap_servers": self.config.bootstrap_servers,
-			"client_id": self.config.client_id,
-			"security_protocol": self.config.security_protocol
-		}
-		
-		# Add SASL authentication if configured
-		if self.config.sasl_mechanism:
-			kafka_params.update({
-				"sasl_mechanism": self.config.sasl_mechanism,
-				"sasl_plain_username": self.config.sasl_username,
-				"sasl_plain_password": self.config.sasl_password
-			})
-		
-		# Add SSL configuration if needed
-		if self.config.security_protocol in ["SSL", "SASL_SSL"]:
-			ssl_params = {}
-			if self.config.ssl_cafile:
-				ssl_params["ssl_cafile"] = self.config.ssl_cafile
-			if self.config.ssl_certfile:
-				ssl_params["ssl_certfile"] = self.config.ssl_certfile
-			if self.config.ssl_keyfile:
-				ssl_params["ssl_keyfile"] = self.config.ssl_keyfile
-			kafka_params.update(ssl_params)
-		
-		# Initialize producer
-		self.producer = AIOKafkaProducer(
-			compression_type=self.config.compression_type,
-			**kafka_params
-		)
-		await self.producer.start()
-		
-		# Initialize consumer if group_id is provided
-		if self.config.group_id:
-			self.consumer = AIOKafkaConsumer(
-				group_id=self.config.group_id,
-				auto_offset_reset=self.config.auto_offset_reset,
-				enable_auto_commit=self.config.enable_auto_commit,
-				max_poll_records=self.config.max_poll_records,
-				session_timeout_ms=self.config.session_timeout_ms,
-				heartbeat_interval_ms=self.config.heartbeat_interval_ms,
-				**kafka_params
-			)
-			await self.consumer.start()
-		
-		logger.info(self._log_connector_info("Kafka connector initialized"))
+		"""Initialize Bytewax stream ledgers."""
+		self.streams = {stream_name: [] for stream_name in self.config.stream_names}
+		logger.info(self._log_connector_info("Bytewax connector initialized"))
 	
 	async def _disconnect(self) -> None:
-		"""Close Kafka connections."""
-		
+		"""Close Bytewax stream connector."""
 		# Stop consuming
 		if self.consumer_task:
 			self.consumer_task.cancel()
 			await asyncio.gather(self.consumer_task, return_exceptions=True)
 		
-		# Close consumer
-		if self.consumer:
-			await self.consumer.stop()
-			self.consumer = None
-		
-		# Close producer
-		if self.producer:
-			await self.producer.stop()
-			self.producer = None
-		
-		logger.info(self._log_connector_info("Kafka connector disconnected"))
+		self.subscribed_streams.clear()
+		self.is_consuming = False
+		logger.info(self._log_connector_info("Bytewax connector disconnected"))
 	
 	async def _execute_operation(self, operation: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-		"""Execute Kafka operation."""
+		"""Execute Bytewax stream operation."""
 		
 		if operation == "produce":
 			return await self._produce_message(parameters)
 		elif operation == "consume":
 			return await self._consume_messages(parameters)
 		elif operation == "subscribe":
-			return await self._subscribe_topics(parameters)
+			return await self._subscribe_streams(parameters)
 		elif operation == "unsubscribe":
-			return await self._unsubscribe_topics(parameters)
+			return await self._unsubscribe_streams(parameters)
 		else:
-			raise ValueError(f"Unsupported Kafka operation: {operation}")
+			raise ValueError(f"Unsupported Bytewax operation: {operation}")
 	
 	async def _produce_message(self, params: Dict[str, Any]) -> Dict[str, Any]:
-		"""Produce message to Kafka topic."""
+		"""Emit item to a Bytewax stream."""
 		
-		topic = params.get("topic")
+		stream = params.get("stream")
 		message = params.get("message")
 		key = params.get("key")
 		headers = params.get("headers", {})
-		partition = params.get("partition")
-		
-		if not topic or message is None:
-			raise ValueError("Topic and message are required for Kafka produce operation")
-		
-		# Serialize message
-		if isinstance(message, dict):
-			message_bytes = json.dumps(message).encode("utf-8")
-		elif isinstance(message, str):
-			message_bytes = message.encode("utf-8")
-		else:
-			message_bytes = message
-		
-		# Serialize key if provided
-		key_bytes = None
-		if key:
-			if isinstance(key, str):
-				key_bytes = key.encode("utf-8")
-			else:
-				key_bytes = key
-		
-		# Convert headers to bytes
-		headers_bytes = {}
-		for k, v in headers.items():
-			if isinstance(v, str):
-				headers_bytes[k] = v.encode("utf-8")
-			else:
-				headers_bytes[k] = v
-		
-		try:
-			# Send message
-			record_metadata = await self.producer.send_and_wait(
-				topic=topic,
-				value=message_bytes,
-				key=key_bytes,
-				headers=list(headers_bytes.items()) if headers_bytes else None,
-				partition=partition
-			)
+
+		if not stream or message is None:
+			raise ValueError("Stream and message are required for Bytewax produce operation")
+
+		self.streams.setdefault(stream, [])
+		record = {
+			"stream": stream,
+			"sequence": len(self.streams[stream]),
+			"timestamp": datetime.now(timezone.utc).isoformat(),
+			"key": key,
+			"value": message,
+			"headers": headers
+		}
+		self.streams[stream].append(record)
 			
-			return {
-				"topic": record_metadata.topic,
-				"partition": record_metadata.partition,
-				"offset": record_metadata.offset,
-				"timestamp": record_metadata.timestamp,
-				"success": True
-			}
-		
-		except KafkaError as e:
-			logger.error(self._log_connector_info(f"Failed to produce message: {e}"))
-			raise
+		return {
+			"stream": stream,
+			"sequence": record["sequence"],
+			"timestamp": record["timestamp"],
+			"success": True
+		}
 	
 	async def _consume_messages(self, params: Dict[str, Any]) -> Dict[str, Any]:
-		"""Consume messages from Kafka topics."""
+		"""Consume items from Bytewax streams."""
 		
-		timeout_ms = params.get("timeout_ms", 1000)
-		max_records = params.get("max_records", 100)
-		
-		if not self.consumer:
-			raise ValueError("Consumer not initialized. Provide group_id in configuration.")
-		
+		streams = params.get("streams") or list(self.subscribed_streams) or self.config.stream_names
+		max_records = params.get("max_records", self.config.max_records)
+		start_sequence = 0 if self.config.replay_from_start else params.get("start_sequence", 0)
 		messages = []
-		try:
-			# Poll for messages
-			message_batch = await self.consumer.getmany(timeout_ms=timeout_ms, max_records=max_records)
-			
-			for topic_partition, messages_list in message_batch.items():
-				for message in messages_list:
-					# Deserialize message
-					try:
-						value = json.loads(message.value.decode("utf-8"))
-					except (json.JSONDecodeError, UnicodeDecodeError):
-						value = message.value.decode("utf-8", errors="ignore")
-					
-					# Deserialize key
-					key = None
-					if message.key:
-						try:
-							key = message.key.decode("utf-8")
-						except UnicodeDecodeError:
-							key = str(message.key)
-					
-					# Deserialize headers
-					headers = {}
-					if message.headers:
-						for header_key, header_value in message.headers:
-							try:
-								headers[header_key] = header_value.decode("utf-8")
-							except UnicodeDecodeError:
-								headers[header_key] = str(header_value)
-					
-					messages.append({
-						"topic": message.topic,
-						"partition": message.partition,
-						"offset": message.offset,
-						"timestamp": message.timestamp,
-						"key": key,
-						"value": value,
-						"headers": headers
-					})
-			
-			return {
-				"messages": messages,
-				"count": len(messages),
-				"success": True
-			}
+
+		for stream in streams:
+			for record in self.streams.get(stream, []):
+				if record["sequence"] >= start_sequence:
+					messages.append(record)
+				if len(messages) >= max_records:
+					break
+			if len(messages) >= max_records:
+				break
 		
-		except KafkaError as e:
-			logger.error(self._log_connector_info(f"Failed to consume messages: {e}"))
-			raise
+		return {
+			"messages": messages,
+			"count": len(messages),
+			"success": True
+		}
 	
-	async def _subscribe_topics(self, params: Dict[str, Any]) -> Dict[str, Any]:
-		"""Subscribe to Kafka topics."""
+	async def _subscribe_streams(self, params: Dict[str, Any]) -> Dict[str, Any]:
+		"""Subscribe to Bytewax streams."""
 		
-		topics = params.get("topics", [])
-		if not topics:
-			raise ValueError("Topics list is required for subscribe operation")
+		streams = params.get("streams", [])
+		if not streams:
+			raise ValueError("Streams list is required for subscribe operation")
 		
-		if not self.consumer:
-			raise ValueError("Consumer not initialized. Provide group_id in configuration.")
-		
-		try:
-			self.consumer.subscribe(topics)
-			
-			# Start consuming task if not already running
-			if not self.is_consuming:
-				self.consumer_task = asyncio.create_task(self._consume_loop())
-				self.is_consuming = True
-			
-			return {
-				"subscribed_topics": topics,
-				"success": True
-			}
-		
-		except KafkaError as e:
-			logger.error(self._log_connector_info(f"Failed to subscribe to topics: {e}"))
-			raise
+		for stream in streams:
+			self.streams.setdefault(stream, [])
+			self.subscribed_streams.add(stream)
+			self.stream_cursors.setdefault(stream, 0 if self.config.replay_from_start else len(self.streams[stream]))
+
+		# Start consuming task if not already running
+		if not self.is_consuming:
+			self.consumer_task = asyncio.create_task(self._consume_loop())
+			self.is_consuming = True
+
+		return {
+			"subscribed_streams": streams,
+			"success": True
+		}
 	
-	async def _unsubscribe_topics(self, params: Dict[str, Any]) -> Dict[str, Any]:
-		"""Unsubscribe from Kafka topics."""
+	async def _unsubscribe_streams(self, params: Dict[str, Any]) -> Dict[str, Any]:
+		"""Unsubscribe from Bytewax streams."""
 		
-		if not self.consumer:
-			raise ValueError("Consumer not initialized.")
+		streams = params.get("streams")
+		if streams:
+			for stream in streams:
+				self.subscribed_streams.discard(stream)
+				self.stream_cursors.pop(stream, None)
+		else:
+			self.subscribed_streams.clear()
+			self.stream_cursors.clear()
 		
-		try:
-			self.consumer.unsubscribe()
-			
-			# Stop consuming task
-			if self.consumer_task:
-				self.consumer_task.cancel()
-				self.is_consuming = False
-			
-			return {"success": True}
+		# Stop consuming task if no streams remain
+		if not self.subscribed_streams and self.consumer_task:
+			self.consumer_task.cancel()
+			self.is_consuming = False
 		
-		except KafkaError as e:
-			logger.error(self._log_connector_info(f"Failed to unsubscribe: {e}"))
-			raise
+		return {"success": True}
 	
 	async def _consume_loop(self) -> None:
 		"""Background message consumption loop."""
 		while self.is_consuming:
 			try:
 				# Consume messages and call handlers
-				result = await self._consume_messages({"timeout_ms": 1000, "max_records": 100})
-				
-				for message in result.get("messages", []):
-					topic = message["topic"]
-					if topic in self.message_handlers:
-						try:
-							await self.message_handlers[topic](message)
-						except Exception as e:
-							logger.error(self._log_connector_info(f"Message handler error for topic {topic}: {e}"))
+				for stream in list(self.subscribed_streams):
+					cursor = self.stream_cursors.get(stream, 0)
+					for message in self.streams.get(stream, []):
+						if message["sequence"] < cursor:
+							continue
+						if stream in self.message_handlers:
+							try:
+								await self.message_handlers[stream](message)
+							except Exception as e:
+								logger.error(self._log_connector_info(f"Message handler error for stream {stream}: {e}"))
+						self.stream_cursors[stream] = message["sequence"] + 1
 			
 			except asyncio.CancelledError:
 				break
 			except Exception as e:
 				logger.error(self._log_connector_info(f"Consume loop error: {e}"))
 				await asyncio.sleep(1)
+			await asyncio.sleep(0.1)
 	
 	async def _health_check(self) -> bool:
-		"""Check Kafka connectivity."""
-		try:
-			if self.producer:
-				# Try to get metadata
-				metadata = await self.producer.client.bootstrap()
-				return len(metadata.brokers) > 0
-			return False
-		except Exception as e:
-			logger.warning(self._log_connector_info(f"Health check failed: {e}"))
-			return False
+		"""Check Bytewax stream connector readiness."""
+		return self.streams is not None
 	
-	def add_message_handler(self, topic: str, handler: Callable) -> None:
-		"""Add message handler for specific topic."""
-		self.message_handlers[topic] = handler
+	def add_message_handler(self, stream: str, handler: Callable) -> None:
+		"""Add message handler for a specific stream."""
+		self.message_handlers[stream] = handler
 
 class RabbitMQConnector(BaseConnector):
 	"""High-performance RabbitMQ message queue connector."""
@@ -995,8 +850,8 @@ class RedisQueueConnector(BaseConnector):
 
 # Export message queue connector classes
 __all__ = [
-	"KafkaConnector",
-	"KafkaConfiguration",
+	"BytewaxConnector",
+	"BytewaxConfiguration",
 	"RabbitMQConnector",
 	"RabbitMQConfiguration",
 	"RedisQueueConnector",

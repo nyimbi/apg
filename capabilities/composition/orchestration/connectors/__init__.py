@@ -11,7 +11,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 from .rest_connector import RESTConnector, GraphQLConnector
 from .database_connector import DatabaseConnector, PostgreSQLAdapter, MongoDBAdapter
 from .cloud_connector import AWSConnector, AzureConnector, GCPConnector
-from .message_queue_connector import KafkaConnector, RabbitMQConnector, RedisQueueConnector
+from .message_queue_connector import BytewaxConnector, RabbitMQConnector, RedisQueueConnector
 from .file_connector import FileSystemConnector, FTPConnector, S3Connector
 from .base_connector import BaseConnector, ConnectorStatus, ConnectorMetrics
 
@@ -27,7 +27,7 @@ __all__ = [
 	"AWSConnector",
 	"AzureConnector", 
 	"GCPConnector",
-	"KafkaConnector",
+	"BytewaxConnector",
 	"RabbitMQConnector",
 	"RedisQueueConnector",
 	"FileSystemConnector",

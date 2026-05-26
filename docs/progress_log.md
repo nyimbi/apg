@@ -1340,3 +1340,22 @@ Current broader Bytewax migration findings:
 
 - The central config realtime sync manager no longer imports Kafka clients or exposes Kafka broker configuration.
 - More runtime Kafka surfaces remain in composition events/orchestration, DVRL, META, MQEB, and generated docs/examples; these should be migrated in follow-on focused commits.
+
+### 2026-05-26 17:22 EAT
+
+Completed checkpoint:
+
+- Replaced the workflow orchestration message queue connector's Kafka/`aiokafka` surface with a dependency-light `BytewaxConnector`.
+- Added Bytewax stream configuration, in-process stream ledgers, subscribe/unsubscribe state, cursor-based consumer replay, stream health checks, and stream handler registration.
+- Updated the orchestration connector package exports to expose `BytewaxConnector` instead of `KafkaConnector`.
+
+Verification:
+
+- `rg -n "Kafka|KAFKA|kafka|aiokafka|AIOKafka|KafkaConnector|KafkaConfiguration|_subscribe_topics|_unsubscribe_topics|[\"topic\"]" capabilities/composition/orchestration/connectors/message_queue_connector.py capabilities/composition/orchestration/connectors/__init__.py` -> no matches
+- `.venv/bin/python -m py_compile capabilities/composition/orchestration/connectors/message_queue_connector.py capabilities/composition/orchestration/connectors/__init__.py`
+- `git diff --check -- capabilities/composition/orchestration/connectors/message_queue_connector.py capabilities/composition/orchestration/connectors/__init__.py`
+
+Current broader orchestration findings:
+
+- The generic message queue connector package no longer depends on Kafka clients for its stream connector.
+- Separate orchestration enterprise-integration and generated template files still contain Kafka references and need their own focused migration pass.
