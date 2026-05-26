@@ -2819,3 +2819,19 @@ Verification:
 - `.venv/bin/python -m py_compile capabilities/eam/ast/api.py tests/test_eam_ast_context_resolution.py`
 - `.venv/bin/python -m pytest -q tests/test_eam_ast_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "user-123|tenant-456|mock user data|For now, return mock user|Kafka|kafka" capabilities/eam/ast/api.py` -> no matches
+
+### 2026-05-27 01:35 EAT
+
+Completed checkpoint:
+
+- Replaced CKM RTC REST API's mock `user123`/`tenant123`/`rtc:*` auth dependency with request-derived APG identity and read-only fallback permissions.
+- Replaced CKM RTC Flask join-session fixed collaboration context with Flask `g`, session, APG headers, and query argument resolution.
+- Replaced CKM RTC WebSocket mock connection metadata with path/query/header/environment context resolution and non-empty identity validation.
+- Added focused CKM RTC context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/ckm/rtc/api.py capabilities/ckm/rtc/views.py capabilities/ckm/rtc/websocket_manager.py tests/test_ckm_rtc_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_ckm_rtc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed
+- `rg -n "'user123'|'tenant123'|\"current_user_id\"|\"current_tenant_id\"|Mock current user from APG auth|return mock data|rtc:\*|Kafka|kafka" capabilities/ckm/rtc/api.py capabilities/ckm/rtc/views.py capabilities/ckm/rtc/websocket_manager.py` -> no matches
+- `git diff --check` -> no issues

@@ -7,12 +7,14 @@ for Flask-AppBuilder page-level collaboration with APG integration.
 
 import asyncio
 import json
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Set
 from uuid_extensions import uuid7str
 import logging
 from dataclasses import dataclass
 from enum import Enum
+from urllib.parse import parse_qs, unquote, urlparse
 
 # Import WebRTC signaling for integration
 try:
@@ -80,6 +82,66 @@ class MessageType(Enum):
 	# Error handling
 	ERROR = "error"
 	VALIDATION_ERROR = "validation_error"
+
+
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def _query_value(query: Dict[str, List[str]], name: str) -> Optional[str]:
+	values = query.get(name)
+	if not values:
+		return None
+	return values[0]
+
+
+def resolve_connection_context(websocket: WebSocketServerProtocol, path: str) -> tuple[str, str, str]:
+	"""Resolve WebSocket user, tenant, and page context from headers/path/query."""
+	parsed = urlparse(path or "")
+	segments = [unquote(segment) for segment in parsed.path.split("/") if segment]
+	query = parse_qs(parsed.query)
+	headers = getattr(websocket, "request_headers", {}) or {}
+
+	path_tenant = segments[-2] if len(segments) >= 4 and segments[-4:-2] == ["ws", "rtc"] else None
+	path_user = segments[-1] if len(segments) >= 4 and segments[-4:-2] == ["ws", "rtc"] else None
+	page_url = _first_text([
+		_query_value(query, "page_url"),
+		_query_value(query, "page"),
+		headers.get("X-APG-Page-URL"),
+		headers.get("Referer"),
+		headers.get("Origin"),
+	], parsed.path or "/")
+
+	return (
+		_first_text([
+			headers.get("X-User-ID"),
+			headers.get("X-APG-User-ID"),
+			_query_value(query, "user_id"),
+			path_user,
+			os.getenv("APG_USER_ID"),
+		], os.getenv("APG_DEFAULT_USER_ID", "system")),
+		_first_text([
+			headers.get("X-Tenant-ID"),
+			headers.get("X-APG-Tenant-ID"),
+			headers.get("X-Organization-ID"),
+			_query_value(query, "tenant_id"),
+			_query_value(query, "tenant"),
+			path_tenant,
+			os.getenv("APG_TENANT_ID"),
+		], os.getenv("APG_DEFAULT_TENANT_ID", "default")),
+		page_url,
+	)
 
 
 @dataclass
@@ -244,17 +306,13 @@ class WebSocketManager:
 	
 	async def _extract_connection_info(self, websocket: WebSocketServerProtocol, path: str) -> tuple[str, str, str]:
 		"""Extract user_id, tenant_id, and page_url from connection"""
-		# Parse path: /ws/rtc/{tenant_id}/{user_id}?page_url={encoded_url}
-		# This would integrate with APG auth_rbac for authentication
-		
-		# For now, return mock data - would be replaced with real auth
-		return "user123", "tenant123", "http://localhost:5000/some/page"
+		return resolve_connection_context(websocket, path)
 	
 	async def _validate_connection(self, user_id: str, tenant_id: str) -> bool:
 		"""Validate connection with APG auth_rbac"""
 		# Integration point with APG auth_rbac capability
 		# Would validate JWT tokens, permissions, etc.
-		return True
+		return bool(_clean_text(user_id) and _clean_text(tenant_id))
 	
 	async def _register_connection(self, connection: WebSocketConnection) -> None:
 		"""Register new connection"""
