@@ -1803,3 +1803,18 @@ Verification:
 - `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py::TestESStream::test_stream_name_bytewax_compliance capabilities/composition/events/tests/unit/test_services.py::TestEventStreamingService::test_create_stream_success` -> 2 passed
 - `.venv/bin/python -m pytest --collect-only -q capabilities/composition/events/tests/unit` -> 80 tests collected
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed
+
+### 2026-05-26 20:33 EAT
+
+Completed checkpoint:
+
+- Made the Event Streaming SQLAlchemy model layer executable under direct local construction, matching the existing unit-test contract before database flush.
+- Added visible constructor defaults for event, stream, subscription, schema, stream assignment, processing history, and stream processor identifiers/status/config fields.
+- Preserved legacy Event Streaming names such as `topic_name`, `source_stream_id`, `assignment_type`, `assigned_by`, `processed_by`, and `metadata` while mapping them onto the Bytewax stream and SQLAlchemy-safe fields.
+- Added the missing `EventStatus.RETRY` and `ProcessorType.CUSTOM` enum values expected by the model contract.
+- Added model reprs and validation for the enhanced schema/assignment/processor objects used by the Event Streaming tests.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py` -> 46 passed
+- `.venv/bin/python -m py_compile capabilities/composition/events/models.py`

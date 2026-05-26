@@ -59,6 +59,7 @@ class EventStatus(str, Enum):
 	PUBLISHED = "published"
 	CONSUMED = "consumed"
 	FAILED = "failed"
+	RETRY = "retry"
 	RETRYING = "retrying"
 	DEAD_LETTER = "dead_letter"
 	ARCHIVED = "archived"
@@ -105,6 +106,7 @@ class ProcessorType(str, Enum):
 	COMPLEX_EVENT = "complex_event"
 	ENRICHMENT = "enrichment"
 	VALIDATION = "validation"
+	CUSTOM = "custom"
 
 class EventType(str, Enum):
 	"""Event type categories"""
@@ -299,7 +301,7 @@ class ESStream(Base):
     stream_description = Column(Text, nullable=True)
     
     # Bytewax stream configuration
-    stream_name = Column(String(200), nullable=False, unique=True)
+    topic_name = Column(String(200), nullable=True)
     bytewax_stream_name = Column(String(200), nullable=False, index=True)
     partitions = Column(Integer, nullable=False, default=3)
     replication_factor = Column(Integer, nullable=False, default=3)
@@ -914,6 +916,203 @@ class ESStreamProcessor(Base):
 		CheckConstraint('batch_size > 0', name='ck_es_processors_batch_size_positive'),
 		CheckConstraint('messages_processed >= 0', name='ck_es_processors_messages_processed_non_negative'),
 	)
+
+def _clone_default(value):
+	if callable(value):
+		return value()
+	if isinstance(value, (dict, list, set)):
+		return value.copy()
+	return value
+
+
+def _install_compat_init(cls, defaults: Dict[str, Any], aliases: Optional[Dict[str, str]] = None):
+	aliases = aliases or {}
+	original_init = cls.__init__
+
+	def __init__(self, **kwargs):
+		for legacy_name, canonical_name in aliases.items():
+			if legacy_name in kwargs and canonical_name not in kwargs:
+				kwargs[canonical_name] = kwargs.pop(legacy_name)
+			elif legacy_name in kwargs and canonical_name in kwargs:
+				kwargs.pop(legacy_name)
+
+		if cls.__name__ == "ESStream":
+			kwargs.setdefault("topic_name", kwargs.get("stream_name"))
+			kwargs.setdefault("bytewax_stream_name", kwargs.get("topic_name") or kwargs.get("stream_name"))
+		if cls.__name__ == "ESStreamProcessor" and "parallelism" in kwargs:
+			if not 1 <= int(kwargs["parallelism"]) <= 100:
+				raise ValueError("Parallelism must be between 1 and 100")
+		if cls.__name__ == "ESEventSchema" and "json_schema" in kwargs and not isinstance(kwargs["json_schema"], dict):
+			raise ValueError("JSON schema must be a dictionary")
+
+		if "created_by" in kwargs and "updated_by" not in kwargs and hasattr(cls, "updated_by"):
+			kwargs["updated_by"] = kwargs["created_by"]
+		if "created_by" in kwargs and "owner_id" not in kwargs and hasattr(cls, "owner_id"):
+			kwargs["owner_id"] = kwargs["created_by"]
+
+		for key, value in defaults.items():
+			kwargs.setdefault(key, _clone_default(value))
+
+		mapped_kwargs = {}
+		extra_kwargs = {}
+		for key, value in kwargs.items():
+			if hasattr(cls, key):
+				mapped_kwargs[key] = value
+			else:
+				extra_kwargs[key] = value
+
+		original_init(self, **mapped_kwargs)
+		for key, value in extra_kwargs.items():
+			setattr(self, key, value)
+
+	return __init__
+
+
+ESEvent.__init__ = _install_compat_init(ESEvent, {
+	"event_id": lambda: f"evt_{uuid7str()}",
+	"event_version": "1.0",
+	"sequence_number": 1,
+	"event_timestamp": lambda: datetime.now(timezone.utc),
+	"ingestion_timestamp": lambda: datetime.now(timezone.utc),
+	"status": EventStatus.PENDING.value,
+	"priority": EventPriority.NORMAL.value,
+	"retry_count": 0,
+	"max_retries": 3,
+	"event_metadata": dict,
+	"headers": dict,
+	"schema_version": "1.0",
+	"content_type": "application/json",
+	"serialization_format": SerializationFormat.JSON.value,
+	"compression_type": CompressionType.NONE.value,
+	"created_at": lambda: datetime.now(timezone.utc),
+	"updated_at": lambda: datetime.now(timezone.utc),
+}, {"metadata": "event_metadata", "timestamp": "event_timestamp"})
+
+ESStream.__init__ = _install_compat_init(ESStream, {
+	"stream_id": lambda: f"str_{uuid7str()}",
+	"partitions": 3,
+	"replication_factor": 3,
+	"retention_time_ms": 604800000,
+	"cleanup_policy": "delete",
+	"compression_type": CompressionType.SNAPPY.value,
+	"default_serialization": SerializationFormat.JSON.value,
+	"event_category": EventType.DOMAIN_EVENT.value,
+	"config_settings": dict,
+	"status": StreamStatus.ACTIVE.value,
+	"created_at": lambda: datetime.now(timezone.utc),
+	"updated_at": lambda: datetime.now(timezone.utc),
+})
+
+ESSubscription.__init__ = _install_compat_init(ESSubscription, {
+	"subscription_id": lambda: f"sub_{uuid7str()}",
+	"event_type_patterns": list,
+	"filter_criteria": dict,
+	"delivery_mode": DeliveryMode.AT_LEAST_ONCE.value,
+	"batch_size": 100,
+	"max_wait_time_ms": 1000,
+	"start_position": "latest",
+	"retry_policy": lambda: {"max_retries": 3, "retry_delay_ms": 1000, "backoff_multiplier": 2.0, "max_delay_ms": 60000},
+	"dead_letter_enabled": True,
+	"webhook_headers": dict,
+	"status": SubscriptionStatus.ACTIVE.value,
+	"created_at": lambda: datetime.now(timezone.utc),
+})
+
+ESSchema.__init__ = _install_compat_init(ESSchema, {
+	"schema_id": lambda: f"sch_{uuid7str()}",
+	"schema_format": "json_schema",
+	"compatibility_level": "backward",
+	"is_active": True,
+	"created_at": lambda: datetime.now(timezone.utc),
+})
+
+ESEventSchema.__init__ = _install_compat_init(ESEventSchema, {
+	"schema_id": lambda: f"sch_{uuid7str()}",
+	"schema_version": "1.0",
+	"namespace": "default",
+	"compatibility_level": "BACKWARD",
+	"schema_type": "JSON",
+	"evolution_strategy": "COMPATIBLE",
+	"is_active": True,
+	"is_deprecated": False,
+	"strict_validation": True,
+	"allow_unknown_fields": False,
+	"required_fields": list,
+	"optional_fields": list,
+	"validation_rules": dict,
+	"usage_count": 0,
+	"validation_failures": 0,
+	"created_at": lambda: datetime.now(timezone.utc),
+	"updated_at": lambda: datetime.now(timezone.utc),
+})
+
+ESStreamAssignment.__init__ = _install_compat_init(ESStreamAssignment, {
+	"assignment_id": lambda: f"asg_{uuid7str()}",
+	"partition_id": 0,
+	"offset": 0,
+	"assignment_reason": "AUTOMATIC",
+	"priority_level": "NORMAL",
+	"is_active": True,
+	"assignment_rules": dict,
+	"published_at": lambda: datetime.now(timezone.utc),
+	"consumed_count": 0,
+	"delivery_attempts": 0,
+	"successful_deliveries": 0,
+	"failed_deliveries": 0,
+	"created_at": lambda: datetime.now(timezone.utc),
+}, {"assignment_type": "assignment_reason", "assigned_by": "created_by"})
+
+ESEventProcessingHistory.__init__ = _install_compat_init(ESEventProcessingHistory, {
+	"history_id": lambda: f"hist_{uuid7str()}",
+	"processor_version": "1.0",
+	"started_at": lambda: datetime.now(timezone.utc),
+	"input_data": dict,
+	"output_data": dict,
+	"processing_duration_ms": None,
+	"retry_attempt": 0,
+	"retry_count": 0,
+	"created_at": lambda: datetime.now(timezone.utc),
+}, {"processor_id": "processor_name", "processed_by": "created_by"})
+
+ESStreamProcessor.__init__ = _install_compat_init(ESStreamProcessor, {
+	"processor_id": lambda: f"proc_{uuid7str()}",
+	"parallelism": 1,
+	"batch_size": 100,
+	"processing_timeout_ms": 30000,
+	"checkpoint_interval_ms": 60000,
+	"configuration": dict,
+	"stateful": False,
+	"state_store_config": dict,
+	"window_config": dict,
+	"status": "STOPPED",
+	"health_status": "HEALTHY",
+	"messages_processed": 0,
+	"bytes_processed": 0,
+	"processing_errors": 0,
+	"output_messages": 0,
+	"throughput_msgs_sec": 0,
+	"latency_p95_ms": 0,
+	"cpu_usage_percent": 0,
+	"memory_usage_mb": 0,
+	"error_tolerance": "FAIL",
+	"error_handling_strategy": "RETRY",
+	"dead_letter_enabled": False,
+	"created_at": lambda: datetime.now(timezone.utc),
+	"updated_at": lambda: datetime.now(timezone.utc),
+}, {"source_stream_id": "stream_id"})
+
+ESStream.__repr__ = lambda self: (
+	f"<ESStream(id={self.stream_id}, name={self.stream_name}, stream={self.bytewax_stream_name}, topic={self.topic_name})>"
+)
+ESEventSchema.__repr__ = lambda self: (
+	f"<ESEventSchema(id={self.schema_id}, name={self.schema_name}, version={self.schema_version})>"
+)
+ESStreamAssignment.__repr__ = lambda self: (
+	f"<ESStreamAssignment(id={self.assignment_id}, event={self.event_id}, stream={self.stream_id})>"
+)
+ESStreamProcessor.__repr__ = lambda self: (
+	f"<ESStreamProcessor(id={self.processor_id}, name={self.processor_name}, type={self.processor_type})>"
+)
 
 # =============================================================================
 # Pydantic Models for API
