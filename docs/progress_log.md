@@ -932,3 +932,27 @@ Current broader DTWN/IOTD/BCLG/QUAN execution findings:
 - DTWN, IOTD, BCLG, and QUAN are no longer placeholders at the composition layer.
 - Phase 11 emerging/advanced infrastructure now has first-class registration/contract coverage.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:54 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder SCRP package into a first-class APG scraper/data-harvesting capability with tenant-scoped source, extraction, compliance, governance, UI, and theme configuration.
+- Added deterministic SCRP rules for tenant context, source ownership, terms evidence, PII handling, schedule policy, and sensitive-source review.
+- Promoted the placeholder PLGN package into a first-class APG plugin/extension capability with tenant-scoped marketplace, plugin, security, governance, UI, and theme configuration.
+- Added deterministic PLGN rules for tenant context, plugin ownership, package signatures, permission review, sandbox policy, and external plugin review.
+- Promoted the placeholder SBOX package into a first-class APG sandbox/testing capability with tenant-scoped sandbox, isolation, dataset, governance, UI, and theme configuration.
+- Added deterministic SBOX rules for tenant context, sandbox ownership, isolation profiles, secret redaction, outbound network approval, and long-lived sandbox review.
+- Promoted the placeholder ESGC package into a first-class APG ESG/carbon capability with tenant-scoped emissions, data-source, reporting, governance, UI, and theme configuration.
+- Added deterministic ESGC rules for tenant context, inventory ownership, approved factor sources, reporting boundaries, report approval, and anomaly review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/scrp/__init__.py capabilities/common/scrp/capability_contract.py capabilities/common/scrp/test_capability_contract.py capabilities/common/plgn/__init__.py capabilities/common/plgn/capability_contract.py capabilities/common/plgn/test_capability_contract.py capabilities/common/sbox/__init__.py capabilities/common/sbox/capability_contract.py capabilities/common/sbox/test_capability_contract.py capabilities/common/esgc/__init__.py capabilities/common/esgc/capability_contract.py capabilities/common/esgc/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/scrp/test_capability_contract.py capabilities/common/plgn/test_capability_contract.py capabilities/common/sbox/test_capability_contract.py capabilities/common/esgc/test_capability_contract.py` -> 12 passed, 10 warnings
+
+Current broader SCRP/PLGN/SBOX/ESGC execution findings:
+
+- SCRP, PLGN, SBOX, and ESGC are no longer placeholders at the composition layer.
+- Final specialized services are partially complete; remaining placeholder tail is SHDN, USRM, SEOP, PLFD, and TENS.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
