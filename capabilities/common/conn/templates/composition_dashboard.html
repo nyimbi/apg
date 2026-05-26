@@ -1,0 +1,376 @@
+{% extends "appbuilder/general/widgets/base.html" %}
+{% block content %}
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-12">
+			<div class="card">
+				<div class="card-header">
+					<h3 class="card-title">
+						<i class="fa fa-puzzle-piece"></i>
+						Capability Composition Dashboard
+					</h3>
+					<div class="card-tools">
+						<a href="{{ url_for('CapabilityCompositionView.register_capability') }}" class="btn btn-primary btn-sm">
+							<i class="fa fa-plus"></i> Register Capability
+						</a>
+						<a href="{{ url_for('CapabilityCompositionView.create_composition') }}" class="btn btn-success btn-sm">
+							<i class="fa fa-link"></i> Create Composition
+						</a>
+						<a href="{{ url_for('CapabilityCompositionView.composition_monitor') }}" class="btn btn-info btn-sm">
+							<i class="fa fa-eye"></i> Monitor
+						</a>
+					</div>
+				</div>
+				<div class="card-body">
+					<!-- Statistics Cards -->
+					<div class="row">
+						<div class="col-lg-3 col-6">
+							<div class="small-box bg-info">
+								<div class="inner">
+									<h3>{{ stats.registered_capabilities_count }}</h3>
+									<p>Registered Capabilities</p>
+								</div>
+								<div class="icon">
+									<i class="fa fa-cube"></i>
+								</div>
+							</div>
+						</div>
+						<div class="col-lg-3 col-6">
+							<div class="small-box bg-success">
+								<div class="inner">
+									<h3>{{ stats.active_compositions_count }}</h3>
+									<p>Active Compositions</p>
+								</div>
+								<div class="icon">
+									<i class="fa fa-link"></i>
+								</div>
+							</div>
+						</div>
+						<div class="col-lg-3 col-6">
+							<div class="small-box bg-warning">
+								<div class="inner">
+									<h3>{{ stats.integration_methods|length }}</h3>
+									<p>Integration Methods</p>
+								</div>
+								<div class="icon">
+									<i class="fa fa-cogs"></i>
+								</div>
+							</div>
+						</div>
+						<div class="col-lg-3 col-6">
+							<div class="small-box bg-danger">
+								<div class="inner">
+									<h3>{{ stats.capability_types|length }}</h3>
+									<p>Capability Types</p>
+								</div>
+								<div class="icon">
+									<i class="fa fa-tags"></i>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Capabilities and Compositions -->
+					<div class="row">
+						<div class="col-md-6">
+							<div class="card">
+								<div class="card-header">
+									<h4 class="card-title">Registered Capabilities</h4>
+								</div>
+								<div class="card-body">
+									{% if registered_capabilities %}
+										<div class="table-responsive">
+											<table class="table table-sm table-hover">
+												<thead>
+													<tr>
+														<th>Name</th>
+														<th>Type</th>
+														<th>Version</th>
+														<th>Methods</th>
+														<th>Actions</th>
+													</tr>
+												</thead>
+												<tbody>
+													{% for capability in registered_capabilities %}
+													<tr>
+														<td>
+															<strong>{{ capability.name }}</strong>
+														</td>
+														<td>
+															<span class="badge badge-info">{{ capability.capability_type.value }}</span>
+														</td>
+														<td>{{ capability.version }}</td>
+														<td>
+															{% for method in capability.supported_methods %}
+																<span class="badge badge-secondary">{{ method.value }}</span>
+															{% endfor %}
+														</td>
+														<td>
+															<button class="btn btn-xs btn-primary" onclick="viewCapability('{{ capability.capability_id }}')">
+																<i class="fa fa-eye"></i>
+															</button>
+														</td>
+													</tr>
+													{% endfor %}
+												</tbody>
+											</table>
+										</div>
+									{% else %}
+										<div class="alert alert-info">
+											<i class="fa fa-info-circle"></i>
+											No capabilities registered yet.
+											<a href="{{ url_for('CapabilityCompositionView.register_capability') }}">Register the first one</a>.
+										</div>
+									{% endif %}
+								</div>
+							</div>
+						</div>
+
+						<div class="col-md-6">
+							<div class="card">
+								<div class="card-header">
+									<h4 class="card-title">Active Compositions</h4>
+								</div>
+								<div class="card-body">
+									{% if active_compositions %}
+										<div class="table-responsive">
+											<table class="table table-sm table-hover">
+												<thead>
+													<tr>
+														<th>Source → Target</th>
+														<th>Method</th>
+														<th>Direction</th>
+														<th>Actions</th>
+													</tr>
+												</thead>
+												<tbody>
+													{% for composition in active_compositions %}
+													<tr>
+														<td>
+															<small>{{ composition.source_capability }}</small>
+															<i class="fa fa-arrow-right"></i>
+															<small>{{ composition.target_capability }}</small>
+														</td>
+														<td>
+															<span class="badge badge-success">{{ composition.integration_method.value }}</span>
+														</td>
+														<td>
+															<span class="badge badge-secondary">{{ composition.data_flow_direction }}</span>
+														</td>
+														<td>
+															<button class="btn btn-xs btn-info" onclick="testComposition('{{ composition.contract_id }}')">
+																<i class="fa fa-play"></i>
+															</button>
+															<button class="btn btn-xs btn-warning" onclick="viewComposition('{{ composition.contract_id }}')">
+																<i class="fa fa-eye"></i>
+															</button>
+														</td>
+													</tr>
+													{% endfor %}
+												</tbody>
+											</table>
+										</div>
+									{% else %}
+										<div class="alert alert-info">
+											<i class="fa fa-info-circle"></i>
+											No active compositions.
+											<a href="{{ url_for('CapabilityCompositionView.create_composition') }}">Create the first one</a>.
+										</div>
+									{% endif %}
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Quick Actions -->
+					<div class="row mt-4">
+						<div class="col-12">
+							<div class="card">
+								<div class="card-header">
+									<h4 class="card-title">Quick Actions</h4>
+								</div>
+								<div class="card-body">
+									<div class="row">
+										<div class="col-md-3">
+											<a href="{{ url_for('CapabilityCompositionView.register_capability') }}" class="btn btn-block btn-outline-primary">
+												<i class="fa fa-plus-circle"></i><br>
+												Register New Capability
+											</a>
+										</div>
+										<div class="col-md-3">
+											<a href="{{ url_for('CapabilityCompositionView.create_composition') }}" class="btn btn-block btn-outline-success">
+												<i class="fa fa-link"></i><br>
+												Create Composition
+											</a>
+										</div>
+										<div class="col-md-3">
+											<a href="{{ url_for('CapabilityCompositionView.composition_monitor') }}" class="btn btn-block btn-outline-info">
+												<i class="fa fa-chart-line"></i><br>
+												Monitor Performance
+											</a>
+										</div>
+										<div class="col-md-3">
+											<a href="{{ url_for('CapabilityTestView.test_dashboard') }}" class="btn btn-block btn-outline-warning">
+												<i class="fa fa-flask"></i><br>
+												Test Compositions
+											</a>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Capability Details Modal -->
+<div class="modal fade" id="capabilityModal" tabindex="-1" role="dialog">
+	<div class="modal-dialog modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title">Capability Details</h5>
+				<button type="button" class="close" data-dismiss="modal">
+					<span>&times;</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<div id="capabilityDetails">Loading...</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+async function viewCapability(capabilityId) {
+	try {
+		const response = await fetch(`{{ url_for('CapabilityCompositionView.api_get_capability_interface', capability_id='__CAPABILITY_ID__') }}`.replace('__CAPABILITY_ID__', capabilityId));
+		const data = await response.json();
+
+		if (data.status === 'success') {
+			const capability = data.data;
+			document.getElementById('capabilityDetails').innerHTML = `
+				<div class="row">
+					<div class="col-md-6">
+						<h6>Basic Information</h6>
+						<table class="table table-sm">
+							<tr><th>Name:</th><td>${capability.name}</td></tr>
+							<tr><th>Version:</th><td>${capability.version}</td></tr>
+							<tr><th>Type:</th><td><span class="badge badge-info">${capability.capability_type}</span></td></tr>
+							<tr><th>ID:</th><td><small>${capability.capability_id}</small></td></tr>
+						</table>
+					</div>
+					<div class="col-md-6">
+						<h6>Integration Methods</h6>
+						<div>
+							${capability.supported_methods.map(method =>
+								`<span class="badge badge-secondary mr-1">${method}</span>`
+							).join('')}
+						</div>
+						<h6 class="mt-3">Data Formats</h6>
+						<div>
+							${capability.data_formats.map(format =>
+								`<span class="badge badge-light mr-1">${format}</span>`
+							).join('')}
+						</div>
+					</div>
+				</div>
+				<div class="row mt-3">
+					<div class="col-12">
+						<h6>Endpoints</h6>
+						<pre class="bg-light p-2">${JSON.stringify(capability.endpoints, null, 2)}</pre>
+					</div>
+				</div>
+				<div class="row mt-3">
+					<div class="col-6">
+						<h6>Event Types</h6>
+						<div class="list-group">
+							${capability.event_types.map(event =>
+								`<div class="list-group-item list-group-item-action">${event}</div>`
+							).join('')}
+						</div>
+					</div>
+					<div class="col-6">
+						<h6>Requirements</h6>
+						<pre class="bg-light p-2">${JSON.stringify(capability.requirements, null, 2)}</pre>
+					</div>
+				</div>
+			`;
+		} else {
+			document.getElementById('capabilityDetails').innerHTML = `
+				<div class="alert alert-danger">Error: ${data.message}</div>
+			`;
+		}
+
+		$('#capabilityModal').modal('show');
+	} catch (error) {
+		document.getElementById('capabilityDetails').innerHTML = `
+			<div class="alert alert-danger">Error loading capability details: ${error.message}</div>
+		`;
+		$('#capabilityModal').modal('show');
+	}
+}
+
+function testComposition(compositionId) {
+	// Redirect to test page with composition ID
+	window.location.href = `{{ url_for('CapabilityTestView.test_dashboard') }}?composition=${compositionId}`;
+}
+
+function viewComposition(compositionId) {
+	// Similar to viewCapability but for composition details
+	alert('Composition viewer not implemented yet');
+}
+
+// Auto-refresh dashboard every 30 seconds
+setTimeout(() => {
+	location.reload();
+}, 30000);
+</script>
+
+<style>
+.small-box {
+	border-radius: 8px;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	margin-bottom: 20px;
+}
+
+.small-box .inner {
+	padding: 15px;
+}
+
+.small-box .inner h3 {
+	font-size: 2.2rem;
+	font-weight: bold;
+	margin: 0;
+}
+
+.small-box .inner p {
+	font-size: 1rem;
+	margin: 0;
+}
+
+.small-box .icon {
+	position: absolute;
+	top: 15px;
+	right: 15px;
+	font-size: 3rem;
+	opacity: 0.3;
+}
+
+.json-editor {
+	font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+	font-size: 12px;
+}
+
+.capability-card {
+	transition: transform 0.2s ease-in-out;
+}
+
+.capability-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+</style>
+{% endblock %}

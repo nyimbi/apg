@@ -1,0 +1,248 @@
+# APG Connection Management - Docker Compose Configuration
+# Production-ready deployment with PostgreSQL, Redis, and monitoring
+#
+# Author: Nyimbi Odero
+# Company: Datacraft
+# Copyright: © 2025
+
+version: '3.8'
+
+services:
+  # APG Connection Management Application
+  apg-conn:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile
+    image: datacraft/apg-connection-mgmt:latest
+    container_name: apg-conn-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APG_ENV=production
+      - APG_LOG_LEVEL=INFO
+      - APG_WORKERS=4
+      - APG_DB_HOST=postgres
+      - APG_DB_PORT=5432
+      - APG_DB_NAME=apg
+      - APG_DB_USER=apg
+      - APG_DB_PASSWORD_FILE=/run/secrets/db_password
+      - APG_REDIS_HOST=redis
+      - APG_REDIS_PORT=6379
+      - APG_JWT_SECRET_FILE=/run/secrets/jwt_secret
+      - APG_ENCRYPTION_KEY_FILE=/run/secrets/encryption_key
+      - APG_ENABLE_METRICS=true
+      - APG_ENABLE_TRACING=true
+      - APG_OTEL_ENDPOINT=http://otel-collector:4317
+    volumes:
+      - apg-logs:/app/logs
+      - apg-data:/app/data
+      - /etc/localtime:/etc/localtime:ro
+    secrets:
+      - db_password
+      - jwt_secret
+      - encryption_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - apg-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.apg-conn.rule=Host(`conn.apg.local`)"
+      - "traefik.http.routers.apg-conn.tls=true"
+      - "traefik.http.services.apg-conn.loadbalancer.server.port=8000"
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: apg-conn-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=apg
+      - POSTGRES_USER=apg
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - /etc/localtime:/etc/localtime:ro
+    secrets:
+      - db_password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apg -d apg"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - apg-network
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.7
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=8
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=8
+      -c max_parallel_maintenance_workers=4
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: apg-conn-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - /etc/localtime:/etc/localtime:ro
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --appendonly yes
+      --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - apg-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:1.24-alpine
+    container_name: apg-conn-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - apg-logs:/var/log/apg:ro
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - apg-conn
+    networks:
+      - apg-network
+    labels:
+      - "traefik.enable=false"
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: apg-conn-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+      - /etc/localtime:/etc/localtime:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - apg-network
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: apg-conn-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_password
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-clock-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - /etc/localtime:/etc/localtime:ro
+    secrets:
+      - grafana_password
+    depends_on:
+      - prometheus
+    networks:
+      - apg-network
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: apg-conn-otel
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics
+      - "8889:8889"   # Prometheus exporter metrics
+    networks:
+      - apg-network
+
+# Docker secrets for sensitive data
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  encryption_key:
+    file: ./secrets/encryption_key.txt
+  grafana_password:
+    file: ./secrets/grafana_password.txt
+
+# Persistent volumes
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  apg-logs:
+    driver: local
+  apg-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+# Network configuration
+networks:
+  apg-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

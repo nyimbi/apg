@@ -1,0 +1,450 @@
+{% extends "appbuilder/general/widgets/base.html" %}
+{% block content %}
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-12">
+			<div class="card">
+				<div class="card-header">
+					<h3 class="card-title">
+						<i class="fa fa-eye"></i>
+						Capability Composition Monitor
+					</h3>
+					<div class="card-tools">
+						<button class="btn btn-sm btn-primary" onclick="refreshData()">
+							<i class="fa fa-refresh"></i> Refresh
+						</button>
+						<a href="{{ url_for('CapabilityCompositionView.dashboard') }}" class="btn btn-sm btn-secondary">
+							<i class="fa fa-arrow-left"></i> Back
+						</a>
+					</div>
+				</div>
+				<div class="card-body">
+					<!-- Real-time Statistics -->
+					<div class="row">
+						<div class="col-lg-3 col-md-6">
+							<div class="info-box">
+								<span class="info-box-icon bg-info"><i class="fa fa-cubes"></i></span>
+								<div class="info-box-content">
+									<span class="info-box-text">Total Capabilities</span>
+									<span class="info-box-number">{{ monitor_data.total_capabilities or 0 }}</span>
+								</div>
+							</div>
+						</div>
+						<div class="col-lg-3 col-md-6">
+							<div class="info-box">
+								<span class="info-box-icon bg-success"><i class="fa fa-link"></i></span>
+								<div class="info-box-content">
+									<span class="info-box-text">Active Compositions</span>
+									<span class="info-box-number">{{ monitor_data.total_compositions or 0 }}</span>
+								</div>
+							</div>
+						</div>
+						<div class="col-lg-3 col-md-6">
+							<div class="info-box">
+								<span class="info-box-icon bg-warning"><i class="fa fa-cogs"></i></span>
+								<div class="info-box-content">
+									<span class="info-box-text">Integration Methods</span>
+									<span class="info-box-number">{{ monitor_data.integration_methods.keys()|length or 0 }}</span>
+								</div>
+							</div>
+						</div>
+						<div class="col-lg-3 col-md-6">
+							<div class="info-box">
+								<span class="info-box-icon bg-danger"><i class="fa fa-tags"></i></span>
+								<div class="info-box-content">
+									<span class="info-box-text">Capability Types</span>
+									<span class="info-box-number">{{ monitor_data.capability_types.keys()|length or 0 }}</span>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Charts and Visualizations -->
+					<div class="row">
+						<div class="col-md-6">
+							<div class="card">
+								<div class="card-header">
+									<h4 class="card-title">Integration Methods Distribution</h4>
+								</div>
+								<div class="card-body">
+									<canvas id="integrationChart" height="300"></canvas>
+								</div>
+							</div>
+						</div>
+						<div class="col-md-6">
+							<div class="card">
+								<div class="card-header">
+									<h4 class="card-title">Capability Types Distribution</h4>
+								</div>
+								<div class="card-body">
+									<canvas id="capabilityChart" height="300"></canvas>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Active Compositions Table -->
+					<div class="row mt-4">
+						<div class="col-12">
+							<div class="card">
+								<div class="card-header">
+									<h4 class="card-title">Active Compositions</h4>
+								</div>
+								<div class="card-body">
+									{% if compositions %}
+										<div class="table-responsive">
+											<table id="compositionsTable" class="table table-striped table-hover">
+												<thead>
+													<tr>
+														<th>Contract ID</th>
+														<th>Source → Target</th>
+														<th>Method</th>
+														<th>Data Flow</th>
+														<th>Event Mappings</th>
+														<th>Transformations</th>
+														<th>Status</th>
+														<th>Actions</th>
+													</tr>
+												</thead>
+												<tbody>
+													{% for composition in compositions %}
+													<tr>
+														<td>
+															<small class="text-monospace">{{ composition.contract_id[:8] }}...</small>
+														</td>
+														<td>
+															<div class="d-flex align-items-center">
+																<span class="badge badge-light">{{ composition.source_capability[:15] }}...</span>
+																<i class="fa fa-arrow-right mx-2"></i>
+																<span class="badge badge-light">{{ composition.target_capability[:15] }}...</span>
+															</div>
+														</td>
+														<td>
+															<span class="badge badge-info">{{ composition.integration_method.value }}</span>
+														</td>
+														<td>
+															<span class="badge badge-secondary">{{ composition.data_flow_direction }}</span>
+														</td>
+														<td>
+															<span class="badge badge-primary">{{ composition.event_mappings.keys()|length }}</span>
+														</td>
+														<td>
+															<span class="badge badge-warning">{{ composition.data_transformations|length }}</span>
+														</td>
+														<td>
+															<span class="badge badge-success">Active</span>
+														</td>
+														<td>
+															<div class="btn-group btn-group-sm">
+																<button class="btn btn-outline-info" onclick="viewComposition('{{ composition.contract_id }}')" title="View Details">
+																	<i class="fa fa-eye"></i>
+																</button>
+																<button class="btn btn-outline-success" onclick="testComposition('{{ composition.contract_id }}')" title="Test">
+																	<i class="fa fa-play"></i>
+																</button>
+																<button class="btn btn-outline-warning" onclick="editComposition('{{ composition.contract_id }}')" title="Edit">
+																	<i class="fa fa-edit"></i>
+																</button>
+															</div>
+														</td>
+													</tr>
+													{% endfor %}
+												</tbody>
+											</table>
+										</div>
+									{% else %}
+										<div class="alert alert-info">
+											<i class="fa fa-info-circle"></i>
+											No active compositions found.
+											<a href="{{ url_for('CapabilityCompositionView.create_composition') }}">Create one now</a>.
+										</div>
+									{% endif %}
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Registered Capabilities -->
+					<div class="row mt-4">
+						<div class="col-12">
+							<div class="card">
+								<div class="card-header">
+									<h4 class="card-title">Registered Capabilities</h4>
+								</div>
+								<div class="card-body">
+									{% if capabilities %}
+										<div class="row">
+											{% for capability in capabilities %}
+											<div class="col-md-4 mb-3">
+												<div class="card capability-card">
+													<div class="card-body">
+														<h6 class="card-title">
+															{{ capability.name }}
+															<span class="badge badge-info float-right">{{ capability.version }}</span>
+														</h6>
+														<p class="card-text">
+															<small class="text-muted">{{ capability.capability_type.value }}</small>
+														</p>
+														<div class="mb-2">
+															{% for method in capability.supported_methods %}
+																<span class="badge badge-secondary badge-sm">{{ method.value }}</span>
+															{% endfor %}
+														</div>
+														<div class="mb-2">
+															<small class="text-muted">Events: </small>
+															<span class="badge badge-light">{{ capability.event_types|length }}</span>
+															<small class="text-muted">Endpoints: </small>
+															<span class="badge badge-light">{{ capability.endpoints.keys()|length }}</span>
+														</div>
+														<button class="btn btn-sm btn-outline-primary" onclick="viewCapability('{{ capability.capability_id }}')">
+															<i class="fa fa-eye"></i> View
+														</button>
+													</div>
+												</div>
+											</div>
+											{% endfor %}
+										</div>
+									{% else %}
+										<div class="alert alert-info">
+											<i class="fa fa-info-circle"></i>
+											No capabilities registered yet.
+											<a href="{{ url_for('CapabilityCompositionView.register_capability') }}">Register one now</a>.
+										</div>
+									{% endif %}
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Composition Details Modal -->
+<div class="modal fade" id="compositionModal" tabindex="-1" role="dialog">
+	<div class="modal-dialog modal-xl" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title">Composition Details</h5>
+				<button type="button" class="close" data-dismiss="modal">
+					<span>&times;</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<div id="compositionDetails">Loading...</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+// Initialize charts
+document.addEventListener('DOMContentLoaded', function() {
+	initializeCharts();
+	initializeDataTable();
+
+	// Auto-refresh every 10 seconds
+	setInterval(refreshData, 10000);
+});
+
+function initializeCharts() {
+	const integrationData = {{ monitor_data.integration_methods | tojson }};
+	const capabilityData = {{ monitor_data.capability_types | tojson }};
+
+	// Integration methods chart
+	const integrationCtx = document.getElementById('integrationChart');
+	if (integrationCtx && Object.keys(integrationData).length > 0) {
+		new Chart(integrationCtx, {
+			type: 'doughnut',
+			data: {
+				labels: Object.keys(integrationData),
+				datasets: [{
+					data: Object.values(integrationData),
+					backgroundColor: [
+						'#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6'
+					]
+				}]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: {
+					legend: {
+						position: 'bottom'
+					}
+				}
+			}
+		});
+	}
+
+	// Capability types chart
+	const capabilityCtx = document.getElementById('capabilityChart');
+	if (capabilityCtx && Object.keys(capabilityData).length > 0) {
+		new Chart(capabilityCtx, {
+			type: 'bar',
+			data: {
+				labels: Object.keys(capabilityData),
+				datasets: [{
+					label: 'Count',
+					data: Object.values(capabilityData),
+					backgroundColor: '#2ecc71',
+					borderColor: '#27ae60',
+					borderWidth: 1
+				}]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: {
+					legend: {
+						display: false
+					}
+				},
+				scales: {
+					y: {
+						beginAtZero: true,
+						ticks: {
+							stepSize: 1
+						}
+					}
+				}
+			}
+		});
+	}
+}
+
+function initializeDataTable() {
+	if (document.getElementById('compositionsTable')) {
+		$('#compositionsTable').DataTable({
+			responsive: true,
+			pageLength: 10,
+			order: [[0, 'desc']],
+			columnDefs: [
+				{ targets: [7], orderable: false } // Actions column
+			]
+		});
+	}
+}
+
+function refreshData() {
+	location.reload();
+}
+
+function viewComposition(compositionId) {
+	document.getElementById('compositionDetails').innerHTML = 'Loading composition details...';
+	$('#compositionModal').modal('show');
+
+	// This would fetch detailed composition data
+	// For now, just show a placeholder
+	setTimeout(() => {
+		document.getElementById('compositionDetails').innerHTML = `
+			<div class="alert alert-info">
+				<h5>Composition: ${compositionId}</h5>
+				<p>Detailed composition view would be implemented here with:</p>
+				<ul>
+					<li>Event flow diagram</li>
+					<li>Performance metrics</li>
+					<li>Error logs</li>
+					<li>Execution history</li>
+				</ul>
+			</div>
+		`;
+	}, 500);
+}
+
+function testComposition(compositionId) {
+	window.location.href = `{{ url_for('CapabilityTestView.test_dashboard') }}?composition=${compositionId}`;
+}
+
+function editComposition(compositionId) {
+	// Redirect to edit form
+	alert('Edit composition functionality would be implemented here');
+}
+
+function viewCapability(capabilityId) {
+	// Reuse the capability view function from dashboard
+	if (typeof viewCapability !== 'undefined') {
+		viewCapability(capabilityId);
+	} else {
+		alert('Capability details would be shown here');
+	}
+}
+</script>
+
+<style>
+.info-box {
+	display: flex;
+	align-items: center;
+	padding: 10px;
+	background: #fff;
+	border-radius: 8px;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	margin-bottom: 20px;
+}
+
+.info-box-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 70px;
+	height: 70px;
+	border-radius: 50%;
+	font-size: 24px;
+	color: white;
+	margin-right: 15px;
+}
+
+.info-box-content {
+	flex: 1;
+}
+
+.info-box-text {
+	display: block;
+	font-size: 14px;
+	color: #666;
+	text-transform: uppercase;
+}
+
+.info-box-number {
+	display: block;
+	font-size: 28px;
+	font-weight: bold;
+	color: #333;
+}
+
+.capability-card {
+	transition: transform 0.2s ease-in-out;
+	height: 100%;
+}
+
+.capability-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.badge-sm {
+	font-size: 0.7rem;
+	padding: 0.2rem 0.4rem;
+}
+
+.text-monospace {
+	font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+canvas {
+	max-height: 300px !important;
+}
+
+.card {
+	border: none;
+	border-radius: 8px;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card-header {
+	background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
+	border-bottom: 1px solid #dee2e6;
+}
+</style>
+{% endblock %}

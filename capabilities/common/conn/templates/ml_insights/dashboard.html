@@ -1,0 +1,533 @@
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block head_css %}
+    {{ super() }}
+    <link href="{{ url_for('static', filename='css/ml-insights-dashboard.css') }}" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .insight-card {
+            border-left: 4px solid #007bff;
+            transition: all 0.3s ease;
+        }
+        .insight-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .insight-card.critical {
+            border-left-color: #dc3545;
+        }
+        .insight-card.high {
+            border-left-color: #fd7e14;
+        }
+        .insight-card.medium {
+            border-left-color: #ffc107;
+        }
+        .insight-card.low {
+            border-left-color: #28a745;
+        }
+        .severity-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .confidence-bar {
+            height: 4px;
+            background: #e9ecef;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffc107 0%, #28a745 100%);
+            transition: width 0.3s ease;
+        }
+        .analysis-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+        .anomaly-icon { background: #dc3545; }
+        .clustering-icon { background: #17a2b8; }
+        .pattern-icon { background: #6f42c1; }
+        .profiling-icon { background: #20c997; }
+        .forecasting-icon { background: #fd7e14; }
+        .sentiment-icon { background: #e83e8c; }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fa fa-brain text-primary"></i>
+                        ML Insights Dashboard
+                    </h1>
+                    <p class="text-muted">Advanced machine learning analytics for your data connections</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('MLInsightsDashboardView.analyze') }}" class="btn btn-primary">
+                        <i class="fa fa-play"></i> Run Analysis
+                    </a>
+                    <button class="btn btn-outline-secondary" onclick="refreshDashboard()">
+                        <i class="fa fa-refresh"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0">{{ recent_insights|length }}</h4>
+                        <small>Recent Insights</small>
+                    </div>
+                    <i class="fa fa-lightbulb fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0">{{ insights_by_severity.critical + insights_by_severity.high }}</h4>
+                        <small>Critical/High Priority</small>
+                    </div>
+                    <i class="fa fa-exclamation-triangle fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0">{{ top_connections|length }}</h4>
+                        <small>Analyzed Connections</small>
+                    </div>
+                    <i class="fa fa-database fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0">85%</h4>
+                        <small>Avg Confidence</small>
+                    </div>
+                    <i class="fa fa-chart-line fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-chart-area text-primary"></i>
+                        Insights Timeline
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="insightsTimelineChart" height="80"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-pie-chart text-info"></i>
+                        Analysis Types
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="analysisDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Types Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-cogs text-success"></i>
+                        Analysis Types Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2 text-center mb-3">
+                            <div class="analysis-icon anomaly-icon mx-auto mb-2">
+                                <i class="fa fa-exclamation-triangle"></i>
+                            </div>
+                            <h6>Anomaly Detection</h6>
+                            <p class="text-muted small">{{ analysis_types.anomaly_detection }} analyses</p>
+                            <a href="{{ url_for('MLInsightsDashboardView.anomaly_detection') }}" class="btn btn-sm btn-outline-danger">View</a>
+                        </div>
+                        <div class="col-md-2 text-center mb-3">
+                            <div class="analysis-icon clustering-icon mx-auto mb-2">
+                                <i class="fa fa-project-diagram"></i>
+                            </div>
+                            <h6>Clustering</h6>
+                            <p class="text-muted small">{{ analysis_types.clustering }} analyses</p>
+                            <a href="{{ url_for('MLInsightsDashboardView.clustering') }}" class="btn btn-sm btn-outline-info">View</a>
+                        </div>
+                        <div class="col-md-2 text-center mb-3">
+                            <div class="analysis-icon pattern-icon mx-auto mb-2">
+                                <i class="fa fa-search"></i>
+                            </div>
+                            <h6>Pattern Recognition</h6>
+                            <p class="text-muted small">{{ analysis_types.pattern_recognition }} analyses</p>
+                            <a href="{{ url_for('MLInsightsDashboardView.patterns') }}" class="btn btn-sm btn-outline-secondary">View</a>
+                        </div>
+                        <div class="col-md-2 text-center mb-3">
+                            <div class="analysis-icon profiling-icon mx-auto mb-2">
+                                <i class="fa fa-clipboard-check"></i>
+                            </div>
+                            <h6>Data Profiling</h6>
+                            <p class="text-muted small">{{ analysis_types.data_profiling }} analyses</p>
+                            <a href="{{ url_for('DataQualityDashboardView.dashboard') }}" class="btn btn-sm btn-outline-success">View</a>
+                        </div>
+                        <div class="col-md-2 text-center mb-3">
+                            <div class="analysis-icon forecasting-icon mx-auto mb-2">
+                                <i class="fa fa-chart-line"></i>
+                            </div>
+                            <h6>Forecasting</h6>
+                            <p class="text-muted small">{{ analysis_types.time_series_forecasting }} analyses</p>
+                            <a href="{{ url_for('MLInsightsDashboardView.forecasting') }}" class="btn btn-sm btn-outline-warning">View</a>
+                        </div>
+                        <div class="col-md-2 text-center mb-3">
+                            <div class="analysis-icon sentiment-icon mx-auto mb-2">
+                                <i class="fa fa-heart"></i>
+                            </div>
+                            <h6>Sentiment Analysis</h6>
+                            <p class="text-muted small">{{ analysis_types.sentiment_analysis }} analyses</p>
+                            <a href="#" class="btn btn-sm btn-outline-primary">View</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Insights and Top Connections -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-lightbulb text-warning"></i>
+                        Recent Insights
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_insights %}
+                        {% for insight in recent_insights %}
+                        <div class="insight-card card mb-3 {{ insight.severity }}">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="flex-fill">
+                                        <h6 class="card-title mb-1">{{ insight.title }}</h6>
+                                        <p class="card-text text-muted small">{{ insight.description }}</p>
+                                    </div>
+                                    <span class="badge badge-{{ 'danger' if insight.severity == 'critical' else 'warning' if insight.severity == 'high' else 'info' if insight.severity == 'medium' else 'success' }} severity-badge">
+                                        {{ insight.severity.title() }}
+                                    </span>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="flex-fill mr-3">
+                                        <div class="confidence-bar">
+                                            <div class="confidence-fill" style="width: {{ (insight.confidence * 100)|round }}%"></div>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">{{ (insight.confidence * 100)|round }}% confidence</small>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge badge-light mr-1">{{ insight.analysis_type.replace('_', ' ').title() }}</span>
+                                        <small class="text-muted">{{ insight.generated_at }}</small>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewInsightDetails('{{ insight.insight_id }}')">
+                                        <i class="fa fa-eye"></i> Details
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <div class="text-center">
+                            <a href="{{ url_for('MLInsightsDashboardView.results', job_id='all') }}" class="btn btn-primary">
+                                View All Insights
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fa fa-info-circle fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No insights generated yet</p>
+                            <a href="{{ url_for('MLInsightsDashboardView.analyze') }}" class="btn btn-primary">
+                                <i class="fa fa-play"></i> Run Your First Analysis
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-trophy text-success"></i>
+                        Top Analyzed Connections
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for conn in top_connections %}
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-3 {% if not loop.last %}border-bottom{% endif %}">
+                        <div class="flex-fill">
+                            <h6 class="mb-1">{{ conn.name }}</h6>
+                            <small class="text-muted">{{ conn.insights_count }} insights • {{ conn.last_analyzed }}</small>
+                        </div>
+                        <div class="text-right">
+                            <span class="badge badge-primary">{{ conn.insights_count }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('CMConnectionModelView.list') }}" class="btn btn-sm btn-outline-primary">
+                            View All Connections
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-bolt text-warning"></i>
+                        Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="runQuickAnalysis('anomaly')">
+                            <i class="fa fa-exclamation-triangle"></i> Quick Anomaly Check
+                        </button>
+                        <button class="btn btn-outline-info btn-sm" onclick="runQuickAnalysis('patterns')">
+                            <i class="fa fa-search"></i> Find Patterns
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="runQuickAnalysis('quality')">
+                            <i class="fa fa-clipboard-check"></i> Quality Assessment
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="runQuickAnalysis('forecast')">
+                            <i class="fa fa-chart-line"></i> Generate Forecast
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analysis Progress Modal -->
+<div class="modal fade" id="analysisModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Running ML Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <p id="analysisStatus">Initializing analysis...</p>
+                    <div class="progress mb-3">
+                        <div id="analysisProgress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Insight Details Modal -->
+<div class="modal fade" id="insightModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Insight Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="insightModalBody">
+                <!-- Insight details will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    <script>
+        // Initialize charts
+        const timelineCtx = document.getElementById('insightsTimelineChart').getContext('2d');
+        const distributionCtx = document.getElementById('analysisDistributionChart').getContext('2d');
+
+        let timelineChart, distributionChart;
+
+        // Load timeline chart
+        fetch('{{ url_for("MLInsightsChartsView.api_insights_timeline") }}')
+            .then(response => response.json())
+            .then(data => {
+                timelineChart = new Chart(timelineCtx, {
+                    type: 'line',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Daily Insights by Severity'
+                            },
+                            legend: {
+                                position: 'bottom'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                stacked: true
+                            }
+                        }
+                    }
+                });
+            });
+
+        // Load distribution chart
+        fetch('{{ url_for("MLInsightsChartsView.api_analysis_distribution") }}')
+            .then(response => response.json())
+            .then(data => {
+                distributionChart = new Chart(distributionCtx, {
+                    type: 'doughnut',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            });
+
+        // Functions
+        function refreshDashboard() {
+            location.reload();
+        }
+
+        function runQuickAnalysis(analysisType) {
+            // Show analysis modal
+            const modal = new bootstrap.Modal(document.getElementById('analysisModal'));
+            modal.show();
+
+            // Simulate analysis progress
+            let progress = 0;
+            const progressBar = document.getElementById('analysisProgress');
+            const statusText = document.getElementById('analysisStatus');
+
+            const interval = setInterval(() => {
+                progress += Math.random() * 20;
+                if (progress > 100) progress = 100;
+
+                progressBar.style.width = progress + '%';
+
+                if (progress < 30) {
+                    statusText.textContent = 'Preparing data...';
+                } else if (progress < 60) {
+                    statusText.textContent = 'Running analysis...';
+                } else if (progress < 90) {
+                    statusText.textContent = 'Generating insights...';
+                } else if (progress >= 100) {
+                    statusText.textContent = 'Analysis complete!';
+                    clearInterval(interval);
+
+                    setTimeout(() => {
+                        modal.hide();
+                        location.reload();
+                    }, 1500);
+                }
+            }, 500);
+        }
+
+        function viewInsightDetails(insightId) {
+            // Load insight details
+            const modalBody = document.getElementById('insightModalBody');
+            modalBody.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                </div>
+            `;
+
+            const modal = new bootstrap.Modal(document.getElementById('insightModal'));
+            modal.show();
+
+            // Mock loading insight details
+            setTimeout(() => {
+                modalBody.innerHTML = `
+                    <div class="insight-details">
+                        <h6>Insight ID: ${insightId}</h6>
+                        <p>Detailed analysis results and recommendations would be displayed here.</p>
+
+                        <h6>Evidence:</h6>
+                        <ul>
+                            <li>Statistical analysis results</li>
+                            <li>Affected data fields</li>
+                            <li>Confidence intervals</li>
+                        </ul>
+
+                        <h6>Recommendations:</h6>
+                        <ul>
+                            <li>Action item 1</li>
+                            <li>Action item 2</li>
+                            <li>Action item 3</li>
+                        </ul>
+                    </div>
+                `;
+            }, 1000);
+        }
+    </script>
+{% endblock %}

@@ -1,0 +1,836 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+#lineage-container {
+    height: 700px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f8f9fa;
+    position: relative;
+    overflow: hidden;
+}
+
+.lineage-toolbar {
+    height: 50px;
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.lineage-canvas {
+    height: calc(100% - 50px);
+    position: relative;
+}
+
+.lineage-sidebar {
+    width: 300px;
+    background: #fff;
+    border-right: 1px solid #ddd;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+#lineage-viz {
+    flex: 1;
+    position: relative;
+}
+
+.node {
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.node circle {
+    stroke: #fff;
+    stroke-width: 2px;
+}
+
+.node.connection circle {
+    fill: #28a745;
+}
+
+.node.table circle {
+    fill: #007bff;
+}
+
+.node.field circle {
+    fill: #17a2b8;
+}
+
+.node.flow circle {
+    fill: #6f42c1;
+}
+
+.node.sensitive circle {
+    stroke: #dc3545;
+    stroke-width: 3px;
+    stroke-dasharray: 3, 3;
+}
+
+.node.selected circle {
+    stroke: #ffc107;
+    stroke-width: 4px;
+}
+
+.node text {
+    font: 12px sans-serif;
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+.link {
+    fill: none;
+    stroke: #666;
+    stroke-width: 2px;
+    marker-end: url(#arrow);
+    transition: all 0.3s;
+}
+
+.link.contains {
+    stroke: #28a745;
+    stroke-dasharray: 2, 2;
+}
+
+.link.derives_from {
+    stroke: #007bff;
+}
+
+.link.transforms_to {
+    stroke: #17a2b8;
+}
+
+.link.maps_to {
+    stroke: #6c757d;
+}
+
+.link.aggregates {
+    stroke: #6f42c1;
+    stroke-width: 3px;
+}
+
+.link.joins_with {
+    stroke: #e83e8c;
+    stroke-width: 3px;
+}
+
+.link.highlighted {
+    stroke: #ffc107;
+    stroke-width: 4px;
+}
+
+.tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 1000;
+    max-width: 300px;
+}
+
+.legend {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    margin: 10px;
+    font-size: 11px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin: 3px 0;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+.controls {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 10px;
+}
+
+.control-group {
+    margin-bottom: 10px;
+}
+
+.control-group label {
+    display: block;
+    font-weight: bold;
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+.search-box {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.filter-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.node-details {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 10px;
+}
+
+.zoom-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 100;
+}
+
+.zoom-controls button {
+    border: none;
+    background: none;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.zoom-controls button:hover {
+    background: #f8f9fa;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <h1 class="page-header">
+                <i class="fa fa-share-alt"></i> Data Lineage
+                <small>Interactive data flow visualization</small>
+            </h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="panel panel-default">
+                <div class="panel-body" style="padding: 0;">
+                    <div id="lineage-container">
+                        <!-- Toolbar -->
+                        <div class="lineage-toolbar">
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-default" id="btn-full-view">
+                                    <i class="fa fa-eye"></i> Full View
+                                </button>
+                                <button class="btn btn-sm btn-info" id="btn-upstream">
+                                    <i class="fa fa-arrow-left"></i> Upstream
+                                </button>
+                                <button class="btn btn-sm btn-success" id="btn-downstream">
+                                    <i class="fa fa-arrow-right"></i> Downstream
+                                </button>
+                                <button class="btn btn-sm btn-warning" id="btn-impact">
+                                    <i class="fa fa-exclamation-triangle"></i> Impact
+                                </button>
+                            </div>
+
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-default" id="btn-refresh">
+                                    <i class="fa fa-refresh"></i> Refresh
+                                </button>
+                                <button class="btn btn-sm btn-default" id="btn-export">
+                                    <i class="fa fa-download"></i> Export
+                                </button>
+                            </div>
+
+                            <div style="flex: 1;"></div>
+
+                            <span class="text-muted" id="lineage-summary">
+                                Click nodes to explore • Drag to move • Scroll to zoom
+                            </span>
+                        </div>
+
+                        <div style="display: flex; height: calc(100% - 50px);">
+                            <!-- Sidebar -->
+                            <div class="lineage-sidebar">
+                                <!-- Search and Filters -->
+                                <div class="controls">
+                                    <div class="control-group">
+                                        <label>Search Nodes</label>
+                                        <input type="text" class="search-box" id="node-search" placeholder="Search by name...">
+                                    </div>
+
+                                    <div class="control-group">
+                                        <label>Node Types</label>
+                                        <div class="filter-checkboxes" id="type-filters">
+                                            <label><input type="checkbox" value="connection" checked> Connections</label>
+                                            <label><input type="checkbox" value="table" checked> Tables</label>
+                                            <label><input type="checkbox" value="field" checked> Fields</label>
+                                            <label><input type="checkbox" value="flow" checked> Flows</label>
+                                        </div>
+                                    </div>
+
+                                    <div class="control-group">
+                                        <label>
+                                            <input type="checkbox" id="sensitive-only"> Show Sensitive Only
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Legend -->
+                                <div class="legend">
+                                    <strong>Node Types</strong>
+                                    <div class="legend-item">
+                                        <div class="legend-color" style="background: #28a745;"></div>
+                                        Connection
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-color" style="background: #007bff;"></div>
+                                        Table
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-color" style="background: #17a2b8;"></div>
+                                        Field
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-color" style="background: #6f42c1;"></div>
+                                        Flow
+                                    </div>
+
+                                    <hr style="margin: 8px 0;">
+                                    <strong>Relationships</strong>
+                                    <div class="legend-item">
+                                        <div style="width: 12px; height: 2px; background: #28a745; margin-right: 6px; border-style: dashed;"></div>
+                                        Contains
+                                    </div>
+                                    <div class="legend-item">
+                                        <div style="width: 12px; height: 2px; background: #007bff; margin-right: 6px;"></div>
+                                        Derives From
+                                    </div>
+                                    <div class="legend-item">
+                                        <div style="width: 12px; height: 3px; background: #6f42c1; margin-right: 6px;"></div>
+                                        Aggregates
+                                    </div>
+                                </div>
+
+                                <!-- Node Details -->
+                                <div class="node-details" id="node-details" style="display: none;">
+                                    <h5>Node Details</h5>
+                                    <div id="node-details-content">
+                                        <!-- Details will be populated here -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Visualization Area -->
+                            <div id="lineage-viz">
+                                <div class="zoom-controls">
+                                    <button id="zoom-in" title="Zoom In">
+                                        <i class="fa fa-plus"></i>
+                                    </button>
+                                    <button id="zoom-out" title="Zoom Out">
+                                        <i class="fa fa-minus"></i>
+                                    </button>
+                                    <button id="zoom-fit" title="Fit to Screen">
+                                        <i class="fa fa-arrows-alt"></i>
+                                    </button>
+                                </div>
+
+                                <svg id="lineage-svg"></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip" class="tooltip" style="display: none;"></div>
+
+<script>
+class LineageVisualization {
+    constructor() {
+        this.width = 0;
+        this.height = 0;
+        this.svg = null;
+        this.g = null;
+        this.simulation = null;
+        this.nodes = [];
+        this.links = [];
+        this.selectedNode = null;
+        this.currentView = 'full';
+
+        // Initial data from template
+        this.rawData = {{ lineage_data|safe }};
+
+        this.init();
+    }
+
+    init() {
+        this.setupSVG();
+        this.setupEventHandlers();
+        this.loadData();
+        this.render();
+    }
+
+    setupSVG() {
+        const container = document.getElementById('lineage-viz');
+        const rect = container.getBoundingClientRect();
+        this.width = rect.width;
+        this.height = rect.height;
+
+        this.svg = d3.select('#lineage-svg')
+            .attr('width', this.width)
+            .attr('height', this.height);
+
+        // Define arrow marker
+        this.svg.append('defs')
+            .append('marker')
+            .attr('id', 'arrow')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 15)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', '#666');
+
+        this.g = this.svg.append('g');
+
+        // Add zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on('zoom', (event) => {
+                this.g.attr('transform', event.transform);
+            });
+
+        this.svg.call(zoom);
+    }
+
+    setupEventHandlers() {
+        // Toolbar buttons
+        document.getElementById('btn-full-view').addEventListener('click', () => this.showView('full'));
+        document.getElementById('btn-upstream').addEventListener('click', () => this.showUpstream());
+        document.getElementById('btn-downstream').addEventListener('click', () => this.showDownstream());
+        document.getElementById('btn-impact').addEventListener('click', () => this.showImpact());
+        document.getElementById('btn-refresh').addEventListener('click', () => this.refresh());
+        document.getElementById('btn-export').addEventListener('click', () => this.exportData());
+
+        // Zoom controls
+        document.getElementById('zoom-in').addEventListener('click', () => this.zoom(1.5));
+        document.getElementById('zoom-out').addEventListener('click', () => this.zoom(0.67));
+        document.getElementById('zoom-fit').addEventListener('click', () => this.zoomToFit());
+
+        // Search and filters
+        document.getElementById('node-search').addEventListener('input', (e) => this.searchNodes(e.target.value));
+        document.getElementById('sensitive-only').addEventListener('change', (e) => this.filterSensitive(e.target.checked));
+
+        // Type filters
+        document.querySelectorAll('#type-filters input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => this.applyFilters());
+        });
+    }
+
+    loadData() {
+        // Process nodes
+        this.nodes = this.rawData.nodes.map(node => ({
+            id: node.id,
+            label: node.label,
+            type: node.type,
+            sensitive: node.metadata?.sensitive || false,
+            metadata: node.metadata || {},
+            x: Math.random() * this.width,
+            y: Math.random() * this.height,
+            visible: true
+        }));
+
+        // Process links
+        this.links = this.rawData.edges.map(edge => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            type: edge.type,
+            metadata: edge.metadata || {},
+            visible: true
+        }));
+
+        this.updateSummary();
+    }
+
+    render() {
+        this.renderLinks();
+        this.renderNodes();
+        this.startSimulation();
+    }
+
+    renderNodes() {
+        const nodeGroup = this.g.selectAll('.node')
+            .data(this.nodes.filter(d => d.visible), d => d.id);
+
+        const nodeEnter = nodeGroup.enter()
+            .append('g')
+            .attr('class', d => `node ${d.type} ${d.sensitive ? 'sensitive' : ''}`)
+            .call(d3.drag()
+                .on('start', (event, d) => this.dragStart(event, d))
+                .on('drag', (event, d) => this.dragging(event, d))
+                .on('end', (event, d) => this.dragEnd(event, d)));
+
+        nodeEnter.append('circle')
+            .attr('r', d => this.getNodeRadius(d))
+            .on('click', (event, d) => this.selectNode(d))
+            .on('mouseover', (event, d) => this.showTooltip(event, d))
+            .on('mouseout', () => this.hideTooltip());
+
+        nodeEnter.append('text')
+            .attr('dy', '.35em')
+            .text(d => this.getNodeLabel(d));
+
+        nodeGroup.exit().remove();
+    }
+
+    renderLinks() {
+        const linkGroup = this.g.selectAll('.link')
+            .data(this.links.filter(d => d.visible), d => d.id);
+
+        linkGroup.enter()
+            .append('path')
+            .attr('class', d => `link ${d.type}`)
+            .on('mouseover', (event, d) => this.showLinkTooltip(event, d))
+            .on('mouseout', () => this.hideTooltip());
+
+        linkGroup.exit().remove();
+    }
+
+    startSimulation() {
+        this.simulation = d3.forceSimulation(this.nodes.filter(d => d.visible))
+            .force('link', d3.forceLink(this.links.filter(d => d.visible))
+                .id(d => d.id)
+                .distance(100))
+            .force('charge', d3.forceManyBody().strength(-300))
+            .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+            .on('tick', () => this.tick());
+    }
+
+    tick() {
+        this.g.selectAll('.link')
+            .attr('d', d => this.getLinkPath(d));
+
+        this.g.selectAll('.node')
+            .attr('transform', d => `translate(${d.x},${d.y})`);
+    }
+
+    getLinkPath(d) {
+        const source = d.source;
+        const target = d.target;
+
+        if (!source || !target) return '';
+
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const dr = Math.sqrt(dx * dx + dy * dy) * 0.3;
+
+        return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
+    }
+
+    getNodeRadius(d) {
+        switch (d.type) {
+            case 'connection': return 15;
+            case 'table': return 12;
+            case 'field': return 8;
+            case 'flow': return 10;
+            default: return 10;
+        }
+    }
+
+    getNodeLabel(d) {
+        return d.label.length > 15 ? d.label.substring(0, 12) + '...' : d.label;
+    }
+
+    selectNode(node) {
+        // Clear previous selection
+        this.g.selectAll('.node').classed('selected', false);
+
+        this.selectedNode = node;
+
+        // Highlight selected node
+        this.g.selectAll('.node')
+            .filter(d => d.id === node.id)
+            .classed('selected', true);
+
+        this.showNodeDetails(node);
+        this.highlightRelatedNodes(node);
+    }
+
+    showNodeDetails(node) {
+        const detailsDiv = document.getElementById('node-details');
+        const contentDiv = document.getElementById('node-details-content');
+
+        let html = `
+            <strong>${node.label}</strong><br>
+            <em>Type:</em> ${node.type}<br>
+        `;
+
+        if (node.metadata.connection_id) {
+            html += `<em>Connection:</em> ${node.metadata.connection_id}<br>`;
+        }
+
+        if (node.metadata.schema_name) {
+            html += `<em>Schema:</em> ${node.metadata.schema_name}<br>`;
+        }
+
+        if (node.metadata.table_name) {
+            html += `<em>Table:</em> ${node.metadata.table_name}<br>`;
+        }
+
+        if (node.metadata.field_name) {
+            html += `<em>Field:</em> ${node.metadata.field_name}<br>`;
+        }
+
+        if (node.sensitive) {
+            html += `<em style="color: #dc3545;">⚠️ Contains Sensitive Data</em><br>`;
+        }
+
+        html += `<br><div class="btn-group btn-group-sm">
+            <button class="btn btn-info" onclick="lineageViz.showUpstreamFor('${node.id}')">
+                <i class="fa fa-arrow-left"></i> Upstream
+            </button>
+            <button class="btn btn-success" onclick="lineageViz.showDownstreamFor('${node.id}')">
+                <i class="fa fa-arrow-right"></i> Downstream
+            </button>
+        </div>`;
+
+        contentDiv.innerHTML = html;
+        detailsDiv.style.display = 'block';
+    }
+
+    highlightRelatedNodes(node) {
+        const relatedNodeIds = new Set();
+        const relatedLinkIds = new Set();
+
+        // Find related links and nodes
+        this.links.forEach(link => {
+            if (link.source.id === node.id || link.target.id === node.id) {
+                relatedLinkIds.add(link.id);
+                relatedNodeIds.add(link.source.id);
+                relatedNodeIds.add(link.target.id);
+            }
+        });
+
+        // Highlight related elements
+        this.g.selectAll('.node')
+            .classed('highlighted', d => relatedNodeIds.has(d.id));
+
+        this.g.selectAll('.link')
+            .classed('highlighted', d => relatedLinkIds.has(d.id));
+    }
+
+    showTooltip(event, d) {
+        const tooltip = document.getElementById('tooltip');
+        tooltip.innerHTML = `
+            <strong>${d.label}</strong><br>
+            Type: ${d.type}<br>
+            ${d.sensitive ? '<span style="color: #ffc107;">⚠️ Sensitive Data</span>' : ''}
+        `;
+        tooltip.style.display = 'block';
+        tooltip.style.left = event.pageX + 10 + 'px';
+        tooltip.style.top = event.pageY - 10 + 'px';
+    }
+
+    showLinkTooltip(event, d) {
+        const tooltip = document.getElementById('tooltip');
+        tooltip.innerHTML = `
+            <strong>Relationship:</strong> ${d.type}<br>
+            ${d.metadata.transformation_logic ? `<strong>Logic:</strong> ${d.metadata.transformation_logic}<br>` : ''}
+            ${d.metadata.confidence_score ? `<strong>Confidence:</strong> ${Math.round(d.metadata.confidence_score * 100)}%` : ''}
+        `;
+        tooltip.style.display = 'block';
+        tooltip.style.left = event.pageX + 10 + 'px';
+        tooltip.style.top = event.pageY - 10 + 'px';
+    }
+
+    hideTooltip() {
+        document.getElementById('tooltip').style.display = 'none';
+    }
+
+    updateSummary() {
+        const summary = this.rawData.summary || {};
+        const summaryText = `${summary.total_nodes || 0} nodes • ${summary.total_edges || 0} relationships • ${summary.sensitive_entities || 0} sensitive`;
+        document.getElementById('lineage-summary').textContent = summaryText;
+    }
+
+    // View switching methods
+    showView(type) {
+        this.currentView = type;
+        this.loadView();
+    }
+
+    async loadView(nodeId = null) {
+        const params = new URLSearchParams();
+        if (nodeId) params.append('node_id', nodeId);
+        params.append('type', this.currentView);
+        params.append('max_depth', '10');
+
+        try {
+            const response = await fetch(`/connections/api/lineage/visualization?${params}`);
+            const result = await response.json();
+
+            if (result.success) {
+                this.rawData = result.lineage_data;
+                this.loadData();
+                this.render();
+            }
+        } catch (error) {
+            console.error('Failed to load lineage data:', error);
+        }
+    }
+
+    showUpstream() {
+        if (this.selectedNode) {
+            this.showUpstreamFor(this.selectedNode.id);
+        }
+    }
+
+    showDownstream() {
+        if (this.selectedNode) {
+            this.showDownstreamFor(this.selectedNode.id);
+        }
+    }
+
+    showImpact() {
+        if (this.selectedNode) {
+            this.currentView = 'impact';
+            this.loadView(this.selectedNode.id);
+        }
+    }
+
+    showUpstreamFor(nodeId) {
+        this.currentView = 'upstream';
+        this.loadView(nodeId);
+    }
+
+    showDownstreamFor(nodeId) {
+        this.currentView = 'downstream';
+        this.loadView(nodeId);
+    }
+
+    refresh() {
+        this.loadView();
+    }
+
+    // Filter and search methods
+    searchNodes(query) {
+        const lowerQuery = query.toLowerCase();
+        this.nodes.forEach(node => {
+            node.visible = !query || node.label.toLowerCase().includes(lowerQuery);
+        });
+        this.applyFilters();
+    }
+
+    filterSensitive(sensitiveOnly) {
+        if (sensitiveOnly) {
+            this.nodes.forEach(node => {
+                node.visible = node.visible && node.sensitive;
+            });
+        }
+        this.render();
+    }
+
+    applyFilters() {
+        const enabledTypes = Array.from(document.querySelectorAll('#type-filters input:checked'))
+            .map(cb => cb.value);
+
+        this.nodes.forEach(node => {
+            node.visible = node.visible && enabledTypes.includes(node.type);
+        });
+
+        this.links.forEach(link => {
+            const sourceVisible = this.nodes.find(n => n.id === link.source.id)?.visible;
+            const targetVisible = this.nodes.find(n => n.id === link.target.id)?.visible;
+            link.visible = sourceVisible && targetVisible;
+        });
+
+        this.render();
+    }
+
+    // Utility methods
+    dragStart(event, d) {
+        if (!event.active) this.simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    dragging(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    dragEnd(event, d) {
+        if (!event.active) this.simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+
+    zoom(factor) {
+        this.svg.transition().duration(300).call(
+            d3.zoom().scaleBy,
+            factor
+        );
+    }
+
+    zoomToFit() {
+        this.svg.transition().duration(750).call(
+            d3.zoom().transform,
+            d3.zoomIdentity
+        );
+    }
+
+    exportData() {
+        const data = {
+            nodes: this.rawData.nodes,
+            edges: this.rawData.edges,
+            summary: this.rawData.summary
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'lineage-data.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+}
+
+// Initialize visualization
+let lineageViz;
+document.addEventListener('DOMContentLoaded', function() {
+    lineageViz = new LineageVisualization();
+});
+</script>
+{% endblock %}

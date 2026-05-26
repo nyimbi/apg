@@ -1,0 +1,345 @@
+{% extends "appbuilder/general/widgets/base.html" %}
+{% block content %}
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-12">
+			<div class="card">
+				<div class="card-header">
+					<h3 class="card-title">
+						<i class="fa fa-plus-circle"></i>
+						Register New Capability
+					</h3>
+					<div class="card-tools">
+						<a href="{{ url_for('CapabilityCompositionView.dashboard') }}" class="btn btn-secondary btn-sm">
+							<i class="fa fa-arrow-left"></i> Back to Dashboard
+						</a>
+					</div>
+				</div>
+				<div class="card-body">
+					<form method="POST" action="{{ url_for('CapabilityCompositionView.register_capability') }}">
+						<div class="row">
+							<div class="col-md-6">
+								<!-- Basic Information -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Basic Information</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.name.label(class="form-label") }}
+											{{ form.name(class="form-control", placeholder="e.g., data_analytics_engine") }}
+											{% if form.name.errors %}
+												<div class="text-danger">
+													{% for error in form.name.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+
+										<div class="form-group">
+											{{ form.version.label(class="form-label") }}
+											{{ form.version(class="form-control", placeholder="e.g., 1.0.0") }}
+											{% if form.version.errors %}
+												<div class="text-danger">
+													{% for error in form.version.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+
+										<div class="form-group">
+											{{ form.capability_type.label(class="form-label") }}
+											{{ form.capability_type(class="form-control") }}
+											<small class="form-text text-muted">Select the primary type of this capability</small>
+										</div>
+
+										<div class="form-group">
+											<label class="form-label">Supported Integration Methods</label>
+											<div class="form-check">
+												{% for method in integration_methods %}
+													<div class="form-check">
+														<input class="form-check-input" type="checkbox" name="supported_methods" value="{{ method[0] }}" id="method_{{ method[0] }}">
+														<label class="form-check-label" for="method_{{ method[0] }}">
+															{{ method[1] }}
+														</label>
+													</div>
+												{% endfor %}
+											</div>
+											<small class="form-text text-muted">Select all integration methods this capability supports</small>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="col-md-6">
+								<!-- Configuration -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Configuration</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.endpoints.label(class="form-label") }}
+											{{ form.endpoints(class="form-control json-editor", placeholder='{\n  "create": "/api/create",\n  "read": "/api/read",\n  "update": "/api/update",\n  "delete": "/api/delete"\n}') }}
+											<small class="form-text text-muted">JSON object mapping endpoint names to URL paths</small>
+											{% if form.endpoints.errors %}
+												<div class="text-danger">
+													{% for error in form.endpoints.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+
+										<div class="form-group">
+											{{ form.event_types.label(class="form-label") }}
+											{{ form.event_types(class="form-control json-editor", placeholder='[\n  "data.processed",\n  "analysis.completed",\n  "error.occurred"\n]') }}
+											<small class="form-text text-muted">JSON array of event types this capability can emit or handle</small>
+											{% if form.event_types.errors %}
+												<div class="text-danger">
+													{% for error in form.event_types.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+
+										<div class="form-group">
+											{{ form.data_formats.label(class="form-label") }}
+											{{ form.data_formats(class="form-control json-editor", placeholder='[\n  "json",\n  "avro",\n  "parquet"\n]') }}
+											<small class="form-text text-muted">JSON array of supported data formats</small>
+											{% if form.data_formats.errors %}
+												<div class="text-danger">
+													{% for error in form.data_formats.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="row mt-3">
+							<div class="col-md-6">
+								<!-- Requirements -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Requirements</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.requirements.label(class="form-label") }}
+											{{ form.requirements(class="form-control json-editor", placeholder='{\n  "async_support": true,\n  "min_memory_mb": 512,\n  "cpu_cores": 2\n}') }}
+											<small class="form-text text-muted">JSON object specifying capability requirements</small>
+											{% if form.requirements.errors %}
+												<div class="text-danger">
+													{% for error in form.requirements.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="col-md-6">
+								<!-- Metadata -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Metadata</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.metadata.label(class="form-label") }}
+											{{ form.metadata(class="form-control json-editor", placeholder='{\n  "author": "Your Name",\n  "description": "Capability description",\n  "tags": ["analytics", "data"]\n}') }}
+											<small class="form-text text-muted">JSON object with additional metadata</small>
+											{% if form.metadata.errors %}
+												<div class="text-danger">
+													{% for error in form.metadata.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="row mt-3">
+							<div class="col-12">
+								<div class="card">
+									<div class="card-body text-center">
+										<button type="submit" class="btn btn-primary btn-lg">
+											<i class="fa fa-save"></i>
+											Register Capability
+										</button>
+										<button type="button" class="btn btn-secondary btn-lg ml-2" onclick="resetForm()">
+											<i class="fa fa-refresh"></i>
+											Reset Form
+										</button>
+										<button type="button" class="btn btn-info btn-lg ml-2" onclick="validateForm()">
+											<i class="fa fa-check"></i>
+											Validate JSON
+										</button>
+									</div>
+								</div>
+							</div>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+function resetForm() {
+	document.querySelector('form').reset();
+}
+
+function validateForm() {
+	const jsonFields = [
+		'endpoints',
+		'event_types',
+		'data_formats',
+		'requirements',
+		'metadata'
+	];
+
+	let valid = true;
+	let messages = [];
+
+	jsonFields.forEach(fieldName => {
+		const field = document.querySelector(`textarea[name="${fieldName}"]`);
+		if (field && field.value.trim()) {
+			try {
+				JSON.parse(field.value);
+				field.classList.remove('is-invalid');
+				field.classList.add('is-valid');
+			} catch (e) {
+				valid = false;
+				field.classList.remove('is-valid');
+				field.classList.add('is-invalid');
+				messages.push(`${fieldName}: ${e.message}`);
+			}
+		}
+	});
+
+	if (valid) {
+		alert('All JSON fields are valid! ✓');
+	} else {
+		alert('JSON validation errors:\n' + messages.join('\n'));
+	}
+}
+
+// Auto-validate JSON on input
+document.addEventListener('DOMContentLoaded', function() {
+	const jsonFields = document.querySelectorAll('.json-editor');
+
+	jsonFields.forEach(field => {
+		field.addEventListener('input', function() {
+			if (this.value.trim()) {
+				try {
+					JSON.parse(this.value);
+					this.classList.remove('is-invalid');
+					this.classList.add('is-valid');
+				} catch (e) {
+					this.classList.remove('is-valid');
+					this.classList.add('is-invalid');
+				}
+			} else {
+				this.classList.remove('is-valid', 'is-invalid');
+			}
+		});
+	});
+});
+
+// Template helpers
+function insertTemplate(fieldName, template) {
+	const field = document.querySelector(`textarea[name="${fieldName}"]`);
+	if (field) {
+		field.value = JSON.stringify(template, null, 2);
+		field.dispatchEvent(new Event('input'));
+	}
+}
+
+// Common templates
+const templates = {
+	endpoints: {
+		"health": "/api/health",
+		"status": "/api/status",
+		"process": "/api/process",
+		"results": "/api/results"
+	},
+	event_types: [
+		"capability.started",
+		"capability.completed",
+		"capability.failed",
+		"data.received",
+		"data.processed"
+	],
+	data_formats: [
+		"json",
+		"csv",
+		"avro",
+		"parquet"
+	],
+	requirements: {
+		"async_support": true,
+		"tenant_isolation": true,
+		"min_memory_mb": 256,
+		"max_cpu_percent": 80
+	},
+	metadata: {
+		"author": "APG Developer",
+		"description": "Custom capability for APG platform",
+		"version": "1.0.0",
+		"tags": ["custom", "apg"]
+	}
+};
+</script>
+
+<style>
+.json-editor {
+	font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.is-valid {
+	border-color: #28a745;
+}
+
+.is-invalid {
+	border-color: #dc3545;
+}
+
+.card {
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	border: none;
+	border-radius: 8px;
+	margin-bottom: 20px;
+}
+
+.card-header {
+	background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
+	border-bottom: 1px solid #dee2e6;
+}
+
+.form-check-input:checked {
+	background-color: #007bff;
+	border-color: #007bff;
+}
+
+.btn-lg {
+	padding: 10px 20px;
+	font-size: 16px;
+}
+</style>
+{% endblock %}

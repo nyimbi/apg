@@ -1,0 +1,231 @@
+
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h3 class="panel-title">
+                        <i class="fa fa-brain"></i> AI Connection Insights Dashboard
+                    </h3>
+                </div>
+                <div class="panel-body">
+                    <!-- AI Status Card -->
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <h5><i class="fa fa-robot"></i> AI Status</h5>
+                                    <p id="ai-status">Checking...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <h5><i class="fa fa-database"></i> Connections</h5>
+                                    <p>{{ connections|length }} Total</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <h5><i class="fa fa-chart-line"></i> Analysis</h5>
+                                    <p id="analysis-count">0 Completed</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <h5><i class="fa fa-lightbulb"></i> Insights</h5>
+                                    <p id="insights-count">0 Generated</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Actions -->
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <h4>AI-Powered Actions</h4>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-success" onclick="analyzeAllConnections()">
+                                    <i class="fa fa-heartbeat"></i> Analyze All Health
+                                </button>
+                                <button class="btn btn-info" onclick="getOptimizations()">
+                                    <i class="fa fa-rocket"></i> Get Optimizations
+                                </button>
+                                <button class="btn btn-warning" onclick="generateInsights()">
+                                    <i class="fa fa-chart-bar"></i> System Insights
+                                </button>
+                                <button class="btn btn-primary" onclick="exportReport()">
+                                    <i class="fa fa-download"></i> Export Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Results Area -->
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div id="ai-results" class="card">
+                                <div class="card-header">
+                                    <h5>AI Analysis Results</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted">Select an AI action above to see intelligent insights...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Check AI status on load
+$(document).ready(function() {
+    checkAIStatus();
+});
+
+function checkAIStatus() {
+    $.get('{{ url_for("AIConnectionAnalysisView.ai_health_check") }}')
+        .done(function(data) {
+            if (data.ai_available) {
+                $('#ai-status').html('<i class="fa fa-check"></i> Online (' + data.model + ')');
+            } else {
+                $('#ai-status').html('<i class="fa fa-times"></i> Offline');
+                $('#ai-status').parent().removeClass('bg-success').addClass('bg-danger');
+            }
+        })
+        .fail(function() {
+            $('#ai-status').html('<i class="fa fa-exclamation"></i> Error');
+            $('#ai-status').parent().removeClass('bg-success').addClass('bg-danger');
+        });
+}
+
+function analyzeAllConnections() {
+    showLoading('Analyzing connection health with AI...');
+
+    const connections = {{ connections | tojson }};
+    let analysisCount = 0;
+    let results = [];
+
+    connections.forEach(function(conn) {
+        $.get('{{ url_for("AIConnectionAnalysisView.analyze_health", connection_id="") }}' + conn.id)
+            .done(function(data) {
+                analysisCount++;
+                results.push({connection: conn.name, analysis: data});
+                $('#analysis-count').text(analysisCount + ' Completed');
+
+                if (analysisCount === connections.length) {
+                    displayAnalysisResults(results);
+                }
+            })
+            .fail(function() {
+                analysisCount++;
+                if (analysisCount === connections.length) {
+                    displayAnalysisResults(results);
+                }
+            });
+    });
+}
+
+function getOptimizations() {
+    showLoading('Generating AI optimization suggestions...');
+
+    const connectionIds = {{ connections | map(attribute='id') | list | tojson }};
+
+    $.ajax({
+        url: '{{ url_for("AIConnectionAnalysisView.suggest_optimizations") }}',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({connection_ids: connectionIds})
+    })
+    .done(function(data) {
+        displayOptimizationResults(data);
+    })
+    .fail(function() {
+        showError('Failed to get optimization suggestions');
+    });
+}
+
+function generateInsights() {
+    showLoading('Generating executive AI insights...');
+
+    $.get('{{ url_for("AIConnectionAnalysisView.system_insights") }}')
+        .done(function(data) {
+            displayInsightsResults(data);
+            $('#insights-count').text('1 Generated');
+        })
+        .fail(function() {
+            showError('Failed to generate insights');
+        });
+}
+
+function showLoading(message) {
+    $('#ai-results .card-body').html('<p><i class="fa fa-spinner fa-spin"></i> ' + message + '</p>');
+}
+
+function showError(message) {
+    $('#ai-results .card-body').html('<p class="text-danger"><i class="fa fa-exclamation-triangle"></i> ' + message + '</p>');
+}
+
+function displayAnalysisResults(results) {
+    let html = '<h6>Connection Health Analysis</h6>';
+    results.forEach(function(result) {
+        if (result.analysis.ai_analysis) {
+            html += '<div class="mb-3"><strong>' + result.connection + ':</strong><br>';
+            html += '<div class="text-muted">' + result.analysis.ai_analysis.replace(/\n/g, '<br>') + '</div></div>';
+        }
+    });
+    $('#ai-results .card-body').html(html);
+}
+
+function displayOptimizationResults(data) {
+    let html = '<h6>AI Optimization Suggestions</h6>';
+    if (data.optimization_suggestions) {
+        html += '<div class="alert alert-info">';
+        html += data.optimization_suggestions.replace(/\n/g, '<br>');
+        html += '</div>';
+        html += '<p><small class="text-muted">Model: ' + data.model_used + ' | Connections: ' + data.connections_analyzed + '</small></p>';
+    } else {
+        html += '<p class="text-warning">No optimization suggestions available.</p>';
+    }
+    $('#ai-results .card-body').html(html);
+}
+
+function displayInsightsResults(data) {
+    let html = '<h6>Executive AI Insights</h6>';
+    if (data.system_insights) {
+        html += '<div class="alert alert-success">';
+        html += data.system_insights.replace(/\n/g, '<br>');
+        html += '</div>';
+
+        if (data.metrics) {
+            html += '<h6>Key Metrics</h6>';
+            html += '<div class="row">';
+            Object.keys(data.metrics).forEach(function(key) {
+                html += '<div class="col-md-6"><strong>' + key.replace(/_/g, ' ').toUpperCase() + ':</strong> ' + data.metrics[key] + '</div>';
+            });
+            html += '</div>';
+        }
+
+        html += '<p><small class="text-muted">Generated: ' + new Date(data.timestamp).toLocaleString() + '</small></p>';
+    } else {
+        html += '<p class="text-warning">No insights available.</p>';
+    }
+    $('#ai-results .card-body').html(html);
+}
+
+function exportReport() {
+    window.open('{{ url_for("AIInsightsView.export_insights") }}?format=json', '_blank');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,818 @@
+{% extends "appbuilder/base.html" %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+#designer-container {
+    height: 700px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f8f9fa;
+    position: relative;
+    overflow: hidden;
+}
+
+.designer-toolbar {
+    height: 50px;
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.designer-canvas {
+    height: calc(100% - 50px);
+    position: relative;
+    background-image:
+        radial-gradient(circle, #ddd 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.node-palette {
+    width: 200px;
+    background: #fff;
+    border-right: 1px solid #ddd;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.palette-section {
+    margin-bottom: 20px;
+}
+
+.palette-section h5 {
+    color: #666;
+    font-size: 12px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.palette-node {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    margin-bottom: 5px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: grab;
+    transition: all 0.2s;
+}
+
+.palette-node:hover {
+    background: #e9ecef;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.palette-node:active {
+    cursor: grabbing;
+}
+
+.palette-node-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+}
+
+.flow-node {
+    position: absolute;
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    min-width: 120px;
+    cursor: move;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 10;
+}
+
+.flow-node.selected {
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+
+.flow-node.source {
+    border-color: #28a745;
+}
+
+.flow-node.target {
+    border-color: #dc3545;
+}
+
+.flow-node.transformation {
+    border-color: #ffc107;
+}
+
+.node-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.node-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    margin-right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+}
+
+.node-title {
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.node-description {
+    font-size: 11px;
+    color: #666;
+}
+
+.connection-line {
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.connection-line svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.connection-path {
+    fill: none;
+    stroke: #6c757d;
+    stroke-width: 2;
+    marker-end: url(#arrowhead);
+}
+
+.properties-panel {
+    width: 300px;
+    background: #fff;
+    border-left: 1px solid #ddd;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.properties-panel h4 {
+    margin-top: 0;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    font-weight: bold;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #666;
+}
+
+.save-flow-panel {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <h1 class="page-header">
+                <i class="fa fa-sitemap"></i> Visual Flow Designer
+                <small>Drag and drop to create data pipelines</small>
+            </h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="panel panel-default">
+                <div class="panel-body" style="padding: 0;">
+                    <div id="designer-container">
+                        <!-- Toolbar -->
+                        <div class="designer-toolbar">
+                            <button class="btn btn-sm btn-primary" id="btn-new-flow">
+                                <i class="fa fa-plus"></i> New Flow
+                            </button>
+                            <button class="btn btn-sm btn-success" id="btn-save-flow">
+                                <i class="fa fa-save"></i> Save Flow
+                            </button>
+                            <button class="btn btn-sm btn-info" id="btn-validate-flow">
+                                <i class="fa fa-check"></i> Validate
+                            </button>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-default" id="btn-zoom-in">
+                                    <i class="fa fa-search-plus"></i>
+                                </button>
+                                <button class="btn btn-sm btn-default" id="btn-zoom-out">
+                                    <i class="fa fa-search-minus"></i>
+                                </button>
+                                <button class="btn btn-sm btn-default" id="btn-zoom-fit">
+                                    <i class="fa fa-arrows-alt"></i>
+                                </button>
+                            </div>
+                            <div style="flex: 1;"></div>
+                            <span class="text-muted">Drag nodes from palette • Connect with lines • Configure properties</span>
+                        </div>
+
+                        <div style="display: flex; height: calc(100% - 50px);">
+                            <!-- Node Palette -->
+                            <div class="node-palette">
+                                <div class="palette-section">
+                                    <h5>Data Sources</h5>
+                                    {% for conn in connections|fromjson %}
+                                    {% if conn.type in ['database', 'file', 'api'] %}
+                                    <div class="palette-node" data-node-type="source" data-connection-id="{{ conn.id }}">
+                                        <div class="palette-node-icon" style="background-color: #28a745;">
+                                            <i class="fa fa-database"></i>
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: bold; font-size: 11px;">{{ conn.name }}</div>
+                                            <div style="font-size: 10px; color: #666;">{{ conn.type }}</div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+
+                                <div class="palette-section">
+                                    <h5>Transformations</h5>
+                                    <div class="palette-node" data-node-type="transformation" data-transform-type="filter">
+                                        <div class="palette-node-icon" style="background-color: #ffc107;">
+                                            <i class="fa fa-filter"></i>
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: bold; font-size: 11px;">Filter</div>
+                                            <div style="font-size: 10px; color: #666;">Filter records</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="palette-node" data-node-type="transformation" data-transform-type="map">
+                                        <div class="palette-node-icon" style="background-color: #17a2b8;">
+                                            <i class="fa fa-exchange"></i>
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: bold; font-size: 11px;">Map Fields</div>
+                                            <div style="font-size: 10px; color: #666;">Transform fields</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="palette-node" data-node-type="transformation" data-transform-type="aggregate">
+                                        <div class="palette-node-icon" style="background-color: #6f42c1;">
+                                            <i class="fa fa-calculator"></i>
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: bold; font-size: 11px;">Aggregate</div>
+                                            <div style="font-size: 10px; color: #666;">Group and sum</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="palette-node" data-node-type="transformation" data-transform-type="join">
+                                        <div class="palette-node-icon" style="background-color: #e83e8c;">
+                                            <i class="fa fa-link"></i>
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: bold; font-size: 11px;">Join</div>
+                                            <div style="font-size: 10px; color: #666;">Join datasets</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="palette-section">
+                                    <h5>Data Targets</h5>
+                                    {% for conn in connections|fromjson %}
+                                    {% if conn.type in ['database', 'file', 'api'] %}
+                                    <div class="palette-node" data-node-type="target" data-connection-id="{{ conn.id }}">
+                                        <div class="palette-node-icon" style="background-color: #dc3545;">
+                                            <i class="fa fa-save"></i>
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: bold; font-size: 11px;">{{ conn.name }}</div>
+                                            <div style="font-size: 10px; color: #666;">{{ conn.type }}</div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- Design Canvas -->
+                            <div class="designer-canvas" id="design-canvas">
+                                <!-- SVG for connections -->
+                                <svg class="connection-line">
+                                    <defs>
+                                        <marker id="arrowhead" markerWidth="10" markerHeight="7"
+                                                refX="9" refY="3.5" orient="auto">
+                                            <polygon points="0 0, 10 3.5, 0 7" fill="#6c757d" />
+                                        </marker>
+                                    </defs>
+                                </svg>
+
+                                <!-- Flow nodes will be dynamically added here -->
+                            </div>
+
+                            <!-- Properties Panel -->
+                            <div class="properties-panel">
+                                <h4>Properties</h4>
+                                <div id="properties-content">
+                                    <p class="text-muted">Select a node to view and edit its properties.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save Flow Panel -->
+                        <div class="save-flow-panel" id="save-flow-panel" style="display: none;">
+                            <h5>Save Flow</h5>
+                            <form id="save-flow-form">
+                                <div class="form-group">
+                                    <label>Flow Name</label>
+                                    <input type="text" class="form-control" id="flow-name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Description</label>
+                                    <textarea class="form-control" id="flow-description" rows="2"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="flow-enabled" checked> Enable Flow
+                                    </label>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="submit" class="btn btn-primary">Save</button>
+                                    <button type="button" class="btn btn-default" id="cancel-save">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+class FlowDesigner {
+    constructor() {
+        this.canvas = document.getElementById('design-canvas');
+        this.svg = this.canvas.querySelector('svg');
+        this.nodes = [];
+        this.connections = [];
+        this.selectedNode = null;
+        this.draggedNode = null;
+        this.nodeCounter = 0;
+        this.scale = 1;
+        this.panX = 0;
+        this.panY = 0;
+
+        this.init();
+    }
+
+    init() {
+        this.setupDragAndDrop();
+        this.setupEventHandlers();
+        this.updateCanvas();
+    }
+
+    setupDragAndDrop() {
+        // Make palette nodes draggable
+        const paletteNodes = document.querySelectorAll('.palette-node');
+        paletteNodes.forEach(node => {
+            node.draggable = true;
+            node.addEventListener('dragstart', this.onPaletteDragStart.bind(this));
+        });
+
+        // Setup canvas drop zone
+        this.canvas.addEventListener('dragover', this.onCanvasDragOver.bind(this));
+        this.canvas.addEventListener('drop', this.onCanvasDrop.bind(this));
+    }
+
+    setupEventHandlers() {
+        // Toolbar buttons
+        document.getElementById('btn-new-flow').addEventListener('click', () => this.newFlow());
+        document.getElementById('btn-save-flow').addEventListener('click', () => this.showSaveDialog());
+        document.getElementById('btn-validate-flow').addEventListener('click', () => this.validateFlow());
+        document.getElementById('btn-zoom-in').addEventListener('click', () => this.zoom(1.2));
+        document.getElementById('btn-zoom-out').addEventListener('click', () => this.zoom(0.8));
+        document.getElementById('btn-zoom-fit').addEventListener('click', () => this.zoomToFit());
+
+        // Save dialog
+        document.getElementById('save-flow-form').addEventListener('submit', this.saveFlow.bind(this));
+        document.getElementById('cancel-save').addEventListener('click', () => this.hideSaveDialog());
+
+        // Canvas events
+        this.canvas.addEventListener('click', this.onCanvasClick.bind(this));
+    }
+
+    onPaletteDragStart(e) {
+        const nodeData = {
+            type: e.target.dataset.nodeType,
+            connectionId: e.target.dataset.connectionId,
+            transformType: e.target.dataset.transformType,
+            title: e.target.querySelector('div > div').textContent
+        };
+        e.dataTransfer.setData('text/plain', JSON.stringify(nodeData));
+    }
+
+    onCanvasDragOver(e) {
+        e.preventDefault();
+    }
+
+    onCanvasDrop(e) {
+        e.preventDefault();
+        const nodeData = JSON.parse(e.dataTransfer.getData('text/plain'));
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        this.createNode(nodeData, x, y);
+    }
+
+    createNode(nodeData, x, y) {
+        const nodeId = `node_${++this.nodeCounter}`;
+        const node = document.createElement('div');
+        node.className = `flow-node ${nodeData.type}`;
+        node.id = nodeId;
+        node.style.left = `${x}px`;
+        node.style.top = `${y}px`;
+
+        let iconClass, iconColor;
+        switch (nodeData.type) {
+            case 'source':
+                iconClass = 'fa-database';
+                iconColor = '#28a745';
+                break;
+            case 'transformation':
+                iconClass = this.getTransformationIcon(nodeData.transformType);
+                iconColor = '#ffc107';
+                break;
+            case 'target':
+                iconClass = 'fa-save';
+                iconColor = '#dc3545';
+                break;
+        }
+
+        node.innerHTML = `
+            <div class="node-header">
+                <div class="node-icon" style="background-color: ${iconColor};">
+                    <i class="fa ${iconClass}"></i>
+                </div>
+                <div class="node-title">${nodeData.title}</div>
+            </div>
+            <div class="node-description">${this.getNodeDescription(nodeData)}</div>
+        `;
+
+        // Make node draggable and selectable
+        node.addEventListener('mousedown', this.onNodeMouseDown.bind(this));
+        node.addEventListener('click', this.onNodeClick.bind(this));
+
+        this.canvas.appendChild(node);
+
+        // Store node data
+        this.nodes.push({
+            id: nodeId,
+            element: node,
+            data: nodeData,
+            x: x,
+            y: y
+        });
+
+        this.updateCanvas();
+    }
+
+    getTransformationIcon(transformType) {
+        const icons = {
+            'filter': 'fa-filter',
+            'map': 'fa-exchange',
+            'aggregate': 'fa-calculator',
+            'join': 'fa-link'
+        };
+        return icons[transformType] || 'fa-cog';
+    }
+
+    getNodeDescription(nodeData) {
+        switch (nodeData.type) {
+            case 'source':
+                return 'Data Source';
+            case 'transformation':
+                return nodeData.transformType.charAt(0).toUpperCase() + nodeData.transformType.slice(1);
+            case 'target':
+                return 'Data Target';
+            default:
+                return 'Node';
+        }
+    }
+
+    onNodeMouseDown(e) {
+        e.stopPropagation();
+        this.draggedNode = e.target.closest('.flow-node');
+        this.dragStartX = e.clientX;
+        this.dragStartY = e.clientY;
+        this.dragStartNodeX = parseInt(this.draggedNode.style.left);
+        this.dragStartNodeY = parseInt(this.draggedNode.style.top);
+
+        document.addEventListener('mousemove', this.onMouseMove.bind(this));
+        document.addEventListener('mouseup', this.onMouseUp.bind(this));
+    }
+
+    onMouseMove(e) {
+        if (this.draggedNode) {
+            const deltaX = e.clientX - this.dragStartX;
+            const deltaY = e.clientY - this.dragStartY;
+
+            this.draggedNode.style.left = `${this.dragStartNodeX + deltaX}px`;
+            this.draggedNode.style.top = `${this.dragStartNodeY + deltaY}px`;
+
+            // Update node data
+            const nodeData = this.nodes.find(n => n.id === this.draggedNode.id);
+            if (nodeData) {
+                nodeData.x = this.dragStartNodeX + deltaX;
+                nodeData.y = this.dragStartNodeY + deltaY;
+            }
+
+            this.updateConnections();
+        }
+    }
+
+    onMouseUp(e) {
+        this.draggedNode = null;
+        document.removeEventListener('mousemove', this.onMouseMove.bind(this));
+        document.removeEventListener('mouseup', this.onMouseUp.bind(this));
+    }
+
+    onNodeClick(e) {
+        e.stopPropagation();
+        const node = e.target.closest('.flow-node');
+        this.selectNode(node);
+    }
+
+    onCanvasClick(e) {
+        this.selectNode(null);
+    }
+
+    selectNode(node) {
+        // Clear previous selection
+        if (this.selectedNode) {
+            this.selectedNode.classList.remove('selected');
+        }
+
+        this.selectedNode = node;
+
+        if (node) {
+            node.classList.add('selected');
+            this.showNodeProperties(node);
+        } else {
+            this.hideNodeProperties();
+        }
+    }
+
+    showNodeProperties(node) {
+        const nodeData = this.nodes.find(n => n.id === node.id);
+        const propertiesContent = document.getElementById('properties-content');
+
+        let html = `
+            <h5>${nodeData.data.title}</h5>
+            <div class="form-group">
+                <label>Node Type</label>
+                <input type="text" class="form-control" value="${nodeData.data.type}" readonly>
+            </div>
+        `;
+
+        if (nodeData.data.connectionId) {
+            html += `
+                <div class="form-group">
+                    <label>Connection</label>
+                    <select class="form-control" id="node-connection">
+                        <option value="${nodeData.data.connectionId}" selected>Current Connection</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        if (nodeData.data.type === 'transformation') {
+            html += `
+                <div class="form-group">
+                    <label>Transformation Type</label>
+                    <select class="form-control" id="node-transform-type">
+                        <option value="filter" ${nodeData.data.transformType === 'filter' ? 'selected' : ''}>Filter</option>
+                        <option value="map" ${nodeData.data.transformType === 'map' ? 'selected' : ''}>Map Fields</option>
+                        <option value="aggregate" ${nodeData.data.transformType === 'aggregate' ? 'selected' : ''}>Aggregate</option>
+                        <option value="join" ${nodeData.data.transformType === 'join' ? 'selected' : ''}>Join</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Configuration</label>
+                    <textarea class="form-control" rows="4" placeholder="Enter transformation configuration..."></textarea>
+                </div>
+            `;
+        }
+
+        html += `
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-danger" onclick="designer.deleteNode('${node.id}')">
+                    <i class="fa fa-trash"></i> Delete
+                </button>
+            </div>
+        `;
+
+        propertiesContent.innerHTML = html;
+    }
+
+    hideNodeProperties() {
+        const propertiesContent = document.getElementById('properties-content');
+        propertiesContent.innerHTML = '<p class="text-muted">Select a node to view and edit its properties.</p>';
+    }
+
+    deleteNode(nodeId) {
+        const nodeIndex = this.nodes.findIndex(n => n.id === nodeId);
+        if (nodeIndex > -1) {
+            const node = this.nodes[nodeIndex];
+            node.element.remove();
+            this.nodes.splice(nodeIndex, 1);
+
+            // Remove connections involving this node
+            this.connections = this.connections.filter(c =>
+                c.source !== nodeId && c.target !== nodeId
+            );
+
+            this.updateCanvas();
+            this.hideNodeProperties();
+        }
+    }
+
+    updateCanvas() {
+        this.updateConnections();
+    }
+
+    updateConnections() {
+        // Clear existing connections
+        const paths = this.svg.querySelectorAll('.connection-path');
+        paths.forEach(path => path.remove());
+
+        // Draw connections
+        this.connections.forEach(conn => {
+            this.drawConnection(conn);
+        });
+    }
+
+    drawConnection(connection) {
+        const sourceNode = this.nodes.find(n => n.id === connection.source);
+        const targetNode = this.nodes.find(n => n.id === connection.target);
+
+        if (sourceNode && targetNode) {
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('class', 'connection-path');
+
+            const x1 = sourceNode.x + 60; // Node width / 2
+            const y1 = sourceNode.y + 20; // Node height / 2
+            const x2 = targetNode.x + 60;
+            const y2 = targetNode.y + 20;
+
+            const pathData = `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${y1} ${x2} ${y2}`;
+            path.setAttribute('d', pathData);
+
+            this.svg.appendChild(path);
+        }
+    }
+
+    newFlow() {
+        this.nodes.forEach(node => node.element.remove());
+        this.nodes = [];
+        this.connections = [];
+        this.nodeCounter = 0;
+        this.selectedNode = null;
+        this.updateCanvas();
+        this.hideNodeProperties();
+    }
+
+    showSaveDialog() {
+        if (this.nodes.length === 0) {
+            alert('Please add some nodes to the flow before saving.');
+            return;
+        }
+
+        document.getElementById('save-flow-panel').style.display = 'block';
+    }
+
+    hideSaveDialog() {
+        document.getElementById('save-flow-panel').style.display = 'none';
+    }
+
+    async saveFlow(e) {
+        e.preventDefault();
+
+        const flowData = {
+            name: document.getElementById('flow-name').value,
+            description: document.getElementById('flow-description').value,
+            enabled: document.getElementById('flow-enabled').checked,
+            nodes: this.nodes.map(node => ({
+                id: node.id,
+                type: node.data.type,
+                position: { x: node.x, y: node.y },
+                data: node.data
+            })),
+            connections: this.connections
+        };
+
+        try {
+            const response = await fetch('/flow-designer/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(flowData)
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert(`Flow "${flowData.name}" saved successfully!`);
+                this.hideSaveDialog();
+            } else {
+                alert(`Failed to save flow: ${result.message}`);
+            }
+        } catch (error) {
+            alert(`Error saving flow: ${error.message}`);
+        }
+    }
+
+    validateFlow() {
+        const issues = [];
+
+        // Check for source nodes
+        const sourceNodes = this.nodes.filter(n => n.data.type === 'source');
+        if (sourceNodes.length === 0) {
+            issues.push('Flow must have at least one data source');
+        }
+
+        // Check for target nodes
+        const targetNodes = this.nodes.filter(n => n.data.type === 'target');
+        if (targetNodes.length === 0) {
+            issues.push('Flow must have at least one data target');
+        }
+
+        // Check for orphaned nodes
+        const connectedNodes = new Set();
+        this.connections.forEach(conn => {
+            connectedNodes.add(conn.source);
+            connectedNodes.add(conn.target);
+        });
+
+        const orphanedNodes = this.nodes.filter(n => !connectedNodes.has(n.id));
+        if (orphanedNodes.length > 0) {
+            issues.push(`${orphanedNodes.length} node(s) are not connected`);
+        }
+
+        if (issues.length === 0) {
+            alert('✅ Flow validation passed! Your flow is ready to run.');
+        } else {
+            alert('❌ Flow validation failed:\n\n' + issues.join('\n'));
+        }
+    }
+
+    zoom(factor) {
+        this.scale *= factor;
+        this.canvas.style.transform = `scale(${this.scale}) translate(${this.panX}px, ${this.panY}px)`;
+    }
+
+    zoomToFit() {
+        this.scale = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.canvas.style.transform = 'scale(1) translate(0px, 0px)';
+    }
+}
+
+// Initialize designer
+let designer;
+document.addEventListener('DOMContentLoaded', function() {
+    designer = new FlowDesigner();
+});
+</script>
+{% endblock %}

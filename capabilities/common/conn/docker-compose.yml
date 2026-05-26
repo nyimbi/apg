@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # APG Connection Management API
+  conn-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - APG_TENANT_ID=production
+      - APG_AUTH_ENDPOINT=http://auth-service:8080
+      - APG_AUDIT_ENABLED=true
+      - APG_ENCRYPTION_ENABLED=true
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=apg_conn
+      - POSTGRES_USER=apg_user
+      - POSTGRES_PASSWORD=secure_password
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./singer_runtime:/opt/singer
+      - ./singer_state:/var/singer/state
+      - ./singer_logs:/var/log/singer
+    networks:
+      - apg-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=apg_conn
+      - POSTGRES_USER=apg_user
+      - POSTGRES_PASSWORD=secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - apg-network
+
+  # Redis for Caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - apg-network
+    command: redis-server --appendonly yes
+
+  # Singer.io Runtime Container
+  singer-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.singer
+    volumes:
+      - ./singer_runtime:/opt/singer
+      - ./singer_state:/var/singer/state
+      - ./singer_logs:/var/log/singer
+    networks:
+      - apg-network
+    environment:
+      - SINGER_WORKING_DIR=/opt/singer
+      - SINGER_STATE_DIR=/var/singer/state
+      - SINGER_LOG_DIR=/var/log/singer
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - apg-network
+
+  # Grafana for Visualization
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - apg-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  apg-network:
+    driver: bridge

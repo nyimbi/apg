@@ -1,0 +1,403 @@
+{% extends "appbuilder/general/widgets/base_list.html" %}
+
+{% block head_css %}
+    {{ super() }}
+    <link href="{{ url_for('static', filename='css/marketplace-dashboard.css') }}" rel="stylesheet">
+    <style>
+        .capability-card {
+            transition: transform 0.2s ease-in-out;
+            border: 1px solid #e0e0e0;
+        }
+        .capability-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .capability-icon {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+        }
+        .rating-stars {
+            color: #ffc107;
+        }
+        .price-tag {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #28a745;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .price-tag.commercial {
+            background: #007bff;
+        }
+        .featured-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #ff6b35;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .category-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-decoration: none;
+            transition: transform 0.2s ease;
+        }
+        .category-card:hover {
+            transform: scale(1.05);
+            text-decoration: none;
+            color: white;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fa fa-store text-primary"></i>
+                        Capability Marketplace
+                    </h1>
+                    <p class="text-muted">Discover, install, and manage data processing capabilities</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('MarketplaceDashboardView.browse') }}" class="btn btn-primary">
+                        <i class="fa fa-search"></i> Browse Capabilities
+                    </a>
+                    <a href="{{ url_for('MarketplaceDashboardView.publish_capability') }}" class="btn btn-outline-success">
+                        <i class="fa fa-upload"></i> Publish Capability
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0">{{ installed_count }}</h4>
+                        <small>Installed Capabilities</small>
+                    </div>
+                    <i class="fa fa-download fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0">150+</h4>
+                        <small>Available Capabilities</small>
+                    </div>
+                    <i class="fa fa-cubes fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0">25</h4>
+                        <small>Featured</small>
+                    </div>
+                    <i class="fa fa-star fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0">98%</h4>
+                        <small>Satisfaction Rate</small>
+                    </div>
+                    <i class="fa fa-heart fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">
+                        <i class="fa fa-bolt text-warning"></i>
+                        Quick Actions
+                    </h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <a href="{{ url_for('MarketplaceDashboardView.browse', capability_type='connector') }}" class="btn btn-outline-primary btn-block">
+                                <i class="fa fa-plug"></i><br>
+                                <small>Data Connectors</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('MarketplaceDashboardView.browse', capability_type='transformer') }}" class="btn btn-outline-info btn-block">
+                                <i class="fa fa-cogs"></i><br>
+                                <small>Transformers</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('MarketplaceDashboardView.browse', capability_type='validator') }}" class="btn btn-outline-success btn-block">
+                                <i class="fa fa-check-circle"></i><br>
+                                <small>Validators</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('MarketplaceDashboardView.installed_capabilities') }}" class="btn btn-outline-secondary btn-block">
+                                <i class="fa fa-list"></i><br>
+                                <small>My Capabilities</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Featured Capabilities -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-star text-warning"></i>
+                        Featured Capabilities
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="featuredCapabilities">
+                        <!-- Featured capabilities will be loaded here -->
+                        <div class="col-12 text-center text-muted">
+                            <div class="spinner-border" role="status">
+                                <span class="sr-only">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading featured capabilities...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trending Categories and Recent Installs -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-trending-up text-success"></i>
+                        Trending Categories
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for category in trending_categories %}
+                        <div class="col-md-6 mb-3">
+                            <a href="{{ url_for('MarketplaceDashboardView.browse', categories=category.name) }}" class="category-card d-block">
+                                <div class="d-flex align-items-center">
+                                    <i class="{{ category.icon }} fa-2x mr-3"></i>
+                                    <div>
+                                        <h6 class="mb-0">{{ category.name }}</h6>
+                                        <small class="opacity-75">{{ category.count }} capabilities</small>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-clock text-info"></i>
+                        Recent Installs
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_installs %}
+                        {% for install in recent_installs %}
+                        <div class="d-flex align-items-center mb-2 pb-2 border-bottom">
+                            <i class="fa fa-download text-success mr-2"></i>
+                            <div class="flex-fill">
+                                <small class="font-weight-bold">{{ install.name }}</small>
+                                <div class="text-muted" style="font-size: 11px;">
+                                    v{{ install.version }} • {{ install.installed_at }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <div class="text-center mt-3">
+                            <a href="{{ url_for('MarketplaceDashboardView.installed_capabilities') }}" class="btn btn-sm btn-outline-primary">
+                                View All
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fa fa-info-circle fa-2x mb-2"></i>
+                            <p class="mb-0">No capabilities installed yet</p>
+                            <a href="{{ url_for('MarketplaceDashboardView.browse') }}" class="btn btn-sm btn-primary mt-2">
+                                Browse Marketplace
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">
+                        <i class="fa fa-search text-primary"></i>
+                        Quick Search
+                    </h5>
+                    <form action="{{ url_for('MarketplaceDashboardView.browse') }}" method="GET">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <input type="text" name="query" class="form-control form-control-lg"
+                                       placeholder="Search for capabilities, tags, or authors..."
+                                       value="{{ request.args.get('query', '') }}">
+                            </div>
+                            <div class="col-md-2">
+                                <select name="capability_type" class="form-control form-control-lg">
+                                    <option value="">All Types</option>
+                                    <option value="connector">Connectors</option>
+                                    <option value="transformer">Transformers</option>
+                                    <option value="validator">Validators</option>
+                                    <option value="enricher">Enrichers</option>
+                                    <option value="analyzer">Analyzers</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary btn-lg btn-block">
+                                    <i class="fa fa-search"></i> Search
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+    {{ super() }}
+    <script>
+        // Load featured capabilities
+        async function loadFeaturedCapabilities() {
+            try {
+                const response = await fetch('{{ url_for("MarketplaceDashboardView.api_search") }}?sort_by=featured&limit=6');
+                const data = await response.json();
+
+                const container = document.getElementById('featuredCapabilities');
+
+                if (data.capabilities && data.capabilities.length > 0) {
+                    container.innerHTML = data.capabilities.map(cap => `
+                        <div class="col-md-4 mb-4">
+                            <div class="card capability-card h-100">
+                                <div class="card-body position-relative">
+                                    ${cap.is_featured ? '<span class="featured-badge">Featured</span>' : ''}
+                                    <span class="price-tag ${cap.price > 0 ? 'commercial' : ''}">
+                                        ${cap.price > 0 ? '$' + cap.price : 'Free'}
+                                    </span>
+
+                                    <div class="d-flex align-items-center mb-3">
+                                        <img src="${cap.icon_url || 'https://via.placeholder.com/48'}"
+                                             class="capability-icon mr-3" alt="${cap.name}">
+                                        <div>
+                                            <h6 class="mb-0">${cap.name}</h6>
+                                            <small class="text-muted">${cap.capability_type}</small>
+                                        </div>
+                                    </div>
+
+                                    <p class="card-text small">${cap.description.substring(0, 100)}...</p>
+
+                                    <div class="d-flex align-items-center justify-content-between mb-3">
+                                        <div>
+                                            <span class="rating-stars">
+                                                ${Array.from({length: Math.floor(cap.rating?.average_rating || 0)}, () => '★').join('')}
+                                            </span>
+                                            <small class="text-muted">
+                                                ${cap.rating?.average_rating?.toFixed(1) || 'N/A'}
+                                                (${cap.rating?.total_reviews || 0})
+                                            </small>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="fa fa-download"></i> ${cap.stats?.downloads || 0}
+                                        </small>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        ${cap.tags.slice(0, 3).map(tag => `<span class="badge badge-light mr-1">${tag}</span>`).join('')}
+                                    </div>
+
+                                    <div class="mt-auto">
+                                        <a href="{{ url_for('MarketplaceDashboardView.capability_detail', capability_id='') }}${cap.id}"
+                                           class="btn btn-primary btn-sm btn-block">
+                                            <i class="fa fa-eye"></i> View Details
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div class="col-12 text-center text-muted">
+                            <i class="fa fa-info-circle fa-3x mb-3"></i>
+                            <p>No featured capabilities available</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading featured capabilities:', error);
+                document.getElementById('featuredCapabilities').innerHTML = `
+                    <div class="col-12 text-center text-danger">
+                        <i class="fa fa-exclamation-triangle fa-2x mb-2"></i>
+                        <p>Error loading featured capabilities</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Load on page ready
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFeaturedCapabilities();
+        });
+    </script>
+{% endblock %}

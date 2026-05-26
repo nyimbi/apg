@@ -1,0 +1,563 @@
+{% extends "appbuilder/general/widgets/base.html" %}
+{% block content %}
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-12">
+			<div class="card">
+				<div class="card-header">
+					<h3 class="card-title">
+						<i class="fa fa-link"></i>
+						Create Capability Composition
+					</h3>
+					<div class="card-tools">
+						<a href="{{ url_for('CapabilityCompositionView.dashboard') }}" class="btn btn-secondary btn-sm">
+							<i class="fa fa-arrow-left"></i> Back to Dashboard
+						</a>
+					</div>
+				</div>
+				<div class="card-body">
+					<form method="POST" action="{{ url_for('CapabilityCompositionView.create_composition') }}">
+						<div class="row">
+							<div class="col-md-6">
+								<!-- Basic Composition Setup -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Composition Setup</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.source_capability.label(class="form-label") }}
+											<select name="source_capability" class="form-control" required>
+												<option value="">Select source capability...</option>
+												{% for capability_id, capability_name in available_capabilities %}
+													<option value="{{ capability_id }}">{{ capability_name }}</option>
+												{% endfor %}
+											</select>
+											<small class="form-text text-muted">The capability that will initiate events</small>
+										</div>
+
+										<div class="form-group">
+											{{ form.target_capability.label(class="form-label") }}
+											<select name="target_capability" class="form-control" required>
+												<option value="">Select target capability...</option>
+												{% for capability_id, capability_name in available_capabilities %}
+													<option value="{{ capability_id }}">{{ capability_name }}</option>
+												{% endfor %}
+											</select>
+											<small class="form-text text-muted">The capability that will receive events</small>
+										</div>
+
+										<div class="form-group">
+											{{ form.integration_method.label(class="form-label") }}
+											{{ form.integration_method(class="form-control") }}
+											<small class="form-text text-muted">How the capabilities will communicate</small>
+										</div>
+
+										<div class="form-group">
+											{{ form.data_flow_direction.label(class="form-label") }}
+											{{ form.data_flow_direction(class="form-control") }}
+											<small class="form-text text-muted">Direction of data flow between capabilities</small>
+										</div>
+									</div>
+								</div>
+
+								<!-- Event Mappings -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Event Mappings</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.event_mappings.label(class="form-label") }}
+											{{ form.event_mappings(class="form-control json-editor", placeholder='{\n  "connection.created": "data.source_added",\n  "flow.completed": "analysis.trigger",\n  "schema.discovered": "metadata.updated"\n}') }}
+											<small class="form-text text-muted">Map source events to target events (JSON object)</small>
+											{% if form.event_mappings.errors %}
+												<div class="text-danger">
+													{% for error in form.event_mappings.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+
+										<div class="form-group">
+											<label class="form-label">Event Mapping Helper</label>
+											<div class="row">
+												<div class="col-6">
+													<select id="sourceEvents" class="form-control" size="6">
+														<option disabled>Select source capability first</option>
+													</select>
+													<small class="form-text text-muted">Source events</small>
+												</div>
+												<div class="col-6">
+													<select id="targetEvents" class="form-control" size="6">
+														<option disabled>Select target capability first</option>
+													</select>
+													<small class="form-text text-muted">Target events</small>
+												</div>
+											</div>
+											<button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addEventMapping()">
+												<i class="fa fa-plus"></i> Add Mapping
+											</button>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="col-md-6">
+								<!-- Data Transformations -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Data Transformations</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.data_transformations.label(class="form-label") }}
+											{{ form.data_transformations(class="form-control json-editor", placeholder='[\n  {\n    "type": "map_fields",\n    "mappings": {\n      "old_field": "new_field"\n    }\n  },\n  {\n    "type": "filter_data",\n    "conditions": ["status == active"]\n  }\n]') }}
+											<small class="form-text text-muted">Array of transformation rules to apply to data</small>
+											{% if form.data_transformations.errors %}
+												<div class="text-danger">
+													{% for error in form.data_transformations.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+
+										<div class="form-group">
+											<label class="form-label">Transformation Templates</label>
+											<div class="btn-group-vertical d-block">
+												<button type="button" class="btn btn-sm btn-outline-info mb-1" onclick="addTransformation('map_fields')">
+													<i class="fa fa-exchange"></i> Field Mapping
+												</button>
+												<button type="button" class="btn btn-sm btn-outline-info mb-1" onclick="addTransformation('filter_data')">
+													<i class="fa fa-filter"></i> Data Filter
+												</button>
+												<button type="button" class="btn btn-sm btn-outline-info mb-1" onclick="addTransformation('aggregate')">
+													<i class="fa fa-chart-bar"></i> Aggregation
+												</button>
+												<button type="button" class="btn btn-sm btn-outline-info mb-1" onclick="addTransformation('validate')">
+													<i class="fa fa-check"></i> Validation
+												</button>
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<!-- Validation Rules -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Validation Rules</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.validation_rules.label(class="form-label") }}
+											{{ form.validation_rules(class="form-control json-editor", placeholder='[\n  {\n    "type": "required_fields",\n    "fields": ["id", "timestamp"]\n  },\n  {\n    "type": "data_types",\n    "types": {\n      "id": "string",\n      "count": "integer"\n    }\n  }\n]') }}
+											<small class="form-text text-muted">Array of validation rules for composition data</small>
+											{% if form.validation_rules.errors %}
+												<div class="text-danger">
+													{% for error in form.validation_rules.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="row mt-3">
+							<div class="col-md-6">
+								<!-- Error Handling -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Error Handling</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.error_handling.label(class="form-label") }}
+											{{ form.error_handling(class="form-control json-editor", placeholder='{\n  "strategy": "retry",\n  "retry_count": 3,\n  "retry_delay": 1000,\n  "fallback_action": "log_error",\n  "notification_enabled": true\n}') }}
+											<small class="form-text text-muted">Error handling configuration (JSON object)</small>
+											{% if form.error_handling.errors %}
+												<div class="text-danger">
+													{% for error in form.error_handling.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+
+										<div class="form-group">
+											<label class="form-label">Error Handling Templates</label>
+											<div class="btn-group d-block">
+												<button type="button" class="btn btn-sm btn-outline-warning mr-1" onclick="setErrorHandling('retry')">
+													Retry Strategy
+												</button>
+												<button type="button" class="btn btn-sm btn-outline-warning mr-1" onclick="setErrorHandling('fallback')">
+													Fallback Strategy
+												</button>
+												<button type="button" class="btn btn-sm btn-outline-warning" onclick="setErrorHandling('notify')">
+													Notification Only
+												</button>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="col-md-6">
+								<!-- Performance Requirements -->
+								<div class="card">
+									<div class="card-header">
+										<h5 class="card-title">Performance Requirements</h5>
+									</div>
+									<div class="card-body">
+										<div class="form-group">
+											{{ form.performance_requirements.label(class="form-label") }}
+											{{ form.performance_requirements(class="form-control json-editor", placeholder='{\n  "max_latency_ms": 1000,\n  "max_throughput_rps": 100,\n  "timeout_ms": 5000,\n  "circuit_breaker": true\n}') }}
+											<small class="form-text text-muted">Performance and SLA requirements (JSON object)</small>
+											{% if form.performance_requirements.errors %}
+												<div class="text-danger">
+													{% for error in form.performance_requirements.errors %}
+														<small>{{ error }}</small>
+													{% endfor %}
+												</div>
+											{% endif %}
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="row mt-3">
+							<div class="col-12">
+								<div class="card">
+									<div class="card-body text-center">
+										<button type="button" class="btn btn-info btn-lg mr-2" onclick="validateComposition()">
+											<i class="fa fa-check-circle"></i>
+											Validate Composition
+										</button>
+										<button type="submit" class="btn btn-success btn-lg mr-2">
+											<i class="fa fa-link"></i>
+											Create Composition
+										</button>
+										<button type="button" class="btn btn-secondary btn-lg" onclick="resetForm()">
+											<i class="fa fa-refresh"></i>
+											Reset Form
+										</button>
+									</div>
+								</div>
+							</div>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Validation Results Modal -->
+<div class="modal fade" id="validationModal" tabindex="-1" role="dialog">
+	<div class="modal-dialog modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title">Composition Validation Results</h5>
+				<button type="button" class="close" data-dismiss="modal">
+					<span>&times;</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<div id="validationResults">Validating...</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+let capabilityInterfaces = {};
+
+// Load capability interfaces when capabilities are selected
+document.addEventListener('DOMContentLoaded', function() {
+	const sourceSelect = document.querySelector('select[name="source_capability"]');
+	const targetSelect = document.querySelector('select[name="target_capability"]');
+
+	sourceSelect.addEventListener('change', () => loadCapabilityEvents('source', sourceSelect.value));
+	targetSelect.addEventListener('change', () => loadCapabilityEvents('target', targetSelect.value));
+});
+
+async function loadCapabilityEvents(type, capabilityId) {
+	if (!capabilityId) return;
+
+	try {
+		const response = await fetch(`{{ url_for('CapabilityCompositionView.api_get_capability_interface', capability_id='__ID__') }}`.replace('__ID__', capabilityId));
+		const data = await response.json();
+
+		if (data.status === 'success') {
+			capabilityInterfaces[capabilityId] = data.data;
+
+			const selectId = type === 'source' ? 'sourceEvents' : 'targetEvents';
+			const select = document.getElementById(selectId);
+
+			select.innerHTML = '';
+			data.data.event_types.forEach(eventType => {
+				const option = document.createElement('option');
+				option.value = eventType;
+				option.textContent = eventType;
+				select.appendChild(option);
+			});
+		}
+	} catch (error) {
+		console.error('Error loading capability events:', error);
+	}
+}
+
+function addEventMapping() {
+	const sourceSelect = document.getElementById('sourceEvents');
+	const targetSelect = document.getElementById('targetEvents');
+	const mappingsField = document.querySelector('textarea[name="event_mappings"]');
+
+	if (!sourceSelect.value || !targetSelect.value) {
+		alert('Please select both source and target events');
+		return;
+	}
+
+	try {
+		const currentMappings = mappingsField.value ? JSON.parse(mappingsField.value) : {};
+		currentMappings[sourceSelect.value] = targetSelect.value;
+
+		mappingsField.value = JSON.stringify(currentMappings, null, 2);
+		mappingsField.dispatchEvent(new Event('input'));
+
+		// Clear selections
+		sourceSelect.value = '';
+		targetSelect.value = '';
+	} catch (error) {
+		alert('Error adding mapping: ' + error.message);
+	}
+}
+
+function addTransformation(type) {
+	const transformationsField = document.querySelector('textarea[name="data_transformations"]');
+
+	const templates = {
+		map_fields: {
+			type: 'map_fields',
+			mappings: {
+				'source_field': 'target_field'
+			}
+		},
+		filter_data: {
+			type: 'filter_data',
+			conditions: ['field == "value"']
+		},
+		aggregate: {
+			type: 'aggregate',
+			operations: [
+				{
+					field: 'count',
+					operation: 'sum'
+				}
+			]
+		},
+		validate: {
+			type: 'validate',
+			schema: {
+				type: 'object',
+				required: ['field1', 'field2']
+			}
+		}
+	};
+
+	try {
+		const currentTransformations = transformationsField.value ? JSON.parse(transformationsField.value) : [];
+		currentTransformations.push(templates[type]);
+
+		transformationsField.value = JSON.stringify(currentTransformations, null, 2);
+		transformationsField.dispatchEvent(new Event('input'));
+	} catch (error) {
+		alert('Error adding transformation: ' + error.message);
+	}
+}
+
+function setErrorHandling(strategy) {
+	const errorField = document.querySelector('textarea[name="error_handling"]');
+
+	const templates = {
+		retry: {
+			strategy: 'retry',
+			retry_count: 3,
+			retry_delay: 1000,
+			max_retry_delay: 10000,
+			exponential_backoff: true
+		},
+		fallback: {
+			strategy: 'fallback',
+			fallback_action: 'default_response',
+			fallback_data: {},
+			notification_enabled: true
+		},
+		notify: {
+			strategy: 'notify',
+			notification_channels: ['email', 'webhook'],
+			continue_on_error: false
+		}
+	};
+
+	errorField.value = JSON.stringify(templates[strategy], null, 2);
+	errorField.dispatchEvent(new Event('input'));
+}
+
+async function validateComposition() {
+	const form = document.querySelector('form');
+	const formData = new FormData(form);
+
+	// Convert form data to JSON
+	const compositionData = {
+		source_capability: formData.get('source_capability'),
+		target_capability: formData.get('target_capability'),
+		integration_method: formData.get('integration_method'),
+		data_flow_direction: formData.get('data_flow_direction'),
+		event_mappings: parseJSON(formData.get('event_mappings')),
+		data_transformations: parseJSON(formData.get('data_transformations')),
+		validation_rules: parseJSON(formData.get('validation_rules')),
+		error_handling: parseJSON(formData.get('error_handling')),
+		performance_requirements: parseJSON(formData.get('performance_requirements'))
+	};
+
+	try {
+		const response = await fetch('{{ url_for("CapabilityCompositionView.api_validate_composition") }}', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(compositionData)
+		});
+
+		const result = await response.json();
+
+		let html = '';
+		if (result.status === 'success') {
+			if (result.valid) {
+				html = `
+					<div class="alert alert-success">
+						<i class="fa fa-check-circle"></i>
+						<strong>Composition is valid!</strong> All requirements are met.
+					</div>
+				`;
+			} else {
+				html = `
+					<div class="alert alert-danger">
+						<i class="fa fa-exclamation-triangle"></i>
+						<strong>Validation errors found:</strong>
+						<ul class="mt-2">
+							${result.errors.map(error => `<li>${error}</li>`).join('')}
+						</ul>
+					</div>
+				`;
+			}
+		} else {
+			html = `
+				<div class="alert alert-danger">
+					<i class="fa fa-times-circle"></i>
+					<strong>Validation failed:</strong> ${result.message}
+				</div>
+			`;
+		}
+
+		document.getElementById('validationResults').innerHTML = html;
+		$('#validationModal').modal('show');
+
+	} catch (error) {
+		document.getElementById('validationResults').innerHTML = `
+			<div class="alert alert-danger">
+				<i class="fa fa-times-circle"></i>
+				<strong>Validation error:</strong> ${error.message}
+			</div>
+		`;
+		$('#validationModal').modal('show');
+	}
+}
+
+function parseJSON(str) {
+	if (!str) return {};
+	try {
+		return JSON.parse(str);
+	} catch (e) {
+		return {};
+	}
+}
+
+function resetForm() {
+	document.querySelector('form').reset();
+	document.getElementById('sourceEvents').innerHTML = '<option disabled>Select source capability first</option>';
+	document.getElementById('targetEvents').innerHTML = '<option disabled>Select target capability first</option>';
+}
+
+// Auto-validate JSON fields
+document.addEventListener('DOMContentLoaded', function() {
+	const jsonFields = document.querySelectorAll('.json-editor');
+
+	jsonFields.forEach(field => {
+		field.addEventListener('input', function() {
+			if (this.value.trim()) {
+				try {
+					JSON.parse(this.value);
+					this.classList.remove('is-invalid');
+					this.classList.add('is-valid');
+				} catch (e) {
+					this.classList.remove('is-valid');
+					this.classList.add('is-invalid');
+				}
+			} else {
+				this.classList.remove('is-valid', 'is-invalid');
+			}
+		});
+	});
+});
+</script>
+
+<style>
+.json-editor {
+	font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.is-valid {
+	border-color: #28a745;
+}
+
+.is-invalid {
+	border-color: #dc3545;
+}
+
+.card {
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	border: none;
+	border-radius: 8px;
+	margin-bottom: 20px;
+}
+
+.card-header {
+	background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
+	border-bottom: 1px solid #dee2e6;
+}
+
+.btn-group-vertical .btn {
+	text-align: left;
+}
+
+select[multiple] {
+	height: auto !important;
+}
+
+#sourceEvents, #targetEvents {
+	height: 150px;
+	overflow-y: auto;
+}
+</style>
+{% endblock %}

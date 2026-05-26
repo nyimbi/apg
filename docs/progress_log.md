@@ -292,3 +292,30 @@ Current broader APIG execution findings:
 
 - APIG tests now collect and execute cleanly from `capabilities/common/apig/tests`.
 - Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports.
+
+### 2026-05-26 06:52 EAT
+
+Completed checkpoint:
+
+- Made the CONN common capability executable from its moved package location, including import registration, APG tap metadata, SQLAlchemy portability, service bridge execution, visual designer initialization, data-quality monitoring, marketplace fallback behavior, and ML insight compatibility.
+- Added a first-class CONN capability contract with tenant-specific configuration defaults/schema, an executable rule engine, UI route manifest, and visual theme tokens/components.
+- Restored local execution for connection creation/testing, flow execution, lineage discovery, marketplace install/uninstall, data-quality assessment, AI mapping/performance helpers, and ML insight generation without requiring live network services.
+- Routed CONN reports/guides into `capabilities/common/conn/docs/` and moved optional live demo scripts into `capabilities/common/conn/docs/examples/` so the capability root stays focused on source, spec, and canonical tests.
+- Fixed current dependency drift issues surfaced by the suite, including pandas hourly frequency aliases, NumPy scalar return types, legacy module patch targets, and shared metrics API names.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/service.py capabilities/common/conn/sqlalchemy_models.py capabilities/common/conn/models.py capabilities/common/conn/visual_designer.py capabilities/common/conn/views.py capabilities/common/conn/service_bridge.py capabilities/common/conn/capability_contract.py capabilities/common/conn/data_quality.py capabilities/common/conn/marketplace.py capabilities/common/conn/apg_taps.py capabilities/common/conn/ml_insights.py capabilities/common/conn/ml_insights_views.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_marketplace.py::TestMarketplaceClient::test_client_close` -> 1 passed, 15 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_marketplace.py::TestCapabilityInstaller::test_install_capability_mock capabilities/common/conn/tests/test_marketplace.py::TestCapabilityInstaller::test_uninstall_capability` -> 2 passed, 15 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_marketplace.py::TestErrorHandling::test_capability_installer_invalid_path` -> 1 passed, 15 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_ml_insights.py::TestAnomalyDetector::test_calculate_deviations` -> 1 passed, 15 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_ml_insights.py::TestClusterAnalyzer::test_find_optimal_clusters` -> 1 passed, 15 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_ml_insights.py::TestSentimentAnalyzer::test_analyze_sentiment_no_nlp` -> 1 passed, 15 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_ml_insights.py::TestMLInsightsEngine::test_analyze_data_list_input` -> 1 passed, 17 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests -x -vv` -> 283 passed, 6 skipped, 50 warnings
+
+Current broader CONN execution findings:
+
+- CONN tests now collect and execute cleanly from `capabilities/common/conn/tests`.
+- Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports, service-bridge mock coroutine warnings, and pandas string dtype migration warnings in ML pattern tests.

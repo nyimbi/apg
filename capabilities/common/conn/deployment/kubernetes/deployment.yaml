@@ -1,0 +1,363 @@
+# APG Connection Management - Kubernetes Deployment
+# Production-ready Kubernetes configuration with auto-scaling and monitoring
+#
+# Author: Nyimbi Odero
+# Company: Datacraft
+# Copyright: © 2025
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apg-conn
+  labels:
+    app.kubernetes.io/name: apg-connection-management
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: kubectl
+
+---
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apg-conn-config
+  namespace: apg-conn
+data:
+  APG_ENV: "production"
+  APG_LOG_LEVEL: "INFO"
+  APG_WORKERS: "4"
+  APG_HOST: "0.0.0.0"
+  APG_PORT: "8000"
+  APG_DB_HOST: "postgres-service"
+  APG_DB_PORT: "5432"
+  APG_DB_NAME: "apg"
+  APG_DB_USER: "apg"
+  APG_REDIS_HOST: "redis-service"
+  APG_REDIS_PORT: "6379"
+  APG_ENABLE_METRICS: "true"
+  APG_ENABLE_TRACING: "true"
+  APG_OTEL_ENDPOINT: "http://otel-collector:4317"
+
+---
+# Secret for sensitive configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: apg-conn-secrets
+  namespace: apg-conn
+type: Opaque
+data:
+  # These should be base64 encoded values
+  # Example: echo -n 'your-secret-value' | base64
+  db_password: cGFzc3dvcmQxMjM=  # password123
+  jwt_secret: c2VjcmV0LWp3dC1rZXktZm9yLWFwZw==  # secret-jwt-key-for-apg
+  encryption_key: ZW5jcnlwdGlvbi1rZXktZm9yLWNvbm5lY3Rpb25z  # encryption-key-for-connections
+
+---
+# Deployment for APG Connection Management
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apg-conn-deployment
+  namespace: apg-conn
+  labels:
+    app: apg-conn
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: apg-conn
+  template:
+    metadata:
+      labels:
+        app: apg-conn
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/monitoring/api/metrics/prometheus"
+    spec:
+      serviceAccountName: apg-conn-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: apg-conn
+        image: datacraft/apg-connection-mgmt:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: apg-conn-config
+        env:
+        - name: APG_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: apg-conn-secrets
+              key: db_password
+        - name: APG_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: apg-conn-secrets
+              key: jwt_secret
+        - name: APG_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: apg-conn-secrets
+              key: encryption_key
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /monitoring/api/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /monitoring/api/health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: logs-volume
+          mountPath: /app/logs
+        - name: data-volume
+          mountPath: /app/data
+        - name: tmp-volume
+          mountPath: /app/tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: logs-volume
+        emptyDir: {}
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: apg-conn-data-pvc
+      - name: tmp-volume
+        emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: apg-conn-service-account
+  namespace: apg-conn
+
+---
+# ClusterRole for service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: apg-conn-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: apg-conn-cluster-role-binding
+subjects:
+- kind: ServiceAccount
+  name: apg-conn-service-account
+  namespace: apg-conn
+roleRef:
+  kind: ClusterRole
+  name: apg-conn-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Service for APG Connection Management
+apiVersion: v1
+kind: Service
+metadata:
+  name: apg-conn-service
+  namespace: apg-conn
+  labels:
+    app: apg-conn
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/monitoring/api/metrics/prometheus"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: apg-conn
+
+---
+# Ingress for external access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apg-conn-ingress
+  namespace: apg-conn
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - conn.apg.yourdomain.com
+    secretName: apg-conn-tls-secret
+  rules:
+  - host: conn.apg.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: apg-conn-service
+            port:
+              number: 8000
+
+---
+# PersistentVolumeClaim for data storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: apg-conn-data-pvc
+  namespace: apg-conn
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd  # Adjust based on your storage class
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# HorizontalPodAutoscaler for auto-scaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: apg-conn-hpa
+  namespace: apg-conn
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: apg-conn-deployment
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+
+---
+# PodDisruptionBudget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: apg-conn-pdb
+  namespace: apg-conn
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: apg-conn
+
+---
+# NetworkPolicy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: apg-conn-network-policy
+  namespace: apg-conn
+spec:
+  podSelector:
+    matchLabels:
+      app: apg-conn
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: nginx-ingress
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: apg-conn
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+  - to: []  # Allow all egress for external APIs
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

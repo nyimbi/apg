@@ -1,0 +1,56 @@
+# Core Dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+asyncio-extra>=0.1.0
+
+# Database
+asyncpg>=0.29.0
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+
+# Singer.io
+singer-python>=5.12.0
+jsonschema>=4.17.0
+
+# Data Processing
+pandas>=2.1.0
+numpy>=1.24.0
+pyarrow>=14.0.0
+
+# Transformation
+jq>=1.6.0
+xmltodict>=0.13.0
+
+# AI/ML (lightweight)
+scikit-learn>=1.3.0
+nltk>=3.8.0
+
+# Caching & Queue
+redis>=5.0.0
+celery>=5.3.0
+
+# Monitoring
+prometheus-client>=0.19.0
+structlog>=23.2.0
+
+# Security
+cryptography>=41.0.0
+pyjwt>=2.8.0
+passlib>=1.7.4
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+httpx>=0.25.0
+
+# Development
+black>=23.0.0
+ruff>=0.1.0
+mypy>=1.7.0
+
+# APG Platform Integration
+# apg-auth>=1.0.0
+# apg-audit>=1.0.0
+# apg-encryption>=1.0.0

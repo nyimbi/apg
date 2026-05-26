@@ -1,0 +1,186 @@
+
+{% extends "appbuilder/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <h1 class="page-header">Connection Management Dashboard</h1>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row">
+        <div class="col-lg-3 col-md-6">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3">
+                            <i class="fa fa-database fa-5x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge">{{ total_connections }}</div>
+                            <div>Total Connections</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="panel panel-green">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3">
+                            <i class="fa fa-check-circle fa-5x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge">{{ active_connections }}</div>
+                            <div>Active Connections</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="panel panel-yellow">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3">
+                            <i class="fa fa-random fa-5x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge">{{ flows_count }}</div>
+                            <div>Data Flows</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="panel panel-red">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3">
+                            <i class="fa fa-play fa-5x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge">{{ enabled_flows }}</div>
+                            <div>Enabled Flows</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Connections -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-clock-o fa-fw"></i> Recent Connections
+                </div>
+                <div class="panel-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for conn in recent_connections %}
+                                <tr>
+                                    <td>{{ conn.name }}</td>
+                                    <td><span class="label label-info">{{ conn.connection_type.value }}</span></td>
+                                    <td>
+                                        {% if conn.status.value == 'active' %}
+                                            <span class="label label-success">{{ conn.status.value }}</span>
+                                        {% elif conn.status.value == 'error' %}
+                                            <span class="label label-danger">{{ conn.status.value }}</span>
+                                        {% else %}
+                                            <span class="label label-warning">{{ conn.status.value }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ conn.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <a href="{{ url_for('ConnectionModelView.show', pk=conn.id) }}" class="btn btn-xs btn-primary">View</a>
+                                        <a href="{{ url_for('ConnectionDashboardView.test_connection', connection_id=conn.id) }}" class="btn btn-xs btn-success">Test</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-pie-chart fa-fw"></i> Connection Types
+                </div>
+                <div class="panel-body">
+                    <canvas id="connectionTypeChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <i class="fa fa-bolt fa-fw"></i> Quick Actions
+                </div>
+                <div class="panel-body">
+                    <a href="{{ url_for('ConnectionModelView.add') }}" class="btn btn-lg btn-primary">
+                        <i class="fa fa-plus"></i> New Connection
+                    </a>
+                    <a href="{{ url_for('FlowDesignerView.designer') }}" class="btn btn-lg btn-success">
+                        <i class="fa fa-sitemap"></i> Design Flow
+                    </a>
+                    <a href="{{ url_for('ConnectionDashboardView.health_overview') }}" class="btn btn-lg btn-info">
+                        <i class="fa fa-heartbeat"></i> Health Monitor
+                    </a>
+                    <a href="{{ url_for('ConnectionDashboardView.lineage_view') }}" class="btn btn-lg btn-warning">
+                        <i class="fa fa-share-alt"></i> Data Lineage
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Connection type chart
+const ctx = document.getElementById('connectionTypeChart').getContext('2d');
+const connectionTypeData = {{ connection_types | tojson }};
+
+new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: connectionTypeData.map(item => item[0]),
+        datasets: [{
+            data: connectionTypeData.map(item => item[1]),
+            backgroundColor: [
+                '#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6', '#1abc9c'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+});
+</script>
+{% endblock %}
