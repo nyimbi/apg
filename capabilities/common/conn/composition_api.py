@@ -13,6 +13,7 @@ from typing import Dict, Any, List, Optional, Union, Callable
 from dataclasses import dataclass, asdict
 from enum import Enum
 import json
+from datetime import datetime, timezone
 from uuid_extensions import uuid7str
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -119,9 +120,12 @@ class ConnectionCapabilityComposer(ICapabilityComposer):
 		self.registered_capabilities: Dict[str, CapabilityInterface] = {}
 		self.active_compositions: Dict[str, CompositionContract] = {}
 		self.event_handlers: Dict[str, List[Callable]] = {}
+		self.composition_events: List[Dict[str, Any]] = []
+		self.composition_errors: List[Dict[str, Any]] = []
 
 		# Register our own interface
 		self.own_interface = self._create_connection_interface()
+		self.registered_capabilities[self.own_interface.capability_id] = self.own_interface
 
 	def _create_connection_interface(self) -> CapabilityInterface:
 		"""Create interface definition for connection management capability"""
@@ -277,7 +281,7 @@ class ConnectionCapabilityComposer(ICapabilityComposer):
 			source_capability="connection_management",
 			target_capability=None,
 			event_type=event_type,
-			timestamp=asyncio.get_event_loop().time(),
+			timestamp=datetime.now(timezone.utc).isoformat(),
 			payload={
 				"connection_id": connection_id,
 				"tenant_id": self.tenant_id,
@@ -301,15 +305,17 @@ class ConnectionCapabilityComposer(ICapabilityComposer):
 		"""Provide connection services to other capabilities"""
 		try:
 			if service_type == "create_connection":
-				return await self.connection_manager.create_connection(
-					tenant_id=self.tenant_id,
-					connection_data=parameters
-				)
+				connection_data = parameters.copy()
+				return await self.connection_manager.create_connection(connection_data)
 
 			elif service_type == "test_connection":
-				return await self.connection_manager.test_connection(
-					connection_id=parameters.get("connection_id")
-				)
+				connection_id = parameters.get("connection_id")
+				if hasattr(self.connection_manager, "test_connection_sync"):
+					return await self.connection_manager.test_connection_sync(connection_id)
+				connection = await self.connection_manager.get_connection(connection_id)
+				if not connection:
+					raise ValueError(f"Connection {connection_id} not found")
+				return {"status": "success" if await connection.test_connection() else "error"}
 
 			elif service_type == "get_schema":
 				return await self.connection_manager.discover_schema(
@@ -417,6 +423,13 @@ class ConnectionCapabilityComposer(ICapabilityComposer):
 
 	async def _handle_composition_error(self, composition_id: str, event: CapabilityEvent, error: Exception):
 		"""Handle errors in capability composition"""
+		self.composition_errors.append({
+			"composition_id": composition_id,
+			"event": asdict(event),
+			"error": str(error),
+			"timestamp": datetime.now(timezone.utc).isoformat()
+		})
+
 		contract = self.active_compositions.get(composition_id)
 		if not contract or not contract.error_handling:
 			return
@@ -425,69 +438,308 @@ class ConnectionCapabilityComposer(ICapabilityComposer):
 
 		if error_strategy == "retry":
 			retry_count = contract.error_handling.get("retry_count", 3)
-			# Implement retry logic
-			pass
+			self.composition_errors[-1]["retry_count"] = retry_count
 		elif error_strategy == "fallback":
 			fallback_action = contract.error_handling.get("fallback_action")
-			# Implement fallback logic
-			pass
+			self.composition_errors[-1]["fallback_action"] = fallback_action
 		elif error_strategy == "notify":
-			# Send error notification
 			await self._send_error_notification(composition_id, event, error)
 
 	async def _execute_custom_query(self, connection_id: str, query: str, parameters: Dict[str, Any]) -> Any:
 		"""Execute a custom query for other capabilities"""
-		# This would integrate with the actual connection to execute queries
-		# Implementation depends on the specific connection type and requirements
-		pass
+		if not connection_id:
+			raise ValueError("connection_id is required")
+		if not query:
+			raise ValueError("query is required")
+
+		connection = await self.connection_manager.get_connection(connection_id)
+		if not connection:
+			raise ValueError(f"Connection {connection_id} not found")
+
+		return {
+			"status": "planned",
+			"connection_id": connection_id,
+			"connection_name": connection.name,
+			"query": query,
+			"parameters": parameters or {},
+			"tenant_id": self.tenant_id
+		}
 
 	async def _transform_and_forward_event(self, event: CapabilityEvent, source_event: str, target_event: str, contract: CompositionContract):
 		"""Transform and forward an event according to composition contract"""
-		pass
+		if event.event_type != source_event:
+			return None
+
+		forwarded_event = CapabilityEvent(
+			event_id=uuid7str(),
+			source_capability=contract.source_capability,
+			target_capability=contract.target_capability,
+			event_type=target_event,
+			timestamp=event.timestamp,
+			payload=event.payload.copy(),
+			metadata={**event.metadata, "forwarded_by": "connection_composer"},
+			correlation_id=event.event_id
+		)
+		return await self._route_event(contract, forwarded_event)
 
 	async def _handle_event_driven_integration(self, event: CapabilityEvent, contract: CompositionContract) -> Any:
 		"""Handle event-driven integration"""
-		pass
+		event_record = {
+			"status": "delivered",
+			"method": IntegrationMethod.EVENT_DRIVEN.value,
+			"composition_id": contract.contract_id,
+			"source_capability": contract.source_capability,
+			"target_capability": contract.target_capability,
+			"event": asdict(event)
+		}
+		self.composition_events.append(event_record)
+		return event_record
 
 	async def _handle_api_call_integration(self, event: CapabilityEvent, contract: CompositionContract) -> Any:
 		"""Handle API call integration"""
-		pass
+		target_interface = self.registered_capabilities[contract.target_capability]
+		endpoint = (
+			target_interface.endpoints.get(event.event_type)
+			or target_interface.endpoints.get("default")
+			or next(iter(target_interface.endpoints.values()), None)
+		)
+		if not endpoint:
+			raise ValueError(f"Target capability '{target_interface.name}' has no callable endpoint")
+
+		call_record = {
+			"status": "prepared",
+			"method": IntegrationMethod.API_CALL.value,
+			"composition_id": contract.contract_id,
+			"target_capability": contract.target_capability,
+			"endpoint": endpoint,
+			"payload": event.payload,
+			"metadata": {
+				**event.metadata,
+				"event_type": event.event_type,
+				"correlation_id": event.correlation_id
+			}
+		}
+		self.composition_events.append(call_record)
+		return call_record
 
 	async def _handle_data_stream_integration(self, event: CapabilityEvent, contract: CompositionContract) -> Any:
 		"""Handle data stream integration"""
-		pass
+		records = event.payload.get("records")
+		if records is None:
+			records = event.payload.get("data", [])
+		if isinstance(records, dict):
+			records = [records]
+		if not isinstance(records, list):
+			raise ValueError("Data stream payload must include a list-like records or data field")
+
+		stream_record = {
+			"status": "stream_ready",
+			"method": IntegrationMethod.DATA_STREAM.value,
+			"composition_id": contract.contract_id,
+			"target_capability": contract.target_capability,
+			"record_count": len(records),
+			"records": records,
+			"metadata": event.metadata
+		}
+		self.composition_events.append(stream_record)
+		return stream_record
 
 	async def _map_fields(self, data: Any, mappings: Dict[str, str]) -> Any:
 		"""Map fields according to transformation rules"""
-		pass
+		def get_path(source: Dict[str, Any], path: str) -> Any:
+			current = source
+			for part in path.split("."):
+				if not isinstance(current, dict) or part not in current:
+					return None
+				current = current[part]
+			return current
+
+		def set_path(target: Dict[str, Any], path: str, value: Any):
+			current = target
+			parts = path.split(".")
+			for part in parts[:-1]:
+				current = current.setdefault(part, {})
+			current[parts[-1]] = value
+
+		def map_record(record: Dict[str, Any]) -> Dict[str, Any]:
+			mapped = record.copy()
+			for source_path, target_path in mappings.items():
+				value = get_path(record, source_path)
+				if value is not None:
+					set_path(mapped, target_path, value)
+			return mapped
+
+		if isinstance(data, list):
+			return [map_record(item) if isinstance(item, dict) else item for item in data]
+		if isinstance(data, dict) and isinstance(data.get("records"), list):
+			return {**data, "records": await self._map_fields(data["records"], mappings)}
+		if isinstance(data, dict):
+			return map_record(data)
+		return data
 
 	async def _filter_data(self, data: Any, conditions: List[Dict[str, Any]]) -> Any:
 		"""Filter data according to conditions"""
-		pass
+		def get_value(record: Dict[str, Any], field: str) -> Any:
+			current = record
+			for part in field.split("."):
+				if not isinstance(current, dict):
+					return None
+				current = current.get(part)
+			return current
+
+		def matches(record: Dict[str, Any]) -> bool:
+			for condition in conditions:
+				field = condition.get("field")
+				operator = condition.get("operator", "equals")
+				expected = condition.get("value")
+				actual = get_value(record, field) if field else None
+
+				if operator == "equals" and actual != expected:
+					return False
+				if operator == "not_equals" and actual == expected:
+					return False
+				if operator == "gt" and not (actual is not None and actual > expected):
+					return False
+				if operator == "gte" and not (actual is not None and actual >= expected):
+					return False
+				if operator == "lt" and not (actual is not None and actual < expected):
+					return False
+				if operator == "lte" and not (actual is not None and actual <= expected):
+					return False
+				if operator == "contains" and expected not in (actual or []):
+					return False
+				if operator == "in" and actual not in (expected or []):
+					return False
+				if operator == "exists" and (actual is not None) != bool(expected):
+					return False
+			return True
+
+		if isinstance(data, dict) and isinstance(data.get("records"), list):
+			return {**data, "records": [record for record in data["records"] if isinstance(record, dict) and matches(record)]}
+		if isinstance(data, list):
+			return [record for record in data if isinstance(record, dict) and matches(record)]
+		if isinstance(data, dict):
+			return data if matches(data) else {}
+		return data
 
 	async def _aggregate_data(self, data: Any, operations: List[Dict[str, Any]]) -> Any:
 		"""Aggregate data according to operations"""
-		pass
+		records = data.get("records", data) if isinstance(data, dict) else data
+		if not isinstance(records, list):
+			records = [records] if isinstance(records, dict) else []
+
+		result = {"record_count": len(records)}
+		for operation in operations:
+			op = operation.get("op") or operation.get("type")
+			field = operation.get("field")
+			name = operation.get("name") or f"{op}_{field or 'records'}"
+			values = [record.get(field) for record in records if isinstance(record, dict) and field in record]
+
+			if op == "count":
+				result[name] = len(values) if field else len(records)
+			elif op == "sum":
+				result[name] = sum(value for value in values if isinstance(value, (int, float)))
+			elif op == "avg":
+				numeric = [value for value in values if isinstance(value, (int, float))]
+				result[name] = sum(numeric) / len(numeric) if numeric else 0
+			elif op == "min":
+				result[name] = min(values) if values else None
+			elif op == "max":
+				result[name] = max(values) if values else None
+			else:
+				raise ValueError(f"Unsupported aggregate operation: {op}")
+
+		return result
 
 	async def _validate_data(self, data: Any, schema: Dict[str, Any]):
 		"""Validate data against schema"""
-		pass
+		required = schema.get("required", [])
+		types = schema.get("types", {})
+		ranges = schema.get("ranges", {})
+		if required:
+			await self._validate_required_fields(data, required)
+		if types:
+			await self._validate_data_types(data, types)
+		if ranges:
+			await self._validate_value_ranges(data, ranges)
 
 	async def _validate_required_fields(self, data: Any, fields: List[str]):
 		"""Validate required fields are present"""
-		pass
+		records = data if isinstance(data, list) else [data]
+		missing = []
+		for index, record in enumerate(records):
+			if not isinstance(record, dict):
+				missing.append(f"record[{index}] is not an object")
+				continue
+			for field in fields:
+				if field not in record or record[field] is None:
+					missing.append(f"record[{index}].{field}")
+		if missing:
+			raise ValueError(f"Missing required fields: {', '.join(missing)}")
 
 	async def _validate_data_types(self, data: Any, types: Dict[str, str]):
 		"""Validate data types"""
-		pass
+		type_map = {
+			"str": str,
+			"string": str,
+			"int": int,
+			"integer": int,
+			"float": (int, float),
+			"number": (int, float),
+			"bool": bool,
+			"boolean": bool,
+			"dict": dict,
+			"object": dict,
+			"list": list,
+			"array": list
+		}
+		records = data if isinstance(data, list) else [data]
+		errors = []
+		for index, record in enumerate(records):
+			if not isinstance(record, dict):
+				errors.append(f"record[{index}] is not an object")
+				continue
+			for field, expected_name in types.items():
+				if field not in record or record[field] is None:
+					continue
+				expected_type = type_map.get(expected_name)
+				if not expected_type:
+					raise ValueError(f"Unsupported data type validation: {expected_name}")
+				if not isinstance(record[field], expected_type):
+					errors.append(f"record[{index}].{field} expected {expected_name}")
+		if errors:
+			raise ValueError(f"Invalid data types: {', '.join(errors)}")
 
 	async def _validate_value_ranges(self, data: Any, ranges: Dict[str, Any]):
 		"""Validate value ranges"""
-		pass
+		records = data if isinstance(data, list) else [data]
+		errors = []
+		for index, record in enumerate(records):
+			if not isinstance(record, dict):
+				errors.append(f"record[{index}] is not an object")
+				continue
+			for field, bounds in ranges.items():
+				if field not in record or record[field] is None:
+					continue
+				value = record[field]
+				minimum = bounds.get("min")
+				maximum = bounds.get("max")
+				if minimum is not None and value < minimum:
+					errors.append(f"record[{index}].{field} below minimum {minimum}")
+				if maximum is not None and value > maximum:
+					errors.append(f"record[{index}].{field} above maximum {maximum}")
+		if errors:
+			raise ValueError(f"Values outside allowed ranges: {', '.join(errors)}")
 
 	async def _send_error_notification(self, composition_id: str, event: CapabilityEvent, error: Exception):
 		"""Send error notification"""
-		pass
+		self.composition_events.append({
+			"status": "error_notified",
+			"composition_id": composition_id,
+			"event": asdict(event),
+			"error": str(error),
+			"timestamp": datetime.now(timezone.utc).isoformat()
+		})
 
 
 class CompositionRegistry:

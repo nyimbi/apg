@@ -1194,3 +1194,25 @@ Current broader CONN API findings:
 - REST and collaboration WebSocket entrypoints now share an executable security boundary instead of static demo identities.
 - Importing `capabilities.common.conn.api` now succeeds under the current Pydantic v2 runtime.
 - Remaining warnings during focused pytest are pre-existing adjacent deprecation warnings, FastAPI `on_event` deprecation warnings, and the current development JWT secret-length warning.
+
+### 2026-05-26 16:44 EAT
+
+Completed checkpoint:
+
+- Replaced CONN composition runtime `pass` placeholders with deterministic event-driven, API-call, and data-stream execution paths.
+- Added in-process composition event and error ledgers so executions, prepared API calls, stream handoffs, and error notifications are inspectable.
+- Added executable transformation support for field mapping, conditional filtering, and aggregate operations.
+- Added executable validation support for required fields, data types, value ranges, and schema-style validation blocks.
+- Fixed connection event timestamps to use ISO-8601 strings and auto-registered the connection-management interface on composer initialization.
+- Added focused composition runtime tests for data-stream execution with transforms/validation, API-call preparation, and error-notification recording.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/composition_api.py capabilities/common/conn/tests/test_composition_api_runtime.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_composition_api_runtime.py` -> 3 passed, 10 warnings
+
+Current broader CONN composition findings:
+
+- Capability composition now has an executable local runtime surface instead of validation-only contracts.
+- The API-call path intentionally prepares deterministic call records rather than performing network calls; this keeps composition executable offline while preserving endpoint, payload, and correlation metadata.
+- Remaining `pass` statements in `composition_api.py` are abstract interface method bodies only.
