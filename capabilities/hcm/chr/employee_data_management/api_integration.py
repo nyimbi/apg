@@ -200,16 +200,26 @@ class EmployeeAPIView(BaseView):
 
 
 # Blueprint route handlers (alternative approach)
+def _blueprint_request_context() -> tuple[Optional[Dict[str, Any]], str, str]:
+	"""Resolve request body, tenant, and user context for blueprint handlers."""
+	body = request.get_json(silent=True) if request.method in ['POST', 'PUT', 'PATCH'] else None
+	return body, get_tenant_id_from_request(body), get_current_user_id(body)
+
+
 @employee_api_bp.route('/employees', methods=['GET'])
 def bp_list_employees():
 	"""Blueprint route for listing employees."""
 	try:
-		gateway = EmployeeAPIGateway("default_tenant")
+		body, tenant_id, user_id = _blueprint_request_context()
+		gateway = EmployeeAPIGateway(tenant_id)
 		api_request = APIRequest(
 			endpoint_path='/api/v1/employees',
 			method=HTTPMethod.GET,
 			headers=dict(request.headers),
 			query_params=dict(request.args),
+			body=body,
+			user_id=user_id,
+			tenant_id=tenant_id,
 			client_ip=request.remote_addr
 		)
 		
@@ -233,13 +243,16 @@ def bp_list_employees():
 def bp_create_employee():
 	"""Blueprint route for creating employee."""
 	try:
-		gateway = EmployeeAPIGateway("default_tenant")
+		body, tenant_id, user_id = _blueprint_request_context()
+		gateway = EmployeeAPIGateway(tenant_id)
 		api_request = APIRequest(
 			endpoint_path='/api/v1/employees',
 			method=HTTPMethod.POST,
 			headers=dict(request.headers),
 			query_params=dict(request.args),
-			body=request.get_json(),
+			body=body,
+			user_id=user_id,
+			tenant_id=tenant_id,
 			client_ip=request.remote_addr
 		)
 		
@@ -262,12 +275,16 @@ def bp_create_employee():
 def bp_get_employee(employee_id):
 	"""Blueprint route for getting employee."""
 	try:
-		gateway = EmployeeAPIGateway("default_tenant")
+		body, tenant_id, user_id = _blueprint_request_context()
+		gateway = EmployeeAPIGateway(tenant_id)
 		api_request = APIRequest(
 			endpoint_path=f'/api/v1/employees/{employee_id}',
 			method=HTTPMethod.GET,
 			headers=dict(request.headers),
 			query_params=dict(request.args),
+			body=body,
+			user_id=user_id,
+			tenant_id=tenant_id,
 			client_ip=request.remote_addr
 		)
 		
@@ -291,7 +308,8 @@ def bp_get_employee(employee_id):
 def bp_health_check():
 	"""Blueprint route for health check."""
 	try:
-		gateway = EmployeeAPIGateway("default_tenant")
+		_, tenant_id, _ = _blueprint_request_context()
+		gateway = EmployeeAPIGateway(tenant_id)
 		health_status = asyncio.run(gateway.health_check())
 		return jsonify(health_status)
 	except Exception as e:

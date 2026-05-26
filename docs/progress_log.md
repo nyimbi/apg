@@ -3095,3 +3095,18 @@ Verification:
 - `rg -n "'default_tenant'|\"default_tenant\"|Integration with APG authentication system|Kafka|kafka|\byield\s*=" capabilities/fin/cbm/cash_management/views.py tests/test_fin_cbm_cash_views_context.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:44 EAT
+
+Completed checkpoint:
+
+- Replaced HCM Employee Data Management blueprint route handlers' fixed `default_tenant` gateway construction with the existing APG tenant/user context helpers.
+- Ensured blueprint API requests now carry resolved tenant and user context consistently with the Flask-AppBuilder view path.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/chr/employee_data_management/api_integration.py tests/test_hcm_employee_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_hcm_employee_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "EmployeeAPIGateway\(\"default_tenant\"\)|default_tenant|Kafka|kafka" capabilities/hcm/chr/employee_data_management/api_integration.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

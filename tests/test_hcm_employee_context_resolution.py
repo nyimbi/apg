@@ -45,6 +45,11 @@ def test_employee_management_surfaces_delegate_context_resolution():
 	assert "from .context import get_current_user_id, get_tenant_id_from_request" in api_integration_source
 	assert "from flask_login import current_user" not in views_source
 	assert "from flask import Blueprint, request, jsonify, g" not in api_integration_source
+	assert 'EmployeeAPIGateway("default_tenant")' not in api_integration_source
+	assert "def _blueprint_request_context() -> tuple[Optional[Dict[str, Any]], str, str]:" in api_integration_source
+	assert "gateway = EmployeeAPIGateway(tenant_id)" in api_integration_source
+	assert "user_id=user_id" in api_integration_source
+	assert "tenant_id=tenant_id" in api_integration_source
 	assert "from .service import RevolutionaryEmployeeDataManagementService as EmployeeDataManagementService" in views_source
 	assert "from .service import RevolutionaryEmployeeDataManagementService as EmployeeDataManagementService" in api_source
 	assert 'return "default_tenant"' not in combined
