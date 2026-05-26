@@ -1560,3 +1560,18 @@ Verification:
 - `.venv/bin/python -m pytest -q capabilities/common/test_capability_contracts.py` -> 1 passed, 10 warnings
 - `.venv/bin/python -m py_compile capabilities/common/test_capability_contracts.py`
 - `git diff --check -- capabilities/common/test_capability_contracts.py docs/progress_log.md`
+
+### 2026-05-26 18:29 EAT
+
+Completed checkpoint:
+
+- Audited spec-backed capabilities outside `common` and found 20 `cap_spec.md` directories without executable capability contracts.
+- Added `capabilities/capability_contract_factory.py` to derive a complete executable contract from a local capability specification.
+- Added thin `capability_contract.py` wrappers for the 20 spec-backed capability directories that were missing contracts.
+- Added a repository-level spec-backed capability contract regression so every `capabilities/*/*/cap_spec.md` directory must expose configuration, schema, deterministic rules, UI routes with theme support, and theme tokens.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q capabilities/test_spec_capability_contracts.py` -> 1 passed
+- `.venv/bin/python -m py_compile capabilities/capability_contract_factory.py capabilities/test_spec_capability_contracts.py`
+- `git diff --check -- capabilities docs/progress_log.md`
