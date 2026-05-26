@@ -481,3 +481,24 @@ Current broader MDM/META execution findings:
 - MDM and META contract discovery/registration now work without optional database/search dependencies such as `asyncpg`.
 - Focused MDM and META contract tests live outside existing heavyweight runtime test folders so metadata discovery remains isolated from database fixtures.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 08:55 EAT
+
+Completed checkpoint:
+
+- Made the ETLP data-processing capability executable as a first-class APG capability with tenant-scoped pipeline, processing, quality, governance, optimization, UI, and theme configuration.
+- Added deterministic ETLP pipeline-governance rules for tenant context, pipeline ownership, production approval, quality gates, lineage emission, and high-cost execution review.
+- Made the DVRL data-access capability executable as a first-class APG capability with tenant-scoped sources, queries, cache, governance, optimization, UI, and theme configuration.
+- Added deterministic DVRL virtualization-governance rules for tenant context, vaulted source credentials, restricted-query RBAC, sensitive result cache blocking, lineage capture, and high-cost query review.
+- Exposed ETLP and DVRL contract helpers through package registration/info surfaces while keeping ETLP contract discovery independent of the current eager API-controller initialization issue.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/etlp/__init__.py capabilities/common/etlp/capability_contract.py capabilities/common/etlp/test_capability_contract.py capabilities/common/dvrl/__init__.py capabilities/common/dvrl/capability_contract.py capabilities/common/dvrl/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/etlp/test_capability_contract.py capabilities/common/dvrl/test_capability_contract.py` -> 6 passed, 15 warnings
+
+Current broader ETLP/DVRL execution findings:
+
+- ETLP contract discovery/registration now works despite a pre-existing eager API-controller import failure for a missing `get_pipeline_logs` handler.
+- DVRL contract discovery/registration now returns the same executable configuration/rules/UI/theme surface as the rest of the data backbone.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

@@ -9,6 +9,10 @@ Copyright: © 2025 Datacraft
 
 from typing import Dict, List, Any, Optional
 from uuid_extensions import uuid7str
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
 
 # APG Capability Metadata for Composition Engine
 CAPABILITY_METADATA = {
@@ -71,7 +75,57 @@ CAPABILITY_METADATA = {
 # APG Capability Registration
 def register_capability() -> Dict[str, Any]:
 	"""Register DVRL capability with APG composition engine"""
-	return CAPABILITY_METADATA
+	contract = get_capability_contract()
+	return {
+		"name": "dvrl",
+		"aliases": ["data_virtualization", "federated_queries", "unified_data_access"],
+		"display_name": CAPABILITY_METADATA["display_name"],
+		"description": CAPABILITY_METADATA["description"],
+		"version": CAPABILITY_METADATA["version"],
+		"dependencies": CAPABILITY_METADATA["dependencies"]["required"],
+		"optional_dependencies": CAPABILITY_METADATA["dependencies"]["optional"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"data_virtualization": "Expose unified access across heterogeneous data sources",
+			"federated_queries": "Plan, execute, cache, and audit federated queries",
+			"source_governance": "Manage virtual source registration and policies",
+			"query_optimization": "Apply cost, cache, and policy-aware query planning",
+			"capability_rules": "Evaluate deterministic virtualization governance rules",
+			"visual_theming": "Apply federation-console theme tokens and components"
+		},
+		"endpoints": {
+			"queries": "/dvrl/api/v1/queries",
+			"sources": "/dvrl/api/v1/sources",
+			"schemas": "/dvrl/api/v1/schemas",
+			"federation": "/dvrl/api/v1/federation",
+			"cache": "/dvrl/api/v1/cache",
+			"metrics": "/dvrl/api/v1/metrics"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"dvrl:view",
+			"dvrl:query",
+			"dvrl:manage_sources",
+			"dvrl:view_lineage",
+			"dvrl:manage_policies",
+			"dvrl:view_metrics",
+			"dvrl:admin"
+		]
+	}
+
+
+def get_capability_info() -> Dict[str, Any]:
+	"""Get DVRL capability information for composition and marketplace discovery."""
+	info = CAPABILITY_METADATA.copy()
+	info["contract"] = get_capability_contract()
+	return info
 
 # APG Health Check Functions
 async def _log_info(message: str, context: Optional[Dict[str, Any]] = None) -> None:
@@ -100,6 +154,9 @@ async def _log_warning(message: str, context: Optional[Dict[str, Any]] = None) -
 __all__ = [
 	"CAPABILITY_METADATA",
 	"register_capability",
+	"get_capability_info",
+	"get_capability_contract",
+	"evaluate_capability_rules",
 	"_log_info",
 	"_log_error", 
 	"_log_warning"
