@@ -44,13 +44,13 @@ def get_tenant_id_from_context(payload: Optional[Dict[str, Any]] = None) -> str:
 			]
 		)
 
-	candidates.append(os.getenv("APG_DEFAULT_TENANT_ID"))
+	candidates.extend([os.getenv("APG_DEFAULT_TENANT_ID"), os.getenv("APG_TENANT_ID")])
 
 	for candidate in candidates:
 		tenant_id = _clean_text(candidate)
 		if tenant_id:
 			return tenant_id
-	return "default_tenant"
+	return "default"
 
 
 def get_current_user_id(payload: Optional[Dict[str, Any]] = None) -> str:

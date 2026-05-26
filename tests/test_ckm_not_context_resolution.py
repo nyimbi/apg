@@ -13,6 +13,7 @@ CONTEXT_PATH = REPO_ROOT / "capabilities" / "ckm" / "not" / "context.py"
 SURFACE_PATHS = [
 	REPO_ROOT / "capabilities" / "ckm" / "not" / "views.py",
 	REPO_ROOT / "capabilities" / "ckm" / "not" / "api.py",
+	REPO_ROOT / "capabilities" / "ckm" / "not" / "blueprint.py",
 	REPO_ROOT / "capabilities" / "ckm" / "not" / "websocket.py",
 	REPO_ROOT / "capabilities" / "ckm" / "not" / "personalization" / "api.py",
 ]
@@ -45,8 +46,9 @@ def test_ckm_notification_surfaces_delegate_context_resolution():
 
 	assert "from .context import get_tenant_id_from_context" in SURFACE_PATHS[0].read_text(encoding="utf-8")
 	assert "from .context import get_tenant_id_from_context" in SURFACE_PATHS[1].read_text(encoding="utf-8")
-	assert "from .context import get_current_user_id, get_tenant_id_from_context" in SURFACE_PATHS[2].read_text(encoding="utf-8")
-	assert "from ..context import get_current_user_id, get_tenant_id_from_context" in SURFACE_PATHS[3].read_text(encoding="utf-8")
+	assert "from .context import get_tenant_id_from_context" in SURFACE_PATHS[2].read_text(encoding="utf-8")
+	assert "from .context import get_current_user_id, get_tenant_id_from_context" in SURFACE_PATHS[3].read_text(encoding="utf-8")
+	assert "from ..context import get_current_user_id, get_tenant_id_from_context" in SURFACE_PATHS[4].read_text(encoding="utf-8")
 
 
 def test_ckm_notification_context_resolves_tenant_and_user(monkeypatch):

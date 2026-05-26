@@ -2631,3 +2631,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_imex_secure_identity.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 2 passed
 - `rg -n "user_123|id=\"user_123\"" capabilities/common/imex/api_secure.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:42 EAT
+
+Completed checkpoint:
+
+- Replaced CKM and common notification context helpers' literal `default_tenant` fallback with configured tenant resolution through `APG_DEFAULT_TENANT_ID`, `APG_TENANT_ID`, then `default`.
+- Replaced the CKM notification blueprint test-send path's fixed `default_tenant` service construction with `get_tenant_id_from_context()`.
+- Extended CKM notification regression coverage to include the blueprint surface.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/ckm/not/context.py capabilities/ckm/not/blueprint.py capabilities/common/ntfy/context.py tests/test_ckm_not_context_resolution.py tests/test_common_ntfy_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_ckm_not_context_resolution.py tests/test_common_ntfy_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed
+- `rg -n "['\"]default_tenant['\"]|create_notification_service\('default_tenant'\)" capabilities/ckm/not capabilities/common/ntfy --glob '*.py' -g '!**/tests/**'` -> no matches
+- `git diff --check` -> no issues
