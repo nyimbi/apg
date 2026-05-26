@@ -989,6 +989,7 @@ agent Planner {
     role: "planner";
     model: "openai:gpt-4.1-mini";
     system: "Break work into steps.";
+    capabilities: [planning, ticket_triage];
     tools: [docs.search, tickets.read];
     memory: vector support_memory;
     config: {temperature: 0.2, max_turns: 4};
@@ -1003,13 +1004,14 @@ agent Writer {
 
 swarm SupportCrew {
     agents: [Planner, Writer];
+    capabilities: [support_response];
     flow: Planner -> Writer;
     rules: [{name: "review_low_confidence", when: "confidence < 0.6", action: "human_review"}];
     theme: {name: "support_ops", density: compact};
 }
 ```
 
-The compiler validates agent references and emits `ai_agents.py` with `AI_AGENTS`, `AI_AGENT_TEAMS`, lookup helpers, and per-agent/per-team configuration, rules, UI, and theme metadata. See [AI Agent Composition](./ai_agent_composition.md) for the executable contract.
+The compiler validates agent references and emits `ai_agents.py` with `AI_AGENTS`, `AI_AGENT_TEAMS`, lookup helpers, runtime aliases, and per-agent/per-team capabilities, configuration, rules, UI, and theme metadata. See [AI Agent Composition](./ai_agent_composition.md) for the executable contract.
 
 ```apg
 // Cognitive architecture

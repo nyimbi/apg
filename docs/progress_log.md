@@ -1913,3 +1913,16 @@ Verification:
 
 - `.venv/bin/python -m py_compile compiler/ast_builder.py compiler/ai_agent_composition.py compiler/code_generator.py compiler/semantic_analyzer.py tests/test_ai_agent_composition.py`
 - `.venv/bin/python -m pytest -q tests/test_ai_agent_composition.py` -> 4 passed
+
+### 2026-05-26 21:15 EAT
+
+Completed checkpoint:
+
+- Updated the AI Agent Composition documentation so the examples and entity-field table include `capability` / `capabilities`.
+- Updated the language reference AI-agent section to show capability declarations and describe generated runtime aliases plus per-agent/per-team capabilities.
+- Kept the docs in the existing `docs/` hierarchy rather than adding root-level documentation files.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_ai_agent_composition.py` -> 4 passed
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories` -> 1 passed

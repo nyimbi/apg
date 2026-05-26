@@ -16,6 +16,7 @@ agent Planner {
     model: "openai:gpt-4.1-mini";
     runtime: codex;
     system: "Break the ticket into concrete work.";
+    capabilities: [planning, ticket_triage];
     tools: [tickets.read, docs.search];
     memory: vector support_memory;
     input: ticket;
@@ -33,6 +34,7 @@ agent Writer {
 
 swarm SupportCrew {
     agents: [Planner, Writer];
+    capabilities: [support_response];
     flow: Planner -> Writer;
 }
 ```
@@ -47,6 +49,7 @@ swarm SupportCrew {
 | `runtime` / `runner` | no | Execution adapter, for example `codex`, `claude_code`, `opencode`, `pi`, or `local`. |
 | `role` | recommended | Short human-readable responsibility. |
 | `system` | recommended | System instruction used by the generated runtime manifest. |
+| `capability` / `capabilities` | no | Named APG capability contracts the agent provides or requires, for example `planning` or `[ticket_triage, code_review]`. |
 | `tools` | no | Tool or capability references available to the agent. |
 | `memory` | no | Memory backend hint, for example `vector support_memory`. |
 | `input` / `inputs` | no | Named input contract values. |
@@ -64,6 +67,7 @@ swarm ResearchCrew {
     agent Researcher {
         model: "openai:gpt-4.1-mini";
         system: "Find source-backed facts.";
+        capability: research;
         tools: [web.search, docs.read];
         config: {temperature: 0.1, max_turns: 3};
         ui: {view: "ResearchConsole", route: "/agents/researcher"};
@@ -75,6 +79,7 @@ swarm ResearchCrew {
     }
 
     flow: Researcher -> Reviewer;
+    capabilities: [research_review];
     rules: [{name: "weak_evidence_review", when: "citation_count < 2", action: "human_review"}];
     theme: {name: "research_ops", density: compact};
 }
@@ -105,7 +110,7 @@ The file contains:
 - `get_agent(name)`, `get_team(name)`, and `describe_team(name)` helpers.
 - `AI_AGENT_RUNTIME_DATA`: dependency-free runtime catalog for generated apps.
 - `list_agent_runtimes()`, `canonical_runtime()`, `agents_by_runtime()`, and `validate_agent_runtimes()` helpers.
-- Per-agent and per-team `configuration`, `rules`, `ui`, and `theme` metadata.
+- Per-agent and per-team `capabilities`, `configuration`, `rules`, `ui`, and `theme` metadata.
 
 The runtime manifest is dependency-free. Provider SDK wiring belongs in the selected AI capability integration, while `ai_agents.py` remains the stable contract between APG syntax and application code. Generated apps can still validate declared runtimes before deployment:
 
@@ -125,6 +130,7 @@ agent CodeReviewer {
     role: "reviewer";
     model: "openai:gpt-5.4";
     runtime: codex;
+    capability: code_review;
     system: "Review the branch and return concrete defects.";
     tools: [repo.read, tests.run];
 }
@@ -185,7 +191,7 @@ Any first-class AI agent or team selects the `ai/llm_integration` capability. A 
 
 This keeps the language surface concise while still making deployment dependencies explicit in the generated application.
 
-Agents and teams can also carry the same executable capability contract shape APG expects elsewhere: specific configuration, deterministic rule metadata, UI manifest hints, and visual theme tokens. Keep those blocks short and local to the declaration when they are specific to that agent or team.
+Agents and teams can also carry the same executable capability contract shape APG expects elsewhere: named capabilities, specific configuration, deterministic rule metadata, UI manifest hints, and visual theme tokens. Keep those blocks short and local to the declaration when they are specific to that agent or team.
 
 ## Design Guidance
 
