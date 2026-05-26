@@ -12,6 +12,7 @@ monitoring with 100% coverage and scenario-based testing.
 
 import pytest
 import asyncio
+import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
@@ -435,6 +436,107 @@ class TestAlertManager:
 					# Evaluate again (should trigger now)
 					await alert_manager._evaluate_alert_condition(alert)
 					mock_trigger.assert_called_once()
+
+	@pytest.mark.asyncio
+	async def test_unconfigured_notifications_record_skipped_delivery(self, alert_manager):
+		"""Test default channels record skipped delivery instead of pretending to send."""
+		await alert_manager.initialize()
+		alert_event = {
+			"alert_id": "alert-1",
+			"alert_name": "No Channel Config",
+			"severity": "high",
+			"metric_name": "latency",
+			"current_value": 200,
+			"threshold": 100,
+			"timestamp": datetime.utcnow().isoformat(),
+			"trigger_count": 1
+		}
+
+		await alert_manager.notification_channels["email"](alert_event)
+		await alert_manager.notification_channels["webhook"](alert_event)
+
+		assert alert_manager.notification_delivery_history[-2]["status"] == "skipped"
+		assert alert_manager.notification_delivery_history[-2]["reason"] == "email_not_configured"
+		assert alert_manager.notification_delivery_history[-1]["status"] == "skipped"
+		assert alert_manager.notification_delivery_history[-1]["reason"] == "webhook_not_configured"
+
+	@pytest.mark.asyncio
+	async def test_email_notification_uses_configured_smtp_channel(self):
+		"""Test configured email notifications send through SMTP."""
+		manager = AlertManager({
+			"email": {
+				"smtp_host": "smtp.example.test",
+				"smtp_port": 2525,
+				"use_ssl": False,
+				"sender": "alerts@example.test",
+				"recipients": ["ops@example.test"]
+			}
+		})
+		await manager.initialize()
+		alert_event = {
+			"alert_id": "alert-email",
+			"alert_name": "Email Alert",
+			"severity": "critical",
+			"metric_name": "error_rate",
+			"current_value": 10,
+			"threshold": 5,
+			"timestamp": datetime.utcnow().isoformat(),
+			"trigger_count": 1
+		}
+
+		with patch("capabilities.common.aicr.monitoring.smtplib.SMTP") as mock_smtp:
+			smtp_client = mock_smtp.return_value.__enter__.return_value
+			await manager.notification_channels["email"](alert_event)
+
+		mock_smtp.assert_called_once_with("smtp.example.test", 2525, timeout=10.0)
+		smtp_client.send_message.assert_called_once()
+		message = smtp_client.send_message.call_args.args[0]
+		assert message["Subject"] == "[APG CRITICAL] Email Alert"
+		assert message["To"] == "ops@example.test"
+		assert manager.notification_delivery_history[-1]["status"] == "sent"
+
+	@pytest.mark.asyncio
+	async def test_webhook_notification_posts_structured_payload(self):
+		"""Test configured webhook notifications post structured JSON."""
+		manager = AlertManager({"webhook": {"url": "https://hooks.example.test/alerts", "headers": {"X-Test": "true"}}})
+		await manager.initialize()
+		alert_event = {
+			"alert_id": "alert-webhook",
+			"alert_name": "Webhook Alert",
+			"severity": "medium",
+			"metric_name": "queue_depth",
+			"current_value": 50,
+			"threshold": 25,
+			"timestamp": datetime.utcnow().isoformat(),
+			"trigger_count": 1
+		}
+
+		class FakeResponse:
+			status = 202
+
+			def __enter__(self):
+				return self
+
+			def __exit__(self, *_args):
+				return False
+
+			def read(self):
+				return b"accepted"
+
+			def getcode(self):
+				return self.status
+
+		with patch("capabilities.common.aicr.monitoring.urllib.request.urlopen", return_value=FakeResponse()) as mock_urlopen:
+			await manager.notification_channels["webhook"](alert_event)
+
+		request = mock_urlopen.call_args.args[0]
+		payload = json.loads(request.data.decode("utf-8"))
+		assert request.full_url == "https://hooks.example.test/alerts"
+		assert request.headers["X-test"] == "true"
+		assert payload["source"] == "apg.aicr.monitoring"
+		assert payload["alert"]["alert_id"] == "alert-webhook"
+		assert manager.notification_delivery_history[-1]["status"] == "sent"
+		assert manager.notification_delivery_history[-1]["status_code"] == 202
 
 
 class TestPerformanceAnalyzer:

@@ -1006,3 +1006,23 @@ Current broader root cleanup findings:
 - Root tracked files are now closer to entrypoints, package/build metadata, and generator utilities rather than mixed documentation/spec/demo artifacts.
 - No root-level tracked `test_*.py` files were found; tests are already under `tests/` or capability-local test directories.
 - Remaining root dirty files are unrelated pre-existing workspace changes and were intentionally left untouched.
+
+### 2026-05-26 15:52 EAT
+
+Completed checkpoint:
+
+- Replaced AICR monitoring email/webhook notification placeholders with concrete stdlib delivery implementations.
+- Added configurable SMTP delivery for email alerts, including sender, recipients, host/port, SSL/starttls, login, timeout, and structured alert payloads.
+- Added configurable HTTP webhook delivery using `urllib.request` with JSON payloads, custom headers, timeout, status checking, and failure reporting.
+- Added explicit notification delivery history so skipped, sent, and failed outcomes are auditable and testable.
+- Kept unconfigured channels safe by recording `skipped` outcomes instead of pretending delivery succeeded.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/aicr/monitoring.py capabilities/common/aicr/tests/test_monitoring.py`
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_monitoring.py` -> 30 passed, 10 warnings
+
+Current broader AICR monitoring findings:
+
+- The previously placeholder email/webhook alert channels are now executable runtime paths.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

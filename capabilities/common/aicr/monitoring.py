@@ -13,10 +13,14 @@ and autonomous optimization for AI systems within the APG platform.
 import asyncio
 import json
 import logging
+import smtplib
 import time
+import urllib.error
+import urllib.request
 import uuid
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
+from email.message import EmailMessage
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Callable, Tuple
@@ -471,6 +475,7 @@ class AlertManager:
 		self.config = config or {}
 		self.alerts: Dict[str, Alert] = {}
 		self.alert_history: List[Dict[str, Any]] = []
+		self.notification_delivery_history: List[Dict[str, Any]] = []
 		self.notification_channels: Dict[str, Callable] = {}
 		self.evaluation_tasks: Dict[str, asyncio.Task] = {}
 		self.logger = logging.getLogger(__name__)
@@ -622,20 +627,113 @@ class AlertManager:
 			)
 
 		async def email_notification(alert_event: Dict[str, Any]) -> None:
-			"""Email notification channel (placeholder)."""
-			# In production, this would integrate with email service
-			self._log_alert_event(f"Email alert sent: {alert_event['alert_name']}")
+			"""Send an alert through the configured SMTP email channel."""
+			await asyncio.to_thread(self._send_email_notification, alert_event)
 
 		async def webhook_notification(alert_event: Dict[str, Any]) -> None:
-			"""Webhook notification channel (placeholder)."""
-			# In production, this would make HTTP request to webhook
-			self._log_alert_event(f"Webhook alert sent: {alert_event['alert_name']}")
+			"""Send an alert through the configured HTTP webhook channel."""
+			await asyncio.to_thread(self._send_webhook_notification, alert_event)
 
 		self.notification_channels = {
 			"log": log_notification,
 			"email": email_notification,
 			"webhook": webhook_notification
 		}
+
+	def _send_email_notification(self, alert_event: Dict[str, Any]) -> None:
+		"""Send an alert email or record why email delivery was skipped."""
+		email_config = self.config.get("email", {})
+		recipients = email_config.get("recipients") or email_config.get("to") or []
+		if isinstance(recipients, str):
+			recipients = [recipients]
+		smtp_host = email_config.get("smtp_host") or email_config.get("host")
+
+		if not smtp_host or not recipients:
+			self._record_notification_delivery("email", alert_event, "skipped", reason="email_not_configured")
+			return
+
+		sender = email_config.get("sender") or email_config.get("from") or "apg-alerts@localhost"
+		port = int(email_config.get("smtp_port") or email_config.get("port") or 465)
+		timeout = float(email_config.get("timeout_seconds", 10))
+		use_ssl = bool(email_config.get("use_ssl", True))
+		use_starttls = bool(email_config.get("starttls", False))
+
+		message = EmailMessage()
+		message["Subject"] = self._format_alert_subject(alert_event)
+		message["From"] = sender
+		message["To"] = ", ".join(recipients)
+		message.set_content(json.dumps(self._notification_payload(alert_event), indent=2, sort_keys=True))
+
+		smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+		with smtp_class(smtp_host, port, timeout=timeout) as smtp:
+			if use_starttls:
+				smtp.starttls()
+			username = email_config.get("username")
+			password = email_config.get("password")
+			if username and password:
+				smtp.login(username, password)
+			smtp.send_message(message)
+
+		self._record_notification_delivery("email", alert_event, "sent", recipients=recipients)
+
+	def _send_webhook_notification(self, alert_event: Dict[str, Any]) -> None:
+		"""Send an alert webhook or record why webhook delivery was skipped."""
+		webhook_config = self.config.get("webhook", {})
+		webhook_url = webhook_config.get("url") or self.config.get("webhook_url")
+
+		if not webhook_url:
+			self._record_notification_delivery("webhook", alert_event, "skipped", reason="webhook_not_configured")
+			return
+
+		payload = json.dumps(self._notification_payload(alert_event), sort_keys=True).encode("utf-8")
+		headers = {"Content-Type": "application/json", **webhook_config.get("headers", {})}
+		request = urllib.request.Request(webhook_url, data=payload, headers=headers, method="POST")
+		timeout = float(webhook_config.get("timeout_seconds", 10))
+
+		try:
+			with urllib.request.urlopen(request, timeout=timeout) as response:
+				status_code = getattr(response, "status", None) or response.getcode()
+				response_body = response.read().decode("utf-8", errors="replace")
+		except urllib.error.URLError as exc:
+			self._record_notification_delivery("webhook", alert_event, "failed", reason=str(exc))
+			raise
+
+		if status_code >= 400:
+			self._record_notification_delivery("webhook", alert_event, "failed", status_code=status_code, reason=response_body)
+			raise RuntimeError(f"Webhook notification failed with HTTP {status_code}")
+
+		self._record_notification_delivery("webhook", alert_event, "sent", status_code=status_code)
+
+	def _notification_payload(self, alert_event: Dict[str, Any]) -> Dict[str, Any]:
+		"""Build a stable notification payload for outbound channels."""
+		return {
+			"source": "apg.aicr.monitoring",
+			"manager_id": self.manager_id,
+			"alert": alert_event,
+			"sent_at": datetime.utcnow().isoformat()
+		}
+
+	def _format_alert_subject(self, alert_event: Dict[str, Any]) -> str:
+		"""Return a concise email subject for an alert event."""
+		severity = str(alert_event.get("severity", "alert")).upper()
+		alert_name = alert_event.get("alert_name", "APG Alert")
+		return f"[APG {severity}] {alert_name}"
+
+	def _record_notification_delivery(self, channel: str, alert_event: Dict[str, Any], status: str, **details: Any) -> None:
+		"""Record notification delivery outcomes for audit and tests."""
+		record = {
+			"channel": channel,
+			"status": status,
+			"alert_id": alert_event.get("alert_id"),
+			"alert_name": alert_event.get("alert_name"),
+			"timestamp": datetime.utcnow().isoformat(),
+			**details
+		}
+		self.notification_delivery_history.append(record)
+		if status == "sent":
+			self._log_alert_event(f"{channel.title()} alert sent: {alert_event.get('alert_name')}", record)
+		elif status == "skipped":
+			self._log_warning(f"{channel.title()} alert skipped: {details.get('reason')}", record)
 
 	async def _get_current_metric_value(self, metric_name: str) -> Optional[float]:
 		"""Return the latest metric value when an external collector is not wired."""
