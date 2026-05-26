@@ -747,7 +747,7 @@ class WBPMAPIDefinitions:
 							"required": ["recipient_id", "channels", "subject", "message"]
 						},
 						"example": {
-							"recipient_id": "user_123",
+							"recipient_id": "workflow_approver_alpha",
 							"channels": ["email", "in_app"],
 							"priority": "high",
 							"subject": "Process Approval Required",
@@ -1147,7 +1147,7 @@ instance = await client.processes.start_instance(
 
 # Get user tasks
 tasks = await client.tasks.get_user_tasks(
-    user_id="user_123",
+    user_id="workflow_approver_alpha",
     status="active"
 )
 
@@ -1222,7 +1222,7 @@ curl -X POST \\
   -H "X-Tenant-ID: $TENANT_ID" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "recipient_id": "user_123",
+    "recipient_id": "workflow_approver_alpha",
     "channels": ["email", "in_app"],
     "priority": "high",
     "subject": "Task Assignment",
@@ -1284,11 +1284,11 @@ Event payload example:
 {
   "event_type": "task.assigned",
   "timestamp": "2025-01-15T12:00:00Z",
-  "tenant_id": "tenant_123",
+  "tenant_id": "workflow_tenant_alpha",
   "data": {
     "task_id": "task_456",
     "process_id": "proc_789",
-    "assignee": "user_123",
+    "assignee": "workflow_approver_alpha",
     "task_name": "Review Document",
     "due_date": "2025-01-20T17:00:00Z"
   },

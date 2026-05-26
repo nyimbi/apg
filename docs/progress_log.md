@@ -2678,3 +2678,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_top_level_blueprint_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return ['\"]default_tenant['\"]|['\"]default_tenant['\"]" capabilities/composition/orchestration/blueprint.py capabilities/composition/config/security_engine.py capabilities/common/request_context.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:58 EAT
+
+Completed checkpoint:
+
+- Removed stale `user_123`, `tenant_123`, and `tenant_456` demo literals from cleaned workflow API documentation, enhanced session management demo code, cash-management UX example code, and audit-learning behavioral-score examples.
+- Replaced fixed session demo identities with a generated demo user ID so web and mobile session examples still share the same user without carrying a hardcoded actor.
+- Added a focused placeholder identity hygiene regression for the cleaned capability surfaces.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/ckm/wfa/api_documentation.py capabilities/common/auth/session_manager.py capabilities/common/audl/world_class_improvements.py capabilities/fin/cbm/cash_management/revolutionary_ux_engine.py tests/test_placeholder_identity_hygiene.py`
+- `.venv/bin/python -m pytest -q tests/test_placeholder_identity_hygiene.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 2 passed
+- `rg -n "return ['\"]user_123['\"]|return ['\"]tenant_123['\"]|return ['\"]default_tenant['\"]|['\"]user_123['\"]|['\"]tenant_456['\"]|request\\.headers\\.get\\(['\"]X-Tenant-ID['\"], ['\"]default_tenant['\"]\\)|request\\.args\\.get\\(['\"]tenant_id['\"], ['\"]default_tenant['\"]\\)" capabilities --glob '*.py' -g '!**/tests/**' -g '!**/test_*.py' -g '!**/migrations/**'` -> no matches
+- `git diff --check` -> no issues

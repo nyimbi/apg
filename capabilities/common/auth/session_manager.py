@@ -1007,6 +1007,7 @@ async def demo_enhanced_session_management():
 	})
 	
 	print("Initialized enhanced session manager")
+	demo_user_id = f"demo_user_{uuid7str()}"
 	
 	# Create test sessions
 	device_info = {
@@ -1024,7 +1025,7 @@ async def demo_enhanced_session_management():
 	
 	# Create web session
 	web_session = await manager.create_session(
-		user_id="user_123",
+		user_id=demo_user_id,
 		session_type=SessionType.WEB,
 		device_info=device_info,
 		security_context=security_context
@@ -1056,7 +1057,7 @@ async def demo_enhanced_session_management():
 	}
 	
 	mobile_session = await manager.create_session(
-		user_id="user_123",
+		user_id=demo_user_id,
 		session_type=SessionType.MOBILE,
 		device_info=mobile_device
 	)

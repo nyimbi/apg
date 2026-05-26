@@ -1422,7 +1422,7 @@ if __name__ == "__main__":
 		# Test natural language query
 		response = await ux_engine.process_natural_language_query(
 			"What's my current cash balance?",
-			"user_123",
+			"demo_cash_user",
 			"session_456"
 		)
 		

@@ -828,9 +828,9 @@ class WorldClassAuditEngine:
 				"Geographic location inconsistency"
 			],
 			"behavioral_scores": {
-				"user_123": 0.3,  # Low score = anomalous
-				"user_456": 0.8,  # High score = normal
-				"user_789": 0.4   # Moderate anomaly
+				"anomaly_user_low": 0.3,  # Low score = anomalous
+				"baseline_user_normal": 0.8,  # High score = normal
+				"anomaly_user_moderate": 0.4   # Moderate anomaly
 			}
 		}
 	
