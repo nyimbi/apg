@@ -2093,3 +2093,21 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native tests/test_fin_cos_tenant_resolution.py` -> 3 passed
 - `rg -n "CostAccountingService\(tenant_id='default_tenant'\)|TODO: Get from session|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|data\.get\('tenant_id', 'default_tenant'\)" capabilities/fin/cos/api.py capabilities/fin/cos/views.py capabilities/fin/cos/tenant.py` -> no matches
 - `git diff --check -- capabilities/fin/cos/api.py capabilities/fin/cos/views.py capabilities/fin/cos/tenant.py tests/test_fin_cos_tenant_resolution.py` -> no issues
+
+### 2026-05-26 22:10 EAT
+
+Completed checkpoint:
+
+- Fixed the billing payment processor syntax error by returning the PayPal webhook outer exception handler to `verify_webhook()` and removing the misplaced duplicate from access-token retrieval.
+- Made optional billing gateway dependencies import-safe: missing Stripe, AIOHTTP, Avalara, TaxJar, SendGrid, boto3, and webhook AIOHTTP now fail at provider initialization/delivery instead of blocking package import.
+- Converted billing package view exports to lazy loading so service and payment processor imports do not instantiate Flask-AppBuilder datamodels for unmapped runtime view classes.
+- Replaced `await` expressions in the synchronous refund view path with a small sync bridge so billing views compile again.
+- Added a focused billing import regression covering missing gateway SDKs and package-level payment processor import.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/bil/__init__.py capabilities/fin/bil/payment_processors.py capabilities/fin/bil/tax_services.py capabilities/fin/bil/email_services.py capabilities/fin/bil/webhook_system.py capabilities/fin/bil/views.py tests/test_fin_bil_payment_processors_imports.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_bil_payment_processors_imports.py` -> 2 passed
+- `.venv/bin/python -c "from capabilities.fin.bil.payment_processors import PaymentProcessorManager; print(PaymentProcessorManager.__name__)"` -> `PaymentProcessorManager`
+- `.venv/bin/python -m pytest -q tests/test_fin_bil_payment_processors_imports.py tests/test_fin_cos_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed
+- `git diff --check -- capabilities/fin/bil/__init__.py capabilities/fin/bil/payment_processors.py capabilities/fin/bil/tax_services.py capabilities/fin/bil/email_services.py capabilities/fin/bil/webhook_system.py capabilities/fin/bil/views.py tests/test_fin_bil_payment_processors_imports.py` -> no issues

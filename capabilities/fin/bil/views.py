@@ -8,6 +8,8 @@ admin console, and analytics dashboards.
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
+import asyncio
+
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -25,6 +27,11 @@ from .models import (
 	SubscriptionStatus, InvoiceStatus, PaymentStatus, BillingCurrency, BillingPeriod, PricingModel
 )
 from .service import get_billing_service
+
+
+def _run_billing_async(coro):
+	"""Run an async billing operation from a synchronous Flask-AppBuilder view."""
+	return asyncio.run(coro)
 
 
 class BillingCustomerModelView(ModelView):
@@ -357,12 +364,12 @@ class BillingPaymentModelView(ModelView):
 			}
 			
 			# Create dispute for tracking
-			dispute = await dispute_system.create_dispute(refund_data)
+			dispute = _run_billing_async(dispute_system.create_dispute(refund_data))
 			
 			if dispute:
 				# Process the refund immediately
-				refund_result = await dispute_system._process_stripe_refund(
-					payment, payment.amount, dispute
+				refund_result = _run_billing_async(
+					dispute_system._process_stripe_refund(payment, payment.amount, dispute)
 				)
 				
 				if refund_result.get('success'):

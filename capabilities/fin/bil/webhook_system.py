@@ -18,8 +18,10 @@ from typing import Any, Dict, List, Optional, Callable
 from enum import Enum
 from uuid_extensions import uuid7str
 
-import aiohttp
-from cryptography.fernet import Fernet
+try:
+	import aiohttp
+except ImportError:  # pragma: no cover - exercised through billing import regression
+	aiohttp = None
 
 
 class WebhookEventType(Enum):
@@ -293,7 +295,10 @@ class WebhookSystem:
 			if self.signature_required:
 				signature = endpoint.generate_signature(payload, timestamp)
 				headers['X-APG-Signature'] = signature
-			
+
+			if aiohttp is None:
+				raise RuntimeError("aiohttp is required to deliver billing webhooks")
+
 			# Make HTTP request
 			async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=endpoint.timeout_seconds)) as session:
 				async with session.post(endpoint.url, data=payload, headers=headers) as response:

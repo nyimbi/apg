@@ -16,9 +16,20 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
-import aiohttp
-import avalara_sdk
-from taxjar import Taxjar
+try:
+	import aiohttp
+except ImportError:  # pragma: no cover - exercised through billing import regression
+	aiohttp = None
+
+try:
+	import avalara_sdk
+except ImportError:  # pragma: no cover - exercised through billing import regression
+	avalara_sdk = None
+
+try:
+	from taxjar import Taxjar
+except ImportError:  # pragma: no cover - exercised through billing import regression
+	Taxjar = None
 from uuid_extensions import uuid7str
 
 from .models import BLCustomer, BLInvoice, BillingCurrency
@@ -62,6 +73,8 @@ class AvalaraTaxService(TaxService):
 	"""Avalara tax service implementation"""
 	
 	def __init__(self, app_name: str, app_version: str, machine_name: str, username: str, password: str, environment: str = 'sandbox'):
+		if avalara_sdk is None:
+			raise TaxCalculationError("Avalara SDK is required to initialize Avalara tax service")
 		self.app_name = app_name
 		self.app_version = app_version
 		self.machine_name = machine_name
@@ -278,6 +291,8 @@ class TaxJarService(TaxService):
 	"""TaxJar tax service implementation"""
 	
 	def __init__(self, api_token: str, environment: str = 'sandbox'):
+		if Taxjar is None:
+			raise TaxCalculationError("TaxJar SDK is required to initialize TaxJar tax service")
 		self.api_token = api_token
 		self.environment = environment
 		self.logger = logging.getLogger(f"{__name__}.TaxJarService")

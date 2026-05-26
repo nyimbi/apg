@@ -14,11 +14,26 @@ from .models import (
     BLPricingRule, BLTax, BLDiscount, BLRevenue,
     CreateSubscriptionRequest, UsageSubmissionRequest, InvoiceGenerationRequest
 )
-from .views import (
-    BillingCustomerModelView, BillingPlanModelView, BillingSubscriptionModelView,
-    BillingInvoiceModelView, BillingPaymentModelView, BillingUsageModelView,
-    BillingDashboardView, BillingReportsView, BillingCustomerPortalView
-)
+
+_VIEW_EXPORTS = {
+    "BillingCustomerModelView",
+    "BillingPlanModelView",
+    "BillingSubscriptionModelView",
+    "BillingInvoiceModelView",
+    "BillingPaymentModelView",
+    "BillingUsageModelView",
+    "BillingDashboardView",
+    "BillingReportsView",
+    "BillingCustomerPortalView",
+}
+
+
+def __getattr__(name: str):
+    """Lazy-load Flask-AppBuilder views only when the UI layer asks for them."""
+    if name in _VIEW_EXPORTS:
+        from . import views
+        return getattr(views, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __version__ = "1.0.0"
 __author__ = "Nyimbi Odero <nyimbi@gmail.com>"

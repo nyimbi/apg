@@ -16,10 +16,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
-import stripe
-import paypal_sdk
-import aiohttp
-from cryptography.fernet import Fernet
+try:
+	import stripe
+except ImportError:  # pragma: no cover - exercised through import regression
+	stripe = None
+
+try:
+	import aiohttp
+except ImportError:  # pragma: no cover - exercised through import regression
+	aiohttp = None
 
 from .models import BLPayment, PaymentStatus, BillingCurrency
 
@@ -67,6 +72,8 @@ class StripePaymentProcessor(PaymentProcessor):
 	"""Stripe payment processor implementation"""
 	
 	def __init__(self, api_key: str, webhook_secret: str):
+		if stripe is None:
+			raise PaymentProcessorError("Stripe SDK is required to initialize Stripe payments")
 		self.api_key = api_key
 		self.webhook_secret = webhook_secret
 		stripe.api_key = api_key
@@ -257,6 +264,8 @@ class PayPalPaymentProcessor(PaymentProcessor):
 	"""PayPal payment processor implementation"""
 	
 	def __init__(self, client_id: str, client_secret: str, environment: str = 'sandbox'):
+		if aiohttp is None:
+			raise PaymentProcessorError("aiohttp is required to initialize PayPal payments")
 		self.client_id = client_id
 		self.client_secret = client_secret
 		self.environment = environment
@@ -553,6 +562,10 @@ class PayPalPaymentProcessor(PaymentProcessor):
 			except Exception as e:
 				self.logger.error(f"PayPal signature verification error: {e}")
 				return False
+
+		except Exception as e:
+			self.logger.error(f"PayPal webhook verification failed: {e}")
+			return False
 	
 	async def _get_paypal_public_key(self, cert_id: str) -> Optional[str]:
 		"""Get PayPal public key for certificate ID"""
@@ -656,10 +669,6 @@ z+E1K1YgQZf4QdO9X+H5n4Y+tV4Z8z+E1K1YgQZf4QdO9X+H5n4Y+tVQwIDAQAB
 		except Exception as e:
 			self.logger.error(f"Failed to get PayPal access token: {e}")
 			return None
-		
-		except Exception as e:
-			self.logger.error(f"PayPal webhook verification failed: {e}")
-			return False
 
 
 class FraudDetectionService:

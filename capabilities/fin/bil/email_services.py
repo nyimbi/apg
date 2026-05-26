@@ -18,10 +18,22 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
-import aiohttp
-import boto3
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, From, To, Subject, PlainTextContent, HtmlContent, Attachment, FileContent, FileName, FileType
+try:
+	import aiohttp
+except ImportError:  # pragma: no cover - exercised through billing import regression
+	aiohttp = None
+
+try:
+	import boto3
+except ImportError:  # pragma: no cover - exercised through billing import regression
+	boto3 = None
+
+try:
+	from sendgrid import SendGridAPIClient
+	from sendgrid.helpers.mail import Mail, From, To, Subject, PlainTextContent, HtmlContent, Attachment, FileContent, FileName, FileType
+except ImportError:  # pragma: no cover - exercised through billing import regression
+	SendGridAPIClient = None
+	Mail = From = To = Subject = PlainTextContent = HtmlContent = Attachment = FileContent = FileName = FileType = None
 
 from .models import BLCustomer, BLInvoice, BLPayment
 
@@ -61,6 +73,8 @@ class SendGridEmailService(EmailService):
 	"""SendGrid email service implementation"""
 	
 	def __init__(self, api_key: str, from_email: str, from_name: str = None):
+		if SendGridAPIClient is None:
+			raise EmailServiceError("SendGrid SDK is required to initialize SendGrid email service")
 		self.api_key = api_key
 		self.from_email = from_email
 		self.from_name = from_name or "APG Billing"
@@ -167,6 +181,8 @@ class MailgunEmailService(EmailService):
 	"""Mailgun email service implementation"""
 	
 	def __init__(self, api_key: str, domain: str, from_email: str, from_name: str = None):
+		if aiohttp is None:
+			raise EmailServiceError("aiohttp is required to initialize Mailgun email service")
 		self.api_key = api_key
 		self.domain = domain
 		self.from_email = from_email
@@ -302,6 +318,8 @@ class SESEmailService(EmailService):
 	
 	def __init__(self, aws_access_key_id: str, aws_secret_access_key: str, 
 				 region: str, from_email: str, from_name: str = None):
+		if boto3 is None:
+			raise EmailServiceError("boto3 is required to initialize Amazon SES email service")
 		self.from_email = from_email
 		self.from_name = from_name or "APG Billing"
 		self.logger = logging.getLogger(f"{__name__}.SESEmailService")
