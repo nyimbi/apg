@@ -45,7 +45,7 @@ class ProtocolType(str, Enum):
 	"""Supported messaging protocols"""
 	MQTT = "mqtt"
 	AMQP = "amqp"
-	KAFKA = "kafka"
+	BYTEWAX = "bytewax"
 	WEBSOCKET = "websocket"
 	GRPC = "grpc"
 	HTTP_REST = "http_rest"

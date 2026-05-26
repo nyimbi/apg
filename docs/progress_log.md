@@ -1397,3 +1397,22 @@ Verification:
 Current broader Bytewax migration findings:
 
 - Several small executable/default surfaces are now clean, reducing the remaining migration to larger capability families: composition events, DVRL, META, MQEB, and docs/examples.
+
+### 2026-05-26 17:31 EAT
+
+Completed checkpoint:
+
+- Migrated MQEB protocol/model metadata from Kafka compatibility to Bytewax stream support.
+- Replaced `ProtocolType.KAFKA` with `ProtocolType.BYTEWAX`.
+- Replaced MQEB runtime config and health metadata from `MQEB_KAFKA_ENABLED`/`kafka` to `MQEB_BYTEWAX_ENABLED`/`bytewax`.
+- Updated MQEB capability metadata and protocol gateway descriptions to present Bytewax as the stream/dataflow surface.
+
+Verification:
+
+- `rg -n "Kafka|KAFKA|kafka|apache_kafka|MQEB_KAFKA" capabilities/common/mqeb/views.py capabilities/common/mqeb/__init__.py capabilities/common/mqeb/blueprint.py capabilities/common/mqeb/models.py` -> no matches
+- `.venv/bin/python -m py_compile capabilities/common/mqeb/views.py capabilities/common/mqeb/__init__.py capabilities/common/mqeb/blueprint.py capabilities/common/mqeb/models.py`
+- `git diff --check -- capabilities/common/mqeb/views.py capabilities/common/mqeb/__init__.py capabilities/common/mqeb/blueprint.py capabilities/common/mqeb/models.py`
+
+Current broader Bytewax migration findings:
+
+- MQEB executable/model metadata is clean; remaining heavy runtime references are concentrated in composition events, DVRL, and META.

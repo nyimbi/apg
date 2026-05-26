@@ -147,7 +147,7 @@ class MQEBDashboardView(BaseView):
 				'websocket': 'healthy',
 				'mqtt': 'healthy',
 				'amqp': 'degraded',  # Example degraded service
-				'kafka': 'healthy'
+				'bytewax': 'healthy'
 			},
 			'alerts': [
 				{

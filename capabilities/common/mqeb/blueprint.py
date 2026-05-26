@@ -67,7 +67,7 @@ class MQEBAppBuilderConfig:
 	# Protocol-specific configuration
 	MQEB_MQTT_ENABLED = os.environ.get('MQEB_MQTT_ENABLED', 'true').lower() == 'true'
 	MQEB_AMQP_ENABLED = os.environ.get('MQEB_AMQP_ENABLED', 'true').lower() == 'true'
-	MQEB_KAFKA_ENABLED = os.environ.get('MQEB_KAFKA_ENABLED', 'true').lower() == 'true'
+	MQEB_BYTEWAX_ENABLED = os.environ.get('MQEB_BYTEWAX_ENABLED', 'true').lower() == 'true'
 	MQEB_WEBSOCKET_ENABLED = os.environ.get('MQEB_WEBSOCKET_ENABLED', 'true').lower() == 'true'
 	MQEB_GRPC_ENABLED = os.environ.get('MQEB_GRPC_ENABLED', 'true').lower() == 'true'
 	
@@ -289,7 +289,7 @@ def _initialize_apg_integration(appbuilder: AppBuilder) -> None:
 			"post_request": "_mqeb_post_request"
 		},
 		"protocols": [
-			"HTTP/REST", "WebSocket", "MQTT", "AMQP", "Kafka-compatible", "gRPC"
+			"HTTP/REST", "WebSocket", "MQTT", "AMQP", "Bytewax streams", "gRPC"
 		],
 		"capabilities": [
 			"intelligent_routing", "quantum_safe_encryption", "multi_cloud_federation",
@@ -358,8 +358,8 @@ def _mqeb_post_init(app: Flask) -> None:
 				protocols_initialized.append('MQTT 5.0')
 			if app.config.get('MQEB_AMQP_ENABLED'):
 				protocols_initialized.append('AMQP 1.0')
-			if app.config.get('MQEB_KAFKA_ENABLED'):
-				protocols_initialized.append('Kafka Compatible')
+			if app.config.get('MQEB_BYTEWAX_ENABLED'):
+				protocols_initialized.append('Bytewax Streams')
 			if app.config.get('MQEB_WEBSOCKET_ENABLED'):
 				protocols_initialized.append('WebSocket')
 			if app.config.get('MQEB_GRPC_ENABLED'):

@@ -8,7 +8,7 @@ Copyright: © 2025 Datacraft
 
 The MQEB capability provides:
 - Intelligent message routing with AI-powered optimization
-- Universal protocol support (MQTT, AMQP, Kafka, WebSocket, gRPC, HTTP/REST)
+- Universal protocol support (MQTT, AMQP, Bytewax, WebSocket, gRPC, HTTP/REST)
 - Quantum-safe security with post-quantum cryptography
 - Real-time analytics and predictive scaling
 - Multi-cloud federation with edge computing support
@@ -95,7 +95,7 @@ APG_CAPABILITY_INFO = {
         "WebSocket", 
         "MQTT 5.0",
         "AMQP 1.0",
-        "Apache Kafka Compatible",
+        "Bytewax Streams",
         "gRPC Streaming"
     ],
     
@@ -154,7 +154,7 @@ APG_CAPABILITY_INFO = {
 
 # Industry comparison
 INDUSTRY_BENCHMARKS = {
-    "apache_kafka": {
+    "bytewax": {
         "max_throughput_msg_per_sec": 1_000_000,
         "typical_p99_latency_ms": 20,
         "max_concurrent_connections": 100_000
@@ -212,7 +212,7 @@ def register_capability() -> dict:
         "capabilities": {
             "message_routing": "Publish and route messages across tenant-aware topics",
             "event_streaming": "Expose durable event streams with delivery guarantees",
-            "protocol_gateway": "Bridge HTTP, WebSocket, MQTT, AMQP, Kafka, and gRPC traffic",
+            "protocol_gateway": "Bridge HTTP, WebSocket, MQTT, AMQP, Bytewax, and gRPC traffic",
             "predictive_scaling": "Scale messaging infrastructure from demand signals",
             "capability_rules": "Evaluate deterministic message governance rules",
             "visual_theming": "Apply event-fabric theme tokens and components"
