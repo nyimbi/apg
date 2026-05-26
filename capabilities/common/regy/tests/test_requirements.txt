@@ -1,0 +1,36 @@
+# Test Requirements for APG Registry Advanced Technology Enhancements
+# Version: 1.0.0
+# Author: APG Platform Team
+
+# Core testing framework
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+pytest-benchmark>=4.0.0
+pytest-mock>=3.11.0
+pytest-xdist>=3.3.0  # For parallel test execution
+pytest-html>=3.2.0  # For HTML test reports
+
+# Mathematical and scientific computing (matching main requirements)
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Performance and profiling
+pytest-profiling>=1.7.0
+memory-profiler>=0.61.0
+
+# Test data generation and factories
+factory-boy>=3.3.0
+faker>=19.0.0
+
+# Code quality and coverage
+coverage>=7.2.0
+pytest-clarity>=1.0.0  # Better test failure output
+
+# Async testing support
+anyio>=3.7.0
+
+# Utilities for testing
+freezegun>=1.2.0  # For time-based tests
+responses>=0.23.0  # For HTTP mocking
+pytest-env>=0.8.0  # For environment variable testing

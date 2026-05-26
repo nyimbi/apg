@@ -216,3 +216,27 @@ Current broader IMEX execution findings:
 
 - IMEX tests now collect and execute cleanly from `capabilities/common/imex/tests`.
 - Remaining warnings are pre-existing deprecation/context warnings from adjacent common capability imports and IMEX Pydantic v1-style validators.
+
+### 2026-05-26 04:28 EAT
+
+Completed checkpoint:
+
+- Made the REGY common capability executable from its moved package location, including model defaults, service lifecycle state, API fallback routing, Flask-AppBuilder blueprint/view compatibility, and APG dependency shims.
+- Restored REGY service behavior for registration, discovery, duplicate handling, health scoring, metrics storage, tenant isolation, service events, and async startup helpers.
+- Added compatibility coverage for the advanced REGY surfaces: probabilistic discovery, adaptive health prediction, 3D/holographic rendering, historical analysis, multi-criteria routing, self-aware service intelligence, biometric scaling, advanced information storage, network optimization, and intelligent orchestration.
+- Fixed the REGY pytest async harness so normal `pytest.mark.asyncio` tests run through `pytest-asyncio`, while unmarked async patch-wrapper tests still execute correctly.
+- Hardened advanced edge cases for generated service IDs, malformed historical artifact dictionaries, extreme values, concurrent registration, memory pressure, and high-load routing/storage scenarios.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/regy/models.py capabilities/common/regy/service.py capabilities/common/regy/api.py capabilities/common/regy/blueprint.py capabilities/common/regy/views.py capabilities/common/regy/revolutionary_enhancements_production.py capabilities/common/regy/tests/conftest.py`
+- `.venv/bin/python -m pytest -q capabilities/common/regy/tests/test_advanced_enhancements.py -x -vv` -> 43 passed, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/regy/tests/test_biometric_orchestration.py -x -vv` -> 24 passed, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/regy/tests/test_edge_cases.py -x -vv` -> 14 passed, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/regy/tests/test_api.py -x -vv` -> 26 passed, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/regy/tests` -> 199 passed, 14 warnings
+
+Current broader REGY execution findings:
+
+- REGY tests now collect and execute cleanly from `capabilities/common/regy/tests`.
+- Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports.

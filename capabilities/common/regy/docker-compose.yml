@@ -1,0 +1,387 @@
+# APG Registry (regy) - Docker Compose Configuration
+# ==================================================
+# Complete development and production-ready Docker Compose setup
+# for the APG Registry capability with all dependencies
+
+version: '3.8'
+
+services:
+  # APG Registry Application
+  apg-registry:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - PYTHON_VERSION=3.11
+        - APG_VERSION=1.0.0
+    image: datacraft/apg-registry:1.0.0
+    container_name: apg-registry
+    hostname: apg-registry
+    restart: unless-stopped
+    
+    ports:
+      - "5000:5000"    # HTTP API
+      - "5001:5001"    # WebSocket
+      - "9090:9090"    # Prometheus metrics
+    
+    environment:
+      # Core Configuration
+      - APG_TENANT_ID=default
+      - APG_CONFIG_FILE=/app/config/config.yaml
+      - APG_LOG_LEVEL=INFO
+      - PYTHONPATH=/app
+      
+      # Database
+      - APG_DATABASE_URL=postgresql://apg_user:apg_password@postgres:5432/apg_registry
+      - APG_DATABASE_SSL_MODE=disable
+      - APG_DATABASE_POOL_SIZE=20
+      
+      # Cache
+      - APG_REDIS_URL=redis://redis:6379/0
+      - APG_CACHE_TTL=300
+      
+      # Security
+      - JWT_SECRET_KEY=development-secret-key-change-in-production
+      - APG_ENCRYPTION_KEY=dev-encryption-key-32-chars-long
+      
+      # ML Features
+      - APG_ML_ENABLED=true
+      - APG_ML_MODEL_PATH=/app/models
+      
+      # Performance
+      - APG_MAX_WORKERS=10
+      - APG_MAX_CONNECTIONS=100
+      - APG_REQUEST_TIMEOUT=30
+      
+      # External Services
+      - APG_AUTH_SERVICE_URL=http://apg-auth:5000
+      - APG_MONITORING_SERVICE_URL=http://apg-monitoring:5000
+      
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - registry_data:/app/data
+      - ml_models:/app/models
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    networks:
+      - apg-network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/regy/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.apg-registry.rule=Host(`registry.localhost`)"
+      - "traefik.http.routers.apg-registry.entrypoints=web"
+      - "traefik.http.services.apg-registry.loadbalancer.server.port=5000"
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: apg-registry-postgres
+    hostname: postgres
+    restart: unless-stopped
+    
+    ports:
+      - "5432:5432"
+    
+    environment:
+      - POSTGRES_DB=apg_registry
+      - POSTGRES_USER=apg_user
+      - POSTGRES_PASSWORD=apg_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+      - ./database/backup:/backup
+    
+    networks:
+      - apg-network
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apg_user -d apg_registry"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.8
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=8
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=8
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: apg-registry-redis
+    hostname: redis
+    restart: unless-stopped
+    
+    ports:
+      - "6379:6379"
+    
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 60
+      --timeout 300
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    
+    networks:
+      - apg-network
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # APG Auth Service Mock (for development)
+  apg-auth:
+    image: mockserver/mockserver:5.15.0
+    container_name: apg-auth-mock
+    hostname: apg-auth
+    restart: unless-stopped
+    
+    ports:
+      - "5010:1080"
+    
+    environment:
+      - MOCKSERVER_LOG_LEVEL=INFO
+      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/auth-mock-config.json
+    
+    volumes:
+      - ./mocks/auth-mock-config.json:/config/auth-mock-config.json:ro
+    
+    networks:
+      - apg-network
+
+  # APG Monitoring Service Mock (for development)
+  apg-monitoring:
+    image: mockserver/mockserver:5.15.0
+    container_name: apg-monitoring-mock
+    hostname: apg-monitoring
+    restart: unless-stopped
+    
+    ports:
+      - "5020:1080"
+    
+    environment:
+      - MOCKSERVER_LOG_LEVEL=INFO
+      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/monitoring-mock-config.json
+    
+    volumes:
+      - ./mocks/monitoring-mock-config.json:/config/monitoring-mock-config.json:ro
+    
+    networks:
+      - apg-network
+
+  # Prometheus (Optional - for monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: apg-registry-prometheus
+    hostname: prometheus
+    restart: unless-stopped
+    
+    ports:
+      - "9090:9090"
+    
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    
+    networks:
+      - apg-network
+    
+    profiles:
+      - monitoring
+
+  # Grafana (Optional - for dashboards)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: apg-registry-grafana
+    hostname: grafana
+    restart: unless-stopped
+    
+    ports:
+      - "3000:3000"
+    
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    
+    networks:
+      - apg-network
+    
+    profiles:
+      - monitoring
+
+  # Nginx Load Balancer (Optional - for production)
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: apg-registry-nginx
+    hostname: nginx
+    restart: unless-stopped
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/ssl/certs:ro
+      - nginx_logs:/var/log/nginx
+    
+    depends_on:
+      - apg-registry
+    
+    networks:
+      - apg-network
+    
+    profiles:
+      - production
+
+  # ElasticSearch (Optional - for log aggregation)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: apg-registry-elasticsearch
+    hostname: elasticsearch
+    restart: unless-stopped
+    
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    
+    networks:
+      - apg-network
+    
+    profiles:
+      - logging
+
+  # Kibana (Optional - for log visualization)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: apg-registry-kibana
+    hostname: kibana
+    restart: unless-stopped
+    
+    ports:
+      - "5601:5601"
+    
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    
+    depends_on:
+      - elasticsearch
+    
+    networks:
+      - apg-network
+    
+    profiles:
+      - logging
+
+# Volumes
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  registry_data:
+    driver: local
+  ml_models:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+# Networks
+networks:
+  apg-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+
+# Configuration for different environments
+# Use with: docker-compose --profile <profile> up
+
+# Development: docker-compose up
+# - apg-registry, postgres, redis, auth-mock, monitoring-mock
+
+# Production: docker-compose --profile production up
+# - All core services + nginx load balancer
+
+# Monitoring: docker-compose --profile monitoring up
+# - All core services + prometheus + grafana
+
+# Logging: docker-compose --profile logging up
+# - All core services + elasticsearch + kibana
+
+# Full Stack: docker-compose --profile production --profile monitoring --profile logging up
+# - All services for complete observability stack
