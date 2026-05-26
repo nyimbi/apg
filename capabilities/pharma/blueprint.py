@@ -7,6 +7,7 @@ Registers all sub-capability views, API endpoints, and URL routes.
 
 from flask import Blueprint
 from flask_appbuilder import AppBuilder
+from ..common.request_context import get_tenant_id_from_context
 
 # Import sub-capability blueprint registration functions
 from .regulatory_compliance.blueprint import register_views as register_regulatory_views
@@ -260,6 +261,7 @@ def _init_regulatory_frameworks():
 	
 	from .regulatory_compliance.models import PHRCRegulatoryFramework
 	from ...auth_rbac.models import db
+	tenant_id = get_tenant_id_from_context()
 	
 	frameworks = [
 		{
@@ -294,12 +296,13 @@ def _init_regulatory_frameworks():
 	
 	for framework_data in frameworks:
 		existing = PHRCRegulatoryFramework.query.filter_by(
+			tenant_id=tenant_id,
 			framework_code=framework_data['framework_code']
 		).first()
 		
 		if not existing:
 			framework = PHRCRegulatoryFramework(
-				tenant_id='default_tenant',
+				tenant_id=tenant_id,
 				**framework_data
 			)
 			db.session.add(framework)
@@ -312,6 +315,7 @@ def _init_compliance_controls():
 	
 	from .regulatory_compliance.models import PHRCComplianceControl
 	from ...auth_rbac.models import db
+	tenant_id = get_tenant_id_from_context()
 	
 	controls = [
 		{
@@ -342,12 +346,13 @@ def _init_compliance_controls():
 	
 	for control_data in controls:
 		existing = PHRCComplianceControl.query.filter_by(
+			tenant_id=tenant_id,
 			control_code=control_data['control_code']
 		).first()
 		
 		if not existing:
 			control = PHRCComplianceControl(
-				tenant_id='default_tenant',
+				tenant_id=tenant_id,
 				**control_data
 			)
 			db.session.add(control)
@@ -360,6 +365,7 @@ def _init_serialization_standards():
 	
 	from .product_serialization_tracking.models import PHPSSerializationStandard
 	from ...auth_rbac.models import db
+	tenant_id = get_tenant_id_from_context()
 	
 	standards = [
 		{
@@ -387,12 +393,13 @@ def _init_serialization_standards():
 	
 	for standard_data in standards:
 		existing = PHPSSerializationStandard.query.filter_by(
+			tenant_id=tenant_id,
 			standard_code=standard_data['standard_code']
 		).first()
 		
 		if not existing:
 			standard = PHPSSerializationStandard(
-				tenant_id='default_tenant',
+				tenant_id=tenant_id,
 				**standard_data
 			)
 			db.session.add(standard)

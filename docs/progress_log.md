@@ -2693,3 +2693,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_placeholder_identity_hygiene.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 2 passed
 - `rg -n "return ['\"]user_123['\"]|return ['\"]tenant_123['\"]|return ['\"]default_tenant['\"]|['\"]user_123['\"]|['\"]tenant_456['\"]|request\\.headers\\.get\\(['\"]X-Tenant-ID['\"], ['\"]default_tenant['\"]\\)|request\\.args\\.get\\(['\"]tenant_id['\"], ['\"]default_tenant['\"]\\)" capabilities --glob '*.py' -g '!**/tests/**' -g '!**/test_*.py' -g '!**/migrations/**'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:02 EAT
+
+Completed checkpoint:
+
+- Replaced Pharma default-data initialization's fixed `default_tenant` writes with shared request-context tenant resolution.
+- Scoped Pharma regulatory framework, compliance control, and serialization standard existence checks by tenant so one tenant's seeded defaults do not mask another tenant's defaults.
+- Replaced the regulatory-compliance sub-capability default-data seeding path with the same tenant resolution and tenant-scoped FDA framework lookup.
+- Added focused regression coverage for Pharma tenant-context seeding.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/pharma/blueprint.py capabilities/pharma/rec/blueprint.py tests/test_pharma_tenant_context.py`
+- `.venv/bin/python -m pytest -q tests/test_pharma_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "tenant_id=['\"]default_tenant['\"]|['\"]default_tenant['\"]" capabilities/pharma/blueprint.py capabilities/pharma/rec/blueprint.py` -> no matches
+- `git diff --check` -> no issues

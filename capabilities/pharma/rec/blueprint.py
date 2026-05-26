@@ -7,6 +7,7 @@ Registers views, API endpoints, and URL routes.
 
 from flask import Blueprint
 from flask_appbuilder import AppBuilder
+from ...common.request_context import get_tenant_id_from_context
 
 from .views import (
 	PHRCRegulatoryFrameworkModelView, PHRCSubmissionModelView,
@@ -360,6 +361,7 @@ def _init_default_data(appbuilder: AppBuilder):
 	try:
 		from .models import PHRCRegulatoryFramework, PHRCComplianceControl
 		from ....auth_rbac.models import db
+		tenant_id = get_tenant_id_from_context()
 		
 		# Create default regulatory frameworks if they don't exist
 		default_frameworks = [
@@ -391,12 +393,13 @@ def _init_default_data(appbuilder: AppBuilder):
 		
 		for framework_data in default_frameworks:
 			existing = PHRCRegulatoryFramework.query.filter_by(
+				tenant_id=tenant_id,
 				framework_code=framework_data['framework_code']
 			).first()
 			
 			if not existing:
 				framework = PHRCRegulatoryFramework(
-					tenant_id='default_tenant',
+					tenant_id=tenant_id,
 					**framework_data
 				)
 				db.session.add(framework)
@@ -423,18 +426,20 @@ def _init_default_data(appbuilder: AppBuilder):
 		
 		for control_data in default_controls:
 			existing = PHRCComplianceControl.query.filter_by(
+				tenant_id=tenant_id,
 				control_code=control_data['control_code']
 			).first()
 			
 			if not existing:
 				# Get FDA framework for default association
 				fda_framework = PHRCRegulatoryFramework.query.filter_by(
+					tenant_id=tenant_id,
 					framework_code='FDA'
 				).first()
 				
 				if fda_framework:
 					control = PHRCComplianceControl(
-						tenant_id='default_tenant',
+						tenant_id=tenant_id,
 						framework_id=fda_framework.framework_id,
 						**control_data
 					)
