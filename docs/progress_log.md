@@ -587,3 +587,24 @@ Current broader NLPC/CVSN execution findings:
 - Attempting to run the old `capabilities/common/nlpc/tests/test_language_codes.py` location triggered `capabilities/common/nlpc/tests/conftest.py`, which imports the full NLPC service stack and currently fails before tests with `AttributeError: module 'nltk' has no attribute 'tokenize'`.
 - The lightweight language-code regression now lives at `capabilities/common/nlpc/test_language_codes.py` to avoid that unrelated heavy fixture path.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities and NLPC Pydantic v2 deprecations.
+
+### 2026-05-26 09:48 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder PRED capability into a first-class APG capability with tenant-scoped forecasting, scoring, model, governance, UI, and theme configuration.
+- Added deterministic PRED predictive-governance rules for tenant context, forecast history sufficiency, production model approval, feature lineage, high-impact explainability, and long-horizon review.
+- Promoted the placeholder ANOM capability into a first-class APG capability with tenant-scoped detection, baseline, investigation, governance, UI, and theme configuration.
+- Added deterministic ANOM anomaly-governance rules for tenant context, monitoring source linkage, baseline history sufficiency, critical investigation ownership, baseline reset approval, and high false-positive tuning review.
+- Exposed PRED and ANOM contract helpers through package registration/info surfaces for lightweight composition-time discovery.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/pred/__init__.py capabilities/common/pred/capability_contract.py capabilities/common/pred/test_capability_contract.py capabilities/common/anom/__init__.py capabilities/common/anom/capability_contract.py capabilities/common/anom/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/pred/test_capability_contract.py capabilities/common/anom/test_capability_contract.py` -> 6 passed, 11 warnings
+
+Current broader PRED/ANOM execution findings:
+
+- PRED and ANOM are no longer placeholder packages at the composition layer; both now advertise executable configuration/rules/UI/theme contracts.
+- Focused tests live next to each placeholder package to avoid inventing runtime fixtures for capabilities that currently only have registration-level implementation.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
