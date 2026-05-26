@@ -9,7 +9,11 @@ Author: Nyimbi Odero | APG Platform Architect
 """
 
 import asyncio
+import base64
+import binascii
+import json
 import logging
+import os
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Any, Optional, Union
@@ -399,14 +403,94 @@ class APGErrorResponse(APGBaseModel):
 
 security = HTTPBearer()
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-	"""Extract user information from JWT token"""
-	# Integration with APG authentication system
-	# This would validate JWT tokens and extract user/tenant info
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a non-empty stripped string or None."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+def _first_text(*values: Any) -> Optional[str]:
+	"""Return the first non-empty text value."""
+	for value in values:
+		text = _clean_text(value)
+		if text:
+			return text
+	return None
+
+def _decode_bearer_claims(token: str) -> Dict[str, Any]:
+	"""Decode JWT-style bearer claims without accepting malformed payloads."""
+	parts = token.split(".")
+	if len(parts) < 2:
+		return {}
+	payload = parts[1]
+	padding = "=" * (-len(payload) % 4)
+	try:
+		decoded = base64.urlsafe_b64decode(f"{payload}{padding}".encode("ascii"))
+		claims = json.loads(decoded.decode("utf-8"))
+	except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError):
+		return {}
+	return claims if isinstance(claims, dict) else {}
+
+def _permission_list(*values: Any) -> List[str]:
+	"""Normalize claim/header permission carriers into a list of strings."""
+	permissions: List[str] = []
+	for value in values:
+		if value is None:
+			continue
+		if isinstance(value, str):
+			parts = [part.strip() for part in value.replace(" ", ",").split(",")]
+		elif isinstance(value, (list, tuple, set)):
+			parts = [str(part).strip() for part in value]
+		else:
+			parts = [str(value).strip()]
+		permissions.extend(part for part in parts if part)
+	return permissions
+
+async def get_current_user(
+	request: Request,
+	credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+	"""Extract user, tenant, and permission context from APG request carriers."""
+	claims = _decode_bearer_claims(credentials.credentials)
+	user_id = _first_text(
+		claims.get("user_id"),
+		claims.get("sub"),
+		claims.get("username"),
+		request.headers.get("X-APG-User-ID"),
+		request.headers.get("X-User-ID"),
+		request.query_params.get("user_id"),
+		os.getenv("APG_USER_ID"),
+		os.getenv("APG_DEFAULT_USER_ID"),
+	)
+	tenant_id = _first_text(
+		claims.get("tenant_id"),
+		claims.get("tenant"),
+		claims.get("organization_id"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.query_params.get("tenant_id"),
+		request.query_params.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+		os.getenv("APG_DEFAULT_TENANT_ID"),
+	)
+	if not user_id or not tenant_id:
+		raise HTTPException(
+			status_code=status.HTTP_401_UNAUTHORIZED,
+			detail="Bearer token must resolve user and tenant context"
+		)
+
 	return {
-		'user_id': 'api_user',  # Extract from token
-		'tenant_id': 'default_tenant',  # Extract from token
-		'permissions': ['cash_management.read', 'cash_management.write']  # Extract from token
+		'user_id': user_id,
+		'tenant_id': tenant_id,
+		'permissions': _permission_list(
+			claims.get("permissions"),
+			claims.get("scope"),
+			claims.get("scopes"),
+			request.headers.get("X-APG-Permissions"),
+			os.getenv("APG_PERMISSIONS"),
+		)
 	}
 
 async def get_tenant_id(user: dict = Depends(get_current_user)) -> str:

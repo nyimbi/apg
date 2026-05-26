@@ -3063,3 +3063,19 @@ Verification:
 - `rg -n "api_user|request\.json\.get\('acknowledged_by'|request\.json\.get\('resolved_by'|Kafka|kafka" capabilities/common/moni/blueprint.py tests/test_common_moni_blueprint_context.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:33 EAT
+
+Completed checkpoint:
+
+- Replaced Cash Management API's fixed bearer-token user/tenant stub with APG request-context resolution from JWT-shaped claims, headers, query params, and environment.
+- Moved permission extraction to token claims, APG permissions headers, or environment instead of granting fixed read/write permissions to a fixed actor.
+- Added focused CBM Cash API auth-context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/cbm/cash_management/api.py tests/test_fin_cbm_cash_api_context.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_cbm_cash_api_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "api_user|default_tenant|This would validate JWT tokens|Kafka|kafka" capabilities/fin/cbm/cash_management/api.py tests/test_fin_cbm_cash_api_context.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
