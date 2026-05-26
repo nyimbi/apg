@@ -2988,3 +2988,18 @@ Verification:
 - `rg -n "\"api_user\"|'api_user'|\"default_tenant\"|'default_tenant'|Would come from authentication|Kafka|kafka" capabilities/composition/gateway/api.py capabilities/composition/gateway/context.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:15 EAT
+
+Completed checkpoint:
+
+- Replaced Cache Management API's fixed tenant/user dependency helpers with FastAPI request-state, APG header, query, scope, and environment identity resolution.
+- Added focused CACH API context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/cach/api.py tests/test_common_cach_api_context.py`
+- `.venv/bin/python -m pytest -q tests/test_common_cach_api_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "api_user|In production: extract from JWT token or APG auth context|Kafka|kafka" capabilities/common/cach/api.py tests/test_common_cach_api_context.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

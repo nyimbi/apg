@@ -10,9 +10,10 @@ Copyright: © 2025 Datacraft
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Union
-from fastapi import FastAPI, HTTPException, Depends, Query, Path, Body
+from fastapi import FastAPI, HTTPException, Depends, Query, Path, Body, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -135,16 +136,65 @@ async def get_cache_service() -> CacheService:
 	return cache_service
 
 
-def get_current_tenant() -> str:
-	"""Get current tenant ID from auth context"""
-	# In production: extract from JWT token or APG auth context
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a non-empty stripped string or None."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _mapping_get(mapping: Any, *keys: str) -> Optional[str]:
+	"""Read the first present value from a dict-like request carrier."""
+	if mapping is None:
+		return None
+	for key in keys:
+		try:
+			value = mapping.get(key)
+		except AttributeError:
+			value = None
+		text = _clean_text(value)
+		if text:
+			return text
+	return None
+
+
+def get_current_tenant(request: Request) -> str:
+	"""Get current tenant ID from APG request context."""
+	for candidate in (
+		getattr(getattr(request, "state", None), "tenant_id", None),
+		getattr(getattr(request, "state", None), "current_tenant", None),
+		_mapping_get(request.headers, "X-APG-Tenant-ID", "X-Tenant-ID", "X-Organization-ID"),
+		_mapping_get(request.query_params, "tenant_id", "tenant"),
+		_mapping_get(request.scope, "apg_tenant_id", "tenant_id"),
+		os.getenv("APG_TENANT_ID"),
+		os.getenv("APG_DEFAULT_TENANT_ID"),
+		"default",
+	):
+		tenant_id = _clean_text(candidate)
+		if tenant_id:
+			return tenant_id
+
 	return "default"
 
 
-def get_current_user() -> str:
-	"""Get current user ID from auth context"""
-	# In production: extract from JWT token or APG auth context
-	return "api_user"
+def get_current_user(request: Request) -> str:
+	"""Get current user ID from APG request context."""
+	for candidate in (
+		getattr(getattr(request, "state", None), "user_id", None),
+		getattr(getattr(request, "state", None), "current_user_id", None),
+		_mapping_get(request.headers, "X-APG-User-ID", "X-User-ID"),
+		_mapping_get(request.query_params, "user_id", "user"),
+		_mapping_get(request.scope, "apg_user_id", "user_id"),
+		os.getenv("APG_USER_ID"),
+		os.getenv("APG_DEFAULT_USER_ID"),
+		"system",
+	):
+		user_id = _clean_text(candidate)
+		if user_id:
+			return user_id
+
+	return "system"
 
 
 # Create FastAPI app
