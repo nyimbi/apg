@@ -2060,3 +2060,20 @@ Verification:
 - `.venv/bin/python -m py_compile capabilities/fintech/gateway/stripe_reporting.py tests/test_stripe_reporting_metrics.py`
 - `.venv/bin/python -m pytest -q tests/test_stripe_reporting_metrics.py` -> 2 passed
 - `rg -n "Calculate chargeback rate - placeholder implementation|Calculate refund rate - placeholder implementation|Calculate customer acquisition cost - placeholder implementation|Calculate customer lifetime value - placeholder implementation|Calculate customer retention rate - placeholder implementation|Calculate custom metric - placeholder implementation|Format report data as Excel - placeholder implementation" capabilities/fintech/gateway/stripe_reporting.py` -> no matches
+
+### 2026-05-26 21:59 EAT
+
+Completed checkpoint:
+
+- Confirmed the APG streaming platform direction remains Bytewax-native and not Kafka-family broker based.
+- Replaced Financial Cost Accounting API tenant placeholders with a shared resolver that accepts request payload, Flask auth context, tenant headers, query args, environment context, and `APG_DEFAULT_TENANT_ID` fallback.
+- Updated cost center, allocation, job cost, variance, ABC, and dashboard API endpoints to use the shared resolver instead of hardcoded `default_tenant` request lookups.
+- Added a focused tenant-resolution regression that avoids the unrelated broader finance package import error while still exercising the executable resolver behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/cos/api.py tests/test_fin_cos_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_cos_tenant_resolution.py` -> 2 passed
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native tests/test_fin_cos_tenant_resolution.py` -> 3 passed
+- `git grep -n -i -E "kafka|confluent|redpanda|bootstrap\.servers|bootstrap_servers|BYTEWAX_BROKERS|Bytewax broker|Bytewax brokers|broker connection string" -- ':!uploads' ':!tmp' ':!node_modules' ':!**/swagger-ui-bundle.js' ':!.venv' ':!.git' ':!docs/progress_log.md' ':!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check -- capabilities/fin/cos/api.py tests/test_fin_cos_tenant_resolution.py` -> no issues

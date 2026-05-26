@@ -5,13 +5,15 @@ REST API endpoints for Cost Accounting functionality.
 Provides programmatic access to cost accounting operations.
 """
 
-from flask import request, jsonify, Blueprint
+import os
+
+from flask import request, jsonify, Blueprint, g, has_request_context
 from flask_restful import Api, Resource
 from flask_appbuilder.api import BaseApi, expose
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from marshmallow import Schema, fields, validate
 from datetime import date, datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from decimal import Decimal
 
 from .models import (
@@ -179,7 +181,7 @@ class CostCenterListApi(Resource):
 	
 	def get(self):
 		"""Get list of cost centers"""
-		tenant_id = request.args.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_request()
 		active_only = request.args.get('active_only', 'true').lower() == 'true'
 		
 		query = CFCACostCenter.query.filter_by(tenant_id=tenant_id)
@@ -202,7 +204,7 @@ class CostCenterListApi(Resource):
 		except Exception as e:
 			return {'error': str(e)}, 400
 		
-		tenant_id = request.json.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_request(data)
 		service = CostAccountingService(tenant_id=tenant_id)
 		
 		try:
@@ -278,7 +280,7 @@ class CostAllocationApi(Resource):
 				return {'error': f'Missing required field: {field}'}, 400
 		
 		try:
-			tenant_id = data.get('tenant_id', 'default_tenant')
+			tenant_id = get_tenant_id_from_request(data)
 			service = CostAccountingService(tenant_id=tenant_id)
 			
 			allocation_request = CostAllocationRequest(
@@ -312,7 +314,7 @@ class JobCostApi(Resource):
 	
 	def get(self):
 		"""Get job costs with optional filtering"""
-		tenant_id = request.args.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_request()
 		status = request.args.get('status')
 		job_number = request.args.get('job_number')
 		
@@ -366,7 +368,7 @@ class JobCostApi(Resource):
 		except Exception as e:
 			return {'error': str(e)}, 400
 		
-		tenant_id = request.json.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_request(data)
 		service = CostAccountingService(tenant_id=tenant_id)
 		
 		try:
@@ -382,7 +384,7 @@ class JobCostApi(Resource):
 		if 'job_number' not in data or 'cost_updates' not in data:
 			return {'error': 'job_number and cost_updates are required'}, 400
 		
-		tenant_id = data.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_request(data)
 		service = CostAccountingService(tenant_id=tenant_id)
 		
 		try:
@@ -411,7 +413,7 @@ class VarianceAnalysisApi(Resource):
 	
 	def get(self):
 		"""Get variance analysis reports"""
-		tenant_id = request.args.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_request()
 		period = request.args.get('period', datetime.now().strftime('%Y-%m'))
 		cost_object_type = request.args.get('cost_object_type')
 		
@@ -455,7 +457,7 @@ class VarianceAnalysisApi(Resource):
 			if field not in data:
 				return {'error': f'Missing required field: {field}'}, 400
 		
-		tenant_id = data.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_request(data)
 		service = CostAccountingService(tenant_id=tenant_id)
 		
 		try:
@@ -501,7 +503,7 @@ class ABCAnalysisApi(Resource):
 	
 	def get(self):
 		"""Get ABC profitability analysis"""
-		tenant_id = request.args.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_request()
 		period = request.args.get('period', datetime.now().strftime('%Y-%m'))
 		
 		service = CostAccountingService(tenant_id=tenant_id)
@@ -542,7 +544,7 @@ class DashboardApi(Resource):
 	
 	def get(self):
 		"""Get dashboard data"""
-		tenant_id = request.args.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_request()
 		period = request.args.get('period', datetime.now().strftime('%Y-%m'))
 		
 		service = CostAccountingService(tenant_id=tenant_id)
@@ -623,8 +625,43 @@ def validate_period_format(period_str: str) -> bool:
 		return False
 
 
-def get_tenant_id_from_request() -> str:
-	"""Extract tenant ID from request (placeholder implementation)"""
-	# In a real implementation, this would extract tenant ID from JWT token,
-	# session, or other authentication mechanism
-	return request.args.get('tenant_id', 'default_tenant')
+def _clean_tenant_id(value: Any) -> Optional[str]:
+	"""Return a usable tenant ID or None for empty values."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def get_tenant_id_from_request(payload: Optional[Dict[str, Any]] = None) -> str:
+	"""Resolve tenant ID from request/auth context with a configured fallback."""
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", "default_tenant")
+	if not has_request_context():
+		return default_tenant
+
+	candidates: List[Any] = []
+	if payload:
+		candidates.extend([
+			payload.get("tenant_id"),
+			payload.get("tenant"),
+		])
+
+	current_user = getattr(g, "current_user", None)
+	candidates.extend([
+		getattr(g, "tenant_id", None),
+		getattr(g, "current_tenant", None),
+		getattr(current_user, "tenant_id", None),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+		request.environ.get("APG_TENANT_ID"),
+	])
+
+	for candidate in candidates:
+		tenant_id = _clean_tenant_id(candidate)
+		if tenant_id:
+			return tenant_id
+
+	return default_tenant
