@@ -712,9 +712,160 @@ class ContextualIntelligenceEngine:
 		anomaly_detection: Dict[str, Any]
 	) -> Optional[ContextualInsight]:
 		"""Generate trend-related insights"""
-		# This would analyze trends over time
-		# For now, return a placeholder insight
-		return None
+		historical_samples = self._extract_trend_samples(business_context.historical_patterns)
+		current_sample = self._extract_trend_sample(visual_analysis)
+
+		if len(historical_samples) < 2 or not current_sample:
+			return None
+
+		supporting_evidence: List[Dict[str, Any]] = []
+		positive_signals: List[str] = []
+		negative_signals: List[str] = []
+
+		baseline_quality = self._average_trend_metric(historical_samples, "quality_score")
+		current_quality = current_sample.get("quality_score")
+		if baseline_quality is not None and current_quality is not None:
+			quality_delta = current_quality - baseline_quality
+			supporting_evidence.append({
+				"metric": "quality_score",
+				"current_value": current_quality,
+				"historical_average": baseline_quality,
+				"delta": quality_delta
+			})
+			if quality_delta >= 0.05:
+				positive_signals.append("quality_score")
+			elif quality_delta <= -0.05:
+				negative_signals.append("quality_score")
+
+		baseline_processing_time = self._average_trend_metric(historical_samples, "processing_time_ms")
+		current_processing_time = current_sample.get("processing_time_ms")
+		if baseline_processing_time and current_processing_time is not None:
+			processing_delta_ratio = (baseline_processing_time - current_processing_time) / baseline_processing_time
+			supporting_evidence.append({
+				"metric": "processing_time_ms",
+				"current_value": current_processing_time,
+				"historical_average": baseline_processing_time,
+				"delta_ratio": processing_delta_ratio
+			})
+			if processing_delta_ratio >= 0.15:
+				positive_signals.append("processing_time_ms")
+			elif processing_delta_ratio <= -0.15:
+				negative_signals.append("processing_time_ms")
+
+		success_rates = [
+			pattern.get("success_rate")
+			for pattern in pattern_matches
+			if isinstance(pattern.get("success_rate"), (int, float))
+		]
+		if success_rates:
+			success_probability = float(np.mean(success_rates))
+			supporting_evidence.append({
+				"metric": "success_rate",
+				"current_value": success_probability,
+				"historical_samples": len(success_rates)
+			})
+			if success_probability >= 0.75:
+				positive_signals.append("success_rate")
+			elif success_probability <= 0.55:
+				negative_signals.append("success_rate")
+
+		if len(positive_signals) == len(negative_signals):
+			return None
+
+		trend_direction = "improving" if len(positive_signals) > len(negative_signals) else "deteriorating"
+		dominant_signal_count = max(len(positive_signals), len(negative_signals))
+		confidence_score = min(
+			0.55 + (0.1 * dominant_signal_count) + (0.05 * min(len(historical_samples), 3)),
+			0.9
+		)
+		supporting_evidence.insert(0, {
+			"metric": "trend_summary",
+			"trend_direction": trend_direction,
+			"historical_samples": len(historical_samples),
+			"positive_signals": positive_signals,
+			"negative_signals": negative_signals
+		})
+
+		if trend_direction == "improving":
+			return ContextualInsight(
+				tenant_id=business_context.tenant_id,
+				created_by=business_context.created_by,
+				insight_type="trend_analysis",
+				insight_message=(
+					f"Trend analysis for {business_context.workflow_stage} is improving against recent historical baselines"
+				),
+				confidence_score=confidence_score,
+				supporting_evidence=supporting_evidence,
+				business_impact="Improving quality and throughput trends can increase operational predictability",
+				recommended_actions=[
+					"Capture the current run as a reference baseline",
+					"Preserve the workflow settings driving the improvement",
+					"Roll out the improved process to similar workloads"
+				],
+				urgency_level="low"
+			)
+
+		quality_drop = (
+			(baseline_quality - current_quality)
+			if baseline_quality is not None and current_quality is not None
+			else 0.0
+		)
+		urgency_level = "high" if quality_drop >= 0.1 or dominant_signal_count > 1 else "medium"
+		return ContextualInsight(
+			tenant_id=business_context.tenant_id,
+			created_by=business_context.created_by,
+			insight_type="trend_analysis",
+			insight_message=(
+				f"Trend analysis for {business_context.workflow_stage} is deteriorating against recent historical baselines"
+			),
+			confidence_score=confidence_score,
+			supporting_evidence=supporting_evidence,
+			business_impact="Declining operational trends may reduce quality, throughput, and downstream confidence",
+			recommended_actions=[
+				"Review recent workflow or input changes",
+				"Compare this run with the strongest recent baseline",
+				"Escalate corrective action if the next batch repeats the decline"
+			],
+			urgency_level=urgency_level
+		)
+
+	def _extract_trend_samples(self, historical_patterns: List[Dict[str, Any]]) -> List[Dict[str, float]]:
+		"""Extract normalized trend samples from historical context data."""
+		return [
+			sample
+			for sample in (
+				self._extract_trend_sample(pattern)
+				for pattern in historical_patterns[-5:]
+			)
+			if sample
+		]
+
+	def _extract_trend_sample(self, data: Dict[str, Any]) -> Dict[str, float]:
+		"""Extract a normalized trend sample from flat or nested analysis data."""
+		if not isinstance(data, dict):
+			return {}
+
+		visual_data = data.get("visual_analysis", {})
+		sample: Dict[str, float] = {}
+		for metric in ("quality_score", "processing_time_ms", "success_rate"):
+			value = data.get(metric)
+			if not isinstance(value, (int, float)) and isinstance(visual_data, dict):
+				value = visual_data.get(metric)
+			if isinstance(value, (int, float)):
+				sample[metric] = float(value)
+
+		return sample
+
+	def _average_trend_metric(
+		self,
+		samples: List[Dict[str, float]],
+		metric: str
+	) -> Optional[float]:
+		"""Average a trend metric across normalized historical samples."""
+		values = [sample[metric] for sample in samples if metric in sample]
+		if not values:
+			return None
+		return float(np.mean(values))
 	
 	async def _calculate_pattern_similarity(
 		self,

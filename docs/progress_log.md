@@ -1278,3 +1278,25 @@ Current broader parallelization findings:
 - Current session can only run one new subagent because two stale shutdown agents still count against the thread limit and could not be closed by the tool, so maximum velocity in this session is one subagent plus one coordinator-owned local lane.
 - The parallel work model is still valid: non-overlapping capability ownership, coordinator-owned progress log/commits, and focused battery-aware tests per slice.
 - Remaining warnings during focused pytest are pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+
+### 2026-05-26 17:04 EAT
+
+Completed checkpoint:
+
+- Completed the parallel CVSN contextual-intelligence lane while the coordinator separately completed the CONN transformations lane.
+- Replaced CVSN trend-analysis placeholder behavior with deterministic local contextual insight generation from recent historical baselines.
+- Added trend sample normalization for flat and nested `visual_analysis` historical patterns.
+- Added trend evidence for quality score, processing time, and matched-pattern success rates, with improving/deteriorating insight messages, confidence, urgency, business impact, and recommended actions.
+- Added focused CVSN contextual-intelligence tests for improving trends, deteriorating trends, and insufficient-history no-op behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/cvsn/contextual_intelligence.py capabilities/common/cvsn/tests/unit/test_contextual_intelligence.py`
+- `.venv/bin/python -m pytest -q capabilities/common/cvsn/tests/unit/test_contextual_intelligence.py` -> 3 passed, 10 warnings
+- `git diff --check -- capabilities/common/cvsn/contextual_intelligence.py capabilities/common/cvsn/tests/unit/test_contextual_intelligence.py`
+
+Current broader CVSN contextual-intelligence findings:
+
+- Trend insight generation no longer depends on placeholder behavior or initialized ML models for basic contextual output.
+- The focused test file stubs optional ML packages so the deterministic business logic remains verifiable in minimal/offline environments.
+- Remaining warnings during focused pytest are pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
