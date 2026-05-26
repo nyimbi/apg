@@ -398,3 +398,23 @@ Current broader MTEN execution findings:
 
 - MTEN contract discovery/registration now works without importing optional blueprint dependencies.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 08:18 EAT
+
+Completed checkpoint:
+
+- Made the ENCR security-foundation capability executable as a first-class APG capability with tenant-scoped cryptography, key lifecycle, policy, threat-adaptive, compliance, UI, and theme configuration.
+- Added deterministic ENCR cryptographic governance rules for missing tenant context, restricted-data quantum-safety, plaintext export blocking, low entropy, legacy algorithm review, and active-threat key rotation.
+- Made the KEYM security-foundation capability executable as a first-class APG capability with tenant-scoped key domains, lifecycle, access, HSM, compliance, automation, UI, and theme configuration.
+- Added deterministic KEYM key-governance rules for tenant context, key-policy attachment, root-key HSM attestation, export dual control, overdue rotation review, and compromised-key blocking.
+- Exposed ENCR and KEYM contract helpers through package registration/info surfaces for lightweight composition-time discovery.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/__init__.py capabilities/common/encr/capability_contract.py capabilities/common/encr/tests/test_capability_contract.py capabilities/common/keym/__init__.py capabilities/common/keym/capability_contract.py capabilities/common/keym/tests/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/encr/tests/test_capability_contract.py capabilities/common/keym/tests/test_capability_contract.py` -> 6 passed, 15 warnings
+
+Current broader ENCR/KEYM execution findings:
+
+- ENCR and KEYM contract discovery/registration now work without initializing their full cryptographic runtimes.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

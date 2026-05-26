@@ -10,6 +10,11 @@ Copyright: © 2025 Datacraft
 from typing import Dict, List, Any
 from datetime import datetime
 
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
+
 # APG Capability Metadata for Composition Engine Registration
 CAPABILITY_METADATA = {
 	"name": "keym",
@@ -184,11 +189,53 @@ async def health_check() -> Dict[str, Any]:
 		"last_check": datetime.utcnow()
 	}
 
+
+def register_capability() -> Dict[str, Any]:
+	"""Register key management with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "keym",
+		"aliases": ["key_management", "kms", "vault"],
+		"display_name": CAPABILITY_METADATA["display_name"],
+		"description": CAPABILITY_METADATA["description"],
+		"version": CAPABILITY_METADATA["version"],
+		"dependencies": CAPABILITY_METADATA["composition"]["dependencies"],
+		"optional_dependencies": CAPABILITY_METADATA["composition"]["optional_dependencies"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"key_lifecycle": "Create, rotate, disable, back up, and restore tenant keys",
+			"key_policy_governance": "Attach policy and approval controls to key operations",
+			"hsm_attestation": "Enforce software or hardware HSM attestation where required",
+			"cryptographic_operations": "Coordinate encrypt, decrypt, sign, and verify workflows",
+			"audit_and_compliance": "Expose immutable key access audit and compliance surfaces",
+			"capability_rules": "Evaluate deterministic key-governance rules",
+			"visual_theming": "Apply vault-console theme tokens and components"
+		},
+		"endpoints": {
+			"keys": "/keym/api/v1/keys",
+			"lifecycle": "/keym/api/v1/lifecycle",
+			"policies": "/keym/api/v1/policies",
+			"hsm": "/keym/api/v1/hsm",
+			"audit": "/keym/api/v1/audit",
+			"analytics": "/keym/api/v1/analytics"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": CAPABILITY_METADATA["composition"]["permissions"]
+	}
+
 # APG Capability Information
 def get_capability_info() -> Dict[str, Any]:
 	"""Get capability information for APG marketplace"""
 	return {
 		"metadata": CAPABILITY_METADATA,
+		"contract": get_capability_contract(),
 		"features": [
 			"AI-powered key lifecycle management",
 			"Quantum-safe cryptography support", 
@@ -233,7 +280,10 @@ async def initialize_capability(config: Dict[str, Any] | None = None) -> bool:
 # Export capability metadata for APG composition engine
 __all__ = [
 	"CAPABILITY_METADATA",
+	"register_capability",
 	"health_check", 
 	"get_capability_info",
-	"initialize_capability"
+	"initialize_capability",
+	"get_capability_contract",
+	"evaluate_capability_rules"
 ]

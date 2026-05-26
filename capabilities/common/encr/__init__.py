@@ -23,6 +23,11 @@ APG Integration:
 from typing import Dict, Any, List
 from datetime import datetime
 
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
+
 # APG Capability Metadata for Composition Engine
 CAPABILITY_METADATA = {
 	"name": "encr",
@@ -115,8 +120,58 @@ async def register_with_composition_engine() -> Dict[str, Any]:
 	return {
 		"capability_id": "encr",
 		"metadata": CAPABILITY_METADATA,
+		"contract": get_capability_contract(),
 		"registration_status": "SUCCESS",
 		"registered_at": datetime.utcnow().isoformat()
+	}
+
+
+def register_capability() -> Dict[str, Any]:
+	"""Register encryption services with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "encr",
+		"aliases": ["encryption_services", "quantum_safe_encryption"],
+		"display_name": CAPABILITY_METADATA["display_name"],
+		"description": CAPABILITY_METADATA["description"],
+		"version": CAPABILITY_METADATA["version"],
+		"dependencies": CAPABILITY_METADATA["composition"]["dependencies"],
+		"optional_dependencies": CAPABILITY_METADATA["composition"]["optional_dependencies"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"quantum_safe_encryption": "Encrypt restricted data with quantum-safe controls",
+			"zero_knowledge_encryption": "Protect sensitive workloads with zero-knowledge defaults",
+			"autonomous_key_lifecycle": "Coordinate key lifecycle policy with KEYM",
+			"homomorphic_computation": "Expose controlled computation on encrypted data",
+			"capability_rules": "Evaluate deterministic cryptographic governance rules",
+			"visual_theming": "Apply encryption-control theme tokens and components"
+		},
+		"endpoints": {
+			"operations": "/encr/api/v1/operations",
+			"keys": "/encr/api/v1/keys",
+			"policies": "/encr/api/v1/policies",
+			"entropy": "/encr/api/v1/entropy",
+			"homomorphic": "/encr/api/v1/homomorphic",
+			"analytics": "/encr/api/v1/analytics"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"encr:view",
+			"encr:operate",
+			"encr:view_keys",
+			"encr:manage_policies",
+			"encr:view_entropy",
+			"encr:compute",
+			"encr:view_analytics",
+			"encr:admin"
+		]
 	}
 
 async def get_capability_health() -> Dict[str, Any]:
@@ -186,10 +241,13 @@ encryption_interface = APGEncryptionInterface()
 # Export for APG composition engine
 __all__ = [
 	"CAPABILITY_METADATA",
+	"register_capability",
 	"register_with_composition_engine", 
 	"get_capability_health",
 	"get_capability_dependencies",
 	"get_export_functions",
+	"get_capability_contract",
+	"evaluate_capability_rules",
 	"APGEncryptionInterface",
 	"encryption_interface"
 ]
