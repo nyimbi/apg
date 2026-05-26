@@ -1359,3 +1359,21 @@ Current broader orchestration findings:
 
 - The generic message queue connector package no longer depends on Kafka clients for its stream connector.
 - Separate orchestration enterprise-integration and generated template files still contain Kafka references and need their own focused migration pass.
+
+### 2026-05-26 17:24 EAT
+
+Completed checkpoint:
+
+- Removed the remaining direct Kafka producer import from orchestration enterprise integration.
+- Replaced audit/security Kafka producer state with Bytewax-style in-process audit and security stream ledgers.
+- Added a small `_emit_bytewax_event` helper so audit events and generated security alerts share the same stream record shape.
+
+Verification:
+
+- `rg -n "Kafka|KAFKA|kafka|KafkaProducer|kafka_producer" capabilities/composition/orchestration/enterprise_integration.py` -> no matches
+- `.venv/bin/python -m py_compile capabilities/composition/orchestration/enterprise_integration.py`
+
+Current broader orchestration findings:
+
+- The executable orchestration connector and enterprise audit stream surfaces no longer import Kafka clients.
+- Generated orchestration templates still need a documentation/template migration pass to remove stale Kafka examples.

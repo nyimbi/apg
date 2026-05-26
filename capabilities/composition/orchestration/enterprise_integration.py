@@ -34,7 +34,6 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import cx_Oracle
 import pymssql
 import pymongo
-from kafka import KafkaProducer
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 import boto3
@@ -728,7 +727,7 @@ class EnterpriseAuditSystem:
 	def __init__(self, level: AuditLevel = AuditLevel.STANDARD):
 		self.audit_level = level
 		self.redis_client = None
-		self.kafka_producer = None
+		self.bytewax_streams: Dict[str, List[Dict[str, Any]]] = {}
 		self.audit_db = None
 		self._initialize_audit_infrastructure()
 	
@@ -742,11 +741,9 @@ class EnterpriseAuditSystem:
 				decode_responses=True
 			)
 			
-			# Initialize Kafka for audit event streaming
-			self.kafka_producer = KafkaProducer(
-				bootstrap_servers=["localhost:9092"],
-				value_serializer=lambda v: json.dumps(v).encode('utf-8')
-			)
+			# Initialize Bytewax-style audit event streams
+			self.bytewax_streams.setdefault("audit-events", [])
+			self.bytewax_streams.setdefault("security-alerts", [])
 			
 		except Exception as e:
 			print(f"Audit infrastructure initialization warning: {e}")
@@ -812,15 +809,15 @@ class EnterpriseAuditSystem:
 					)
 					self.redis_client.ltrim(f"audit:user:{event.user_id}", 0, 999)  # Keep last 1000
 			
-			# Stream to Kafka for real-time processing
-			if self.kafka_producer:
+			# Stream to Bytewax for real-time processing
+			if self.bytewax_streams is not None:
 				audit_data = event.model_dump()
 				audit_data["timestamp"] = audit_data["timestamp"].isoformat()
-				
-				self.kafka_producer.send(
+
+				self._emit_bytewax_event(
 					"audit-events",
 					value=audit_data,
-					key=event_id.encode('utf-8')
+					key=event_id
 				)
 			
 			# Check for security alerts
@@ -920,8 +917,8 @@ class EnterpriseAuditSystem:
 			await self.log_audit_event(audit_event)
 			
 			# Send to monitoring system
-			if self.kafka_producer:
-				self.kafka_producer.send(
+			if self.bytewax_streams is not None:
+				self._emit_bytewax_event(
 					"security-alerts",
 					value=alert
 				)
@@ -930,6 +927,19 @@ class EnterpriseAuditSystem:
 			
 		except Exception as e:
 			print(f"Security alert error: {e}")
+
+	def _emit_bytewax_event(self, stream: str, value: Dict[str, Any], key: Optional[str] = None) -> Dict[str, Any]:
+		"""Append an audit/security item to a Bytewax-style stream ledger."""
+		self.bytewax_streams.setdefault(stream, [])
+		record = {
+			"stream": stream,
+			"sequence": len(self.bytewax_streams[stream]),
+			"key": key,
+			"value": value,
+			"emitted_at": datetime.utcnow().isoformat()
+		}
+		self.bytewax_streams[stream].append(record)
+		return record
 	
 	async def generate_compliance_report(self, framework: ComplianceFramework, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
 		"""Generate compliance report"""
