@@ -48,6 +48,7 @@ from .sqlalchemy_models import (
 	ConnectionStatus as DBConnectionStatus,
 	ConnectionType as DBConnectionType,
 )
+from .monitoring import global_metrics_collector
 
 # AI Integration
 try:
@@ -195,6 +196,14 @@ class ConnectionManager:
 		"""Log connection operations following APG patterns."""
 		print(f"Connection manager: {operation}")
 
+	def _sync_connection_monitoring(self, connection: Connection) -> None:
+		"""Keep global active-connection metrics aligned with service state."""
+		connection_id = str(connection.id)
+		if connection.status == ConnectionStatus.ACTIVE:
+			global_metrics_collector.register_active_connection(connection_id)
+		else:
+			global_metrics_collector.unregister_active_connection(connection_id)
+
 	async def initialize(self) -> None:
 		"""Initialize connection manager and Singer.io ecosystem."""
 		self._log_connection_operation("Initializing connection manager")
@@ -337,6 +346,7 @@ class ConnectionManager:
 		if self.audit_enabled:
 			await self._audit_connection_created(connection)
 
+		self._sync_connection_monitoring(connection)
 		return connection
 
 	async def get_connection(self, connection_id: str) -> Optional[Connection]:
@@ -422,6 +432,7 @@ class ConnectionManager:
 		if self.audit_enabled:
 			await self._audit_connection_updated(connection, updates)
 
+		self._sync_connection_monitoring(connection)
 		return connection
 
 	async def delete_connection(self, connection_id: str) -> bool:
@@ -449,6 +460,7 @@ class ConnectionManager:
 		# Remove from monitoring
 		if connection_id in self.health_monitor:
 			del self.health_monitor[connection_id]
+		global_metrics_collector.unregister_active_connection(connection_id)
 
 		# Remove connection
 		del self.connections[connection_id]

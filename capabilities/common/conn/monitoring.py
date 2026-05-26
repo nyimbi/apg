@@ -97,6 +97,8 @@ class MetricsCollector:
         self.counters: Dict[str, int] = defaultdict(int)
         self.gauges: Dict[str, float] = defaultdict(float)
         self.timers: Dict[str, deque] = defaultdict(lambda: deque(maxlen=100))
+        self.active_connections: set[str] = set()
+        self.active_flows: set[str] = set()
 
         # OpenTelemetry setup
         if self.enable_otel:
@@ -263,14 +265,40 @@ class MetricsCollector:
         }
 
     def get_active_connections(self) -> List[str]:
-        """Get list of active connection IDs (mock implementation)"""
-        # This would integrate with actual connection manager
-        return []
+        """Get list of active connection IDs."""
+        return sorted(self.active_connections)
 
     def get_active_flows(self) -> List[str]:
-        """Get list of active flow IDs (mock implementation)"""
-        # This would integrate with actual flow executor
-        return []
+        """Get list of active flow IDs."""
+        return sorted(self.active_flows)
+
+    def register_active_connection(self, connection_id: str) -> None:
+        """Track an active connection and update its gauge."""
+        if not connection_id:
+            raise ValueError("connection_id is required")
+        self.active_connections.add(connection_id)
+        self.record_gauge("active_connections", len(self.active_connections))
+
+    def unregister_active_connection(self, connection_id: str) -> None:
+        """Stop tracking an active connection and update its gauge."""
+        if not connection_id:
+            raise ValueError("connection_id is required")
+        self.active_connections.discard(connection_id)
+        self.record_gauge("active_connections", len(self.active_connections))
+
+    def register_active_flow(self, flow_id: str) -> None:
+        """Track an active flow and update its gauge."""
+        if not flow_id:
+            raise ValueError("flow_id is required")
+        self.active_flows.add(flow_id)
+        self.record_gauge("active_flows", len(self.active_flows))
+
+    def unregister_active_flow(self, flow_id: str) -> None:
+        """Stop tracking an active flow and update its gauge."""
+        if not flow_id:
+            raise ValueError("flow_id is required")
+        self.active_flows.discard(flow_id)
+        self.record_gauge("active_flows", len(self.active_flows))
 
 
 class HealthChecker:
@@ -601,6 +629,16 @@ def record_connection_created(connection_type: str, tenant_id: str):
     )
 
 
+def register_active_connection(connection_id: str):
+    """Register a connection as active in global metrics."""
+    global_metrics_collector.register_active_connection(connection_id)
+
+
+def unregister_active_connection(connection_id: str):
+    """Remove a connection from active global metrics."""
+    global_metrics_collector.unregister_active_connection(connection_id)
+
+
 def record_flow_executed(flow_type: str, duration_seconds: float, success: bool):
     """Record flow execution metric"""
     global_metrics_collector.record_counter(
@@ -609,6 +647,16 @@ def record_flow_executed(flow_type: str, duration_seconds: float, success: bool)
         {'flow_type': flow_type, 'success': str(success)}
     )
     global_metrics_collector.record_histogram("flow_duration", duration_seconds)
+
+
+def register_active_flow(flow_id: str):
+    """Register a flow as active in global metrics."""
+    global_metrics_collector.register_active_flow(flow_id)
+
+
+def unregister_active_flow(flow_id: str):
+    """Remove a flow from active global metrics."""
+    global_metrics_collector.unregister_active_flow(flow_id)
 
 
 def record_data_processed(bytes_processed: int, connection_type: str):

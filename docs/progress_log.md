@@ -1088,3 +1088,24 @@ Current broader CONN marketplace UI findings:
 - Marketplace backend and UI catalog behavior now share one deterministic source for offline/test execution.
 - The synchronous Flask-AppBuilder install view now bridges to the async installer; it intentionally raises if called from an already-running event loop.
 - Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities.
+
+### 2026-05-26 16:13 EAT
+
+Completed checkpoint:
+
+- Replaced CONN monitoring active connection and active flow stub methods with explicit runtime registries on `MetricsCollector`.
+- Added register/unregister methods for active connections and flows, with gauge updates and stable sorted lookup output.
+- Added global convenience functions for active connection and flow registration.
+- Wired `ConnectionManager` state changes to active connection monitoring so active service connections update the global metrics collector and deleted/inactive connections are removed.
+- Added focused monitoring runtime-state tests for collector registries, gauges, and service monitoring synchronization.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/monitoring.py capabilities/common/conn/service.py capabilities/common/conn/tests/test_monitoring_runtime_state.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_monitoring_runtime_state.py` -> 2 passed, 10 warnings
+
+Current broader CONN monitoring findings:
+
+- Active connection and active flow metrics now have an executable in-process source instead of always reporting empty lists.
+- Service-level connection lifecycle changes now synchronize to the monitoring registry for active/inactive connection status.
+- Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities.
