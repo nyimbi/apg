@@ -1,6 +1,52 @@
-# APG Template File: models/__init__.py.template
-# Template: Warehouse Management System
-# Domain: Warehouse Management
-#
-# This file will contain the complete implementation for Warehouse Management System.
-# TODO: Implement models/__init__.py.template for Warehouse Management System
+"""Domain models for Warehouse Management System."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+DATABASES = [
+    "inventory",
+    "orders",
+    "shipments",
+    "warehouse_layout"
+]
+SEED_ITEMS = [
+    [
+        "inventory_management",
+        "Inventory Management"
+    ],
+    [
+        "order_picking",
+        "Order Picking"
+    ],
+    [
+        "shipping_management",
+        "Shipping Management"
+    ],
+    [
+        "layout_optimization",
+        "Layout Optimization"
+    ]
+]
+
+
+@dataclass(slots=True)
+class TemplateRecord:
+	key: str
+	label: str
+	status: str = "ready"
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+	def activate(self) -> None:
+		self.status = "active"
+
+
+def seed_records() -> list[TemplateRecord]:
+	return [
+		TemplateRecord(key=key, label=label, metadata={"database": DATABASES[index % len(DATABASES)] if DATABASES else "default"})
+		for index, (key, label) in enumerate(SEED_ITEMS)
+	]

@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Human Resources Management
-# Domain: Human Resources
-#
-# This file will contain the complete implementation for Human Resources Management.
-# TODO: Implement README.md.template for Human Resources Management
+# {{project_name}}
+
+Generated from the APG **Human Resources Management** template.
+
+Complete HR management system with employee lifecycle
+
+## Template
+
+- ID: `enterprise/hr_management`
+- Domain: Human Resources
+- Complexity: Advanced
+
+## Features
+
+- Employee Management
+- Recruitment
+- Performance Management
+- Payroll
+
+## Agents
+
+- HRAgent
+- RecruitmentAgent
+- PerformanceAgent
+- PayrollAgent
+
+## Data Stores
+
+- employees
+- recruitment
+- performance
+- payroll
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

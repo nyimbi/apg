@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Gig Economy Platform
-# Domain: Gig Economy
-#
-# This file will contain the complete implementation for Gig Economy Platform.
-# TODO: Implement README.md.template for Gig Economy Platform
+# {{project_name}}
+
+Generated from the APG **Gig Economy Platform** template.
+
+Platform for freelancers and gig workers
+
+## Template
+
+- ID: `marketplace/gig_economy`
+- Domain: Gig Economy
+- Complexity: Advanced
+
+## Features
+
+- Gig Matching
+- Skill Verification
+- Project Management
+- Automated Payouts
+
+## Agents
+
+- GigAgent
+- WorkerAgent
+- ClientAgent
+- PayoutAgent
+
+## Data Stores
+
+- gigs
+- workers
+- clients
+- transactions
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

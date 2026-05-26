@@ -1,6 +1,36 @@
-# APG Template File: agents/__init__.py.template
-# Template: Shipping Tracker
-# Domain: Shipping & Delivery
-#
-# This file will contain the complete implementation for Shipping Tracker.
-# TODO: Implement agents/__init__.py.template for Shipping Tracker
+"""Agent registry for Shipping Tracker."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+AGENTS = [
+    "TrackingAgent",
+    "DeliveryAgent",
+    "RouteAgent",
+    "NotificationAgent"
+]
+
+
+@dataclass(slots=True)
+class TemplateAgent:
+	name: str
+	capabilities: list[str] = field(default_factory=list)
+
+	def handle(self, event: dict[str, Any]) -> dict[str, Any]:
+		return {
+			"agent": self.name,
+			"accepted": True,
+			"event": dict(event),
+			"handled_at": datetime.now(timezone.utc).isoformat(),
+		}
+
+
+def build_agent_registry() -> dict[str, TemplateAgent]:
+	return {
+		agent_name: TemplateAgent(name=agent_name, capabilities=["observe", "validate", "act"])
+		for agent_name in AGENTS
+	}

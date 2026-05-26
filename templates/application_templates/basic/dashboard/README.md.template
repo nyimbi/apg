@@ -1,6 +1,39 @@
-# APG Template File: README.md.template
-# Template: Analytics Dashboard
-# Domain: Analytics
-#
-# This file will contain the complete implementation for Analytics Dashboard.
-# TODO: Implement README.md.template for Analytics Dashboard
+# {{project_name}}
+
+Generated from the APG **Analytics Dashboard** template.
+
+Real-time analytics dashboard with charts and metrics
+
+## Template
+
+- ID: `basic/dashboard`
+- Domain: Analytics
+- Complexity: Intermediate
+
+## Features
+
+- Real-time Charts
+- KPI Tracking
+- Data Visualization
+
+## Agents
+
+- AnalyticsAgent
+- MetricsCollector
+
+## Data Stores
+
+- analytics_data
+- metrics
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

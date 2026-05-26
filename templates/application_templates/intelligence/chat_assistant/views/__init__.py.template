@@ -1,6 +1,41 @@
-# APG Template File: views/__init__.py.template
-# Template: Conversational AI Assistant
-# Domain: Conversational AI
-#
-# This file will contain the complete implementation for Conversational AI Assistant.
-# TODO: Implement views/__init__.py.template for Conversational AI Assistant
+"""View payload builders for Conversational AI Assistant."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "natural_language_processing",
+        "path": "/natural-language-processing",
+        "feature": "Natural Language Processing"
+    },
+    {
+        "name": "context_awareness",
+        "path": "/context-awareness",
+        "feature": "Context Awareness"
+    },
+    {
+        "name": "multi_turn_conversations",
+        "path": "/multi-turn-conversations",
+        "feature": "Multi-turn Conversations"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Advanced chatbot with context awareness and learning",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

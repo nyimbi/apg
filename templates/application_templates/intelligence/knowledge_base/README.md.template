@@ -1,6 +1,41 @@
-# APG Template File: README.md.template
-# Template: Knowledge Base System
-# Domain: Knowledge Management
-#
-# This file will contain the complete implementation for Knowledge Base System.
-# TODO: Implement README.md.template for Knowledge Base System
+# {{project_name}}
+
+Generated from the APG **Knowledge Base System** template.
+
+Intelligent knowledge management with semantic search
+
+## Template
+
+- ID: `intelligence/knowledge_base`
+- Domain: Knowledge Management
+- Complexity: Advanced
+
+## Features
+
+- Semantic Search
+- Document Processing
+- Knowledge Graph
+
+## Agents
+
+- KnowledgeAgent
+- SearchAgent
+- IndexingAgent
+
+## Data Stores
+
+- documents
+- knowledge_graph
+- search_index
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

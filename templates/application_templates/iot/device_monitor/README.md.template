@@ -1,6 +1,42 @@
-# APG Template File: README.md.template
-# Template: IoT Device Monitor
-# Domain: Internet of Things
-#
-# This file will contain the complete implementation for IoT Device Monitor.
-# TODO: Implement README.md.template for IoT Device Monitor
+# {{project_name}}
+
+Generated from the APG **IoT Device Monitor** template.
+
+Monitor and manage IoT devices with real-time data
+
+## Template
+
+- ID: `iot/device_monitor`
+- Domain: Internet of Things
+- Complexity: Intermediate
+
+## Features
+
+- Device Management
+- Real-time Monitoring
+- Alert System
+- Data Visualization
+
+## Agents
+
+- DeviceAgent
+- MonitoringAgent
+- AlertAgent
+
+## Data Stores
+
+- devices
+- sensor_data
+- alerts
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

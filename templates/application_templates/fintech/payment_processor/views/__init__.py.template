@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Payment Processing System
-# Domain: Payment Processing
-#
-# This file will contain the complete implementation for Payment Processing System.
-# TODO: Implement views/__init__.py.template for Payment Processing System
+"""View payload builders for Payment Processing System."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "payment_processing",
+        "path": "/payment-processing",
+        "feature": "Payment Processing"
+    },
+    {
+        "name": "fraud_detection",
+        "path": "/fraud-detection",
+        "feature": "Fraud Detection"
+    },
+    {
+        "name": "settlement",
+        "path": "/settlement",
+        "feature": "Settlement"
+    },
+    {
+        "name": "reconciliation",
+        "path": "/reconciliation",
+        "feature": "Reconciliation"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Secure payment processing with fraud detection",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

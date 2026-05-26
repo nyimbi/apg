@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Service Marketplace
-# Domain: Service Economy
-#
-# This file will contain the complete implementation for Service Marketplace.
-# TODO: Implement views/__init__.py.template for Service Marketplace
+"""View payload builders for Service Marketplace."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "service_listings",
+        "path": "/service-listings",
+        "feature": "Service Listings"
+    },
+    {
+        "name": "booking_system",
+        "path": "/booking-system",
+        "feature": "Booking System"
+    },
+    {
+        "name": "rating_&_reviews",
+        "path": "/rating-and-reviews",
+        "feature": "Rating & Reviews"
+    },
+    {
+        "name": "dispute_resolution",
+        "path": "/dispute-resolution",
+        "feature": "Dispute Resolution"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Platform for service providers and consumers",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

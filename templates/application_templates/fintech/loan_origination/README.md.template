@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Loan Origination System
-# Domain: Lending
-#
-# This file will contain the complete implementation for Loan Origination System.
-# TODO: Implement README.md.template for Loan Origination System
+# {{project_name}}
+
+Generated from the APG **Loan Origination System** template.
+
+Automated loan processing and underwriting
+
+## Template
+
+- ID: `fintech/loan_origination`
+- Domain: Lending
+- Complexity: Advanced
+
+## Features
+
+- Loan Applications
+- Credit Scoring
+- Automated Underwriting
+- Document Processing
+
+## Agents
+
+- LoanAgent
+- UnderwritingAgent
+- CreditAgent
+- DocumentAgent
+
+## Data Stores
+
+- loan_applications
+- credit_reports
+- underwriting_results
+- documents
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

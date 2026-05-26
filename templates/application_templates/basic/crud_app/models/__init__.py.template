@@ -1,6 +1,45 @@
-# APG Template File: models/__init__.py.template
-# Template: CRUD Application
-# Domain: General
-#
-# This file will contain the complete implementation for CRUD Application.
-# TODO: Implement models/__init__.py.template for CRUD Application
+"""Domain models for CRUD Application."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+DATABASES = [
+    "main_data"
+]
+SEED_ITEMS = [
+    [
+        "crud_operations",
+        "CRUD Operations"
+    ],
+    [
+        "database_management",
+        "Database Management"
+    ],
+    [
+        "admin_interface",
+        "Admin Interface"
+    ]
+]
+
+
+@dataclass(slots=True)
+class TemplateRecord:
+	key: str
+	label: str
+	status: str = "ready"
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+	def activate(self) -> None:
+		self.status = "active"
+
+
+def seed_records() -> list[TemplateRecord]:
+	return [
+		TemplateRecord(key=key, label=label, metadata={"database": DATABASES[index % len(DATABASES)] if DATABASES else "default"})
+		for index, (key, label) in enumerate(SEED_ITEMS)
+	]

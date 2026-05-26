@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Service Marketplace
-# Domain: Service Economy
-#
-# This file will contain the complete implementation for Service Marketplace.
-# TODO: Implement README.md.template for Service Marketplace
+# {{project_name}}
+
+Generated from the APG **Service Marketplace** template.
+
+Platform for service providers and consumers
+
+## Template
+
+- ID: `marketplace/service_marketplace`
+- Domain: Service Economy
+- Complexity: Advanced
+
+## Features
+
+- Service Listings
+- Booking System
+- Rating & Reviews
+- Dispute Resolution
+
+## Agents
+
+- ServiceAgent
+- BookingAgent
+- RatingAgent
+- DisputeAgent
+
+## Data Stores
+
+- services
+- bookings
+- reviews
+- disputes
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

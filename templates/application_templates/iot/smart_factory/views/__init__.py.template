@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Smart Factory System
-# Domain: Industrial IoT
-#
-# This file will contain the complete implementation for Smart Factory System.
-# TODO: Implement views/__init__.py.template for Smart Factory System
+"""View payload builders for Smart Factory System."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "production_monitoring",
+        "path": "/production-monitoring",
+        "feature": "Production Monitoring"
+    },
+    {
+        "name": "quality_control",
+        "path": "/quality-control",
+        "feature": "Quality Control"
+    },
+    {
+        "name": "predictive_maintenance",
+        "path": "/predictive-maintenance",
+        "feature": "Predictive Maintenance"
+    },
+    {
+        "name": "efficiency_analytics",
+        "path": "/efficiency-analytics",
+        "feature": "Efficiency Analytics"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Industrial IoT platform for smart manufacturing",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

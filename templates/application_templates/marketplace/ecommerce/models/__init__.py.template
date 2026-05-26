@@ -1,6 +1,52 @@
-# APG Template File: models/__init__.py.template
-# Template: E-Commerce Platform
-# Domain: E-Commerce
-#
-# This file will contain the complete implementation for E-Commerce Platform.
-# TODO: Implement models/__init__.py.template for E-Commerce Platform
+"""Domain models for E-Commerce Platform."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+DATABASES = [
+    "products",
+    "orders",
+    "customers",
+    "inventory"
+]
+SEED_ITEMS = [
+    [
+        "product_catalog",
+        "Product Catalog"
+    ],
+    [
+        "shopping_cart",
+        "Shopping Cart"
+    ],
+    [
+        "order_management",
+        "Order Management"
+    ],
+    [
+        "payment_processing",
+        "Payment Processing"
+    ]
+]
+
+
+@dataclass(slots=True)
+class TemplateRecord:
+	key: str
+	label: str
+	status: str = "ready"
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+	def activate(self) -> None:
+		self.status = "active"
+
+
+def seed_records() -> list[TemplateRecord]:
+	return [
+		TemplateRecord(key=key, label=label, metadata={"database": DATABASES[index % len(DATABASES)] if DATABASES else "default"})
+		for index, (key, label) in enumerate(SEED_ITEMS)
+	]

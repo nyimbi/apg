@@ -1,6 +1,51 @@
-# APG Template File: config.py.template
-# Template: Loan Origination System
-# Domain: Lending
-#
-# This file will contain the complete implementation for Loan Origination System.
-# TODO: Implement config.py.template for Loan Origination System
+"""Configuration defaults for Loan Origination System."""
+
+from __future__ import annotations
+
+import os
+
+
+class Config:
+	PROJECT_NAME = os.environ.get("PROJECT_NAME", "{{project_name}}")
+	PROJECT_DESCRIPTION = os.environ.get("PROJECT_DESCRIPTION", "{{project_description}}")
+	AUTHOR = os.environ.get("PROJECT_AUTHOR", "{{author}}")
+	DATABASE_URL = os.environ.get("DATABASE_URL", "{{database_url}}")
+	SECRET_KEY = os.environ.get("SECRET_KEY", "{{secret_key}}")
+	TEMPLATE_ID = "fintech/loan_origination"
+	TEMPLATE_NAME = "Loan Origination System"
+	DOMAIN = "Lending"
+	COMPLEXITY = "Advanced"
+	FEATURES = [
+    "Loan Applications",
+    "Credit Scoring",
+    "Automated Underwriting",
+    "Document Processing"
+]
+	DATABASES = [
+    "loan_applications",
+    "credit_reports",
+    "underwriting_results",
+    "documents"
+]
+	AGENTS = [
+    "LoanAgent",
+    "UnderwritingAgent",
+    "CreditAgent",
+    "DocumentAgent"
+]
+
+
+def as_dict() -> dict[str, object]:
+	return {
+		"project_name": Config.PROJECT_NAME,
+		"project_description": Config.PROJECT_DESCRIPTION,
+		"author": Config.AUTHOR,
+		"database_url": Config.DATABASE_URL,
+		"template_id": Config.TEMPLATE_ID,
+		"template_name": Config.TEMPLATE_NAME,
+		"domain": Config.DOMAIN,
+		"complexity": Config.COMPLEXITY,
+		"features": list(Config.FEATURES),
+		"databases": list(Config.DATABASES),
+		"agents": list(Config.AGENTS),
+	}

@@ -1,6 +1,3 @@
-# APG Template File: requirements.txt.template
-# Template: Telemedicine Platform
-# Domain: Telemedicine
-#
-# This file will contain the complete implementation for Telemedicine Platform.
-# TODO: Implement requirements.txt.template for Telemedicine Platform
+Flask-AppBuilder>=4.3.0
+Flask>=2.3.0
+SQLAlchemy>=2.0.0

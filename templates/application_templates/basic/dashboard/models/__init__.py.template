@@ -1,6 +1,46 @@
-# APG Template File: models/__init__.py.template
-# Template: Analytics Dashboard
-# Domain: Analytics
-#
-# This file will contain the complete implementation for Analytics Dashboard.
-# TODO: Implement models/__init__.py.template for Analytics Dashboard
+"""Domain models for Analytics Dashboard."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+DATABASES = [
+    "analytics_data",
+    "metrics"
+]
+SEED_ITEMS = [
+    [
+        "real_time_charts",
+        "Real-time Charts"
+    ],
+    [
+        "kpi_tracking",
+        "KPI Tracking"
+    ],
+    [
+        "data_visualization",
+        "Data Visualization"
+    ]
+]
+
+
+@dataclass(slots=True)
+class TemplateRecord:
+	key: str
+	label: str
+	status: str = "ready"
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+	def activate(self) -> None:
+		self.status = "active"
+
+
+def seed_records() -> list[TemplateRecord]:
+	return [
+		TemplateRecord(key=key, label=label, metadata={"database": DATABASES[index % len(DATABASES)] if DATABASES else "default"})
+		for index, (key, label) in enumerate(SEED_ITEMS)
+	]

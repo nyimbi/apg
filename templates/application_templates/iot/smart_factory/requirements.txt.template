@@ -1,6 +1,3 @@
-# APG Template File: requirements.txt.template
-# Template: Smart Factory System
-# Domain: Industrial IoT
-#
-# This file will contain the complete implementation for Smart Factory System.
-# TODO: Implement requirements.txt.template for Smart Factory System
+Flask-AppBuilder>=4.3.0
+Flask>=2.3.0
+SQLAlchemy>=2.0.0

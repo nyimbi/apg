@@ -1,6 +1,3 @@
-# APG Template File: requirements.txt.template
-# Template: E-Commerce Platform
-# Domain: E-Commerce
-#
-# This file will contain the complete implementation for E-Commerce Platform.
-# TODO: Implement requirements.txt.template for E-Commerce Platform
+Flask-AppBuilder>=4.3.0
+Flask>=2.3.0
+SQLAlchemy>=2.0.0

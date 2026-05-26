@@ -1,6 +1,41 @@
-# APG Template File: views/__init__.py.template
-# Template: Knowledge Base System
-# Domain: Knowledge Management
-#
-# This file will contain the complete implementation for Knowledge Base System.
-# TODO: Implement views/__init__.py.template for Knowledge Base System
+"""View payload builders for Knowledge Base System."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "semantic_search",
+        "path": "/semantic-search",
+        "feature": "Semantic Search"
+    },
+    {
+        "name": "document_processing",
+        "path": "/document-processing",
+        "feature": "Document Processing"
+    },
+    {
+        "name": "knowledge_graph",
+        "path": "/knowledge-graph",
+        "feature": "Knowledge Graph"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Intelligent knowledge management with semantic search",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

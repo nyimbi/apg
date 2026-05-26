@@ -1,6 +1,30 @@
-# APG Template File: digital_twins/__init__.py.template
-# Template: Environmental Monitoring
-# Domain: Environmental Monitoring
-#
-# This file will contain the complete implementation for Environmental Monitoring.
-# TODO: Implement digital_twins/__init__.py.template for Environmental Monitoring
+"""Digital twin definitions for generated Environmental Monitoring projects."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+TWIN_TYPES = [
+    "SensorNetworkTwin",
+    "EnvironmentTwin"
+]
+
+
+@dataclass(slots=True)
+class DigitalTwin:
+	twin_id: str
+	twin_type: str
+	state: dict[str, Any] = field(default_factory=dict)
+	updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+	def update(self, changes: dict[str, Any]) -> dict[str, Any]:
+		self.state.update(changes)
+		self.updated_at = datetime.now(timezone.utc).isoformat()
+		return dict(self.state)
+
+
+def seed_twins() -> list[DigitalTwin]:
+	return [DigitalTwin(twin_id=f"{twin_type.lower()}-001", twin_type=twin_type) for twin_type in TWIN_TYPES]

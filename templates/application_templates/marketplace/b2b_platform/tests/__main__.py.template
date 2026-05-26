@@ -1,0 +1,9 @@
+"""Command-line smoke test runner for generated B2B Trading Platform projects."""
+
+from __future__ import annotations
+
+from . import smoke_test
+
+
+if __name__ == "__main__":
+	raise SystemExit(0 if smoke_test() else 1)

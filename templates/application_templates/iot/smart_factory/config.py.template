@@ -1,6 +1,51 @@
-# APG Template File: config.py.template
-# Template: Smart Factory System
-# Domain: Industrial IoT
-#
-# This file will contain the complete implementation for Smart Factory System.
-# TODO: Implement config.py.template for Smart Factory System
+"""Configuration defaults for Smart Factory System."""
+
+from __future__ import annotations
+
+import os
+
+
+class Config:
+	PROJECT_NAME = os.environ.get("PROJECT_NAME", "{{project_name}}")
+	PROJECT_DESCRIPTION = os.environ.get("PROJECT_DESCRIPTION", "{{project_description}}")
+	AUTHOR = os.environ.get("PROJECT_AUTHOR", "{{author}}")
+	DATABASE_URL = os.environ.get("DATABASE_URL", "{{database_url}}")
+	SECRET_KEY = os.environ.get("SECRET_KEY", "{{secret_key}}")
+	TEMPLATE_ID = "iot/smart_factory"
+	TEMPLATE_NAME = "Smart Factory System"
+	DOMAIN = "Industrial IoT"
+	COMPLEXITY = "Expert"
+	FEATURES = [
+    "Production Monitoring",
+    "Quality Control",
+    "Predictive Maintenance",
+    "Efficiency Analytics"
+]
+	DATABASES = [
+    "production_data",
+    "quality_metrics",
+    "maintenance_logs",
+    "efficiency_reports"
+]
+	AGENTS = [
+    "ProductionAgent",
+    "QualityAgent",
+    "MaintenanceAgent",
+    "EfficiencyAgent"
+]
+
+
+def as_dict() -> dict[str, object]:
+	return {
+		"project_name": Config.PROJECT_NAME,
+		"project_description": Config.PROJECT_DESCRIPTION,
+		"author": Config.AUTHOR,
+		"database_url": Config.DATABASE_URL,
+		"template_id": Config.TEMPLATE_ID,
+		"template_name": Config.TEMPLATE_NAME,
+		"domain": Config.DOMAIN,
+		"complexity": Config.COMPLEXITY,
+		"features": list(Config.FEATURES),
+		"databases": list(Config.DATABASES),
+		"agents": list(Config.AGENTS),
+	}

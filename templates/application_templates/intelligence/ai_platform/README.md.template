@@ -1,6 +1,42 @@
-# APG Template File: README.md.template
-# Template: AI Intelligence Platform
-# Domain: Artificial Intelligence
-#
-# This file will contain the complete implementation for AI Intelligence Platform.
-# TODO: Implement README.md.template for AI Intelligence Platform
+# {{project_name}}
+
+Generated from the APG **AI Intelligence Platform** template.
+
+Complete AI platform with multiple AI agents and services
+
+## Template
+
+- ID: `intelligence/ai_platform`
+- Domain: Artificial Intelligence
+- Complexity: Expert
+
+## Features
+
+- Model Management
+- Multi-Agent AI
+- Inference Pipeline
+- AI Analytics
+
+## Agents
+
+- AIOrchestrator
+- ModelManager
+- InferenceAgent
+
+## Data Stores
+
+- models
+- inference_logs
+- training_data
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

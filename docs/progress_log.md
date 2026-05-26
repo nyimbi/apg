@@ -1988,3 +1988,19 @@ Verification:
 
 - `.venv/bin/python -m py_compile cli.py tests/test_cli_project_scaffold.py`
 - `.venv/bin/python -m pytest -q tests/test_cli_project_scaffold.py` -> 1 passed
+
+### 2026-05-26 21:39 EAT
+
+Completed checkpoint:
+
+- Materialized the legacy `templates/application_templates` catalog from metadata instead of leaving TODO-only shells.
+- All 31 legacy application templates now ship dependency-free executable starter modules for app startup, configuration, models, agents, views, requirements, README, and smoke tests.
+- Template metadata now registers every checked-in `.template` file, including generated package smoke-test entrypoints and IoT digital-twin helpers.
+- Added a focused regression that rejects placeholder markers, verifies template metadata coverage, compiles every Python template body, and materializes/runs a representative Shipping Tracker project.
+
+Verification:
+
+- `.venv/bin/python -m py_compile tests/test_application_templates_materialized.py`
+- `.venv/bin/python -m pytest -q tests/test_application_templates_materialized.py` -> 2 passed
+- `git diff --check -- templates/application_templates tests/test_application_templates_materialized.py`
+- `.venv/bin/python -m pytest -q tests/test_application_templates_materialized.py tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories` -> 3 passed

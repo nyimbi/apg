@@ -1,6 +1,37 @@
-# APG Template File: README.md.template
-# Template: Simple Agent
-# Domain: General
-#
-# This file will contain the complete implementation for Simple Agent.
-# TODO: Implement README.md.template for Simple Agent
+# {{project_name}}
+
+Generated from the APG **Simple Agent** template.
+
+Basic agent with simple methods and web interface
+
+## Template
+
+- ID: `basic/simple_agent`
+- Domain: General
+- Complexity: Beginner
+
+## Features
+
+- Agent Runtime
+- Basic Methods
+- Web Dashboard
+
+## Agents
+
+- BasicAgent
+
+## Data Stores
+
+- simple_data
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

@@ -1,6 +1,52 @@
-# APG Template File: models/__init__.py.template
-# Template: Inventory Optimization
-# Domain: Inventory Management
-#
-# This file will contain the complete implementation for Inventory Optimization.
-# TODO: Implement models/__init__.py.template for Inventory Optimization
+"""Domain models for Inventory Optimization."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+DATABASES = [
+    "inventory_levels",
+    "demand_history",
+    "optimization_models",
+    "cost_analysis"
+]
+SEED_ITEMS = [
+    [
+        "demand_planning",
+        "Demand Planning"
+    ],
+    [
+        "inventory_optimization",
+        "Inventory Optimization"
+    ],
+    [
+        "automated_replenishment",
+        "Automated Replenishment"
+    ],
+    [
+        "cost_analysis",
+        "Cost Analysis"
+    ]
+]
+
+
+@dataclass(slots=True)
+class TemplateRecord:
+	key: str
+	label: str
+	status: str = "ready"
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+	def activate(self) -> None:
+		self.status = "active"
+
+
+def seed_records() -> list[TemplateRecord]:
+	return [
+		TemplateRecord(key=key, label=label, metadata={"database": DATABASES[index % len(DATABASES)] if DATABASES else "default"})
+		for index, (key, label) in enumerate(SEED_ITEMS)
+	]

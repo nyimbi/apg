@@ -1,6 +1,18 @@
-# APG Template File: tests/__init__.py.template
-# Template: Knowledge Base System
-# Domain: Knowledge Management
-#
-# This file will contain the complete implementation for Knowledge Base System.
-# TODO: Implement tests/__init__.py.template for Knowledge Base System
+"""Smoke tests for generated Knowledge Base System projects."""
+
+from __future__ import annotations
+
+
+def smoke_test() -> bool:
+	from app import create_application, health_check
+
+	application = create_application()
+	status = health_check()
+	assert status["status"] == "ready"
+	assert application["features"]
+	assert application["routes"]
+	return True
+
+
+if __name__ == "__main__":
+	raise SystemExit(0 if smoke_test() else 1)

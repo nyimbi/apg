@@ -1,6 +1,73 @@
-# APG Template File: app.py.template
-# Template: Fleet Management System
-# Domain: Fleet Management
-#
-# This file will contain the complete implementation for Fleet Management System.
-# TODO: Implement app.py.template for Fleet Management System
+"""Executable APG starter for Fleet Management System."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+from agents import build_agent_registry
+from models import seed_records
+from views import build_dashboard_payload, list_routes
+
+
+TEMPLATE_ID = "iot/fleet_management"
+TEMPLATE_NAME = "Fleet Management System"
+DESCRIPTION = "Vehicle fleet tracking and management platform"
+FEATURES = [
+    "GPS Tracking",
+    "Route Optimization",
+    "Maintenance Scheduling",
+    "Fuel Management"
+]
+DATABASES = [
+    "vehicles",
+    "routes",
+    "maintenance",
+    "fuel_data"
+]
+AGENT_NAMES = [
+    "VehicleAgent",
+    "RoutingAgent",
+    "MaintenanceAgent",
+    "FuelAgent"
+]
+
+
+def create_application(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Create a dependency-free application descriptor for local execution."""
+	runtime_config = config or {}
+	records = seed_records()
+	agents = build_agent_registry()
+	dashboard = build_dashboard_payload(records, agents, runtime_config)
+	return {
+		"template_id": TEMPLATE_ID,
+		"name": runtime_config.get("project_name", "{{project_name}}"),
+		"description": runtime_config.get("project_description", DESCRIPTION),
+		"features": list(FEATURES),
+		"databases": list(DATABASES),
+		"agents": list(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) for record in records],
+		"dashboard": dashboard,
+	}
+
+
+def health_check() -> dict[str, Any]:
+	"""Return a deterministic readiness payload for generated projects."""
+	app = create_application()
+	return {
+		"status": "ready",
+		"template": TEMPLATE_ID,
+		"feature_count": len(app["features"]),
+		"agent_count": len(app["agents"]),
+		"route_count": len(app["routes"]),
+	}
+
+
+def main() -> None:
+	status = health_check()
+	print(f"{status['template']}: {status['status']} ({status['feature_count']} features)")
+
+
+if __name__ == "__main__":
+	main()

@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: IoT Device Monitor
-# Domain: Internet of Things
-#
-# This file will contain the complete implementation for IoT Device Monitor.
-# TODO: Implement views/__init__.py.template for IoT Device Monitor
+"""View payload builders for IoT Device Monitor."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "device_management",
+        "path": "/device-management",
+        "feature": "Device Management"
+    },
+    {
+        "name": "real_time_monitoring",
+        "path": "/real-time-monitoring",
+        "feature": "Real-time Monitoring"
+    },
+    {
+        "name": "alert_system",
+        "path": "/alert-system",
+        "feature": "Alert System"
+    },
+    {
+        "name": "data_visualization",
+        "path": "/data-visualization",
+        "feature": "Data Visualization"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Monitor and manage IoT devices with real-time data",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

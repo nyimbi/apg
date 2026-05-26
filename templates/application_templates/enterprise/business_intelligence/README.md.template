@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Business Intelligence Platform
-# Domain: Business Intelligence
-#
-# This file will contain the complete implementation for Business Intelligence Platform.
-# TODO: Implement README.md.template for Business Intelligence Platform
+# {{project_name}}
+
+Generated from the APG **Business Intelligence Platform** template.
+
+Enterprise BI platform with advanced analytics
+
+## Template
+
+- ID: `enterprise/business_intelligence`
+- Domain: Business Intelligence
+- Complexity: Expert
+
+## Features
+
+- Data Analytics
+- Interactive Dashboards
+- Automated Reporting
+- Predictive Analytics
+
+## Agents
+
+- BIAgent
+- AnalyticsAgent
+- ReportingAgent
+- DashboardAgent
+
+## Data Stores
+
+- business_data
+- analytics_results
+- reports
+- dashboards
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

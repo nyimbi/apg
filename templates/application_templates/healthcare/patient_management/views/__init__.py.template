@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Patient Management System
-# Domain: Healthcare
-#
-# This file will contain the complete implementation for Patient Management System.
-# TODO: Implement views/__init__.py.template for Patient Management System
+"""View payload builders for Patient Management System."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "electronic_health_records",
+        "path": "/electronic-health-records",
+        "feature": "Electronic Health Records"
+    },
+    {
+        "name": "appointment_scheduling",
+        "path": "/appointment-scheduling",
+        "feature": "Appointment Scheduling"
+    },
+    {
+        "name": "medical_history",
+        "path": "/medical-history",
+        "feature": "Medical History"
+    },
+    {
+        "name": "billing_integration",
+        "path": "/billing-integration",
+        "feature": "Billing Integration"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Complete electronic health records and patient management",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

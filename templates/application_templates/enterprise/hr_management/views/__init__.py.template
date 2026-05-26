@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Human Resources Management
-# Domain: Human Resources
-#
-# This file will contain the complete implementation for Human Resources Management.
-# TODO: Implement views/__init__.py.template for Human Resources Management
+"""View payload builders for Human Resources Management."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "employee_management",
+        "path": "/employee-management",
+        "feature": "Employee Management"
+    },
+    {
+        "name": "recruitment",
+        "path": "/recruitment",
+        "feature": "Recruitment"
+    },
+    {
+        "name": "performance_management",
+        "path": "/performance-management",
+        "feature": "Performance Management"
+    },
+    {
+        "name": "payroll",
+        "path": "/payroll",
+        "feature": "Payroll"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Complete HR management system with employee lifecycle",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

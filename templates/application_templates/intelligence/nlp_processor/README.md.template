@@ -1,6 +1,41 @@
-# APG Template File: README.md.template
-# Template: NLP Processing Pipeline
-# Domain: Natural Language Processing
-#
-# This file will contain the complete implementation for NLP Processing Pipeline.
-# TODO: Implement README.md.template for NLP Processing Pipeline
+# {{project_name}}
+
+Generated from the APG **NLP Processing Pipeline** template.
+
+Complete natural language processing pipeline
+
+## Template
+
+- ID: `intelligence/nlp_processor`
+- Domain: Natural Language Processing
+- Complexity: Advanced
+
+## Features
+
+- Text Processing
+- Sentiment Analysis
+- Entity Recognition
+
+## Agents
+
+- NLPAgent
+- TextAnalyzer
+- SentimentAnalyzer
+
+## Data Stores
+
+- text_corpus
+- processing_results
+- models
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

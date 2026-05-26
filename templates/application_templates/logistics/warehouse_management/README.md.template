@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Warehouse Management System
-# Domain: Warehouse Management
-#
-# This file will contain the complete implementation for Warehouse Management System.
-# TODO: Implement README.md.template for Warehouse Management System
+# {{project_name}}
+
+Generated from the APG **Warehouse Management System** template.
+
+Advanced warehouse operations and inventory management
+
+## Template
+
+- ID: `logistics/warehouse_management`
+- Domain: Warehouse Management
+- Complexity: Advanced
+
+## Features
+
+- Inventory Management
+- Order Picking
+- Shipping Management
+- Layout Optimization
+
+## Agents
+
+- InventoryAgent
+- PickingAgent
+- ShippingAgent
+- OptimizationAgent
+
+## Data Stores
+
+- inventory
+- orders
+- shipments
+- warehouse_layout
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

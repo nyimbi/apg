@@ -1,6 +1,3 @@
-# APG Template File: requirements.txt.template
-# Template: Loan Origination System
-# Domain: Lending
-#
-# This file will contain the complete implementation for Loan Origination System.
-# TODO: Implement requirements.txt.template for Loan Origination System
+Flask-AppBuilder>=4.3.0
+Flask>=2.3.0
+SQLAlchemy>=2.0.0

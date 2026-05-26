@@ -1,6 +1,3 @@
-# APG Template File: requirements.txt.template
-# Template: Inventory Optimization
-# Domain: Inventory Management
-#
-# This file will contain the complete implementation for Inventory Optimization.
-# TODO: Implement requirements.txt.template for Inventory Optimization
+Flask-AppBuilder>=4.3.0
+Flask>=2.3.0
+SQLAlchemy>=2.0.0

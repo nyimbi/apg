@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Clinical Trials Management
-# Domain: Clinical Research
-#
-# This file will contain the complete implementation for Clinical Trials Management.
-# TODO: Implement views/__init__.py.template for Clinical Trials Management
+"""View payload builders for Clinical Trials Management."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "trial_management",
+        "path": "/trial-management",
+        "feature": "Trial Management"
+    },
+    {
+        "name": "participant_tracking",
+        "path": "/participant-tracking",
+        "feature": "Participant Tracking"
+    },
+    {
+        "name": "data_collection",
+        "path": "/data-collection",
+        "feature": "Data Collection"
+    },
+    {
+        "name": "regulatory_compliance",
+        "path": "/regulatory-compliance",
+        "feature": "Regulatory Compliance"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Clinical research and trial management system",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

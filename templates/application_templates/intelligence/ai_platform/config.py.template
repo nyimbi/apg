@@ -1,6 +1,49 @@
-# APG Template File: config.py.template
-# Template: AI Intelligence Platform
-# Domain: Artificial Intelligence
-#
-# This file will contain the complete implementation for AI Intelligence Platform.
-# TODO: Implement config.py.template for AI Intelligence Platform
+"""Configuration defaults for AI Intelligence Platform."""
+
+from __future__ import annotations
+
+import os
+
+
+class Config:
+	PROJECT_NAME = os.environ.get("PROJECT_NAME", "{{project_name}}")
+	PROJECT_DESCRIPTION = os.environ.get("PROJECT_DESCRIPTION", "{{project_description}}")
+	AUTHOR = os.environ.get("PROJECT_AUTHOR", "{{author}}")
+	DATABASE_URL = os.environ.get("DATABASE_URL", "{{database_url}}")
+	SECRET_KEY = os.environ.get("SECRET_KEY", "{{secret_key}}")
+	TEMPLATE_ID = "intelligence/ai_platform"
+	TEMPLATE_NAME = "AI Intelligence Platform"
+	DOMAIN = "Artificial Intelligence"
+	COMPLEXITY = "Expert"
+	FEATURES = [
+    "Model Management",
+    "Multi-Agent AI",
+    "Inference Pipeline",
+    "AI Analytics"
+]
+	DATABASES = [
+    "models",
+    "inference_logs",
+    "training_data"
+]
+	AGENTS = [
+    "AIOrchestrator",
+    "ModelManager",
+    "InferenceAgent"
+]
+
+
+def as_dict() -> dict[str, object]:
+	return {
+		"project_name": Config.PROJECT_NAME,
+		"project_description": Config.PROJECT_DESCRIPTION,
+		"author": Config.AUTHOR,
+		"database_url": Config.DATABASE_URL,
+		"template_id": Config.TEMPLATE_ID,
+		"template_name": Config.TEMPLATE_NAME,
+		"domain": Config.DOMAIN,
+		"complexity": Config.COMPLEXITY,
+		"features": list(Config.FEATURES),
+		"databases": list(Config.DATABASES),
+		"agents": list(Config.AGENTS),
+	}

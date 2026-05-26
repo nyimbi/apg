@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Patient Management System
-# Domain: Healthcare
-#
-# This file will contain the complete implementation for Patient Management System.
-# TODO: Implement README.md.template for Patient Management System
+# {{project_name}}
+
+Generated from the APG **Patient Management System** template.
+
+Complete electronic health records and patient management
+
+## Template
+
+- ID: `healthcare/patient_management`
+- Domain: Healthcare
+- Complexity: Expert
+
+## Features
+
+- Electronic Health Records
+- Appointment Scheduling
+- Medical History
+- Billing Integration
+
+## Agents
+
+- PatientAgent
+- AppointmentAgent
+- MedicalRecordsAgent
+- BillingAgent
+
+## Data Stores
+
+- patients
+- appointments
+- medical_records
+- billing
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

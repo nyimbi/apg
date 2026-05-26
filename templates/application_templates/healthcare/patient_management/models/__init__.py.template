@@ -1,6 +1,52 @@
-# APG Template File: models/__init__.py.template
-# Template: Patient Management System
-# Domain: Healthcare
-#
-# This file will contain the complete implementation for Patient Management System.
-# TODO: Implement models/__init__.py.template for Patient Management System
+"""Domain models for Patient Management System."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+DATABASES = [
+    "patients",
+    "appointments",
+    "medical_records",
+    "billing"
+]
+SEED_ITEMS = [
+    [
+        "electronic_health_records",
+        "Electronic Health Records"
+    ],
+    [
+        "appointment_scheduling",
+        "Appointment Scheduling"
+    ],
+    [
+        "medical_history",
+        "Medical History"
+    ],
+    [
+        "billing_integration",
+        "Billing Integration"
+    ]
+]
+
+
+@dataclass(slots=True)
+class TemplateRecord:
+	key: str
+	label: str
+	status: str = "ready"
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+	def activate(self) -> None:
+		self.status = "active"
+
+
+def seed_records() -> list[TemplateRecord]:
+	return [
+		TemplateRecord(key=key, label=label, metadata={"database": DATABASES[index % len(DATABASES)] if DATABASES else "default"})
+		for index, (key, label) in enumerate(SEED_ITEMS)
+	]

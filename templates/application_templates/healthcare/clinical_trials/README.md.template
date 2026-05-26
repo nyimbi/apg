@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Clinical Trials Management
-# Domain: Clinical Research
-#
-# This file will contain the complete implementation for Clinical Trials Management.
-# TODO: Implement README.md.template for Clinical Trials Management
+# {{project_name}}
+
+Generated from the APG **Clinical Trials Management** template.
+
+Clinical research and trial management system
+
+## Template
+
+- ID: `healthcare/clinical_trials`
+- Domain: Clinical Research
+- Complexity: Expert
+
+## Features
+
+- Trial Management
+- Participant Tracking
+- Data Collection
+- Regulatory Compliance
+
+## Agents
+
+- TrialAgent
+- ParticipantAgent
+- DataAgent
+- ComplianceAgent
+
+## Data Stores
+
+- trials
+- participants
+- trial_data
+- compliance
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

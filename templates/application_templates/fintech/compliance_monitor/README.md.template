@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Financial Compliance Monitor
-# Domain: Financial Compliance
-#
-# This file will contain the complete implementation for Financial Compliance Monitor.
-# TODO: Implement README.md.template for Financial Compliance Monitor
+# {{project_name}}
+
+Generated from the APG **Financial Compliance Monitor** template.
+
+Regulatory compliance monitoring and reporting
+
+## Template
+
+- ID: `fintech/compliance_monitor`
+- Domain: Financial Compliance
+- Complexity: Expert
+
+## Features
+
+- Compliance Monitoring
+- Audit Trails
+- Regulatory Reporting
+- Risk Alerts
+
+## Agents
+
+- ComplianceAgent
+- AuditAgent
+- ReportingAgent
+- AlertAgent
+
+## Data Stores
+
+- compliance_rules
+- audit_logs
+- reports
+- violations
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

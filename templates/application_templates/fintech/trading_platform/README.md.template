@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Trading Platform
-# Domain: Financial Services
-#
-# This file will contain the complete implementation for Trading Platform.
-# TODO: Implement README.md.template for Trading Platform
+# {{project_name}}
+
+Generated from the APG **Trading Platform** template.
+
+Financial trading platform with real-time market data
+
+## Template
+
+- ID: `fintech/trading_platform`
+- Domain: Financial Services
+- Complexity: Expert
+
+## Features
+
+- Real-time Trading
+- Risk Management
+- Market Analysis
+- Regulatory Compliance
+
+## Agents
+
+- TradingAgent
+- RiskAgent
+- MarketDataAgent
+- ComplianceAgent
+
+## Data Stores
+
+- trades
+- market_data
+- risk_metrics
+- compliance_logs
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

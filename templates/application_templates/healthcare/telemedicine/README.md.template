@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Telemedicine Platform
-# Domain: Telemedicine
-#
-# This file will contain the complete implementation for Telemedicine Platform.
-# TODO: Implement README.md.template for Telemedicine Platform
+# {{project_name}}
+
+Generated from the APG **Telemedicine Platform** template.
+
+Remote healthcare delivery platform
+
+## Template
+
+- ID: `healthcare/telemedicine`
+- Domain: Telemedicine
+- Complexity: Advanced
+
+## Features
+
+- Video Consultations
+- Remote Diagnostics
+- Digital Prescriptions
+- Health Monitoring
+
+## Agents
+
+- ConsultationAgent
+- DiagnosticAgent
+- PrescriptionAgent
+- MonitoringAgent
+
+## Data Stores
+
+- consultations
+- diagnostics
+- prescriptions
+- health_data
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

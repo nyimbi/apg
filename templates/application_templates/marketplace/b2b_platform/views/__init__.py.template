@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: B2B Trading Platform
-# Domain: B2B Commerce
-#
-# This file will contain the complete implementation for B2B Trading Platform.
-# TODO: Implement views/__init__.py.template for B2B Trading Platform
+"""View payload builders for B2B Trading Platform."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "business_matching",
+        "path": "/business-matching",
+        "feature": "Business Matching"
+    },
+    {
+        "name": "contract_management",
+        "path": "/contract-management",
+        "feature": "Contract Management"
+    },
+    {
+        "name": "bulk_trading",
+        "path": "/bulk-trading",
+        "feature": "Bulk Trading"
+    },
+    {
+        "name": "compliance_tracking",
+        "path": "/compliance-tracking",
+        "feature": "Compliance Tracking"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Business-to-business marketplace with advanced trading features",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

@@ -1,6 +1,41 @@
-# APG Template File: views/__init__.py.template
-# Template: Environmental Monitoring
-# Domain: Environmental Monitoring
-#
-# This file will contain the complete implementation for Environmental Monitoring.
-# TODO: Implement views/__init__.py.template for Environmental Monitoring
+"""View payload builders for Environmental Monitoring."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "multi_sensor_integration",
+        "path": "/multi-sensor-integration",
+        "feature": "Multi-sensor Integration"
+    },
+    {
+        "name": "environmental_analytics",
+        "path": "/environmental-analytics",
+        "feature": "Environmental Analytics"
+    },
+    {
+        "name": "trend_prediction",
+        "path": "/trend-prediction",
+        "feature": "Trend Prediction"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Environmental sensor network with data analysis",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

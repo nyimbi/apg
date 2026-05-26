@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Supply Chain Management
-# Domain: Supply Chain
-#
-# This file will contain the complete implementation for Supply Chain Management.
-# TODO: Implement README.md.template for Supply Chain Management
+# {{project_name}}
+
+Generated from the APG **Supply Chain Management** template.
+
+End-to-end supply chain visibility and optimization
+
+## Template
+
+- ID: `logistics/supply_chain`
+- Domain: Supply Chain
+- Complexity: Expert
+
+## Features
+
+- Supply Planning
+- Demand Forecasting
+- Logistics Optimization
+- Supply Chain Visibility
+
+## Agents
+
+- SupplyAgent
+- DemandAgent
+- LogisticsAgent
+- OptimizationAgent
+
+## Data Stores
+
+- suppliers
+- inventory
+- shipments
+- demand_forecasts
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

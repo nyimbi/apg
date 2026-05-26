@@ -1,6 +1,41 @@
-# APG Template File: views/__init__.py.template
-# Template: Simple Agent
-# Domain: General
-#
-# This file will contain the complete implementation for Simple Agent.
-# TODO: Implement views/__init__.py.template for Simple Agent
+"""View payload builders for Simple Agent."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "agent_runtime",
+        "path": "/agent-runtime",
+        "feature": "Agent Runtime"
+    },
+    {
+        "name": "basic_methods",
+        "path": "/basic-methods",
+        "feature": "Basic Methods"
+    },
+    {
+        "name": "web_dashboard",
+        "path": "/web-dashboard",
+        "feature": "Web Dashboard"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Basic agent with simple methods and web interface",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

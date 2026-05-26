@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Telemedicine Platform
-# Domain: Telemedicine
-#
-# This file will contain the complete implementation for Telemedicine Platform.
-# TODO: Implement views/__init__.py.template for Telemedicine Platform
+"""View payload builders for Telemedicine Platform."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "video_consultations",
+        "path": "/video-consultations",
+        "feature": "Video Consultations"
+    },
+    {
+        "name": "remote_diagnostics",
+        "path": "/remote-diagnostics",
+        "feature": "Remote Diagnostics"
+    },
+    {
+        "name": "digital_prescriptions",
+        "path": "/digital-prescriptions",
+        "feature": "Digital Prescriptions"
+    },
+    {
+        "name": "health_monitoring",
+        "path": "/health-monitoring",
+        "feature": "Health Monitoring"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Remote healthcare delivery platform",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

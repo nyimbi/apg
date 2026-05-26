@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Customer Relationship Management
-# Domain: Customer Management
-#
-# This file will contain the complete implementation for Customer Relationship Management.
-# TODO: Implement README.md.template for Customer Relationship Management
+# {{project_name}}
+
+Generated from the APG **Customer Relationship Management** template.
+
+Comprehensive CRM platform for customer management
+
+## Template
+
+- ID: `enterprise/crm_platform`
+- Domain: Customer Management
+- Complexity: Advanced
+
+## Features
+
+- Customer Management
+- Sales Pipeline
+- Marketing Campaigns
+- Customer Service
+
+## Agents
+
+- CustomerAgent
+- SalesAgent
+- MarketingAgent
+- ServiceAgent
+
+## Data Stores
+
+- customers
+- sales
+- marketing
+- service_tickets
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

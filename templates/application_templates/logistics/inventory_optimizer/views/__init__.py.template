@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Inventory Optimization
-# Domain: Inventory Management
-#
-# This file will contain the complete implementation for Inventory Optimization.
-# TODO: Implement views/__init__.py.template for Inventory Optimization
+"""View payload builders for Inventory Optimization."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "demand_planning",
+        "path": "/demand-planning",
+        "feature": "Demand Planning"
+    },
+    {
+        "name": "inventory_optimization",
+        "path": "/inventory-optimization",
+        "feature": "Inventory Optimization"
+    },
+    {
+        "name": "automated_replenishment",
+        "path": "/automated-replenishment",
+        "feature": "Automated Replenishment"
+    },
+    {
+        "name": "cost_analysis",
+        "path": "/cost-analysis",
+        "feature": "Cost Analysis"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "AI-powered inventory optimization and demand planning",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

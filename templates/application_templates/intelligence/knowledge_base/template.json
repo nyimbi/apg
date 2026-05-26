@@ -35,9 +35,14 @@
     "secret_key": "{{secret_key}}"
   },
   "files": [
+    "README.md.template",
+    "agents/__init__.py.template",
     "app.py.template",
     "config.py.template",
+    "models/__init__.py.template",
     "requirements.txt.template",
-    "README.md.template"
+    "tests/__init__.py.template",
+    "tests/__main__.py.template",
+    "views/__init__.py.template"
   ]
 }

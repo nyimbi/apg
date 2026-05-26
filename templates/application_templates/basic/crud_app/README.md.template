@@ -1,6 +1,37 @@
-# APG Template File: README.md.template
-# Template: CRUD Application
-# Domain: General
-#
-# This file will contain the complete implementation for CRUD Application.
-# TODO: Implement README.md.template for CRUD Application
+# {{project_name}}
+
+Generated from the APG **CRUD Application** template.
+
+Complete Create, Read, Update, Delete application
+
+## Template
+
+- ID: `basic/crud_app`
+- Domain: General
+- Complexity: Beginner
+
+## Features
+
+- CRUD Operations
+- Database Management
+- Admin Interface
+
+## Agents
+
+- DataManagerAgent
+
+## Data Stores
+
+- main_data
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

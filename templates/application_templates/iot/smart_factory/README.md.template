@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Smart Factory System
-# Domain: Industrial IoT
-#
-# This file will contain the complete implementation for Smart Factory System.
-# TODO: Implement README.md.template for Smart Factory System
+# {{project_name}}
+
+Generated from the APG **Smart Factory System** template.
+
+Industrial IoT platform for smart manufacturing
+
+## Template
+
+- ID: `iot/smart_factory`
+- Domain: Industrial IoT
+- Complexity: Expert
+
+## Features
+
+- Production Monitoring
+- Quality Control
+- Predictive Maintenance
+- Efficiency Analytics
+
+## Agents
+
+- ProductionAgent
+- QualityAgent
+- MaintenanceAgent
+- EfficiencyAgent
+
+## Data Stores
+
+- production_data
+- quality_metrics
+- maintenance_logs
+- efficiency_reports
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Inventory Optimization
-# Domain: Inventory Management
-#
-# This file will contain the complete implementation for Inventory Optimization.
-# TODO: Implement README.md.template for Inventory Optimization
+# {{project_name}}
+
+Generated from the APG **Inventory Optimization** template.
+
+AI-powered inventory optimization and demand planning
+
+## Template
+
+- ID: `logistics/inventory_optimizer`
+- Domain: Inventory Management
+- Complexity: Advanced
+
+## Features
+
+- Demand Planning
+- Inventory Optimization
+- Automated Replenishment
+- Cost Analysis
+
+## Agents
+
+- InventoryAgent
+- DemandAgent
+- OptimizationAgent
+- ReplenishmentAgent
+
+## Data Stores
+
+- inventory_levels
+- demand_history
+- optimization_models
+- cost_analysis
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

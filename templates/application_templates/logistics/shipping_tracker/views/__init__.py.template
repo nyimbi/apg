@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Shipping Tracker
-# Domain: Shipping & Delivery
-#
-# This file will contain the complete implementation for Shipping Tracker.
-# TODO: Implement views/__init__.py.template for Shipping Tracker
+"""View payload builders for Shipping Tracker."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "package_tracking",
+        "path": "/package-tracking",
+        "feature": "Package Tracking"
+    },
+    {
+        "name": "delivery_management",
+        "path": "/delivery-management",
+        "feature": "Delivery Management"
+    },
+    {
+        "name": "route_optimization",
+        "path": "/route-optimization",
+        "feature": "Route Optimization"
+    },
+    {
+        "name": "customer_notifications",
+        "path": "/customer-notifications",
+        "feature": "Customer Notifications"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Real-time package tracking and delivery management",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

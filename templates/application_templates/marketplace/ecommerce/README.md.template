@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: E-Commerce Platform
-# Domain: E-Commerce
-#
-# This file will contain the complete implementation for E-Commerce Platform.
-# TODO: Implement README.md.template for E-Commerce Platform
+# {{project_name}}
+
+Generated from the APG **E-Commerce Platform** template.
+
+Complete online marketplace with products, orders, and payments
+
+## Template
+
+- ID: `marketplace/ecommerce`
+- Domain: E-Commerce
+- Complexity: Advanced
+
+## Features
+
+- Product Catalog
+- Shopping Cart
+- Order Management
+- Payment Processing
+
+## Agents
+
+- ProductAgent
+- OrderAgent
+- PaymentAgent
+- InventoryAgent
+
+## Data Stores
+
+- products
+- orders
+- customers
+- inventory
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

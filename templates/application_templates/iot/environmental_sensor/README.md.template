@@ -1,6 +1,41 @@
-# APG Template File: README.md.template
-# Template: Environmental Monitoring
-# Domain: Environmental Monitoring
-#
-# This file will contain the complete implementation for Environmental Monitoring.
-# TODO: Implement README.md.template for Environmental Monitoring
+# {{project_name}}
+
+Generated from the APG **Environmental Monitoring** template.
+
+Environmental sensor network with data analysis
+
+## Template
+
+- ID: `iot/environmental_sensor`
+- Domain: Environmental Monitoring
+- Complexity: Intermediate
+
+## Features
+
+- Multi-sensor Integration
+- Environmental Analytics
+- Trend Prediction
+
+## Agents
+
+- SensorAgent
+- AnalyticsAgent
+- PredictionAgent
+
+## Data Stores
+
+- sensor_readings
+- environmental_data
+- predictions
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

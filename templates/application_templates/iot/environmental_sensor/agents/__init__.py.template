@@ -1,6 +1,35 @@
-# APG Template File: agents/__init__.py.template
-# Template: Environmental Monitoring
-# Domain: Environmental Monitoring
-#
-# This file will contain the complete implementation for Environmental Monitoring.
-# TODO: Implement agents/__init__.py.template for Environmental Monitoring
+"""Agent registry for Environmental Monitoring."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+AGENTS = [
+    "SensorAgent",
+    "AnalyticsAgent",
+    "PredictionAgent"
+]
+
+
+@dataclass(slots=True)
+class TemplateAgent:
+	name: str
+	capabilities: list[str] = field(default_factory=list)
+
+	def handle(self, event: dict[str, Any]) -> dict[str, Any]:
+		return {
+			"agent": self.name,
+			"accepted": True,
+			"event": dict(event),
+			"handled_at": datetime.now(timezone.utc).isoformat(),
+		}
+
+
+def build_agent_registry() -> dict[str, TemplateAgent]:
+	return {
+		agent_name: TemplateAgent(name=agent_name, capabilities=["observe", "validate", "act"])
+		for agent_name in AGENTS
+	}

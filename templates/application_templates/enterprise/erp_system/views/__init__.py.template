@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Enterprise Resource Planning
-# Domain: Enterprise Management
-#
-# This file will contain the complete implementation for Enterprise Resource Planning.
-# TODO: Implement views/__init__.py.template for Enterprise Resource Planning
+"""View payload builders for Enterprise Resource Planning."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "financial_management",
+        "path": "/financial-management",
+        "feature": "Financial Management"
+    },
+    {
+        "name": "human_resources",
+        "path": "/human-resources",
+        "feature": "Human Resources"
+    },
+    {
+        "name": "operations_management",
+        "path": "/operations-management",
+        "feature": "Operations Management"
+    },
+    {
+        "name": "reporting",
+        "path": "/reporting",
+        "feature": "Reporting"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Complete ERP system for enterprise resource management",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

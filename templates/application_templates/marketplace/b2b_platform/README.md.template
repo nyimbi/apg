@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: B2B Trading Platform
-# Domain: B2B Commerce
-#
-# This file will contain the complete implementation for B2B Trading Platform.
-# TODO: Implement README.md.template for B2B Trading Platform
+# {{project_name}}
+
+Generated from the APG **B2B Trading Platform** template.
+
+Business-to-business marketplace with advanced trading features
+
+## Template
+
+- ID: `marketplace/b2b_platform`
+- Domain: B2B Commerce
+- Complexity: Expert
+
+## Features
+
+- Business Matching
+- Contract Management
+- Bulk Trading
+- Compliance Tracking
+
+## Agents
+
+- TradingAgent
+- MatchingAgent
+- ContractAgent
+- ComplianceAgent
+
+## Data Stores
+
+- businesses
+- trades
+- contracts
+- compliance_records
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

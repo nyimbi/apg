@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Fleet Management System
-# Domain: Fleet Management
-#
-# This file will contain the complete implementation for Fleet Management System.
-# TODO: Implement README.md.template for Fleet Management System
+# {{project_name}}
+
+Generated from the APG **Fleet Management System** template.
+
+Vehicle fleet tracking and management platform
+
+## Template
+
+- ID: `iot/fleet_management`
+- Domain: Fleet Management
+- Complexity: Advanced
+
+## Features
+
+- GPS Tracking
+- Route Optimization
+- Maintenance Scheduling
+- Fuel Management
+
+## Agents
+
+- VehicleAgent
+- RoutingAgent
+- MaintenanceAgent
+- FuelAgent
+
+## Data Stores
+
+- vehicles
+- routes
+- maintenance
+- fuel_data
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

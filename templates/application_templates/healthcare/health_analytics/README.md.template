@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Health Analytics Platform
-# Domain: Health Analytics
-#
-# This file will contain the complete implementation for Health Analytics Platform.
-# TODO: Implement README.md.template for Health Analytics Platform
+# {{project_name}}
+
+Generated from the APG **Health Analytics Platform** template.
+
+Healthcare data analytics and insights
+
+## Template
+
+- ID: `healthcare/health_analytics`
+- Domain: Health Analytics
+- Complexity: Advanced
+
+## Features
+
+- Health Analytics
+- Population Health
+- Outcome Analysis
+- Predictive Modeling
+
+## Agents
+
+- AnalyticsAgent
+- PopulationAgent
+- OutcomeAgent
+- PredictiveAgent
+
+## Data Stores
+
+- health_metrics
+- population_data
+- outcomes
+- predictions
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

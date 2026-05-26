@@ -1,6 +1,41 @@
-# APG Template File: README.md.template
-# Template: Conversational AI Assistant
-# Domain: Conversational AI
-#
-# This file will contain the complete implementation for Conversational AI Assistant.
-# TODO: Implement README.md.template for Conversational AI Assistant
+# {{project_name}}
+
+Generated from the APG **Conversational AI Assistant** template.
+
+Advanced chatbot with context awareness and learning
+
+## Template
+
+- ID: `intelligence/chat_assistant`
+- Domain: Conversational AI
+- Complexity: Advanced
+
+## Features
+
+- Natural Language Processing
+- Context Awareness
+- Multi-turn Conversations
+
+## Agents
+
+- ChatAgent
+- ContextManager
+- LearningAgent
+
+## Data Stores
+
+- conversations
+- context_memory
+- user_profiles
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Business Intelligence Platform
-# Domain: Business Intelligence
-#
-# This file will contain the complete implementation for Business Intelligence Platform.
-# TODO: Implement views/__init__.py.template for Business Intelligence Platform
+"""View payload builders for Business Intelligence Platform."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "data_analytics",
+        "path": "/data-analytics",
+        "feature": "Data Analytics"
+    },
+    {
+        "name": "interactive_dashboards",
+        "path": "/interactive-dashboards",
+        "feature": "Interactive Dashboards"
+    },
+    {
+        "name": "automated_reporting",
+        "path": "/automated-reporting",
+        "feature": "Automated Reporting"
+    },
+    {
+        "name": "predictive_analytics",
+        "path": "/predictive-analytics",
+        "feature": "Predictive Analytics"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Enterprise BI platform with advanced analytics",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

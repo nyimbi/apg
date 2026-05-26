@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: AI Intelligence Platform
-# Domain: Artificial Intelligence
-#
-# This file will contain the complete implementation for AI Intelligence Platform.
-# TODO: Implement views/__init__.py.template for AI Intelligence Platform
+"""View payload builders for AI Intelligence Platform."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "model_management",
+        "path": "/model-management",
+        "feature": "Model Management"
+    },
+    {
+        "name": "multi_agent_ai",
+        "path": "/multi-agent-ai",
+        "feature": "Multi-Agent AI"
+    },
+    {
+        "name": "inference_pipeline",
+        "path": "/inference-pipeline",
+        "feature": "Inference Pipeline"
+    },
+    {
+        "name": "ai_analytics",
+        "path": "/ai-analytics",
+        "feature": "AI Analytics"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Complete AI platform with multiple AI agents and services",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

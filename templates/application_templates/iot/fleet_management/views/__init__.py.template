@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Fleet Management System
-# Domain: Fleet Management
-#
-# This file will contain the complete implementation for Fleet Management System.
-# TODO: Implement views/__init__.py.template for Fleet Management System
+"""View payload builders for Fleet Management System."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "gps_tracking",
+        "path": "/gps-tracking",
+        "feature": "GPS Tracking"
+    },
+    {
+        "name": "route_optimization",
+        "path": "/route-optimization",
+        "feature": "Route Optimization"
+    },
+    {
+        "name": "maintenance_scheduling",
+        "path": "/maintenance-scheduling",
+        "feature": "Maintenance Scheduling"
+    },
+    {
+        "name": "fuel_management",
+        "path": "/fuel-management",
+        "feature": "Fuel Management"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Vehicle fleet tracking and management platform",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

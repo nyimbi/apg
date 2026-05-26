@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Enterprise Resource Planning
-# Domain: Enterprise Management
-#
-# This file will contain the complete implementation for Enterprise Resource Planning.
-# TODO: Implement README.md.template for Enterprise Resource Planning
+# {{project_name}}
+
+Generated from the APG **Enterprise Resource Planning** template.
+
+Complete ERP system for enterprise resource management
+
+## Template
+
+- ID: `enterprise/erp_system`
+- Domain: Enterprise Management
+- Complexity: Expert
+
+## Features
+
+- Financial Management
+- Human Resources
+- Operations Management
+- Reporting
+
+## Agents
+
+- ERPAgent
+- FinanceAgent
+- HRAgent
+- OperationsAgent
+
+## Data Stores
+
+- financials
+- employees
+- operations
+- reports
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

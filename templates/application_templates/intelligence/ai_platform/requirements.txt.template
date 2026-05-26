@@ -1,6 +1,3 @@
-# APG Template File: requirements.txt.template
-# Template: AI Intelligence Platform
-# Domain: Artificial Intelligence
-#
-# This file will contain the complete implementation for AI Intelligence Platform.
-# TODO: Implement requirements.txt.template for AI Intelligence Platform
+Flask-AppBuilder>=4.3.0
+Flask>=2.3.0
+SQLAlchemy>=2.0.0

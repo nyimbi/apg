@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Warehouse Management System
-# Domain: Warehouse Management
-#
-# This file will contain the complete implementation for Warehouse Management System.
-# TODO: Implement views/__init__.py.template for Warehouse Management System
+"""View payload builders for Warehouse Management System."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "inventory_management",
+        "path": "/inventory-management",
+        "feature": "Inventory Management"
+    },
+    {
+        "name": "order_picking",
+        "path": "/order-picking",
+        "feature": "Order Picking"
+    },
+    {
+        "name": "shipping_management",
+        "path": "/shipping-management",
+        "feature": "Shipping Management"
+    },
+    {
+        "name": "layout_optimization",
+        "path": "/layout-optimization",
+        "feature": "Layout Optimization"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "Advanced warehouse operations and inventory management",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}

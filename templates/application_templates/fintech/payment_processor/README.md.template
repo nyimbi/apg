@@ -1,6 +1,44 @@
-# APG Template File: README.md.template
-# Template: Payment Processing System
-# Domain: Payment Processing
-#
-# This file will contain the complete implementation for Payment Processing System.
-# TODO: Implement README.md.template for Payment Processing System
+# {{project_name}}
+
+Generated from the APG **Payment Processing System** template.
+
+Secure payment processing with fraud detection
+
+## Template
+
+- ID: `fintech/payment_processor`
+- Domain: Payment Processing
+- Complexity: Expert
+
+## Features
+
+- Payment Processing
+- Fraud Detection
+- Settlement
+- Reconciliation
+
+## Agents
+
+- PaymentAgent
+- FraudAgent
+- SettlementAgent
+- ReconciliationAgent
+
+## Data Stores
+
+- payments
+- fraud_scores
+- settlements
+- reconciliation
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```

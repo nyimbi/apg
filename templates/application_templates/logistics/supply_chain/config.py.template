@@ -1,6 +1,51 @@
-# APG Template File: config.py.template
-# Template: Supply Chain Management
-# Domain: Supply Chain
-#
-# This file will contain the complete implementation for Supply Chain Management.
-# TODO: Implement config.py.template for Supply Chain Management
+"""Configuration defaults for Supply Chain Management."""
+
+from __future__ import annotations
+
+import os
+
+
+class Config:
+	PROJECT_NAME = os.environ.get("PROJECT_NAME", "{{project_name}}")
+	PROJECT_DESCRIPTION = os.environ.get("PROJECT_DESCRIPTION", "{{project_description}}")
+	AUTHOR = os.environ.get("PROJECT_AUTHOR", "{{author}}")
+	DATABASE_URL = os.environ.get("DATABASE_URL", "{{database_url}}")
+	SECRET_KEY = os.environ.get("SECRET_KEY", "{{secret_key}}")
+	TEMPLATE_ID = "logistics/supply_chain"
+	TEMPLATE_NAME = "Supply Chain Management"
+	DOMAIN = "Supply Chain"
+	COMPLEXITY = "Expert"
+	FEATURES = [
+    "Supply Planning",
+    "Demand Forecasting",
+    "Logistics Optimization",
+    "Supply Chain Visibility"
+]
+	DATABASES = [
+    "suppliers",
+    "inventory",
+    "shipments",
+    "demand_forecasts"
+]
+	AGENTS = [
+    "SupplyAgent",
+    "DemandAgent",
+    "LogisticsAgent",
+    "OptimizationAgent"
+]
+
+
+def as_dict() -> dict[str, object]:
+	return {
+		"project_name": Config.PROJECT_NAME,
+		"project_description": Config.PROJECT_DESCRIPTION,
+		"author": Config.AUTHOR,
+		"database_url": Config.DATABASE_URL,
+		"template_id": Config.TEMPLATE_ID,
+		"template_name": Config.TEMPLATE_NAME,
+		"domain": Config.DOMAIN,
+		"complexity": Config.COMPLEXITY,
+		"features": list(Config.FEATURES),
+		"databases": list(Config.DATABASES),
+		"agents": list(Config.AGENTS),
+	}

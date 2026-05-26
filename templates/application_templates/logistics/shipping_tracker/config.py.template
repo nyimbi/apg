@@ -1,6 +1,51 @@
-# APG Template File: config.py.template
-# Template: Shipping Tracker
-# Domain: Shipping & Delivery
-#
-# This file will contain the complete implementation for Shipping Tracker.
-# TODO: Implement config.py.template for Shipping Tracker
+"""Configuration defaults for Shipping Tracker."""
+
+from __future__ import annotations
+
+import os
+
+
+class Config:
+	PROJECT_NAME = os.environ.get("PROJECT_NAME", "{{project_name}}")
+	PROJECT_DESCRIPTION = os.environ.get("PROJECT_DESCRIPTION", "{{project_description}}")
+	AUTHOR = os.environ.get("PROJECT_AUTHOR", "{{author}}")
+	DATABASE_URL = os.environ.get("DATABASE_URL", "{{database_url}}")
+	SECRET_KEY = os.environ.get("SECRET_KEY", "{{secret_key}}")
+	TEMPLATE_ID = "logistics/shipping_tracker"
+	TEMPLATE_NAME = "Shipping Tracker"
+	DOMAIN = "Shipping & Delivery"
+	COMPLEXITY = "Intermediate"
+	FEATURES = [
+    "Package Tracking",
+    "Delivery Management",
+    "Route Optimization",
+    "Customer Notifications"
+]
+	DATABASES = [
+    "packages",
+    "deliveries",
+    "routes",
+    "tracking_events"
+]
+	AGENTS = [
+    "TrackingAgent",
+    "DeliveryAgent",
+    "RouteAgent",
+    "NotificationAgent"
+]
+
+
+def as_dict() -> dict[str, object]:
+	return {
+		"project_name": Config.PROJECT_NAME,
+		"project_description": Config.PROJECT_DESCRIPTION,
+		"author": Config.AUTHOR,
+		"database_url": Config.DATABASE_URL,
+		"template_id": Config.TEMPLATE_ID,
+		"template_name": Config.TEMPLATE_NAME,
+		"domain": Config.DOMAIN,
+		"complexity": Config.COMPLEXITY,
+		"features": list(Config.FEATURES),
+		"databases": list(Config.DATABASES),
+		"agents": list(Config.AGENTS),
+	}

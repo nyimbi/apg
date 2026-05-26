@@ -1,6 +1,46 @@
-# APG Template File: views/__init__.py.template
-# Template: Supply Chain Management
-# Domain: Supply Chain
-#
-# This file will contain the complete implementation for Supply Chain Management.
-# TODO: Implement views/__init__.py.template for Supply Chain Management
+"""View payload builders for Supply Chain Management."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = [
+    {
+        "name": "supply_planning",
+        "path": "/supply-planning",
+        "feature": "Supply Planning"
+    },
+    {
+        "name": "demand_forecasting",
+        "path": "/demand-forecasting",
+        "feature": "Demand Forecasting"
+    },
+    {
+        "name": "logistics_optimization",
+        "path": "/logistics-optimization",
+        "feature": "Logistics Optimization"
+    },
+    {
+        "name": "supply_chain_visibility",
+        "path": "/supply-chain-visibility",
+        "feature": "Supply Chain Visibility"
+    }
+]
+
+
+def list_routes() -> list[dict[str, str]]:
+	return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+	runtime_config = config or {}
+	return {
+		"title": runtime_config.get("project_name", "{{project_name}}"),
+		"summary": "End-to-end supply chain visibility and optimization",
+		"record_count": len(records),
+		"agent_count": len(agents),
+		"routes": list_routes(),
+		"records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+	}
