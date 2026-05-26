@@ -2662,3 +2662,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_top_level_blueprint_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return ['\"]default_tenant['\"]|request\\.args\\.get\\(['\"]tenant_id['\"], ['\"]default_tenant['\"]\\)|['\"]default_tenant['\"]" capabilities/scm/blueprint.py capabilities/hcm/blueprint.py capabilities/intel/crawler/blueprint.py capabilities/common/request_context.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:55 EAT
+
+Completed checkpoint:
+
+- Extended the shared lightweight tenant resolver to support Flask session tenant IDs and APG core context before configured fallbacks.
+- Replaced composition orchestration's duplicated `default_tenant` resolver with the shared request-context helper.
+- Replaced composition security engine API-key and malformed-OAuth email tenant fallbacks with shared context/configured tenant resolution.
+- Fixed a pre-existing `security_engine.py` syntax error where `global QUANTUM_CRYPTO_AVAILABLE` appeared after the name was read in the same function.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/request_context.py capabilities/composition/orchestration/blueprint.py capabilities/composition/config/security_engine.py tests/test_top_level_blueprint_tenant_context.py`
+- `.venv/bin/python -m pytest -q tests/test_top_level_blueprint_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return ['\"]default_tenant['\"]|['\"]default_tenant['\"]" capabilities/composition/orchestration/blueprint.py capabilities/composition/config/security_engine.py capabilities/common/request_context.py` -> no matches
+- `git diff --check` -> no issues

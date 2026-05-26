@@ -33,6 +33,7 @@ from jose import jwe, jwk
 import httpx
 import urllib.parse
 from urllib.parse import urlencode, parse_qs
+from ...common.request_context import get_tenant_id_from_context
 
 # Quantum-resistant cryptography using real post-quantum algorithms
 try:
@@ -243,6 +244,7 @@ class CentralConfigurationSecurity:
 	
 	def _initialize_quantum_crypto(self):
 		"""Initialize quantum-resistant cryptography."""
+		global QUANTUM_CRYPTO_AVAILABLE
 		if QUANTUM_CRYPTO_AVAILABLE:
 			try:
 				# Initialize Kyber-768 for key encapsulation mechanism (KEM)
@@ -265,7 +267,6 @@ class CentralConfigurationSecurity:
 				print("✅ Quantum-resistant cryptography initialized (Kyber768 + Dilithium3 + ChaCha20)")
 			except Exception as e:
 				print(f"⚠️ Quantum crypto initialization failed: {e}; using fallback crypto")
-				global QUANTUM_CRYPTO_AVAILABLE
 				QUANTUM_CRYPTO_AVAILABLE = False
 	
 	def _initialize_oauth2_providers(self):
@@ -840,7 +841,7 @@ class CentralConfigurationSecurity:
 		# For now, simple validation
 		if api_key.startswith("cc_") and len(api_key) >= 32:
 			user_id = "api_user"
-			tenant_id = "default_tenant"
+			tenant_id = get_tenant_id_from_context(credentials)
 			
 			await self._audit_security_event(
 				event_type="authentication",
@@ -1046,7 +1047,7 @@ class CentralConfigurationSecurity:
 			}
 			return domain_tenant_map.get(domain, f"tenant_{domain.replace('.', '_')}")
 		else:
-			return "default_tenant"
+			return get_tenant_id_from_context()
 	
 	async def _determine_oauth2_permissions(self, user_info: Dict[str, Any], provider: OAuth2Provider, email: str) -> List[str]:
 		"""Determine user permissions based on OAuth2 provider and user info."""

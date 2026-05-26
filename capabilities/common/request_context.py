@@ -41,17 +41,19 @@ def get_tenant_id_from_context(payload: Optional[Dict[str, Any]] = None) -> str:
 	candidates: list[Any] = _payload_values(payload, ["tenant_id", "tenant", "organization_id"])
 
 	try:
-		from flask import g, has_request_context, request
+		from flask import g, has_request_context, request, session
 	except Exception:
 		g = None
 		has_request_context = lambda: False
 		request = None
+		session = None
 
 	if has_request_context():
 		current_tenant = _object_value(g, "current_tenant")
 		current_user = _object_value(g, "current_user")
 		fab_user = _object_value(g, "user")
 		candidates.extend([
+			_mapping_value(session, "tenant_id"),
 			_object_value(g, "tenant_id"),
 			_object_value(current_tenant, "tenant_id") or current_tenant,
 			_object_value(current_user, "tenant_id"),
@@ -63,6 +65,13 @@ def get_tenant_id_from_context(payload: Optional[Dict[str, Any]] = None) -> str:
 			_mapping_value(request.args, "tenant"),
 			_mapping_value(request.environ, "APG_TENANT_ID"),
 		])
+
+	try:
+		from apg.core.context import get_current_context
+		context = get_current_context()
+	except Exception:
+		context = None
+	candidates.append(_object_value(context, "tenant_id"))
 
 	candidates.extend([
 		os.getenv("APG_DEFAULT_TENANT_ID"),

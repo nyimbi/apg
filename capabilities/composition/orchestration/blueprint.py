@@ -32,6 +32,7 @@ from .database import CRWorkflow, CRWorkflowInstance, CRTaskExecution, DatabaseM
 from .service import WorkflowOrchestrationService
 from .management import WorkflowManager, WorkflowValidationLevel
 from .api import create_api_app
+from ...common.request_context import get_tenant_id_from_context
 
 logger = logging.getLogger(__name__)
 
@@ -612,38 +613,10 @@ class APGWorkflowOrchestrationBlueprint:
 def get_current_tenant_id() -> str:
 	"""Get current tenant ID from session/context."""
 	try:
-		# Try to get tenant ID from Flask session/request context
-		from flask import session, request, g
-		
-		# Check session first
-		if 'tenant_id' in session:
-			return session['tenant_id']
-		
-		# Check request headers for API calls
-		if hasattr(request, 'headers') and 'X-Tenant-ID' in request.headers:
-			return request.headers['X-Tenant-ID']
-		
-		# Check Flask global context
-		if hasattr(g, 'tenant_id'):
-			return g.tenant_id
-		
-		# Check for APG context if available
-		try:
-			from apg.core.context import get_current_context
-			context = get_current_context()
-			if context and hasattr(context, 'tenant_id'):
-				return context.tenant_id
-		except ImportError:
-			pass  # APG context not available
-		
-		# Fallback to environment variable
-		import os
-		tenant_id = os.getenv('APG_TENANT_ID', 'default_tenant')
-		return tenant_id
-		
+		return get_tenant_id_from_context()
 	except Exception as e:
 		logger.warning(f"Failed to get tenant ID from context: {e}")
-		return "default_tenant"
+		return "default"
 
 def get_current_user_id() -> str:
 	"""Get current user ID from session/context."""
