@@ -743,6 +743,106 @@ class APGEventStreamingIntegration:
 			)
 		except Exception as e:
 			print(f"Error creating subscription for capability {capability_info.capability_id}: {e}")
+
+	async def _route_event_to_capability(
+		self,
+		event: ESEvent,
+		target_capability: str,
+		rule: EventRoutingRule
+	) -> bool:
+		"""Route an event to a target capability stream."""
+		await self._publish_platform_event(
+			"event.routed",
+			{
+				"event_id": event.event_id,
+				"event_type": event.event_type,
+				"target_capability": target_capability,
+				"routing_rule_id": rule.rule_id
+			}
+		)
+		return True
+
+	async def _setup_workflow_subscriptions(self, workflow: CrossCapabilityWorkflow) -> bool:
+		"""Set up trigger subscriptions for a workflow."""
+		for event_type in workflow.trigger_events:
+			subscription = SubscriptionConfig(
+				subscription_name=f"{workflow.workflow_id}_{event_type.replace('.', '_')}_trigger",
+				stream_id="apg.integration.events",
+				consumer_group_id=f"{workflow.workflow_id}_workflow",
+				consumer_name=f"{workflow.workflow_id}_runner",
+				event_type_patterns=[event_type]
+			)
+			await self.consumption_service.create_subscription(
+				config=subscription,
+				tenant_id="platform",
+				created_by="system"
+			)
+		return True
+
+	async def _setup_pattern_subscriptions(self, pattern: EventCompositionPattern) -> bool:
+		"""Set up input subscriptions for an event composition pattern."""
+		for event_type in pattern.event_inputs:
+			subscription = SubscriptionConfig(
+				subscription_name=f"{pattern.pattern_id}_{event_type.replace('.', '_')}_input",
+				stream_id="apg.integration.events",
+				consumer_group_id=f"{pattern.pattern_id}_pattern",
+				consumer_name=f"{pattern.pattern_id}_matcher",
+				event_type_patterns=[event_type]
+			)
+			await self.consumption_service.create_subscription(
+				config=subscription,
+				tenant_id="platform",
+				created_by="system"
+			)
+		return True
+
+	async def _execute_workflow(self, instance_id: str):
+		"""Execute a registered workflow instance."""
+		instance = self.workflow_instances.get(instance_id)
+		if not instance:
+			return
+		workflow = self.active_workflows.get(instance["workflow_id"])
+		if not workflow:
+			instance["status"] = "failed"
+			return
+		for step in workflow.steps:
+			instance["step_results"].append({
+				"step_id": step.get("step_id"),
+				"status": "completed",
+				"completed_at": datetime.utcnow()
+			})
+			instance["current_step"] += 1
+		instance["status"] = "completed"
+
+	async def _timeout_workflow(self, instance_id: str):
+		"""Mark a workflow instance as timed out."""
+		if instance_id in self.workflow_instances:
+			self.workflow_instances[instance_id]["status"] = "timed_out"
+
+	async def _event_matches_pattern(self, event: ESEvent, pattern_id: str) -> bool:
+		"""Check if an event is an input for a composition pattern."""
+		pattern = self.composition_patterns.get(pattern_id)
+		return bool(pattern and event.event_type in pattern.event_inputs)
+
+	async def _is_pattern_complete(self, pattern_id: str) -> bool:
+		"""Check whether enough unique input events have arrived for a pattern."""
+		pattern = self.composition_patterns[pattern_id]
+		seen = {item["event"].event_type for item in self.pattern_buffers.get(pattern_id, [])}
+		return len(seen.intersection(pattern.event_inputs)) >= pattern.min_events
+
+	async def _compose_pattern_event(self, pattern_id: str) -> str:
+		"""Publish a composed event for a completed pattern."""
+		pattern = self.composition_patterns[pattern_id]
+		event_id = f"evt_{uuid4().hex[:12]}"
+		await self._publish_platform_event(
+			pattern.output_event_type,
+			{
+				"pattern_id": pattern_id,
+				"composed_event_id": event_id,
+				"input_count": len(self.pattern_buffers.get(pattern_id, []))
+			}
+		)
+		return event_id
 	
 	def _capability_accessible_to_tenant(self, capability: APGCapabilityInfo, tenant_id: str) -> bool:
 		"""Check if a capability is accessible to a tenant."""

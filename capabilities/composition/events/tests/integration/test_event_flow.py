@@ -12,6 +12,7 @@ import pytest
 import asyncio
 from datetime import datetime, timezone
 from typing import List, Dict, Any
+from unittest.mock import AsyncMock
 
 from ...models import EventConfig, StreamConfig, SubscriptionConfig, EventStatus
 from ...service import EventStreamingService, EventPublishingService, EventConsumptionService

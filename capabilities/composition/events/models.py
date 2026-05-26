@@ -1140,7 +1140,7 @@ class StreamConfig(BaseModel):
     model_config = model_config
     
     stream_name: str = Field(..., min_length=1, max_length=200)
-    stream_description: Optional[str] = Field(None, max_length=1000)
+    stream_description: Optional[str] = Field(None, max_length=1000, alias="description")
     stream_name: str = Field(..., min_length=1, max_length=200)
     topic_name: Optional[str] = Field(None, max_length=200)
     partitions: int = Field(default=3, ge=1, le=1000)
@@ -1184,7 +1184,7 @@ class SubscriptionConfig(BaseModel):
         "max_delay_ms": 60000
     })
     dead_letter_enabled: bool = Field(default=True)
-    dead_letter_stream: Optional[str] = Field(None, max_length=200)
+    dead_letter_stream: Optional[str] = Field(None, max_length=200, alias="dead_letter_topic")
     webhook_url: Optional[str] = Field(None, max_length=500)
     webhook_headers: Dict[str, str] = Field(default_factory=dict)
     webhook_timeout_ms: Optional[int] = Field(None, ge=1000, le=300000)

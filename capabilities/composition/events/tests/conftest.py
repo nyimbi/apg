@@ -9,6 +9,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 import asyncio
 import pytest
+import pytest_asyncio
 import json
 from datetime import datetime, timezone
 from typing import Dict, Any, List
@@ -245,9 +246,12 @@ def mock_event_streaming_service():
 @pytest.fixture
 def mock_event_publishing_service():
 	"""Create mock event publishing service."""
+	async def publish_event_batch(events, **kwargs):
+		return [f"evt_{uuid7str()}" for _ in events]
+
 	service = Mock(spec=EventPublishingService)
 	service.publish_event = AsyncMock(return_value="evt_123")
-	service.publish_event_batch = AsyncMock(return_value=["evt_123", "evt_124"])
+	service.publish_event_batch = AsyncMock(side_effect=publish_event_batch)
 	service.get_event = AsyncMock()
 	service.validate_event = AsyncMock(return_value=True)
 	return service
@@ -334,7 +338,7 @@ def mock_redis_client():
 # Integration Test Fixtures
 # =============================================================================
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def integration_event_streaming_service(mock_database_session, mock_bytewax_producer, mock_redis_client):
 	"""Create event streaming service for integration tests."""
 	service = EventStreamingService()
@@ -345,7 +349,7 @@ async def integration_event_streaming_service(mock_database_session, mock_bytewa
 	service.redis_client = mock_redis_client
 	return service
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def integration_apg_integration(
 	integration_event_streaming_service,
 	mock_event_publishing_service,

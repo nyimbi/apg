@@ -2417,6 +2417,7 @@ class EventStreamingService:
         self.event_sourcing = EventSourcingService(db_session, self.redis_client)
         self.stream_manager = StreamManagementService(db_session, self.bytewax_config)
         self.consumer_manager = ConsumerManagementService(db_session, self.bytewax_config)
+        self._local_streams: Dict[str, ESStream] = {}
         
     async def publish_event(
         self,
@@ -2548,6 +2549,7 @@ class EventStreamingService:
             )
             self.db_session.add(stream)
             await self.db_session.commit()
+            self._local_streams[stream.stream_id] = stream
             return stream.stream_id
 
         return await self.stream_manager.create_stream(stream_config, tenant_id, user_id)
@@ -2593,6 +2595,9 @@ class EventStreamingService:
 
     async def get_stream(self, stream_id: str, tenant_id: str) -> Optional[ESStream]:
         """Retrieve a stream by ID."""
+        stream = self._local_streams.get(stream_id)
+        if stream and stream.tenant_id == tenant_id:
+            return stream
         return _query_first(
             self.db_session,
             ESStream,
@@ -2602,7 +2607,18 @@ class EventStreamingService:
 
     async def list_streams(self, tenant_id: str) -> List[ESStream]:
         """List streams for a tenant."""
+        streams = [stream for stream in self._local_streams.values() if stream.tenant_id == tenant_id]
+        if streams:
+            return streams
         return _query_all(self.db_session, ESStream, ESStream.tenant_id == tenant_id)
+
+    async def _recover_stream(self, stream_id: str) -> bool:
+        """Recover a stream from an error state."""
+        stream = self._local_streams.get(stream_id)
+        if stream:
+            stream.status = StreamStatus.ACTIVE.value
+            return True
+        return False
 
     async def query_events(
         self,

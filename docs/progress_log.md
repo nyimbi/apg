@@ -1847,3 +1847,20 @@ Verification:
 - `.venv/bin/python -m pytest --collect-only -q capabilities/composition/events/tests/integration/test_event_flow.py capabilities/composition/events/tests/integration/test_enterprise_features.py capabilities/composition/events/tests/performance/test_throughput.py` -> 30 tests collected
 - `.venv/bin/python -m py_compile capabilities/composition/events/tests/integration/__init__.py capabilities/composition/events/tests/performance/__init__.py capabilities/composition/events/tests/production/__init__.py capabilities/composition/events/tests/production/production_validation.py capabilities/composition/events/tests/production/load_tests.py capabilities/composition/events/tests/production/disaster_recovery_tests.py capabilities/composition/events/tests/production/security_audit.py`
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed
+
+### 2026-05-26 20:52 EAT
+
+Completed checkpoint:
+
+- Made the Event Flow integration chunk execute end-to-end under the local dependency-light Bytewax test harness.
+- Converted Event Streaming integration fixtures to pytest-asyncio fixtures and made mock batch publishing return one event ID per input event.
+- Added legacy configuration aliases used by APG integration (`description` and `dead_letter_topic`) while preserving the canonical model fields.
+- Added APG integration routing, workflow subscription, composition-pattern, and workflow execution helpers needed for first-class cross-capability event orchestration tests.
+- Added in-memory stream tracking and recovery hooks so tenant isolation and stream recovery run without a database.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/events/models.py capabilities/composition/events/service.py capabilities/composition/events/apg_integration.py capabilities/composition/events/tests/conftest.py capabilities/composition/events/tests/integration/test_event_flow.py`
+- `.venv/bin/python -m pytest -q capabilities/composition/events/tests/integration/test_event_flow.py` -> 13 passed
+- `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py` -> 80 passed
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed
