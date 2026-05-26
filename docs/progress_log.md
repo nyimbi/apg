@@ -2851,3 +2851,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_colb_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed
 - `rg -n "'user123'|'tenant123'|\"current_user_id\"|\"current_tenant_id\"|Mock current user from APG auth|return mock data|rtc:\*|Kafka|kafka" capabilities/common/colb/api.py capabilities/common/colb/views.py capabilities/common/colb/websocket_manager.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:42 EAT
+
+Completed checkpoint:
+
+- Replaced common MFA API and Flask view fixed `demo_user`/`demo_tenant` fallbacks with APG request, Flask context/session, header, query, and environment identity resolution.
+- Converted MFA REST handlers that used `await` into `async def` handlers so the module compiles.
+- Made the MFA rate-limit decorator async-aware so it preserves coroutine endpoint execution.
+- Added focused MFA context/executable-syntax regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mfau/api.py capabilities/common/mfau/views.py tests/test_common_mfau_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_common_mfau_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "demo_user|demo_tenant|Kafka|kafka" capabilities/common/mfau/api.py capabilities/common/mfau/views.py` -> no matches
+- `git diff --check` -> no issues

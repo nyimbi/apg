@@ -10,9 +10,11 @@ Website: www.datacraft.co.ke
 """
 
 import logging
+import os
+import inspect
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-from flask import Flask, request, jsonify, current_app
+from flask import Flask, request, jsonify, current_app, g, session
 from flask_restx import Api, Resource, fields, Namespace
 from werkzeug.exceptions import BadRequest, Unauthorized, Forbidden, NotFound
 from functools import wraps
@@ -28,10 +30,91 @@ def _log_api_operation(operation: str, user_id: str, details: str = "") -> str:
 	return f"[MFA API] {operation} for user {user_id}: {details}"
 
 
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def _resolve_current_user_id(fallback: str = "system") -> str:
+	current_user = (
+		_object_value(request, "current_user")
+		or _object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	return _first_text([
+		_object_value(current_user, "user_id"),
+		_object_value(current_user, "id"),
+		_object_value(current_user, "username"),
+		_object_value(request, "current_user_id"),
+		_object_value(g, "user_id"),
+		session.get("user_id"),
+		request.headers.get("X-User-ID"),
+		request.headers.get("X-APG-User-ID"),
+		request.args.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", fallback))
+
+
+def _resolve_current_tenant_id(fallback: str = "default") -> str:
+	current_user = (
+		_object_value(request, "current_user")
+		or _object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	current_tenant = _object_value(g, "current_tenant")
+	return _first_text([
+		_object_value(current_user, "tenant_id"),
+		_object_value(request, "current_tenant_id"),
+		_object_value(g, "tenant_id"),
+		_object_value(current_tenant, "tenant_id"),
+		current_tenant,
+		session.get("tenant_id"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], os.getenv("APG_DEFAULT_TENANT_ID", fallback))
+
+
 # Rate limiting decorator
 def rate_limit(max_requests: int = 100, window_seconds: int = 60):
 	"""Rate limiting decorator for API endpoints"""
 	def decorator(f):
+		if inspect.iscoroutinefunction(f):
+			@wraps(f)
+			async def async_decorated_function(*args, **kwargs):
+				# Simple in-memory rate limiting (use Redis in production)
+				client_ip = request.remote_addr
+				current_time = time.time()
+
+				# This would be implemented with Redis in production
+				# For now, skip rate limiting in development
+
+				return await f(*args, **kwargs)
+			return async_decorated_function
+
 		@wraps(f)
 		def decorated_function(*args, **kwargs):
 			# Simple in-memory rate limiting (use Redis in production)
@@ -64,9 +147,9 @@ def require_auth(f):
 		if not token:
 			return {'error': 'Invalid token'}, 401
 		
-		# Add user context to request
-		request.current_user_id = 'demo_user'  # This would come from token validation
-		request.current_tenant_id = 'demo_tenant'
+		# Add APG request context resolved from auth middleware/session/headers.
+		request.current_user_id = _resolve_current_user_id()
+		request.current_tenant_id = _resolve_current_tenant_id()
 		
 		return f(*args, **kwargs)
 	return decorated_function
@@ -151,14 +234,13 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 		@api.expect(auth_request_model)
 		@api.marshal_with(auth_response_model)
 		@rate_limit(max_requests=50, window_seconds=60)
-		def post(self):
+		async def post(self):
 			"""Authenticate user with MFA"""
 			try:
 				data = request.get_json()
 				
-				# Extract user context (would come from JWT in production)
-				user_id = request.headers.get('X-User-ID', 'demo_user')
-				tenant_id = request.headers.get('X-Tenant-ID', 'demo_tenant')
+				user_id = _resolve_current_user_id()
+				tenant_id = _resolve_current_tenant_id()
 				
 				# Build context
 				context = data.get('context', {})
@@ -216,7 +298,7 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 	class StepUpResource(Resource):
 		@api.doc('step_up_auth')
 		@require_auth
-		def post(self):
+		async def post(self):
 			"""Perform step-up authentication"""
 			try:
 				data = request.get_json()
@@ -243,7 +325,7 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 		@api.doc('list_methods')
 		@api.marshal_list_with(method_model)
 		@require_auth
-		def get(self):
+		async def get(self):
 			"""Get user's MFA methods"""
 			try:
 				user_id = request.current_user_id
@@ -259,7 +341,7 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 		@api.doc('enroll_method')
 		@api.expect(enrollment_request_model)
 		@require_auth
-		def post(self):
+		async def post(self):
 			"""Enroll new MFA method"""
 			try:
 				data = request.get_json()
@@ -313,7 +395,7 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 		
 		@api.doc('remove_method')
 		@require_auth
-		def delete(self, method_id):
+		async def delete(self, method_id):
 			"""Remove MFA method"""
 			try:
 				user_id = request.current_user_id
@@ -373,7 +455,7 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 		@api.doc('get_user_status')
 		@api.marshal_with(user_status_model)
 		@require_auth
-		def get(self):
+		async def get(self):
 			"""Get user MFA status"""
 			try:
 				user_id = request.current_user_id
@@ -390,7 +472,7 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 	class BackupCodesResource(Resource):
 		@api.doc('generate_backup_codes')
 		@require_auth
-		def post(self):
+		async def post(self):
 			"""Generate backup codes"""
 			try:
 				user_id = request.current_user_id
@@ -413,7 +495,7 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 	class BiometricEnrollResource(Resource):
 		@api.doc('start_biometric_enrollment')
 		@require_auth
-		def post(self):
+		async def post(self):
 			"""Start biometric enrollment"""
 			try:
 				data = request.get_json()
@@ -437,7 +519,7 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 	@recovery_ns.route('/initiate')
 	class InitiateRecoveryResource(Resource):
 		@api.doc('initiate_recovery')
-		def post(self):
+		async def post(self):
 			"""Initiate account recovery"""
 			try:
 				data = request.get_json()
@@ -479,7 +561,7 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 	class MetricsResource(Resource):
 		@api.doc('get_metrics')
 		@require_auth
-		def get(self):
+		async def get(self):
 			"""Get MFA system metrics"""
 			try:
 				metrics = await mfa_service.get_service_metrics()
@@ -493,10 +575,10 @@ def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
 	class AdminUserStatusResource(Resource):
 		@api.doc('get_admin_user_status')
 		@require_auth
-		def get(self, user_id):
+		async def get(self, user_id):
 			"""Get user MFA status (admin view)"""
 			try:
-				tenant_id = request.args.get('tenant_id', 'default')
+				tenant_id = _resolve_current_tenant_id()
 				
 				status = await mfa_service.get_user_mfa_status(user_id, tenant_id)
 				return status

@@ -11,7 +11,8 @@ Website: www.datacraft.co.ke
 
 import logging
 import json
-from flask import request, jsonify, render_template, redirect, url_for, flash
+import os
+from flask import g, request, jsonify, render_template, redirect, url_for, flash, session
 from flask_appbuilder import ModelView, BaseView, expose, has_access
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.security.decorators import protect
@@ -23,6 +24,74 @@ from .models import (
 )
 from .service import MFAService
 from .integration import APGIntegrationRouter
+
+
+def _clean_text(value):
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source, name):
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _first_text(candidates, fallback):
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def _resolve_current_user_id() -> str:
+	current_user = (
+		_object_value(request, "current_user")
+		or _object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	return _first_text([
+		_object_value(current_user, "user_id"),
+		_object_value(current_user, "id"),
+		_object_value(current_user, "username"),
+		_object_value(request, "current_user_id"),
+		_object_value(g, "user_id"),
+		session.get("user_id"),
+		request.headers.get("X-User-ID"),
+		request.headers.get("X-APG-User-ID"),
+		request.args.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
+
+
+def _resolve_current_tenant_id() -> str:
+	current_user = (
+		_object_value(request, "current_user")
+		or _object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	current_tenant = _object_value(g, "current_tenant")
+	return _first_text([
+		_object_value(current_user, "tenant_id"),
+		_object_value(request, "current_tenant_id"),
+		_object_value(g, "tenant_id"),
+		_object_value(current_tenant, "tenant_id"),
+		current_tenant,
+		session.get("tenant_id"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], os.getenv("APG_DEFAULT_TENANT_ID", "default"))
 
 
 class MFAUserProfileView(ModelView):
@@ -185,9 +254,8 @@ class MFADashboardView(BaseView):
 	def dashboard(self):
 		"""Main MFA dashboard"""
 		try:
-			# Get current user context
-			user_id = request.current_user.id if hasattr(request, 'current_user') else 'demo_user'
-			tenant_id = getattr(request.current_user, 'tenant_id', 'demo_tenant') if hasattr(request, 'current_user') else 'demo_tenant'
+			user_id = _resolve_current_user_id()
+			tenant_id = _resolve_current_tenant_id()
 			
 			# Initialize MFA service (this would come from dependency injection in production)
 			# For now, we'll create a mock service
@@ -380,8 +448,8 @@ class MFAAPIView(BaseView):
 	def get_status(self):
 		"""Get MFA status for current user"""
 		try:
-			user_id = request.current_user.id if hasattr(request, 'current_user') else 'demo_user'
-			tenant_id = getattr(request.current_user, 'tenant_id', 'demo_tenant') if hasattr(request, 'current_user') else 'demo_tenant'
+			user_id = _resolve_current_user_id()
+			tenant_id = _resolve_current_tenant_id()
 			
 			# Mock status data
 			status = {
@@ -404,8 +472,8 @@ class MFAAPIView(BaseView):
 		"""Enroll new MFA method"""
 		try:
 			data = request.get_json()
-			user_id = request.current_user.id if hasattr(request, 'current_user') else 'demo_user'
-			tenant_id = getattr(request.current_user, 'tenant_id', 'demo_tenant') if hasattr(request, 'current_user') else 'demo_tenant'
+			user_id = _resolve_current_user_id()
+			tenant_id = _resolve_current_tenant_id()
 			
 			# Mock enrollment result
 			result = {
