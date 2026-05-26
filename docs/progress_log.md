@@ -2646,3 +2646,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_ckm_not_context_resolution.py tests/test_common_ntfy_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed
 - `rg -n "['\"]default_tenant['\"]|create_notification_service\('default_tenant'\)" capabilities/ckm/not capabilities/common/ntfy --glob '*.py' -g '!**/tests/**'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:50 EAT
+
+Completed checkpoint:
+
+- Added shared lightweight request-context tenant resolution for top-level capability blueprints.
+- Replaced hardcoded SCM and HCM dashboard `default_tenant` fallbacks with request, Flask context, header, query, and environment-aware resolution.
+- Replaced Intel crawler blueprint tenant query fallback from `default_tenant` to the same shared context helper.
+- Added focused regression coverage for tenant precedence and stale top-level blueprint fallback removal.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/request_context.py capabilities/scm/blueprint.py capabilities/hcm/blueprint.py capabilities/intel/crawler/blueprint.py tests/test_top_level_blueprint_tenant_context.py`
+- `.venv/bin/python -m pytest -q tests/test_top_level_blueprint_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return ['\"]default_tenant['\"]|request\\.args\\.get\\(['\"]tenant_id['\"], ['\"]default_tenant['\"]\\)|['\"]default_tenant['\"]" capabilities/scm/blueprint.py capabilities/hcm/blueprint.py capabilities/intel/crawler/blueprint.py capabilities/common/request_context.py` -> no matches
+- `git diff --check` -> no issues

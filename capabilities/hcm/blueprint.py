@@ -7,6 +7,7 @@ Main blueprint registration for Human Resources capability and all its sub-capab
 from flask import Blueprint
 from flask_appbuilder import AppBuilder
 from typing import List, Dict, Any
+from ..common.request_context import get_tenant_id_from_context
 
 # Import sub-capability blueprint registration functions
 from .employee_data_management.blueprint import init_subcapability as init_edm
@@ -153,8 +154,7 @@ def create_capability_dashboard(appbuilder: AppBuilder):
 		
 		def get_tenant_id(self) -> str:
 			"""Get current tenant ID"""
-			# TODO: Implement tenant resolution
-			return "default_tenant"
+			return get_tenant_id_from_context()
 	
 	# Register the dashboard view
 	appbuilder.add_view_no_menu(HumanResourcesDashboardView())

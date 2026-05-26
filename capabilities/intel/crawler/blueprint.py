@@ -29,6 +29,7 @@ from .models import (
 	CrawlTarget, ExtractedDataset, DataRecord, ValidationSession,
 	RAGChunk, GraphRAGNode, KnowledgeGraph, AnalyticsInsight
 )
+from ...common.request_context import get_tenant_id_from_context
 
 # =====================================================
 # BLUEPRINT SETUP
@@ -52,8 +53,7 @@ crawler_fab_bp = Blueprint(
 
 def get_tenant_id():
 	"""Get tenant ID from session or request"""
-	# In a real APG implementation, this would come from APG auth context
-	return request.args.get('tenant_id', 'default_tenant')
+	return get_tenant_id_from_context()
 
 def run_async(coro):
 	"""Run async coroutine in sync context"""

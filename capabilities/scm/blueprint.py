@@ -7,6 +7,7 @@ Main blueprint registration for Procurement & Purchasing capability and all its 
 from flask import Blueprint
 from flask_appbuilder import AppBuilder
 from typing import List, Dict, Any
+from ..common.request_context import get_tenant_id_from_context
 
 # Import sub-capability blueprint registration functions
 from .requisitioning.blueprint import init_subcapability as init_requisitioning
@@ -249,8 +250,7 @@ def create_capability_dashboard(appbuilder: AppBuilder):
 		
 		def get_tenant_id(self) -> str:
 			"""Get current tenant ID"""
-			# TODO: Implement tenant resolution
-			return "default_tenant"
+			return get_tenant_id_from_context()
 	
 	# Register the dashboard view
 	appbuilder.add_view_no_menu(ProcurementPurchasingDashboardView())
