@@ -1605,3 +1605,19 @@ Verification:
 - `.venv/bin/python -m py_compile cli.py tests/test_cli_capability_contracts.py`
 - `.venv/bin/python cli.py capabilities validate-contracts` -> `✓ Validated 101 capability contracts`
 - `git diff --check -- cli.py tests/test_cli_capability_contracts.py`
+
+### 2026-05-26 18:42 EAT
+
+Completed checkpoint:
+
+- Promoted the executable capability-contract registry to a public package API through `capabilities.__init__`.
+- Added public API coverage for loading the registry, retrieving a contract, rule evaluation, and system statistics.
+- Added `docs/capability_contracts.md` with the required contract shape, Python registry usage, CLI validation commands, wrapper template, and focused test commands.
+- Linked the new contract documentation from the docs index and root README.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_capability_contract_public_api.py capabilities/test_capability_contract_registry.py tests/test_cli_capability_contracts.py` -> 9 passed
+- `.venv/bin/python -m py_compile capabilities/__init__.py tests/test_capability_contract_public_api.py`
+- `.venv/bin/python cli.py capabilities validate-contracts` -> `✓ Validated 101 capability contracts`
+- `git diff --check -- capabilities/__init__.py tests/test_capability_contract_public_api.py docs/capability_contracts.md docs/README.md README.md`

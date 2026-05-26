@@ -83,6 +83,12 @@ twin ProductionLine {
 - Swarm intelligence and collective behavior
 - Multi-layer cognitive architectures
 
+### 🧩 **Executable Capability Contracts**
+- 100+ capability contracts discoverable through a platform registry
+- Per-capability configuration schemas, deterministic rules, UI manifests, and theme tokens
+- CLI validation with `python cli.py capabilities validate-contracts`
+- JSON contract listing with `python cli.py capabilities contracts --json`
+
 ### 🕵️ **Intelligence & Analytics**
 - OSINT and intelligence gathering systems
 - Complex business calculations and reporting

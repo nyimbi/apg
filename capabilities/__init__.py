@@ -88,6 +88,14 @@ import importlib
 import pkgutil
 from pathlib import Path
 
+from .capability_contract_registry import (
+	discover_contract_paths,
+	evaluate_rules as evaluate_capability_contract_rules,
+	get_contract as get_capability_contract,
+	load_contract_registry,
+	validate_contract_shape,
+)
+
 # Version information
 __version__ = "1.0.0"
 __author__ = "APG Development Team"
@@ -311,10 +319,12 @@ def validate_capability_combination(capabilities: List[str]) -> Dict[str, Any]:
 def get_system_statistics() -> Dict[str, Any]:
 	"""Get comprehensive system statistics"""
 	total_subcaps = sum(cap['subcapabilities'] for cap in AVAILABLE_CAPABILITIES.values())
+	contract_count = len(discover_contract_paths())
 	
 	return {
 		'capabilities': len(AVAILABLE_CAPABILITIES),
 		'subcapabilities': total_subcaps,
+		'executable_contracts': contract_count,
 		'industry_focus_areas': len(set(cap['industry_focus'] for cap in AVAILABLE_CAPABILITIES.values())),
 		'production_ready_capabilities': len([cap for cap in AVAILABLE_CAPABILITIES.values() 
 											 if cap['status'] == 'production']),
@@ -390,6 +400,8 @@ __all__ = [
 	
 	# Validation functions
 	'validate_capability_combination', 'get_system_statistics',
+	'discover_contract_paths', 'load_contract_registry', 'get_capability_contract',
+	'validate_contract_shape', 'evaluate_capability_contract_rules',
 	
 	# Composition functions
 	'get_composition_engine', 'load_capability',
