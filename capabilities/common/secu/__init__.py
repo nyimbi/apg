@@ -19,6 +19,7 @@ from pathlib import Path
 from uuid_extensions import uuid7str
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
 from contextlib import asynccontextmanager
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
 # Security Framework Enums
 class SecurityLevel(str, Enum):
@@ -370,6 +371,47 @@ APG_SECURITY_METADATA = {
 	"enterprise_features": True
 }
 
+def get_capability_info(tenant_id: str = "default", overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+	"""Return executable SECU capability metadata and contract details."""
+	contract = get_capability_contract(tenant_id, overrides)
+	return {
+		"metadata": APG_SECURITY_METADATA,
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"]
+	}
+
+def register_capability() -> Dict[str, Any]:
+	"""Register SECU with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "secu",
+		"display_name": "Security Framework",
+		"description": APG_SECURITY_METADATA["description"],
+		"version": APG_SECURITY_METADATA["version"],
+		"dependencies": APG_SECURITY_METADATA["dependencies"],
+		"provides": APG_SECURITY_METADATA["provides"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"secu:view",
+			"secu:view_risk",
+			"secu:view_threats",
+			"secu:view_compliance",
+			"secu:manage_policies",
+			"secu:admin"
+		]
+	}
+
 # Export main interfaces
 __all__ = [
 	# Enums
@@ -392,5 +434,7 @@ __all__ = [
 	"initialize_apg_dependencies", "get_apg_dependencies",
 	
 	# Metadata
-	"APG_SECURITY_METADATA"
+	"APG_SECURITY_METADATA",
+	"get_capability_contract", "evaluate_capability_rules",
+	"get_capability_info", "register_capability"
 ]

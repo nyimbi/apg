@@ -361,3 +361,21 @@ Current broader AUTH execution findings:
 
 - AUTH contract discovery/registration now works without importing optional crypto runtime modules.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 08:08 EAT
+
+Completed checkpoint:
+
+- Made the SECU foundation capability executable as a first-class APG capability with tenant-scoped zero-trust, risk, threat-detection, compliance, UI, and theme configuration.
+- Added deterministic SECU security posture rules for malicious networks, compromised devices, critical risk scores, step-up challenges, and compliance evidence requirements.
+- Added focused SECU regression coverage for contract shape, rule evaluation, and registration/info payloads.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/secu/__init__.py capabilities/common/secu/capability_contract.py capabilities/common/secu/tests/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/secu/tests/test_capability_contract.py` -> 3 passed, 15 warnings
+
+Current broader SECU execution findings:
+
+- SECU contract discovery/registration now works without initializing the full security runtime.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
