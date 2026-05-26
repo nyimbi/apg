@@ -700,3 +700,26 @@ Current broader DLPD/ZTNA/COMP execution findings:
 - DLPD, ZTNA, and COMP are no longer placeholders at the composition layer.
 - Phase 5 now has uniform first-class registration/contract coverage across advanced authentication, biometric identity, federation, advanced security, and compliance.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:01 EAT
+
+Completed checkpoint:
+
+- Made NTFY import-light and executable as a first-class APG notifications capability with tenant-scoped channel, delivery, preference, governance, UI, and theme configuration.
+- Added deterministic NTFY rules for tenant context, recipient opt-in, template approval, sensitive-payload encryption, provider health, and large-batch review.
+- Promoted the placeholder CHAT package into a first-class APG chat/messaging capability with tenant-scoped room, messaging, moderation, governance, UI, and theme configuration.
+- Added deterministic CHAT rules for tenant context, room ownership, retention policy, external guest policy, restricted-content moderation, and large-room review.
+- Made COLB import-light and executable as a first-class APG collaboration capability with tenant-scoped workspace, session, protocol, governance, UI, and theme configuration.
+- Added deterministic COLB rules for tenant context, workspace ownership, external collaboration policy, secure transport, artifact policy, and large-workspace review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/ntfy/__init__.py capabilities/common/ntfy/capability_contract.py capabilities/common/ntfy/test_capability_contract.py capabilities/common/chat/__init__.py capabilities/common/chat/capability_contract.py capabilities/common/chat/test_capability_contract.py capabilities/common/colb/__init__.py capabilities/common/colb/capability_contract.py capabilities/common/colb/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/ntfy/test_capability_contract.py capabilities/common/chat/test_capability_contract.py capabilities/common/colb/test_capability_contract.py` -> 9 passed, 11 warnings
+
+Current broader NTFY/CHAT/COLB execution findings:
+
+- NTFY and COLB had substantial runtime code but package imports were not kept lightweight for composition-time discovery.
+- CHAT is no longer a placeholder package at the composition layer.
+- Phase 6 communication core now has uniform first-class registration/contract coverage.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
