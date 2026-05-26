@@ -8,6 +8,7 @@ from flask_appbuilder import ModelView, BaseView, expose, has_access
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 
 from .models import PPOPurchaseOrder, PPOPurchaseOrderLine, PPOReceipt, PPOReceiptLine, PPOThreeWayMatch, PPOChangeOrder
+from .context import get_tenant_id_from_request
 from .service import PurchaseOrderService
 
 
@@ -239,4 +240,4 @@ class PurchaseOrderDashboardView(BaseView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()

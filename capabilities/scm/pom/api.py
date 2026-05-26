@@ -11,6 +11,7 @@ from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.security.decorators import has_access_api
 
 from .models import PPOPurchaseOrder
+from .context import get_tenant_id_from_request
 from .service import PurchaseOrderService
 
 
@@ -53,7 +54,8 @@ class PurchaseOrderApi(BaseApi):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 
 
 def register_api_views(appbuilder: AppBuilder):

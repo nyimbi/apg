@@ -2405,3 +2405,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_ckm_not_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "'default_tenant'|\"default_tenant\"|'user_123'|\"user_123\"" capabilities/ckm/not/views.py capabilities/ckm/not/api.py capabilities/ckm/not/websocket.py capabilities/ckm/not/personalization/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:40 EAT
+
+Completed checkpoint:
+
+- Replaced Purchase Order Management API/view tenant defaults with shared request-context resolution.
+- POM dashboard service construction and purchase-order API service construction now resolve tenant identity from payload, Flask context/current user, `g.user`, APG headers, query args, request environment, and configured fallback.
+- Added focused regression coverage that rejects stale POM tenant placeholders and verifies tenant precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/scm/pom/context.py capabilities/scm/pom/views.py capabilities/scm/pom/api.py tests/test_scm_pom_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_scm_pom_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|default_tenant" capabilities/scm/pom/views.py capabilities/scm/pom/api.py` -> no matches
+- `git diff --check` -> no issues
