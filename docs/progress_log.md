@@ -2045,3 +2045,18 @@ Verification:
 - `.venv/bin/python -m py_compile capabilities/crm/ord/service.py tests/test_crm_order_audit_logging.py`
 - `.venv/bin/python -m pytest -q tests/test_crm_order_audit_logging.py` -> 1 passed
 - `rg -n "TODO: Implement audit logging|pass  # TODO: Implement audit logging" capabilities/crm/ord/service.py` -> no matches
+
+### 2026-05-26 21:53 EAT
+
+Completed checkpoint:
+
+- Replaced Stripe reporting placeholder analytics with deterministic calculations over Stripe payment, charge, customer, subscription, dispute, and risk snapshots.
+- Implemented chargeback/refund rates, CAC, CLV, retention, customer ranking/segmentation/adoption, subscription MRR/churn/growth/LTV/trial conversion/plan revenue, Radar-style risk analytics, fraud indicators, and custom metric dispatch.
+- Replaced placeholder Excel export bytes with a minimal valid XLSX workbook writer.
+- Added focused regression coverage with a fake Stripe module and deterministic Stripe-like objects.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fintech/gateway/stripe_reporting.py tests/test_stripe_reporting_metrics.py`
+- `.venv/bin/python -m pytest -q tests/test_stripe_reporting_metrics.py` -> 2 passed
+- `rg -n "Calculate chargeback rate - placeholder implementation|Calculate refund rate - placeholder implementation|Calculate customer acquisition cost - placeholder implementation|Calculate customer lifetime value - placeholder implementation|Calculate customer retention rate - placeholder implementation|Calculate custom metric - placeholder implementation|Format report data as Excel - placeholder implementation" capabilities/fintech/gateway/stripe_reporting.py` -> no matches

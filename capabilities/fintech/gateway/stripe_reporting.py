@@ -23,6 +23,8 @@ from enum import Enum
 import json
 import csv
 import io
+import zipfile
+from xml.sax.saxutils import escape as xml_escape
 
 import stripe
 from pydantic import BaseModel, Field, validator
@@ -860,7 +862,7 @@ class StripeReportingService:
         
         return output.getvalue()
     
-    # Placeholder methods for complex calculations that would require more data
+    # Derived calculations that combine Stripe resource snapshots
     
     async def _get_top_customers(self, payment_intents: List[stripe.PaymentIntent]) -> List[Dict[str, Any]]:
         """Get top customers by revenue"""
@@ -920,27 +922,134 @@ class StripeReportingService:
         
         return float((current - previous) / previous)
     
-    # Additional placeholder methods that would be implemented with real business logic
+    # Additional metric helpers
+
+    def _attr(self, value: Any, name: str, default: Any = None) -> Any:
+        """Read an attribute from either a Stripe object or dict."""
+        if value is None:
+            return default
+        if isinstance(value, dict):
+            return value.get(name, default)
+        return getattr(value, name, default)
+
+    def _nested_attr(self, value: Any, path: str, default: Any = None) -> Any:
+        """Read a dotted attribute path from mixed Stripe objects and dicts."""
+        current = value
+        for part in path.split("."):
+            current = self._attr(current, part, None)
+            if current is None:
+                return default
+        return current
+
+    def _amount_to_decimal(self, amount: Any) -> Decimal:
+        """Convert Stripe minor-unit amounts to major-unit Decimal values."""
+        if amount is None:
+            return Decimal("0")
+        return Decimal(str(amount)) / Decimal("100")
+
+    def _payment_revenue(self, payment_intent: stripe.PaymentIntent) -> Decimal:
+        if self._attr(payment_intent, "status") != "succeeded":
+            return Decimal("0")
+        return self._amount_to_decimal(self._attr(payment_intent, "amount", 0))
+
+    def _charge_revenue(self, charge: stripe.Charge) -> Decimal:
+        if self._attr(charge, "status") != "succeeded":
+            return Decimal("0")
+        return self._amount_to_decimal(self._attr(charge, "amount", 0))
+
+    def _subscription_monthly_amount(self, subscription: stripe.Subscription) -> Decimal:
+        """Calculate normalized monthly recurring revenue for a subscription."""
+        items = self._nested_attr(subscription, "items.data", []) or []
+        total = Decimal("0")
+        for item in items:
+            price = self._attr(item, "price", {})
+            recurring = self._attr(price, "recurring", {}) or {}
+            interval = self._attr(recurring, "interval", "month")
+            interval_count = int(self._attr(recurring, "interval_count", 1) or 1)
+            unit_amount = self._attr(price, "unit_amount", None)
+            if unit_amount is None:
+                unit_amount = self._attr(price, "unit_amount_decimal", 0)
+            quantity = int(self._attr(item, "quantity", 1) or 1)
+            amount = self._amount_to_decimal(unit_amount) * quantity
+            if interval == "year":
+                amount = amount / Decimal(max(interval_count * 12, 1))
+            elif interval == "week":
+                amount = amount * Decimal("52") / Decimal(max(interval_count * 12, 1))
+            elif interval == "day":
+                amount = amount * Decimal("365") / Decimal(max(interval_count * 12, 1))
+            elif interval == "month" and interval_count > 1:
+                amount = amount / Decimal(interval_count)
+            total += amount
+        return total
     
     async def _calculate_chargeback_rate(self, filters: ReportFilter) -> float:
-        """Calculate chargeback rate - placeholder implementation"""
-        return 0.01  # 1% placeholder
+        """Calculate chargeback rate as disputes per successful charge."""
+        charges, disputes = await asyncio.gather(
+            self._get_charges_data(filters),
+            self._get_disputes_data(filters),
+        )
+        successful_charges = [charge for charge in charges if self._attr(charge, "status") == "succeeded"]
+        return len(disputes) / len(successful_charges) if successful_charges else 0.0
     
     async def _calculate_refund_rate(self, filters: ReportFilter) -> float:
-        """Calculate refund rate - placeholder implementation"""
-        return 0.02  # 2% placeholder
+        """Calculate refund rate as refunded amount divided by successful charge amount."""
+        charges = await self._get_charges_data(filters)
+        successful_charges = [charge for charge in charges if self._attr(charge, "status") == "succeeded"]
+        charged_amount = sum((self._attr(charge, "amount", 0) or 0) for charge in successful_charges)
+        refunded_amount = sum((self._attr(charge, "amount_refunded", 0) or 0) for charge in successful_charges)
+        return refunded_amount / charged_amount if charged_amount else 0.0
     
     async def _calculate_customer_acquisition_cost(self, filters: ReportFilter) -> Decimal:
-        """Calculate customer acquisition cost - placeholder implementation"""
-        return Decimal("25.00")  # $25 placeholder
+        """Calculate customer acquisition cost from configured acquisition spend."""
+        customers = await self._get_customers_data(filters)
+        if not customers:
+            return Decimal("0")
+        metadata = filters.metadata if filters and filters.metadata else {}
+        spend_value = (
+            metadata.get("acquisition_spend")
+            or metadata.get("marketing_spend")
+            or self.config.get("acquisition_spend")
+            or self.config.get("marketing_spend")
+            or 0
+        )
+        acquisition_spend = Decimal(str(spend_value))
+        return acquisition_spend / Decimal(len(customers)) if acquisition_spend else Decimal("0")
     
     async def _calculate_customer_lifetime_value(self, filters: ReportFilter) -> Decimal:
-        """Calculate customer lifetime value - placeholder implementation"""
-        return Decimal("500.00")  # $500 placeholder
+        """Calculate observed customer lifetime value from successful payments."""
+        payment_intents = await self._get_payment_intents_data(filters)
+        customer_revenue: Dict[str, Decimal] = {}
+        for payment_intent in payment_intents:
+            customer_id = self._attr(payment_intent, "customer")
+            revenue = self._payment_revenue(payment_intent)
+            if customer_id and revenue:
+                customer_revenue[customer_id] = customer_revenue.get(customer_id, Decimal("0")) + revenue
+        if not customer_revenue:
+            return Decimal("0")
+        return sum(customer_revenue.values(), Decimal("0")) / Decimal(len(customer_revenue))
     
     async def _calculate_retention_rate(self, filters: ReportFilter, period: ReportPeriod) -> float:
-        """Calculate customer retention rate - placeholder implementation"""
-        return 0.85  # 85% placeholder
+        """Calculate retained paying customers across current and previous periods."""
+        if not filters.start_date or not filters.end_date:
+            filters.start_date, filters.end_date = self._get_period_dates(period)
+        previous_filters = self._get_previous_period_filters(filters, period)
+        current_payments, previous_payments = await asyncio.gather(
+            self._get_payment_intents_data(filters),
+            self._get_payment_intents_data(previous_filters),
+        )
+        current_customers = {
+            self._attr(payment, "customer")
+            for payment in current_payments
+            if self._payment_revenue(payment) > 0 and self._attr(payment, "customer")
+        }
+        previous_customers = {
+            self._attr(payment, "customer")
+            for payment in previous_payments
+            if self._payment_revenue(payment) > 0 and self._attr(payment, "customer")
+        }
+        if not previous_customers:
+            return 1.0 if current_customers else 0.0
+        return len(current_customers & previous_customers) / len(previous_customers)
     
     def _map_customers_to_payments(
         self,
@@ -959,60 +1068,220 @@ class StripeReportingService:
         
         return customer_payments
     
-    # Additional methods would be implemented here for complete functionality
-    # These are simplified implementations for demonstration purposes
-    
     async def _get_top_customers_by_revenue(self, customer_payment_map) -> List[Dict[str, Any]]:
-        return []  # Placeholder
+        """Return customers ranked by successful payment revenue."""
+        ranked = []
+        for customer_id, payments in customer_payment_map.items():
+            revenue = sum((self._payment_revenue(payment) for payment in payments), Decimal("0"))
+            transaction_count = len([payment for payment in payments if self._payment_revenue(payment) > 0])
+            if revenue:
+                ranked.append({
+                    "customer_id": customer_id,
+                    "revenue": float(revenue),
+                    "transaction_count": transaction_count,
+                })
+        return sorted(ranked, key=lambda item: item["revenue"], reverse=True)[:10]
     
     def _segment_customers(self, customer_payment_map) -> Dict[str, int]:
-        return {"high_value": 0, "medium_value": 0, "low_value": 0}  # Placeholder
+        """Segment customers by observed successful payment revenue."""
+        segments = {"high_value": 0, "medium_value": 0, "low_value": 0, "inactive": 0}
+        high_threshold = Decimal(str(self.config.get("high_value_customer_threshold", "1000")))
+        medium_threshold = Decimal(str(self.config.get("medium_value_customer_threshold", "100")))
+        for payments in customer_payment_map.values():
+            revenue = sum((self._payment_revenue(payment) for payment in payments), Decimal("0"))
+            if revenue >= high_threshold:
+                segments["high_value"] += 1
+            elif revenue >= medium_threshold:
+                segments["medium_value"] += 1
+            elif revenue > 0:
+                segments["low_value"] += 1
+            else:
+                segments["inactive"] += 1
+        return segments
     
     async def _calculate_payment_method_adoption(self, customers) -> Dict[str, float]:
-        return {"card": 0.8, "bank_transfer": 0.2}  # Placeholder
+        """Calculate customer default payment method adoption ratios."""
+        method_counts: Dict[str, int] = {}
+        for customer in customers:
+            method_type = self._nested_attr(customer, "invoice_settings.default_payment_method.type")
+            if not method_type:
+                method_type = self._attr(self._attr(customer, "metadata", {}) or {}, "default_payment_method_type")
+            if not method_type:
+                source = self._attr(customer, "default_source")
+                method_type = self._attr(source, "object", None) if source else "unknown"
+            method_counts[method_type or "unknown"] = method_counts.get(method_type or "unknown", 0) + 1
+        total = sum(method_counts.values())
+        return {method: count / total for method, count in method_counts.items()} if total else {}
     
     async def _calculate_mrr(self, subscriptions) -> Decimal:
-        return Decimal("10000.00")  # Placeholder
+        """Calculate monthly recurring revenue from active subscriptions."""
+        return sum(
+            (
+                self._subscription_monthly_amount(subscription)
+                for subscription in subscriptions
+                if self._attr(subscription, "status") in {"active", "trialing", "past_due"}
+            ),
+            Decimal("0"),
+        )
     
     async def _calculate_subscription_churn_rate(self, filters, period) -> float:
-        return 0.05  # Placeholder
+        """Calculate current-period subscription churn rate."""
+        subscriptions = await self._get_subscriptions_data(filters)
+        if not subscriptions:
+            return 0.0
+        canceled = [subscription for subscription in subscriptions if self._attr(subscription, "status") == "canceled"]
+        return len(canceled) / len(subscriptions)
     
     async def _calculate_subscription_growth_rate(self, filters, period) -> float:
-        return 0.10  # Placeholder
+        """Calculate active subscription growth against the previous period."""
+        if filters and (not filters.start_date or not filters.end_date):
+            filters.start_date, filters.end_date = self._get_period_dates(period)
+        previous_filters = self._get_previous_period_filters(filters, period) if filters else None
+        current_subscriptions, previous_subscriptions = await asyncio.gather(
+            self._get_subscriptions_data(filters),
+            self._get_subscriptions_data(previous_filters),
+        )
+        current_active = len([s for s in current_subscriptions if self._attr(s, "status") == "active"])
+        previous_active = len([s for s in previous_subscriptions if self._attr(s, "status") == "active"])
+        if previous_active == 0:
+            return 1.0 if current_active > 0 else 0.0
+        return (current_active - previous_active) / previous_active
     
     async def _calculate_subscription_ltv(self, subscriptions) -> Decimal:
-        return Decimal("1200.00")  # Placeholder
+        """Calculate observed average subscription lifetime value."""
+        if not subscriptions:
+            return Decimal("0")
+        lifetime_values = []
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        for subscription in subscriptions:
+            created = int(self._attr(subscription, "created", now_ts) or now_ts)
+            ended = int(self._attr(subscription, "ended_at", 0) or now_ts)
+            active_months = max(Decimal(ended - created) / Decimal(30 * 24 * 60 * 60), Decimal("1"))
+            lifetime_values.append(self._subscription_monthly_amount(subscription) * active_months)
+        return sum(lifetime_values, Decimal("0")) / Decimal(len(lifetime_values))
     
     async def _calculate_trial_conversion_rate(self, filters) -> float:
-        return 0.25  # Placeholder
+        """Calculate the ratio of trial subscriptions that became active."""
+        subscriptions = await self._get_subscriptions_data(filters)
+        trialed = [
+            subscription for subscription in subscriptions
+            if self._attr(subscription, "trial_start") or self._attr(subscription, "trial_end")
+        ]
+        if not trialed:
+            return 0.0
+        converted = [subscription for subscription in trialed if self._attr(subscription, "status") == "active"]
+        return len(converted) / len(trialed)
     
     async def _get_subscription_changes(self, filters) -> Dict[str, int]:
-        return {"upgrades": 50, "downgrades": 20}  # Placeholder
+        """Infer subscription upgrades and downgrades from metadata when available."""
+        subscriptions = await self._get_subscriptions_data(filters)
+        changes = {"upgrades": 0, "downgrades": 0}
+        for subscription in subscriptions:
+            metadata = self._attr(subscription, "metadata", {}) or {}
+            change_type = self._attr(metadata, "change_type")
+            if change_type in changes:
+                changes[change_type] += 1
+        return changes
     
     async def _calculate_revenue_by_plan(self, subscriptions) -> Dict[str, Decimal]:
-        return {"basic": Decimal("5000"), "premium": Decimal("15000")}  # Placeholder
+        """Calculate MRR grouped by Stripe price/product plan."""
+        revenue_by_plan: Dict[str, Decimal] = {}
+        for subscription in subscriptions:
+            if self._attr(subscription, "status") not in {"active", "trialing", "past_due"}:
+                continue
+            for item in self._nested_attr(subscription, "items.data", []) or []:
+                price = self._attr(item, "price", {})
+                plan = (
+                    self._attr(price, "nickname")
+                    or self._attr(price, "lookup_key")
+                    or self._attr(price, "id")
+                    or "unknown"
+                )
+                item_subscription = type("SubscriptionShim", (), {"items": {"data": [item]}})()
+                revenue_by_plan[plan] = revenue_by_plan.get(plan, Decimal("0")) + self._subscription_monthly_amount(item_subscription)
+        return revenue_by_plan
     
     async def _get_radar_analytics(self, filters) -> Dict[str, Any]:
+        """Calculate Radar-style risk analytics from charge outcomes."""
+        charges = await self._get_charges_data(filters)
+        distribution = {"low": 0, "medium": 0, "high": 0}
+        blocked_transactions = 0
+        blocked_amount = 0
+        high_risk_transactions = 0
+        reviewed_transactions = 0
+        false_positives = 0
+        for charge in charges:
+            outcome = self._attr(charge, "outcome", {}) or {}
+            risk_score = int(self._attr(outcome, "risk_score", 0) or 0)
+            seller_message = (self._attr(outcome, "seller_message", "") or "").lower()
+            if risk_score >= 75:
+                distribution["high"] += 1
+                high_risk_transactions += 1
+            elif risk_score >= 40:
+                distribution["medium"] += 1
+            else:
+                distribution["low"] += 1
+            if self._attr(charge, "status") == "failed" or "blocked" in seller_message:
+                blocked_transactions += 1
+                blocked_amount += self._attr(charge, "amount", 0) or 0
+            if self._attr(outcome, "type"):
+                reviewed_transactions += 1
+                if risk_score >= 75 and self._attr(charge, "status") == "succeeded":
+                    false_positives += 1
+        total = len(charges)
         return {
-            "accuracy": 0.95,
-            "blocked_transactions": 100,
-            "blocked_amount": 50000,
-            "false_positive_rate": 0.02,
-            "high_risk_transactions": 25,
-            "risk_score_distribution": {"low": 80, "medium": 15, "high": 5}
-        }  # Placeholder
+            "accuracy": 1.0 - (false_positives / reviewed_transactions) if reviewed_transactions else 0.0,
+            "blocked_transactions": blocked_transactions,
+            "blocked_amount": blocked_amount,
+            "false_positive_rate": false_positives / reviewed_transactions if reviewed_transactions else 0.0,
+            "high_risk_transactions": high_risk_transactions,
+            "risk_score_distribution": distribution,
+            "reviewed_transactions": reviewed_transactions,
+            "coverage": reviewed_transactions / total if total else 0.0,
+        }
     
     async def _get_top_fraud_indicators(self, disputes) -> List[Dict[str, Any]]:
+        """Return dispute reasons ranked as fraud indicators."""
+        counts: Dict[str, int] = {}
+        for dispute in disputes:
+            reason = self._attr(dispute, "reason", None) or self._attr(dispute, "status", None) or "unknown"
+            counts[reason] = counts.get(reason, 0) + 1
         return [
-            {"indicator": "high_risk_country", "count": 25},
-            {"indicator": "velocity_check_failed", "count": 15}
-        ]  # Placeholder
+            {"indicator": indicator, "count": count}
+            for indicator, count in sorted(counts.items(), key=lambda item: item[1], reverse=True)[:10]
+        ]
     
     async def _calculate_custom_metric(self, metric, period, filters) -> Dict[str, Any]:
-        """Calculate custom metric - placeholder implementation"""
+        """Calculate supported custom metrics from live report data."""
+        metric_name = str(metric).lower()
+        payment_intents = await self._get_payment_intents_data(filters)
+        successful_payments = [payment for payment in payment_intents if self._payment_revenue(payment) > 0]
+        total_revenue = sum((self._payment_revenue(payment) for payment in successful_payments), Decimal("0"))
+        value: Union[int, float, Decimal]
+        metric_type = MetricType.COUNT
+        if metric_name in {"revenue", "total_revenue"}:
+            value = total_revenue
+            metric_type = MetricType.REVENUE
+        elif metric_name in {"transactions", "transaction_count", "count"}:
+            value = len(payment_intents)
+            metric_type = MetricType.COUNT
+        elif metric_name in {"successful_transactions", "successful_count"}:
+            value = len(successful_payments)
+            metric_type = MetricType.COUNT
+        elif metric_name in {"average_transaction_value", "atv"}:
+            value = total_revenue / Decimal(len(successful_payments)) if successful_payments else Decimal("0")
+            metric_type = MetricType.AVERAGE
+        elif metric_name == "chargeback_rate":
+            value = await self._calculate_chargeback_rate(filters)
+            metric_type = MetricType.PERCENTAGE
+        elif metric_name == "refund_rate":
+            value = await self._calculate_refund_rate(filters)
+            metric_type = MetricType.PERCENTAGE
+        else:
+            raise ValueError(f"Unsupported custom metric: {metric}")
         return {
-            "value": 100,
-            "type": "count",
+            "value": float(value) if isinstance(value, Decimal) else value,
+            "type": metric_type.value,
             "period": period.value,
             "calculated_at": datetime.utcnow().isoformat()
         }
@@ -1038,8 +1307,75 @@ class StripeReportingService:
         return "metric,value\n" + "\n".join([f"{k},{v}" for k, v in report_data["metrics"].items()])
     
     def _format_as_excel(self, report_data: Dict[str, Any]) -> bytes:
-        """Format report data as Excel - placeholder implementation"""
-        return b"Excel data placeholder"
+        """Format report data as a minimal XLSX workbook."""
+        rows = [["metric", "value", "type", "period"]]
+        for metric_name, metric_value in report_data.get("metrics", {}).items():
+            if isinstance(metric_value, dict):
+                rows.append([
+                    metric_name,
+                    metric_value.get("value"),
+                    metric_value.get("type"),
+                    metric_value.get("period", report_data.get("period")),
+                ])
+            else:
+                rows.append([metric_name, metric_value, None, report_data.get("period")])
+
+        def cell_ref(row_index: int, column_index: int) -> str:
+            return f"{chr(ord('A') + column_index)}{row_index}"
+
+        sheet_rows = []
+        for row_index, row in enumerate(rows, start=1):
+            cells = []
+            for column_index, value in enumerate(row):
+                text = "" if value is None else str(value)
+                cells.append(
+                    f'<c r="{cell_ref(row_index, column_index)}" t="inlineStr">'
+                    f'<is><t>{xml_escape(text)}</t></is></c>'
+                )
+            sheet_rows.append(f'<row r="{row_index}">{"".join(cells)}</row>')
+
+        worksheet = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            f'<sheetData>{"".join(sheet_rows)}</sheetData>'
+            '</worksheet>'
+        )
+        workbook = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            '<sheets><sheet name="Report" sheetId="1" r:id="rId1"/></sheets>'
+            '</workbook>'
+        )
+        content_types = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            '</Types>'
+        )
+        root_rels = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            '</Relationships>'
+        )
+        workbook_rels = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+            '</Relationships>'
+        )
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as workbook_zip:
+            workbook_zip.writestr("[Content_Types].xml", content_types)
+            workbook_zip.writestr("_rels/.rels", root_rels)
+            workbook_zip.writestr("xl/workbook.xml", workbook)
+            workbook_zip.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
+            workbook_zip.writestr("xl/worksheets/sheet1.xml", worksheet)
+        return output.getvalue()
 
 
 async def create_stripe_reporting_service(
