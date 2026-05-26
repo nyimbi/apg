@@ -29,6 +29,7 @@ from .api_models import (
 )
 from .service import NotificationService, create_notification_service
 from .channel_manager import UniversalChannelManager
+from .context import get_tenant_id_from_context
 
 
 # Configure logging
@@ -127,8 +128,7 @@ def require_auth(f):
 
 def get_current_tenant() -> str:
 	"""Get current tenant ID from request context"""
-	# Would extract from JWT token or headers
-	return request.headers.get('X-Tenant-ID', 'default_tenant')
+	return get_tenant_id_from_context()
 
 
 # ========== Model Definitions for OpenAPI ==========

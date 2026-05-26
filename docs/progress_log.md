@@ -2389,3 +2389,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_ntfy_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "'default_tenant'|\"default_tenant\"|default_tenant" capabilities/common/ntfy/views.py capabilities/common/ntfy/api.py capabilities/common/ntfy/blueprint.py capabilities/common/ntfy/websocket.py capabilities/common/ntfy/personalization/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:38 EAT
+
+Completed checkpoint:
+
+- Replaced CKM Notification tenant defaults across FAB views, REST tenant lookup, WebSocket tenant extraction, and personalization auth/service construction with shared request-context helpers.
+- CKM notification and personalization API surfaces now resolve tenant/user identity from payload/auth data, Flask context/current user, `g.user`, APG headers, query args, request environment, and configured fallbacks.
+- CKM WebSocket monitoring, collaboration, and analytics namespaces now join tenant rooms and stamp actor identity from authenticated payload/context instead of hardcoded tenant/user placeholders.
+- Added focused regression coverage that rejects stale CKM notification tenant/user placeholders in the touched surfaces and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/ckm/not/context.py capabilities/ckm/not/views.py capabilities/ckm/not/api.py capabilities/ckm/not/websocket.py capabilities/ckm/not/personalization/api.py tests/test_ckm_not_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_ckm_not_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "'default_tenant'|\"default_tenant\"|'user_123'|\"user_123\"" capabilities/ckm/not/views.py capabilities/ckm/not/api.py capabilities/ckm/not/websocket.py capabilities/ckm/not/personalization/api.py` -> no matches
+- `git diff --check` -> no issues

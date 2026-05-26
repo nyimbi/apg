@@ -27,6 +27,7 @@ from .api_models import (
 	DeliveryChannel, NotificationPriority, EngagementEvent,
 	ComprehensiveDelivery, AdvancedCampaign
 )
+from .context import get_current_user_id, get_tenant_id_from_context
 
 
 # Configure logging
@@ -521,8 +522,8 @@ class MonitoringNamespace(Namespace):
 			# user_id = token_data.get('user_id')
 			
 			# Mock authentication for demo
-			tenant_id = auth.get('tenant_id', 'default_tenant')
-			user_id = auth.get('user_id', 'user_123')
+			tenant_id = get_tenant_id_from_context(auth)
+			user_id = get_current_user_id(auth)
 			
 			# Join tenant room
 			join_room(f"tenant_{tenant_id}")
@@ -571,8 +572,8 @@ class CollaborationNamespace(Namespace):
 		"""Handle collaboration connection"""
 		try:
 			# Validate and extract user info
-			tenant_id = auth.get('tenant_id', 'default_tenant')
-			user_id = auth.get('user_id', 'user_123')
+			tenant_id = get_tenant_id_from_context(auth)
+			user_id = get_current_user_id(auth)
 			
 			_log.info(f"Client connected to collaboration: user {user_id}, tenant {tenant_id}")
 			
@@ -591,8 +592,8 @@ class CollaborationNamespace(Namespace):
 		try:
 			resource_type = data.get('resource_type')  # 'campaign' or 'template'
 			resource_id = data.get('resource_id')
-			tenant_id = data.get('tenant_id', 'default_tenant')
-			user_id = data.get('user_id', 'user_123')
+			tenant_id = get_tenant_id_from_context(data)
+			user_id = get_current_user_id(data)
 			
 			# Start session
 			if self.manager:
@@ -619,7 +620,7 @@ class CollaborationNamespace(Namespace):
 		"""Handle content changes"""
 		try:
 			session_id = data.get('session_id')
-			user_id = data.get('user_id', 'user_123')
+			user_id = get_current_user_id(data)
 			changes = data.get('changes', {})
 			
 			if self.manager:
@@ -638,7 +639,7 @@ class CollaborationNamespace(Namespace):
 		try:
 			resource_id = data.get('resource_id')
 			resource_type = data.get('resource_type')
-			user_id = data.get('user_id', 'user_123')
+			user_id = get_current_user_id(data)
 			position = data.get('position', {})
 			
 			# Broadcast cursor position to other users in room
@@ -662,8 +663,8 @@ class AnalyticsNamespace(Namespace):
 	def on_connect(self, auth):
 		"""Handle analytics connection"""
 		try:
-			tenant_id = auth.get('tenant_id', 'default_tenant')
-			user_id = auth.get('user_id', 'user_123')
+			tenant_id = get_tenant_id_from_context(auth)
+			user_id = get_current_user_id(auth)
 			
 			# Join analytics room
 			join_room(f"analytics_{tenant_id}")
@@ -682,7 +683,7 @@ class AnalyticsNamespace(Namespace):
 	def on_subscribe_metrics(self, data):
 		"""Subscribe to real-time metrics"""
 		metric_types = data.get('metrics', [])
-		tenant_id = data.get('tenant_id', 'default_tenant')
+		tenant_id = get_tenant_id_from_context(data)
 		
 		for metric_type in metric_types:
 			join_room(f"metrics_{tenant_id}_{metric_type}")
