@@ -1531,7 +1531,7 @@ Verification:
 - `.venv/bin/python -m py_compile examples/complete_demo.py scripts/capability_generation/create_advanced_ai_capabilities.py scripts/capability_generation/create_business_intelligence_capabilities.py scripts/capability_generation/create_cloud_capabilities.py scripts/capability_generation/create_community_system.py scripts/capability_generation/create_iot_capabilities.py scripts/capability_generation/create_performance_capabilities.py scripts/capability_generation/create_security_capabilities.py scripts/template_generation/create_template_structure.py scripts/template_generation/setup_composable_templates.py scripts/migrations/migration_to_v2.py`
 - `git diff --check`
 
-### 2026-05-26 18:20 EAT
+### 2026-05-26 18:16 EAT
 
 Completed checkpoint:
 
@@ -1546,3 +1546,17 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_ai_agent_composition.py` -> 3 passed
 - `.venv/bin/python -m py_compile compiler/ai_agent_composition.py compiler/ast_builder.py compiler/code_generator.py tests/test_ai_agent_composition.py`
 - `git diff --check -- compiler/ai_agent_composition.py compiler/ast_builder.py compiler/code_generator.py tmp/apg.g4 tests/test_ai_agent_composition.py`
+
+### 2026-05-26 18:18 EAT
+
+Completed checkpoint:
+
+- Added a common capability-contract regression covering all discovered `capabilities/common/*/capability_contract.py` modules.
+- Locked the requirement that common capabilities expose specific configuration, configuration schema, deterministic rule engine, UI routes requiring theme support, and theme tokens.
+- Kept the test outside individual heavyweight capability test directories so it can run as a focused, battery-friendly contract check.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q capabilities/common/test_capability_contracts.py` -> 1 passed, 10 warnings
+- `.venv/bin/python -m py_compile capabilities/common/test_capability_contracts.py`
+- `git diff --check -- capabilities/common/test_capability_contracts.py docs/progress_log.md`
