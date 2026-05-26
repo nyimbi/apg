@@ -2867,3 +2867,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_mfau_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n "demo_user|demo_tenant|Kafka|kafka" capabilities/common/mfau/api.py capabilities/common/mfau/views.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:46 EAT
+
+Completed checkpoint:
+
+- Replaced MTen's fixed APG token user fallback with FastAPI request-state, header, query, and environment user resolution.
+- Replaced CRM ADV's mock user/tenant auth dependency with FastAPI request-state, APG header, query, and environment context resolution.
+- Added focused MTen/CRM auth context regression coverage while preserving the Bytewax-native streaming guard.
+- Confirmed repo-wide Kafka references are limited to historical progress-log notes and the repository hygiene guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mten/api.py capabilities/crm/adv/api.py tests/test_mten_crm_auth_context.py`
+- `.venv/bin/python -m pytest -q tests/test_mten_crm_auth_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "return \"user-123\"|For now, return mock user|For now, return mock user ID|mock_user_001|mock_tenant_001|TODO: Implement proper JWT token validation|Kafka|kafka" capabilities/common/mten/api.py capabilities/crm/adv/api.py` -> no matches
+- `rg -n -i "\bkafka\b" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!**/__pycache__/**'` -> only `docs/progress_log.md` and `tests/test_repository_hygiene.py`
+- `git diff --check` -> no issues

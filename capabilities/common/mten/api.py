@@ -9,9 +9,10 @@ FastAPI REST endpoints for multi-tenant management with APG authentication integ
 following CLAUDE.md standards: async throughout, modern typing.
 """
 
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, Request
 from fastapi.responses import JSONResponse
 
 from .models import Tenant, TenantStatus, TenantTier
@@ -24,6 +25,47 @@ from .views import (
 	TenantTierUpgradeRequest, TenantSuspensionRequest,
 	MultiTenantStatsResponse, HealthCheckResponse
 )
+
+
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def resolve_apg_user_id(request: Request) -> str:
+	"""Resolve APG user identity from request state, headers, query, or environment."""
+	state = getattr(request, "state", None)
+	current_user = (
+		getattr(state, "current_user", None)
+		or getattr(state, "user", None)
+		or getattr(state, "auth_user", None)
+	)
+	if isinstance(current_user, dict):
+		state_user_id = current_user.get("user_id") or current_user.get("id") or current_user.get("username")
+	else:
+		state_user_id = (
+			getattr(current_user, "user_id", None)
+			or getattr(current_user, "id", None)
+			or getattr(current_user, "username", None)
+		)
+	return _first_text([
+		state_user_id,
+		getattr(state, "user_id", None),
+		request.headers.get("X-User-ID"),
+		request.headers.get("X-APG-User-ID"),
+		request.query_params.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
 
 
 class MultiTenantAPI:
@@ -40,11 +82,13 @@ class MultiTenantAPI:
 		self.service_manager = service_manager
 		self._register_routes()
 	
-	def _verify_apg_token(self, token: str = Depends(lambda: "mock-token")) -> str:
+	def _verify_apg_token(
+		self,
+		request: Request,
+		token: str = Depends(lambda: "mock-token")
+	) -> str:
 		"""Verify APG authentication token and return user ID"""
-		# Would integrate with APG auth_rbac capability
-		# For now, return mock user ID
-		return "user-123"
+		return resolve_apg_user_id(request)
 	
 	def _register_routes(self) -> None:
 		"""Register all API routes"""

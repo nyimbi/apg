@@ -12,11 +12,12 @@ Email: nyimbi@gmail.com
 
 import asyncio
 import logging
+import os
 from datetime import datetime, date
 from typing import Dict, List, Any, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Query, Path, Body, status
+from fastapi import FastAPI, HTTPException, Depends, Query, Path, Body, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -200,17 +201,89 @@ async def get_crm_service() -> CRMService:
 	return _service_instance
 
 
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def _split_roles(value: Any) -> List[str]:
+	if value is None:
+		return []
+	if isinstance(value, (list, tuple, set)):
+		return [text for item in value if (text := _clean_text(item))]
+	return [text for item in str(value).replace(" ", "").split(",") if (text := _clean_text(item))]
+
+
 async def get_current_user(
+	request: Request,
 	credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> Dict[str, Any]:
-	"""Get current authenticated user"""
-	# TODO: Implement proper JWT token validation with APG auth system
-	# For now, return mock user
+	"""Resolve authenticated APG user context from request state, headers, query, or environment."""
+	state = getattr(request, "state", None)
+	state_user = (
+		_object_value(state, "current_user")
+		or _object_value(state, "user")
+		or _object_value(state, "auth_user")
+	)
+	headers = request.headers
+	query = request.query_params
+
+	user_id = _first_text([
+		_object_value(state_user, "user_id"),
+		_object_value(state_user, "id"),
+		_object_value(state_user, "username"),
+		_object_value(state, "user_id"),
+		headers.get("X-User-ID"),
+		headers.get("X-APG-User-ID"),
+		query.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
+	tenant_id = _first_text([
+		_object_value(state_user, "tenant_id"),
+		_object_value(state, "tenant_id"),
+		headers.get("X-Tenant-ID"),
+		headers.get("X-APG-Tenant-ID"),
+		headers.get("X-Organization-ID"),
+		query.get("tenant_id"),
+		query.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], os.getenv("APG_DEFAULT_TENANT_ID", "default"))
+	roles = (
+		_split_roles(_object_value(state_user, "roles"))
+		or _split_roles(_object_value(state, "roles"))
+		or _split_roles(headers.get("X-APG-Roles"))
+		or _split_roles(os.getenv("APG_DEFAULT_ROLES"))
+		or ["crm_user"]
+	)
+
 	return {
-		"user_id": "mock_user_001",
-		"tenant_id": "mock_tenant_001",
-		"username": "api_user",
-		"roles": ["crm_user"]
+		"user_id": user_id,
+		"tenant_id": tenant_id,
+		"username": _first_text([
+			_object_value(state_user, "username"),
+			headers.get("X-APG-Username"),
+			query.get("username"),
+		], user_id),
+		"roles": roles,
+		"token_scheme": credentials.scheme,
 	}
 
 
