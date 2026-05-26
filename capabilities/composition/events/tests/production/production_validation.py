@@ -16,10 +16,13 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
 from pathlib import Path
-import aiohttp
 import ssl
-import psutil
 import subprocess
+
+import pytest
+
+aiohttp = pytest.importorskip("aiohttp")
+psutil = pytest.importorskip("psutil")
 
 from .load_tests import LoadTestExecutor, LoadTestConfig
 from .security_audit import SecurityAuditor

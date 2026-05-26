@@ -16,14 +16,21 @@ from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import aiohttp
-import websockets
-from bytewax import BytewaxProducer, BytewaxConsumer
-from bytewax.errors import BytewaxError
-import redis
-import psutil
-import numpy as np
 from uuid_extensions import uuid7str
+
+import pytest
+
+aiohttp = pytest.importorskip("aiohttp")
+websockets = pytest.importorskip("websockets")
+bytewax = pytest.importorskip("bytewax")
+bytewax_errors = pytest.importorskip("bytewax.errors")
+redis = pytest.importorskip("redis")
+psutil = pytest.importorskip("psutil")
+np = pytest.importorskip("numpy")
+
+BytewaxProducer = bytewax.BytewaxProducer
+BytewaxConsumer = bytewax.BytewaxConsumer
+BytewaxError = bytewax_errors.BytewaxError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

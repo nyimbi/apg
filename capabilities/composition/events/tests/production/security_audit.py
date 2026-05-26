@@ -8,7 +8,6 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 import asyncio
-import aiohttp
 import ssl
 import socket
 import json
@@ -23,6 +22,10 @@ import hmac
 from urllib.parse import urljoin, urlparse
 import subprocess
 import os
+
+import pytest
+
+aiohttp = pytest.importorskip("aiohttp")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -313,6 +316,7 @@ class SecurityAuditor:
 		]
 		
 		# Test SQL injection in query parameters
+		sql_vulnerable = False
 		for payload in sql_payloads:
 			try:
 				params = {'limit': payload, 'offset': payload}
@@ -329,12 +333,14 @@ class SecurityAuditor:
 								affected_endpoint="/api/v1/events",
 								evidence=f"Payload: {payload}"
 							))
+							sql_vulnerable = True
 							break
-				else:
-					self._add_passed_check("SQL injection protection")
 			
 			except Exception as e:
 				logger.debug(f"SQL injection test error: {e}")
+
+		if not sql_vulnerable:
+			self._add_passed_check("SQL injection protection")
 		
 		# Test XSS in event data
 		xss_event = {

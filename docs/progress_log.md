@@ -1833,3 +1833,17 @@ Verification:
 - `.venv/bin/python -m py_compile capabilities/composition/events/service.py capabilities/composition/events/models.py capabilities/composition/events/tests/conftest.py`
 - `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py` -> 80 passed
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed
+
+### 2026-05-26 20:47 EAT
+
+Completed checkpoint:
+
+- Restored package boundaries for Event Streaming integration, performance, and production test folders so relative imports resolve under pytest.
+- Made production validation helpers parse in lightweight local environments by skipping cleanly when optional runtime-only dependencies are absent.
+- Fixed a syntax/indentation defect in the production security audit SQL-injection check that prevented parsing.
+
+Verification:
+
+- `.venv/bin/python -m pytest --collect-only -q capabilities/composition/events/tests/integration/test_event_flow.py capabilities/composition/events/tests/integration/test_enterprise_features.py capabilities/composition/events/tests/performance/test_throughput.py` -> 30 tests collected
+- `.venv/bin/python -m py_compile capabilities/composition/events/tests/integration/__init__.py capabilities/composition/events/tests/performance/__init__.py capabilities/composition/events/tests/production/__init__.py capabilities/composition/events/tests/production/production_validation.py capabilities/composition/events/tests/production/load_tests.py capabilities/composition/events/tests/production/disaster_recovery_tests.py capabilities/composition/events/tests/production/security_audit.py`
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed

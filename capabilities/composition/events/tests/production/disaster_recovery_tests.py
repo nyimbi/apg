@@ -18,13 +18,22 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
 from pathlib import Path
-import aiohttp
-import asyncpg
-import redis
-from bytewax import BytewaxProducer, BytewaxConsumer, BytewaxAdminClient
-from bytewax.admin import BytewaxStreamDefinition
-import kubernetes
-from kubernetes import client, config
+
+import pytest
+
+aiohttp = pytest.importorskip("aiohttp")
+asyncpg = pytest.importorskip("asyncpg")
+redis = pytest.importorskip("redis")
+bytewax = pytest.importorskip("bytewax")
+bytewax_admin = pytest.importorskip("bytewax.admin")
+kubernetes = pytest.importorskip("kubernetes")
+
+BytewaxProducer = bytewax.BytewaxProducer
+BytewaxConsumer = bytewax.BytewaxConsumer
+BytewaxAdminClient = bytewax.BytewaxAdminClient
+BytewaxStreamDefinition = bytewax_admin.BytewaxStreamDefinition
+client = kubernetes.client
+config = kubernetes.config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
