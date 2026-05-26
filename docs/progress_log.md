@@ -1130,3 +1130,24 @@ Current broader CONN ML insights findings:
 - ML insights UI/API routes now have an executable local analysis path instead of hardcoded demo results.
 - The view-level job registry is intentionally in-process; durable/background execution still needs APG shared job/event storage before cross-process analysis status is guaranteed.
 - Remaining warnings during focused pytest are pre-existing adjacent deprecation warnings plus a pandas dtype-selection warning in the underlying ML profiling code.
+
+### 2026-05-26 16:29 EAT
+
+Completed checkpoint:
+
+- Fixed CONN data-quality views so they import the actual SQLAlchemy connection model instead of missing aliases from the Pydantic model module.
+- Replaced connection quality stats, quality-level distribution, top issue lists, trend chart data, distribution chart data, and connection detail metrics with values derived from `global_data_quality_monitor.quality_history`.
+- Updated connection assessment to use embedded `sample_records`/`sample_data` from connection metadata/config when available, otherwise deterministic connection-derived assessment records.
+- Annotated assessment metrics with connection id/name so dashboard and detail views can trace monitor history back to the assessed connection.
+- Added focused data-quality view runtime tests for monitor-history summaries, issue aggregation, embedded sample extraction, and connection detail metrics.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/data_quality_views.py capabilities/common/conn/tests/test_data_quality_views_runtime.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_data_quality_views_runtime.py` -> 3 passed, 10 warnings
+
+Current broader CONN data-quality findings:
+
+- Data-quality dashboard and chart surfaces now reflect executable monitor history instead of static demo numbers.
+- Connection-level assessment still executes in-process; durable historical reporting depends on replacing the monitor history backing store with APG shared persistence.
+- Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities.
