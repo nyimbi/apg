@@ -1151,3 +1151,24 @@ Current broader CONN data-quality findings:
 - Data-quality dashboard and chart surfaces now reflect executable monitor history instead of static demo numbers.
 - Connection-level assessment still executes in-process; durable historical reporting depends on replacing the monitor history backing store with APG shared persistence.
 - Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities.
+
+### 2026-05-26 16:36 EAT
+
+Completed checkpoint:
+
+- Replaced CONN notification WebSocket and Socket.IO token-validation TODOs with executable validation against APG security sessions, JWTs, and API keys.
+- Added normalized bearer-token handling, constant-time identity claim checks, and a typed notification authentication result that carries user, tenant, session, and auth-source metadata.
+- Updated WebSocket authentication to reject invalid credentials with a security notification instead of silently accepting caller-supplied identity fields.
+- Updated Socket.IO authentication to emit an explicit `authentication_failed` event and only persist identity after security validation succeeds.
+- Added focused notification authentication tests covering valid JWT identity, tenant-claim mismatch rejection, valid WebSocket authentication, and invalid WebSocket authentication.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/notifications.py capabilities/common/conn/tests/test_notifications_authentication.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_notifications_authentication.py` -> 4 passed, 16 warnings
+
+Current broader CONN notification findings:
+
+- Real-time notification clients now have an executable APG security boundary instead of trusting client-supplied user and tenant IDs.
+- WebSocket authentication supports the existing APG security primitives without adding dependencies or network calls.
+- Remaining warnings during focused pytest are pre-existing adjacent deprecation warnings plus the current development JWT secret-length warning.

@@ -19,6 +19,7 @@ from functools import wraps
 import weakref
 from collections import defaultdict, deque
 import time
+import secrets
 
 # WebSocket and async imports
 try:
@@ -40,12 +41,13 @@ except ImportError:
 # Flask-SocketIO for Flask integration
 try:
     from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
+    from flask import request
     FLASK_SOCKETIO_AVAILABLE = True
 except ImportError:
     FLASK_SOCKETIO_AVAILABLE = False
 
 from .error_handling import APGError, ErrorContext
-from .security import SecurityContext, require_authentication
+from .security import AuthenticationError, SecurityContext, auth_manager, require_authentication
 from .monitoring import global_metrics_collector
 
 logger = logging.getLogger(__name__)
@@ -135,6 +137,174 @@ class WebSocketClient:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class NotificationAuthResult:
+    """Validated notification client identity."""
+    user_id: str
+    tenant_id: str
+    session_id: Optional[str] = None
+    source: str = "unknown"
+    context: Optional[SecurityContext] = None
+
+
+def _normalize_auth_token(token: Optional[str]) -> Optional[str]:
+    """Normalize raw auth tokens from WebSocket payloads."""
+    if token is None:
+        return None
+
+    normalized = str(token).strip()
+    if not normalized:
+        return None
+
+    if normalized.lower().startswith("bearer "):
+        normalized = normalized[7:].strip()
+
+    return normalized or None
+
+
+def _constant_time_match(expected: Optional[str], actual: Optional[str]) -> bool:
+    """Match optional identity claims without leaking string comparison timing."""
+    if expected is None or expected == "":
+        return True
+    if actual is None or actual == "":
+        return False
+    return secrets.compare_digest(str(expected), str(actual))
+
+
+def _result_from_context(
+    context: SecurityContext,
+    source: str,
+    user_id: Optional[str],
+    tenant_id: Optional[str]
+) -> NotificationAuthResult:
+    if not _constant_time_match(user_id, context.user.user_id):
+        raise AuthenticationError(
+            message="Notification user does not match authenticated principal",
+            context=ErrorContext(
+                tenant_id=context.tenant_id,
+                user_id=context.user.user_id,
+                operation="validate_notification_authentication"
+            )
+        )
+
+    if not _constant_time_match(tenant_id, context.tenant_id):
+        raise AuthenticationError(
+            message="Notification tenant does not match authenticated principal",
+            context=ErrorContext(
+                tenant_id=context.tenant_id,
+                user_id=context.user.user_id,
+                operation="validate_notification_authentication"
+            )
+        )
+
+    return NotificationAuthResult(
+        user_id=context.user.user_id,
+        tenant_id=context.tenant_id,
+        session_id=context.session_id,
+        source=source,
+        context=context
+    )
+
+
+def _result_from_jwt_payload(
+    payload: Dict[str, Any],
+    user_id: Optional[str],
+    tenant_id: Optional[str],
+    session_id: Optional[str]
+) -> NotificationAuthResult:
+    payload_user_id = str(payload.get("user_id") or "")
+    payload_tenant_id = str(payload.get("tenant_id") or "")
+
+    if not payload_user_id or not payload_tenant_id:
+        raise AuthenticationError(
+            message="Notification token is missing required identity claims",
+            context=ErrorContext(
+                tenant_id=payload_tenant_id or "unknown",
+                user_id=payload_user_id or None,
+                operation="validate_notification_authentication"
+            )
+        )
+
+    if not _constant_time_match(user_id, payload_user_id):
+        raise AuthenticationError(
+            message="Notification user does not match JWT principal",
+            context=ErrorContext(
+                tenant_id=payload_tenant_id,
+                user_id=payload_user_id,
+                operation="validate_notification_authentication"
+            )
+        )
+
+    if not _constant_time_match(tenant_id, payload_tenant_id):
+        raise AuthenticationError(
+            message="Notification tenant does not match JWT principal",
+            context=ErrorContext(
+                tenant_id=payload_tenant_id,
+                user_id=payload_user_id,
+                operation="validate_notification_authentication"
+            )
+        )
+
+    return NotificationAuthResult(
+        user_id=payload_user_id,
+        tenant_id=payload_tenant_id,
+        session_id=session_id,
+        source="jwt"
+    )
+
+
+def validate_notification_authentication(
+    token: Optional[str],
+    user_id: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    authentication_manager=auth_manager
+) -> NotificationAuthResult:
+    """Validate notification client credentials against APG security state."""
+    normalized_token = _normalize_auth_token(token)
+
+    if session_id:
+        context = authentication_manager.validate_session(str(session_id))
+        if context:
+            return _result_from_context(context, "session", user_id, tenant_id)
+
+    if not normalized_token:
+        raise AuthenticationError(
+            message="Notification authentication requires a token or valid session",
+            context=ErrorContext(
+                tenant_id=tenant_id or "unknown",
+                user_id=user_id,
+                operation="validate_notification_authentication"
+            )
+        )
+
+    token_context = authentication_manager.validate_session(normalized_token)
+    if token_context:
+        return _result_from_context(token_context, "session_token", user_id, tenant_id)
+
+    jwt_error: Optional[AuthenticationError] = None
+    try:
+        payload = authentication_manager.validate_jwt_token(normalized_token)
+    except AuthenticationError as error:
+        jwt_error = error
+    else:
+        return _result_from_jwt_payload(payload, user_id, tenant_id, session_id)
+
+    try:
+        context = authentication_manager.authenticate_api_key(normalized_token)
+        return _result_from_context(context, "api_key", user_id, tenant_id)
+    except AuthenticationError as api_key_error:
+        raise AuthenticationError(
+            message="Invalid notification authentication token",
+            context=ErrorContext(
+                tenant_id=tenant_id or "unknown",
+                user_id=user_id,
+                operation="validate_notification_authentication"
+            ),
+            cause=jwt_error or api_key_error
+        )
+
+
 class NotificationFilter:
     """Filter for notification routing"""
 
@@ -173,9 +343,15 @@ class NotificationFilter:
 class WebSocketNotificationServer:
     """WebSocket server for real-time notifications"""
 
-    def __init__(self, host: str = "localhost", port: int = 8765):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 8765,
+        authentication_manager=auth_manager
+    ):
         self.host = host
         self.port = port
+        self.authentication_manager = authentication_manager
         self.clients: Dict[str, WebSocketClient] = {}
         self.subscriptions: Dict[str, Set[str]] = defaultdict(set)  # channel -> client_ids
         self.message_history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=100))
@@ -302,21 +478,38 @@ class WebSocketNotificationServer:
         tenant_id = data.get('tenant_id')
         session_id = data.get('session_id')
 
-        # TODO: Validate token with security manager
-        # For now, accept any authentication data
+        try:
+            auth_result = validate_notification_authentication(
+                token=token,
+                user_id=user_id,
+                tenant_id=tenant_id,
+                session_id=session_id,
+                authentication_manager=self.authentication_manager
+            )
+        except AuthenticationError:
+            await self.send_to_client(connection_id, NotificationMessage(
+                type=NotificationType.SECURITY_EVENT,
+                title="Authentication Failed",
+                message="Invalid notification credentials",
+                priority=NotificationPriority.HIGH,
+                tags=['authentication', 'failed']
+            ))
+            logger.warning(f"Client {connection_id} failed notification authentication")
+            return
 
-        client.user_id = user_id
-        client.tenant_id = tenant_id
-        client.session_id = session_id
+        client.user_id = auth_result.user_id
+        client.tenant_id = auth_result.tenant_id
+        client.session_id = auth_result.session_id
+        client.metadata['auth_source'] = auth_result.source
 
         await self.send_to_client(connection_id, NotificationMessage(
             type=NotificationType.USER_ACTION,
             title="Authenticated",
-            message=f"Successfully authenticated as {user_id}",
+            message=f"Successfully authenticated as {auth_result.user_id}",
             priority=NotificationPriority.LOW
         ))
 
-        logger.info(f"Client {connection_id} authenticated as {user_id}")
+        logger.info(f"Client {connection_id} authenticated as {auth_result.user_id}")
 
     async def _subscribe_client(self, connection_id: str, data: Dict[str, Any]):
         """Subscribe client to channels"""
@@ -553,9 +746,10 @@ class WebSocketNotificationServer:
 class FlaskSocketIONotificationServer:
     """Flask-SocketIO integration for notifications"""
 
-    def __init__(self, app=None):
+    def __init__(self, app=None, authentication_manager=auth_manager):
         self.app = app
         self.socketio = None
+        self.authentication_manager = authentication_manager
         self.clients: Dict[str, Dict[str, Any]] = {}
         self.subscriptions: Dict[str, Set[str]] = defaultdict(set)
 
@@ -626,15 +820,31 @@ class FlaskSocketIONotificationServer:
             tenant_id = data.get('tenant_id')
             token = data.get('token')
 
-            # TODO: Validate token
+            try:
+                auth_result = validate_notification_authentication(
+                    token=token,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    session_id=data.get('session_id'),
+                    authentication_manager=self.authentication_manager
+                )
+            except AuthenticationError:
+                emit('authentication_failed', {
+                    'message': 'Invalid notification credentials',
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                })
+                logger.warning(f"Socket.IO client {session_id} failed notification authentication")
+                return
 
             if session_id in self.clients:
-                self.clients[session_id]['user_id'] = user_id
-                self.clients[session_id]['tenant_id'] = tenant_id
+                self.clients[session_id]['user_id'] = auth_result.user_id
+                self.clients[session_id]['tenant_id'] = auth_result.tenant_id
+                self.clients[session_id]['auth_source'] = auth_result.source
+                self.clients[session_id]['security_session_id'] = auth_result.session_id
 
                 emit('authenticated', {
-                    'user_id': user_id,
-                    'tenant_id': tenant_id,
+                    'user_id': auth_result.user_id,
+                    'tenant_id': auth_result.tenant_id,
                     'timestamp': datetime.now(timezone.utc).isoformat()
                 })
 
