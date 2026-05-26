@@ -1,4 +1,4 @@
-"""Tenant resolution regression tests for Financial Cost Accounting API."""
+"""Tenant resolution regression tests for Financial Cost Accounting surfaces."""
 
 from __future__ import annotations
 
@@ -8,11 +8,14 @@ from typing import Any, Dict, List, Optional
 from flask import Flask, g, has_request_context, request
 
 
-API_PATH = Path(__file__).resolve().parents[1] / "capabilities" / "fin" / "cos" / "api.py"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+API_PATH = REPO_ROOT / "capabilities" / "fin" / "cos" / "api.py"
+VIEWS_PATH = REPO_ROOT / "capabilities" / "fin" / "cos" / "views.py"
+TENANT_PATH = REPO_ROOT / "capabilities" / "fin" / "cos" / "tenant.py"
 
 
 def _tenant_helpers() -> dict[str, Any]:
-	source = API_PATH.read_text(encoding="utf-8")
+	source = TENANT_PATH.read_text(encoding="utf-8")
 	start = source.index("def _clean_tenant_id")
 	namespace: dict[str, Any] = {
 		"Any": Any,
@@ -24,21 +27,27 @@ def _tenant_helpers() -> dict[str, Any]:
 		"os": __import__("os"),
 		"request": request,
 	}
-	exec(compile(source[start:], str(API_PATH), "exec"), namespace)
+	exec(compile(source[start:], str(TENANT_PATH), "exec"), namespace)
 	return namespace
 
 
-def test_fin_cos_api_uses_shared_tenant_resolver():
-	source = API_PATH.read_text(encoding="utf-8")
+def test_fin_cos_surfaces_use_shared_tenant_resolver():
+	api_source = API_PATH.read_text(encoding="utf-8")
+	views_source = VIEWS_PATH.read_text(encoding="utf-8")
 
 	for stale_lookup in (
 		"request.args.get('tenant_id', 'default_tenant')",
 		"request.json.get('tenant_id', 'default_tenant')",
 		"data.get('tenant_id', 'default_tenant')",
+		"CostAccountingService(tenant_id='default_tenant')",
 	):
-		assert stale_lookup not in source
+		assert stale_lookup not in api_source
+		assert stale_lookup not in views_source
 
-	assert source.count("get_tenant_id_from_request(") >= 9
+	assert "from .tenant import get_tenant_id_from_request" in api_source
+	assert "from .tenant import get_tenant_id_from_request" in views_source
+	assert api_source.count("get_tenant_id_from_request(") >= 9
+	assert views_source.count("get_tenant_id_from_request(") >= 11
 
 
 def test_tenant_resolver_prefers_payload_context_headers_and_query(monkeypatch):
@@ -54,6 +63,10 @@ def test_tenant_resolver_prefers_payload_context_headers_and_query(monkeypatch):
 	with app.test_request_context("/cost_centers?tenant_id=query-tenant", headers={"X-Tenant-ID": "header-tenant"}):
 		g.tenant_id = "context-tenant"
 		assert resolver({}) == "context-tenant"
+
+	with app.test_request_context("/cost_centers?tenant_id=query-tenant", headers={"X-Tenant-ID": "header-tenant"}):
+		g.current_user = type("User", (), {"tenant_id": "user-tenant"})()
+		assert resolver({}) == "user-tenant"
 
 	with app.test_request_context("/cost_centers?tenant_id=query-tenant", headers={"X-Tenant-ID": "header-tenant"}):
 		assert resolver({}) == "header-tenant"

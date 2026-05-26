@@ -2077,3 +2077,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native tests/test_fin_cos_tenant_resolution.py` -> 3 passed
 - `git grep -n -i -E "kafka|confluent|redpanda|bootstrap\.servers|bootstrap_servers|BYTEWAX_BROKERS|Bytewax broker|Bytewax brokers|broker connection string" -- ':!uploads' ':!tmp' ':!node_modules' ':!**/swagger-ui-bundle.js' ':!.venv' ':!.git' ':!docs/progress_log.md' ':!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check -- capabilities/fin/cos/api.py tests/test_fin_cos_tenant_resolution.py` -> no issues
+
+### 2026-05-26 22:01 EAT
+
+Completed checkpoint:
+
+- Promoted Financial Cost Accounting tenant resolution into a shared `tenant.py` helper instead of leaving API-only resolver logic.
+- Updated the Flask-AppBuilder cost accounting views to use the shared tenant resolver for hierarchy, allocation execution, job profitability/cost updates, variance reports, dashboard, ABC analysis, job summary, and cost-center performance.
+- Extended the tenant regression to cover both API and view surfaces so hardcoded `default_tenant` service construction cannot return silently.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/cos/api.py capabilities/fin/cos/views.py capabilities/fin/cos/tenant.py tests/test_fin_cos_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_cos_tenant_resolution.py` -> 2 passed
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native tests/test_fin_cos_tenant_resolution.py` -> 3 passed
+- `rg -n "CostAccountingService\(tenant_id='default_tenant'\)|TODO: Get from session|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|data\.get\('tenant_id', 'default_tenant'\)" capabilities/fin/cos/api.py capabilities/fin/cos/views.py capabilities/fin/cos/tenant.py` -> no matches
+- `git diff --check -- capabilities/fin/cos/api.py capabilities/fin/cos/views.py capabilities/fin/cos/tenant.py tests/test_fin_cos_tenant_resolution.py` -> no issues

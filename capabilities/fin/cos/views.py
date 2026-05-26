@@ -22,6 +22,7 @@ from .models import (
 	CFCAJobCost, CFCAStandardCost, CFCAVarianceAnalysis
 )
 from .service import CostAccountingService, CostAllocationRequest
+from .tenant import get_tenant_id_from_request
 from ...auth_rbac.models import db
 
 
@@ -73,7 +74,7 @@ class CACostCenterModelView(ModelView):
 	@has_access
 	def hierarchy(self):
 		"""Show cost center hierarchy"""
-		service = CostAccountingService(tenant_id='default_tenant')  # TODO: Get from session
+		service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 		hierarchy_data = service.get_cost_centers_hierarchy()
 		
 		return self.render_template(
@@ -237,7 +238,7 @@ class CACostAllocationModelView(ModelView):
 		period = request.form.get('period', datetime.now().strftime('%Y-%m'))
 		
 		try:
-			service = CostAccountingService(tenant_id='default_tenant')
+			service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 			request_obj = CostAllocationRequest(
 				source_center_id=allocation.source_center_id,
 				allocation_method=allocation.allocation_method,
@@ -496,7 +497,7 @@ class CAJobCostModelView(ModelView):
 	@has_access
 	def job_profitability(self, job_number):
 		"""Show job profitability analysis"""
-		service = CostAccountingService(tenant_id='default_tenant')
+		service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 		
 		try:
 			job_summary = service.get_job_cost_summary(job_number)
@@ -517,7 +518,7 @@ class CAJobCostModelView(ModelView):
 		"""Update job costs"""
 		if request.method == 'POST':
 			try:
-				service = CostAccountingService(tenant_id='default_tenant')
+				service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 				
 				# Parse cost updates from form
 				cost_updates = {}
@@ -616,7 +617,7 @@ class CAVarianceAnalysisView(BaseView):
 		"""Variance analysis dashboard"""
 		period = request.args.get('period', datetime.now().strftime('%Y-%m'))
 		
-		service = CostAccountingService(tenant_id='default_tenant')
+		service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 		variance_reports = service.get_variance_report(period)
 		
 		# Summary statistics
@@ -646,7 +647,7 @@ class CAVarianceAnalysisView(BaseView):
 		"""Perform new variance analysis"""
 		if request.method == 'POST':
 			try:
-				service = CostAccountingService(tenant_id='default_tenant')
+				service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 				
 				analysis_data = {
 					'standard_cost_id': request.form.get('standard_cost_id'),
@@ -705,7 +706,7 @@ class CAVarianceAnalysisView(BaseView):
 	@has_access
 	def period_report(self, period):
 		"""Generate variance report for specific period"""
-		service = CostAccountingService(tenant_id='default_tenant')
+		service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 		variance_reports = service.get_variance_report(period)
 		
 		return self.render_template(
@@ -727,7 +728,7 @@ class CADashboardView(BaseView):
 		"""Main cost accounting dashboard"""
 		period = request.args.get('period', datetime.now().strftime('%Y-%m'))
 		
-		service = CostAccountingService(tenant_id='default_tenant')
+		service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 		dashboard_data = service.generate_cost_dashboard_data(period)
 		
 		return self.render_template(
@@ -743,7 +744,7 @@ class CADashboardView(BaseView):
 		"""Activity-Based Costing analysis"""
 		period = request.args.get('period', datetime.now().strftime('%Y-%m'))
 		
-		service = CostAccountingService(tenant_id='default_tenant')
+		service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 		abc_data = service.get_abc_profitability_analysis(period)
 		
 		return self.render_template(
@@ -759,7 +760,7 @@ class CADashboardView(BaseView):
 		"""Job costing summary"""
 		status = request.args.get('status', 'Active')
 		
-		service = CostAccountingService(tenant_id='default_tenant')
+		service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 		jobs = service.get_jobs_by_status(status)
 		
 		return self.render_template(
@@ -775,7 +776,7 @@ class CADashboardView(BaseView):
 		"""Cost center performance analysis"""
 		period = request.args.get('period', datetime.now().strftime('%Y-%m'))
 		
-		service = CostAccountingService(tenant_id='default_tenant')
+		service = CostAccountingService(tenant_id=get_tenant_id_from_request())
 		performance_data = service.get_cost_center_performance(center_id, period)
 		
 		return self.render_template(
