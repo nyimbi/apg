@@ -542,3 +542,27 @@ Current broader IMEX execution findings:
 - IMEX contract discovery/registration now provides the executable configuration/rules/UI/theme surface used by the rest of the Phase 2 data and integration backbone.
 - Focused IMEX contract tests live outside the existing heavyweight runtime test folder.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 09:35 EAT
+
+Completed checkpoint:
+
+- Made the AICR AI infrastructure capability executable as a first-class APG capability with tenant-scoped services, inference, orchestration, governance, UI, and theme configuration.
+- Added deterministic AICR AI-governance rules for tenant context, service ownership, model policy attachment, high-risk workflow approval, service health routing, and large-context review.
+- Promoted the placeholder MLCM capability into a first-class APG capability with tenant-scoped model registry, promotion, evaluation, governance, UI, and theme configuration.
+- Added deterministic MLCM model-lifecycle rules for tenant context, model ownership, production promotion approval, model-card evidence, low evaluation score blocking, and drift review.
+- Promoted the placeholder FEDL capability into a first-class APG capability with tenant-scoped federation, privacy, training, governance, UI, and theme configuration.
+- Added deterministic FEDL federated-learning rules for tenant context, participant attestation, minimum participants, secure aggregation, privacy budget review, and poisoning-signal blocking.
+- Exposed AICR, MLCM, and FEDL contract helpers through package registration/info surfaces for lightweight composition-time discovery.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/aicr/__init__.py capabilities/common/aicr/capability_contract.py capabilities/common/aicr/test_capability_contract.py capabilities/common/mlcm/__init__.py capabilities/common/mlcm/capability_contract.py capabilities/common/mlcm/test_capability_contract.py capabilities/common/fedl/__init__.py capabilities/common/fedl/capability_contract.py capabilities/common/fedl/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/test_capability_contract.py capabilities/common/mlcm/test_capability_contract.py capabilities/common/fedl/test_capability_contract.py` -> 9 passed, 15 warnings
+
+Current broader AICR/MLCM/FEDL execution findings:
+
+- AICR contract discovery/registration now works without starting the AI runtime service stack.
+- MLCM and FEDL are no longer placeholder packages at the composition layer; both now advertise executable configuration/rules/UI/theme contracts.
+- Focused contract tests live outside existing heavyweight runtime test folders to keep this battery-constrained verification slice small.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

@@ -29,6 +29,10 @@ from .models import (
 	AIModelMetadata, AIInferenceRequest, AIInferenceResult,
 	AIWorkflow, AIAuditEvent, model_registry
 )
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
 
 
 def uuid7str() -> str:
@@ -804,6 +808,61 @@ async def register_with_apg() -> Dict[str, Any]:
 		}
 
 
+def register_capability() -> Dict[str, Any]:
+	"""Register AICR as a first-class APG composition capability."""
+	metadata = CapabilityMetadata()
+	contract = get_capability_contract()
+	return {
+		"name": metadata.id,
+		"aliases": ["ai_core", "ai_orchestration", "ai_infrastructure"],
+		"display_name": metadata.name,
+		"description": metadata.description,
+		"version": metadata.version,
+		"dependencies": metadata.dependencies,
+		"optional_dependencies": ["cach", "audl", "keym"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"ai_service_registry": "Register, discover, and govern tenant-scoped AI services",
+			"inference_engine": "Route governed inference work across registered AI providers",
+			"model_catalog": "Expose shared AI model metadata to downstream capabilities",
+			"workflow_orchestration": "Compose AI workflows with human approval and monitoring",
+			"capability_rules": "Evaluate deterministic AI infrastructure governance rules",
+			"visual_theming": "Apply AI control-console theme tokens and components"
+		},
+		"endpoints": {
+			"services": "/aicr/api/v1/services",
+			"inference": "/aicr/api/v1/inference",
+			"models": "/aicr/api/v1/models",
+			"workflows": "/aicr/api/v1/workflows",
+			"metrics": "/aicr/api/v1/metrics"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"aicr:view",
+			"aicr:manage_services",
+			"aicr:run_inference",
+			"aicr:view_models",
+			"aicr:manage_workflows",
+			"aicr:govern",
+			"aicr:view_metrics",
+			"aicr:admin"
+		]
+	}
+
+
+def get_capability_info() -> Dict[str, Any]:
+	"""Get AICR capability information for composition and marketplace discovery."""
+	metadata = CapabilityMetadata()
+	return metadata.model_dump(mode="json") | {"contract": get_capability_contract()}
+
+
 # Module exports for APG integration
 __version__ = "1.0.0"
 __capability_id__ = "aicr"
@@ -819,7 +878,8 @@ __all__ = [
 	"APGCapabilityProtocol",
 
 	# Registration functions
-	"get_capability", "register_with_apg",
+	"get_capability", "register_with_apg", "register_capability", "get_capability_info",
+	"get_capability_contract", "evaluate_capability_rules",
 
 	# Model registry from models module
 	"model_registry",
