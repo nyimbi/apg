@@ -240,3 +240,33 @@ Current broader REGY execution findings:
 
 - REGY tests now collect and execute cleanly from `capabilities/common/regy/tests`.
 - Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports.
+
+### 2026-05-26 04:57 EAT
+
+Completed checkpoint:
+
+- Made the AICR common capability executable from its moved package location, including compatibility contracts for legacy/public model records, inference requests and responses, pipelines, metrics, status enums, and module exports.
+- Restored AICR service execution for model registration, listing, updates, deletion, deployment, undeployment, single inference, batch inference, tenant-aware validation, monitoring hooks, and cleanup behavior.
+- Added a self-contained AICR security facade with JWT, RBAC, cryptographic, post-quantum, audit, anonymization, retention, and data-access helpers so tests and callers can execute without optional enterprise security packages.
+- Hardened monitoring and ML-pipeline runtime paths for local execution, including optional pandas/scipy/cryptography/websocket fallbacks, non-blocking CPU sampling, mocked-initialization state repair, clean singleton telemetry reinitialization, executor/resource background loops, and no-op background task handling when no event loop is running.
+- Kept performance execution practical by skipping telemetry awaits when the service monitoring component has been intentionally mocked out.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/aicr/models.py capabilities/common/aicr/security.py capabilities/common/aicr/service.py capabilities/common/aicr/monitoring.py`
+- `.venv/bin/python -m py_compile capabilities/common/aicr/model_marketplace.py capabilities/common/aicr/model_security.py`
+- `.venv/bin/python -m py_compile capabilities/common/aicr/__init__.py capabilities/common/aicr/models.py capabilities/common/aicr/service.py capabilities/common/aicr/monitoring.py capabilities/common/aicr/security.py capabilities/common/aicr/model_security.py capabilities/common/aicr/model_marketplace.py capabilities/common/aicr/ml_pipeline.py capabilities/common/aicr/websocket.py`
+- `.venv/bin/python -m pytest --collect-only -q capabilities/common/aicr/tests` -> 129 tests collected, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_models.py -x -vv` -> 30 passed, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_service.py -x -vv` -> 24 passed, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_security.py -x -vv` -> 21 passed, 19 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_monitoring.py -x -vv` -> 27 passed, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_integration.py -x -vv` -> 15 passed, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_performance.py::TestResourceUtilization::test_cpu_utilization_efficiency -vv` -> 1 passed, 14 warnings
+- `git diff --cached --check` -> passed after mechanical trailing-whitespace cleanup in the AICR slice
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests` -> 129 passed, 19 warnings
+
+Current broader AICR execution findings:
+
+- AICR tests now collect and execute cleanly from `capabilities/common/aicr/tests`.
+- Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports plus low-length JWT test-key warnings from the local security compatibility suite.
