@@ -2216,3 +2216,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_ecd_esg_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "str\(self\.appbuilder\.sm\.get_user\(\)\.id\)|return \"default_tenant\"|user session/profile" capabilities/ecd/esg/views.py` -> no matches
 - `git diff --check -- capabilities/ecd/esg/views.py capabilities/ecd/esg/context.py tests/test_ecd_esg_context_resolution.py` -> no issues
+
+### 2026-05-26 22:51 EAT
+
+Completed checkpoint:
+
+- Replaced Time Series Analytics tenant defaults and direct Flask-AppBuilder user lookups with shared request-context helpers.
+- TSA stream/model create hooks now resolve tenant IDs from payload, Flask context/current user, tenant headers, query args, request environment, and `APG_DEFAULT_TENANT_ID` fallback.
+- TSA anomaly actions now resolve user IDs from Flask context, APG user headers, request environment, and Flask-AppBuilder security fallback.
+- Added focused regression coverage that rejects stale TSA default/user lookup text and exercises tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/bia/tsa/context.py capabilities/bia/tsa/views.py tests/test_bia_tsa_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_bia_tsa_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|return str\(current_user\.id\)|from flask_appbuilder.security import current_user" capabilities/bia/tsa/views.py` -> no matches
+- `git diff --check` -> no issues

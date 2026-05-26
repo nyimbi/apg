@@ -21,6 +21,7 @@ from .models import (
 	TSDataStream, TSDataPoint, TSForecastModel, TSForecast,
 	TSAnomaly, TSAnalyticsJob
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 
 
 class TimeSeriesBaseView(BaseView):
@@ -32,12 +33,11 @@ class TimeSeriesBaseView(BaseView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID from security context"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def _format_duration(self, seconds: float) -> str:
 		"""Format duration for display"""
@@ -191,7 +191,7 @@ class TSDataStreamModelView(ModelView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class TSForecastModelModelView(ModelView):
@@ -352,7 +352,7 @@ class TSForecastModelModelView(ModelView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class TSForecastModelView(ModelView):
@@ -578,8 +578,7 @@ class TSAnomalyModelView(ModelView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 
 
 class TSAnalyticsJobModelView(ModelView):
