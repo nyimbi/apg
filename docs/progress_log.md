@@ -887,3 +887,24 @@ Current broader THEM/ACCS/WSBL/CONS execution findings:
 - THEM, ACCS, WSBL, and CONS are no longer placeholders at the composition layer.
 - Phase 10 UX/privacy work now has first-class registration/contract coverage for theming, accessibility, site building, and consent/privacy.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:44 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder AGNT package into the first-class APG AI Agent Composition capability.
+- Added tenant-scoped agent, team, runtime, memory, governance, UI, and theme configuration for AI agent composition.
+- Aligned AGNT runtime configuration with the existing provider-neutral agent integration registry for local, Codex, Claude Code, OpenCode, and Pi backends.
+- Added deterministic AGNT rules for tenant context, required agent models, registered runtimes, non-empty teams, resolved handoff endpoints, workspace sandbox policy, and external runtime review.
+- Added AGNT UI routes for agent registry, team builder, handoff graph, runtime manager, execution trace, memory policy, and settings.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/agnt/__init__.py capabilities/common/agnt/capability_contract.py capabilities/common/agnt/test_capability_contract.py agents/integrations.py compiler/ai_agent_composition.py`
+- `.venv/bin/python -m pytest -q capabilities/common/agnt/test_capability_contract.py tests/test_agent_integrations.py tests/test_ai_agent_composition.py` -> 9 passed, 10 warnings
+
+Current broader AGNT execution findings:
+
+- AI agent composition is now represented both in the compiler/runtime path and as a first-class APG capability package.
+- Fast-changing agent backends remain behind provider-neutral runtime adapter names instead of hardwired SDK-specific dependencies.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
