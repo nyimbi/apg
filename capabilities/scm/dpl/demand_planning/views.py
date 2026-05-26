@@ -18,7 +18,21 @@ from .models import (
 	SCDPForecast, SCDPForecastModel, SCDPDemandHistory, 
 	SCDPSeasonalPattern, SCDPForecastAccuracy
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import SCDemandPlanningService
+
+
+class SCDPBaseView(BaseView):
+	"""Shared context helpers for demand planning dashboards."""
+
+	def _get_tenant_id(self) -> str:
+		"""Get current tenant ID from request context."""
+		return get_tenant_id_from_request()
+
+	def _get_current_user(self) -> str:
+		"""Get current user from request or AppBuilder context."""
+		return get_current_user_id(self.appbuilder)
+
 
 class SCDPForecastModelView(ModelView):
 	"""View for managing demand forecasts"""
@@ -255,7 +269,7 @@ class SCDPSeasonalPatternModelView(ModelView):
 		'is_active': 'Active'
 	}
 
-class SCDPForecastAccuracyView(BaseView):
+class SCDPForecastAccuracyView(SCDPBaseView):
 	"""View for forecast accuracy analysis"""
 	
 	@expose('/')
@@ -299,7 +313,7 @@ class SCDPForecastAccuracyView(BaseView):
 			days_back=days_back
 		)
 
-class SCDPDashboardView(BaseView):
+class SCDPDashboardView(SCDPBaseView):
 	"""Main dashboard for demand planning"""
 	
 	@expose('/')
@@ -354,15 +368,6 @@ class SCDPDashboardView(BaseView):
 			models=models
 		)
 	
-	def _get_tenant_id(self) -> str:
-		"""Get current tenant ID from session"""
-		# Implementation depends on your multi-tenancy setup
-		return "default_tenant"
-	
-	def _get_current_user(self) -> str:
-		"""Get current user"""
-		return self.appbuilder.sm.user.username if self.appbuilder.sm.user else "system"
-
 # Chart views for analytics
 class SCDPForecastAccuracyChartView(GroupByChartView):
 	"""Chart view for forecast accuracy trends"""

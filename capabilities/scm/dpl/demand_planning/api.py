@@ -11,6 +11,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_restx import Api, Resource, fields, Namespace
 from marshmallow import Schema, fields as ma_fields, validate, ValidationError
 
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import SCDemandPlanningService
 from .models import ForecastCreate, DemandHistoryCreate, ForecastModelCreate
 
@@ -60,14 +61,13 @@ model_performance_model = api.model('ModelPerformance', {
 # Helper functions
 def get_service() -> SCDemandPlanningService:
 	"""Get demand planning service instance"""
-	# This would typically get the database session and tenant info from the request context
-	from flask_appbuilder import AppBuilder
 	appbuilder = current_app.appbuilder
+	payload = request.get_json(silent=True) if request.is_json else None
 	
 	return SCDemandPlanningService(
 		db_session=appbuilder.get_session,
-		tenant_id=request.headers.get('X-Tenant-ID', 'default'),
-		current_user=request.headers.get('X-User-ID', 'api_user')
+		tenant_id=get_tenant_id_from_request(payload),
+		current_user=get_current_user_id(appbuilder, payload)
 	)
 
 def handle_async_result(async_func):

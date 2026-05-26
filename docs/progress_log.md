@@ -2247,3 +2247,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_scm_src_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|TODO: Get tenant" capabilities/scm/src/views.py capabilities/scm/src/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:00 EAT
+
+Completed checkpoint:
+
+- Replaced Demand Planning dashboard/API tenant and user placeholders with shared request-context helpers.
+- DPL API service construction now resolves tenant and user from payload, Flask context/current user, `g.user`, APG headers, query args, request environment, AppBuilder security context, and configured fallbacks.
+- Added a shared DPL base view so both the dashboard and forecast accuracy view have executable tenant/user helpers instead of relying on a method that only existed on one class.
+- Added focused regression coverage that rejects stale DPL placeholder strings and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/scm/dpl/demand_planning/context.py capabilities/scm/dpl/demand_planning/views.py capabilities/scm/dpl/demand_planning/api.py tests/test_scm_dpl_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_scm_dpl_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|request\.headers\.get\('X-Tenant-ID', 'default'\)|request\.headers\.get\('X-User-ID', 'api_user'\)|Implementation depends on your multi-tenancy setup" capabilities/scm/dpl/demand_planning/views.py capabilities/scm/dpl/demand_planning/api.py` -> no matches
+- `git diff --check` -> no issues
