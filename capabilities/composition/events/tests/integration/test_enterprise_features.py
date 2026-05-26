@@ -171,20 +171,20 @@ class TestStreamProcessingIntegration:
 	"""Test stream processing functionality end-to-end."""
 	
 	@pytest.fixture
-	async def stream_service(self, test_database_session, test_kafka_admin, test_redis_client):
+	async def stream_service(self, test_database_session, test_bytewax_admin, test_redis_client):
 		"""Create stream management service with test dependencies."""
 		service = StreamManagementService()
 		service.db_session = test_database_session
-		service.kafka_admin = test_kafka_admin
+		service.bytewax_admin = test_bytewax_admin
 		service.redis_client = test_redis_client
 		return service
 	
 	@pytest.fixture
-	async def publishing_service(self, test_database_session, test_kafka_producer, test_redis_client):
+	async def publishing_service(self, test_database_session, test_bytewax_producer, test_redis_client):
 		"""Create event publishing service for test data."""
 		service = EventPublishingService()
 		service.db_session = test_database_session
-		service.kafka_producer = test_kafka_producer
+		service.bytewax_producer = test_bytewax_producer
 		service.redis_client = test_redis_client
 		return service
 	
@@ -675,7 +675,7 @@ class TestEnterpriseWorkflowIntegration:
 	"""Test complete enterprise workflow integrating all features."""
 	
 	@pytest.mark.asyncio
-	async def test_complete_enterprise_workflow(self, test_database_session, test_kafka_cluster, test_redis_client, test_tenant_id, test_user_id):
+	async def test_complete_enterprise_workflow(self, test_database_session, test_bytewax_cluster, test_redis_client, test_tenant_id, test_user_id):
 		"""Test complete enterprise event streaming workflow."""
 		
 		# Initialize all services

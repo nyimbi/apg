@@ -290,8 +290,8 @@ def mock_database_session():
 	return session
 
 @pytest.fixture
-def mock_kafka_producer():
-	"""Create mock Kafka producer."""
+def mock_bytewax_producer():
+	"""Create mock Bytewax producer."""
 	producer = Mock()
 	producer.send = AsyncMock()
 	producer.flush = AsyncMock()
@@ -299,8 +299,8 @@ def mock_kafka_producer():
 	return producer
 
 @pytest.fixture
-def mock_kafka_consumer():
-	"""Create mock Kafka consumer."""
+def mock_bytewax_consumer():
+	"""Create mock Bytewax consumer."""
 	consumer = Mock()
 	consumer.subscribe = AsyncMock()
 	consumer.unsubscribe = AsyncMock()
@@ -326,13 +326,13 @@ def mock_redis_client():
 # =============================================================================
 
 @pytest.fixture
-async def integration_event_streaming_service(mock_database_session, mock_kafka_producer, mock_redis_client):
+async def integration_event_streaming_service(mock_database_session, mock_bytewax_producer, mock_redis_client):
 	"""Create event streaming service for integration tests."""
 	service = EventStreamingService()
 	# In a real integration test, you'd inject actual dependencies
 	# For now, we'll use mocks to avoid external dependencies
 	service.db_session = mock_database_session
-	service.kafka_producer = mock_kafka_producer
+	service.bytewax_producer = mock_bytewax_producer
 	service.redis_client = mock_redis_client
 	return service
 

@@ -1475,3 +1475,22 @@ Verification:
 Current broader Bytewax migration findings:
 
 - Composition events runtime files are clean. Remaining Python references are composition events tests and generated orchestration templates/helpers.
+
+### 2026-05-26 17:50 EAT
+
+Completed checkpoint:
+
+- Migrated remaining Python test/helper/generated-template references from Kafka naming to Bytewax naming.
+- Updated composition events production/integration/unit test surfaces and generated orchestration helper/template Python files so no Python file presents Kafka as the stream runtime.
+- Verified repo-wide Python search for Kafka/client/bootstrap identifiers returns no matches.
+
+Verification:
+
+- `rg -l "Kafka|KAFKA|kafka|aiokafka|KafkaProducer|KafkaConsumer|AIOKafka|apache_kafka|bootstrap_servers|localhost:9092" --glob '*.py' --glob '!*.pyc' --glob '!.git/**' --glob '!uploads/**'` -> no matches
+- `.venv/bin/python -m py_compile capabilities/composition/events/tests/production/disaster_recovery_tests.py capabilities/composition/events/tests/production/load_tests.py capabilities/composition/events/tests/integration/test_event_flow.py capabilities/composition/events/tests/integration/test_enterprise_features.py capabilities/composition/events/tests/conftest.py capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py capabilities/composition/orchestration/verify_complete_integration.py capabilities/composition/orchestration/additional_templates.py`
+- `git diff --check -- capabilities/composition/events/tests/production/disaster_recovery_tests.py capabilities/composition/events/tests/production/load_tests.py capabilities/composition/events/tests/integration/test_event_flow.py capabilities/composition/events/tests/integration/test_enterprise_features.py capabilities/composition/events/tests/conftest.py capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py capabilities/composition/orchestration/verify_complete_integration.py capabilities/composition/orchestration/additional_templates.py`
+
+Current broader Bytewax migration findings:
+
+- Python runtime/test/template surfaces are clean of Kafka stream-runtime references.
+- Non-Python docs, examples, YAML, Helm, compose, and requirements still need a repository-wide text/config cleanup pass.

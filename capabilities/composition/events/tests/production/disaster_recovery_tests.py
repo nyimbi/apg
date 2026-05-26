@@ -21,8 +21,8 @@ from pathlib import Path
 import aiohttp
 import asyncpg
 import redis
-from kafka import KafkaProducer, KafkaConsumer, KafkaAdminClient
-from kafka.admin import NewTopic
+from bytewax import BytewaxProducer, BytewaxConsumer, BytewaxAdminClient
+from bytewax.admin import BytewaxStreamDefinition
 import kubernetes
 from kubernetes import client, config
 
@@ -65,7 +65,7 @@ class DisasterRecoveryTester:
 		self.base_url = config.get('api_url', 'http://localhost:8080')
 		self.database_url = config.get('database_url')
 		self.redis_url = config.get('redis_url', 'redis://localhost:6379/0')
-		self.kafka_servers = config.get('kafka_servers', 'localhost:9092')
+		self.bytewax_flow_id = config.get('bytewax_flow_id', 'apg-event-streaming')
 		self.k8s_namespace = config.get('k8s_namespace', 'apg-event-streaming-bus')
 		
 		self.session: Optional[aiohttp.ClientSession] = None
@@ -385,22 +385,22 @@ class DisasterRecoveryTester:
 				error_message=str(e)
 			)
 	
-	async def test_kafka_backup_recovery(self) -> RecoveryTestResult:
-		"""Test Kafka topic backup and recovery."""
-		logger.info("Testing Kafka backup and recovery...")
+	async def test_bytewax_backup_recovery(self) -> RecoveryTestResult:
+		"""Test Bytewax topic backup and recovery."""
+		logger.info("Testing Bytewax backup and recovery...")
 		
 		start_time = datetime.now(timezone.utc)
 		
 		try:
-			# Create Kafka admin client
-			admin_client = KafkaAdminClient(
-				bootstrap_servers=self.kafka_servers.split(','),
+			# Create Bytewax admin client
+			admin_client = BytewaxAdminClient(
+				flow_id=self.bytewax_flow_id.split(','),
 				client_id='dr_test_admin'
 			)
 			
 			# Create test topic
 			test_topic = "dr-test-topic"
-			topic_list = [NewTopic(name=test_topic, num_partitions=3, replication_factor=1)]
+			topic_list = [BytewaxStreamDefinition(name=test_topic, num_partitions=3, replication_factor=1)]
 			
 			try:
 				admin_client.create_topics(topic_list)
@@ -409,8 +409,8 @@ class DisasterRecoveryTester:
 				pass  # Topic might already exist
 			
 			# Produce test messages
-			producer = KafkaProducer(
-				bootstrap_servers=self.kafka_servers.split(','),
+			producer = BytewaxProducer(
+				flow_id=self.bytewax_flow_id.split(','),
 				value_serializer=lambda x: json.dumps(x).encode('utf-8')
 			)
 			
@@ -425,14 +425,14 @@ class DisasterRecoveryTester:
 				test_messages.append(message)
 			
 			producer.flush()
-			logger.info(f"Produced {len(test_messages)} test messages to Kafka")
+			logger.info(f"Produced {len(test_messages)} test messages to Bytewax")
 			
 			# Backup: Consume all messages to file
-			backup_file = f"{self.backup_location}/kafka_backup_{int(time.time())}.json"
+			backup_file = f"{self.backup_location}/bytewax_backup_{int(time.time())}.json"
 			
-			consumer = KafkaConsumer(
+			consumer = BytewaxConsumer(
 				test_topic,
-				bootstrap_servers=self.kafka_servers.split(','),
+				flow_id=self.bytewax_flow_id.split(','),
 				auto_offset_reset='earliest',
 				value_deserializer=lambda x: json.loads(x.decode('utf-8')),
 				consumer_timeout_ms=10000
@@ -447,7 +447,7 @@ class DisasterRecoveryTester:
 			with open(backup_file, 'w') as f:
 				json.dump(backed_up_messages, f)
 			
-			logger.info(f"Backed up {len(backed_up_messages)} messages from Kafka")
+			logger.info(f"Backed up {len(backed_up_messages)} messages from Bytewax")
 			
 			# Simulate data loss by deleting topic
 			admin_client.delete_topics([test_topic])
@@ -461,8 +461,8 @@ class DisasterRecoveryTester:
 			with open(backup_file, 'r') as f:
 				restore_messages = json.load(f)
 			
-			producer = KafkaProducer(
-				bootstrap_servers=self.kafka_servers.split(','),
+			producer = BytewaxProducer(
+				flow_id=self.bytewax_flow_id.split(','),
 				value_serializer=lambda x: json.dumps(x).encode('utf-8')
 			)
 			
@@ -475,9 +475,9 @@ class DisasterRecoveryTester:
 			recovery_time = (end_time - start_time).total_seconds()
 			
 			# Verify recovery
-			consumer = KafkaConsumer(
+			consumer = BytewaxConsumer(
 				test_topic,
-				bootstrap_servers=self.kafka_servers.split(','),
+				flow_id=self.bytewax_flow_id.split(','),
 				auto_offset_reset='earliest',
 				value_deserializer=lambda x: json.loads(x.decode('utf-8')),
 				consumer_timeout_ms=10000
@@ -493,7 +493,7 @@ class DisasterRecoveryTester:
 			data_loss = len(test_messages) - len(recovered_messages)
 			
 			return RecoveryTestResult(
-				test_name="kafka_backup_recovery",
+				test_name="bytewax_backup_recovery",
 				start_time=start_time,
 				end_time=end_time,
 				success=success,
@@ -510,7 +510,7 @@ class DisasterRecoveryTester:
 		except Exception as e:
 			end_time = datetime.now(timezone.utc)
 			return RecoveryTestResult(
-				test_name="kafka_backup_recovery",
+				test_name="bytewax_backup_recovery",
 				start_time=start_time,
 				end_time=end_time,
 				success=False,
@@ -647,7 +647,7 @@ class DisasterRecoveryTester:
 			# Backup all components
 			db_result = await self.test_database_backup_recovery()
 			redis_result = await self.test_redis_backup_recovery()
-			kafka_result = await self.test_kafka_backup_recovery()
+			bytewax_result = await self.test_bytewax_backup_recovery()
 			
 			# Simulate complete system failure
 			logger.info("Simulating complete system failure...")
@@ -718,14 +718,14 @@ class DisasterRecoveryTester:
 			total_data_loss = (
 				db_result.data_loss_events +
 				redis_result.data_loss_events +
-				kafka_result.data_loss_events
+				bytewax_result.data_loss_events
 			)
 			
 			success = (
 				system_healthy and
 				db_result.success and
 				redis_result.success and
-				kafka_result.success
+				bytewax_result.success
 			)
 			
 			return RecoveryTestResult(
@@ -738,7 +738,7 @@ class DisasterRecoveryTester:
 				metrics={
 					"database_recovery_time": db_result.recovery_time_seconds,
 					"redis_recovery_time": redis_result.recovery_time_seconds,
-					"kafka_recovery_time": kafka_result.recovery_time_seconds,
+					"bytewax_recovery_time": bytewax_result.recovery_time_seconds,
 					"system_healthy": system_healthy,
 					"backup_directory": backup_dir
 				}
@@ -769,7 +769,7 @@ class DisasterRecoveryTester:
 			tests = [
 				self.test_database_backup_recovery(),
 				self.test_redis_backup_recovery(),
-				self.test_kafka_backup_recovery(),
+				self.test_bytewax_backup_recovery(),
 				self.test_application_pod_recovery(),
 				self.test_complete_system_recovery()
 			]
@@ -872,7 +872,7 @@ if __name__ == "__main__":
 		'api_url': sys.argv[1] if len(sys.argv) > 1 else 'http://localhost:8080',
 		'database_url': sys.argv[2] if len(sys.argv) > 2 else 'postgresql://esb_user:esb_password@localhost:5432/apg_esb',
 		'redis_url': sys.argv[3] if len(sys.argv) > 3 else 'redis://localhost:6379/0',
-		'kafka_servers': sys.argv[4] if len(sys.argv) > 4 else 'localhost:9092',
+		'bytewax_flow_id': sys.argv[4] if len(sys.argv) > 4 else 'apg-event-streaming',
 		'k8s_namespace': sys.argv[5] if len(sys.argv) > 5 else 'apg-event-streaming-bus',
 		'environment': 'production'
 	}

@@ -356,7 +356,7 @@ class IntegrationVerifier:
 				"graphql": True,                     # GraphQL connector
 				"database": True,                    # Database connectors
 				"cloud_services": True,              # AWS/Azure/GCP
-				"message_queues": True,              # RabbitMQ/Kafka
+				"message_queues": True,              # RabbitMQ/Bytewax
 				"file_systems": True,                # File operations
 				"webhooks": True,                    # Webhook integration
 				"email": True                        # Email integration
@@ -668,7 +668,7 @@ class IntegrationVerifier:
 			external_integrations = {
 				"databases": "PostgreSQL, MySQL, MongoDB",
 				"cloud_platforms": "AWS, Azure, GCP",
-				"message_queues": "RabbitMQ, Apache Kafka",
+				"message_queues": "RabbitMQ, Apache Bytewax",
 				"apis": "REST, GraphQL, gRPC",
 				"file_systems": "Local, S3, Azure Blob",
 				"monitoring": "Prometheus, Grafana",

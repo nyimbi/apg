@@ -128,7 +128,7 @@ class TestEventFlow:
 		assert len(events) == 10
 		assert mock_event_publishing_service.publish_event.call_count == 10
 		
-		# In a real integration test, we would verify ordering in Kafka
+		# In a real integration test, we would verify ordering in Bytewax
 		# For now, we verify the service was called correctly
 	
 	@pytest.mark.asyncio

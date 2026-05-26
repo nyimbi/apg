@@ -15682,7 +15682,7 @@ def create_real_time_analytics_pipeline():
 					"description": "Scalable data ingestion from multiple sources with real-time processing capabilities",
 					"config": {
 						"ingestion_sources": {
-							"streaming_sources": ["kafka", "kinesis", "pulsar", "rabbitmq", "mqtt"],
+							"streaming_sources": ["bytewax", "kinesis", "pulsar", "rabbitmq", "mqtt"],
 							"api_endpoints": ["rest_apis", "graphql", "webhooks", "websockets"],
 							"database_streams": ["change_data_capture", "database_logs", "trigger_based"],
 							"file_systems": ["hdfs", "s3", "azure_blob", "gcs", "nfs"]
@@ -15719,7 +15719,7 @@ def create_real_time_analytics_pipeline():
 					"description": "Distributed stream processing with complex event processing and windowing",
 					"config": {
 						"processing_frameworks": {
-							"apache_kafka_streams": "java_scala_based_stream_processing",
+							"bytewax_streams": "java_scala_based_stream_processing",
 							"apache_flink": "distributed_stateful_stream_processing",
 							"apache_storm": "real_time_computation_system",
 							"apache_spark_streaming": "micro_batch_stream_processing"
@@ -16164,7 +16164,7 @@ def create_real_time_analytics_pipeline():
 					"properties": {
 						"primary_sources": {
 							"type": "array",
-							"items": {"type": "string", "enum": ["kafka", "kinesis", "api", "database", "file_system"]},
+							"items": {"type": "string", "enum": ["bytewax", "kinesis", "api", "database", "file_system"]},
 							"description": "Primary data ingestion sources"
 						},
 						"data_volume": {
@@ -16294,7 +16294,7 @@ This workflow provides a comprehensive real-time analytics pipeline with advance
 ## Prerequisites
 
 ### Infrastructure Requirements
-- Distributed streaming platform (Kafka, Kinesis, Pulsar)
+- Distributed streaming platform (Bytewax, Kinesis, Pulsar)
 - Container orchestration platform (Kubernetes, Docker Swarm)
 - Distributed computing framework (Spark, Flink, Storm)
 - Time-series database (InfluxDB, TimescaleDB, Prometheus)
@@ -16320,7 +16320,7 @@ This workflow provides a comprehensive real-time analytics pipeline with advance
 ```json
 {
   "data_sources": {
-    "primary_sources": ["kafka", "api", "database"],
+    "primary_sources": ["bytewax", "api", "database"],
     "data_volume": "high",
     "data_velocity": "real_time"
   },
@@ -16408,10 +16408,10 @@ This workflow provides a comprehensive real-time analytics pipeline with advance
 
 ### Stream Processing Integration
 ```python
-# Example: Kafka stream processing configuration
+# Example: Bytewax stream processing configuration
 stream_config = {
-    "kafka": {
-        "bootstrap_servers": "kafka-cluster:9092",
+    "bytewax": {
+        "flow_id": "bytewax-cluster:9092",
         "topics": ["user_events", "transactions", "system_logs"],
         "consumer_group": "analytics_pipeline"
     },
@@ -16527,7 +16527,7 @@ ml_config = {
 		],
 		
 		prerequisites=[
-			"Distributed streaming platform (Kafka, Kinesis, Pulsar)",
+			"Distributed streaming platform (Bytewax, Kinesis, Pulsar)",
 			"Container orchestration system (Kubernetes, Docker)",
 			"Distributed computing framework (Spark, Flink, Storm)",
 			"Time-series database (InfluxDB, TimescaleDB)",
@@ -16943,7 +16943,7 @@ def create_anomaly_detection_system():
 							"security_events", "performance_metrics", "business_kpis", "external_feeds"
 						],
 						"ingestion_methods": {
-							"streaming": ["kafka", "kinesis", "pulsar", "websockets"],
+							"streaming": ["bytewax", "kinesis", "pulsar", "websockets"],
 							"batch": ["s3", "hdfs", "database_polling", "file_system"],
 							"real_time": ["mqtt", "webhook", "api_endpoints", "message_queues"]
 						},

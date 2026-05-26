@@ -31,11 +31,11 @@ class TestEventPublishingService:
 	"""Test EventPublishingService."""
 	
 	@pytest.fixture
-	def publishing_service(self, mock_database_session, mock_kafka_producer, mock_redis_client):
+	def publishing_service(self, mock_database_session, mock_bytewax_producer, mock_redis_client):
 		"""Create publishing service with mocked dependencies."""
 		service = EventPublishingService()
 		service.db_session = mock_database_session
-		service.kafka_producer = mock_kafka_producer
+		service.bytewax_producer = mock_bytewax_producer
 		service.redis_client = mock_redis_client
 		return service
 	
@@ -52,7 +52,7 @@ class TestEventPublishingService:
 		payload = {"user_name": "john.doe", "email": "john@example.com"}
 		
 		# Mock successful publishing
-		publishing_service.kafka_producer.send.return_value = AsyncMock()
+		publishing_service.bytewax_producer.send.return_value = AsyncMock()
 		
 		event_id = await publishing_service.publish_event(
 			event_config=event_config,
@@ -63,7 +63,7 @@ class TestEventPublishingService:
 		)
 		
 		assert event_id.startswith("evt_")
-		publishing_service.kafka_producer.send.assert_called_once()
+		publishing_service.bytewax_producer.send.assert_called_once()
 		publishing_service.db_session.add.assert_called_once()
 		publishing_service.db_session.commit.assert_called_once()
 	
@@ -84,7 +84,7 @@ class TestEventPublishingService:
 		]
 		
 		# Mock successful batch publishing
-		publishing_service.kafka_producer.send.return_value = AsyncMock()
+		publishing_service.bytewax_producer.send.return_value = AsyncMock()
 		
 		event_ids = await publishing_service.publish_event_batch(
 			events=events,
@@ -95,7 +95,7 @@ class TestEventPublishingService:
 		
 		assert len(event_ids) == 5
 		assert all(event_id.startswith("evt_") for event_id in event_ids)
-		assert publishing_service.kafka_producer.send.call_count == 5
+		assert publishing_service.bytewax_producer.send.call_count == 5
 	
 	@pytest.mark.asyncio
 	async def test_publish_event_validation_failure(self, publishing_service, test_tenant_id, test_user_id):
@@ -244,11 +244,11 @@ class TestStreamManagementService:
 	"""Test StreamManagementService."""
 	
 	@pytest.fixture
-	def stream_service(self, mock_database_session, mock_kafka_admin, mock_redis_client):
+	def stream_service(self, mock_database_session, mock_bytewax_admin, mock_redis_client):
 		"""Create stream management service with mocked dependencies."""
 		service = StreamManagementService()
 		service.db_session = mock_database_session
-		service.kafka_admin = mock_kafka_admin
+		service.bytewax_admin = mock_bytewax_admin
 		service.redis_client = mock_redis_client
 		return service
 	
@@ -284,7 +284,7 @@ class TestStreamManagementService:
 		mock_processor.processor_type = ProcessorType.FILTER.value
 		
 		stream_service.db_session.query.return_value.filter.return_value.first.return_value = mock_processor
-		stream_service._start_kafka_streams_processor = AsyncMock(return_value=True)
+		stream_service._start_bytewax_streams_processor = AsyncMock(return_value=True)
 		
 		success = await stream_service.start_stream_processor(
 			processor_id=processor_id,
@@ -330,11 +330,11 @@ class TestConsumerManagementService:
 	"""Test ConsumerManagementService."""
 	
 	@pytest.fixture
-	def consumer_service(self, mock_database_session, mock_kafka_admin, mock_redis_client):
+	def consumer_service(self, mock_database_session, mock_bytewax_admin, mock_redis_client):
 		"""Create consumer management service with mocked dependencies."""
 		service = ConsumerManagementService()
 		service.db_session = mock_database_session
-		service.kafka_admin = mock_kafka_admin
+		service.bytewax_admin = mock_bytewax_admin
 		service.redis_client = mock_redis_client
 		return service
 	
@@ -394,7 +394,7 @@ class TestConsumerManagementService:
 		mock_group.group_name = "test_group"
 		
 		consumer_service.db_session.query.return_value.filter.return_value.first.return_value = mock_group
-		consumer_service._trigger_kafka_rebalance = AsyncMock(return_value=True)
+		consumer_service._trigger_bytewax_rebalance = AsyncMock(return_value=True)
 		
 		success = await consumer_service.trigger_rebalance(
 			group_id=group_id,
@@ -402,7 +402,7 @@ class TestConsumerManagementService:
 		)
 		
 		assert success == True
-		consumer_service._trigger_kafka_rebalance.assert_called_once_with(mock_group.group_name)
+		consumer_service._trigger_bytewax_rebalance.assert_called_once_with(mock_group.group_name)
 
 # =============================================================================
 # Enhanced Schema Registry Service Tests
@@ -505,11 +505,11 @@ class TestEventConsumptionService:
 	"""Test EventConsumptionService."""
 	
 	@pytest.fixture
-	def consumption_service(self, mock_database_session, mock_kafka_consumer, mock_redis_client):
+	def consumption_service(self, mock_database_session, mock_bytewax_consumer, mock_redis_client):
 		"""Create consumption service with mocked dependencies."""
 		service = EventConsumptionService()
 		service.db_session = mock_database_session
-		service.kafka_consumer = mock_kafka_consumer
+		service.bytewax_consumer = mock_bytewax_consumer
 		service.redis_client = mock_redis_client
 		return service
 	
@@ -599,11 +599,11 @@ class TestEventStreamingService:
 	"""Test EventStreamingService."""
 	
 	@pytest.fixture
-	def streaming_service(self, mock_database_session, mock_kafka_producer, mock_redis_client):
+	def streaming_service(self, mock_database_session, mock_bytewax_producer, mock_redis_client):
 		"""Create streaming service with mocked dependencies."""
 		service = EventStreamingService()
 		service.db_session = mock_database_session
-		service.kafka_producer = mock_kafka_producer
+		service.bytewax_producer = mock_bytewax_producer
 		service.redis_client = mock_redis_client
 		return service
 	
@@ -616,8 +616,8 @@ class TestEventStreamingService:
 			source_capability="test_capability"
 		)
 		
-		# Mock Kafka topic creation
-		streaming_service._create_kafka_topic = AsyncMock(return_value=True)
+		# Mock Bytewax topic creation
+		streaming_service._create_bytewax_stream = AsyncMock(return_value=True)
 		
 		stream_id = await streaming_service.create_stream(
 			config=stream_config,
@@ -628,7 +628,7 @@ class TestEventStreamingService:
 		assert stream_id.startswith("str_")
 		streaming_service.db_session.add.assert_called_once()
 		streaming_service.db_session.commit.assert_called_once()
-		streaming_service._create_kafka_topic.assert_called_once()
+		streaming_service._create_bytewax_stream.assert_called_once()
 	
 	@pytest.mark.asyncio
 	async def test_get_stream_success(self, streaming_service, test_tenant_id):
@@ -841,10 +841,10 @@ class TestStreamProcessingService:
 	"""Test StreamProcessingService."""
 	
 	@pytest.fixture
-	def processing_service(self, mock_kafka_consumer, mock_redis_client):
+	def processing_service(self, mock_bytewax_consumer, mock_redis_client):
 		"""Create processing service with mocked dependencies."""
 		service = StreamProcessingService()
-		service.kafka_consumer = mock_kafka_consumer
+		service.bytewax_consumer = mock_bytewax_consumer
 		service.redis_client = mock_redis_client
 		return service
 	

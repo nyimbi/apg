@@ -116,8 +116,8 @@ class TestESStream:
 				created_by="test"
 			)
 	
-	def test_stream_name_kafka_compliance(self):
-		"""Test stream name Kafka topic naming compliance."""
+	def test_stream_name_bytewax_compliance(self):
+		"""Test stream name Bytewax topic naming compliance."""
 		with pytest.raises(ValueError, match="can only contain alphanumeric"):
 			stream = ESStream(
 				stream_name="invalid@name!",

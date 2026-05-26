@@ -18,8 +18,8 @@ from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import aiohttp
 import websockets
-from kafka import KafkaProducer, KafkaConsumer
-from kafka.errors import KafkaError
+from bytewax import BytewaxProducer, BytewaxConsumer
+from bytewax.errors import BytewaxError
 import redis
 import psutil
 import numpy as np
@@ -34,7 +34,7 @@ class LoadTestConfig:
 	"""Configuration for load tests."""
 	api_url: str = "http://localhost:8080"
 	ws_url: str = "ws://localhost:8080"
-	kafka_servers: str = "localhost:9092"
+	bytewax_flow_id: str = "apg-event-streaming"
 	redis_url: str = "redis://localhost:6379/0"
 	
 	# Test parameters
@@ -110,7 +110,7 @@ class LoadTestExecutor:
 	def __init__(self, config: LoadTestConfig):
 		self.config = config
 		self.session: Optional[aiohttp.ClientSession] = None
-		self.kafka_producer: Optional[KafkaProducer] = None
+		self.bytewax_producer: Optional[BytewaxProducer] = None
 		self.redis_client: Optional[redis.Redis] = None
 		self.results: List[TestResult] = []
 		self.errors: Dict[str, int] = {}
@@ -128,9 +128,9 @@ class LoadTestExecutor:
 		timeout = aiohttp.ClientTimeout(total=30)
 		self.session = aiohttp.ClientSession(timeout=timeout)
 		
-		# Kafka producer
-		self.kafka_producer = KafkaProducer(
-			bootstrap_servers=self.config.kafka_servers.split(','),
+		# Bytewax producer
+		self.bytewax_producer = BytewaxProducer(
+			flow_id=self.config.bytewax_flow_id.split(','),
 			value_serializer=lambda x: json.dumps(x).encode('utf-8'),
 			acks='all',
 			retries=3,
@@ -154,8 +154,8 @@ class LoadTestExecutor:
 		if self.session:
 			await self.session.close()
 		
-		if self.kafka_producer:
-			self.kafka_producer.close()
+		if self.bytewax_producer:
+			self.bytewax_producer.close()
 		
 		if self.redis_client:
 			self.redis_client.close()
@@ -169,11 +169,11 @@ class LoadTestExecutor:
 			if response.status != 200:
 				raise Exception(f"API health check failed: {response.status}")
 		
-		# Test Kafka
+		# Test Bytewax
 		try:
-			self.kafka_producer.send('test-topic', {'test': 'connectivity'}).get(timeout=10)
-		except KafkaError as e:
-			raise Exception(f"Kafka connectivity test failed: {e}")
+			self.bytewax_producer.send('test-topic', {'test': 'connectivity'}).get(timeout=10)
+		except BytewaxError as e:
+			raise Exception(f"Bytewax connectivity test failed: {e}")
 		
 		# Test Redis
 		if not self.redis_client.ping():
@@ -353,9 +353,9 @@ class LoadTestExecutor:
 		logger.info(f"WebSocket load test completed: {len(results)} connections")
 		return results
 	
-	async def _kafka_load_test(self) -> List[TestResult]:
-		"""Execute Kafka load test."""
-		logger.info("Starting Kafka load test...")
+	async def _bytewax_load_test(self) -> List[TestResult]:
+		"""Execute Bytewax load test."""
+		logger.info("Starting Bytewax load test...")
 		
 		results = []
 		
@@ -372,14 +372,14 @@ class LoadTestExecutor:
 					"stream_id": "load_test_stream"
 				}
 				
-				# Send to Kafka
-				future = self.kafka_producer.send('apg-events', event_data)
+				# Send to Bytewax
+				future = self.bytewax_producer.send('apg-events', event_data)
 				record_metadata = future.get(timeout=10)
 				
 				end_ms = time.time() * 1000
 				
 				result = TestResult(
-					test_name="kafka_publish",
+					test_name="bytewax_publish",
 					start_time=start_time,
 					end_time=datetime.now(timezone.utc),
 					duration_ms=end_ms - start_ms,
@@ -389,7 +389,7 @@ class LoadTestExecutor:
 				
 			except Exception as e:
 				result = TestResult(
-					test_name="kafka_publish",
+					test_name="bytewax_publish",
 					start_time=start_time,
 					end_time=datetime.now(timezone.utc),
 					duration_ms=0,
@@ -404,7 +404,7 @@ class LoadTestExecutor:
 			if i % 100 == 0:
 				await asyncio.sleep(0.1)
 		
-		logger.info(f"Kafka load test completed: {len(results)} events published")
+		logger.info(f"Bytewax load test completed: {len(results)} events published")
 		return results
 	
 	async def _database_load_test(self) -> List[TestResult]:
@@ -500,11 +500,11 @@ class LoadTestExecutor:
 			# Execute all test types
 			api_results = await self._api_load_test()
 			ws_results = await self._websocket_load_test()
-			kafka_results = await self._kafka_load_test()
+			bytewax_results = await self._bytewax_load_test()
 			db_results = await self._database_load_test()
 			
 			# Combine all results
-			all_results = api_results + ws_results + kafka_results + db_results
+			all_results = api_results + ws_results + bytewax_results + db_results
 			
 		finally:
 			# Stop monitoring
@@ -537,7 +537,7 @@ class LoadTestExecutor:
 			p95_response_time_ms=stats.get("p95_response_time_ms", 0),
 			p99_response_time_ms=stats.get("p99_response_time_ms", 0),
 			requests_per_second=stats.get("total_requests", 0) / test_duration,
-			events_per_second=len(kafka_results) / test_duration,
+			events_per_second=len(bytewax_results) / test_duration,
 			bytes_per_second=stats.get("response_size_bytes", 0) / test_duration,
 			peak_cpu_percent=max(self.cpu_samples) if self.cpu_samples else 0,
 			peak_memory_mb=max(self.memory_samples) if self.memory_samples else 0,
