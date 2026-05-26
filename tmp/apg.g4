@@ -413,7 +413,9 @@ statement
     ;
 
 object
-    : database
+    : ai_agent
+    | agent_team
+    | database
     | mixin             // Mixins are global
     | enum_ext          // Enumerations are global
     | table
@@ -421,6 +423,65 @@ object
     | dbfunc          // Database function, trigges, procedures
     | index_ext       // Externally defined indices
     | ref_ext         // References defined outside the table definition
+    ;
+
+ai_agent
+    : 'agent' name_attr L_CURLY ai_agent_member* R_CURLY
+    ;
+
+agent_team
+    : ('swarm' | 'team' | 'agent_team') name_attr L_CURLY agent_team_member* R_CURLY
+    ;
+
+agent_team_member
+    : ai_agent
+    | ai_agent_member
+    ;
+
+ai_agent_member
+    : ai_agent_property SEMI_COLON?
+    ;
+
+ai_agent_property
+    : ai_agent_key COLON ai_agent_value
+    ;
+
+ai_agent_key
+    : 'role' | 'model' | 'runtime' | 'runner' | 'system' | 'tools'
+    | 'memory' | 'input' | 'inputs' | 'output' | 'outputs'
+    | 'handoff' | 'handoffs' | 'agents' | 'flow'
+    | 'config' | 'configuration' | 'rules' | 'ui' | 'theme'
+    | ident
+    ;
+
+ai_agent_value
+    : ai_agent_object
+    | ai_agent_list
+    | ai_agent_flow
+    | string
+    | Number
+    | int
+    | ident ident?              // bare references and memory hints: vector support_memory
+    ;
+
+ai_agent_list
+    : L_SQUARE (ai_agent_value (COMMA ai_agent_value)* COMMA?)? R_SQUARE
+    ;
+
+ai_agent_object
+    : L_CURLY (ai_agent_object_pair (COMMA ai_agent_object_pair)* COMMA?)? R_CURLY
+    ;
+
+ai_agent_object_pair
+    : (ident | string) COLON ai_agent_value
+    ;
+
+ai_agent_flow
+    : ident ('->' ident)+ ('when' ai_agent_condition)?
+    ;
+
+ai_agent_condition
+    : ~(SEMI_COLON | R_CURLY)+
     ;
 
 database

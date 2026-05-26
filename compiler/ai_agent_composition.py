@@ -177,6 +177,10 @@ def _parse_agent(name: str, body: str, source_name: str, line: int, column: int)
 		inputs=inputs,
 		outputs=outputs,
 		handoffs=handoffs,
+		configuration=_dict_value(props.get("config", props.get("configuration"))),
+		rules=_rule_list(props.get("rules")),
+		ui=_dict_value(props.get("ui")),
+		theme=_dict_value(props.get("theme")),
 		line=line,
 		column=column,
 		source_file=source_name,
@@ -206,7 +210,8 @@ def _parse_team(
 
 	policy = {
 		key: value for key, value in props.items()
-		if key not in {"agents", "flow"} and isinstance(value, (str, int, float, bool, list))
+		if key not in {"agents", "flow", "config", "configuration", "rules", "ui", "theme"}
+		and isinstance(value, (str, int, float, bool, list))
 	}
 
 	return AgentTeamDeclaration(
@@ -215,6 +220,10 @@ def _parse_team(
 		agents=agents,
 		flow=flow,
 		policy=policy,
+		configuration=_dict_value(props.get("config", props.get("configuration"))),
+		rules=_rule_list(props.get("rules")),
+		ui=_dict_value(props.get("ui")),
+		theme=_dict_value(props.get("theme")),
 		line=line,
 		column=column,
 		source_file=source_name,
@@ -292,6 +301,13 @@ def _parse_value(value: str) -> Any:
 	if value.startswith("[") and value.endswith("]"):
 		inner = value[1:-1].strip()
 		return [_parse_value(part.strip()) for part in _split_commas(inner)] if inner else []
+	if value.startswith("{") and value.endswith("}"):
+		inner = value[1:-1].strip()
+		result: Dict[str, Any] = {}
+		for part in _split_commas(inner):
+			key, item_value = _split_key_value(part)
+			result[key] = _parse_value(item_value)
+		return result
 	if value.lower() in {"true", "false"}:
 		return value.lower() == "true"
 	if re.fullmatch(r"-?\d+", value):
@@ -322,6 +338,27 @@ def _split_commas(value: str) -> List[str]:
 			start = index + 1
 	items.append(value[start:])
 	return items
+
+
+def _split_key_value(value: str) -> tuple[str, str]:
+	depth = 0
+	quote: Optional[str] = None
+	for index, char in enumerate(value):
+		if quote:
+			if char == quote and value[index - 1:index] != "\\":
+				quote = None
+			continue
+		if char in {"'", '"'}:
+			quote = char
+		elif char in "[{(":
+			depth += 1
+		elif char in "]})":
+			depth -= 1
+		elif char == ":" and depth == 0:
+			key = value[:index].strip().strip("'\"")
+			item_value = value[index + 1:].strip()
+			return key, item_value
+	raise AIAgentParseError(f"expected key:value entry in object literal: {value.strip()}")
 
 
 def _parse_memory(value: Any) -> Optional[AgentMemory]:
@@ -367,6 +404,20 @@ def _string_list(value: Any) -> List[str]:
 	if isinstance(value, list):
 		return [str(item) for item in value]
 	return [str(value)]
+
+
+def _dict_value(value: Any) -> Dict[str, Any]:
+	return dict(value) if isinstance(value, dict) else {}
+
+
+def _rule_list(value: Any) -> List[Dict[str, Any]]:
+	if value is None:
+		return []
+	if isinstance(value, dict):
+		return [value]
+	if isinstance(value, list):
+		return [item for item in value if isinstance(item, dict)]
+	return []
 
 
 def _optional_string(value: Any) -> Optional[str]:

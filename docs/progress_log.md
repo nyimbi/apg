@@ -1530,3 +1530,19 @@ Verification:
 - `find scripts -maxdepth 2 -type f | sort`
 - `.venv/bin/python -m py_compile examples/complete_demo.py scripts/capability_generation/create_advanced_ai_capabilities.py scripts/capability_generation/create_business_intelligence_capabilities.py scripts/capability_generation/create_cloud_capabilities.py scripts/capability_generation/create_community_system.py scripts/capability_generation/create_iot_capabilities.py scripts/capability_generation/create_performance_capabilities.py scripts/capability_generation/create_security_capabilities.py scripts/template_generation/create_template_structure.py scripts/template_generation/setup_composable_templates.py scripts/migrations/migration_to_v2.py`
 - `git diff --check`
+
+### 2026-05-26 18:20 EAT
+
+Completed checkpoint:
+
+- Extended first-class AI agent and team declarations with capability-style `config` / `configuration`, `rules`, `ui`, and `theme` metadata.
+- Updated the AI-agent composition parser so object and list-of-object literals can carry concise runtime configuration and deterministic rule contracts.
+- Updated generated `ai_agents.py` manifests to expose configuration, rules, UI metadata, and theme metadata for both agents and teams.
+- Updated tracked `tmp/apg.g4` so the grammar source accepts first-class `agent`, `swarm`, `team`, and `agent_team` declarations with concise configuration/rule/UI/theme fields.
+- Updated AI-agent composition documentation and the language reference with compact configuration/rule/UI/theme examples.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_ai_agent_composition.py` -> 3 passed
+- `.venv/bin/python -m py_compile compiler/ai_agent_composition.py compiler/ast_builder.py compiler/code_generator.py tests/test_ai_agent_composition.py`
+- `git diff --check -- compiler/ai_agent_composition.py compiler/ast_builder.py compiler/code_generator.py tmp/apg.g4 tests/test_ai_agent_composition.py`

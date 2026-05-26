@@ -52,6 +52,10 @@ swarm SupportCrew {
 | `input` / `inputs` | no | Named input contract values. |
 | `output` / `outputs` | no | Named output contract values. |
 | `handoff` / `handoffs` | no | Agent-local directed handoff, for example `handoff: Reviewer;`. |
+| `config` / `configuration` | no | Agent-specific runtime configuration such as temperature, max turns, budgets, or routing flags. |
+| `rules` | no | Deterministic governance rules evaluated by the selected capability or runtime adapter. |
+| `ui` | no | UI manifest hints such as dashboard view, route, and visible controls. |
+| `theme` | no | Theme tokens or theme selection for generated/admin surfaces. |
 
 `swarm`, `team`, and `agent_team` declare the same composition shape. Prefer `swarm` when the group is an autonomous multi-agent system and `team` when the group is a simple pipeline.
 
@@ -61,6 +65,8 @@ swarm ResearchCrew {
         model: "openai:gpt-4.1-mini";
         system: "Find source-backed facts.";
         tools: [web.search, docs.read];
+        config: {temperature: 0.1, max_turns: 3};
+        ui: {view: "ResearchConsole", route: "/agents/researcher"};
     }
 
     agent Reviewer {
@@ -69,6 +75,8 @@ swarm ResearchCrew {
     }
 
     flow: Researcher -> Reviewer;
+    rules: [{name: "weak_evidence_review", when: "citation_count < 2", action: "human_review"}];
+    theme: {name: "research_ops", density: compact};
 }
 ```
 
@@ -95,6 +103,7 @@ The file contains:
 - `AI_AGENTS`: registry keyed by agent name.
 - `AI_AGENT_TEAMS`: registry keyed by team name.
 - `get_agent(name)`, `get_team(name)`, and `describe_team(name)` helpers.
+- Per-agent and per-team `configuration`, `rules`, `ui`, and `theme` metadata.
 
 The runtime manifest is dependency-free. Provider SDK wiring belongs in the selected AI capability integration, while `ai_agents.py` remains the stable contract between APG syntax and application code.
 
@@ -162,6 +171,8 @@ The adapter contract normalizes every runner into `AgentInvocation` and `AgentRu
 Any first-class AI agent or team selects the `ai/llm_integration` capability. A vector memory declaration also selects `data/vector_database`.
 
 This keeps the language surface concise while still making deployment dependencies explicit in the generated application.
+
+Agents and teams can also carry the same executable capability contract shape APG expects elsewhere: specific configuration, deterministic rule metadata, UI manifest hints, and visual theme tokens. Keep those blocks short and local to the declaration when they are specific to that agent or team.
 
 ## Design Guidance
 

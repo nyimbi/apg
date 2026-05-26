@@ -991,6 +991,8 @@ agent Planner {
     system: "Break work into steps.";
     tools: [docs.search, tickets.read];
     memory: vector support_memory;
+    config: {temperature: 0.2, max_turns: 4};
+    ui: {view: "PlannerConsole", route: "/support/planner"};
 }
 
 agent Writer {
@@ -1002,10 +1004,12 @@ agent Writer {
 swarm SupportCrew {
     agents: [Planner, Writer];
     flow: Planner -> Writer;
+    rules: [{name: "review_low_confidence", when: "confidence < 0.6", action: "human_review"}];
+    theme: {name: "support_ops", density: compact};
 }
 ```
 
-The compiler validates agent references and emits `ai_agents.py` with `AI_AGENTS`, `AI_AGENT_TEAMS`, and lookup helpers. See [AI Agent Composition](./ai_agent_composition.md) for the executable contract.
+The compiler validates agent references and emits `ai_agents.py` with `AI_AGENTS`, `AI_AGENT_TEAMS`, lookup helpers, and per-agent/per-team configuration, rules, UI, and theme metadata. See [AI Agent Composition](./ai_agent_composition.md) for the executable contract.
 
 ```apg
 // Cognitive architecture

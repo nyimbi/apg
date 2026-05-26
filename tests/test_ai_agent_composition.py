@@ -22,6 +22,10 @@ agent Planner {
     memory: vector support_memory;
     input: ticket;
     output: plan;
+    config: {temperature: 0.2, max_turns: 4};
+    rules: [{name: "ticket_required", when: "ticket missing", action: "reject"}];
+    ui: {view: "PlannerConsole", route: "/support/planner"};
+    theme: {name: "support_ops", density: compact};
 }
 
 agent Writer {
@@ -34,6 +38,10 @@ agent Writer {
 swarm SupportCrew {
     agents: [Planner, Writer];
     flow: Planner -> Writer;
+    config: {handoff_mode: sequential};
+    rules: [{name: "review_low_confidence", when: "confidence < 0.6", action: "human_review"}];
+    ui: {view: "SupportCrewDashboard", route: "/support/crew"};
+    theme: {name: "support_ops"};
 }
 """
 
@@ -57,10 +65,18 @@ def test_ai_agent_composition_parses_to_first_class_ast():
     assert planner.tools == ["tickets.read", "docs.search"]
     assert planner.memory.kind == "vector"
     assert planner.memory.name == "support_memory"
+    assert planner.configuration == {"temperature": 0.2, "max_turns": 4}
+    assert planner.rules == [{"name": "ticket_required", "when": "ticket missing", "action": "reject"}]
+    assert planner.ui == {"view": "PlannerConsole", "route": "/support/planner"}
+    assert planner.theme == {"name": "support_ops", "density": "compact"}
 
     assert isinstance(crew, AgentTeamDeclaration)
     assert crew.agents == ["Planner", "Writer"]
     assert [(edge.source, edge.target) for edge in crew.flow] == [("Planner", "Writer")]
+    assert crew.configuration == {"handoff_mode": "sequential"}
+    assert crew.rules == [{"name": "review_low_confidence", "when": "confidence < 0.6", "action": "human_review"}]
+    assert crew.ui == {"view": "SupportCrewDashboard", "route": "/support/crew"}
+    assert crew.theme == {"name": "support_ops"}
 
 
 def test_agent_composition_semantics_reject_unknown_handoffs():
@@ -95,3 +111,7 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert "'SupportCrew'" in runtime
     assert "openai:gpt-4.1-mini" in runtime
     assert "'runtime': 'codex'" in runtime
+    assert "'configuration': {'temperature': 0.2, 'max_turns': 4}" in runtime
+    assert "'rules': [{'name': 'ticket_required'" in runtime
+    assert "'ui': {'view': 'SupportCrewDashboard', 'route': '/support/crew'}" in runtime
+    assert "'theme': {'name': 'support_ops'}" in runtime

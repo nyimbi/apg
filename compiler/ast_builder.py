@@ -120,6 +120,10 @@ class AIAgentDeclaration(EntityDeclaration):
 	inputs: List[str] = field(default_factory=list)
 	outputs: List[str] = field(default_factory=list)
 	handoffs: List[AgentHandoff] = field(default_factory=list)
+	configuration: Dict[str, Any] = field(default_factory=dict)
+	rules: List[Dict[str, Any]] = field(default_factory=list)
+	ui: Dict[str, Any] = field(default_factory=dict)
+	theme: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -128,6 +132,10 @@ class AgentTeamDeclaration(EntityDeclaration):
 	agents: List[str] = field(default_factory=list)
 	flow: List[AgentHandoff] = field(default_factory=list)
 	policy: Dict[str, Any] = field(default_factory=dict)
+	configuration: Dict[str, Any] = field(default_factory=dict)
+	rules: List[Dict[str, Any]] = field(default_factory=list)
+	ui: Dict[str, Any] = field(default_factory=dict)
+	theme: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

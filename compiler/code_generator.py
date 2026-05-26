@@ -260,6 +260,10 @@ class PythonCodeGenerator:
 					{"source": edge.source, "target": edge.target, "condition": edge.condition}
 					for edge in agent.handoffs
 				],
+				"configuration": agent.configuration,
+				"rules": agent.rules,
+				"ui": agent.ui,
+				"theme": agent.theme,
 			}
 			for agent in agents
 		}
@@ -271,6 +275,10 @@ class PythonCodeGenerator:
 					for edge in team.flow
 				],
 				"policy": team.policy,
+				"configuration": team.configuration,
+				"rules": team.rules,
+				"ui": team.ui,
+				"theme": team.theme,
 			}
 			for team in teams
 		}
@@ -299,6 +307,10 @@ class AIAgentSpec:
     inputs: List[str]
     outputs: List[str]
     handoffs: List[Dict[str, str]]
+    configuration: Dict[str, Any]
+    rules: List[Dict[str, Any]]
+    ui: Dict[str, Any]
+    theme: Dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -307,6 +319,10 @@ class AgentTeamSpec:
     agents: List[str]
     flow: List[Dict[str, str]]
     policy: Dict[str, Any]
+    configuration: Dict[str, Any]
+    rules: List[Dict[str, Any]]
+    ui: Dict[str, Any]
+    theme: Dict[str, Any]
 
 
 AI_AGENT_DATA: Dict[str, Dict[str, Any]] = {agent_specs!r}
