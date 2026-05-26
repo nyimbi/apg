@@ -59,6 +59,21 @@ python cli.py capabilities contracts
 python cli.py capabilities contracts --json
 ```
 
+## Generated Applications
+
+The composable application generator also emits `capability_contracts.py` into
+each generated application. That file is dependency-free and exposes:
+
+- `list_capability_contracts(tenant_id="default")`
+- `get_capability_contract(capability_id, tenant_id="default")`
+- `validate_capability_contracts()`
+- `evaluate_capability_rules(capability_id, context, tenant_id="default")`
+
+Generated contracts use the same required surfaces as platform contracts:
+configuration, schema, deterministic rules, UI routes, and theme tokens. This
+keeps selected capabilities first-class inside the generated application rather
+than leaving contract metadata only in the APG source tree.
+
 ## Adding a Contract
 
 For a spec-backed capability, add a thin wrapper beside `cap_spec.md`:
@@ -101,5 +116,6 @@ Run these checks after changing contracts:
 python -m pytest -q capabilities/test_capability_contract_registry.py \
   capabilities/test_spec_capability_contracts.py \
   capabilities/common/test_capability_contracts.py \
-  tests/test_cli_capability_contracts.py
+  tests/test_cli_capability_contracts.py \
+  tests/test_composition_capability_contracts.py
 ```

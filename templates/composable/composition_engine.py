@@ -9,6 +9,7 @@ based on APG AST analysis and user requirements.
 
 import re
 import json
+from pprint import pformat
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set, Tuple
 from dataclasses import dataclass, field
@@ -448,6 +449,10 @@ class CompositionEngine:
         # Generate capability registry
         registry_content = self._generate_capability_registry(context)
         generated_files['capability_registry.py'] = registry_content
+
+        # Generate executable capability contracts for the composed app
+        contracts_content = self._generate_capability_contracts(context)
+        generated_files['capability_contracts.py'] = contracts_content
         
         return generated_files
     
@@ -516,6 +521,17 @@ def get_capability_info() -> Dict[str, Any]:
     
     def _generate_capability_registry(self, context: CompositionContext) -> str:
         """Generate capability registry"""
+        registry = {
+            record["id"]: {
+                "name": record["name"],
+                "category": record["category"],
+                "version": record["version"],
+                "description": record["description"],
+                "features": record["features"],
+            }
+            for record in self._capability_records(context)
+        }
+        registry_literal = pformat(registry, width=100, sort_dicts=True)
         template_str = '''"""
 Capability Registry
 ==================
@@ -535,16 +551,11 @@ class CapabilityInfo:
     features: List[str]
 
 # Registered capabilities
+_CAPABILITY_DATA: Dict[str, Dict[str, Any]] = {{registry_literal}}
+
 CAPABILITIES: Dict[str, CapabilityInfo] = {
-    {% for capability in capabilities %}
-    '{{capability}}': CapabilityInfo(
-        name='{{capability_descriptions[capability]}}',
-        category='{{capability}}',  # TODO: Get actual category
-        version='1.0.0',  # TODO: Get actual version
-        description='{{capability_descriptions[capability]}}',
-        features=[]  # TODO: Get actual features
-    ),
-    {% endfor %}
+    capability_id: CapabilityInfo(**metadata)
+    for capability_id, metadata in _CAPABILITY_DATA.items()
 }
 
 def get_capability(name: str) -> CapabilityInfo:
@@ -561,7 +572,248 @@ def get_capabilities_by_category(category: str) -> List[CapabilityInfo]:
 '''
         
         template = Template(template_str)
-        return template.render(**context.to_template_context())
+        return template.render(registry_literal=registry_literal)
+
+    def _generate_capability_contracts(self, context: CompositionContext) -> str:
+        """Generate executable capability contracts for the composed application."""
+        contracts = {
+            record["id"]: self._build_generated_contract(record, context)
+            for record in self._capability_records(context)
+        }
+        contracts_literal = pformat(contracts, width=120, sort_dicts=True)
+        template_str = '''"""
+Generated Capability Contracts
+==============================
+
+Executable capability contracts for this composed APG application.
+"""
+
+from copy import deepcopy
+from typing import Any, Dict, List
+
+
+REQUIRED_CONTRACT_KEYS = {"configuration", "configuration_schema", "rule_engine", "ui", "theme"}
+
+CAPABILITY_CONTRACTS: Dict[str, Dict[str, Any]] = {{contracts_literal}}
+
+
+def list_capability_contracts(tenant_id: str = "default") -> Dict[str, Dict[str, Any]]:
+    """Return all capability contracts keyed by capability id."""
+    return {
+        capability_id: get_capability_contract(capability_id, tenant_id)
+        for capability_id in CAPABILITY_CONTRACTS
+    }
+
+
+def get_capability_contract(capability_id: str, tenant_id: str = "default") -> Dict[str, Any]:
+    """Return one generated capability contract."""
+    if capability_id not in CAPABILITY_CONTRACTS:
+        raise KeyError(f"Unknown capability contract: {capability_id}")
+    contract = deepcopy(CAPABILITY_CONTRACTS[capability_id])
+    contract["configuration"]["tenant_id"] = tenant_id
+    return contract
+
+
+def validate_capability_contracts() -> Dict[str, List[str]]:
+    """Validate the generated contract shape without external dependencies."""
+    errors: List[str] = []
+    for capability_id, contract in CAPABILITY_CONTRACTS.items():
+        missing = sorted(REQUIRED_CONTRACT_KEYS - set(contract))
+        if missing:
+            errors.append(f"{capability_id} missing keys: {', '.join(missing)}")
+        if contract.get("capability") != capability_id:
+            errors.append(f"{capability_id} capability id mismatch")
+        if contract.get("rule_engine", {}).get("type") != "deterministic":
+            errors.append(f"{capability_id} rule_engine.type must be deterministic")
+        if not contract.get("rule_engine", {}).get("rules"):
+            errors.append(f"{capability_id} must define at least one rule")
+        if contract.get("ui", {}).get("requires_theme") is not True:
+            errors.append(f"{capability_id} ui.requires_theme must be true")
+        if not contract.get("ui", {}).get("routes"):
+            errors.append(f"{capability_id} must define UI routes")
+        if not contract.get("theme", {}).get("tokens"):
+            errors.append(f"{capability_id} must define theme tokens")
+    return {"errors": errors, "validated": [] if errors else sorted(CAPABILITY_CONTRACTS)}
+
+
+def evaluate_capability_rules(capability_id: str, context: Dict[str, Any], tenant_id: str = "default") -> Dict[str, Any]:
+    """Evaluate deterministic rules for one generated capability contract."""
+    contract = get_capability_contract(capability_id, tenant_id)
+    matched: List[str] = []
+    actions: List[Dict[str, Any]] = []
+    decision = "allow"
+    for rule in contract["rule_engine"]["rules"]:
+        if _matches(rule["condition"], context):
+            matched.append(rule["name"])
+            effect = dict(rule["effect"])
+            actions.append(effect)
+            if effect.get("decision") == "deny":
+                decision = "deny"
+            elif effect.get("decision") == "require_review" and decision != "deny":
+                decision = "require_review"
+    return {"decision": decision, "matched_rules": matched, "actions": actions, "context": context}
+
+
+def _matches(condition: Dict[str, Any], context: Dict[str, Any]) -> bool:
+    for key, expected in condition.items():
+        if key.endswith("_lt"):
+            if not context.get(key[:-3], 0) < expected:
+                return False
+        elif key.endswith("_gt"):
+            if not context.get(key[:-3], 0) > expected:
+                return False
+        elif context.get(key) != expected:
+            return False
+    return True
+'''
+        template = Template(template_str)
+        return template.render(contracts_literal=contracts_literal)
+
+    def _capability_records(self, context: CompositionContext) -> List[Dict[str, Any]]:
+        """Return normalized metadata for selected capabilities."""
+        records = []
+        for capability in context.capabilities:
+            slug = self._capability_slug(capability)
+            capability_id = f"{capability.category.value}/{slug}"
+            records.append({
+                "id": capability_id,
+                "slug": slug,
+                "name": capability.name,
+                "category": capability.category.value,
+                "version": capability.version,
+                "description": capability.description,
+                "features": list(capability.features),
+                "configuration": dict(capability.configuration),
+                "dependencies": [
+                    {
+                        "name": dependency.name,
+                        "version": dependency.version,
+                        "optional": dependency.optional,
+                        "reason": dependency.reason,
+                    }
+                    for dependency in capability.dependencies
+                ],
+            })
+        return records
+
+    def _build_generated_contract(self, record: Dict[str, Any], context: CompositionContext) -> Dict[str, Any]:
+        """Build the executable contract shape for one generated app capability."""
+        route_prefix = f"/{record['category']}/{record['slug'].replace('_', '-')}"
+        default_theme = f"{record['slug']}_operations"
+        return {
+            "capability": record["id"],
+            "display_name": record["name"],
+            "configuration": {
+                "tenant_id": "default",
+                "capability": {
+                    "id": record["id"],
+                    "name": record["name"],
+                    "category": record["category"],
+                    "version": record["version"],
+                    "description": record["description"],
+                    "enabled": True,
+                    "features": record["features"],
+                    "dependencies": record["dependencies"],
+                },
+                "composition": {
+                    "project_name": context.project_name,
+                    "base_template": context.base_template.name if context.base_template else "",
+                    "generated_by": "APG Composition Engine",
+                },
+                "execution": {
+                    "require_tenant_context": True,
+                    "audit_operations": True,
+                    "policy_enforced": True,
+                    "async_supported": True,
+                },
+                "capability_settings": record["configuration"],
+                "ui": {
+                    "enable_dashboard": True,
+                    "enable_operations": True,
+                    "enable_rules": True,
+                    "enable_settings": True,
+                },
+                "theme": {
+                    "default_theme": default_theme,
+                    "allow_tenant_overrides": True,
+                },
+            },
+            "configuration_schema": {
+                "type": "object",
+                "required": ["tenant_id", "capability", "composition", "execution", "ui", "theme"],
+                "properties": {
+                    "tenant_id": {"type": "string", "minLength": 1},
+                    "capability": {"type": "object"},
+                    "composition": {"type": "object"},
+                    "execution": {"type": "object"},
+                    "capability_settings": {"type": "object"},
+                    "ui": {"type": "object"},
+                    "theme": {"type": "object"},
+                },
+            },
+            "rule_engine": {
+                "type": "deterministic",
+                "rules": [
+                    {
+                        "name": "tenant_context_required",
+                        "description": f"{record['name']} operations require tenant context.",
+                        "condition": {"tenant_context_present": False},
+                        "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"},
+                    },
+                    {
+                        "name": "operation_policy_required",
+                        "description": f"{record['name']} write operations require policy enforcement.",
+                        "condition": {"operation_type": "write", "policy_attached": False},
+                        "effect": {"decision": "deny", "reason": "operation_policy_required", "required_action": "attach_operation_policy"},
+                    },
+                    {
+                        "name": "high_risk_requires_review",
+                        "description": f"High-risk {record['name']} operations require review.",
+                        "condition": {"risk_level": "high", "review_recorded": False},
+                        "effect": {"decision": "require_review", "reason": "high_risk_review_required", "required_action": "record_review"},
+                    },
+                ],
+            },
+            "ui": {
+                "shell": "flask_appbuilder",
+                "api_prefix": f"{route_prefix}/api/v1",
+                "routes": [
+                    {"name": "dashboard", "path": f"{route_prefix}/dashboard", "component": "CapabilityDashboard", "permission": f"{record['id']}:view", "nav_group": "Overview"},
+                    {"name": "operations", "path": f"{route_prefix}/operations", "component": "CapabilityOperations", "permission": f"{record['id']}:operate", "nav_group": "Operations"},
+                    {"name": "rules", "path": f"{route_prefix}/rules", "component": "CapabilityRules", "permission": f"{record['id']}:govern", "nav_group": "Governance"},
+                    {"name": "settings", "path": f"{route_prefix}/settings", "component": "CapabilitySettings", "permission": f"{record['id']}:admin", "nav_group": "Administration"},
+                ],
+                "template_roots": ["templates/", "static/"],
+                "requires_theme": True,
+            },
+            "theme": {
+                "name": default_theme,
+                "tokens": {
+                    "color.primary": "#28536B",
+                    "color.accent": "#C44536",
+                    "color.success": "#2F855A",
+                    "color.warning": "#B7791F",
+                    "color.danger": "#C53030",
+                    "surface.canvas": "#F7F8FA",
+                    "surface.panel": "#FFFFFF",
+                    "text.primary": "#172033",
+                    "text.secondary": "#52606D",
+                    "border.radius": "8px",
+                    "density": "compact",
+                },
+                "components": {
+                    "dashboard": {"icon": "layout-dashboard", "status_indicator": "health-pill", "risk_style": "policy-band"},
+                    "operations": {"visual": "work-queue", "status_style": "sla-chip"},
+                    "rules": {"visual": "rule-list", "status_style": "decision-chip"},
+                    "settings": {"visual": "settings-panel", "density": "compact"},
+                },
+            },
+        }
+
+    @staticmethod
+    def _capability_slug(capability: Capability) -> str:
+        """Return the generated-app-safe slug for a capability name."""
+        return capability.name.lower().replace(" ", "_").replace("-", "_")
     
     def validate_composition(self, context: CompositionContext) -> Dict[str, List[str]]:
         """Validate that the composition is valid"""

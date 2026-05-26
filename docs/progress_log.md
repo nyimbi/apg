@@ -1639,3 +1639,19 @@ Verification:
 - `bash -n capabilities/composition/events/docker/entrypoint.sh`
 - `.venv/bin/python -c "import yaml, pathlib; ..."` -> parsed 5 YAML files
 - `git diff --check -- capabilities/composition/events/docker-compose.yml capabilities/composition/events/docker/entrypoint.sh capabilities/composition/events/k8s/configmap.yaml capabilities/composition/events/k8s/secret.yaml capabilities/composition/events/k8s/deployment.yaml capabilities/composition/events/k8s/service.yaml capabilities/composition/events/README.md capabilities/composition/events/docs/deployment.md docs/progress_log.md`
+
+### 2026-05-26 18:56 EAT
+
+Completed checkpoint:
+
+- Added generated `capability_contracts.py` to composable application output so selected capabilities carry executable configuration, schema, deterministic rule, UI route, and theme metadata into generated apps.
+- Reworked generated `capability_registry.py` to use actual selected capability ids, names, categories, versions, descriptions, and features instead of placeholder category/version TODOs.
+- Added dependency-free generated helpers for listing contracts, retrieving one contract, validating contract shape, and evaluating deterministic rules.
+- Documented generated-app capability contracts as part of the public executable contract surface.
+- Added focused generated-app contract tests covering contract emission, shape validation, rule execution, and registry metadata.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_composition_engine.py tests/test_composition_capability_contracts.py` -> 4 passed
+- `.venv/bin/python -m py_compile templates/composable/composition_engine.py tests/test_composition_capability_contracts.py`
+- `git diff --check -- templates/composable/composition_engine.py tests/test_composition_capability_contracts.py docs/capability_contracts.md`
