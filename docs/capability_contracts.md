@@ -25,6 +25,7 @@ from capabilities import (
 
 registry = load_contract_registry()
 contract = get_capability_contract("composition_events")
+validation = validate_contract_registry()
 decision = evaluate_capability_contract_rules(
     "composition_events",
     {
@@ -37,6 +38,14 @@ decision = evaluate_capability_contract_rules(
 
 The registry discovers every `capability_contract.py` under `capabilities/`,
 validates the required shape, and indexes contracts by capability id.
+`validate_contract_registry()` returns a structured report with `valid`,
+`contract_count`, `error_count`, `errors`, and `capabilities`.
+
+Validation is intentionally stronger than a presence check. Every contract must
+expose tenant-scoped configuration, a schema that requires `tenant_id`, `ui`,
+and `theme`, deterministic rules with named conditions and decisions, UI routes
+with route/component/permission metadata, and a named visual theme with tokens
+and component styling.
 
 ## CLI Validation
 

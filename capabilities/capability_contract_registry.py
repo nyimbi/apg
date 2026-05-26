@@ -12,6 +12,10 @@ from typing import Any, Iterable
 
 CONTRACT_FILENAME = "capability_contract.py"
 REQUIRED_CONTRACT_KEYS = {"configuration", "configuration_schema", "rule_engine", "ui", "theme"}
+REQUIRED_SCHEMA_KEYS = {"tenant_id", "ui", "theme"}
+REQUIRED_RULE_KEYS = {"name", "condition", "effect"}
+REQUIRED_ROUTE_KEYS = {"name", "path", "component", "permission"}
+REQUIRED_THEME_TOKENS = {"border.radius"}
 
 
 @dataclass(frozen=True)
@@ -59,6 +63,40 @@ def load_contract_registry(
 	return records
 
 
+def validate_contract_registry(
+	root: Path | str | None = None,
+	tenant_id: str = "default",
+) -> dict[str, Any]:
+	"""Validate all discovered contracts and return a structured report."""
+	errors: list[str] = []
+	records: dict[str, CapabilityContractRecord] = {}
+	for path in discover_contract_paths(root):
+		try:
+			module = _load_contract_module(path)
+			if not hasattr(module, "get_capability_contract"):
+				raise ValueError(f"{path} does not expose get_capability_contract")
+			contract = module.get_capability_contract(tenant_id)
+			validate_contract_shape(contract, path)
+			capability_id = str(contract["capability"])
+			records[capability_id] = CapabilityContractRecord(
+				capability_id=capability_id,
+				display_name=str(contract.get("display_name") or capability_id),
+				path=path,
+				module_name=module.__name__,
+				contract=contract,
+				module=module,
+			)
+		except Exception as exc:
+			errors.append(f"{path}: {exc}")
+	return {
+		"valid": not errors,
+		"contract_count": len(records),
+		"error_count": len(errors),
+		"errors": errors,
+		"capabilities": sorted(records),
+	}
+
+
 def get_contract(
 	capability_id: str,
 	root: Path | str | None = None,
@@ -95,9 +133,19 @@ def validate_contract_shape(contract: dict[str, Any], source: Path | str = "<con
 		raise ValueError(f"{source} configuration must be a dict")
 	if not isinstance(contract["configuration_schema"], dict):
 		raise ValueError(f"{source} configuration_schema must be a dict")
+	_validate_configuration(contract["configuration"], contract["configuration_schema"], source)
 	_validate_rule_engine(contract["rule_engine"], source)
 	_validate_ui(contract["ui"], source)
 	_validate_theme(contract["theme"], source)
+
+
+def _validate_configuration(configuration: Any, schema: Any, source: Path | str) -> None:
+	if not isinstance(configuration.get("tenant_id"), str) or not configuration["tenant_id"]:
+		raise ValueError(f"{source} configuration.tenant_id must be a non-empty string")
+	required = set(schema.get("required", []))
+	missing = sorted(REQUIRED_SCHEMA_KEYS - required)
+	if missing:
+		raise ValueError(f"{source} configuration_schema.required missing: {', '.join(missing)}")
 
 
 def _load_contract_module(path: Path) -> ModuleType:
@@ -119,6 +167,20 @@ def _validate_rule_engine(rule_engine: Any, source: Path | str) -> None:
 	rules = rule_engine.get("rules")
 	if not isinstance(rules, list) or not rules:
 		raise ValueError(f"{source} rule_engine.rules must be a non-empty list")
+	for index, rule in enumerate(rules):
+		if not isinstance(rule, dict):
+			raise ValueError(f"{source} rule_engine.rules[{index}] must be a dict")
+		missing = sorted(REQUIRED_RULE_KEYS - set(rule))
+		if missing:
+			raise ValueError(f"{source} rule_engine.rules[{index}] missing: {', '.join(missing)}")
+		if not isinstance(rule["name"], str) or not rule["name"]:
+			raise ValueError(f"{source} rule_engine.rules[{index}].name must be a non-empty string")
+		if not isinstance(rule["condition"], dict):
+			raise ValueError(f"{source} rule_engine.rules[{index}].condition must be a dict")
+		if not isinstance(rule["effect"], dict):
+			raise ValueError(f"{source} rule_engine.rules[{index}].effect must be a dict")
+		if not rule["effect"].get("decision"):
+			raise ValueError(f"{source} rule_engine.rules[{index}].effect.decision is required")
 
 
 def _validate_ui(ui: Any, source: Path | str) -> None:
@@ -126,15 +188,37 @@ def _validate_ui(ui: Any, source: Path | str) -> None:
 		raise ValueError(f"{source} ui must be a dict")
 	if ui.get("requires_theme") is not True:
 		raise ValueError(f"{source} ui.requires_theme must be true")
+	if not isinstance(ui.get("shell"), str) or not ui["shell"]:
+		raise ValueError(f"{source} ui.shell must be a non-empty string")
+	if not isinstance(ui.get("template_roots"), list) or not ui["template_roots"]:
+		raise ValueError(f"{source} ui.template_roots must be a non-empty list")
 	if not isinstance(ui.get("routes"), list) or not ui["routes"]:
 		raise ValueError(f"{source} ui.routes must be a non-empty list")
+	for index, route in enumerate(ui["routes"]):
+		if not isinstance(route, dict):
+			raise ValueError(f"{source} ui.routes[{index}] must be a dict")
+		missing = sorted(REQUIRED_ROUTE_KEYS - set(route))
+		if missing:
+			raise ValueError(f"{source} ui.routes[{index}] missing: {', '.join(missing)}")
+		for key in REQUIRED_ROUTE_KEYS:
+			if not isinstance(route[key], str) or not route[key]:
+				raise ValueError(f"{source} ui.routes[{index}].{key} must be a non-empty string")
+		if not route["path"].startswith("/"):
+			raise ValueError(f"{source} ui.routes[{index}].path must start with /")
 
 
 def _validate_theme(theme: Any, source: Path | str) -> None:
 	if not isinstance(theme, dict):
 		raise ValueError(f"{source} theme must be a dict")
+	if not isinstance(theme.get("name"), str) or not theme["name"]:
+		raise ValueError(f"{source} theme.name must be a non-empty string")
 	if not isinstance(theme.get("tokens"), dict) or not theme["tokens"]:
 		raise ValueError(f"{source} theme.tokens must be a non-empty dict")
+	missing_tokens = sorted(REQUIRED_THEME_TOKENS - set(theme["tokens"]))
+	if missing_tokens:
+		raise ValueError(f"{source} theme.tokens missing: {', '.join(missing_tokens)}")
+	if not isinstance(theme.get("components"), dict) or not theme["components"]:
+		raise ValueError(f"{source} theme.components must be a non-empty dict")
 
 
 def _evaluate_default(rules: Iterable[dict[str, Any]], context: dict[str, Any]) -> dict[str, Any]:

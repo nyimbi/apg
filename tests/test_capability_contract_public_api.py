@@ -7,8 +7,11 @@ import capabilities
 
 def test_capability_contract_registry_is_public_api():
 	registry = capabilities.load_contract_registry()
+	validation = capabilities.validate_contract_registry()
 
 	assert len(registry) >= 100
+	assert validation["valid"] is True
+	assert validation["contract_count"] >= 100
 	assert capabilities.get_capability_contract("composition_events")["capability"] == "composition_events"
 	assert capabilities.get_system_statistics()["executable_contracts"] >= 100
 

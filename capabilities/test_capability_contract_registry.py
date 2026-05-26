@@ -7,6 +7,7 @@ from capabilities.capability_contract_registry import (
 	evaluate_rules,
 	get_contract,
 	load_contract_registry,
+	validate_contract_registry,
 	validate_contract_shape,
 )
 
@@ -23,6 +24,16 @@ def test_registry_discovers_and_validates_all_capability_contracts():
 
 	for record in registry.values():
 		validate_contract_shape(record.contract, record.path)
+
+
+def test_registry_returns_structured_validation_report():
+	report = validate_contract_registry()
+
+	assert report["valid"] is True
+	assert report["contract_count"] >= 100
+	assert report["error_count"] == 0
+	assert report["errors"] == []
+	assert {"nlpc", "composition_events", "fintech_gateway"} <= set(report["capabilities"])
 
 
 def test_registry_returns_contract_by_capability_id():

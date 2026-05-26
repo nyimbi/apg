@@ -93,6 +93,7 @@ from .capability_contract_registry import (
 	evaluate_rules as evaluate_capability_contract_rules,
 	get_contract as get_capability_contract,
 	load_contract_registry,
+	validate_contract_registry,
 	validate_contract_shape,
 )
 
@@ -404,7 +405,7 @@ __all__ = [
 	# Validation functions
 	'validate_capability_combination', 'get_system_statistics',
 	'discover_contract_paths', 'load_contract_registry', 'get_capability_contract',
-	'validate_contract_shape', 'evaluate_capability_contract_rules',
+	'validate_contract_registry', 'validate_contract_shape', 'evaluate_capability_contract_rules',
 	
 	# Composition functions
 	'get_composition_engine', 'load_capability',

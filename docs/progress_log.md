@@ -1926,3 +1926,21 @@ Verification:
 
 - `.venv/bin/python -m pytest -q tests/test_ai_agent_composition.py` -> 4 passed
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories` -> 1 passed
+
+### 2026-05-26 21:21 EAT
+
+Completed checkpoint:
+
+- Tightened the platform-wide executable capability contract registry so configuration, rule engines, UI routes, and visual themes are validated beyond top-level presence.
+- Added structured `validate_contract_registry()` reporting with validity, contract count, error count, error details, and discovered capability IDs.
+- Enforced tenant-scoped configuration, schema requirements for `tenant_id`/`ui`/`theme`, named deterministic rules with decisions, UI route metadata, and theme names/tokens/components across all discovered contracts.
+- Exposed the structured validation report through the public `capabilities` API and switched the CLI validation command to use it.
+- Documented the stronger validation guarantees in `docs/capability_contracts.md`.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/capability_contract_registry.py capabilities/__init__.py cli.py capabilities/test_capability_contract_registry.py tests/test_capability_contract_public_api.py tests/test_cli_capability_contracts.py`
+- `.venv/bin/python -m pytest -q capabilities/test_capability_contract_registry.py tests/test_capability_contract_public_api.py tests/test_cli_capability_contracts.py` -> 10 passed
+- `.venv/bin/python -m pytest -q tests/test_composition_capability_contracts.py tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories` -> 4 passed
+- `.venv/bin/python cli.py capabilities validate-contracts` -> `Validated 101 capability contracts`
+- `python cli.py capabilities validate-contracts` -> failed before CLI dispatch because the system Python environment is missing `antlr4`; the project `.venv` command above is the authoritative verification.

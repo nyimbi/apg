@@ -26,7 +26,7 @@ try:
     from .templates.composable.composition_engine import CompositionEngine
     from .templates.composable.base_template import BaseTemplateType
     from .templates.composable.capability import CapabilityCategory
-    from .capabilities.capability_contract_registry import load_contract_registry, validate_contract_shape
+    from .capabilities.capability_contract_registry import load_contract_registry, validate_contract_registry
 except ImportError:
     # Handle direct execution
     from compiler.compiler import APGCompiler, CodeGenConfig, CompilationResult
@@ -35,7 +35,7 @@ except ImportError:
     from templates.composable.composition_engine import CompositionEngine
     from templates.composable.base_template import BaseTemplateType
     from templates.composable.capability import CapabilityCategory
-    from capabilities.capability_contract_registry import load_contract_registry, validate_contract_shape
+    from capabilities.capability_contract_registry import load_contract_registry, validate_contract_registry
 
 
 # ========================================
@@ -625,11 +625,14 @@ class APGCLICommands:
 	def validate_capability_contracts(self) -> bool:
 		"""Validate every executable capability contract"""
 		try:
-			registry = load_contract_registry()
-			for record in registry.values():
-				validate_contract_shape(record.contract, record.path)
-			print(f"✓ Validated {len(registry)} capability contracts")
-			return True
+			report = validate_contract_registry()
+			if report["valid"]:
+				print(f"✓ Validated {report['contract_count']} capability contracts")
+				return True
+			print(f"✗ Capability contract validation failed with {report['error_count']} errors")
+			for error in report["errors"]:
+				print(f"  - {error}")
+			return False
 		except Exception as e:
 			print(f"✗ Capability contract validation failed: {e}")
 			return False
