@@ -25,6 +25,10 @@ from .models import (
 	MonitoringQuery, MonitoringTarget, MetricType, AlertSeverity, AlertStatus,
 	AlertConditionType, DashboardType, DataRetentionPolicy, MonitoringScope
 )
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
 
 # Capability metadata for APG composition engine
 __capability_name__ = "moni"
@@ -81,6 +85,10 @@ __all__ = [
 	
 	# APG metadata
 	'CAPABILITY_METADATA',
+	'register_capability',
+	'get_capability_info',
+	'get_capability_contract',
+	'evaluate_capability_rules',
 	'__capability_name__',
 	'__capability_version__',
 	'__capability_description__',
@@ -107,6 +115,72 @@ async def initialize_capability(config: dict = None) -> MonitoringService:
 	await service.initialize(config)
 	
 	return service
+
+
+def register_capability() -> dict:
+	"""Register monitoring and observability with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "moni",
+		"aliases": ["monitoring", "observability", "signals"],
+		"display_name": CAPABILITY_METADATA["display_name"],
+		"description": __capability_description__,
+		"version": __capability_version__,
+		"dependencies": __capability_dependencies__,
+		"optional_dependencies": __capability_optional_dependencies__,
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"metrics_collection": "Track tenant-aware metrics from APG capabilities",
+			"log_observability": "Ingest and govern structured logs",
+			"trace_exploration": "Expose distributed trace navigation surfaces",
+			"alert_orchestration": "Create, route, deduplicate, and correlate alerts",
+			"autonomous_remediation": "Coordinate runbook-backed remediation workflows",
+			"capability_rules": "Evaluate deterministic observability governance rules",
+			"visual_theming": "Apply signal-console theme tokens and components"
+		},
+		"endpoints": {
+			"metrics": "/moni/api/v1/metrics",
+			"logs": "/moni/api/v1/logs",
+			"traces": "/moni/api/v1/traces",
+			"alerts": "/moni/api/v1/alerts",
+			"rules": "/moni/api/v1/rules",
+			"analytics": "/moni/api/v1/analytics"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"moni:view",
+			"moni:view_metrics",
+			"moni:view_traces",
+			"moni:manage_alerts",
+			"moni:manage_rules",
+			"moni:view_analytics",
+			"moni:remediate",
+			"moni:admin"
+		]
+	}
+
+
+def get_capability_info() -> dict:
+	"""Get MONI capability information for composition and marketplace discovery."""
+	return {
+		"metadata": CAPABILITY_METADATA,
+		"contract": get_capability_contract(),
+		"features": [
+			"Predictive issue prevention",
+			"Contextual business impact correlation",
+			"Unified metrics, logs, and traces",
+			"Intelligent alert orchestration",
+			"Autonomous remediation workflow support",
+			"Performance optimization advisor"
+		]
+	}
 
 
 # APG capability health check

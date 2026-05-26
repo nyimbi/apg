@@ -439,3 +439,24 @@ Current broader MQEB/CACH execution findings:
 - MQEB contract discovery/registration now works despite current Flask-AppBuilder auth constant drift in its optional UI layer.
 - CACH contract discovery/registration now works without optional compression packages such as `lz4` and `zstandard`.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 08:32 EAT
+
+Completed checkpoint:
+
+- Made the MONI reliability capability executable as a first-class APG capability with tenant-scoped collection, alerting, analytics, retention, remediation, security, UI, and theme configuration.
+- Added deterministic MONI observability-governance rules for tenant context, metric source attribution, critical alert routing, PII log redaction, high-cardinality review, and production remediation runbook approval.
+- Made the HLTH reliability capability executable as a first-class APG capability with tenant-scoped assessment, baselines, alerts, prediction, remediation, incidents, UI, and theme configuration.
+- Added deterministic HLTH health-governance rules for tenant context, component identifiers, critical health alerts, remediation runbooks, stale baseline review, and critical incident deployment blocking.
+- Exposed MONI and HLTH contract helpers through package registration/info surfaces for lightweight composition-time discovery.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/moni/__init__.py capabilities/common/moni/capability_contract.py capabilities/common/moni/tests/test_capability_contract.py capabilities/common/hlth/__init__.py capabilities/common/hlth/capability_contract.py capabilities/common/hlth/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/moni/tests/test_capability_contract.py capabilities/common/hlth/test_capability_contract.py` -> 6 passed, 15 warnings
+
+Current broader MONI/HLTH execution findings:
+
+- MONI and HLTH contract discovery/registration now work without starting their monitoring or health runtimes.
+- The focused HLTH contract test lives outside `capabilities/common/hlth/tests/` because that directory's existing `conftest.py` imports the full health service stack and currently hits a pre-existing `HealthThreshold` model/service mismatch.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

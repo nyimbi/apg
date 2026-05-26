@@ -16,6 +16,10 @@ from .models import (
 	HealthAction, SystemComponent, HealthReport,
 	HealthStatus, HealthSeverity, HealthDimension
 )
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
 
 
 # APG Capability Metadata for Composition Engine Registration
@@ -484,7 +488,59 @@ async def _register_health_event_handlers() -> None:
 # APG Composition Engine Integration Functions
 def get_capability_metadata() -> Dict[str, Any]:
 	"""Get capability metadata for APG composition engine registration"""
-	return CAPABILITY_METADATA.copy()
+	metadata = CAPABILITY_METADATA.copy()
+	metadata['contract'] = get_capability_contract()
+	return metadata
+
+
+def register_capability() -> Dict[str, Any]:
+	"""Register system health management with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		'name': 'hlth',
+		'aliases': ['system_health', 'health_checks', 'diagnostics'],
+		'display_name': CAPABILITY_METADATA['display_name'],
+		'description': CAPABILITY_METADATA['description'],
+		'version': CAPABILITY_METADATA['version'],
+		'dependencies': CAPABILITY_METADATA['dependencies'],
+		'optional_dependencies': CAPABILITY_METADATA['optional_dependencies'],
+		'configuration': contract['configuration'],
+		'configuration_schema': contract['configuration_schema'],
+		'rule_engine': contract['rule_engine'],
+		'capabilities': {
+			'health_assessment': 'Score component and platform health with tenant context',
+			'health_prediction': 'Forecast component health and failure risks',
+			'incident_governance': 'Coordinate health incidents, reports, and remediation',
+			'autonomous_remediation': 'Run approved health remediation workflows',
+			'capability_rules': 'Evaluate deterministic health governance rules',
+			'visual_theming': 'Apply health-console theme tokens and components'
+		},
+		'endpoints': {
+			'assessment': '/hlth/api/v1/assessment',
+			'components': '/hlth/api/v1/components',
+			'alerts': '/hlth/api/v1/alerts',
+			'incidents': '/hlth/api/v1/incidents',
+			'predictions': '/hlth/api/v1/predictions',
+			'remediation': '/hlth/api/v1/remediation',
+			'reports': '/hlth/api/v1/reports'
+		},
+		'ui_components': {
+			route['name']: route['path']
+			for route in contract['ui']['routes']
+		},
+		'ui_manifest': contract['ui'],
+		'theme': contract['theme'],
+		'permissions': CAPABILITY_METADATA['permissions']
+	}
+
+
+def get_capability_info() -> Dict[str, Any]:
+	"""Get HLTH capability information for composition and marketplace discovery."""
+	return {
+		'metadata': CAPABILITY_METADATA,
+		'contract': get_capability_contract(),
+		'features': CAPABILITY_METADATA['features']
+	}
 
 
 def get_export_functions() -> Dict[str, Any]:
@@ -549,6 +605,8 @@ def get_health_service() -> Optional['SystemHealthService']:
 # Export all public functions and classes
 __all__ = [
 	'CAPABILITY_METADATA',
+	'register_capability',
+	'get_capability_info',
 	'initialize_capability',
 	'health_check',
 	'track_component_health',
@@ -559,5 +617,7 @@ __all__ = [
 	'get_capability_metadata',
 	'get_export_functions',
 	'get_api_routes',
-	'get_health_service'
+	'get_health_service',
+	'get_capability_contract',
+	'evaluate_capability_rules'
 ]
