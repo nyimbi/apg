@@ -20,6 +20,7 @@ from .models import (
 	CFBFForecast, CFBFForecastLine, CFBFActualVsBudget, CFBFDrivers,
 	CFBFTemplate, CFBFApproval, CFBFAllocation
 )
+from .context import get_tenant_id_from_request
 from .service import CFBFBudgetService, CFBFVarianceAnalysisService, CFBFForecastService, CFBFDriverService
 from ...auth_rbac.decorators import require_permission
 from ...database import db
@@ -142,8 +143,8 @@ variances_schema = VarianceAnalysisSchema(many=True)
 
 def get_tenant_id() -> str:
 	"""Get tenant ID from JWT token or request context"""
-	# Implementation would extract tenant ID from JWT or session
-	return request.headers.get('X-Tenant-ID', 'default_tenant')
+	payload = request.get_json(silent=True) if request.is_json else None
+	return get_tenant_id_from_request(payload)
 
 
 def get_user_id() -> str:

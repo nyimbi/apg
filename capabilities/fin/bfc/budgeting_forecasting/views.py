@@ -21,6 +21,7 @@ from .models import (
 	CFBFForecast, CFBFForecastLine, CFBFActualVsBudget, CFBFDrivers,
 	CFBFTemplate, CFBFApproval, CFBFAllocation
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import CFBFBudgetService, CFBFVarianceAnalysisService, CFBFForecastService, CFBFDriverService
 from ..general_ledger.models import CFGLAccount
 
@@ -767,10 +768,8 @@ class CFBFScenarioComparisonView(BaseView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		# Implementation would depend on your authentication system
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID"""
-		# Implementation would depend on your authentication system
-		return "current_user"
+		return get_current_user_id()

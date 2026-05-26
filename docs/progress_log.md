@@ -2435,3 +2435,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_pde_pim_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "session\.get\('tenant_id', 'default_tenant'\)|session\.get\('user_id', 'system'\)|default_tenant" capabilities/pde/pim/blueprint.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:48 EAT
+
+Completed checkpoint:
+
+- Replaced Budgeting & Forecasting API/view tenant defaults and scenario-comparison current-user placeholder with shared request-context helpers.
+- BFC API tenant lookup and scenario comparison budget/variance service construction now resolve tenant/user identity from payload, Flask context/current user, `g.user`, session, APG headers, query args, request environment, and configured fallbacks.
+- Added focused regression coverage that rejects stale BFC tenant/user placeholders and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/bfc/budgeting_forecasting/context.py capabilities/fin/bfc/budgeting_forecasting/views.py capabilities/fin/bfc/budgeting_forecasting/api.py tests/test_fin_bfc_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_bfc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|return \"current_user\"|request\.headers\.get\('X-Tenant-ID', 'default_tenant'\)|Implementation would depend on your authentication system" capabilities/fin/bfc/budgeting_forecasting/views.py capabilities/fin/bfc/budgeting_forecasting/api.py` -> no matches
+- `git diff --check` -> no issues
