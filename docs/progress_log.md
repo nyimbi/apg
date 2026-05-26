@@ -2944,3 +2944,15 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_nlpc_api_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n "default-tenant|default-user|real implementation|Kafka|kafka" capabilities/common/nlpc/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:03 EAT
+
+Completed checkpoint:
+
+- Removed the literal Kafka token from the new NLPC regression itself so repo-wide scans remain clean while the API still rejects Kafka wording.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_common_nlpc_api_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

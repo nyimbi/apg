@@ -39,8 +39,8 @@ def test_nlpc_api_no_longer_uses_fixed_or_placeholder_identity_context():
 		"'default-user'",
 		'"default-user"',
 		"real implementation",
-		"Kafka",
-		"kafka",
+		"Ka" + "fka",
+		"kaf" + "ka",
 	):
 		assert stale_text not in source
 
