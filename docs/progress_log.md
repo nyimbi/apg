@@ -2758,3 +2758,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_bfc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "tenant_id=['\"]default_tenant['\"]|['\"]default_tenant['\"]|return ['\"]current_user['\"]|user_id=['\"]current_user['\"]" capabilities/fin/bfc/budgeting_forecasting/context.py capabilities/fin/bfc/budgeting_forecasting/blueprint.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:17 EAT
+
+Completed checkpoint:
+
+- Replaced stale SCM context-helper `default_tenant` environment fallbacks with `APG_DEFAULT_TENANT_ID`, `APG_TENANT_ID`, then `default`.
+- Applied the fallback cleanup across sourcing, demand planning, contract management, blanket orders, reporting, requisitioning, supplier management, stock tracking, and purchase order management context helpers.
+- Added a focused SCM fallback hygiene regression that rejects literal `default_tenant` in the cleaned context helpers.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/scm/src/context.py capabilities/scm/dpl/demand_planning/context.py capabilities/scm/ctm/contract_management/context.py capabilities/scm/blt/context.py capabilities/scm/rep/context.py capabilities/scm/req/context.py capabilities/scm/edm/context.py capabilities/scm/inv/stock_tracking_control/context.py capabilities/scm/pom/context.py tests/test_scm_context_fallback_hygiene.py`
+- `.venv/bin/python -m pytest -q tests/test_scm_context_fallback_hygiene.py tests/test_scm_req_context_resolution.py tests/test_scm_src_tenant_resolution.py tests/test_scm_dpl_context_resolution.py tests/test_scm_ctm_tenant_resolution.py tests/test_scm_stc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 12 passed
+- `rg -n "os\\.getenv\\(['\"]APG_DEFAULT_TENANT_ID['\"], ['\"]default_tenant['\"]\\)|['\"]default_tenant['\"]" capabilities/scm/src/context.py capabilities/scm/dpl/demand_planning/context.py capabilities/scm/ctm/contract_management/context.py capabilities/scm/blt/context.py capabilities/scm/rep/context.py capabilities/scm/req/context.py capabilities/scm/edm/context.py capabilities/scm/inv/stock_tracking_control/context.py capabilities/scm/pom/context.py` -> no matches
+- `git diff --check` -> no issues
