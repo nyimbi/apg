@@ -23,15 +23,46 @@ from .models import (
 
 from .service import MQEBService, create_mqeb_service
 
-from .blueprint import (
-    MQEBBlueprint, MQEBAppBuilderConfig,
-    create_mqeb_app, create_mqeb_appbuilder, create_mqeb_blueprint
+from .capability_contract import (
+    get_capability_contract,
+    evaluate_capability_rules
 )
+try:
+    from .blueprint import (
+        MQEBBlueprint, MQEBAppBuilderConfig,
+        create_mqeb_app, create_mqeb_appbuilder, create_mqeb_blueprint
+    )
 
-from .views import (
-    MQEBDashboardView, TopicManagementView, MessagePublishingView,
-    SubscriptionManagementView, MonitoringView, init_views
-)
+    from .views import (
+        MQEBDashboardView, TopicManagementView, MessagePublishingView,
+        SubscriptionManagementView, MonitoringView, init_views
+    )
+    _UI_IMPORT_ERROR = None
+except ImportError as exc:
+    MQEBBlueprint = None
+    MQEBAppBuilderConfig = None
+    MQEBDashboardView = None
+    TopicManagementView = None
+    MessagePublishingView = None
+    SubscriptionManagementView = None
+    MonitoringView = None
+    _UI_IMPORT_ERROR = exc
+
+    def create_mqeb_app(*args, **kwargs):
+        """Require optional Flask-AppBuilder dependencies before app creation."""
+        raise ImportError("MQEB UI integration requires compatible Flask-AppBuilder dependencies") from _UI_IMPORT_ERROR
+
+    def create_mqeb_appbuilder(*args, **kwargs):
+        """Require optional Flask-AppBuilder dependencies before AppBuilder creation."""
+        raise ImportError("MQEB UI integration requires compatible Flask-AppBuilder dependencies") from _UI_IMPORT_ERROR
+
+    def create_mqeb_blueprint(*args, **kwargs):
+        """Require optional Flask-AppBuilder dependencies before blueprint creation."""
+        raise ImportError("MQEB UI integration requires compatible Flask-AppBuilder dependencies") from _UI_IMPORT_ERROR
+
+    def init_views(*args, **kwargs):
+        """Require optional Flask-AppBuilder dependencies before view registration."""
+        raise ImportError("MQEB UI integration requires compatible Flask-AppBuilder dependencies") from _UI_IMPORT_ERROR
 
 # Version information
 __version__ = "1.0.0"
@@ -160,7 +191,56 @@ INDUSTRY_BENCHMARKS = {
 
 def get_capability_info() -> dict:
     """Get MQEB capability information"""
-    return APG_CAPABILITY_INFO.copy()
+    info = APG_CAPABILITY_INFO.copy()
+    info["contract"] = get_capability_contract()
+    return info
+
+
+def register_capability() -> dict:
+    """Register MQEB with the APG composition engine."""
+    contract = get_capability_contract()
+    return {
+        "name": "mqeb",
+        "aliases": ["message_queue_event_bus", "event_bus", "messaging"],
+        "display_name": APG_CAPABILITY_INFO["display_name"],
+        "description": APG_CAPABILITY_INFO["description"],
+        "version": APG_CAPABILITY_INFO["version"],
+        "dependencies": APG_CAPABILITY_INFO["apg_dependencies"],
+        "configuration": contract["configuration"],
+        "configuration_schema": contract["configuration_schema"],
+        "rule_engine": contract["rule_engine"],
+        "capabilities": {
+            "message_routing": "Publish and route messages across tenant-aware topics",
+            "event_streaming": "Expose durable event streams with delivery guarantees",
+            "protocol_gateway": "Bridge HTTP, WebSocket, MQTT, AMQP, Kafka, and gRPC traffic",
+            "predictive_scaling": "Scale messaging infrastructure from demand signals",
+            "capability_rules": "Evaluate deterministic message governance rules",
+            "visual_theming": "Apply event-fabric theme tokens and components"
+        },
+        "endpoints": {
+            "topics": "/mqeb/api/v1/topics",
+            "messages": "/mqeb/api/v1/messages",
+            "subscriptions": "/mqeb/api/v1/subscriptions",
+            "routing": "/mqeb/api/v1/routing",
+            "metrics": "/mqeb/api/v1/metrics",
+            "health": "/mqeb/api/v1/health"
+        },
+        "ui_components": {
+            route["name"]: route["path"]
+            for route in contract["ui"]["routes"]
+        },
+        "ui_manifest": contract["ui"],
+        "theme": contract["theme"],
+        "permissions": [
+            "mqeb:view",
+            "mqeb:publish",
+            "mqeb:subscribe",
+            "mqeb:manage_topics",
+            "mqeb:manage_routing",
+            "mqeb:view_metrics",
+            "mqeb:admin"
+        ]
+    }
 
 
 def get_performance_benchmarks() -> dict:
@@ -190,6 +270,7 @@ __all__ = [
     
     # Utility functions
     'get_capability_info', 'get_performance_benchmarks',
+    'register_capability', 'get_capability_contract', 'evaluate_capability_rules',
     
     # Version info
     '__version__', '__author__', '__email__', '__copyright__',

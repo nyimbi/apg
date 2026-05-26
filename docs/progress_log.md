@@ -418,3 +418,24 @@ Current broader ENCR/KEYM execution findings:
 
 - ENCR and KEYM contract discovery/registration now work without initializing their full cryptographic runtimes.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 08:24 EAT
+
+Completed checkpoint:
+
+- Made the MQEB infrastructure capability executable as a first-class APG capability with tenant-scoped broker, delivery, routing, security, compliance, scaling, UI, and theme configuration.
+- Added deterministic MQEB message-governance rules for tenant context, topic existence, restricted-topic encryption, cross-tenant publish blocking, dead-letter requirements, and priority quota review.
+- Made the CACH infrastructure capability executable as a first-class APG capability with tenant-scoped cache hierarchy, policy, warming, security, optimization, telemetry, UI, and theme configuration.
+- Added deterministic CACH cache-governance rules for tenant context, namespace writes, sensitive-entry encryption, cross-tenant access blocking, critical stale reads, and high memory pressure review.
+- Exposed MQEB and CACH contract helpers through package registration/info surfaces while guarding optional UI/runtime imports for lightweight composition-time discovery.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mqeb/__init__.py capabilities/common/mqeb/capability_contract.py capabilities/common/mqeb/tests/test_capability_contract.py capabilities/common/cach/__init__.py capabilities/common/cach/capability_contract.py capabilities/common/cach/tests/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/mqeb/tests/test_capability_contract.py capabilities/common/cach/tests/test_capability_contract.py` -> 6 passed, 15 warnings
+
+Current broader MQEB/CACH execution findings:
+
+- MQEB contract discovery/registration now works despite current Flask-AppBuilder auth constant drift in its optional UI layer.
+- CACH contract discovery/registration now works without optional compression packages such as `lz4` and `zstandard`.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

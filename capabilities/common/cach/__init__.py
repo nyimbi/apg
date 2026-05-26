@@ -19,16 +19,56 @@ Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
 """
 
-from .service import CacheService, CacheServiceConfig, create_cache_service
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
+try:
+	from .service import CacheService, CacheServiceConfig, create_cache_service
+	_SERVICE_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+	if exc.name not in {'lz4', 'zstandard'}:
+		raise
+	CacheService = None
+	CacheServiceConfig = None
+	_SERVICE_IMPORT_ERROR = exc
+
+	def create_cache_service(*args, **kwargs):
+		"""Require optional compression dependencies before service creation."""
+		raise ModuleNotFoundError(
+			"CACH service requires optional compression dependencies: lz4, zstandard"
+		) from _SERVICE_IMPORT_ERROR
+
 from .models import (
 	CacheEntry, CacheCluster, CachePolicy, CacheMetrics, AIOptimizationResult,
 	CacheBackendType, CompressionAlgorithm, EvictionPolicy, CacheAccessPattern,
 	SecurityLevel, CacheTier
 )
-from .blueprint import (
-	cache_blueprint, CacheManagementView, CacheAPIView, CacheChartView,
-	CAPABILITY_METADATA, register_with_appbuilder
-)
+try:
+	from .blueprint import (
+		cache_blueprint, CacheManagementView, CacheAPIView, CacheChartView,
+		CAPABILITY_METADATA, register_with_appbuilder
+	)
+	_BLUEPRINT_IMPORT_ERROR = None
+except (ImportError, ModuleNotFoundError) as exc:
+	cache_blueprint = None
+	CacheManagementView = None
+	CacheAPIView = None
+	CacheChartView = None
+	_BLUEPRINT_IMPORT_ERROR = exc
+	CAPABILITY_METADATA = {
+		"name": "cach",
+		"display_name": "Cache Management",
+		"description": "AI-powered cache management with autonomous optimization",
+		"version": "1.0.0",
+		"category": "infrastructure",
+		"dependencies": ["auth", "audl", "mten", "moni", "conf"],
+		"optional_dependencies": ["aicr", "pred", "anom", "agnt"]
+	}
+
+	def register_with_appbuilder(*args, **kwargs):
+		"""Require optional UI/runtime dependencies before AppBuilder registration."""
+		raise ImportError("CACH UI integration requires optional runtime dependencies") from _BLUEPRINT_IMPORT_ERROR
 
 # Capability metadata for APG composition engine
 __capability_name__ = "cach"
@@ -68,6 +108,10 @@ __all__ = [
 	
 	# APG metadata
 	'CAPABILITY_METADATA',
+	'register_capability',
+	'get_capability_info',
+	'get_capability_contract',
+	'evaluate_capability_rules',
 	'__capability_name__',
 	'__capability_version__',
 	'__capability_description__',
@@ -81,6 +125,10 @@ async def initialize_capability(config: dict = None) -> CacheService:
 	Initialize the cache management capability
 	Called by APG composition engine during capability loading
 	"""
+	if CacheService is None or CacheServiceConfig is None:
+		raise ModuleNotFoundError(
+			"CACH service requires optional compression dependencies: lz4, zstandard"
+		) from _SERVICE_IMPORT_ERROR
 	cache_config = CacheServiceConfig()
 	
 	if config:
@@ -94,6 +142,71 @@ async def initialize_capability(config: dict = None) -> CacheService:
 	await service.initialize(config)
 	
 	return service
+
+
+def register_capability() -> dict:
+	"""Register cache management with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "cach",
+		"aliases": ["cache_management", "cache", "caching_layer"],
+		"display_name": "Cache Management",
+		"description": __capability_description__,
+		"version": __capability_version__,
+		"dependencies": __capability_dependencies__,
+		"optional_dependencies": __capability_optional_dependencies__,
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"cache_operations": "Read, write, delete, and inspect tenant-aware cache entries",
+			"cache_policy_governance": "Apply namespace, TTL, eviction, and security policies",
+			"intelligent_warming": "Warm cache namespaces from configured data sources",
+			"adaptive_optimization": "Tune cache tiers from performance and access signals",
+			"capability_rules": "Evaluate deterministic cache governance rules",
+			"visual_theming": "Apply cache-control theme tokens and components"
+		},
+		"endpoints": {
+			"entries": "/cach/api/v1/entries",
+			"policies": "/cach/api/v1/policies",
+			"warming": "/cach/api/v1/warming",
+			"tiers": "/cach/api/v1/tiers",
+			"analytics": "/cach/api/v1/analytics",
+			"health": "/cach/api/v1/health"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"cach:view",
+			"cach:read",
+			"cach:write",
+			"cach:delete",
+			"cach:manage_policies",
+			"cach:warm",
+			"cach:view_analytics",
+			"cach:admin"
+		]
+	}
+
+
+def get_capability_info() -> dict:
+	"""Get CACH capability information for composition and marketplace discovery."""
+	return {
+		"metadata": CAPABILITY_METADATA,
+		"contract": get_capability_contract(),
+		"features": [
+			"Tenant-aware cache namespaces",
+			"Autonomous cache optimization",
+			"Predictive content warming",
+			"Adaptive multi-tier orchestration",
+			"Content-aware security controls",
+			"Real-time performance analytics"
+		]
+	}
 
 
 # APG capability health check
