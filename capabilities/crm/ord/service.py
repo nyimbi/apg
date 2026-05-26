@@ -8,6 +8,7 @@ pricing calculation, and inventory checking.
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from decimal import Decimal
+import json
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, func
 
@@ -126,6 +127,8 @@ class OrderEntryService:
 			shipping_charge = self._calculate_shipping(order)
 			if shipping_charge:
 				self.db.add(shipping_charge)
+
+		self._log_order_created(order, user_id)
 		
 		self.db.commit()
 		return order
@@ -222,6 +225,7 @@ class OrderEntryService:
 			raise ValueError("Order not found")
 		
 		try:
+			old_status = order.status
 			order.submit_order(user_id)
 			
 			# Check inventory availability
@@ -229,6 +233,8 @@ class OrderEntryService:
 			
 			# Apply any automatic holds
 			self._apply_automatic_holds(order)
+
+			self._log_order_status_change(order, old_status, order.status, user_id)
 			
 			self.db.commit()
 			
@@ -251,7 +257,9 @@ class OrderEntryService:
 			raise ValueError("Order not found")
 		
 		try:
+			old_status = order.status
 			order.approve_order(user_id, notes)
+			self._log_order_status_change(order, old_status, order.status, user_id)
 			self.db.commit()
 			
 			return {
@@ -272,10 +280,13 @@ class OrderEntryService:
 			raise ValueError("Order not found")
 		
 		try:
+			old_status = order.status
 			order.cancel_order(user_id, reason)
 			
 			# Release any inventory allocations
 			self._release_inventory_allocations(order)
+
+			self._log_order_status_change(order, old_status, order.status, user_id)
 			
 			self.db.commit()
 			
@@ -692,8 +703,55 @@ class OrderEntryService:
 	
 	def _log_order_created(self, order: SOESalesOrder, user_id: str):
 		"""Log order creation for audit trail"""
-		pass  # TODO: Implement audit logging
+		return self._append_order_audit_event(
+			order,
+			"order_created",
+			user_id,
+			{
+				"status": order.status,
+				"total_amount": str(order.total_amount or 0),
+				"line_count": len(getattr(order, "lines", []) or []),
+			},
+		)
 	
 	def _log_order_status_change(self, order: SOESalesOrder, old_status: str, new_status: str, user_id: str):
 		"""Log order status changes"""
-		pass  # TODO: Implement audit logging
+		if old_status == new_status:
+			return None
+		return self._append_order_audit_event(
+			order,
+			"order_status_changed",
+			user_id,
+			{
+				"old_status": old_status,
+				"new_status": new_status,
+				"total_amount": str(order.total_amount or 0),
+			},
+		)
+
+	def _append_order_audit_event(
+		self,
+		order: SOESalesOrder,
+		event_type: str,
+		user_id: str,
+		details: Dict[str, Any]
+	) -> Dict[str, Any]:
+		"""Append a durable audit event to the order's internal notes."""
+		event = {
+			"event_type": event_type,
+			"tenant_id": order.tenant_id,
+			"order_id": order.order_id,
+			"order_number": order.order_number,
+			"user_id": user_id,
+			"timestamp": datetime.utcnow().isoformat() + "Z",
+			"details": details,
+		}
+		audit_line = "AUDIT " + json.dumps(event, sort_keys=True, default=str)
+		existing_notes = (order.internal_notes or "").rstrip()
+		order.internal_notes = f"{existing_notes}\n{audit_line}".strip()
+		if hasattr(order, "updated_by_user_id"):
+			order.updated_by_user_id = user_id
+		if hasattr(order, "updated_at"):
+			order.updated_at = datetime.utcnow()
+		self.db.add(order)
+		return event

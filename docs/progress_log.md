@@ -2031,3 +2031,17 @@ Verification:
 - `.venv/bin/python -m py_compile scripts/migrations/migration_to_v2.py tests/test_migration_to_v2_templates.py`
 - `.venv/bin/python -m pytest -q tests/test_migration_to_v2_templates.py` -> 1 passed
 - `rg -n "TODO: Implement specific models|TODO: Implement initialization logic|Model implementation placeholder" scripts/migrations/migration_to_v2.py` -> no matches
+
+### 2026-05-26 21:48 EAT
+
+Completed checkpoint:
+
+- Replaced CRM order audit logging pass/TODO bodies with durable internal audit events.
+- Order creation, submission, approval, and cancellation now append JSON audit lines with user, timestamp, order identity, status, totals, and line-count/status-change details.
+- Added a focused audit helper regression using a fake DB/session and fake model package so the service code can be exercised despite unrelated CRM package import issues.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/ord/service.py tests/test_crm_order_audit_logging.py`
+- `.venv/bin/python -m pytest -q tests/test_crm_order_audit_logging.py` -> 1 passed
+- `rg -n "TODO: Implement audit logging|pass  # TODO: Implement audit logging" capabilities/crm/ord/service.py` -> no matches
