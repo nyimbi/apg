@@ -55,7 +55,7 @@ from .models import (
 	ServiceStatus, EndpointProtocol, LoadBalancerAlgorithm, HealthStatus
 )
 from .views import NaturalLanguagePolicyRequest
-from .context import get_tenant_id_from_request
+from .context import get_current_user_id_from_request, get_tenant_id_from_request
 
 # =============================================================================
 # Pydantic Models for API
@@ -257,6 +257,10 @@ async def get_tenant_id(request: Request) -> str:
 	"""Get tenant ID from request context."""
 	return get_tenant_id_from_request(request)
 
+async def get_user_id(request: Request) -> str:
+	"""Get current user ID from request context."""
+	return get_current_user_id_from_request(request)
+
 # =============================================================================
 # Service Management Endpoints
 # =============================================================================
@@ -265,7 +269,8 @@ async def get_tenant_id(request: Request) -> str:
 async def register_service(
 	request: ServiceRegistrationRequest,
 	asm_service: ASMService = Depends(get_asm_service),
-	tenant_id: str = Depends(get_tenant_id)
+	tenant_id: str = Depends(get_tenant_id),
+	user_id: str = Depends(get_user_id)
 ):
 	"""Register a new service with the mesh."""
 	try:
@@ -273,7 +278,7 @@ async def register_service(
 			service_config=request.service_config.model_dump(),
 			endpoints=[ep.model_dump() for ep in request.endpoints],
 			tenant_id=tenant_id,
-			created_by="api_user"  # Would come from authentication
+			created_by=user_id
 		)
 		
 		# Broadcast service registration event
@@ -442,14 +447,15 @@ async def deregister_service(
 async def create_route(
 	request: RouteCreationRequest,
 	asm_service: ASMService = Depends(get_asm_service),
-	tenant_id: str = Depends(get_tenant_id)
+	tenant_id: str = Depends(get_tenant_id),
+	user_id: str = Depends(get_user_id)
 ):
 	"""Create a new traffic routing rule."""
 	try:
 		route_id = await asm_service.traffic_manager.create_route(
 			route_config=request.route_config.model_dump(),
 			tenant_id=tenant_id,
-			created_by="api_user"
+			created_by=user_id
 		)
 		
 		# Broadcast route creation event
@@ -493,7 +499,8 @@ async def update_traffic_split(
 	route_id: str,
 	request: TrafficSplitRequest,
 	asm_service: ASMService = Depends(get_asm_service),
-	tenant_id: str = Depends(get_tenant_id)
+	tenant_id: str = Depends(get_tenant_id),
+	user_id: str = Depends(get_user_id)
 ):
 	"""Update traffic splitting configuration."""
 	try:
@@ -501,7 +508,7 @@ async def update_traffic_split(
 			route_id=route_id,
 			destination_services=request.destination_services,
 			tenant_id=tenant_id,
-			updated_by="api_user"
+			updated_by=user_id
 		)
 		
 		# Broadcast traffic split update

@@ -58,3 +58,32 @@ def get_tenant_id_from_request(request: Any = None) -> str:
 			return tenant_id
 
 	return default_tenant
+
+
+def get_current_user_id_from_request(request: Any = None) -> str:
+	"""Resolve current user ID from a FastAPI request with an environment fallback."""
+	default_user = os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
+	if request is None:
+		return default_user
+
+	for candidate in (
+		getattr(getattr(request, "state", None), "user_id", None),
+		getattr(getattr(request, "state", None), "current_user_id", None),
+		_mapping_get(
+			getattr(request, "headers", None),
+			("X-User-ID", "X-APG-User-ID"),
+		),
+		_mapping_get(
+			getattr(request, "query_params", None),
+			("user_id", "user"),
+		),
+		_mapping_get(
+			getattr(request, "scope", None),
+			("apg_user_id", "user_id"),
+		),
+	):
+		user_id = _clean_text(candidate)
+		if user_id:
+			return user_id
+
+	return default_user

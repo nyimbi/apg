@@ -2972,3 +2972,19 @@ Verification:
 - `rg -n "\"api_user\"|\"default_tenant\"|For now, simple validation|your-secret-key-here|Kafka|kafka" capabilities/composition/events/api.py capabilities/composition/config/api.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:11 EAT
+
+Completed checkpoint:
+
+- Replaced API Service Mesh gateway mutation endpoints' fixed `api_user` stamps with request-context user resolution.
+- Extended the gateway context helper to resolve user IDs from FastAPI state, APG headers, query params, scope, and environment fallback beside the existing tenant resolver.
+- Expanded focused gateway context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/api.py capabilities/composition/gateway/context.py tests/test_composition_gateway_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_gateway_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "\"api_user\"|'api_user'|\"default_tenant\"|'default_tenant'|Would come from authentication|Kafka|kafka" capabilities/composition/gateway/api.py capabilities/composition/gateway/context.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
