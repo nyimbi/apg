@@ -59,7 +59,7 @@ class RevolutionaryAnalysisRequest(CVBaseModel):
 	)
 	priority_level: str = Field(
 		default="normal",
-		regex="^(low|normal|high|urgent)$",
+		pattern="^(low|normal|high|urgent)$",
 		description="Processing priority level"
 	)
 
@@ -127,7 +127,7 @@ class SystemCapability(CVBaseModel):
 	capability_name: str = Field(..., description="Name of capability")
 	status: str = Field(
 		...,
-		regex="^(active|initializing|disabled|error)$",
+		pattern="^(active|initializing|disabled|error)$",
 		description="Current capability status"
 	)
 	performance_score: float = Field(

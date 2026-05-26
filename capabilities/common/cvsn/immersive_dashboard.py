@@ -31,7 +31,7 @@ class SpatialLayout(CVBaseModel):
 	layout_id: str = Field(default_factory=uuid7str, description="Layout identifier")
 	layout_type: str = Field(
 		...,
-		regex="^(grid|cluster|hierarchy|timeline|scatter|network)$",
+		pattern="^(grid|cluster|hierarchy|timeline|scatter|network)$",
 		description="Type of spatial layout"
 	)
 	dimensions: Dict[str, float] = Field(
@@ -60,7 +60,7 @@ class InteractiveElement(CVBaseModel):
 	element_id: str = Field(default_factory=uuid7str, description="Element identifier")
 	element_type: str = Field(
 		...,
-		regex="^(button|slider|dial|panel|hologram|particle_system)$",
+		pattern="^(button|slider|dial|panel|hologram|particle_system)$",
 		description="Type of interactive element"
 	)
 	position: Dict[str, float] = Field(
@@ -138,7 +138,7 @@ class GestureCommand(CVBaseModel):
 	command_id: str = Field(default_factory=uuid7str, description="Command identifier")
 	gesture_type: str = Field(
 		...,
-		regex="^(point|grab|swipe|pinch|wave|tap|draw|zoom)$",
+		pattern="^(point|grab|swipe|pinch|wave|tap|draw|zoom)$",
 		description="Type of gesture"
 	)
 	gesture_data: Dict[str, Any] = Field(

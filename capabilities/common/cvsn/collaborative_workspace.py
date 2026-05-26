@@ -32,7 +32,7 @@ class CollaborativeSession(CVBaseModel):
 	session_name: str = Field(..., description="Human-readable session name")
 	session_type: str = Field(
 		default="visual_analysis", 
-		regex="^(visual_analysis|quality_review|training|audit)$",
+		pattern="^(visual_analysis|quality_review|training|audit)$",
 		description="Type of collaborative session"
 	)
 	participants: List[str] = Field(
@@ -43,7 +43,7 @@ class CollaborativeSession(CVBaseModel):
 	analysis_type: str = Field(..., description="Type of analysis being performed")
 	session_status: str = Field(
 		default="active",
-		regex="^(active|paused|completed|archived)$",
+		pattern="^(active|paused|completed|archived)$",
 		description="Current session status"
 	)
 	max_participants: int = Field(default=10, ge=1, le=50, description="Maximum participants allowed")
@@ -62,7 +62,7 @@ class VisualAnnotation(CVBaseModel):
 	author_name: str = Field(..., description="Display name of author")
 	annotation_type: str = Field(
 		..., 
-		regex="^(rectangle|circle|arrow|text|measurement|highlight|freehand)$",
+		pattern="^(rectangle|circle|arrow|text|measurement|highlight|freehand)$",
 		description="Type of annotation"
 	)
 	coordinates: Dict[str, float] = Field(
@@ -74,7 +74,7 @@ class VisualAnnotation(CVBaseModel):
 	)
 	visibility: str = Field(
 		default="public",
-		regex="^(public|private|team)$",
+		pattern="^(public|private|team)$",
 		description="Annotation visibility level"
 	)
 	tags: List[str] = Field(
@@ -96,12 +96,12 @@ class ParticipantStatus(CVBaseModel):
 	display_name: str = Field(..., description="User display name")
 	user_role: str = Field(
 		default="analyst",
-		regex="^(owner|moderator|analyst|viewer|guest)$",
+		pattern="^(owner|moderator|analyst|viewer|guest)$",
 		description="User role in session"
 	)
 	connection_status: str = Field(
 		default="connected",
-		regex="^(connected|disconnected|away|busy)$",
+		pattern="^(connected|disconnected|away|busy)$",
 		description="Connection status"
 	)
 	cursor_position: Dict[str, float] = Field(
@@ -141,7 +141,7 @@ class CollaborativeInsight(CVBaseModel):
 	)
 	priority_level: str = Field(
 		default="medium",
-		regex="^(low|medium|high|critical)$",
+		pattern="^(low|medium|high|critical)$",
 		description="Priority level"
 	)
 
@@ -152,7 +152,7 @@ class CollaborationEvent(CVBaseModel):
 	event_id: str = Field(default_factory=uuid7str, description="Event identifier")
 	event_type: str = Field(
 		...,
-		regex="^(join|leave|annotation|cursor_move|tool_change|message|insight)$",
+		pattern="^(join|leave|annotation|cursor_move|tool_change|message|insight)$",
 		description="Type of collaboration event"
 	)
 	user_id: str = Field(..., description="User who triggered event")

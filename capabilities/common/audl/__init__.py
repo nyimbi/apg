@@ -40,6 +40,11 @@ from pathlib import Path
 from uuid_extensions import uuid7str
 from pydantic import BaseModel, Field, ConfigDict
 
+from .capability_contract import (
+	evaluate_capability_rules,
+	get_capability_contract,
+)
+
 class AuditLevel(str, Enum):
 	"""Audit log levels"""
 	DEBUG = "DEBUG"
@@ -366,6 +371,19 @@ APG_CAPABILITY_METADATA = {
 	}
 }
 
+
+def get_capability_info(tenant_id: str = "default", overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+	"""Return executable AUDL capability metadata and contract details."""
+	contract = get_capability_contract(tenant_id, overrides)
+	return {
+		"metadata": APG_CAPABILITY_METADATA,
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+	}
+
 # APG Health Check Interface
 async def health_check() -> Dict[str, Any]:
 	"""APG-compatible health check endpoint"""
@@ -390,6 +408,7 @@ async def health_check() -> Dict[str, Any]:
 async def register_capability() -> bool:
 	"""Register this capability with the APG composition engine"""
 	try:
+		get_capability_info()
 		# This would integrate with the actual APG composition engine
 		# For now, we simulate successful registration
 		return True

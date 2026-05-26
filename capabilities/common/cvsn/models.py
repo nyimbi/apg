@@ -91,6 +91,19 @@ def _validate_processing_parameters(v: Dict[str, Any]) -> Dict[str, Any]:
 	return v
 
 
+def _coerce_enum(enum_cls: type[Enum], value: Any) -> Any:
+	"""Accept enum instances, enum values, or legacy enum names."""
+	if isinstance(value, enum_cls):
+		return value
+	if isinstance(value, str):
+		if value in enum_cls.__members__:
+			return enum_cls[value]
+		for member in enum_cls:
+			if value == member.value or value.lower() == str(member.value).lower():
+				return member
+	return value
+
+
 # Enums
 class ProcessingStatus(str, Enum):
 	"""Processing job status enumeration"""
@@ -171,6 +184,11 @@ class CVBaseModel(BaseModel):
 	created_by: str = Field(..., description="User ID who created this record")
 	metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
+	def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
+		"""Serialize without computed fields unless callers request them."""
+		kwargs.setdefault("exclude_computed_fields", True)
+		return super().model_dump(*args, **kwargs)
+
 
 class CVProcessingJob(CVBaseModel):
 	"""
@@ -220,6 +238,32 @@ class CVProcessingJob(CVBaseModel):
 		default=0.0, description="Processing progress as percentage"
 	)
 	progress_message: Optional[str] = Field(None, max_length=255, description="Current progress message")
+
+	@field_validator('processing_type', mode='before')
+	@classmethod
+	def _coerce_processing_type(cls, v):
+		"""Accept legacy enum names during deserialization."""
+		return _coerce_enum(ProcessingType, v)
+
+	@field_validator('content_type', mode='before')
+	@classmethod
+	def _coerce_content_type(cls, v):
+		"""Accept legacy enum names during deserialization."""
+		return _coerce_enum(ContentType, v)
+
+	@field_validator('status', mode='before')
+	@classmethod
+	def _coerce_status(cls, v):
+		"""Accept legacy enum names during deserialization."""
+		return _coerce_enum(ProcessingStatus, v)
+
+	def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
+		"""Serialize processing job enums using legacy APG enum names."""
+		data = super().model_dump(*args, **kwargs)
+		for key in ("processing_type", "content_type", "status"):
+			if isinstance(data.get(key), Enum):
+				data[key] = data[key].name
+		return data
 	
 	@computed_field
 	@property
@@ -232,7 +276,8 @@ class CVProcessingJob(CVBaseModel):
 	def duration_seconds(self) -> Optional[int]:
 		"""Calculate actual duration if job is completed"""
 		if self.started_at and self.completed_at:
-			return int((self.completed_at - self.started_at).total_seconds())
+			duration = (self.completed_at - self.started_at).total_seconds()
+			return max(1, int(duration)) if duration > 0 else 0
 		return None
 	
 	@model_validator(mode='after')
@@ -598,7 +643,7 @@ class CVQualityControl(CVBaseModel):
 	inspection_station: str = Field(..., max_length=50, description="Inspection station or line")
 	
 	# Inspection results
-	pass_fail_status: str = Field(..., regex="^(PASS|FAIL|WARNING|REVIEW)$", description="Overall inspection result")
+	pass_fail_status: str = Field(..., pattern="^(PASS|FAIL|WARNING|REVIEW)$", description="Overall inspection result")
 	overall_score: Annotated[float, AfterValidator(_validate_confidence_score)] = Field(
 		..., description="Overall quality score (0-1)"
 	)
@@ -723,7 +768,7 @@ class CVModel(CVBaseModel):
 	)
 	model_file_size_mb: float = Field(..., ge=0, description="Model file size in MB")
 	deployment_status: str = Field(
-		default="ACTIVE", regex="^(ACTIVE|INACTIVE|DEPRECATED|TESTING)$",
+		default="ACTIVE", pattern="^(ACTIVE|INACTIVE|DEPRECATED|TESTING)$",
 		description="Model deployment status"
 	)
 	

@@ -13,6 +13,8 @@ Email: nyimbi@gmail.com
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
+from .capability_contract import evaluate_capability_rules, get_capability_contract
+
 # APG Capability Metadata
 CAPABILITY_METADATA = {
 	"capability_id": "computer_vision",
@@ -343,6 +345,7 @@ API_CONFIG = {
 
 def get_capability_info() -> Dict[str, Any]:
 	"""Get complete capability information for APG registration"""
+	contract = get_capability_contract()
 	return {
 		"metadata": CAPABILITY_METADATA,
 		"keywords": COMPOSITION_KEYWORDS,
@@ -352,7 +355,12 @@ def get_capability_info() -> Dict[str, Any]:
 		"integration": PLATFORM_INTEGRATION,
 		"performance": PERFORMANCE_CONFIG,
 		"compliance": COMPLIANCE_CONFIG,
-		"api": API_CONFIG
+		"api": API_CONFIG,
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"]
 	}
 
 
@@ -413,6 +421,8 @@ __all__ = [
 	"PERFORMANCE_CONFIG",
 	"COMPLIANCE_CONFIG",
 	"API_CONFIG",
+	"get_capability_contract",
+	"evaluate_capability_rules",
 	"get_capability_info",
 	"validate_capability_requirements",
 	"register_with_apg_platform"

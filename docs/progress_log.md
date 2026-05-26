@@ -319,3 +319,26 @@ Current broader CONN execution findings:
 
 - CONN tests now collect and execute cleanly from `capabilities/common/conn/tests`.
 - Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports, service-bridge mock coroutine warnings, and pandas string dtype migration warnings in ML pattern tests.
+
+### 2026-05-26 07:49 EAT
+
+Completed checkpoint:
+
+- Made the CVSN common capability executable as a first-class APG capability with tenant configuration defaults/schema, deterministic rule evaluation, UI route manifest, and visual theme tokens/components.
+- Restored CVSN local test execution for FastAPI uploads, APG-style error envelopes, job listing/cancellation, batch processing, optional heavyweight vision backends, object detection test doubles, quality-control aliases, video-analysis aliases, concurrency limits, and Pydantic v2 serialization compatibility.
+- Routed CVSN root reports/guides into `capabilities/common/cvsn/docs/` while keeping the capability root focused on `README.md`, `cap_spec.md`, `todo.md`, source, and tests.
+- Updated CVSN status docs to reflect executable integration progress and completed verification.
+- Started parallel capability build-out for foundation capabilities: CONF and AUDL now expose the same first-class configuration/rules/UI/theme contract surface with focused contract tests.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/cvsn/api.py capabilities/common/cvsn/models.py capabilities/common/cvsn/service.py capabilities/common/cvsn/__init__.py capabilities/common/cvsn/capability_contract.py capabilities/common/cvsn/tests/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/cvsn/tests` -> 92 passed, 15 warnings
+- CONF lane: `python -m py_compile capabilities/common/conf/capability_contract.py capabilities/common/conf/__init__.py capabilities/common/conf/tests/test_capability_contract.py` -> passed; `python -m pytest capabilities/common/conf/tests/test_capability_contract.py -q` -> 3 passed
+- AUDL lane: `python -m py_compile capabilities/common/audl/__init__.py capabilities/common/audl/capability_contract.py capabilities/common/audl/tests/test_capability_contract.py` -> passed; `pytest capabilities/common/audl/tests/test_capability_contract.py -q` -> 3 passed
+
+Current broader CVSN/foundation execution findings:
+
+- CVSN tests now collect and execute cleanly from `capabilities/common/cvsn/tests`.
+- Parallel capability build-out is active with non-overlapping ownership. AUTH is running as the next foundation lane.
+- Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports.

@@ -12,6 +12,7 @@ Email: nyimbi@gmail.com
 
 import asyncio
 import hashlib
+import json
 import mimetypes
 import os
 import time
@@ -22,12 +23,14 @@ from uuid_extensions import uuid7str
 
 from fastapi import (
 	FastAPI, HTTPException, Depends, File, UploadFile, Form,
-	BackgroundTasks, Query, Header, Path as FastAPIPath
+	BackgroundTasks, Query, Header, Path as FastAPIPath, Request
 )
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.openapi.utils import get_openapi
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, Field, ValidationError
 import uvicorn
 
@@ -205,6 +208,41 @@ app.add_middleware(
 	allow_headers=["*"],
 )
 
+
+@app.exception_handler(HTTPException)
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+	"""Return APG-standard error envelopes for HTTP exceptions."""
+	message = exc.detail if isinstance(exc.detail, str) else "Request failed"
+	if exc.status_code in {401, 403} and "authentication" not in message.lower():
+		message = f"Authentication failed: {message}"
+	return JSONResponse(
+		status_code=exc.status_code,
+		content={
+			"success": False,
+			"error": {
+				"message": message,
+				"detail": exc.detail
+			}
+		},
+		headers=getattr(exc, "headers", None)
+	)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+	"""Return APG-standard error envelopes for request validation failures."""
+	return JSONResponse(
+		status_code=422,
+		content={
+			"success": False,
+			"error": {
+				"message": "Request validation failed",
+				"detail": exc.errors()
+			}
+		}
+	)
+
 # Security
 security = HTTPBearer()
 
@@ -243,12 +281,17 @@ async def verify_tenant_access(tenant_id: str, user: Dict[str, Any] = Depends(ge
 	return user["tenant_id"] == tenant_id
 
 
+async def check_rate_limit(user: Dict[str, Any] | None = None) -> None:
+	"""Placeholder hook for APG rate-limit enforcement."""
+	return None
+
+
 # File Upload Helpers
 async def validate_file_upload(file: UploadFile, allowed_types: set) -> None:
 	"""Validate uploaded file type and size"""
 	if file.content_type not in allowed_types:
 		raise HTTPException(
-			status_code=400,
+			status_code=422,
 			detail=f"Unsupported file type: {file.content_type}. Allowed types: {allowed_types}"
 		)
 	
@@ -290,6 +333,32 @@ async def calculate_file_hash(file_path: str) -> str:
 		for chunk in iter(lambda: f.read(4096), b""):
 			hash_sha256.update(chunk)
 	return hash_sha256.hexdigest()
+
+
+def _parse_json_form(value: Optional[str]) -> Dict[str, Any]:
+	"""Parse an optional JSON form field into a dictionary."""
+	if not value:
+		return {}
+	try:
+		parsed = json.loads(value)
+	except json.JSONDecodeError as exc:
+		raise HTTPException(status_code=422, detail=f"Invalid processing_parameters JSON: {exc.msg}")
+	if not isinstance(parsed, dict):
+		raise HTTPException(status_code=422, detail="processing_parameters must be a JSON object")
+	return parsed
+
+
+def _parse_json_list_form(value: Optional[str]) -> List[Any]:
+	"""Parse an optional JSON form field into a list."""
+	if not value:
+		return []
+	try:
+		parsed = json.loads(value)
+	except json.JSONDecodeError as exc:
+		raise HTTPException(status_code=422, detail=f"Invalid JSON list: {exc.msg}")
+	if not isinstance(parsed, list):
+		raise HTTPException(status_code=422, detail="value must be a JSON list")
+	return parsed
 
 
 # API Endpoints
@@ -366,6 +435,22 @@ async def create_processing_job(
 		raise HTTPException(status_code=500, detail=f"Failed to create job: {str(e)}")
 
 
+@app.get("/api/v1/jobs", response_model=Dict[str, Any])
+async def list_jobs(
+	status: Optional[ProcessingStatus] = Query(None, description="Optional status filter"),
+	limit: int = Query(default=20, ge=1, le=100),
+	page: int = Query(default=1, ge=1),
+	user: Dict[str, Any] = Depends(get_current_user)
+):
+	"""List processing jobs for the current tenant."""
+	return await processing_service.list_jobs(
+		tenant_id=user["tenant_id"],
+		status=status,
+		limit=limit,
+		page=page
+	)
+
+
 @app.get("/api/v1/jobs/{job_id}", response_model=ProcessingJobResponse)
 async def get_job_status(
 	job_id: str = FastAPIPath(..., description="Job ID"),
@@ -392,6 +477,7 @@ async def get_job_status(
 
 
 @app.delete("/api/v1/jobs/{job_id}")
+@app.delete("/api/v1/jobs/{job_id}/cancel")
 async def cancel_job(
 	job_id: str = FastAPIPath(..., description="Job ID"),
 	user: Dict[str, Any] = Depends(get_current_user)
@@ -593,7 +679,11 @@ async def analyze_faces(
 @app.post("/api/v1/quality/inspect", response_model=QualityControlResponse)
 async def inspect_quality(
 	file: UploadFile = File(..., description="Image file for quality inspection"),
-	request: QualityControlRequest = Depends(),
+	inspection_type: QualityControlType = Form(..., description="Type of quality inspection"),
+	product_identifier: str = Form(..., max_length=100, description="Product or batch identifier"),
+	inspection_station: str = Form(..., max_length=50, description="Inspection station identifier"),
+	quality_standards: Optional[str] = Form(default=None, description="JSON list of quality standards"),
+	tolerance_parameters: Optional[str] = Form(default=None, description="JSON tolerance parameters"),
 	user: Dict[str, Any] = Depends(get_current_user)
 ):
 	"""Perform quality control inspection"""
@@ -603,11 +693,11 @@ async def inspect_quality(
 		file_path = await save_uploaded_file(file, user["tenant_id"])
 		
 		parameters = {
-			"inspection_type": request.inspection_type,
-			"product_identifier": request.product_identifier,
-			"inspection_station": request.inspection_station,
-			"quality_standards": request.quality_standards,
-			"tolerance_parameters": request.tolerance_parameters
+			"inspection_type": inspection_type,
+			"product_identifier": product_identifier,
+			"inspection_station": inspection_station,
+			"quality_standards": _parse_json_list_form(quality_standards),
+			"tolerance_parameters": _parse_json_form(tolerance_parameters)
 		}
 		
 		result = await qc_service.inspect_quality(
@@ -692,7 +782,10 @@ async def find_similar_images(
 @app.post("/api/v1/batch/process", response_model=BatchProcessingResponse)
 async def create_batch_processing(
 	files: List[UploadFile] = File(..., description="Files for batch processing"),
-	request: BatchProcessingRequest = Depends(),
+	processing_type: ProcessingType = Query(..., description="Type of processing to perform"),
+	processing_parameters: Optional[str] = Form(default=None, description="JSON processing configuration"),
+	priority: int = Query(default=5, ge=1, le=10, description="Batch job priority"),
+	notification_webhook: Optional[str] = Query(None, description="Webhook URL for completion notification"),
 	user: Dict[str, Any] = Depends(get_current_user)
 ):
 	"""Create batch processing job for multiple files"""
@@ -702,13 +795,14 @@ async def create_batch_processing(
 	try:
 		batch_id = uuid7str()
 		job_ids = []
+		parameters = _parse_json_form(processing_parameters)
 		
 		# Determine allowed file types based on processing type
-		if request.processing_type in [ProcessingType.OBJECT_DETECTION, ProcessingType.IMAGE_CLASSIFICATION]:
+		if processing_type in [ProcessingType.OBJECT_DETECTION, ProcessingType.IMAGE_CLASSIFICATION]:
 			allowed_types = ALLOWED_IMAGE_TYPES
-		elif request.processing_type == ProcessingType.OCR:
+		elif processing_type == ProcessingType.OCR:
 			allowed_types = ALLOWED_DOCUMENT_TYPES
-		elif request.processing_type == ProcessingType.VIDEO_ANALYSIS:
+		elif processing_type == ProcessingType.VIDEO_ANALYSIS:
 			allowed_types = ALLOWED_VIDEO_TYPES
 		else:
 			allowed_types = ALLOWED_IMAGE_TYPES
@@ -721,13 +815,13 @@ async def create_batch_processing(
 			# Create individual job
 			job = await processing_service.create_processing_job(
 				job_name=f"Batch {batch_id} - {file.filename}",
-				processing_type=request.processing_type,
+				processing_type=processing_type,
 				content_type=ContentType.IMAGE,  # Will be determined by file type
 				input_file_path=file_path,
-				processing_parameters=request.processing_parameters,
+				processing_parameters=parameters,
 				tenant_id=user["tenant_id"],
 				user_id=user["user_id"],
-				priority=request.priority
+				priority=priority
 			)
 			
 			job_ids.append(job.id)
@@ -832,27 +926,16 @@ async def get_analytics_summary(
 # Error Handlers
 
 @app.exception_handler(ValidationError)
-async def validation_exception_handler(request, exc):
+async def pydantic_validation_exception_handler(request, exc):
 	"""Handle Pydantic validation errors"""
 	return JSONResponse(
 		status_code=422,
 		content={
-			"error": "Validation Error",
-			"detail": exc.errors(),
-			"timestamp": datetime.utcnow().isoformat()
-		}
-	)
-
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc):
-	"""Handle HTTP exceptions with consistent format"""
-	return JSONResponse(
-		status_code=exc.status_code,
-		content={
-			"error": exc.detail,
-			"status_code": exc.status_code,
-			"timestamp": datetime.utcnow().isoformat()
+			"success": False,
+			"error": {
+				"message": "Validation error",
+				"detail": exc.errors()
+			}
 		}
 	)
 

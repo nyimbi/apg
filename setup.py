@@ -23,6 +23,8 @@ install_requires = [
 	"Flask-AppBuilder>=4.3.0",
 	"Flask-SQLAlchemy>=3.0.0",
 	"fastapi>=0.100.0",
+	"python-multipart>=0.0.6",
+	"uvicorn>=0.23.0",
 	"SQLAlchemy>=2.0.0",
     "click>=8.1.0",
     "rich>=13.0.0",
@@ -38,8 +40,10 @@ dev_requires = [
 	"pytest>=7.4.0",
 	"pytest-asyncio>=0.21.0",
 	"pytest-cov>=4.1.0",
+	"httpx>=0.24.0",
 	"numpy>=1.24.0",
 	"opencv-python>=4.8.0",
+	"Pillow>=10.0.0",
 	"black>=23.7.0",
 	"flake8>=6.0.0",
 	"mypy>=1.5.0",
@@ -88,7 +92,8 @@ setup(
 		],
 		"vision": [
 			"numpy>=1.24.0",
-			"opencv-python>=4.8.0"
+			"opencv-python>=4.8.0",
+			"Pillow>=10.0.0"
 		],
 		"all": dev_requires + doc_requires,
 	},

@@ -460,7 +460,7 @@ class TestComputerVisionAPI:
 	
 	def test_ocr_endpoint_missing_file(self, client, auth_headers):
 		"""Test OCR endpoint without file"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
 			response = client.post("/api/v1/documents/ocr", headers=auth_headers)
 			assert response.status_code == 422  # Validation error
 	
@@ -473,8 +473,8 @@ class TestComputerVisionAPI:
 			test_image.save(temp_file.name, 'JPEG')
 			temp_file.seek(0)
 			
-			with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-				with patch('...api.document_service.process_document_ocr') as mock_ocr:
+			with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+				with patch('capabilities.common.cvsn.api.document_service.process_document_ocr') as mock_ocr:
 					mock_ocr.return_value = {
 						"extracted_text": "Test text",
 						"confidence_score": 0.9,

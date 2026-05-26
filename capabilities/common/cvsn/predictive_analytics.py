@@ -79,7 +79,7 @@ class AnomalyPrediction(CVBaseModel):
 	predicted_occurrence: datetime = Field(..., description="Predicted occurrence time")
 	probability: float = Field(..., ge=0.0, le=1.0, description="Occurrence probability")
 	severity_level: str = Field(
-		default="medium", regex="^(low|medium|high|critical)$",
+		default="medium", pattern="^(low|medium|high|critical)$",
 		description="Predicted severity level"
 	)
 	impact_assessment: Dict[str, Any] = Field(
@@ -103,7 +103,7 @@ class TrendForecast(CVBaseModel):
 		..., description="Time series of predicted values"
 	)
 	trend_direction: str = Field(
-		..., regex="^(increasing|decreasing|stable|volatile)$",
+		..., pattern="^(increasing|decreasing|stable|volatile)$",
 		description="Overall trend direction"
 	)
 	trend_strength: float = Field(..., ge=0.0, le=1.0, description="Strength of trend")

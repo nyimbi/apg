@@ -12,6 +12,7 @@ Email: nyimbi@gmail.com
 import pytest
 import tempfile
 import json
+from datetime import datetime
 from pathlib import Path
 from PIL import Image
 from fastapi.testclient import TestClient
@@ -94,14 +95,14 @@ class TestDocumentProcessingEndpoints:
 	
 	def test_ocr_endpoint_missing_file(self, client, auth_headers):
 		"""Test OCR endpoint without file"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
 			response = client.post("/api/v1/documents/ocr", headers=auth_headers)
 			assert response.status_code == 422  # Validation error
 	
 	def test_ocr_endpoint_with_file(self, client, auth_headers, temp_test_document):
 		"""Test OCR endpoint with file"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.document_service.process_document_ocr') as mock_ocr:
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.document_service.process_document_ocr') as mock_ocr:
 				mock_ocr.return_value = {
 					"extracted_text": "Test text from image",
 					"confidence_score": 0.95,
@@ -128,15 +129,15 @@ class TestDocumentProcessingEndpoints:
 					# Note: This test structure shows the expected behavior
 					# Actual implementation would need proper auth mocking
 					
-					if response.status_code == 200:
-						data = response.json()
-						assert data["success"] == True
-						assert "extracted_text" in data["data"]
+				if response.status_code == 200:
+					data = response.json()
+					assert data["extracted_text"] == "Test text from image"
+					assert data["confidence_score"] == 0.95
 	
 	def test_comprehensive_analysis_endpoint(self, client, auth_headers, temp_test_document):
 		"""Test comprehensive document analysis endpoint"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.document_service.analyze_document_comprehensive') as mock_analyze:
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.document_service.analyze_document_comprehensive') as mock_analyze:
 				mock_analyze.return_value = {
 					"extracted_text": "Comprehensive analysis result",
 					"document_classification": {
@@ -163,10 +164,9 @@ class TestDocumentProcessingEndpoints:
 						headers=auth_headers
 					)
 					
-					if response.status_code == 200:
-						result = response.json()
-						assert result["success"] == True
-						assert "document_classification" in result["data"]
+				if response.status_code == 200:
+					result = response.json()
+					assert "document_classification" in result
 
 
 class TestImageAnalysisEndpoints:
@@ -196,8 +196,8 @@ class TestImageAnalysisEndpoints:
 	
 	def test_object_detection_with_file(self, client, auth_headers, temp_test_image):
 		"""Test object detection with valid file"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.detection_service.detect_objects') as mock_detect:
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.detection_service.detect_objects') as mock_detect:
 				mock_detect.return_value = {
 					"detected_objects": [
 						{
@@ -234,8 +234,8 @@ class TestImageAnalysisEndpoints:
 	
 	def test_image_classification_endpoint(self, client, auth_headers, temp_test_image):
 		"""Test image classification endpoint"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.classification_service.classify_image') as mock_classify:
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.classification_service.classify_image') as mock_classify:
 				mock_classify.return_value = {
 					"predictions": [
 						{
@@ -297,21 +297,14 @@ class TestQualityControlEndpoints:
 	
 	def test_quality_inspection_endpoint(self, client, auth_headers, temp_product_image):
 		"""Test quality inspection endpoint"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.quality_service.inspect_product_quality') as mock_inspect:
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.qc_service.inspect_quality') as mock_inspect:
 				mock_inspect.return_value = {
-					"inspection_result": {
-						"pass_fail_status": "PASS",
-						"overall_score": 0.95,
-						"inspection_confidence": 0.92
-					},
+					"pass_fail_status": "PASS",
+					"overall_score": 0.95,
 					"defects_detected": [],
-					"defect_summary": {
-						"total_defects": 0,
-						"critical_defects": 0,
-						"major_defects": 0,
-						"minor_defects": 0
-					},
+					"defect_count": 0,
+					"compliance_status": {"standards_met": True},
 					"processing_time_ms": 650
 				}
 				
@@ -319,8 +312,8 @@ class TestQualityControlEndpoints:
 					files = {"file": ("product.jpg", f, "image/jpeg")}
 					data = {
 						"inspection_type": "defect_detection",
-						"product_type": "electronics",
-						"sensitivity": "medium"
+						"product_identifier": "PROD-001",
+						"inspection_station": "QC-1"
 					}
 					
 					response = client.post(
@@ -332,48 +325,30 @@ class TestQualityControlEndpoints:
 					
 					if response.status_code == 200:
 						result = response.json()
-						assert result["success"] == True
-						assert "inspection_result" in result["data"]
+						assert result["inspection_result"] == "PASS"
+						assert result["overall_score"] == 0.95
 	
 	def test_batch_quality_inspection_endpoint(self, client, auth_headers, temp_product_image):
-		"""Test batch quality inspection endpoint"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.quality_service.batch_quality_inspection') as mock_batch:
-				mock_batch.return_value = {
-					"batch_summary": {
-						"total_items": 1,
-						"passed_items": 1,
-						"failed_items": 0,
-						"pass_rate": 1.0
-					},
-					"individual_results": [
-						{
-							"file_name": "product.jpg",
-							"status": "PASS",
-							"score": 0.95
-						}
-					],
-					"processing_time_ms": 800
-				}
+		"""Test batch quality inspection through the generic batch endpoint"""
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.processing_service.create_processing_job', new_callable=AsyncMock) as mock_create:
+				mock_create.return_value = Mock(id="job_1")
 				
 				with open(temp_product_image, 'rb') as f:
 					files = [("files", ("product.jpg", f, "image/jpeg"))]
-					data = {
-						"inspection_type": "defect_detection",
-						"batch_name": "test_batch"
-					}
+					params = {"processing_type": "quality_control"}
 					
 					response = client.post(
-						"/api/v1/quality/batch-inspect",
+						"/api/v1/batch/process",
 						files=files,
-						data=data,
+						params=params,
 						headers=auth_headers
 					)
 					
-					if response.status_code == 200:
-						result = response.json()
-						assert result["success"] == True
-						assert "batch_summary" in result["data"]
+					assert response.status_code == 200
+					result = response.json()
+					assert result["total_files"] == 1
+					assert result["job_ids"] == ["job_1"]
 
 
 class TestJobManagementEndpoints:
@@ -391,36 +366,30 @@ class TestJobManagementEndpoints:
 		"""Test get job status endpoint"""
 		job_id = "job_123456789"
 		
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.processing_service.get_job_status') as mock_status:
-				mock_job_data = {
-					"job_id": job_id,
-					"job_name": "Test Job",
-					"status": "COMPLETED",
-					"progress_percentage": 100,
-					"processing_type": "OCR",
-					"content_type": "DOCUMENT",
-					"results": {
-						"extracted_text": "Test result",
-						"confidence_score": 0.95
-					},
-					"created_at": "2025-01-27T12:00:00Z",
-					"completed_at": "2025-01-27T12:00:05Z"
-				}
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.processing_service.get_job_status') as mock_status:
+				mock_job_data = Mock(
+					id=job_id,
+					tenant_id="tenant_456",
+					status=ProcessingStatus.COMPLETED,
+					progress_percentage=1.0,
+					results={"extracted_text": "Test result", "confidence_score": 0.95},
+					error_message=None,
+					created_at=datetime.utcnow()
+				)
 				mock_status.return_value = mock_job_data
 				
 				response = client.get(f"/api/v1/jobs/{job_id}", headers=auth_headers)
 				
-				if response.status_code == 200:
-					result = response.json()
-					assert result["success"] == True
-					assert result["data"]["job_id"] == job_id
-					assert result["data"]["status"] == "COMPLETED"
+				assert response.status_code == 200
+				result = response.json()
+				assert result["job_id"] == job_id
+				assert result["status"] == "completed"
 	
 	def test_list_jobs_endpoint(self, client, auth_headers):
 		"""Test list jobs endpoint"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.processing_service.list_jobs') as mock_list:
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.processing_service.list_jobs') as mock_list:
 				mock_jobs_data = {
 					"jobs": [
 						{
@@ -448,30 +417,28 @@ class TestJobManagementEndpoints:
 				mock_list.return_value = mock_jobs_data
 				
 				response = client.get(
-					"/api/v1/jobs?status=COMPLETED&limit=20&page=1",
+					"/api/v1/jobs?status=completed&limit=20&page=1",
 					headers=auth_headers
 				)
 				
-				if response.status_code == 200:
-					result = response.json()
-					assert result["success"] == True
-					assert len(result["data"]["jobs"]) == 2
-					assert "pagination" in result["data"]
+				assert response.status_code == 200
+				result = response.json()
+				assert len(result["jobs"]) == 2
+				assert "pagination" in result
 	
 	def test_cancel_job_endpoint(self, client, auth_headers):
 		"""Test cancel job endpoint"""
 		job_id = "job_123456789"
 		
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.processing_service.cancel_job') as mock_cancel:
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.processing_service.cancel_job') as mock_cancel:
 				mock_cancel.return_value = True
 				
 				response = client.delete(f"/api/v1/jobs/{job_id}/cancel", headers=auth_headers)
 				
-				if response.status_code == 200:
-					result = response.json()
-					assert result["success"] == True
-					assert "cancelled" in result["data"]["message"].lower()
+				assert response.status_code == 200
+				result = response.json()
+				assert "cancelled" in result["message"].lower()
 
 
 class TestErrorHandling:
@@ -494,7 +461,7 @@ class TestErrorHandling:
 	def test_validation_error_handling(self, client):
 		"""Test validation error responses"""
 		# Test with invalid file type
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
 			files = {"file": ("test.txt", b"not an image", "text/plain")}
 			headers = {"Authorization": "Bearer test_token"}
 			
@@ -512,7 +479,7 @@ class TestErrorHandling:
 		# Create oversized file content
 		large_content = b"x" * (60 * 1024 * 1024)  # 60MB (over 50MB limit)
 		
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
 			files = {"file": ("large.jpg", large_content, "image/jpeg")}
 			headers = {"Authorization": "Bearer test_token"}
 			
@@ -527,8 +494,8 @@ class TestErrorHandling:
 	
 	def test_internal_server_error_handling(self, client):
 		"""Test internal server error handling"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
-			with patch('...api.document_service.process_document_ocr', side_effect=Exception("Internal error")):
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+			with patch('capabilities.common.cvsn.api.document_service.process_document_ocr', side_effect=Exception("Internal error")):
 				files = {"file": ("test.jpg", b"fake_image_data", "image/jpeg")}
 				headers = {"Authorization": "Bearer test_token"}
 				
@@ -558,7 +525,7 @@ class TestRateLimiting:
 	
 	def test_rate_limiting_headers(self, client, auth_headers):
 		"""Test rate limiting headers are present"""
-		with patch('...api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
+		with patch('capabilities.common.cvsn.api.get_current_user', return_value={"user_id": "test", "tenant_id": "test"}):
 			response = client.get("/health", headers=auth_headers)
 			
 			# Check for rate limiting headers
@@ -573,7 +540,7 @@ class TestRateLimiting:
 		# Here we show the expected structure
 		
 		# Simulate rate limit exceeded
-		with patch('...api.check_rate_limit', side_effect=Exception("Rate limit exceeded")):
+		with patch('capabilities.common.cvsn.api.check_rate_limit', side_effect=Exception("Rate limit exceeded")):
 			response = client.get("/health", headers=auth_headers)
 			
 			if response.status_code == 429:

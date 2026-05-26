@@ -6,7 +6,16 @@
 **Platform**: APG (Advanced Processing Gateway)  
 **Target Version**: 1.0.0  
 **Development Timeline**: 12 weeks  
-**Status**: 🚀 **READY TO START IMPLEMENTATION**
+**Status**: **EXECUTABLE INTEGRATION IN PROGRESS**
+
+## Current Execution Checkpoint
+
+- [x] Root documentation routed under `docs/` while keeping `README.md`, `cap_spec.md`, and `todo.md` at capability root.
+- [x] Pydantic v2 compatibility restored for current model constraints.
+- [x] Optional heavyweight vision backends are import-safe so local tests can collect without GPU/model installs.
+- [x] FastAPI upload, job, batch, and error-response paths aligned with executable API tests.
+- [x] First-class capability contract added for tenant configuration, deterministic rules, UI surfaces, and visual theming.
+- [x] Complete one batched verification pass for the CVSN slice.
 
 ## Executive Summary
 
@@ -131,6 +140,14 @@ This comprehensive development plan outlines the creation of an enterprise-grade
 - [ ] **Compliance Verification**: Automated regulatory verification
 - [ ] **Assembly Line Integration**: Real-time production line monitoring
 - [ ] **Reporting Integration**: Quality metrics and KPI tracking
+
+#### 3.7 Factory-Specific Features - Critical Priority
+- [ ] **People Counting System**: Real-time occupancy monitoring in manufacturing zones
+- [ ] **Smoke Detection**: Advanced smoke pattern recognition with early warning alerts
+- [ ] **Barcode/QR Reading**: Omnidirectional scanning for inventory and asset tracking
+- [ ] **Volume/Length Estimation**: 3D measurement using stereo vision and depth cameras
+- [ ] **OSHA Compliance Monitoring**: Automated safety compliance verification and reporting
+- [ ] **Stock Counting**: Automated shelf inventory counting with planogram compliance
 
 **Acceptance Criteria**:
 - All services implement async/await patterns with proper error handling

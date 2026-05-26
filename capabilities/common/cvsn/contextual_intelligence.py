@@ -60,7 +60,7 @@ class ContextualInsight(CVBaseModel):
 		default_factory=list, description="Specific recommended actions"
 	)
 	urgency_level: str = Field(
-		default="medium", regex="^(low|medium|high|critical)$",
+		default="medium", pattern="^(low|medium|high|critical)$",
 		description="Urgency level for action"
 	)
 
