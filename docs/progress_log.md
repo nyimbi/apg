@@ -956,3 +956,29 @@ Current broader SCRP/PLGN/SBOX/ESGC execution findings:
 - SCRP, PLGN, SBOX, and ESGC are no longer placeholders at the composition layer.
 - Final specialized services are partially complete; remaining placeholder tail is SHDN, USRM, SEOP, PLFD, and TENS.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:59 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder SHDN package into a first-class APG shutdown/lifecycle capability with tenant-scoped service, lifecycle, recovery, governance, UI, and theme configuration.
+- Added deterministic SHDN rules for tenant context, service ownership, health gates, backup snapshots, production approval, and force-shutdown review.
+- Promoted the placeholder USRM package into a first-class APG user-management capability with tenant-scoped user, lifecycle, access, governance, UI, and theme configuration.
+- Added deterministic USRM rules for tenant context, unique identity, consent notices, privileged MFA, access revocation, and bulk-user review.
+- Promoted the placeholder SEOP package into a first-class APG security-operations capability with tenant-scoped detection, incident, response, governance, UI, and theme configuration.
+- Added deterministic SEOP rules for tenant context, alert sources, incident ownership, critical escalation, playbook approval, and anomaly review.
+- Promoted the placeholder PLFD package into a first-class APG platform-foundation capability with tenant-scoped foundation, baseline, operation, governance, UI, and theme configuration.
+- Added deterministic PLFD rules for tenant context, foundation service ownership, dependency health, configuration baselines, platform change approval, and broad-change review.
+- Promoted the placeholder TENS package into a first-class APG legacy-tenant capability with tenant-scoped legacy mapping, migration, access, governance, UI, and theme configuration.
+- Added deterministic TENS rules for tenant context, legacy tenant ownership, mapping validation, migration approval, auth boundary validation, and stale-tenant review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/shdn/__init__.py capabilities/common/shdn/capability_contract.py capabilities/common/shdn/test_capability_contract.py capabilities/common/usrm/__init__.py capabilities/common/usrm/capability_contract.py capabilities/common/usrm/test_capability_contract.py capabilities/common/seop/__init__.py capabilities/common/seop/capability_contract.py capabilities/common/seop/test_capability_contract.py capabilities/common/plfd/__init__.py capabilities/common/plfd/capability_contract.py capabilities/common/plfd/test_capability_contract.py capabilities/common/tens/__init__.py capabilities/common/tens/capability_contract.py capabilities/common/tens/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/shdn/test_capability_contract.py capabilities/common/usrm/test_capability_contract.py capabilities/common/seop/test_capability_contract.py capabilities/common/plfd/test_capability_contract.py capabilities/common/tens/test_capability_contract.py` -> 15 passed, 10 warnings
+
+Current broader SHDN/USRM/SEOP/PLFD/TENS execution findings:
+
+- SHDN, USRM, SEOP, PLFD, and TENS are no longer placeholders at the composition layer.
+- All currently listed `capabilities/common/*/__init__.py` placeholder packages found in the common capability backlog have now been promoted to first-class registration/contract surfaces.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
