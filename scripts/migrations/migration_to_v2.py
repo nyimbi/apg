@@ -385,6 +385,8 @@ class APGMigrationV2:
 		"""Create basic capability template structure."""
 		template_name = config["template"]
 		description = config["description"]
+		class_name = ''.join(part.title() for part in template_name.split('_'))
+		capability_path.mkdir(parents=True, exist_ok=True)
 		
 		# Create __init__.py
 		init_content = f'''"""
@@ -416,20 +418,32 @@ CAPABILITY_METADATA = {{
 © 2025 Datacraft. All rights reserved.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
-from uuid_extensions import uuid7str
 
-# Model implementation placeholder
-# TODO: Implement specific models for {template_name}
+from datetime import datetime, timezone
 
-class {template_name.title().replace('_', '')}Model(BaseModel):
+try:
+    from uuid_extensions import uuid7str
+except ImportError:
+    from uuid import uuid4
+
+    def uuid7str() -> str:
+        return str(uuid4())
+
+class {class_name}Model(BaseModel):
     """Base model for {description}."""
     id: str = Field(default_factory=uuid7str)
-    name: str
-    description: Optional[str] = None
-    created_at: str
-    updated_at: str
+    name: str = "{description}"
+    description: Optional[str] = "{description}"
+    status: str = "active"
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def touch(self) -> None:
+        """Mark the model as updated."""
+        self.updated_at = datetime.now(timezone.utc).isoformat()
 '''
 		
 		with open(capability_path / "models.py", "w") as f:
@@ -442,19 +456,46 @@ class {template_name.title().replace('_', '')}Model(BaseModel):
 © 2025 Datacraft. All rights reserved.
 """
 
-import asyncio
 from typing import Any, Dict, List, Optional
 
-class {template_name.title().replace('_', '')}Service:
+from .models import {class_name}Model
+
+class {class_name}Service:
     """Service layer for {description}."""
     
     def __init__(self):
-        pass
+        self.initialized = False
+        self.records: Dict[str, {class_name}Model] = {{}}
     
     async def initialize(self) -> bool:
         """Initialize the service."""
-        # TODO: Implement initialization logic
+        self.initialized = True
         return True
+
+    async def create_record(
+        self,
+        name: str = "{description}",
+        description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> {class_name}Model:
+        """Create a capability record."""
+        if not self.initialized:
+            await self.initialize()
+        record = {class_name}Model(
+            name=name,
+            description=description or "{description}",
+            metadata=metadata or {{}}
+        )
+        self.records[record.id] = record
+        return record
+
+    async def get_record(self, record_id: str) -> Optional[{class_name}Model]:
+        """Get a capability record by ID."""
+        return self.records.get(record_id)
+
+    async def list_records(self) -> List[{class_name}Model]:
+        """List created capability records."""
+        return list(self.records.values())
     
     async def get_info(self) -> Dict[str, Any]:
         """Get service information."""
@@ -462,7 +503,9 @@ class {template_name.title().replace('_', '')}Service:
             "service_name": "{template_name}",
             "description": "{description}",
             "status": "new_in_v2",
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "initialized": self.initialized,
+            "records": len(self.records)
         }}
 '''
 		

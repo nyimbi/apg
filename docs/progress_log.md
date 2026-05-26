@@ -2017,3 +2017,17 @@ Verification:
 
 - `.venv/bin/python -m py_compile scripts/template_generation/create_template_structure.py tests/test_application_templates_materialized.py`
 - `.venv/bin/python -m pytest -q tests/test_application_templates_materialized.py` -> 3 passed
+
+### 2026-05-26 21:45 EAT
+
+Completed checkpoint:
+
+- Replaced v2 migration capability skeleton TODOs with executable generated Pydantic models and an in-memory async service surface.
+- Generated migration capabilities now create their own directories, default timestamps/IDs safely, initialize deterministically, create/list/fetch records, and expose service state through `get_info()`.
+- Added a focused migration-template regression that generates a temporary capability, compiles generated modules, imports the service package, creates a record, and verifies service state.
+
+Verification:
+
+- `.venv/bin/python -m py_compile scripts/migrations/migration_to_v2.py tests/test_migration_to_v2_templates.py`
+- `.venv/bin/python -m pytest -q tests/test_migration_to_v2_templates.py` -> 1 passed
+- `rg -n "TODO: Implement specific models|TODO: Implement initialization logic|Model implementation placeholder" scripts/migrations/migration_to_v2.py` -> no matches
