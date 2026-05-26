@@ -1716,3 +1716,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composable_template_executable_defaults.py tests/test_composition_capability_contracts.py` -> 6 passed
 - `.venv/bin/python -m py_compile templates/composable/base_template.py templates/composable/capability.py tests/test_composable_template_executable_defaults.py`
 - `rg -n "TODO: Implement|TODO: Add usage examples|TODO: Add more examples|from \\.models import \\*|from \\.views import \\*|pass$|multi-cloud_abstraction|Multi-CloudAbstraction|integrate_multi-cloud" templates/composable/base_template.py templates/composable/capability.py templates/composable/capabilities` -> no matches
+
+### 2026-05-26 19:51 EAT
+
+Completed checkpoint:
+
+- Made the APG runner accept generated Flask, FastAPI, and generic Python entrypoints instead of rejecting non-Flask generated applications.
+- Added `HOST` and `PORT` runtime environment variables alongside Flask-compatible variables so generated FastAPI/microservice apps receive the configured bind address.
+- Changed `apg run check` to probe `/health` before root, matching generated application health endpoints.
+- Replaced silent no-op exception handling in runner file hashing and process shutdown with concrete diagnostic output.
+- Removed no-op `pass` bodies from the top-level Click command groups in `cli/main.py`, `cli/create_project.py`, and `cli/run_command.py`.
+- Added focused runner tests that verify runtime detection, FastAPI launch wiring, non-executable rejection, and health endpoint probing without starting a real server.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_cli_run_command.py` -> 4 passed
+- `.venv/bin/python -m py_compile cli/run_command.py cli/main.py cli/create_project.py tests/test_cli_run_command.py`
+- `rg -n "pass$" cli/run_command.py cli/main.py cli/create_project.py` -> no matches

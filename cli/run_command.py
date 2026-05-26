@@ -10,7 +10,6 @@ import sys
 import os
 import json
 import subprocess
-import signal
 import time
 from pathlib import Path
 from typing import Optional
@@ -137,13 +136,13 @@ def _run_single(app_path: Path, host: str, port: int, debug: bool):
 	console.print(Panel(f"[bold blue]APG Application Runner[/bold blue]", 
 					   subtitle=f"Starting {app_path}"))
 	
-	# Check if it's a Flask-AppBuilder app
+	# Check whether the generated file has an executable entrypoint.
 	with open(app_path, 'r') as f:
 		content = f.read()
-		is_flask_app = 'Flask' in content or 'app.run' in content
+	app_kind = _detect_application_kind(content)
 	
-	if not is_flask_app:
-		console.print("[red]Application does not appear to be a Flask application[/red]")
+	if not app_kind:
+		console.print("[red]Application does not expose a runnable Python entrypoint[/red]")
 		return
 	
 	# Set environment variables
@@ -151,12 +150,15 @@ def _run_single(app_path: Path, host: str, port: int, debug: bool):
 	env['FLASK_HOST'] = host
 	env['FLASK_PORT'] = str(port)
 	env['FLASK_DEBUG'] = '1' if debug else '0'
+	env['HOST'] = host
+	env['PORT'] = str(port)
 	
 	console.print(f"[green]Starting APG application...[/green]")
 	console.print(f"[cyan]Host:[/cyan] {host}")
 	console.print(f"[cyan]Port:[/cyan] {port}")
 	console.print(f"[cyan]Debug:[/cyan] {'enabled' if debug else 'disabled'}")
 	console.print(f"[cyan]Application:[/cyan] {app_path}")
+	console.print(f"[cyan]Detected runtime:[/cyan] {app_kind}")
 	console.print(f"\n[green]Access at:[/green] http://{host}:{port}")
 	console.print(f"[yellow]Press Ctrl+C to stop[/yellow]")
 	console.print("-" * 50)
@@ -177,6 +179,17 @@ def _run_single(app_path: Path, host: str, port: int, debug: bool):
 		console.print(f"\n[red]Error running application: {e}[/red]")
 
 
+def _detect_application_kind(content: str) -> Optional[str]:
+	"""Detect whether generated Python content has a runnable entrypoint."""
+	if 'app.run' in content or 'Flask(' in content or 'AppBuilder(' in content:
+		return 'flask'
+	if 'uvicorn.run' in content or 'FastAPI(' in content:
+		return 'fastapi'
+	if 'if __name__' in content or 'def main(' in content or 'async def main(' in content:
+		return 'python'
+	return None
+
+
 def _run_with_watch(app_path: Path, host: str, port: int, debug: bool):
 	"""Run application with file watching"""
 	
@@ -190,7 +203,8 @@ def _run_with_watch(app_path: Path, host: str, port: int, debug: bool):
 		try:
 			with open(path, 'rb') as f:
 				return hashlib.md5(f.read()).hexdigest()
-		except:
+		except OSError as e:
+			console.print(f"[yellow]Could not hash {path}: {e}[/yellow]")
 			return ""
 	
 	def get_directory_hash(directory: Path) -> str:
@@ -201,7 +215,8 @@ def _run_with_watch(app_path: Path, host: str, port: int, debug: bool):
 				if file_path.is_file():
 					hashes.append(get_file_hash(file_path))
 			return hashlib.md5(''.join(sorted(hashes)).encode()).hexdigest()
-		except:
+		except OSError as e:
+			console.print(f"[yellow]Could not hash directory {directory}: {e}[/yellow]")
 			return ""
 	
 	app_dir = app_path.parent
@@ -220,6 +235,8 @@ def _run_with_watch(app_path: Path, host: str, port: int, debug: bool):
 		env['FLASK_HOST'] = host
 		env['FLASK_PORT'] = str(port)
 		env['FLASK_DEBUG'] = '1' if debug else '0'
+		env['HOST'] = host
+		env['PORT'] = str(port)
 		
 		console.print(f"\n[green]🚀 Starting application at http://{host}:{port}[/green]")
 		
@@ -249,8 +266,8 @@ def _run_with_watch(app_path: Path, host: str, port: int, debug: bool):
 			except subprocess.TimeoutExpired:
 				process.kill()
 				process.wait()
-			except:
-				pass
+			except Exception as e:
+				console.print(f"[yellow]Error while stopping application: {e}[/yellow]")
 			process = None
 			console.print("[yellow]📛 Application stopped[/yellow]")
 	
@@ -321,17 +338,28 @@ def check(port: int, timeout: int):
 	
 	try:
 		# First check if port is open
-		with socket.create_connection(('127.0.0.1', port), timeout=timeout):
-			pass
+		with socket.create_connection(('127.0.0.1', port), timeout=timeout) as connection:
+			connection.getpeername()
+
+		# Then try common health endpoints before falling back to root.
+		status = None
+		checked_url = url
+		last_error = None
+		for path in ('/health', '/'):
+			checked_url = f"{url}{path}"
+			try:
+				with urllib.request.urlopen(checked_url, timeout=timeout) as response:
+					status = response.getcode()
+				break
+			except urllib.error.URLError as e:
+				last_error = e
 		
-		# Then try HTTP request
-		with urllib.request.urlopen(url, timeout=timeout) as response:
-			status = response.getcode()
-			
 		if status == 200:
-			console.print(f"[green]✅ Application is running at {url}[/green]")
+			console.print(f"[green]✅ Application is running at {checked_url}[/green]")
+		elif status is not None:
+			console.print(f"[yellow]⚠️  Application responded with status {status} at {checked_url}[/yellow]")
 		else:
-			console.print(f"[yellow]⚠️  Application responded with status {status}[/yellow]")
+			console.print(f"[red]❌ HTTP health check failed: {last_error}[/red]")
 			
 	except socket.timeout:
 		console.print(f"[red]❌ Connection timeout - application may not be running[/red]")
@@ -377,7 +405,7 @@ def stop(port: int):
 @click.group()
 def run_group():
 	"""Run and manage APG applications"""
-	pass
+	return None
 
 run_group.add_command(run)
 run_group.add_command(check)

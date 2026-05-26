@@ -34,7 +34,7 @@ def cli():
 	APG is a domain-specific language for generating complete, functional web applications
 	with agents, workflows, databases, and real-time interfaces.
 	"""
-	pass
+	return None
 
 
 # Add subcommands

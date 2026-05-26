@@ -31,7 +31,7 @@ console = Console()
 @click.group()
 def create():
 	"""Create new APG projects from templates"""
-	pass
+	return None
 
 
 @create.command()
