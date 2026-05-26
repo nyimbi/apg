@@ -2341,3 +2341,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_gateway_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|extract tenant ID from JWT token or headers" capabilities/composition/gateway/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:25 EAT
+
+Completed checkpoint:
+
+- Replaced Expiry Date Management API/view tenant defaults and current-user placeholders with shared request-context helpers.
+- EDM model-view filters, shelf-life extension approvals, alert acknowledgements, dashboard/FEFO service construction, and expiry API service construction now resolve tenant/user identity from payload, Flask context/current user, `g.user`, APG headers, query args, request environment, and configured fallbacks.
+- Added focused regression coverage that rejects stale EDM tenant/user placeholders and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/scm/edm/context.py capabilities/scm/edm/views.py capabilities/scm/edm/api.py tests/test_scm_edm_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_scm_edm_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|return \"current_user\"|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|TODO: Get tenant" capabilities/scm/edm/views.py capabilities/scm/edm/api.py` -> no matches
+- `git diff --check` -> no issues
