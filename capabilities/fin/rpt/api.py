@@ -18,6 +18,7 @@ from .models import (
 	CFRFReportGeneration, CFRFFinancialStatement, CFRFConsolidation, CFRFNotes,
 	CFRFDisclosure, CFRFAnalyticalReport, CFRFReportDistribution
 )
+from .context import get_tenant_id_from_request
 from .service import FinancialReportingService
 from ...auth_rbac.models import db
 
@@ -102,8 +103,8 @@ consolidation_model = api.model('Consolidation', {
 
 def get_current_tenant() -> str:
 	"""Get current tenant ID from request context"""
-	# This should be implemented based on your authentication system
-	return request.headers.get('X-Tenant-ID', 'default_tenant')
+	payload = request.get_json(silent=True) if request.is_json else None
+	return get_tenant_id_from_request(payload)
 
 
 def serialize_decimal(obj):

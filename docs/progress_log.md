@@ -2480,3 +2480,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_fed_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|from flask_appbuilder.security import current_user|return str\(current_user\.id\) if current_user and current_user\.is_authenticated else None" capabilities/fin/fed/views.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:04 EAT
+
+Completed checkpoint:
+
+- Replaced Financial Reporting API/view tenant defaults and conversational/immersive default-user placeholders with shared request-context helpers.
+- Financial Reporting REST endpoints, template/report generation actions, dashboard queries, conversational report builder, and immersive analytics now resolve tenant/user identity from payload, Flask context/current user, `g.user`, session, APG headers, query args, request environment, and configured fallbacks.
+- Added focused regression coverage that rejects stale Financial Reporting tenant/user placeholders and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/rpt/context.py capabilities/fin/rpt/api.py capabilities/fin/rpt/views.py tests/test_fin_rpt_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_rpt_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "default_tenant|default_user|Implementation depends on APG auth system|Simplified for demonstration|request\.headers\.get\('X-Tenant-ID', 'default_tenant'\)" capabilities/fin/rpt/api.py capabilities/fin/rpt/views.py` -> no matches
+- `git diff --check` -> no issues

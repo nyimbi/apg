@@ -30,6 +30,7 @@ from .models import (
 	CFRFDisclosure, CFRFAnalyticalReport, CFRFReportDistribution, CFRFConversationalInterface,
 	ReportIntelligenceLevel, ConsolidationMethodType
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import FinancialReportingService
 from .conversational_interface import ConversationalFinancialInterface, ConversationMode, LanguageCode
 from .immersive_analytics import ImmersiveAnalyticsDashboard, VisualizationType, InteractionMode
@@ -455,13 +456,11 @@ class ConversationalReportBuilderView(BaseView):
 	
 	def _get_current_tenant_id(self) -> str:
 		"""Get current tenant ID from session."""
-		# Implementation depends on APG auth system
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID from session."""
-		# Implementation depends on APG auth system
-		return "default_user"
+		return get_current_user_id()
 	
 	def _get_available_templates(self, tenant_id: str) -> List[Dict]:
 		"""Get available report templates."""
@@ -634,7 +633,7 @@ class CFRFReportTemplateModelView(ModelView):
 	
 	def get_current_tenant(self) -> str:
 		"""Get current tenant ID - to be implemented based on auth system"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class CFRFFinancialStatementModelView(ModelView):
@@ -871,7 +870,7 @@ class CFRFAnalyticalReportModelView(ModelView):
 	
 	def get_current_tenant(self) -> str:
 		"""Get current tenant ID - to be implemented based on auth system"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class CFRFReportGenerationView(BaseView):
@@ -1003,7 +1002,7 @@ class CFRFReportGenerationView(BaseView):
 	
 	def get_current_tenant(self) -> str:
 		"""Get current tenant ID - to be implemented based on auth system"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class CFRFFinancialDashboardView(BaseView):
@@ -1107,7 +1106,7 @@ class CFRFFinancialDashboardView(BaseView):
 	
 	def get_current_tenant(self) -> str:
 		"""Get current tenant ID - to be implemented based on auth system"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 # Additional view classes for other models
@@ -1523,11 +1522,11 @@ class ImmersiveAnalyticsView(BaseView):
 	
 	def _get_current_tenant_id(self) -> str:
 		"""Get current tenant ID from session/context."""
-		return "default_tenant"  # Simplified for demonstration
+		return get_tenant_id_from_request()
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID from session/context."""
-		return "default_user"  # Simplified for demonstration
+		return get_current_user_id()
 	
 	@expose("/")
 	def dashboard(self):
