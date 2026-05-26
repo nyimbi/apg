@@ -7,9 +7,10 @@ Author: APG Platform Team
 Copyright: © 2025 Datacraft
 """
 
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, g, session, has_request_context
 from flask_appbuilder import BaseView, expose, has_access
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.views import ModelView
@@ -32,6 +33,120 @@ etlp_blueprint = Blueprint(
 )
 
 
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def _normalise_roles(value: Any) -> List[str]:
+	if value is None:
+		return ["admin"]
+	if isinstance(value, str):
+		roles = [role.strip() for role in value.replace(",", " ").split()]
+		return roles or ["admin"]
+	roles = []
+	for role in value:
+		name = _object_value(role, "name") or _object_value(role, "role_name") or role
+		text = _clean_text(name)
+		if text:
+			roles.append(text)
+	return roles or ["admin"]
+
+
+def _appbuilder_user(view: Any) -> Any:
+	appbuilder = getattr(view, "appbuilder", None)
+	security_manager = getattr(appbuilder, "sm", None)
+	get_user = getattr(security_manager, "get_user", None)
+	if not callable(get_user):
+		return None
+	try:
+		return get_user()
+	except Exception:
+		return None
+
+
+def _resolve_current_user(view: Any = None) -> Dict[str, Any]:
+	"""Resolve ETLP tenant/user context from APG, Flask, AppBuilder, headers, query, or environment."""
+	default_user = os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
+	default_roles = os.getenv("APG_DEFAULT_ROLES", os.getenv("APG_ROLES", "admin"))
+
+	flask_user = getattr(g, "user", None) if has_request_context() else None
+	appbuilder_user = _appbuilder_user(view)
+	headers = request.headers if has_request_context() else {}
+	args = request.args if has_request_context() else {}
+	session_values = session if has_request_context() else {}
+
+	tenant_id = _first_text([
+		getattr(g, "tenant_id", None) if has_request_context() else None,
+		_object_value(flask_user, "tenant_id"),
+		_object_value(appbuilder_user, "tenant_id"),
+		session_values.get("tenant_id"),
+		headers.get("X-Tenant-ID"),
+		headers.get("X-APG-Tenant-ID"),
+		headers.get("X-Organization-ID"),
+		args.get("tenant_id"),
+		args.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], default_tenant)
+
+	user_id = _first_text([
+		getattr(g, "user_id", None) if has_request_context() else None,
+		_object_value(flask_user, "user_id"),
+		_object_value(flask_user, "id"),
+		_object_value(appbuilder_user, "user_id"),
+		_object_value(appbuilder_user, "id"),
+		_object_value(appbuilder_user, "username"),
+		session_values.get("user_id"),
+		session_values.get("username"),
+		headers.get("X-User-ID"),
+		headers.get("X-APG-User-ID"),
+		args.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], default_user)
+
+	username = _first_text([
+		_object_value(flask_user, "username"),
+		_object_value(appbuilder_user, "username"),
+		session_values.get("username"),
+		headers.get("X-Username"),
+		args.get("username"),
+	], user_id)
+
+	roles = _normalise_roles(
+		_object_value(flask_user, "roles")
+		or _object_value(appbuilder_user, "roles")
+		or session_values.get("roles")
+		or headers.get("X-APG-Roles")
+		or default_roles
+	)
+
+	return {
+		"tenant_id": tenant_id,
+		"user_id": user_id,
+		"username": username,
+		"roles": roles,
+	}
+
+
 class ETLPDashboardView(BaseView):
 	"""Main ETLP dashboard view for APG"""
 	
@@ -39,14 +154,7 @@ class ETLPDashboardView(BaseView):
 	
 	def _get_current_user(self):
 		"""Get current user information from APG context"""
-		# In a real APG implementation, this would extract from Flask session/JWT token
-		# For now, return a default user context
-		return {
-			'tenant_id': 'default_tenant',
-			'user_id': 'current_user',
-			'username': 'admin',
-			'roles': ['admin']
-		}
+		return _resolve_current_user(self)
 	
 	@expose('/dashboard')
 	@has_access
@@ -100,14 +208,7 @@ class ETLPPipelineView(BaseView):
 	
 	def _get_current_user(self):
 		"""Get current user information from APG context"""
-		# In a real APG implementation, this would extract from Flask session/JWT token
-		# For now, return a default user context
-		return {
-			'tenant_id': 'default_tenant',
-			'user_id': 'current_user',
-			'username': 'admin',
-			'roles': ['admin']
-		}
+		return _resolve_current_user(self)
 	
 	@expose('/pipelines')
 	@has_access
@@ -243,14 +344,7 @@ class ETLPExecutionView(BaseView):
 	
 	def _get_current_user(self):
 		"""Get current user information from APG context"""
-		# In a real APG implementation, this would extract from Flask session/JWT token
-		# For now, return a default user context
-		return {
-			'tenant_id': 'default_tenant',
-			'user_id': 'current_user',
-			'username': 'admin',
-			'roles': ['admin']
-		}
+		return _resolve_current_user(self)
 	
 	@expose('/executions')
 	@has_access
@@ -324,14 +418,7 @@ class ETLPDesignerView(BaseView):
 	
 	def _get_current_user(self):
 		"""Get current user information from APG context"""
-		# In a real APG implementation, this would extract from Flask session/JWT token
-		# For now, return a default user context
-		return {
-			'tenant_id': 'default_tenant',
-			'user_id': 'current_user',
-			'username': 'admin',
-			'roles': ['admin']
-		}
+		return _resolve_current_user(self)
 	
 	@expose('/designer')
 	@has_access
@@ -370,14 +457,7 @@ class ETLPMonitoringView(BaseView):
 	
 	def _get_current_user(self):
 		"""Get current user information from APG context"""
-		# In a real APG implementation, this would extract from Flask session/JWT token
-		# For now, return a default user context
-		return {
-			'tenant_id': 'default_tenant',
-			'user_id': 'current_user',
-			'username': 'admin',
-			'roles': ['admin']
-		}
+		return _resolve_current_user(self)
 	
 	@expose('/monitoring')
 	@has_access

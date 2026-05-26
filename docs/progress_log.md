@@ -3127,3 +3127,19 @@ Verification:
 - `rg -n "mobile_user_123|emp_123|device_mobile_123|tenant_default|TODO: Implement mobile-specific JWT validation|Kafka|kafka" capabilities/hcm/tat/time_attendance/context.py capabilities/hcm/tat/time_attendance/mobile_api.py capabilities/hcm/tat/time_attendance/monitoring.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:56 EAT
+
+Completed checkpoint:
+
+- Replaced ETLP Flask blueprint's repeated fixed user/tenant/role dictionaries with a shared APG context resolver.
+- The resolver now reads Flask `g`, AppBuilder security manager users, session, APG headers, query params, and environment fallbacks.
+- Added focused ETLP blueprint context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/etlp/blueprint.py tests/test_common_etlp_blueprint_context.py`
+- `.venv/bin/python -m pytest -q tests/test_common_etlp_blueprint_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "'default_tenant'|'current_user'|For now, return a default user context|Kafka|kafka" capabilities/common/etlp/blueprint.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
