@@ -2199,3 +2199,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_arc_views_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|return \"default_user\"|This would typically come from session" capabilities/fin/arc/accounts_receivable/views.py` -> no matches
 - `git diff --check -- capabilities/fin/arc/accounts_receivable/views.py capabilities/fin/arc/accounts_receivable/context.py tests/test_fin_arc_views_context_resolution.py` -> no issues
+
+### 2026-05-26 22:43 EAT
+
+Completed checkpoint:
+
+- Replaced ESG view tenant defaults and direct AppBuilder user lookups with shared request-context helpers.
+- ESG view actions now resolve tenant IDs from payload, Flask context/current user, tenant headers, query args, request environment, and `APG_DEFAULT_TENANT_ID` fallback.
+- ESG user resolution now supports Flask context, APG user headers, environment values, and existing AppBuilder security fallback.
+- Added focused regression coverage that rejects stale ESG default/user lookup text and exercises tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/ecd/esg/views.py capabilities/ecd/esg/context.py tests/test_ecd_esg_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_ecd_esg_context_resolution.py` -> 2 passed
+- `.venv/bin/python -m pytest -q tests/test_ecd_esg_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "str\(self\.appbuilder\.sm\.get_user\(\)\.id\)|return \"default_tenant\"|user session/profile" capabilities/ecd/esg/views.py` -> no matches
+- `git diff --check -- capabilities/ecd/esg/views.py capabilities/ecd/esg/context.py tests/test_ecd_esg_context_resolution.py` -> no issues

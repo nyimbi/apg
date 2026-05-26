@@ -33,6 +33,7 @@ from .models import (
 	ESGReportStatus, ESGInitiativeStatus, ESGRiskLevel
 )
 from .service import ESGManagementService, ESGServiceConfig
+from .context import get_current_user_id, get_tenant_id_from_request
 
 # Pydantic Models for API Serialization (APG Pattern: Place in views.py)
 
@@ -307,12 +308,11 @@ class ESGExecutiveDashboardView(BaseView):
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID from Flask-AppBuilder security"""
-		return str(self.appbuilder.sm.get_user().id)
+		return get_current_user_id(self.appbuilder)
 	
 	def get_user_tenant_id(self) -> str:
 		"""Get current user's tenant ID"""
-		# In a real implementation, this would come from user session/profile
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 class ESGMetricsView(ModelView):
 	"""
@@ -396,11 +396,11 @@ class ESGMetricsView(ModelView):
 	
 	def get_user_tenant_id(self) -> str:
 		"""Get current user's tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID"""
-		return str(self.appbuilder.sm.get_user().id)
+		return get_current_user_id(self.appbuilder)
 
 class ESGTargetsView(ModelView):
 	"""
@@ -467,10 +467,10 @@ class ESGTargetsView(ModelView):
 		})
 	
 	def get_user_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
-		return str(self.appbuilder.sm.get_user().id)
+		return get_current_user_id(self.appbuilder)
 
 class ESGStakeholdersView(ModelView):
 	"""
@@ -520,10 +520,10 @@ class ESGStakeholdersView(ModelView):
 		})
 	
 	def get_user_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
-		return str(self.appbuilder.sm.get_user().id)
+		return get_current_user_id(self.appbuilder)
 
 class ESGSuppliersView(ModelView):
 	"""
@@ -553,7 +553,7 @@ class ESGSuppliersView(ModelView):
 	base_filters = [['tenant_id', lambda: self.get_user_tenant_id(), 'equal']]
 	
 	def get_user_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 class ESGInitiativesView(ModelView):
 	"""
@@ -583,7 +583,7 @@ class ESGInitiativesView(ModelView):
 	base_filters = [['tenant_id', lambda: self.get_user_tenant_id(), 'equal']]
 	
 	def get_user_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 class ESGReportsView(ModelView):
 	"""
@@ -628,7 +628,7 @@ class ESGReportsView(ModelView):
 		})
 	
 	def get_user_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 # Chart Views for Analytics
 
