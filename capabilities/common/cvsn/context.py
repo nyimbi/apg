@@ -68,7 +68,7 @@ def resolve_current_user_info(
 ) -> dict[str, Any]:
 	"""Resolve APG CVSN user context from request state, headers, session, or environment."""
 	default_user = os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
-	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", "default_tenant")
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
 	default_permissions = _split_permissions(os.getenv("APG_CVSN_PERMISSIONS")) or DEFAULT_PERMISSIONS
 
 	state_user = _state_user(request)

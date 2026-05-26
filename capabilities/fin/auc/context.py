@@ -18,7 +18,7 @@ def _clean_text(value: Any) -> Optional[str]:
 
 def get_tenant_id_from_request(payload: Optional[Dict[str, Any]] = None) -> str:
 	"""Resolve tenant ID from request/auth context with a configured fallback."""
-	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", "default_tenant")
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
 	if not has_request_context():
 		return default_tenant
 

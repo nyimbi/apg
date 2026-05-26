@@ -27,7 +27,7 @@ def _gateway_user() -> Dict[str, Any]:
 
 def get_tenant_id_from_request(payload: Optional[Dict[str, Any]] = None) -> str:
 	"""Resolve tenant ID from payload, gateway auth, Flask context, request metadata, or fallback."""
-	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", "default_tenant")
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
 	gateway_user = _gateway_user()
 	if not has_request_context():
 		return _clean_text(gateway_user.get("tenant_id")) or default_tenant

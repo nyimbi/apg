@@ -2773,3 +2773,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_scm_context_fallback_hygiene.py tests/test_scm_req_context_resolution.py tests/test_scm_src_tenant_resolution.py tests/test_scm_dpl_context_resolution.py tests/test_scm_ctm_tenant_resolution.py tests/test_scm_stc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 12 passed
 - `rg -n "os\\.getenv\\(['\"]APG_DEFAULT_TENANT_ID['\"], ['\"]default_tenant['\"]\\)|['\"]default_tenant['\"]" capabilities/scm/src/context.py capabilities/scm/dpl/demand_planning/context.py capabilities/scm/ctm/contract_management/context.py capabilities/scm/blt/context.py capabilities/scm/rep/context.py capabilities/scm/req/context.py capabilities/scm/edm/context.py capabilities/scm/inv/stock_tracking_control/context.py capabilities/scm/pom/context.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:22 EAT
+
+Completed checkpoint:
+
+- Replaced the remaining non-SCM context-helper `default_tenant` environment fallbacks with `APG_DEFAULT_TENANT_ID`, `APG_TENANT_ID`, then `default`.
+- Applied the fallback cleanup across PDE PIM, HCM time attendance, ECD ESG, BIA TSA, GL reporting, financial reports, federal accounting, fintech gateway, HCM employee data, auction management, geospatial services, accounts payable, composition gateway, MFG MRO, and computer vision context helpers.
+- Added a focused cross-capability fallback hygiene regression that rejects literal `default_tenant` in the cleaned context helpers.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/pde/pim/context.py capabilities/hcm/tat/time_attendance/context.py capabilities/ecd/esg/context.py capabilities/bia/tsa/context.py capabilities/fin/glr/general_ledger/context.py capabilities/fin/rpt/context.py capabilities/fin/fed/context.py capabilities/fintech/gateway/context.py capabilities/hcm/chr/employee_data_management/context.py capabilities/fin/auc/context.py capabilities/common/geos/context.py capabilities/fin/apy/accounts_payable/context.py capabilities/composition/gateway/context.py capabilities/mfg/mro/context.py capabilities/common/cvsn/context.py tests/test_context_fallback_hygiene.py`
+- `.venv/bin/python -m pytest -q tests/test_context_fallback_hygiene.py tests/test_bia_tsa_context_resolution.py tests/test_common_cvsn_context_resolution.py tests/test_common_geos_context_resolution.py tests/test_composition_gateway_tenant_resolution.py tests/test_ecd_esg_context_resolution.py tests/test_fin_apy_context_resolution.py tests/test_fin_auc_context_resolution.py tests/test_fin_fed_context_resolution.py tests/test_fin_glr_context_resolution.py tests/test_fin_rpt_context_resolution.py tests/test_hcm_employee_context_resolution.py tests/test_hcm_tat_context_resolution.py tests/test_mfg_mro_context_resolution.py tests/test_pde_pim_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 30 passed
+- `rg -n "os\\.getenv\\(['\"]APG_DEFAULT_TENANT_ID['\"], ['\"]default_tenant['\"]\\)|['\"]default_tenant['\"]" capabilities/pde/pim/context.py capabilities/hcm/tat/time_attendance/context.py capabilities/ecd/esg/context.py capabilities/bia/tsa/context.py capabilities/fin/glr/general_ledger/context.py capabilities/fin/rpt/context.py capabilities/fin/fed/context.py capabilities/fintech/gateway/context.py capabilities/hcm/chr/employee_data_management/context.py capabilities/fin/auc/context.py capabilities/common/geos/context.py capabilities/fin/apy/accounts_payable/context.py capabilities/composition/gateway/context.py capabilities/mfg/mro/context.py capabilities/common/cvsn/context.py` -> no matches
+- `git diff --check` -> no issues

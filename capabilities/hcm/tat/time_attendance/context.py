@@ -41,7 +41,7 @@ def _state_user(request: Any) -> Any:
 def resolve_current_user_context(request: Any, roles: Optional[list[str]] = None) -> Dict[str, Any]:
 	"""Resolve authenticated user context from FastAPI request state, headers, query, or fallback."""
 	default_user = os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
-	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", "default_tenant")
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
 	state_user = _state_user(request)
 	state = getattr(request, "state", None)
 	headers = getattr(request, "headers", {}) or {}

@@ -33,7 +33,7 @@ def _mapping_get(mapping: Any, keys: Iterable[str]) -> Optional[str]:
 
 def get_tenant_id_from_request(request: Any = None) -> str:
 	"""Resolve tenant ID from a FastAPI request with an environment fallback."""
-	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", "default_tenant")
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
 	if request is None:
 		return default_tenant
 

@@ -60,7 +60,7 @@ def resolve_current_user_id(request: Any) -> str:
 
 def resolve_tenant_id(request: Any) -> str:
 	"""Resolve tenant ID from FastAPI request state, headers, query, or fallback."""
-	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", "default_tenant")
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
 	state_user = _state_user(request)
 	state = getattr(request, "state", None)
 	headers = getattr(request, "headers", {}) or {}

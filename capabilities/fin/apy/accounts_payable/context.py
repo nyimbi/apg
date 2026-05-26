@@ -71,7 +71,7 @@ def _split_values(value: Any) -> list[str]:
 def resolve_apg_user_context(request: Any = None) -> dict[str, Any]:
 	"""Resolve Accounts Payable user context from APG request state, headers, query, or environment."""
 	default_user = os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
-	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", "default_tenant")
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
 	default_permissions = _split_values(os.getenv("APG_APY_PERMISSIONS")) or DEFAULT_PERMISSIONS
 	default_roles = _split_values(os.getenv("APG_APY_ROLES")) or DEFAULT_ROLES
 
