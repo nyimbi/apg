@@ -2742,3 +2742,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_fam_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n "tenant_id=['\"]default_tenant['\"]|['\"]default_tenant['\"]" capabilities/fin/fam/fixed_asset_management/tenant.py capabilities/fin/fam/fixed_asset_management/blueprint.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:14 EAT
+
+Completed checkpoint:
+
+- Replaced Budgeting & Forecasting blueprint APG tenant contexts' fixed `default_tenant` and `current_user` values with request/session/auth-aware context resolution.
+- Centralized BFC blueprint context construction in `_build_tenant_context()` so all enhanced dashboard, collaboration, workflow, analytics, ML, recommendation, and monitoring views use the same tenant/user source.
+- Replaced the BFC context resolver's literal `default_tenant` environment fallback with `APG_DEFAULT_TENANT_ID`, `APG_TENANT_ID`, then `default`.
+- Extended focused BFC context regression coverage to include blueprint context construction and stale fallback removal.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/bfc/budgeting_forecasting/context.py capabilities/fin/bfc/budgeting_forecasting/blueprint.py tests/test_fin_bfc_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_bfc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "tenant_id=['\"]default_tenant['\"]|['\"]default_tenant['\"]|return ['\"]current_user['\"]|user_id=['\"]current_user['\"]" capabilities/fin/bfc/budgeting_forecasting/context.py capabilities/fin/bfc/budgeting_forecasting/blueprint.py` -> no matches
+- `git diff --check` -> no issues

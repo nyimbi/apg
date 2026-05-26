@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTEXT_PATH = REPO_ROOT / "capabilities" / "fin" / "bfc" / "budgeting_forecasting" / "context.py"
 API_PATH = REPO_ROOT / "capabilities" / "fin" / "bfc" / "budgeting_forecasting" / "api.py"
 VIEWS_PATH = REPO_ROOT / "capabilities" / "fin" / "bfc" / "budgeting_forecasting" / "views.py"
+BLUEPRINT_PATH = REPO_ROOT / "capabilities" / "fin" / "bfc" / "budgeting_forecasting" / "blueprint.py"
 
 
 def _context_helpers() -> dict[str, Any]:
@@ -35,20 +36,30 @@ def _context_helpers() -> dict[str, Any]:
 def test_budgeting_forecasting_surfaces_delegate_context_resolution():
 	api_source = API_PATH.read_text(encoding="utf-8")
 	views_source = VIEWS_PATH.read_text(encoding="utf-8")
+	context_source = CONTEXT_PATH.read_text(encoding="utf-8")
+	blueprint_source = BLUEPRINT_PATH.read_text(encoding="utf-8")
 
 	for stale_text in (
 		'return "default_tenant"',
 		'return "current_user"',
+		'"default_tenant"',
 		"request.headers.get('X-Tenant-ID', 'default_tenant')",
 	):
 		assert stale_text not in api_source
 		assert stale_text not in views_source
+		assert stale_text not in context_source
+		assert stale_text not in blueprint_source
 
 	assert "from .context import get_tenant_id_from_request" in api_source
 	assert "from .context import get_current_user_id, get_tenant_id_from_request" in views_source
+	assert "from .context import get_current_user_id, get_tenant_id_from_request" in blueprint_source
 	assert "get_tenant_id_from_request(payload)" in api_source
 	assert "get_tenant_id_from_request()" in views_source
 	assert "get_current_user_id()" in views_source
+	assert "def _build_tenant_context(payload: Optional[Dict[str, Any]] = None) -> APGTenantContext:" in blueprint_source
+	assert "tenant_id=get_tenant_id_from_request(payload)" in blueprint_source
+	assert "user_id=get_current_user_id(payload)" in blueprint_source
+	assert blueprint_source.count("return _build_tenant_context()") >= 9
 
 
 def test_budgeting_forecasting_context_resolves_tenant_and_user(monkeypatch):

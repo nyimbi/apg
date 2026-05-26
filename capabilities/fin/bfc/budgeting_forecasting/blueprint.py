@@ -43,6 +43,7 @@ from .models import (
     BFBudget, BFBudgetLine, BFForecast, BFVarianceAnalysis, BFScenario,
     BFBudgetType, BFBudgetStatus, BFLineType, BFApprovalStatus
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import APGTenantContext, BFServiceConfig
 from . import create_budgeting_forecasting_capability
 
@@ -56,6 +57,14 @@ budgeting_forecasting_bp = Blueprint(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _build_tenant_context(payload: Optional[Dict[str, Any]] = None) -> APGTenantContext:
+    """Build APG tenant context from request/session/auth metadata."""
+    return APGTenantContext(
+        tenant_id=get_tenant_id_from_request(payload),
+        user_id=get_current_user_id(payload)
+    )
 
 
 # =============================================================================
@@ -126,11 +135,7 @@ class APGBudgetDashboardView(BaseView):
     
     def _get_tenant_context(self) -> APGTenantContext:
         """Get tenant context from current session."""
-        # This would integrate with APG auth system
-        return APGTenantContext(
-            tenant_id="default_tenant",  # Would come from session
-            user_id="current_user"       # Would come from session
-        )
+        return _build_tenant_context()
 
 
 class APGCollaborationView(BaseView):
@@ -192,10 +197,7 @@ class APGCollaborationView(BaseView):
     
     def _get_tenant_context(self) -> APGTenantContext:
         """Get tenant context from current session."""
-        return APGTenantContext(
-            tenant_id="default_tenant",
-            user_id="current_user"
-        )
+        return _build_tenant_context()
 
 
 class APGWorkflowView(BaseView):
@@ -262,10 +264,7 @@ class APGWorkflowView(BaseView):
     
     def _get_tenant_context(self) -> APGTenantContext:
         """Get tenant context from current session."""
-        return APGTenantContext(
-            tenant_id="default_tenant",
-            user_id="current_user"
-        )
+        return _build_tenant_context()
 
 
 # =============================================================================
@@ -324,10 +323,7 @@ class APGAdvancedAnalyticsView(BaseView):
     
     def _get_tenant_context(self) -> APGTenantContext:
         """Get tenant context from current session."""
-        return APGTenantContext(
-            tenant_id="default_tenant",
-            user_id="current_user"
-        )
+        return _build_tenant_context()
 
 
 class APGInteractiveDashboardView(BaseView):
@@ -382,10 +378,7 @@ class APGInteractiveDashboardView(BaseView):
     
     def _get_tenant_context(self) -> APGTenantContext:
         """Get tenant context from current session."""
-        return APGTenantContext(
-            tenant_id="default_tenant",
-            user_id="current_user"
-        )
+        return _build_tenant_context()
 
 
 class APGReportBuilderView(BaseView):
@@ -440,10 +433,7 @@ class APGReportBuilderView(BaseView):
     
     def _get_tenant_context(self) -> APGTenantContext:
         """Get tenant context from current session."""
-        return APGTenantContext(
-            tenant_id="default_tenant",
-            user_id="current_user"
-        )
+        return _build_tenant_context()
 
 
 # =============================================================================
@@ -502,10 +492,7 @@ class APGMLForecastingView(BaseView):
     
     def _get_tenant_context(self) -> APGTenantContext:
         """Get tenant context from current session."""
-        return APGTenantContext(
-            tenant_id="default_tenant",
-            user_id="current_user"
-        )
+        return _build_tenant_context()
 
 
 class APGAIRecommendationsView(BaseView):
@@ -560,10 +547,7 @@ class APGAIRecommendationsView(BaseView):
     
     def _get_tenant_context(self) -> APGTenantContext:
         """Get tenant context from current session."""
-        return APGTenantContext(
-            tenant_id="default_tenant",
-            user_id="current_user"
-        )
+        return _build_tenant_context()
 
 
 class APGAutomatedMonitoringView(BaseView):
@@ -656,10 +640,7 @@ class APGAutomatedMonitoringView(BaseView):
     
     def _get_tenant_context(self) -> APGTenantContext:
         """Get tenant context from current session."""
-        return APGTenantContext(
-            tenant_id="default_tenant",
-            user_id="current_user"
-        )
+        return _build_tenant_context()
 
 
 def register_views(appbuilder: AppBuilder):
