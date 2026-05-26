@@ -209,18 +209,119 @@ class MarketplaceSearchQuery:
 	offset: int = 0
 
 
+def _default_marketplace_catalog() -> List[MarketplaceCapability]:
+	"""Return bundled marketplace catalog entries for offline discovery."""
+	return [
+		MarketplaceCapability(
+			id="postgres-connector",
+			name="PostgreSQL Connector",
+			description="High-performance PostgreSQL database connector with pooling, schema discovery, and SQL validation.",
+			capability_type=CapabilityType.CONNECTOR,
+			status=CapabilityStatus.PUBLISHED,
+			author=CapabilityAuthor(name="Datacraft", email="platform@datacraft.co.ke", organization="Datacraft", verified=True),
+			license=LicenseType.OPEN_SOURCE,
+			current_version="2.1.0",
+			versions=[
+				CapabilityVersion(
+					version="2.1.0",
+					release_notes="Adds tenant-aware connection pooling and schema metadata caching.",
+					compatibility={"apg": ">=1.0.0", "python": ">=3.11"},
+					dependencies=["asyncpg>=0.29"]
+				)
+			],
+			tags=["database", "postgresql", "sql"],
+			categories=["database", "connector"],
+			supported_platforms=["linux", "macos", "container"],
+			configuration_schema={
+				"type": "object",
+				"required": ["dsn"],
+				"properties": {
+					"dsn": {"type": "string"},
+					"pool_size": {"type": "integer", "minimum": 1, "default": 10}
+				}
+			},
+			rating=CapabilityRating(average_rating=4.8, total_reviews=156),
+			stats=CapabilityStats(downloads=12543, installations=8932, success_rate=0.997, avg_execution_time=42.0),
+			is_featured=True
+		),
+		MarketplaceCapability(
+			id="json-transformer",
+			name="JSON Data Transformer",
+			description="JSON transformation engine with JSONPath selection, mapping rules, and validation hooks.",
+			capability_type=CapabilityType.TRANSFORMER,
+			status=CapabilityStatus.PUBLISHED,
+			author=CapabilityAuthor(name="APG Community", email="community@datacraft.co.ke", verified=False),
+			license=LicenseType.FREE,
+			current_version="1.5.2",
+			versions=[
+				CapabilityVersion(
+					version="1.5.2",
+					release_notes="Improves nested array mapping and schema validation diagnostics.",
+					compatibility={"apg": ">=1.0.0"},
+					dependencies=[]
+				)
+			],
+			tags=["json", "transformation", "jsonpath"],
+			categories=["transformer", "data-quality"],
+			supported_platforms=["linux", "macos", "container"],
+			rating=CapabilityRating(average_rating=4.2, total_reviews=89),
+			stats=CapabilityStats(downloads=7821, installations=5643, success_rate=0.991, avg_execution_time=15.0)
+		),
+		MarketplaceCapability(
+			id="test-capability",
+			name="Test Capability",
+			description="Deterministic local catalog capability for installation and marketplace contract verification.",
+			capability_type=CapabilityType.CONNECTOR,
+			status=CapabilityStatus.PUBLISHED,
+			author=CapabilityAuthor(name="Datacraft", email="platform@datacraft.co.ke", organization="Datacraft", verified=True),
+			license=LicenseType.OPEN_SOURCE,
+			current_version="1.0.0",
+			versions=[
+				CapabilityVersion(
+					version="1.0.0",
+					release_notes="Initial local catalog release.",
+					compatibility={"apg": ">=1.0.0"},
+					dependencies=[]
+				)
+			],
+			tags=["test", "connector"],
+			categories=["testing", "connector"],
+			supported_platforms=["linux", "macos", "container"],
+			rating=CapabilityRating(average_rating=4.5, total_reviews=10),
+			stats=CapabilityStats(downloads=100, installations=50, success_rate=1.0, avg_execution_time=1.0)
+		)
+	]
+
+
 class MarketplaceClient:
 	"""Client for APG Capability Marketplace"""
 
 	def __init__(self, marketplace_url: str = "https://marketplace.apg.datacraft.co.ke",
-				 api_key: str = None, timeout: int = 30):
-		self.marketplace_url = marketplace_url
+				 api_key: str = None, timeout: int = 30,
+				 local_catalog: Optional[List[MarketplaceCapability]] = None,
+				 use_local_catalog: Optional[bool] = None,
+				 fallback_to_local_catalog: bool = True):
+		self.marketplace_url = marketplace_url or "https://marketplace.apg.datacraft.co.ke"
 		self.api_key = api_key
 		self.timeout = timeout
 		self._http_client: Optional[Any] = None
+		self.local_catalog: Dict[str, MarketplaceCapability] = {
+			capability.id: capability
+			for capability in (local_catalog or _default_marketplace_catalog())
+		}
+		self.use_local_catalog = (
+			use_local_catalog
+			if use_local_catalog is not None
+			else self._is_local_catalog_url(self.marketplace_url) or not HTTP_CLIENT_AVAILABLE
+		)
+		self.fallback_to_local_catalog = fallback_to_local_catalog
 
 		if not HTTP_CLIENT_AVAILABLE:
 			logger.warning("HTTP client not available. Marketplace features will be limited.")
+
+	def _is_local_catalog_url(self, marketplace_url: str) -> bool:
+		"""Return True when the URL is explicitly non-production/local."""
+		return marketplace_url.startswith("memory://") or "test.marketplace" in marketplace_url
 
 	async def _get_http_client(self) -> Any:
 		"""Get or create HTTP client"""
@@ -251,8 +352,8 @@ class MarketplaceClient:
 	@monitor_performance("marketplace_search")
 	async def search_capabilities(self, query: MarketplaceSearchQuery) -> Dict[str, Any]:
 		"""Search for capabilities in marketplace"""
-		if not HTTP_CLIENT_AVAILABLE:
-			return self._get_mock_search_results(query)
+		if self.use_local_catalog:
+			return self._search_local_catalog(query)
 
 		try:
 			client = await self._get_http_client()
@@ -282,6 +383,9 @@ class MarketplaceClient:
 			return response.json()
 
 		except Exception as e:
+			if self.fallback_to_local_catalog:
+				logger.warning(f"Marketplace search failed, using local catalog: {e}")
+				return self._search_local_catalog(query)
 			logger.error(f"Error searching marketplace: {e}")
 			raise APGError(
 				message=f"Marketplace search failed: {str(e)}",
@@ -292,8 +396,8 @@ class MarketplaceClient:
 	@monitor_performance("marketplace_get_capability")
 	async def get_capability(self, capability_id: str) -> MarketplaceCapability:
 		"""Get detailed capability information"""
-		if not HTTP_CLIENT_AVAILABLE:
-			return self._get_mock_capability(capability_id)
+		if self.use_local_catalog:
+			return self._get_local_capability(capability_id)
 
 		try:
 			client = await self._get_http_client()
@@ -305,6 +409,9 @@ class MarketplaceClient:
 			return self._parse_capability(data)
 
 		except Exception as e:
+			if self.fallback_to_local_catalog:
+				logger.warning(f"Marketplace capability lookup failed, using local catalog: {e}")
+				return self._get_local_capability(capability_id)
 			logger.error(f"Error getting capability {capability_id}: {e}")
 			raise APGError(
 				message=f"Failed to get capability {capability_id}: {str(e)}",
@@ -314,8 +421,8 @@ class MarketplaceClient:
 
 	async def get_capability_versions(self, capability_id: str) -> List[CapabilityVersion]:
 		"""Get all versions of a capability"""
-		if not HTTP_CLIENT_AVAILABLE:
-			return self._get_mock_versions(capability_id)
+		if self.use_local_catalog:
+			return self._get_local_versions(capability_id)
 
 		try:
 			client = await self._get_http_client()
@@ -327,16 +434,16 @@ class MarketplaceClient:
 			return [self._parse_version(v) for v in data.get("versions", [])]
 
 		except Exception as e:
+			if self.fallback_to_local_catalog:
+				logger.warning(f"Marketplace version lookup failed, using local catalog: {e}")
+				return self._get_local_versions(capability_id)
 			logger.error(f"Error getting versions for {capability_id}: {e}")
 			return []
 
 	async def download_capability(self, capability_id: str, version: str = "latest") -> bytes:
 		"""Download capability package"""
-		if not HTTP_CLIENT_AVAILABLE:
-			raise APGError(
-				message="HTTP client not available for downloads",
-				context=ErrorContext(tenant_id="system", operation="download_capability")
-			)
+		if self.use_local_catalog:
+			return self._build_local_capability_package(capability_id, version)
 
 		try:
 			client = await self._get_http_client()
@@ -348,6 +455,9 @@ class MarketplaceClient:
 			return response.content
 
 		except Exception as e:
+			if self.fallback_to_local_catalog:
+				logger.warning(f"Marketplace download failed, using local package: {e}")
+				return self._build_local_capability_package(capability_id, version)
 			logger.error(f"Error downloading capability {capability_id}: {e}")
 			raise APGError(
 				message=f"Failed to download capability {capability_id}: {str(e)}",
@@ -484,70 +594,203 @@ class MarketplaceClient:
 			checksum=data.get("checksum")
 		)
 
-	def _get_mock_search_results(self, query: MarketplaceSearchQuery) -> Dict[str, Any]:
-		"""Mock search results for testing"""
+	def _search_local_catalog(self, query: MarketplaceSearchQuery) -> Dict[str, Any]:
+		"""Search the bundled marketplace catalog."""
+		capabilities = list(self.local_catalog.values())
+
+		if query.query:
+			needle = query.query.lower()
+			capabilities = [
+				capability for capability in capabilities
+				if needle in " ".join([
+					capability.id,
+					capability.name,
+					capability.description,
+					" ".join(capability.tags),
+					" ".join(capability.categories)
+				]).lower()
+			]
+
+		if query.capability_type:
+			capabilities = [
+				capability for capability in capabilities
+				if capability.capability_type == query.capability_type
+			]
+
+		if query.tags:
+			required_tags = {tag.lower() for tag in query.tags}
+			capabilities = [
+				capability for capability in capabilities
+				if required_tags.issubset({tag.lower() for tag in capability.tags})
+			]
+
+		if query.categories:
+			required_categories = {category.lower() for category in query.categories}
+			capabilities = [
+				capability for capability in capabilities
+				if required_categories.issubset({category.lower() for category in capability.categories})
+			]
+
+		if query.author:
+			author = query.author.lower()
+			capabilities = [
+				capability for capability in capabilities
+				if author in capability.author.name.lower()
+				or author in (capability.author.organization or "").lower()
+			]
+
+		if query.license:
+			capabilities = [
+				capability for capability in capabilities
+				if capability.license == query.license
+			]
+
+		if query.min_rating is not None:
+			capabilities = [
+				capability for capability in capabilities
+				if capability.rating and capability.rating.average_rating >= query.min_rating
+			]
+
+		if query.free_only:
+			capabilities = [
+				capability for capability in capabilities
+				if capability.price == 0.0 or capability.license in (LicenseType.FREE, LicenseType.OPEN_SOURCE)
+			]
+
+		if query.verified_only:
+			capabilities = [
+				capability for capability in capabilities
+				if capability.author.verified
+			]
+
+		capabilities = self._sort_capabilities(capabilities, query.sort_by, query.sort_order)
+		total = len(capabilities)
+		limit = max(1, query.limit)
+		offset = max(0, query.offset)
+		page_capabilities = capabilities[offset:offset + limit]
+
 		return {
-			"capabilities": [
-				{
-					"id": "postgres-connector",
-					"name": "PostgreSQL Connector",
-					"description": "High-performance PostgreSQL database connector with advanced features",
-					"capability_type": "connector",
-					"status": "published",
-					"author": {"name": "Datacraft", "verified": True},
-					"license": "open_source",
-					"current_version": "2.1.0",
-					"rating": {"average_rating": 4.8, "total_reviews": 156},
-					"stats": {"downloads": 12543, "installations": 8932},
-					"tags": ["database", "postgresql", "sql"],
-					"is_featured": True
-				},
-				{
-					"id": "json-transformer",
-					"name": "JSON Data Transformer",
-					"description": "Flexible JSON transformation engine with JSONPath support",
-					"capability_type": "transformer",
-					"status": "published",
-					"author": {"name": "Community", "verified": False},
-					"license": "free",
-					"current_version": "1.5.2",
-					"rating": {"average_rating": 4.2, "total_reviews": 89},
-					"stats": {"downloads": 7821, "installations": 5643},
-					"tags": ["json", "transformation", "jsonpath"]
-				}
-			],
-			"total": 2,
-			"page": 0,
-			"pages": 1
+			"capabilities": [self._capability_to_data(capability) for capability in page_capabilities],
+			"total": total,
+			"page": offset // limit,
+			"pages": (total + limit - 1) // limit,
+			"source": "local_catalog"
 		}
 
-	def _get_mock_capability(self, capability_id: str) -> MarketplaceCapability:
-		"""Mock capability for testing"""
-		return MarketplaceCapability(
-			id=capability_id,
-			name="Mock Capability",
-			description="A mock capability for testing",
-			capability_type=CapabilityType.CONNECTOR,
-			status=CapabilityStatus.PUBLISHED,
-			author=CapabilityAuthor(name="Test Author", email="test@example.com", verified=True),
-			license=LicenseType.OPEN_SOURCE,
-			current_version="1.0.0",
-			tags=["mock", "test"],
-			categories=["testing"],
-			rating=CapabilityRating(average_rating=4.5, total_reviews=10),
-			stats=CapabilityStats(downloads=100, installations=50)
+	def _sort_capabilities(
+		self,
+		capabilities: List[MarketplaceCapability],
+		sort_by: str,
+		sort_order: str
+	) -> List[MarketplaceCapability]:
+		"""Sort marketplace capabilities for local catalog searches."""
+		reverse = sort_order != "asc"
+		sort_keys = {
+			"rating": lambda capability: capability.rating.average_rating if capability.rating else 0.0,
+			"downloads": lambda capability: capability.stats.downloads,
+			"updated": lambda capability: capability.updated_at,
+			"featured": lambda capability: (capability.is_featured, capability.stats.downloads),
+			"relevance": lambda capability: (
+				capability.is_featured,
+				capability.rating.average_rating if capability.rating else 0.0,
+				capability.stats.downloads
+			)
+		}
+		return sorted(capabilities, key=sort_keys.get(sort_by, sort_keys["relevance"]), reverse=reverse)
+
+	def _get_local_capability(self, capability_id: str) -> MarketplaceCapability:
+		"""Get a capability from the bundled marketplace catalog."""
+		capability = self.local_catalog.get(capability_id)
+		if capability:
+			return capability
+
+		raise APGError(
+			message=f"Capability {capability_id} not found in local marketplace catalog",
+			context=ErrorContext(tenant_id="system", operation="get_capability")
 		)
 
-	def _get_mock_versions(self, capability_id: str) -> List[CapabilityVersion]:
-		"""Mock versions for testing"""
-		return [
-			CapabilityVersion(
-				version="1.0.0",
-				release_notes="Initial release",
-				compatibility={"apg": ">=1.0.0"},
-				dependencies=[]
-			)
-		]
+	def _get_local_versions(self, capability_id: str) -> List[CapabilityVersion]:
+		"""Get capability versions from the bundled marketplace catalog."""
+		return list(self._get_local_capability(capability_id).versions)
+
+	def _build_local_capability_package(self, capability_id: str, version: str) -> bytes:
+		"""Build an installable metadata package from the local catalog."""
+		capability = self._get_local_capability(capability_id)
+		resolved_version = capability.current_version if version == "latest" else version
+		package = {
+			"capability": self._capability_to_data(capability),
+			"version": resolved_version,
+			"generated_at": datetime.now(timezone.utc).isoformat(),
+			"source": "local_catalog"
+		}
+		return json.dumps(package, indent=2, sort_keys=True).encode("utf-8")
+
+	def _capability_to_data(self, capability: MarketplaceCapability) -> Dict[str, Any]:
+		"""Convert a capability dataclass to marketplace API-shaped data."""
+		return {
+			"id": capability.id,
+			"name": capability.name,
+			"description": capability.description,
+			"capability_type": capability.capability_type.value,
+			"status": capability.status.value,
+			"author": {
+				"name": capability.author.name,
+				"email": capability.author.email,
+				"organization": capability.author.organization,
+				"website": capability.author.website,
+				"verified": capability.author.verified
+			},
+			"license": capability.license.value,
+			"current_version": capability.current_version,
+			"versions": [self._version_to_data(version) for version in capability.versions],
+			"tags": list(capability.tags),
+			"categories": list(capability.categories),
+			"supported_platforms": list(capability.supported_platforms),
+			"requirements": dict(capability.requirements),
+			"configuration_schema": dict(capability.configuration_schema),
+			"documentation_url": capability.documentation_url,
+			"source_url": capability.source_url,
+			"demo_url": capability.demo_url,
+			"icon_url": capability.icon_url,
+			"screenshots": list(capability.screenshots),
+			"rating": {
+				"average_rating": capability.rating.average_rating,
+				"total_reviews": capability.rating.total_reviews,
+				"five_star": capability.rating.five_star,
+				"four_star": capability.rating.four_star,
+				"three_star": capability.rating.three_star,
+				"two_star": capability.rating.two_star,
+				"one_star": capability.rating.one_star
+			} if capability.rating else None,
+			"stats": {
+				"downloads": capability.stats.downloads,
+				"installations": capability.stats.installations,
+				"active_users": capability.stats.active_users,
+				"success_rate": capability.stats.success_rate,
+				"avg_execution_time": capability.stats.avg_execution_time,
+				"error_rate": capability.stats.error_rate
+			},
+			"price": capability.price,
+			"currency": capability.currency,
+			"is_featured": capability.is_featured,
+			"created_at": capability.created_at.isoformat(),
+			"updated_at": capability.updated_at.isoformat(),
+			"metadata": dict(capability.metadata)
+		}
+
+	def _version_to_data(self, version: CapabilityVersion) -> Dict[str, Any]:
+		"""Convert a capability version dataclass to marketplace API-shaped data."""
+		return {
+			"version": version.version,
+			"release_notes": version.release_notes,
+			"compatibility": dict(version.compatibility),
+			"dependencies": list(version.dependencies),
+			"breaking_changes": list(version.breaking_changes),
+			"security_fixes": list(version.security_fixes),
+			"published_at": version.published_at.isoformat(),
+			"download_url": version.download_url,
+			"checksum": version.checksum
+		}
 
 
 class CapabilityInstaller:
@@ -911,8 +1154,7 @@ class MarketplaceManager:
 
 	async def get_recommendations(self, tenant_id: str) -> List[MarketplaceCapability]:
 		"""Get personalized capability recommendations"""
-		# This would use ML/analytics to provide recommendations
-		# For now, return popular capabilities
+		# Local catalog recommendations use popularity until tenant analytics are connected.
 
 		search_query = MarketplaceSearchQuery(
 			sort_by="downloads",

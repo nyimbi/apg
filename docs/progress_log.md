@@ -1047,3 +1047,24 @@ Current broader AUDP runtime findings:
 - AUDP workflow jobs now have an executable status lookup path for jobs created during the current API process lifetime.
 - The current registry is intentionally in-process; durable production deployment still needs an APG shared job/event store backing this contract.
 - Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities and AUDP Pydantic request model style.
+
+### 2026-05-26 16:03 EAT
+
+Completed checkpoint:
+
+- Replaced CONN marketplace mock fallback methods with a deterministic bundled local marketplace catalog.
+- Added local catalog search filtering for query text, capability type, tags, categories, author, license, minimum rating, free-only, verified-only, sorting, pagination, and API-shaped response data.
+- Added local catalog capability detail lookup, version lookup, and installable metadata package generation so offline/test marketplace flows remain executable without pretending arbitrary unknown capabilities exist.
+- Made test marketplace URLs use the local catalog directly, while production URLs can still use HTTP and fall back to the local catalog when configured.
+- Updated marketplace tests to describe local catalog behavior instead of mock responses.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/marketplace.py capabilities/common/conn/tests/test_marketplace.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_marketplace.py -k "local_catalog or featured or recommendations or end_to_end_capability_lifecycle"` -> 7 passed, 34 deselected, 10 warnings
+
+Current broader CONN marketplace findings:
+
+- Marketplace discovery, detail lookup, version lookup, recommendations, and local installation now have a deterministic executable path when the remote marketplace is unavailable.
+- The remote marketplace remains the production path; the local catalog is a fallback and test/offline execution surface, not a replacement for the remote registry.
+- Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities.

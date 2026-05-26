@@ -102,8 +102,8 @@ class TestMarketplaceClient:
 			mock_client.assert_called_once()
 
 	@pytest.mark.asyncio
-	async def test_search_capabilities_mock(self, marketplace_client, sample_search_query):
-		"""Test capability search with mock data"""
+	async def test_search_capabilities_local_catalog(self, marketplace_client, sample_search_query):
+		"""Test capability search with bundled local catalog data"""
 		results = await marketplace_client.search_capabilities(sample_search_query)
 
 		assert "capabilities" in results
@@ -112,18 +112,18 @@ class TestMarketplaceClient:
 		assert results["total"] >= 0
 
 	@pytest.mark.asyncio
-	async def test_get_capability_mock(self, marketplace_client):
-		"""Test getting capability details with mock data"""
+	async def test_get_capability_local_catalog(self, marketplace_client):
+		"""Test getting capability details from bundled local catalog data"""
 		capability = await marketplace_client.get_capability("test-capability")
 
 		assert isinstance(capability, MarketplaceCapability)
 		assert capability.id == "test-capability"
-		assert capability.name == "Mock Capability"
+		assert capability.name == "Test Capability"
 		assert capability.capability_type == CapabilityType.CONNECTOR
 
 	@pytest.mark.asyncio
-	async def test_get_capability_versions_mock(self, marketplace_client):
-		"""Test getting capability versions with mock data"""
+	async def test_get_capability_versions_local_catalog(self, marketplace_client):
+		"""Test getting capability versions from bundled local catalog data"""
 		versions = await marketplace_client.get_capability_versions("test-capability")
 
 		assert isinstance(versions, list)
@@ -598,7 +598,7 @@ class TestErrorHandling:
 			min_rating=-1  # Invalid rating
 		)
 
-		# Should handle gracefully and return mock results
+		# Should handle gracefully and return local catalog results
 		results = await marketplace_client.search_capabilities(invalid_query)
 		assert isinstance(results, dict)
 
@@ -629,7 +629,7 @@ class TestIntegration:
 			capability = await client.get_capability("test-capability")
 			assert isinstance(capability, MarketplaceCapability)
 
-			# Install capability (mock)
+			# Install capability from local catalog
 			with patch.object(client, 'download_capability', new=AsyncMock(return_value=b"test data")):
 				installed = await installer.install_capability("test-capability", "1.0.0", client)
 				assert isinstance(installed, InstalledCapability)
