@@ -26,6 +26,7 @@ try:
     from .templates.composable.composition_engine import CompositionEngine
     from .templates.composable.base_template import BaseTemplateType
     from .templates.composable.capability import CapabilityCategory
+    from .capabilities.capability_contract_registry import load_contract_registry, validate_contract_shape
 except ImportError:
     # Handle direct execution
     from compiler.compiler import APGCompiler, CodeGenConfig, CompilationResult
@@ -34,6 +35,7 @@ except ImportError:
     from templates.composable.composition_engine import CompositionEngine
     from templates.composable.base_template import BaseTemplateType
     from templates.composable.capability import CapabilityCategory
+    from capabilities.capability_contract_registry import load_contract_registry, validate_contract_shape
 
 
 # ========================================
@@ -587,6 +589,50 @@ class APGCLICommands:
 			print(f"Capability '{capability_name}' not found in project")
 		
 		return True
+
+	def list_capability_contracts(self, output_json: bool = False) -> bool:
+		"""List executable capability contracts discovered by the registry"""
+		try:
+			registry = load_contract_registry()
+			records = sorted(registry.values(), key=lambda record: record.capability_id)
+			if output_json:
+				print(json.dumps([
+					{
+						"capability": record.capability_id,
+						"display_name": record.display_name,
+						"path": str(record.path),
+						"routes": len(record.contract["ui"]["routes"]),
+						"rules": len(record.contract["rule_engine"]["rules"]),
+					}
+					for record in records
+				], indent=2))
+				return True
+
+			print(f"Capability contracts: {len(records)}")
+			for record in records:
+				contract = record.contract
+				print(
+					f"  {record.capability_id:<32} "
+					f"rules={len(contract['rule_engine']['rules']):<2} "
+					f"routes={len(contract['ui']['routes']):<2} "
+					f"theme={contract['theme']['name']}"
+				)
+			return True
+		except Exception as e:
+			print(f"Error listing capability contracts: {e}")
+			return False
+
+	def validate_capability_contracts(self) -> bool:
+		"""Validate every executable capability contract"""
+		try:
+			registry = load_contract_registry()
+			for record in registry.values():
+				validate_contract_shape(record.contract, record.path)
+			print(f"✓ Validated {len(registry)} capability contracts")
+			return True
+		except Exception as e:
+			print(f"✗ Capability contract validation failed: {e}")
+			return False
 	
 	def list_base_templates(self) -> bool:
 		"""List available base templates"""
@@ -963,6 +1009,13 @@ For more help on specific commands, use:
 	# Remove capability from project
 	cap_remove_parser = cap_subparsers.add_parser('remove', help='Remove capability from project')
 	cap_remove_parser.add_argument('name', help='Capability name (category/name)')
+
+	# List executable capability contracts
+	cap_contracts_parser = cap_subparsers.add_parser('contracts', help='List executable capability contracts')
+	cap_contracts_parser.add_argument('--json', action='store_true', help='Output contract summary as JSON')
+
+	# Validate executable capability contracts
+	cap_validate_contracts_parser = cap_subparsers.add_parser('validate-contracts', help='Validate executable capability contracts')
 	
 	# Base templates command group
 	bases_parser = subparsers.add_parser('bases', help='Manage base templates')
@@ -1031,8 +1084,12 @@ def main():
 			success = cli.add_capability(args.name)
 		elif args.capability_action == 'remove':
 			success = cli.remove_capability(args.name)
+		elif args.capability_action == 'contracts':
+			success = cli.list_capability_contracts(output_json=getattr(args, 'json', False))
+		elif args.capability_action == 'validate-contracts':
+			success = cli.validate_capability_contracts()
 		else:
-			print("Usage: apg capabilities {list|info|add|remove}")
+			print("Usage: apg capabilities {list|info|add|remove|contracts|validate-contracts}")
 			success = False
 	
 	elif args.command == 'bases':

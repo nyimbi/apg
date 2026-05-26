@@ -1589,3 +1589,19 @@ Verification:
 - `.venv/bin/python -m pytest -q capabilities/test_capability_contract_registry.py` -> 3 passed
 - `.venv/bin/python -m py_compile capabilities/capability_contract_registry.py capabilities/test_capability_contract_registry.py`
 - `git diff --check -- capabilities/capability_contract_registry.py capabilities/test_capability_contract_registry.py`
+
+### 2026-05-26 18:38 EAT
+
+Completed checkpoint:
+
+- Exposed executable capability contracts through the root APG CLI.
+- Added `apg capabilities contracts` to list discovered contracts, rule counts, UI route counts, and theme names, with `--json` support for automation.
+- Added `apg capabilities validate-contracts` so developers and CI can validate the platform contract registry without importing Python manually.
+- Added focused CLI tests for parser routing, text output, JSON output, and validation execution.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q capabilities/test_capability_contract_registry.py tests/test_cli_capability_contracts.py` -> 7 passed
+- `.venv/bin/python -m py_compile cli.py tests/test_cli_capability_contracts.py`
+- `.venv/bin/python cli.py capabilities validate-contracts` -> `✓ Validated 101 capability contracts`
+- `git diff --check -- cli.py tests/test_cli_capability_contracts.py`
