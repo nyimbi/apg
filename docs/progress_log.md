@@ -2495,3 +2495,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_rpt_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "default_tenant|default_user|Implementation depends on APG auth system|Simplified for demonstration|request\.headers\.get\('X-Tenant-ID', 'default_tenant'\)" capabilities/fin/rpt/api.py capabilities/fin/rpt/views.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:09 EAT
+
+Completed checkpoint:
+
+- Replaced HCM Employee Data Management view/API/API-gateway tenant defaults with shared request-context helpers.
+- Employee model views, dashboard, AI insights, data quality, conversational HR, analytics, custom REST endpoints, and API gateway request construction now resolve tenant/user identity from payload, Flask context/current user, `g.user`, session, APG headers, query args, request environment, and configured fallbacks.
+- Fixed Employee Data Management view/API references to the existing `RevolutionaryEmployeeDataManagementService` class so tenant-aware runtime paths no longer depend on a missing `EmployeeDataManagementService` symbol.
+- Added focused regression coverage that rejects stale HCM employee tenant placeholders and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/chr/employee_data_management/context.py capabilities/hcm/chr/employee_data_management/views.py capabilities/hcm/chr/employee_data_management/api.py capabilities/hcm/chr/employee_data_management/api_integration.py tests/test_hcm_employee_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_hcm_employee_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return ['\"]default_tenant['\"]|request\.headers\.get\(['\"]X-Tenant-ID['\"], ['\"]default_tenant['\"]\)|TODO: Implement tenant resolution|Would extract from user session|from flask_login import current_user|from flask import Blueprint, request, jsonify, g" capabilities/hcm/chr/employee_data_management/views.py capabilities/hcm/chr/employee_data_management/api.py capabilities/hcm/chr/employee_data_management/api_integration.py` -> no matches
+- `git diff --check` -> no issues

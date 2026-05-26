@@ -12,11 +12,12 @@ import asyncio
 import json
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify
 from flask_appbuilder import BaseView, expose, has_access
 from werkzeug.exceptions import BadRequest, NotFound, Unauthorized
 import traceback
 
+from .context import get_current_user_id, get_tenant_id_from_request
 from .api_gateway import EmployeeAPIGateway, APIRequest, HTTPMethod
 from .service import RevolutionaryEmployeeDataManagementService
 
@@ -40,26 +41,27 @@ class EmployeeAPIView(BaseView):
 	
 	def _get_api_gateway(self) -> EmployeeAPIGateway:
 		"""Get or create API gateway instance."""
-		if not self.api_gateway:
-			tenant_id = self._get_tenant_id()
+		tenant_id = self._get_tenant_id()
+		if not self.api_gateway or self.api_gateway.tenant_id != tenant_id:
 			self.api_gateway = EmployeeAPIGateway(tenant_id)
 		return self.api_gateway
 	
 	def _get_tenant_id(self) -> str:
 		"""Get tenant ID from request context."""
-		# Would extract from user session or JWT token in production
-		return "default_tenant"
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 	
 	def _create_api_request(self, endpoint_path: str, method: HTTPMethod) -> APIRequest:
 		"""Create API request object from Flask request."""
+		body = request.get_json(silent=True) if request.method in ['POST', 'PUT', 'PATCH'] else None
 		return APIRequest(
 			endpoint_path=endpoint_path,
 			method=method,
 			headers=dict(request.headers),
 			query_params=dict(request.args),
-			body=request.get_json(silent=True) if request.method in ['POST', 'PUT', 'PATCH'] else None,
-			user_id=getattr(g, 'user_id', None),
-			tenant_id=self._get_tenant_id(),
+			body=body,
+			user_id=get_current_user_id(body),
+			tenant_id=get_tenant_id_from_request(body),
 			client_ip=request.remote_addr
 		)
 	

@@ -19,17 +19,19 @@ from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.charts.views import ChartView
 from flask_appbuilder.widgets import ListWidget, ShowWidget, EditWidget
 from flask_appbuilder.actions import action
-from flask_login import current_user
 from sqlalchemy import and_, or_, desc, func
 from werkzeug.exceptions import BadRequest
 from wtforms import validators
 
+from .context import get_tenant_id_from_request
 from .models import (
 	HREmployee, HRDepartment, HRPosition, HRPersonalInfo, HREmergencyContact,
 	HREmploymentHistory, HRSkill, HREmployeeSkill, HREmployeeAIProfile,
 	HRConversationalSession, HRWorkflowAutomation, HRCertification, HREmployeeCertification
 )
-from .service import RevolutionaryEmployeeDataManagementService
+from .service import RevolutionaryEmployeeDataManagementService as EmployeeDataManagementService
+
+RevolutionaryEmployeeDataManagementService = EmployeeDataManagementService
 from .ai_intelligence_engine import EmployeeAIIntelligenceEngine
 from .conversational_assistant import ConversationalHRAssistant
 from .data_quality_engine import IntelligentDataQualityEngine
@@ -297,8 +299,7 @@ class RevolutionaryEmployeeView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		# TODO: Implement tenant resolution from session/context
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class HRDepartmentModelView(ModelView):
@@ -355,7 +356,7 @@ class HRDepartmentModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class HRPositionModelView(ModelView):
@@ -417,7 +418,7 @@ class HRPositionModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class HRSkillModelView(ModelView):
@@ -463,7 +464,7 @@ class HRSkillModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class HRCertificationModelView(ModelView):
@@ -517,7 +518,7 @@ class HRCertificationModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class HREmployeeSkillModelView(ModelView):
@@ -575,7 +576,7 @@ class HREmployeeSkillModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class HREmployeeCertificationModelView(ModelView):
@@ -638,7 +639,7 @@ class HREmployeeCertificationModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class HREmployeeDashboardView(BaseView):
@@ -719,7 +720,7 @@ class HREmployeeDashboardView(BaseView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class HREmploymentHistoryModelView(ModelView):
@@ -840,7 +841,7 @@ class AIInsightsDashboardView(BaseView):
 		}
 	
 	def get_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class DataQualityDashboardView(BaseView):
@@ -911,7 +912,7 @@ class DataQualityDashboardView(BaseView):
 		}
 	
 	def get_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class ConversationalHRView(BaseView):
@@ -969,7 +970,7 @@ class ConversationalHRView(BaseView):
 			return jsonify({'error': str(e)}), 500
 	
 	def get_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class EmployeeAnalyticsDashboardView(BaseView):
@@ -1150,4 +1151,4 @@ class EmployeeAnalyticsDashboardView(BaseView):
 		return await analytics_engine.get_dashboard_data(dashboard_id, AnalyticsTimeframe.QUARTERLY)
 	
 	def get_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()

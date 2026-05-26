@@ -17,7 +17,8 @@ from .models import (
 	HREmploymentHistory, HRSkill, HREmployeeSkill, HRPositionSkill,
 	HRCertification, HREmployeeCertification
 )
-from .service import EmployeeDataManagementService
+from .context import get_tenant_id_from_request
+from .service import RevolutionaryEmployeeDataManagementService as EmployeeDataManagementService
 
 
 class HREmployeeRestApi(ModelRestApi):
@@ -462,8 +463,8 @@ class EmployeeDataManagementApi(BaseApi):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		# TODO: Implement tenant resolution
-		return "default_tenant"
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 
 
 def register_api_views(appbuilder: AppBuilder):
