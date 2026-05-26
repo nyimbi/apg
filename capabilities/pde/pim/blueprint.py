@@ -34,6 +34,7 @@ from .views import (
 	PLMProductConfigurationView, PLMCollaborationSessionView, PLMComplianceRecordView,
 	PLMManufacturingIntegrationView, PLMDigitalTwinBindingView, PLMDashboardMetricsView
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import PLMProductService, PLMEngineeringChangeService, PLMCollaborationService
 from .ai_service import PLMAIService
 
@@ -306,8 +307,8 @@ class PLMProductModelView(ModelView):
 		"""API endpoint to create digital twin for product"""
 		try:
 			# Get current user and tenant
-			user_id = session.get('user_id', 'system')
-			tenant_id = session.get('tenant_id', 'default_tenant')
+			user_id = get_current_user_id()
+			tenant_id = get_tenant_id_from_request()
 			
 			# Create digital twin via service
 			loop = asyncio.new_event_loop()
@@ -343,8 +344,8 @@ class PLMProductModelView(ModelView):
 		
 		for item in items:
 			try:
-				user_id = session.get('user_id', 'system')
-				tenant_id = session.get('tenant_id', 'default_tenant')
+				user_id = get_current_user_id()
+				tenant_id = get_tenant_id_from_request()
 				
 				loop = asyncio.new_event_loop()
 				asyncio.set_event_loop(loop)
@@ -402,8 +403,8 @@ class PLMEngineeringChangeModelView(ModelView):
 		for item in items:
 			if item.status == 'draft':
 				try:
-					user_id = session.get('user_id', 'system')
-					tenant_id = session.get('tenant_id', 'default_tenant')
+					user_id = get_current_user_id()
+					tenant_id = get_tenant_id_from_request()
 					
 					loop = asyncio.new_event_loop()
 					asyncio.set_event_loop(loop)
@@ -460,8 +461,8 @@ class PLMCollaborationSessionModelView(ModelView):
 	def api_start_session(self, session_id: str):
 		"""API endpoint to start collaboration session"""
 		try:
-			user_id = session.get('user_id', 'system')
-			tenant_id = session.get('tenant_id', 'default_tenant')
+			user_id = get_current_user_id()
+			tenant_id = get_tenant_id_from_request()
 			
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
@@ -494,8 +495,8 @@ class PLMCollaborationSessionModelView(ModelView):
 	def api_join_session(self, session_id: str):
 		"""API endpoint to join collaboration session"""
 		try:
-			user_id = session.get('user_id', 'system')
-			tenant_id = session.get('tenant_id', 'default_tenant')
+			user_id = get_current_user_id()
+			tenant_id = get_tenant_id_from_request()
 			
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
@@ -535,8 +536,8 @@ class PLMDashboardView(BaseView):
 	def dashboard(self):
 		"""Main PLM dashboard"""
 		try:
-			tenant_id = session.get('tenant_id', 'default_tenant')
-			user_id = session.get('user_id', 'system')
+			tenant_id = get_tenant_id_from_request()
+			user_id = get_current_user_id()
 			
 			# Get dashboard metrics
 			loop = asyncio.new_event_loop()
@@ -572,8 +573,8 @@ class PLMDashboardView(BaseView):
 	def api_metrics(self):
 		"""API endpoint for dashboard metrics"""
 		try:
-			tenant_id = session.get('tenant_id', 'default_tenant')
-			user_id = session.get('user_id', 'system')
+			tenant_id = get_tenant_id_from_request()
+			user_id = get_current_user_id()
 			
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
@@ -626,7 +627,7 @@ class PLMAnalyticsView(BaseView):
 	def api_performance_metrics(self):
 		"""API endpoint for performance metrics"""
 		try:
-			tenant_id = session.get('tenant_id', 'default_tenant')
+			tenant_id = get_tenant_id_from_request()
 			
 			# Get performance metrics from AI service
 			loop = asyncio.new_event_loop()
@@ -659,8 +660,8 @@ class PLM3DVisualizationView(BaseView):
 	def viewer(self, product_id: str):
 		"""3D product viewer"""
 		try:
-			tenant_id = session.get('tenant_id', 'default_tenant')
-			user_id = session.get('user_id', 'system')
+			tenant_id = get_tenant_id_from_request()
+			user_id = get_current_user_id()
 			
 			# Get product data for 3D visualization
 			loop = asyncio.new_event_loop()
@@ -689,8 +690,8 @@ class PLM3DVisualizationView(BaseView):
 	def api_3d_data(self, product_id: str):
 		"""API endpoint for 3D product data"""
 		try:
-			tenant_id = session.get('tenant_id', 'default_tenant')
-			user_id = session.get('user_id', 'system')
+			tenant_id = get_tenant_id_from_request()
+			user_id = get_current_user_id()
 			
 			# Get 3D data from digital twin
 			loop = asyncio.new_event_loop()

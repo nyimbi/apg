@@ -2420,3 +2420,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_scm_pom_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|default_tenant" capabilities/scm/pom/views.py capabilities/scm/pom/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:44 EAT
+
+Completed checkpoint:
+
+- Replaced Product Information Management blueprint tenant/user session defaults with shared request-context helpers.
+- PIM digital twin creation, bulk digital twin creation, engineering-change approval submission, collaboration start/join, dashboard metrics, analytics metrics, 3D viewer, and 3D data routes now resolve tenant/user identity from payload, Flask context/current user, `g.user`, session, APG headers, query args, request environment, and configured fallbacks.
+- Added focused regression coverage that rejects stale PIM session tenant/user defaults and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/pde/pim/context.py capabilities/pde/pim/blueprint.py tests/test_pde_pim_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_pde_pim_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "session\.get\('tenant_id', 'default_tenant'\)|session\.get\('user_id', 'system'\)|default_tenant" capabilities/pde/pim/blueprint.py` -> no matches
+- `git diff --check` -> no issues
