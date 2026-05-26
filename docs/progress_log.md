@@ -1258,3 +1258,23 @@ Current broader AICR enterprise-integration findings:
 - Enterprise queue/database adapters now have executable offline behavior instead of no-op placeholders for Kafka, Oracle, and SQL Server.
 - Real network integrations still need their respective optional SDKs and service endpoints, but the module no longer fails at import time in minimal/offline environments.
 - Remaining warnings during focused pytest are pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+
+### 2026-05-26 17:01 EAT
+
+Completed checkpoint:
+
+- Activated ultrawork-style parallel execution for capability work, with a CVSN contextual-intelligence subagent running while the coordinator implemented a separate CONN transformations lane.
+- Replaced CONN transformation jq-like expression behavior with executable nested path reading, assignment, array index access, and simple list mapping.
+- Added reusable path read/write helpers for deterministic JSON transformation expressions without adding external jq dependencies.
+- Added focused transformation runtime tests for nested field selection, nested assignment, list mapping, and array-index selection.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/transformations.py capabilities/common/conn/tests/test_transformations_runtime.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_transformations_runtime.py` -> 4 passed, 10 warnings
+
+Current broader parallelization findings:
+
+- Current session can only run one new subagent because two stale shutdown agents still count against the thread limit and could not be closed by the tool, so maximum velocity in this session is one subagent plus one coordinator-owned local lane.
+- The parallel work model is still valid: non-overlapping capability ownership, coordinator-owned progress log/commits, and focused battery-aware tests per slice.
+- Remaining warnings during focused pytest are pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.

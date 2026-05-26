@@ -68,28 +68,73 @@ class DataTransformationEngine:
 
 	async def _apply_jq_expression(self, data: Dict[str, Any], expression: str) -> Dict[str, Any]:
 		"""Apply jq-like transformation expression to data."""
-		# Simplified jq-like operations - in production, use actual jq library
-		if expression.startswith("."):
-			# Field selection: .field_name
-			field_name = expression[1:]
-			if field_name in data:
-				return {field_name: data[field_name]}
-		elif "|" in expression:
-			# Pipe operations: .field | map(func)
-			parts = expression.split("|")
-			current_data = data
+		expression = expression.strip()
+
+		if "=" in expression and expression.startswith("."):
+			target_expression, source_expression = [part.strip() for part in expression.split("=", 1)]
+			value = self._read_path(data, source_expression)
+			result = data.copy()
+			self._write_path(result, target_expression, value)
+			return result
+
+		if "|" in expression:
+			parts = [part.strip() for part in expression.split("|")]
+			current_data: Any = data
 			for part in parts:
-				part = part.strip()
 				if part.startswith("."):
-					field_name = part[1:]
-					if isinstance(current_data, dict) and field_name in current_data:
-						current_data = current_data[field_name]
-				elif part.startswith("map("):
-					# Simple map operation
-					continue
-			return current_data if isinstance(current_data, dict) else data
+					current_data = self._read_path(current_data, part)
+				elif part.startswith("map(") and part.endswith(")"):
+					map_expression = part[4:-1].strip()
+					if isinstance(current_data, list):
+						current_data = [self._read_path(item, map_expression) for item in current_data]
+			return {"result": current_data}
+
+		if expression.startswith("."):
+			value = self._read_path(data, expression)
+			if value is not None:
+				field_name = expression.rsplit(".", 1)[-1]
+				return {field_name: value}
 
 		return data
+
+	def _read_path(self, data: Any, expression: str) -> Any:
+		"""Read a dotted jq-like path from dict/list data."""
+		if expression == ".":
+			return data
+		path = expression[1:] if expression.startswith(".") else expression
+		current = data
+		for part in [p for p in path.split(".") if p]:
+			if "[" in part and part.endswith("]"):
+				field_name, index_text = part[:-1].split("[", 1)
+				if field_name:
+					if not isinstance(current, dict):
+						return None
+					current = current.get(field_name)
+				if not isinstance(current, list):
+					return None
+				try:
+					current = current[int(index_text)]
+				except (ValueError, IndexError):
+					return None
+			elif isinstance(current, dict):
+				current = current.get(part)
+			else:
+				return None
+		return current
+
+	def _write_path(self, data: Dict[str, Any], expression: str, value: Any) -> None:
+		"""Write a dotted jq-like path into dict data."""
+		path = expression[1:] if expression.startswith(".") else expression
+		current = data
+		parts = [p for p in path.split(".") if p]
+		for part in parts[:-1]:
+			next_value = current.get(part)
+			if not isinstance(next_value, dict):
+				next_value = {}
+				current[part] = next_value
+			current = next_value
+		if parts:
+			current[parts[-1]] = value
 
 	async def parse_csv_data(
 		self,
