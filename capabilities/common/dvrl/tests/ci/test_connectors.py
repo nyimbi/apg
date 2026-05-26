@@ -138,9 +138,9 @@ async def test_api_connector_creation():
 async def test_streaming_connector_creation():
 	"""Test streaming connector creation"""
 	config = {
-		'name': 'test_kafka',
-		'type': DataSourceType.KAFKA,
-		'connection_config': {'brokers': 'localhost:9092'}
+		'name': 'test_bytewax',
+		'type': DataSourceType.BYTEWAX,
+		'connection_config': {'streams': ['orders']}
 	}
 	
 	data_source = DataSource(
@@ -152,7 +152,7 @@ async def test_streaming_connector_creation():
 	connector = ConnectorFactory.create_connector(data_source, 'test-tenant', 'test-user')
 	
 	assert isinstance(connector, StreamingConnector)
-	assert connector.data_source.type == DataSourceType.KAFKA
+	assert connector.data_source.type == DataSourceType.BYTEWAX
 
 
 async def test_sql_connector_capabilities():
@@ -314,7 +314,7 @@ async def test_connector_factory_supported_types():
 	assert DataSourceType.POSTGRESQL in supported_types
 	assert DataSourceType.MONGODB in supported_types
 	assert DataSourceType.REST_API in supported_types
-	assert DataSourceType.KAFKA in supported_types
+	assert DataSourceType.BYTEWAX in supported_types
 	
 	assert len(supported_types) > 10  # Should support many types
 

@@ -1435,3 +1435,23 @@ Verification:
 Current broader Bytewax migration findings:
 
 - META executable connector surfaces are clean. Remaining major runtime families are composition events and DVRL, plus generated examples/templates/docs.
+
+### 2026-05-26 17:42 EAT
+
+Completed checkpoint:
+
+- Replaced DVRL's `DataSourceType.KAFKA` with `DataSourceType.BYTEWAX`.
+- Removed the `aiokafka` import path from DVRL connectors.
+- Replaced the streaming connector's broker/client logic with Bytewax-style stream fixtures, schema discovery, list/consume/produce query commands, stream cursors, and offline record normalization.
+- Updated DVRL connector factory, streaming query routing, and connector tests to use Bytewax streams.
+- Fixed two pre-existing indentation defects in DVRL connector cleanup/Redis command paths that blocked focused compilation.
+
+Verification:
+
+- `rg -n "Kafka|KAFKA|kafka|aiokafka|AIOKafka|DataSourceType.KAFKA|_kafka|kafka_" capabilities/common/dvrl/models.py capabilities/common/dvrl/connectors.py capabilities/common/dvrl/service.py capabilities/common/dvrl/tests/ci/test_connectors.py` -> no matches
+- `.venv/bin/python -m py_compile capabilities/common/dvrl/models.py capabilities/common/dvrl/connectors.py capabilities/common/dvrl/service.py capabilities/common/dvrl/tests/ci/test_connectors.py`
+- `git diff --check -- capabilities/common/dvrl/models.py capabilities/common/dvrl/connectors.py capabilities/common/dvrl/service.py capabilities/common/dvrl/tests/ci/test_connectors.py`
+
+Current broader Bytewax migration findings:
+
+- DVRL executable streaming code is clean. Remaining Python references are composition events and generated orchestration templates.

@@ -1973,7 +1973,7 @@ class StreamingExecutor:
 		# Get streaming connectors for data sources
 		streaming_connectors = {}
 		for ds_id, data_source in data_sources.items():
-			if data_source.type in [DataSourceType.KAFKA, DataSourceType.REDIS, DataSourceType.MQTT]:
+			if data_source.type in [DataSourceType.BYTEWAX, DataSourceType.REDIS, DataSourceType.MQTT]:
 				connector = await self.connector_manager.get_connector(ds_id)
 				if not connector:
 					connector = await self.connector_manager.create_connector(data_source)

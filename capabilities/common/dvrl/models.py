@@ -51,7 +51,7 @@ class DataSourceType(str, Enum):
 	REDSHIFT = "redshift"
 	S3 = "s3"
 	HDFS = "hdfs"
-	KAFKA = "kafka"
+	BYTEWAX = "bytewax"
 	REST_API = "rest_api"
 	GRAPHQL = "graphql"
 	FILE_CSV = "file_csv"
