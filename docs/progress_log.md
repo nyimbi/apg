@@ -2587,3 +2587,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_apy_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "user_id=\"user_123\"|tenant_id=\"tenant_456\"|return a mock user context|validate the JWT token" capabilities/fin/apy/accounts_payable/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:33 EAT
+
+Completed checkpoint:
+
+- Replaced Facial Recognition API `default_tenant` fallback with shared request-context resolution.
+- FREC Flask routes now resolve tenant identity from Flask request context, APG headers, query args, environment/configured fallbacks, and preserve the existing tenant-keyed service cache contract.
+- Added focused regression coverage that rejects the stale FREC tenant fallback and verifies tenant precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/frec/context.py capabilities/common/frec/api.py tests/test_common_frec_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_common_frec_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "request\.headers\.get\('X-Tenant-ID', 'default_tenant'\)|default_tenant" capabilities/common/frec/api.py` -> no matches
+- `git diff --check` -> no issues

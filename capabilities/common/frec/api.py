@@ -39,6 +39,7 @@ from .emotion_intelligence import EmotionIntelligenceEngine
 from .collaborative_verification import CollaborativeVerificationEngine
 from .predictive_analytics import PredictiveAnalyticsEngine
 from .privacy_architecture import PrivacyArchitectureEngine
+from .context import resolve_tenant_id
 
 # Create API Blueprint
 facial_api = Blueprint('facial_api', __name__, url_prefix='/api/v1/facial')
@@ -115,7 +116,7 @@ def validate_json(model_class):
 
 def get_tenant_id():
     """Extract tenant ID from request headers"""
-    return request.headers.get('X-Tenant-ID', 'default_tenant')
+    return resolve_tenant_id(request=request)
 
 # Health Check Endpoint
 @facial_api.route('/health', methods=['GET'])
