@@ -678,3 +678,25 @@ Current broader MFAU/BIOP/FREC/IDFD execution findings:
 - FREC had substantial runtime files but no package registration surface; it now advertises executable configuration/rules/UI/theme contracts.
 - IDFD is no longer a placeholder package at the composition layer.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 10:56 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder DLPD package into a first-class APG data-loss-prevention capability with tenant-scoped classifier, channel, response, governance, UI, and theme configuration.
+- Added deterministic DLPD rules for tenant context, egress policy attachment, sensitive-content classification, high-severity blocking/quarantine, encrypted quarantine, and large-export review.
+- Promoted the placeholder ZTNA package into a first-class APG zero-trust access capability with identity, device, resource, governance, UI, and theme configuration.
+- Added deterministic ZTNA rules for tenant context, identity verification, device posture, resource policy attachment, privileged MFA, and high-risk access review.
+- Promoted the placeholder COMP package into a first-class APG compliance-management capability with framework, control, evidence, reporting, governance, UI, and theme configuration.
+- Added deterministic COMP rules for tenant context, control ownership, evidence freshness, DLP linkage for regulated data, report approval, and overdue-finding escalation.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/dlpd/__init__.py capabilities/common/dlpd/capability_contract.py capabilities/common/dlpd/test_capability_contract.py capabilities/common/ztna/__init__.py capabilities/common/ztna/capability_contract.py capabilities/common/ztna/test_capability_contract.py capabilities/common/comp/__init__.py capabilities/common/comp/capability_contract.py capabilities/common/comp/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/dlpd/test_capability_contract.py capabilities/common/ztna/test_capability_contract.py capabilities/common/comp/test_capability_contract.py` -> 9 passed, 11 warnings
+
+Current broader DLPD/ZTNA/COMP execution findings:
+
+- DLPD, ZTNA, and COMP are no longer placeholders at the composition layer.
+- Phase 5 now has uniform first-class registration/contract coverage across advanced authentication, biometric identity, federation, advanced security, and compliance.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
