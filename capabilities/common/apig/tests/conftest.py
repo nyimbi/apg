@@ -23,6 +23,9 @@ import os
 current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if current_dir not in sys.path:
 	sys.path.insert(0, current_dir)
+tests_dir = os.path.dirname(os.path.abspath(__file__))
+if tests_dir not in sys.path:
+	sys.path.insert(0, tests_dir)
 
 # Only import our local APIG modules
 try:
@@ -39,7 +42,7 @@ except ImportError as e:
 	print(f"Warning: Could not import APIG modules: {e}")
 	class MockModel:
 		pass
-	
+
 	APGIntelligentGatewayService = MockModel
 	AgGatewayConfig = MockModel
 
@@ -56,7 +59,7 @@ APG_TEST_CONFIG = {
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 	"""
 	Create event loop for the entire test session.
-	
+
 	Following APG async patterns - no @pytest.mark.asyncio decorators needed.
 	"""
 	loop = asyncio.get_event_loop_policy().new_event_loop()
@@ -67,7 +70,7 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 async def apig_service() -> AsyncGenerator[APGIntelligentGatewayService, None]:
 	"""
 	Create and initialize APIG service for testing.
-	
+
 	Returns:
 		APGIntelligentGatewayService: Fully initialized service instance
 	"""
@@ -76,11 +79,11 @@ async def apig_service() -> AsyncGenerator[APGIntelligentGatewayService, None]:
 		user_id=APG_TEST_CONFIG['user_id'],
 		config={'testing': True}
 	)
-	
+
 	await service.initialize()
-	
+
 	yield service
-	
+
 	# Cleanup
 	await service.shutdown()
 
@@ -88,7 +91,7 @@ async def apig_service() -> AsyncGenerator[APGIntelligentGatewayService, None]:
 def mock_apg_auth_service() -> Mock:
 	"""
 	Mock APG auth_rbac service for testing.
-	
+
 	Returns:
 		Mock: Configured mock auth service
 	"""
@@ -101,14 +104,14 @@ def mock_apg_auth_service() -> Mock:
 	}
 	mock_auth.authorize.return_value = True
 	mock_auth.get_user_roles.return_value = ['admin', 'user']
-	
+
 	return mock_auth
 
 @pytest.fixture
 def mock_apg_monitoring_service() -> AsyncMock:
 	"""
 	Mock APG monitoring service for testing.
-	
+
 	Returns:
 		AsyncMock: Configured mock monitoring service
 	"""
@@ -123,14 +126,14 @@ def mock_apg_monitoring_service() -> AsyncMock:
 	}
 	mock_monitoring.create_alert.return_value = True
 	mock_monitoring.get_health_status.return_value = 'healthy'
-	
+
 	return mock_monitoring
 
 @pytest.fixture
 def mock_apg_messaging_service() -> AsyncMock:
 	"""
 	Mock APG message queuing service for testing.
-	
+
 	Returns:
 		AsyncMock: Configured mock messaging service
 	"""
@@ -141,14 +144,14 @@ def mock_apg_messaging_service() -> AsyncMock:
 		'messages_pending': 0,
 		'consumers_active': 1
 	}
-	
+
 	return mock_messaging
 
 @pytest.fixture
 def mock_apg_config_service() -> AsyncMock:
 	"""
 	Mock APG configuration service for testing.
-	
+
 	Returns:
 		AsyncMock: Configured mock config service
 	"""
@@ -170,14 +173,14 @@ def mock_apg_config_service() -> AsyncMock:
 			'health_check': '/health'
 		}
 	]
-	
+
 	return mock_config
 
 @pytest.fixture
 def mock_apg_ai_orchestration() -> AsyncMock:
 	"""
 	Mock APG AI orchestration service for testing.
-	
+
 	Returns:
 		AsyncMock: Configured mock AI service
 	"""
@@ -195,14 +198,14 @@ def mock_apg_ai_orchestration() -> AsyncMock:
 		'llama3.2:latest',
 		'mistral:latest'
 	]
-	
+
 	return mock_ai
 
 @pytest.fixture
 def sample_gateway_config() -> AgGatewayConfig:
 	"""
 	Sample gateway configuration for testing.
-	
+
 	Returns:
 		AgGatewayConfig: Test gateway configuration
 	"""
@@ -220,7 +223,7 @@ def sample_gateway_config() -> AgGatewayConfig:
 def sample_upstream_service() -> AgUpstreamService:
 	"""
 	Sample upstream service for testing.
-	
+
 	Returns:
 		AgUpstreamService: Test upstream service configuration
 	"""
@@ -235,10 +238,10 @@ def sample_upstream_service() -> AgUpstreamService:
 def sample_api_route(sample_upstream_service: AgUpstreamService) -> AgApiRoute:
 	"""
 	Sample API route for testing.
-	
+
 	Args:
 		sample_upstream_service: Upstream service fixture
-		
+
 	Returns:
 		AgApiRoute: Test API route configuration
 	"""
@@ -258,7 +261,7 @@ def sample_api_route(sample_upstream_service: AgUpstreamService) -> AgApiRoute:
 def sample_rate_limit() -> AgRateLimit:
 	"""
 	Sample rate limit configuration for testing.
-	
+
 	Returns:
 		AgRateLimit: Test rate limit configuration
 	"""
@@ -273,7 +276,7 @@ def sample_rate_limit() -> AgRateLimit:
 def sample_security_policy() -> AgSecurityPolicy:
 	"""
 	Sample security policy for testing.
-	
+
 	Returns:
 		AgSecurityPolicy: Test security policy
 	"""
@@ -292,7 +295,7 @@ def sample_security_policy() -> AgSecurityPolicy:
 def sample_wasm_module() -> AgWasmModule:
 	"""
 	Sample WASM module for testing.
-	
+
 	Returns:
 		AgWasmModule: Test WASM module configuration
 	"""
@@ -311,7 +314,7 @@ def sample_wasm_module() -> AgWasmModule:
 def sample_http_request() -> AgHttpRequest:
 	"""
 	Sample HTTP request for testing.
-	
+
 	Returns:
 		AgHttpRequest: Test HTTP request
 	"""
@@ -333,7 +336,7 @@ def sample_http_request() -> AgHttpRequest:
 def sample_security_event() -> AgSecurityEvent:
 	"""
 	Sample security event for testing.
-	
+
 	Returns:
 		AgSecurityEvent: Test security event
 	"""
@@ -355,7 +358,7 @@ def sample_security_event() -> AgSecurityEvent:
 def sample_traffic_metrics() -> AgTrafficMetrics:
 	"""
 	Sample traffic metrics for testing.
-	
+
 	Returns:
 		AgTrafficMetrics: Test traffic metrics
 	"""
@@ -380,10 +383,10 @@ def sample_traffic_metrics() -> AgTrafficMetrics:
 def assert_valid_uuid(uuid_string: str) -> None:
 	"""
 	Assert that string is a valid UUID.
-	
+
 	Args:
 		uuid_string: String to validate as UUID
-		
+
 	Raises:
 		AssertionError: If string is not a valid UUID
 	"""
@@ -396,11 +399,11 @@ def assert_valid_uuid(uuid_string: str) -> None:
 def assert_recent_timestamp(timestamp: datetime, max_age_seconds: int = 60) -> None:
 	"""
 	Assert that timestamp is recent (within max_age_seconds).
-	
+
 	Args:
 		timestamp: Timestamp to check
 		max_age_seconds: Maximum age in seconds
-		
+
 	Raises:
 		AssertionError: If timestamp is too old
 	"""
@@ -411,30 +414,30 @@ def assert_recent_timestamp(timestamp: datetime, max_age_seconds: int = 60) -> N
 async def wait_for_condition(condition_func, timeout_seconds: float = 5.0, check_interval: float = 0.1):
 	"""
 	Wait for async condition to become true.
-	
+
 	Args:
 		condition_func: Async function that returns bool when condition is met
 		timeout_seconds: Maximum time to wait
 		check_interval: Time between checks
-		
+
 	Raises:
 		TimeoutError: If condition not met within timeout
 	"""
 	import time
-	
+
 	start_time = time.time()
 	while time.time() - start_time < timeout_seconds:
 		if await condition_func():
 			return
 		await asyncio.sleep(check_interval)
-	
+
 	raise TimeoutError(f"Condition not met within {timeout_seconds} seconds")
 
 # Test Markers for Different Test Categories
 
 # Use these markers to categorize tests:
 # @pytest.mark.unit - Unit tests
-# @pytest.mark.integration - Integration tests  
+# @pytest.mark.integration - Integration tests
 # @pytest.mark.performance - Performance tests
 # @pytest.mark.security - Security tests
 # @pytest.mark.apg_integration - APG platform integration tests
@@ -469,6 +472,6 @@ def pytest_collection_modifyitems(config, items):
 __all__ = [
 	'APG_TEST_CONFIG',
 	'assert_valid_uuid',
-	'assert_recent_timestamp', 
+	'assert_recent_timestamp',
 	'wait_for_condition'
 ]

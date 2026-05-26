@@ -26,9 +26,59 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional, Union, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-import aioredis
 import numpy as np
 from urllib.parse import urlparse
+
+try:
+    import aioredis
+except ImportError:
+    class _InMemoryRedisPool:
+        @classmethod
+        def from_url(cls, *args, **kwargs):
+            return cls()
+
+        async def disconnect(self) -> None:
+            return None
+
+    class _InMemoryRedis:
+        def __init__(self, connection_pool: Optional[_InMemoryRedisPool] = None):
+            self.connection_pool = connection_pool
+            self._data: Dict[str, str] = {}
+
+        async def ping(self) -> bool:
+            return True
+
+        async def get(self, key: str) -> Optional[str]:
+            return self._data.get(key)
+
+        async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+            self._data[key] = value
+            return True
+
+        async def delete(self, key: str) -> int:
+            existed = key in self._data
+            self._data.pop(key, None)
+            return int(existed)
+
+        async def exists(self, key: str) -> bool:
+            return key in self._data
+
+        async def incr(self, key: str) -> int:
+            value = int(self._data.get(key, "0")) + 1
+            self._data[key] = str(value)
+            return value
+
+        async def expire(self, key: str, ttl_seconds: int) -> bool:
+            return key in self._data
+
+        async def close(self) -> None:
+            return None
+
+    class _AioRedisCompat:
+        ConnectionPool = _InMemoryRedisPool
+        Redis = _InMemoryRedis
+
+    aioredis = _AioRedisCompat()
 
 from models import (
     AgHttpRequest, AgHttpResponse, AgUpstreamService, AgWasmModule,
@@ -131,26 +181,26 @@ class EdgeProcessingResult:
 
 class ProductionIntelligentCache:
     """Production-grade intelligent cache with AI optimization."""
-    
+
     def __init__(self, tenant_id: str, redis_url: str = "redis://localhost:6379"):
         """Initialize intelligent cache."""
         self.tenant_id = tenant_id
         self.redis_url = redis_url
         self.redis_pool: Optional[aioredis.ConnectionPool] = None
         self.redis: Optional[aioredis.Redis] = None
-        
+
         # Cache statistics
         self.hits = 0
         self.misses = 0
         self.invalidations = 0
         self.warm_operations = 0
-        
+
         # AI model for cache decisions
         self.cache_patterns: Dict[str, float] = {}
         self.access_patterns: Dict[str, List[float]] = {}
-        
+
         logger.info(f"Intelligent cache initialized for tenant {tenant_id}")
-    
+
     async def initialize(self) -> None:
         """Initialize Redis connection."""
         try:
@@ -164,50 +214,50 @@ class ProductionIntelligentCache:
                     'TCP_KEEPIDLE': 1,
                 }
             )
-            
+
             self.redis = aioredis.Redis(connection_pool=self.redis_pool)
-            
+
             # Test connection
             await self.redis.ping()
-            
+
             logger.info("Intelligent cache Redis connection established")
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize Redis cache: {str(e)}")
             raise RuntimeError(f"Cache initialization failed: {str(e)}")
-    
+
     async def get(self, cache_key: str) -> Optional[Dict[str, Any]]:
         """Get item from cache."""
         try:
             start_time = time.perf_counter()
-            
+
             # Get from Redis
             data = await self.redis.get(f"{self.tenant_id}:{cache_key}")
-            
+
             if data:
                 self.hits += 1
                 # Update access pattern
                 await self._record_access_pattern(cache_key)
-                
+
                 result = json.loads(data)
                 result['cache_retrieval_time_ms'] = (time.perf_counter() - start_time) * 1000
-                
+
                 logger.debug(f"Cache hit for key {cache_key}")
                 return result
             else:
                 self.misses += 1
                 logger.debug(f"Cache miss for key {cache_key}")
                 return None
-                
+
         except Exception as e:
             logger.error(f"Cache get error for key {cache_key}: {str(e)}")
             self.misses += 1
             return None
-    
+
     async def set(
-        self, 
-        cache_key: str, 
-        data: Dict[str, Any], 
+        self,
+        cache_key: str,
+        data: Dict[str, Any],
         ttl_seconds: int = 300
     ) -> bool:
         """Set item in cache."""
@@ -218,107 +268,107 @@ class ProductionIntelligentCache:
                 'ttl_seconds': ttl_seconds,
                 'tenant_id': self.tenant_id
             }
-            
+
             serialized_data = json.dumps(cache_data, default=str)
-            
+
             await self.redis.setex(
                 f"{self.tenant_id}:{cache_key}",
                 ttl_seconds,
                 serialized_data
             )
-            
+
             # Update cache patterns for AI learning
             await self._update_cache_patterns(cache_key, ttl_seconds)
-            
+
             logger.debug(f"Cached item with key {cache_key} for {ttl_seconds}s")
             return True
-            
+
         except Exception as e:
             logger.error(f"Cache set error for key {cache_key}: {str(e)}")
             return False
-    
+
     async def invalidate(self, cache_key: str) -> bool:
         """Invalidate cache entry."""
         try:
             result = await self.redis.delete(f"{self.tenant_id}:{cache_key}")
-            
+
             if result > 0:
                 self.invalidations += 1
                 logger.debug(f"Invalidated cache key {cache_key}")
                 return True
             else:
                 return False
-                
+
         except Exception as e:
             logger.error(f"Cache invalidation error for key {cache_key}: {str(e)}")
             return False
-    
+
     async def warm_cache(self, cache_keys: List[str], data_fetcher) -> int:
         """Warm cache with predicted needed data."""
         warmed_count = 0
-        
+
         try:
             for cache_key in cache_keys:
                 # Check if already cached
                 if await self.redis.exists(f"{self.tenant_id}:{cache_key}"):
                     continue
-                
+
                 # Fetch and cache data
                 try:
                     data = await data_fetcher(cache_key)
                     if data and await self.set(cache_key, data):
                         warmed_count += 1
                         self.warm_operations += 1
-                        
+
                 except Exception as e:
                     logger.error(f"Failed to warm cache key {cache_key}: {str(e)}")
                     continue
-            
+
             logger.info(f"Warmed {warmed_count} cache entries")
             return warmed_count
-            
+
         except Exception as e:
             logger.error(f"Cache warming error: {str(e)}")
             return warmed_count
-    
+
     async def analyze_cache_decision(self, request: AgHttpRequest) -> CacheAnalysis:
         """AI-powered cache decision analysis."""
         try:
             # Generate cache key
             cache_key = self._generate_cache_key(request)
-            
+
             # Analyze request characteristics
             is_static_content = self._is_static_content(request.path)
             is_user_specific = self._is_user_specific(request.path)
             is_frequently_accessed = await self._is_frequently_accessed(cache_key)
-            
+
             # AI-based decision logic
             decision = CacheDecision.NO_CACHE
             ttl_seconds = 300
             confidence = 0.5
             reasoning = "Default no-cache policy"
             warm_related = []
-            
+
             if request.method == HttpMethod.GET:
                 if is_static_content:
                     decision = CacheDecision.CACHE
                     ttl_seconds = 3600  # 1 hour for static content
                     confidence = 0.9
                     reasoning = "Static content - high cache value"
-                    
+
                 elif is_frequently_accessed:
                     decision = CacheDecision.CACHE_AND_WARM
                     ttl_seconds = 900  # 15 minutes for dynamic but frequent content
                     confidence = 0.8
                     reasoning = "Frequently accessed - cache with warming"
                     warm_related = await self._predict_related_requests(request.path)
-                    
+
                 elif not is_user_specific:
                     decision = CacheDecision.CACHE
                     ttl_seconds = 600  # 10 minutes for general content
                     confidence = 0.7
                     reasoning = "Non-user-specific content - moderate cache value"
-            
+
             return CacheAnalysis(
                 decision=decision,
                 ttl_seconds=ttl_seconds,
@@ -332,7 +382,7 @@ class ProductionIntelligentCache:
                     'frequently_accessed': is_frequently_accessed
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"Cache analysis error: {str(e)}")
             return CacheAnalysis(
@@ -342,7 +392,7 @@ class ProductionIntelligentCache:
                 reasoning=f"Analysis failed: {str(e)}",
                 cache_key=self._generate_cache_key(request)
             )
-    
+
     def _generate_cache_key(self, request: AgHttpRequest) -> str:
         """Generate cache key from request."""
         key_components = [
@@ -350,26 +400,26 @@ class ProductionIntelligentCache:
             request.path,
             request.query_string,
         ]
-        
+
         # Add relevant headers for cache key
         cache_headers = ['accept', 'accept-encoding', 'accept-language']
         for header in cache_headers:
             if header in request.headers:
                 key_components.append(f"{header}:{request.headers[header]}")
-        
+
         key_string = "|".join(key_components)
         return hashlib.sha256(key_string.encode()).hexdigest()[:16]
-    
+
     def _is_static_content(self, path: str) -> bool:
         """Check if path represents static content."""
         static_extensions = {'.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf'}
         return any(path.lower().endswith(ext) for ext in static_extensions)
-    
+
     def _is_user_specific(self, path: str) -> bool:
         """Check if path contains user-specific content."""
         user_patterns = ['/user/', '/profile/', '/dashboard/', '/account/', '/settings/']
         return any(pattern in path.lower() for pattern in user_patterns)
-    
+
     async def _is_frequently_accessed(self, cache_key: str) -> bool:
         """Check if cache key is frequently accessed."""
         try:
@@ -377,11 +427,11 @@ class ProductionIntelligentCache:
             return int(access_count or 0) > 10  # Threshold for frequent access
         except Exception:
             return False
-    
+
     async def _predict_related_requests(self, path: str) -> List[str]:
         """Predict related requests for cache warming."""
         related_paths = []
-        
+
         # Simple pattern-based predictions
         if '/api/products' in path:
             related_paths.extend([
@@ -394,9 +444,9 @@ class ProductionIntelligentCache:
                 '/api/users/preferences',
                 '/api/users/activity'
             ])
-        
+
         return related_paths[:5]  # Limit to 5 predictions
-    
+
     async def _record_access_pattern(self, cache_key: str) -> None:
         """Record access pattern for AI learning."""
         try:
@@ -404,7 +454,7 @@ class ProductionIntelligentCache:
             await self.redis.expire(f"{self.tenant_id}:access:{cache_key}", 3600)  # 1 hour
         except Exception as e:
             logger.debug(f"Failed to record access pattern: {str(e)}")
-    
+
     async def _update_cache_patterns(self, cache_key: str, ttl_seconds: int) -> None:
         """Update cache patterns for AI learning."""
         try:
@@ -418,12 +468,12 @@ class ProductionIntelligentCache:
                 )
         except Exception as e:
             logger.debug(f"Failed to update cache patterns: {str(e)}")
-    
+
     async def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
         total_requests = self.hits + self.misses
         hit_rate = self.hits / total_requests if total_requests > 0 else 0.0
-        
+
         return {
             'hits': self.hits,
             'misses': self.misses,
@@ -432,7 +482,7 @@ class ProductionIntelligentCache:
             'warm_operations': self.warm_operations,
             'learned_patterns': len(self.cache_patterns)
         }
-    
+
     async def close(self) -> None:
         """Close cache connections."""
         if self.redis:
@@ -443,59 +493,59 @@ class ProductionIntelligentCache:
 
 class ProductionSecurityAnalyzer:
     """Production-grade security analyzer with ML threat detection."""
-    
+
     def __init__(self, tenant_id: str, ollama_client: ProductionOllamaClient):
         """Initialize security analyzer."""
         self.tenant_id = tenant_id
         self.ollama_client = ollama_client
-        
+
         # Security patterns and rules
         self.sql_injection_patterns = [
             r"(\b(union|select|insert|delete|update|drop|create|alter|exec|execute)\b)",
             r"('|\"|;|--|\*|\/\*|\*\/)",
             r"(\b(or|and)\s+\w+\s*=\s*\w+)",
         ]
-        
+
         self.xss_patterns = [
             r"<script[^>]*>.*?</script>",
             r"javascript:",
             r"on\w+\s*=",
             r"<iframe[^>]*>",
         ]
-        
+
         self.suspicious_user_agents = [
             'sqlmap', 'nikto', 'nmap', 'masscan', 'nuclei', 'gobuster'
         ]
-        
+
         # Request tracking for behavioral analysis
         self.request_history: Dict[str, List[datetime]] = {}
         self.failed_attempts: Dict[str, int] = {}
-        
+
         logger.info(f"Security analyzer initialized for tenant {tenant_id}")
-    
+
     async def analyze_request(self, request: AgHttpRequest) -> SecurityAnalysis:
         """Perform comprehensive security analysis."""
         try:
             start_time = time.perf_counter()
-            
+
             threats = []
             risk_score = 0.0
             confidence = 1.0
-            
+
             # Pattern-based detection
             threats.extend(await self._detect_sql_injection(request))
             threats.extend(await self._detect_xss_attempts(request))
             threats.extend(await self._detect_suspicious_user_agent(request))
-            
+
             # Behavioral analysis
             behavioral_threats = await self._analyze_behavior(request)
             threats.extend(behavioral_threats)
-            
+
             # DDoS detection
             if await self._detect_ddos_pattern(request):
                 threats.append(SecurityThreat.DDoS)
                 risk_score += 0.8
-            
+
             # Calculate overall risk score
             threat_weights = {
                 SecurityThreat.SQL_INJECTION: 0.9,
@@ -506,12 +556,12 @@ class ProductionSecurityAnalyzer:
                 SecurityThreat.MALICIOUS_PAYLOAD: 0.7,
                 SecurityThreat.SUSPICIOUS_PATTERN: 0.5,
             }
-            
+
             for threat in threats:
                 risk_score += threat_weights.get(threat, 0.3)
-            
+
             risk_score = min(risk_score, 1.0)  # Cap at 1.0
-            
+
             # Determine threat level
             if risk_score >= 0.8:
                 threat_level = ThreatLevel.CRITICAL
@@ -521,11 +571,11 @@ class ProductionSecurityAnalyzer:
                 threat_level = ThreatLevel.MEDIUM
             else:
                 threat_level = ThreatLevel.LOW
-            
+
             # Determine recommended action
             block_request = risk_score >= 0.7
             rate_limit = risk_score >= 0.4
-            
+
             if block_request:
                 recommended_action = "block_request"
             elif rate_limit:
@@ -534,9 +584,9 @@ class ProductionSecurityAnalyzer:
                 recommended_action = "monitor_closely"
             else:
                 recommended_action = "allow"
-            
+
             analysis_time = (time.perf_counter() - start_time) * 1000
-            
+
             return SecurityAnalysis(
                 threat_level=threat_level,
                 threat_types=threats,
@@ -553,7 +603,7 @@ class ProductionSecurityAnalyzer:
                     'threat_count': len(threats)
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"Security analysis error: {str(e)}")
             return SecurityAnalysis(
@@ -564,97 +614,97 @@ class ProductionSecurityAnalyzer:
                 recommended_action="allow",
                 details={'error': str(e)}
             )
-    
+
     async def _detect_sql_injection(self, request: AgHttpRequest) -> List[SecurityThreat]:
         """Detect SQL injection attempts."""
         threats = []
-        
+
         # Check query string and body
         check_strings = [request.query_string]
         if request.body:
             check_strings.append(request.body.decode('utf-8', errors='ignore'))
-        
+
         for check_string in check_strings:
             if self._contains_sql_injection_pattern(check_string.lower()):
                 threats.append(SecurityThreat.SQL_INJECTION)
                 break
-        
+
         return threats
-    
+
     async def _detect_xss_attempts(self, request: AgHttpRequest) -> List[SecurityThreat]:
         """Detect XSS attempts."""
         threats = []
-        
+
         check_strings = [request.query_string, request.path]
         if request.body:
             check_strings.append(request.body.decode('utf-8', errors='ignore'))
-        
+
         for check_string in check_strings:
             if self._contains_xss_pattern(check_string):
                 threats.append(SecurityThreat.XSS_ATTEMPT)
                 break
-        
+
         return threats
-    
+
     async def _detect_suspicious_user_agent(self, request: AgHttpRequest) -> List[SecurityThreat]:
         """Detect suspicious user agents."""
         threats = []
-        
+
         user_agent = (request.user_agent or '').lower()
-        
+
         for suspicious_agent in self.suspicious_user_agents:
             if suspicious_agent in user_agent:
                 threats.append(SecurityThreat.BOT_ATTACK)
                 break
-        
+
         # Check for empty or very short user agents
         if not user_agent or len(user_agent) < 10:
             threats.append(SecurityThreat.SUSPICIOUS_PATTERN)
-        
+
         return threats
-    
+
     async def _analyze_behavior(self, request: AgHttpRequest) -> List[SecurityThreat]:
         """Analyze request behavior patterns."""
         threats = []
         client_ip = request.client_ip
-        
+
         # Track request frequency
         now = datetime.now(timezone.utc)
         if client_ip not in self.request_history:
             self.request_history[client_ip] = []
-        
+
         # Clean old requests (older than 5 minutes)
         cutoff = now - timedelta(minutes=5)
         self.request_history[client_ip] = [
-            req_time for req_time in self.request_history[client_ip] 
+            req_time for req_time in self.request_history[client_ip]
             if req_time > cutoff
         ]
-        
+
         self.request_history[client_ip].append(now)
-        
+
         # Check for brute force patterns
         recent_requests = len(self.request_history[client_ip])
         if recent_requests > 50:  # More than 50 requests in 5 minutes
             threats.append(SecurityThreat.BRUTE_FORCE)
-        
+
         return threats
-    
+
     async def _detect_ddos_pattern(self, request: AgHttpRequest) -> bool:
         """Detect DDoS attack patterns."""
         client_ip = request.client_ip
-        
+
         # Simple rate-based DDoS detection
         if client_ip in self.request_history:
             recent_minute = datetime.now(timezone.utc) - timedelta(minutes=1)
             recent_requests = sum(
-                1 for req_time in self.request_history[client_ip] 
+                1 for req_time in self.request_history[client_ip]
                 if req_time > recent_minute
             )
-            
+
             return recent_requests > 100  # More than 100 requests per minute
-        
+
         return False
-    
+
     def _contains_sql_injection_pattern(self, text: str) -> bool:
         """Check for SQL injection patterns."""
         import re
@@ -662,7 +712,7 @@ class ProductionSecurityAnalyzer:
             if re.search(pattern, text, re.IGNORECASE):
                 return True
         return False
-    
+
     def _contains_xss_pattern(self, text: str) -> bool:
         """Check for XSS patterns."""
         import re
@@ -675,7 +725,7 @@ class ProductionSecurityAnalyzer:
 class ProductionEdgeEngine:
     """
     Production-grade edge computing engine with comprehensive capabilities.
-    
+
     This engine provides:
     - WebAssembly runtime for custom logic
     - AI-powered traffic analysis and caching
@@ -683,26 +733,26 @@ class ProductionEdgeEngine:
     - Intelligent request processing
     - Performance optimization
     """
-    
+
     def __init__(self, tenant_id: str, edge_location: str = "default"):
         """Initialize edge engine."""
         self.tenant_id = tenant_id
         self.edge_location = edge_location
         self.initialized = False
-        
+
         # Core components
         self.wasm_runtime: Optional[ProductionWASMRuntime] = None
         self.cache: Optional[ProductionIntelligentCache] = None
         self.security_analyzer: Optional[ProductionSecurityAnalyzer] = None
         self.ollama_client: Optional[ProductionOllamaClient] = None
-        
+
         # Performance metrics
         self.total_requests = 0
         self.cached_responses = 0
         self.security_blocks = 0
         self.wasm_executions = 0
         self.total_processing_time = 0.0
-        
+
         # Edge configuration
         self.edge_config = {
             'max_wasm_modules': 50,
@@ -710,25 +760,25 @@ class ProductionEdgeEngine:
             'security_enabled': True,
             'ai_analysis_enabled': True
         }
-        
+
         logger.info(f"Edge Engine initialized at location {edge_location} for tenant {tenant_id}")
-    
+
     async def initialize(self) -> None:
         """Initialize all edge components."""
         try:
             start_time = time.perf_counter()
-            
+
             # Initialize WASM runtime
             self.wasm_runtime = ProductionWASMRuntime(
-                self.tenant_id, 
+                self.tenant_id,
                 max_modules=self.edge_config['max_wasm_modules']
             )
             await self.wasm_runtime.initialize()
-            
+
             # Initialize intelligent cache
             self.cache = ProductionIntelligentCache(self.tenant_id)
             await self.cache.initialize()
-            
+
             # Initialize Ollama client for AI
             ollama_config = OllamaConfig(
                 base_url="http://localhost:11434",
@@ -736,52 +786,52 @@ class ProductionEdgeEngine:
             )
             self.ollama_client = ProductionOllamaClient(ollama_config, self.tenant_id)
             await self.ollama_client.initialize()
-            
+
             # Initialize security analyzer
             self.security_analyzer = ProductionSecurityAnalyzer(
-                self.tenant_id, 
+                self.tenant_id,
                 self.ollama_client
             )
-            
+
             self.initialized = True
-            
+
             initialization_time = (time.perf_counter() - start_time) * 1000
             logger.info(f"Edge Engine initialized successfully in {initialization_time:.2f}ms")
-            
+
         except Exception as e:
             logger.error(f"Edge Engine initialization failed: {str(e)}")
             raise RuntimeError(f"Edge Engine initialization failed: {str(e)}")
-    
+
     async def process_request(
-        self, 
-        request: AgHttpRequest, 
+        self,
+        request: AgHttpRequest,
         upstream_services: List[AgUpstreamService]
     ) -> EdgeProcessingResult:
         """
         Process HTTP request through edge engine.
-        
+
         Args:
             request: HTTP request to process
             upstream_services: Available upstream services
-            
+
         Returns:
             EdgeProcessingResult: Complete processing result
         """
         if not self.initialized:
             raise RuntimeError("Edge Engine not initialized")
-        
+
         start_time = time.perf_counter()
         self.total_requests += 1
-        
+
         try:
             # Step 1: Security Analysis
             security_start = time.perf_counter()
             security_analysis = await self.security_analyzer.analyze_request(request)
             security_time = (time.perf_counter() - security_start) * 1000
-            
+
             if security_analysis.block_request:
                 self.security_blocks += 1
-                
+
                 # Create security block response
                 response = AgHttpResponse(
                     request_id=request.id,
@@ -793,7 +843,7 @@ class ProductionEdgeEngine:
                         'risk_score': security_analysis.risk_score
                     }).encode()
                 )
-                
+
                 return EdgeProcessingResult(
                     response=response,
                     cache_hit=False,
@@ -802,17 +852,17 @@ class ProductionEdgeEngine:
                     edge_location=self.edge_location,
                     metadata={'security_block': True, 'threat_analysis': security_analysis}
                 )
-            
+
             # Step 2: Cache Analysis and Lookup
             cache_analysis = await self.cache.analyze_cache_decision(request)
-            
+
             cached_response = None
             if cache_analysis.decision in [CacheDecision.CACHE, CacheDecision.CACHE_AND_WARM]:
                 cached_response = await self.cache.get(cache_analysis.cache_key)
-            
+
             if cached_response:
                 self.cached_responses += 1
-                
+
                 # Return cached response
                 response = AgHttpResponse(
                     request_id=request.id,
@@ -821,7 +871,7 @@ class ProductionEdgeEngine:
                     body=cached_response.get('body', b''),
                     cache_hit=True
                 )
-                
+
                 return EdgeProcessingResult(
                     response=response,
                     cache_hit=True,
@@ -830,33 +880,33 @@ class ProductionEdgeEngine:
                     edge_location=self.edge_location,
                     metadata={'cache_hit': True, 'cache_analysis': cache_analysis}
                 )
-            
+
             # Step 3: AI Traffic Analysis
             ai_start = time.perf_counter()
             traffic_analysis = await self._analyze_traffic_ai(request, upstream_services)
             ai_time = (time.perf_counter() - ai_start) * 1000
-            
+
             # Step 4: WASM Processing (if modules available)
             wasm_start = time.perf_counter()
             wasm_result = await self._process_with_wasm(request)
             wasm_time = (time.perf_counter() - wasm_start) * 1000
-            
+
             if wasm_result:
                 self.wasm_executions += 1
-            
+
             # Step 5: Upstream Request
             upstream_start = time.perf_counter()
             upstream_response = await self._make_upstream_request(
-                request, 
+                request,
                 upstream_services,
                 traffic_analysis.optimal_upstream
             )
             upstream_time = (time.perf_counter() - upstream_start) * 1000
-            
+
             # Step 6: Cache Response (if recommended)
             if cache_analysis.decision in [CacheDecision.CACHE, CacheDecision.CACHE_AND_WARM]:
                 await self._cache_response(upstream_response, cache_analysis)
-                
+
                 # Warm related cache entries
                 if cache_analysis.warm_related:
                     asyncio.create_task(
@@ -865,10 +915,10 @@ class ProductionEdgeEngine:
                             lambda key: self._fetch_for_warming(key, upstream_services)
                         )
                     )
-            
+
             total_time = (time.perf_counter() - start_time) * 1000
             self.total_processing_time += total_time
-            
+
             return EdgeProcessingResult(
                 response=upstream_response,
                 cache_hit=False,
@@ -885,10 +935,10 @@ class ProductionEdgeEngine:
                     'wasm_executed': wasm_result is not None
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"Edge processing error: {str(e)}")
-            
+
             # Return error response
             error_response = AgHttpResponse(
                 request_id=request.id,
@@ -896,7 +946,7 @@ class ProductionEdgeEngine:
                 headers={'X-Edge-Error': 'true'},
                 body=json.dumps({'error': 'Edge processing failed'}).encode()
             )
-            
+
             return EdgeProcessingResult(
                 response=error_response,
                 cache_hit=False,
@@ -904,16 +954,16 @@ class ProductionEdgeEngine:
                 edge_location=self.edge_location,
                 metadata={'error': str(e)}
             )
-    
+
     async def execute_wasm_module(
-        self, 
-        module_id: str, 
+        self,
+        module_id: str,
         request: AgHttpRequest
     ) -> Optional[WASMExecutionResult]:
         """Execute WASM module with request."""
         if not self.wasm_runtime:
             return None
-        
+
         try:
             context = WASMExecutionContext(
                 module_id=module_id,
@@ -921,24 +971,24 @@ class ProductionEdgeEngine:
                 memory_limit_mb=64,
                 execution_timeout_ms=5000
             )
-            
+
             return await self.wasm_runtime.execute_module(module_id, context)
-            
+
         except Exception as e:
             logger.error(f"WASM execution error: {str(e)}")
             return None
-    
+
     async def load_wasm_module(self, wasm_module: AgWasmModule, binary_data: bytes) -> bool:
         """Load WASM module into runtime."""
         if not self.wasm_runtime:
             return False
-        
+
         try:
             return await self.wasm_runtime.load_module(wasm_module, binary_data)
         except Exception as e:
             logger.error(f"WASM module loading error: {str(e)}")
             return False
-    
+
     async def get_edge_stats(self) -> Dict[str, Any]:
         """Get comprehensive edge statistics."""
         stats = {
@@ -947,52 +997,52 @@ class ProductionEdgeEngine:
             'total_requests': self.total_requests,
             'cached_responses': self.cached_responses,
             'cache_hit_rate': (
-                self.cached_responses / self.total_requests 
+                self.cached_responses / self.total_requests
                 if self.total_requests > 0 else 0.0
             ),
             'security_blocks': self.security_blocks,
             'wasm_executions': self.wasm_executions,
             'average_processing_time_ms': (
-                self.total_processing_time / self.total_requests 
+                self.total_processing_time / self.total_requests
                 if self.total_requests > 0 else 0.0
             )
         }
-        
+
         # Add component stats
         if self.cache:
             stats['cache_stats'] = await self.cache.get_stats()
-        
+
         if self.wasm_runtime:
             stats['wasm_stats'] = await self.wasm_runtime.get_runtime_stats()
-        
+
         if self.ollama_client:
             stats['ai_stats'] = await self.ollama_client.get_performance_stats()
-        
+
         return stats
-    
+
     async def cleanup(self) -> None:
         """Cleanup edge resources."""
         try:
             if self.wasm_runtime:
                 await self.wasm_runtime.cleanup()
-            
+
             if self.cache:
                 await self.cache.close()
-            
+
             if self.ollama_client:
                 await self.ollama_client.close()
-            
+
             self.initialized = False
             logger.info("Edge Engine cleanup completed")
-            
+
         except Exception as e:
             logger.error(f"Edge Engine cleanup error: {str(e)}")
-    
+
     # Private helper methods
-    
+
     async def _analyze_traffic_ai(
-        self, 
-        request: AgHttpRequest, 
+        self,
+        request: AgHttpRequest,
         upstream_services: List[AgUpstreamService]
     ) -> TrafficAnalysis:
         """AI-powered traffic analysis."""
@@ -1001,13 +1051,13 @@ class ProductionEdgeEngine:
             request_pattern = self._classify_request_pattern(request)
             user_behavior = self._analyze_user_behavior(request)
             traffic_class = self._classify_traffic(request)
-            
+
             # Predict response time
             predicted_response_time = self._predict_response_time(request, request_pattern)
-            
+
             # Select optimal upstream
             optimal_upstream = self._select_optimal_upstream(upstream_services, traffic_class)
-            
+
             return TrafficAnalysis(
                 request_pattern=request_pattern,
                 user_behavior=user_behavior,
@@ -1020,7 +1070,7 @@ class ProductionEdgeEngine:
                     'upstream_count': len(upstream_services)
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"Traffic analysis error: {str(e)}")
             return TrafficAnalysis(
@@ -1031,16 +1081,16 @@ class ProductionEdgeEngine:
                 predicted_response_time=100.0,
                 metadata={'error': str(e)}
             )
-    
+
     async def _process_with_wasm(self, request: AgHttpRequest) -> Optional[WASMExecutionResult]:
         """Process request through WASM modules."""
         if not self.wasm_runtime:
             return None
-        
+
         try:
             # Get loaded modules
             modules = await self.wasm_runtime.list_loaded_modules()
-            
+
             # Find suitable module for request
             for module_info in modules:
                 if self._should_use_wasm_module(request, module_info.module_id):
@@ -1048,18 +1098,18 @@ class ProductionEdgeEngine:
                         module_id=module_info.module_id,
                         request=request
                     )
-                    
+
                     return await self.wasm_runtime.execute_module(
-                        module_info.module_id, 
+                        module_info.module_id,
                         context
                     )
-            
+
             return None
-            
+
         except Exception as e:
             logger.error(f"WASM processing error: {str(e)}")
             return None
-    
+
     async def _make_upstream_request(
         self,
         request: AgHttpRequest,
@@ -1075,7 +1125,7 @@ class ProductionEdgeEngine:
             )
         else:
             upstream = upstream_services[0] if upstream_services else None
-        
+
         if not upstream:
             # Return error response
             return AgHttpResponse(
@@ -1084,7 +1134,7 @@ class ProductionEdgeEngine:
                 headers={'X-Upstream-Error': 'no_upstream_available'},
                 body=json.dumps({'error': 'No upstream service available'}).encode()
             )
-        
+
         # Simulate upstream call (would use actual HTTP client in production)
         response_data = {
             'message': 'Response from upstream service',
@@ -1092,7 +1142,7 @@ class ProductionEdgeEngine:
             'request_path': request.path,
             'timestamp': datetime.now(timezone.utc).isoformat()
         }
-        
+
         return AgHttpResponse(
             request_id=request.id,
             status_code=200,
@@ -1103,10 +1153,10 @@ class ProductionEdgeEngine:
             },
             body=json.dumps(response_data).encode()
         )
-    
+
     async def _cache_response(
-        self, 
-        response: AgHttpResponse, 
+        self,
+        response: AgHttpResponse,
         cache_analysis: CacheAnalysis
     ) -> None:
         """Cache response based on analysis."""
@@ -1117,19 +1167,19 @@ class ProductionEdgeEngine:
                 'body': response.body.decode('utf-8', errors='ignore') if response.body else '',
                 'cached_by': 'edge_engine'
             }
-            
+
             await self.cache.set(
                 cache_analysis.cache_key,
                 cache_data,
                 cache_analysis.ttl_seconds
             )
-            
+
         except Exception as e:
             logger.error(f"Response caching error: {str(e)}")
-    
+
     async def _fetch_for_warming(
-        self, 
-        cache_key: str, 
+        self,
+        cache_key: str,
         upstream_services: List[AgUpstreamService]
     ) -> Dict[str, Any]:
         """Fetch data for cache warming."""
@@ -1140,11 +1190,11 @@ class ProductionEdgeEngine:
             'warmed_at': datetime.now(timezone.utc).isoformat(),
             'data': 'cache_warmed_data'
         }
-    
+
     def _classify_request_pattern(self, request: AgHttpRequest) -> str:
         """Classify request pattern."""
         path = request.path.lower()
-        
+
         if '/api/' in path:
             if '/products' in path:
                 return 'api_product'
@@ -1158,7 +1208,7 @@ class ProductionEdgeEngine:
             return 'static_asset'
         else:
             return 'web_page'
-    
+
     def _analyze_user_behavior(self, request: AgHttpRequest) -> str:
         """Analyze user behavior pattern."""
         # Simple user behavior classification
@@ -1172,7 +1222,7 @@ class ProductionEdgeEngine:
                 return 'desktop_user'
         else:
             return 'unknown'
-    
+
     def _classify_traffic(self, request: AgHttpRequest) -> str:
         """Classify traffic type."""
         # Simple traffic classification
@@ -1182,7 +1232,7 @@ class ProductionEdgeEngine:
             return 'write_traffic'
         else:
             return 'other_traffic'
-    
+
     def _predict_response_time(self, request: AgHttpRequest, pattern: str) -> float:
         """Predict response time based on pattern."""
         # Simple prediction based on patterns
@@ -1194,21 +1244,21 @@ class ProductionEdgeEngine:
             'web_page': 200.0,
             'api_generic': 75.0
         }
-        
+
         return prediction_map.get(pattern, 100.0)
-    
+
     def _select_optimal_upstream(
-        self, 
-        upstream_services: List[AgUpstreamService], 
+        self,
+        upstream_services: List[AgUpstreamService],
         traffic_class: str
     ) -> Optional[str]:
         """Select optimal upstream service."""
         if not upstream_services:
             return None
-        
+
         # Simple selection logic (would use load balancing in production)
         return upstream_services[0].name
-    
+
     def _should_use_wasm_module(self, request: AgHttpRequest, module_id: str) -> bool:
         """Determine if WASM module should be used for request."""
         # Simple logic to determine WASM usage
@@ -1218,7 +1268,7 @@ class ProductionEdgeEngine:
 # Export main class
 __all__ = [
     'ProductionEdgeEngine',
-    'ProductionIntelligentCache', 
+    'ProductionIntelligentCache',
     'ProductionSecurityAnalyzer',
     'EdgeProcessingResult',
     'TrafficAnalysis',

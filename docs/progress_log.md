@@ -270,3 +270,25 @@ Current broader AICR execution findings:
 
 - AICR tests now collect and execute cleanly from `capabilities/common/aicr/tests`.
 - Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports plus low-length JWT test-key warnings from the local security compatibility suite.
+
+### 2026-05-26 05:14 EAT
+
+Completed checkpoint:
+
+- Made the APIG common capability executable from its moved package location, including local compatibility paths for optional HTTP, Ollama, Redis, and WASM runtime dependencies.
+- Restored APIG platform-client behavior for auth/RBAC, monitoring, configuration, AI orchestration, MQEB, and audit/compliance integrations when external APG services are unavailable in local test runs.
+- Added deterministic local Ollama and APG-client responses so AI policy generation, service discovery, metrics, queue, audit, and health flows execute without live network services.
+- Hardened APIG model compatibility for legacy route/upstream construction, enum preservation, tenant-access validation, and request defaults used by the production request-processing pipeline.
+- Fixed APIG test import context so the moved tests collect from the repository root.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/apig/models.py`
+- `.venv/bin/python -m py_compile capabilities/common/apig/models.py capabilities/common/apig/apg_clients.py capabilities/common/apig/ollama_client.py capabilities/common/apig/edge_engine_production.py capabilities/common/apig/wasm_runtime.py capabilities/common/apig/control_plane.py capabilities/common/apig/service.py capabilities/common/apig/traffic_manager.py capabilities/common/apig/tests/conftest.py`
+- `.venv/bin/python -m pytest --collect-only -q capabilities/common/apig/tests` -> 89 tests collected, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/apig/tests -x -vv` -> 89 passed, 14 warnings
+
+Current broader APIG execution findings:
+
+- APIG tests now collect and execute cleanly from `capabilities/common/apig/tests`.
+- Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports.

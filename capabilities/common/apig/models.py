@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Dict, List, Any, Optional, Union, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict, validator, field_validator
+from pydantic import BaseModel, Field, ConfigDict, validator, field_validator, model_validator
 from pydantic.types import PositiveInt, NonNegativeFloat
 # Use uuid7 for time-based UUIDs
 try:
@@ -35,7 +35,7 @@ APG_MODEL_CONFIG = ConfigDict(
 	validate_by_alias=True,
 	str_strip_whitespace=True,
 	validate_default=True,
-	use_enum_values=True
+	use_enum_values=False
 )
 
 class HttpMethod(str, Enum):
@@ -92,7 +92,7 @@ class ThreatLevel(str, Enum):
 class AgRateLimit(BaseModel):
 	"""Rate limiting configuration for API routes"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique rate limit ID")
 	requests_per_second: PositiveInt = Field(description="Maximum requests per second")
 	requests_per_minute: Optional[PositiveInt] = Field(None, description="Maximum requests per minute")
@@ -101,7 +101,7 @@ class AgRateLimit(BaseModel):
 	key_extractor: str = Field("client_ip", description="Key extraction method (client_ip, api_key, user_id)")
 	rejection_message: str = Field("Rate limit exceeded", description="Message returned when rate limited")
 	headers_enabled: bool = Field(True, description="Include rate limit headers in response")
-	
+
 	@field_validator('key_extractor')
 	@classmethod
 	def validate_key_extractor(cls, v: str) -> str:
@@ -113,7 +113,7 @@ class AgRateLimit(BaseModel):
 class AgCacheConfig(BaseModel):
 	"""Caching configuration for API responses"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique cache config ID")
 	enabled: bool = Field(True, description="Enable caching for this route")
 	ttl_seconds: PositiveInt = Field(300, description="Time-to-live in seconds")
@@ -126,7 +126,7 @@ class AgCacheConfig(BaseModel):
 class AgHealthCheck(BaseModel):
 	"""Health check configuration for upstream services"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique health check ID")
 	enabled: bool = Field(True, description="Enable health checking")
 	path: str = Field("/health", description="Health check endpoint path")
@@ -140,7 +140,7 @@ class AgHealthCheck(BaseModel):
 class AgUpstreamService(BaseModel):
 	"""Upstream service configuration"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique upstream service ID")
 	name: str = Field(description="Human-readable service name")
 	base_url: str = Field(description="Base URL for the upstream service")
@@ -150,7 +150,15 @@ class AgUpstreamService(BaseModel):
 	read_timeout_ms: PositiveInt = Field(30000, description="Read timeout in milliseconds")
 	health_check: AgHealthCheck = Field(default_factory=lambda: AgHealthCheck(), description="Health check configuration")
 	metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional service metadata")
-	
+
+	@model_validator(mode='before')
+	@classmethod
+	def populate_base_url_alias(cls, data: Any) -> Any:
+		if isinstance(data, dict) and 'base_url' not in data and 'url' in data:
+			data = dict(data)
+			data['base_url'] = data.pop('url')
+		return data
+
 	@field_validator('base_url')
 	@classmethod
 	def validate_base_url(cls, v: str) -> str:
@@ -161,7 +169,7 @@ class AgUpstreamService(BaseModel):
 class AgPolicy(BaseModel):
 	"""Gateway policy configuration"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique policy ID")
 	name: str = Field(description="Human-readable policy name")
 	type: PolicyType = Field(description="Type of policy")
@@ -171,10 +179,10 @@ class AgPolicy(BaseModel):
 	configuration: Dict[str, Any] = Field(default_factory=dict, description="Policy-specific configuration")
 	natural_language_description: Optional[str] = Field(None, description="Natural language description for AI generation")
 	created_by: str = Field(description="User who created this policy")
-	tenant_id: str = Field(description="APG tenant ID")
+	tenant_id: str = Field("default", description="APG tenant ID")
 	created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 	updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-	
+
 	@field_validator('priority')
 	@classmethod
 	def validate_priority(cls, v: int) -> int:
@@ -185,44 +193,44 @@ class AgPolicy(BaseModel):
 class AgApiRoute(BaseModel):
 	"""API route configuration with intelligent routing"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique route ID")
 	path: str = Field(description="Route path pattern (supports path parameters)")
 	method: HttpMethod = Field(description="HTTP method")
 	name: Optional[str] = Field(None, description="Human-readable route name")
 	description: Optional[str] = Field(None, description="Route description")
-	
+
 	# Upstream Configuration
 	upstream_services: List[AgUpstreamService] = Field(description="List of upstream services")
 	load_balancing_algorithm: LoadBalancingAlgorithm = Field(LoadBalancingAlgorithm.ROUND_ROBIN)
-	
+
 	# Policy Configuration
 	policies: List[str] = Field(default_factory=list, description="Applied policy IDs")
 	rate_limit: Optional[AgRateLimit] = Field(None, description="Route-specific rate limiting")
 	cache_config: Optional[AgCacheConfig] = Field(None, description="Route-specific caching")
-	
-	# Security Configuration  
+
+	# Security Configuration
 	auth_required: bool = Field(True, description="Require authentication")
 	allowed_origins: List[str] = Field(default_factory=list, description="CORS allowed origins")
-	
+
 	# Monitoring Configuration
 	metrics_enabled: bool = Field(True, description="Enable metrics collection")
 	tracing_enabled: bool = Field(True, description="Enable distributed tracing")
 	logging_level: Literal['DEBUG', 'INFO', 'WARN', 'ERROR'] = Field('INFO')
-	
+
 	# APG Integration
-	tenant_id: str = Field(description="APG tenant ID")
-	created_by: str = Field(description="User who created this route")
+	tenant_id: str = Field("default", description="APG tenant ID")
+	created_by: str = Field("system", description="User who created this route")
 	created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 	updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-	
+
 	@field_validator('path')
 	@classmethod
 	def validate_path(cls, v: str) -> str:
 		if not v.startswith('/'):
 			raise ValueError("path must start with /")
 		return v
-	
+
 	@field_validator('upstream_services')
 	@classmethod
 	def validate_upstream_services(cls, v: List[AgUpstreamService]) -> List[AgUpstreamService]:
@@ -233,39 +241,39 @@ class AgApiRoute(BaseModel):
 class AgGatewayConfig(BaseModel):
 	"""Main gateway instance configuration"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique gateway ID")
 	name: str = Field(description="Human-readable gateway name")
 	description: Optional[str] = Field(None, description="Gateway description")
 	environment: EnvironmentType = Field(description="Deployment environment")
-	
+
 	# Network Configuration
 	listen_port: PositiveInt = Field(8080, description="Port to listen on")
 	tls_enabled: bool = Field(True, description="Enable TLS/SSL")
 	tls_certificate_path: Optional[str] = Field(None, description="Path to TLS certificate")
 	tls_private_key_path: Optional[str] = Field(None, description="Path to TLS private key")
-	
+
 	# Edge Computing Configuration
 	edge_locations: List[str] = Field(default_factory=list, description="Edge deployment locations")
 	wasm_runtime_enabled: bool = Field(True, description="Enable WebAssembly runtime")
 	ai_intelligence_enabled: bool = Field(True, description="Enable AI-powered features")
-	
+
 	# Performance Configuration
 	max_connections: PositiveInt = Field(10000, description="Maximum concurrent connections")
 	connection_timeout_ms: PositiveInt = Field(30000, description="Connection timeout")
 	request_timeout_ms: PositiveInt = Field(60000, description="Request timeout")
 	keepalive_timeout_ms: PositiveInt = Field(75000, description="Keep-alive timeout")
-	
+
 	# Routes and Policies
 	routes: List[AgApiRoute] = Field(default_factory=list, description="Configured API routes")
 	global_policies: List[str] = Field(default_factory=list, description="Global policy IDs")
-	
+
 	# APG Integration Settings
-	tenant_id: str = Field(description="APG tenant ID")
+	tenant_id: str = Field("default", description="APG tenant ID")
 	auth_rbac_integration: bool = Field(True, description="Enable APG auth_rbac integration")
 	monitoring_integration: bool = Field(True, description="Enable APG monitoring integration")
 	audit_logging_enabled: bool = Field(True, description="Enable APG audit logging")
-	
+
 	# Metadata
 	created_by: str = Field(description="User who created this gateway")
 	created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -277,68 +285,68 @@ class AgGatewayConfig(BaseModel):
 class AgTrafficMetrics(BaseModel):
 	"""Real-time traffic metrics"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique metrics ID")
 	gateway_id: str = Field(description="Gateway instance ID")
 	route_id: Optional[str] = Field(None, description="Specific route ID (None for gateway-wide metrics)")
 	timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-	
+
 	# Request Metrics
 	request_count: NonNegativeFloat = Field(0, description="Total request count")
 	requests_per_second: NonNegativeFloat = Field(0, description="Current RPS")
-	
+
 	# Response Time Metrics (milliseconds)
 	response_time_p50: NonNegativeFloat = Field(0, description="50th percentile response time")
-	response_time_p95: NonNegativeFloat = Field(0, description="95th percentile response time") 
+	response_time_p95: NonNegativeFloat = Field(0, description="95th percentile response time")
 	response_time_p99: NonNegativeFloat = Field(0, description="99th percentile response time")
 	response_time_max: NonNegativeFloat = Field(0, description="Maximum response time")
-	
+
 	# Error Metrics
 	error_count: NonNegativeFloat = Field(0, description="Total error count")
 	error_rate: NonNegativeFloat = Field(0, description="Error rate as percentage (0-100)")
 	error_breakdown: Dict[str, int] = Field(default_factory=dict, description="Errors by status code")
-	
+
 	# Bandwidth Metrics
 	bytes_sent: NonNegativeFloat = Field(0, description="Total bytes sent")
 	bytes_received: NonNegativeFloat = Field(0, description="Total bytes received")
 	bandwidth_mbps: NonNegativeFloat = Field(0, description="Current bandwidth in Mbps")
-	
+
 	# Connection Metrics
 	active_connections: NonNegativeFloat = Field(0, description="Current active connections")
 	total_connections: NonNegativeFloat = Field(0, description="Total connections handled")
-	
+
 	# APG Tenant Context
-	tenant_id: str = Field(description="APG tenant ID")
+	tenant_id: str = Field("default", description="APG tenant ID")
 
 class AgSecurityEvent(BaseModel):
 	"""Security events and threat detection"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique event ID")
 	gateway_id: str = Field(description="Gateway instance ID")
 	timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-	
+
 	# Event Classification
 	event_type: str = Field(description="Type of security event")
 	threat_level: ThreatLevel = Field(description="Threat severity level")
 	confidence: float = Field(0.0, ge=0.0, le=1.0, description="AI confidence score (0-1)")
-	
+
 	# Event Details
 	source_ip: str = Field(description="Source IP address")
 	user_agent: Optional[str] = Field(None, description="User agent string")
 	route_path: Optional[str] = Field(None, description="Targeted route path")
 	attack_signature: Optional[str] = Field(None, description="Detected attack signature")
-	
+
 	# Response Actions
 	action_taken: str = Field(description="Automated response action")
 	blocked: bool = Field(False, description="Whether request was blocked")
 	rate_limited: bool = Field(False, description="Whether request was rate limited")
-	
+
 	# Context and Metadata
 	request_headers: Dict[str, str] = Field(default_factory=dict, description="Request headers")
 	geo_location: Optional[Dict[str, str]] = Field(None, description="Geographic location data")
 	metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional event metadata")
-	
+
 	# APG Integration
 	tenant_id: str = Field(description="APG tenant ID")
 	audit_logged: bool = Field(False, description="Whether logged to APG audit system")
@@ -346,27 +354,27 @@ class AgSecurityEvent(BaseModel):
 class AgWafRule(BaseModel):
 	"""Web Application Firewall rule"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique WAF rule ID")
 	name: str = Field(description="Human-readable rule name")
 	description: Optional[str] = Field(None, description="Rule description")
 	enabled: bool = Field(True, description="Enable this rule")
-	
+
 	# Rule Configuration
 	rule_type: Literal['regex', 'ip_range', 'geo_location', 'rate_limit', 'custom'] = Field(description="Type of WAF rule")
 	pattern: str = Field(description="Rule pattern or expression")
 	case_sensitive: bool = Field(False, description="Case-sensitive pattern matching")
-	
+
 	# Action Configuration
 	action: Literal['block', 'allow', 'log', 'rate_limit', 'captcha'] = Field(description="Action to take when rule matches")
 	response_code: Optional[int] = Field(403, description="HTTP response code for block action")
 	response_message: Optional[str] = Field(None, description="Custom response message")
-	
+
 	# Advanced Configuration
 	priority: int = Field(1000, description="Rule execution priority")
 	conditions: List[str] = Field(default_factory=list, description="Additional conditions")
 	exceptions: List[str] = Field(default_factory=list, description="Rule exceptions")
-	
+
 	# Metadata
 	tenant_id: str = Field(description="APG tenant ID")
 	created_by: str = Field(description="User who created this rule")
@@ -376,37 +384,37 @@ class AgWafRule(BaseModel):
 class AgSecurityPolicy(BaseModel):
 	"""Comprehensive security policy configuration"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique security policy ID")
 	name: str = Field(description="Security policy name")
 	description: Optional[str] = Field(None, description="Policy description")
 	enabled: bool = Field(True, description="Enable this security policy")
-	
+
 	# AI-Powered Security
 	threat_detection_enabled: bool = Field(True, description="Enable AI threat detection")
 	anomaly_detection_enabled: bool = Field(True, description="Enable anomaly detection")
 	behavioral_analysis_enabled: bool = Field(True, description="Enable behavioral analysis")
-	
+
 	# Access Control
 	rate_limit_rules: List[AgRateLimit] = Field(default_factory=list, description="Rate limiting rules")
 	ip_whitelist: List[str] = Field(default_factory=list, description="Allowed IP addresses/ranges")
 	ip_blacklist: List[str] = Field(default_factory=list, description="Blocked IP addresses/ranges")
 	geo_restrictions: List[str] = Field(default_factory=list, description="Blocked countries/regions")
-	
+
 	# WAF Configuration
 	waf_enabled: bool = Field(True, description="Enable Web Application Firewall")
 	waf_rules: List[AgWafRule] = Field(default_factory=list, description="WAF rules")
-	
+
 	# DDoS Protection
 	ddos_protection_enabled: bool = Field(True, description="Enable DDoS protection")
 	ddos_threshold_rps: PositiveInt = Field(10000, description="DDoS detection threshold (RPS)")
 	ddos_response_action: Literal['block', 'rate_limit', 'captcha'] = Field('rate_limit')
-	
+
 	# Bot Management
 	bot_detection_enabled: bool = Field(True, description="Enable bot detection")
 	bot_challenge_enabled: bool = Field(True, description="Enable bot challenges")
 	allowed_bots: List[str] = Field(default_factory=list, description="Allowed bot user agents")
-	
+
 	# APG Integration
 	tenant_id: str = Field(description="APG tenant ID")
 	created_by: str = Field(description="User who created this policy")
@@ -418,27 +426,27 @@ class AgSecurityPolicy(BaseModel):
 class AgWasmModule(BaseModel):
 	"""WebAssembly module configuration"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique WASM module ID")
 	name: str = Field(description="Module name")
 	description: Optional[str] = Field(None, description="Module description")
 	version: str = Field("1.0.0", description="Module version")
-	
+
 	# Module Configuration
 	wasm_binary_path: str = Field(description="Path to WASM binary file")
 	entry_point: str = Field("process_request", description="Entry point function name")
 	memory_limit_mb: PositiveInt = Field(64, description="Memory limit in MB")
 	execution_timeout_ms: PositiveInt = Field(5000, description="Execution timeout in milliseconds")
-	
+
 	# Execution Context
 	environment_variables: Dict[str, str] = Field(default_factory=dict, description="Environment variables")
 	configuration: Dict[str, Any] = Field(default_factory=dict, description="Module configuration")
-	
+
 	# Performance Metrics
 	avg_execution_time_ms: NonNegativeFloat = Field(0, description="Average execution time")
 	total_executions: NonNegativeFloat = Field(0, description="Total number of executions")
 	error_count: NonNegativeFloat = Field(0, description="Number of execution errors")
-	
+
 	# APG Integration
 	tenant_id: str = Field(description="APG tenant ID")
 	created_by: str = Field(description="User who created this module")
@@ -450,41 +458,41 @@ class AgWasmModule(BaseModel):
 class AgHttpRequest(BaseModel):
 	"""HTTP request model for edge processing"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique request ID")
 	method: HttpMethod = Field(description="HTTP method")
 	path: str = Field(description="Request path")
 	query_string: str = Field("", description="Query string")
 	headers: Dict[str, str] = Field(default_factory=dict, description="Request headers")
 	body: Optional[bytes] = Field(None, description="Request body")
-	
+
 	# Client Information
 	client_ip: str = Field(description="Client IP address")
 	user_agent: Optional[str] = Field(None, description="User agent string")
-	
+
 	# Timing Information
 	received_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 	processing_start_time: Optional[float] = Field(None, description="Processing start time (perf_counter)")
-	
+
 	# APG Context
-	tenant_id: str = Field(description="APG tenant ID")
+	tenant_id: str = Field("default", description="APG tenant ID")
 	user_id: Optional[str] = Field(None, description="Authenticated user ID")
 
 class AgHttpResponse(BaseModel):
 	"""HTTP response model for edge processing"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	id: str = Field(default_factory=uuid7str, description="Unique response ID")
 	request_id: str = Field(description="Corresponding request ID")
 	status_code: int = Field(200, ge=100, le=599, description="HTTP status code")
 	headers: Dict[str, str] = Field(default_factory=dict, description="Response headers")
 	body: Optional[bytes] = Field(None, description="Response body")
-	
+
 	# Performance Metrics
 	processing_time_ms: NonNegativeFloat = Field(0, description="Total processing time in milliseconds")
 	upstream_time_ms: NonNegativeFloat = Field(0, description="Upstream response time in milliseconds")
 	cache_hit: bool = Field(False, description="Whether response was served from cache")
-	
+
 	# Metadata
 	generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 	served_from_edge: bool = Field(False, description="Whether served from edge location")
@@ -495,7 +503,7 @@ class AgHttpResponse(BaseModel):
 class AgApiError(BaseModel):
 	"""Standardized API error response"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	error_code: str = Field(description="Machine-readable error code")
 	error_message: str = Field(description="Human-readable error message")
 	error_details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
@@ -506,7 +514,7 @@ class AgApiError(BaseModel):
 class AgPaginationInfo(BaseModel):
 	"""Pagination information for API responses"""
 	model_config = APG_MODEL_CONFIG
-	
+
 	page: PositiveInt = Field(1, description="Current page number")
 	page_size: PositiveInt = Field(50, description="Items per page")
 	total_items: NonNegativeFloat = Field(0, description="Total number of items")
@@ -524,20 +532,24 @@ def _log_model_operation(operation: str, model_name: str, model_id: str) -> None
 async def validate_tenant_access(tenant_id: str, user_id: str) -> bool:
 	"""
 	Validate tenant access for APG multi-tenancy support.
-	
+
 	Args:
 		tenant_id: APG tenant identifier
 		user_id: User identifier
-		
+
 	Returns:
 		bool: True if access is allowed
-		
+
 	Note:
 		This is a placeholder for APG auth_rbac integration
 	"""
-	assert isinstance(tenant_id, str) and tenant_id, "tenant_id must be non-empty string"
-	assert isinstance(user_id, str) and user_id, "user_id must be non-empty string"
-	
+	assert isinstance(tenant_id, str), "tenant_id must be a string"
+	assert isinstance(user_id, str), "user_id must be a string"
+	if not tenant_id:
+		return False
+	if not user_id:
+		return False
+
 	# Placeholder implementation - integrate with APG auth_rbac
 	return True
 
