@@ -2182,3 +2182,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_auc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|return str\(current_user\.id\).*is_authenticated|from flask_appbuilder.security import current_user" capabilities/fin/auc/views.py` -> no matches
 - `git diff --check -- capabilities/fin/auc/views.py capabilities/fin/auc/context.py tests/test_fin_auc_context_resolution.py` -> no issues
+
+### 2026-05-26 22:40 EAT
+
+Completed checkpoint:
+
+- Replaced Accounts Receivable view tenant and user placeholder helpers with shared request-context helpers.
+- AR view actions now resolve tenant IDs from payload, Flask context/current user, tenant headers, query args, request environment, and `APG_DEFAULT_TENANT_ID` fallback.
+- AR user resolution now supports Flask context, APG user headers, environment values, and Flask-AppBuilder security fallback.
+- Added focused regression coverage that rejects hardcoded tenant/user defaults in AR views and exercises tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/arc/accounts_receivable/views.py capabilities/fin/arc/accounts_receivable/context.py tests/test_fin_arc_views_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_arc_views_context_resolution.py` -> 2 passed
+- `.venv/bin/python -m pytest -q tests/test_fin_arc_views_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|return \"default_user\"|This would typically come from session" capabilities/fin/arc/accounts_receivable/views.py` -> no matches
+- `git diff --check -- capabilities/fin/arc/accounts_receivable/views.py capabilities/fin/arc/accounts_receivable/context.py tests/test_fin_arc_views_context_resolution.py` -> no issues

@@ -22,6 +22,7 @@ from .models import (
 	CFARAging, CFARTaxCode, CFARRecurringBilling
 )
 from .service import AccountsReceivableService
+from .context import get_current_user_id, get_tenant_id_from_request
 from ...auth_rbac.models import db
 
 
@@ -176,13 +177,11 @@ class ARCustomerModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		# This would typically come from session or user context
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID"""
-		# This would typically come from session
-		return "default_user"
+		return get_current_user_id()
 
 
 class ARInvoiceModelView(ModelView):
@@ -334,11 +333,11 @@ class ARInvoiceModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID"""
-		return "default_user"
+		return get_current_user_id()
 
 
 class ARPaymentModelView(ModelView):
@@ -491,11 +490,11 @@ class ARPaymentModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID"""
-		return "default_user"
+		return get_current_user_id()
 
 
 class ARCreditMemoModelView(ModelView):
@@ -595,11 +594,11 @@ class ARCreditMemoModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID"""
-		return "default_user"
+		return get_current_user_id()
 
 
 class ARStatementModelView(ModelView):
@@ -706,11 +705,11 @@ class ARStatementModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID"""
-		return "default_user"
+		return get_current_user_id()
 
 
 class ARCollectionModelView(ModelView):
@@ -814,7 +813,7 @@ class ARCollectionModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class ARRecurringBillingModelView(ModelView):
@@ -933,11 +932,11 @@ class ARRecurringBillingModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID"""
-		return "default_user"
+		return get_current_user_id()
 
 
 class ARTaxCodeModelView(ModelView):
@@ -994,7 +993,7 @@ class ARTaxCodeModelView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class ARAgingView(BaseView):
@@ -1049,11 +1048,11 @@ class ARAgingView(BaseView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self) -> str:
 		"""Get current user ID"""
-		return "default_user"
+		return get_current_user_id()
 
 
 class ARDashboardView(BaseView):
@@ -1127,4 +1126,4 @@ class ARDashboardView(BaseView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
