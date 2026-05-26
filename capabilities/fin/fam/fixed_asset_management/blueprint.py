@@ -8,6 +8,7 @@ Registers all views, API endpoints, and URL routes for FAM functionality.
 from flask import Blueprint
 from flask_appbuilder import AppBuilder
 
+from .tenant import get_tenant_id_from_request
 from .views import (
 	FAMAssetModelView, FAMAssetCategoryModelView, FAMDepreciationMethodModelView,
 	FAMAssetAcquisitionModelView, FAMAssetDisposalModelView, FAMAssetTransferModelView,
@@ -406,10 +407,11 @@ def _init_default_data(appbuilder: AppBuilder):
 	from .models import CFAMAssetCategory, CFAMDepreciationMethod
 	from ...auth_rbac.models import db
 	from . import get_default_asset_categories, get_default_depreciation_methods
+	tenant_id = get_tenant_id_from_request()
 	
 	try:
-		# Check if asset categories already exist (use a default tenant for now)
-		existing_categories = CFAMAssetCategory.query.filter_by(tenant_id='default_tenant').count()
+		# Check if asset categories already exist for the current tenant.
+		existing_categories = CFAMAssetCategory.query.filter_by(tenant_id=tenant_id).count()
 		
 		if existing_categories == 0:
 			# Create default asset categories
@@ -417,7 +419,7 @@ def _init_default_data(appbuilder: AppBuilder):
 			
 			for category_data in default_categories:
 				category = CFAMAssetCategory(
-					tenant_id='default_tenant',
+					tenant_id=tenant_id,
 					category_code=category_data['code'],
 					category_name=category_data['name'],
 					description=category_data['description'],
@@ -431,7 +433,7 @@ def _init_default_data(appbuilder: AppBuilder):
 			print("Default FAM asset categories created")
 		
 		# Check if depreciation methods already exist
-		existing_methods = CFAMDepreciationMethod.query.filter_by(tenant_id='default_tenant').count()
+		existing_methods = CFAMDepreciationMethod.query.filter_by(tenant_id=tenant_id).count()
 		
 		if existing_methods == 0:
 			# Create default depreciation methods
@@ -439,7 +441,7 @@ def _init_default_data(appbuilder: AppBuilder):
 			
 			for method_data in default_methods:
 				method = CFAMDepreciationMethod(
-					tenant_id='default_tenant',
+					tenant_id=tenant_id,
 					method_code=method_data['code'],
 					method_name=method_data['name'],
 					description=method_data['description'],
@@ -461,6 +463,7 @@ def create_default_assets(tenant_id: str, appbuilder: AppBuilder):
 	"""Create default assets for a tenant"""
 	
 	from .service import FixedAssetManagementService
+	from .models import CFAMAssetCategory
 	from . import get_default_asset_categories
 	
 	try:
@@ -566,13 +569,14 @@ def setup_fam_integration(appbuilder: AppBuilder):
 		from ..general_ledger.models import CFGLAccount
 		from ...auth_rbac.models import db
 		from . import get_default_gl_account_mappings
+		tenant_id = get_tenant_id_from_request()
 		
 		# Ensure required GL accounts exist
 		gl_mappings = get_default_gl_account_mappings()
 		
 		for account_type, account_code in gl_mappings.items():
 			existing_account = CFGLAccount.query.filter_by(
-				tenant_id='default_tenant',
+				tenant_id=tenant_id,
 				account_code=account_code
 			).first()
 			
@@ -597,6 +601,7 @@ def validate_fam_setup(tenant_id: str) -> Dict[str, Any]:
 	"""Validate FAM setup for a tenant"""
 	
 	from .service import FixedAssetManagementService
+	from .models import CFAMAssetCategory, CFAMDepreciationMethod
 	from ..general_ledger.models import CFGLAccount
 	from . import get_default_gl_account_mappings
 	

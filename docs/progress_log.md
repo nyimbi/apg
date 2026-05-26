@@ -2725,3 +2725,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_cos_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n "tenant_id=['\"]default_tenant['\"]|['\"]default_tenant['\"]" capabilities/fin/cos/tenant.py capabilities/fin/cos/blueprint.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:10 EAT
+
+Completed checkpoint:
+
+- Replaced Fixed Asset Management default-data initialization's fixed `default_tenant` writes with the existing FAM tenant resolver.
+- Scoped FAM default category, depreciation-method, and GL integration lookups by the resolved tenant.
+- Replaced the FAM resolver's literal `default_tenant` environment fallback with `APG_DEFAULT_TENANT_ID`, `APG_TENANT_ID`, then `default`.
+- Fixed latent FAM helper import gaps so default asset creation and setup validation can resolve category and depreciation models locally.
+- Extended focused FAM regression coverage to include tenant-scoped default-data seeding, GL integration lookup, model imports, and stale fallback removal.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/fam/fixed_asset_management/tenant.py capabilities/fin/fam/fixed_asset_management/blueprint.py tests/test_fin_fam_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_fam_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "tenant_id=['\"]default_tenant['\"]|['\"]default_tenant['\"]" capabilities/fin/fam/fixed_asset_management/tenant.py capabilities/fin/fam/fixed_asset_management/blueprint.py` -> no matches
+- `git diff --check` -> no issues

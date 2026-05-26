@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 API_PATH = REPO_ROOT / "capabilities" / "fin" / "fam" / "fixed_asset_management" / "api.py"
 VIEWS_PATH = REPO_ROOT / "capabilities" / "fin" / "fam" / "fixed_asset_management" / "views.py"
 TENANT_PATH = REPO_ROOT / "capabilities" / "fin" / "fam" / "fixed_asset_management" / "tenant.py"
+BLUEPRINT_PATH = REPO_ROOT / "capabilities" / "fin" / "fam" / "fixed_asset_management" / "blueprint.py"
 
 
 def _tenant_helpers() -> dict[str, Any]:
@@ -34,19 +35,38 @@ def _tenant_helpers() -> dict[str, Any]:
 def test_fam_surfaces_delegate_to_shared_tenant_resolver():
 	api_source = API_PATH.read_text(encoding="utf-8")
 	views_source = VIEWS_PATH.read_text(encoding="utf-8")
+	tenant_source = TENANT_PATH.read_text(encoding="utf-8")
 
 	for stale_text in (
 		"return \"default_tenant\"",
+		"\"default_tenant\"",
 		"Get current tenant ID - placeholder implementation",
 		"TODO: Implement proper tenant context",
 	):
 		assert stale_text not in api_source
 		assert stale_text not in views_source
+		assert stale_text not in tenant_source
 
 	assert "from .tenant import get_tenant_id_from_request" in api_source
 	assert "from .tenant import get_tenant_id_from_request" in views_source
 	assert api_source.count("get_tenant_id_from_request()") >= 11
 	assert views_source.count("get_tenant_id_from_request()") >= 1
+
+
+def test_fam_default_seed_data_and_integration_use_current_tenant_context():
+	source = BLUEPRINT_PATH.read_text(encoding="utf-8")
+
+	assert "from .tenant import get_tenant_id_from_request" in source
+	assert "tenant_id = get_tenant_id_from_request()" in source
+	assert "tenant_id='default_tenant'" not in source
+	assert '"default_tenant"' not in source
+	assert "CFAMAssetCategory.query.filter_by(tenant_id=tenant_id).count()" in source
+	assert "CFAMDepreciationMethod.query.filter_by(tenant_id=tenant_id).count()" in source
+	assert "tenant_id=tenant_id,\n\t\t\t\t\tcategory_code=category_data['code']" in source
+	assert "tenant_id=tenant_id,\n\t\t\t\t\tmethod_code=method_data['code']" in source
+	assert "tenant_id=tenant_id,\n\t\t\t\taccount_code=account_code" in source
+	assert "from .models import CFAMAssetCategory" in source
+	assert "from .models import CFAMAssetCategory, CFAMDepreciationMethod" in source
 
 
 def test_fam_tenant_resolver_prefers_payload_context_headers_and_query(monkeypatch):
