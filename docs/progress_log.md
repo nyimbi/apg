@@ -1785,3 +1785,21 @@ Verification:
 Known blocker:
 
 - A targeted Event Streaming unit-test invocation stops during collection because `capabilities.composition.__init__` imports missing `capabilities.composition.capability_registry`; that import gap is outside this Bytewax wording slice and remains a follow-up executable-reality issue.
+
+### 2026-05-26 20:23 EAT
+
+Completed checkpoint:
+
+- Closed the Event Streaming collection blocker by adding dependency-light composition compatibility facades for the legacy top-level composition imports.
+- Made Event Streaming package imports tolerant of optional API/UI/APG integration boot failures so model/service tests can collect without starting Flask-AppBuilder or configuring every SQLAlchemy mapper through the UI layer.
+- Added a Redis fallback for local/import-time Event Streaming service use when the optional `redis.asyncio` package is absent.
+- Fixed Event Streaming model executable gaps uncovered by collection: reserved SQLAlchemy `metadata`, missing stream/consumer relationship foreign keys, missing `bytewax_stream_name`, Pydantic v1/v2 validator compatibility, and legacy `topic_name` acceptance on `StreamConfig`.
+- Restored `EventStreamingService()` no-argument construction and legacy `create_stream(config=..., created_by=...)` behavior used by the existing unit tests.
+
+Verification:
+
+- `.venv/bin/python -c "import capabilities.composition as c; import capabilities.composition.events as e; ..."` -> composition events import ok
+- `.venv/bin/python -m py_compile capabilities/composition/events/__init__.py capabilities/composition/events/api.py capabilities/composition/events/models.py capabilities/composition/events/service.py capabilities/composition/events/tests/unit/__init__.py capabilities/composition/capability_registry.py capabilities/composition/deployment_automation.py capabilities/composition/workflow_orchestration.py capabilities/composition/central_configuration.py capabilities/composition/access_control_integration.py capabilities/composition/__init__.py`
+- `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py::TestESStream::test_stream_name_bytewax_compliance capabilities/composition/events/tests/unit/test_services.py::TestEventStreamingService::test_create_stream_success` -> 2 passed
+- `.venv/bin/python -m pytest --collect-only -q capabilities/composition/events/tests/unit` -> 80 tests collected
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed

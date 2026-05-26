@@ -1396,9 +1396,12 @@ for route in app.routes:
 	if hasattr(route, 'path'):
 		router.routes.append(route)
 
+api_app = app
+
 # Export main components
 __all__ = [
 	'app',
+	'api_app',
 	'router',
 	'ConnectionManager',
 	'connection_manager',

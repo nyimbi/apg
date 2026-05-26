@@ -25,6 +25,10 @@ from sqlalchemy.orm import relationship, validates
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQL_UUID, JSONB, ARRAY
 
 from pydantic import BaseModel, ConfigDict, Field, validator, root_validator
+try:
+	from pydantic import field_validator
+except ImportError:  # Pydantic v1 compatibility
+	field_validator = validator
 from pydantic.types import UUID4
 from uuid_extensions import uuid7str
 
@@ -174,7 +178,7 @@ class ESEvent(Base):
 	
 	# Content and metadata
 	payload = Column(JSONB, nullable=False)
-	metadata = Column(JSONB, nullable=False, default=dict)
+	event_metadata = Column("metadata", JSONB, nullable=False, default=dict)
 	headers = Column(JSONB, nullable=False, default=dict)
 	
 	# Schema and validation
@@ -198,7 +202,7 @@ class ESEvent(Base):
 	error_details = Column(JSONB, nullable=True)
 	
 	# Stream assignment (keep compatibility with existing code)
-	stream_id = Column(String(100), nullable=False, index=True)
+	stream_id = Column(String(100), ForeignKey("es_streams.stream_id"), nullable=False, index=True)
 	partition_key = Column(String(200), nullable=True)
 	offset_position = Column(BigInteger, nullable=True)
 	
@@ -272,7 +276,7 @@ class ESEvent(Base):
 			"status": self.status,
 			"priority": self.priority,
 			"payload": self.payload,
-			"metadata": self.metadata,
+			"metadata": self.event_metadata,
 			"headers": self.headers,
 			"schema_version": self.schema_version
 		}
@@ -296,6 +300,7 @@ class ESStream(Base):
     
     # Bytewax stream configuration
     stream_name = Column(String(200), nullable=False, unique=True)
+    bytewax_stream_name = Column(String(200), nullable=False, index=True)
     partitions = Column(Integer, nullable=False, default=3)
     replication_factor = Column(Integer, nullable=False, default=3)
     
@@ -332,7 +337,12 @@ class ESStream(Base):
     metrics = relationship("ESMetrics", back_populates="stream")
     assignments = relationship("ESStreamAssignment", back_populates="stream", cascade="all, delete-orphan")
     consumer_groups = relationship("ESConsumerGroup", back_populates="stream", cascade="all, delete-orphan")
-    processors = relationship("ESStreamProcessor", back_populates="stream", cascade="all, delete-orphan")
+    processors = relationship(
+        "ESStreamProcessor",
+        back_populates="stream",
+        cascade="all, delete-orphan",
+        foreign_keys="ESStreamProcessor.stream_id",
+    )
     
     # Indexes
     __table_args__ = (
@@ -374,7 +384,7 @@ class ESSubscription(Base):
     stream_id = Column(String(100), ForeignKey("es_streams.stream_id"), nullable=False, index=True)
     
     # Consumer configuration
-    consumer_group_id = Column(String(100), nullable=False, index=True)
+    consumer_group_id = Column(String(100), ForeignKey("es_consumer_groups.group_id"), nullable=False, index=True)
     consumer_name = Column(String(200), nullable=False)
     
     # Event filtering
@@ -933,6 +943,7 @@ class StreamConfig(BaseModel):
     stream_name: str = Field(..., min_length=1, max_length=200)
     stream_description: Optional[str] = Field(None, max_length=1000)
     stream_name: str = Field(..., min_length=1, max_length=200)
+    topic_name: Optional[str] = Field(None, max_length=200)
     partitions: int = Field(default=3, ge=1, le=1000)
     replication_factor: int = Field(default=3, ge=1, le=10)
     retention_time_ms: int = Field(default=604800000, ge=1)  # 7 days

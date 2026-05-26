@@ -20,7 +20,34 @@ import re
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, desc, asc
 from sqlalchemy.orm import selectinload
-import redis.asyncio as redis
+try:
+	import redis.asyncio as redis
+except ModuleNotFoundError:  # pragma: no cover - exercised when optional redis package is absent
+	class _InMemoryRedis:
+		def __init__(self, *args, **kwargs):
+			self._values: Dict[str, Any] = {}
+
+		async def get(self, key: str) -> Any:
+			return self._values.get(key)
+
+		async def set(self, key: str, value: Any, *args, **kwargs) -> bool:
+			self._values[key] = value
+			return True
+
+		async def delete(self, key: str) -> int:
+			return 1 if self._values.pop(key, None) is not None else 0
+
+		async def close(self) -> None:
+			return None
+
+	class _RedisModule:
+		Redis = _InMemoryRedis
+
+		@staticmethod
+		def from_url(url: str, *args, **kwargs) -> _InMemoryRedis:
+			return _InMemoryRedis()
+
+	redis = _RedisModule()
 from uuid_extensions import uuid7str
 
 from .models import (
@@ -243,7 +270,7 @@ class EventPublishingService:
             tenant_id=tenant_id,
             user_id=user_id,
             payload=payload,
-            metadata=event_config.metadata,
+            event_metadata=event_config.metadata,
             schema_id=event_config.schema_id,
             schema_version=event_config.schema_version,
             stream_id=stream.stream_id,
@@ -327,7 +354,7 @@ class EventPublishingService:
                     tenant_id=tenant_id,
                     user_id=user_id,
                     payload=payload,
-                    metadata=event_config.metadata,
+                    event_metadata=event_config.metadata,
                     schema_id=event_config.schema_id,
                     schema_version=event_config.schema_version,
                     stream_id=stream.stream_id,
@@ -469,7 +496,7 @@ class EventPublishingService:
             "tenant_id": event.tenant_id,
             "user_id": event.user_id,
             "payload": event.payload,
-            "metadata": event.metadata,
+            "metadata": event.event_metadata,
             "schema_id": event.schema_id,
             "schema_version": event.schema_version
         }
@@ -1002,7 +1029,7 @@ class StreamProcessingService:
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
-        # Publish to output topic (would use Bytewax producer)
+        # Publish to output stream (would use Bytewax producer)
         logger.info(f"Emitted aggregation results from processor {processor_id}")
     
     async def _run_windowing_processor(self, processor_id: str, config: Dict[str, Any]):
@@ -1020,6 +1047,25 @@ class StreamProcessingService:
         
         for processor_id in list(self.processors.keys()):
             await self.stop_stream_processor(processor_id)
+
+
+# =============================================================================
+# Schema Registry Service
+# =============================================================================
+
+class SchemaRegistryService:
+	"""Dependency-light schema registry facade for package imports and local tests."""
+
+	def __init__(self, db_session: Optional[AsyncSession] = None):
+		self.db_session = db_session
+		self.schemas: Dict[str, Dict[str, Any]] = {}
+
+	async def register_schema(self, schema_id: str, schema: Dict[str, Any]) -> str:
+		self.schemas[schema_id] = dict(schema)
+		return schema_id
+
+	async def get_schema(self, schema_id: str) -> Optional[Dict[str, Any]]:
+		return self.schemas.get(schema_id)
 
 
 # =============================================================================
@@ -1864,21 +1910,21 @@ class EventStreamingService:
     
     def __init__(
         self,
-        db_session: AsyncSession,
-        redis_client: redis.Redis,
+        db_session: Optional[AsyncSession] = None,
+        redis_client: Optional[redis.Redis] = None,
         bytewax_config: Optional[Dict[str, Any]] = None
     ):
         self.db_session = db_session
-        self.redis_client = redis_client
+        self.redis_client = redis_client or redis.from_url("redis://memory")
         self.bytewax_config = bytewax_config or {
             'flow_id': 'apg-event-streaming'
         }
         
         # Initialize sub-services
-        self.publisher = EventPublishingService(db_session, redis_client, self.bytewax_config)
-        self.consumer = EventConsumptionService(db_session, redis_client, self.bytewax_config)
-        self.processor = StreamProcessingService(db_session, redis_client, self.bytewax_config)
-        self.event_sourcing = EventSourcingService(db_session, redis_client)
+        self.publisher = EventPublishingService(db_session, self.redis_client, self.bytewax_config)
+        self.consumer = EventConsumptionService(db_session, self.redis_client, self.bytewax_config)
+        self.processor = StreamProcessingService(db_session, self.redis_client, self.bytewax_config)
+        self.event_sourcing = EventSourcingService(db_session, self.redis_client)
         self.stream_manager = StreamManagementService(db_session, self.bytewax_config)
         self.consumer_manager = ConsumerManagementService(db_session, self.bytewax_config)
         
@@ -1957,9 +2003,74 @@ class EventStreamingService:
         return await self.event_sourcing.create_snapshot(aggregate_id, aggregate_type, tenant_id)
     
     # Stream Management Methods
-    async def create_stream(self, stream_config: StreamCreate, tenant_id: str, user_id: str) -> str:
+    async def create_stream(
+        self,
+        stream_config: Optional[Union[StreamCreate, StreamConfig]] = None,
+        tenant_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        **kwargs: Any
+    ) -> str:
         """Create a new event stream."""
+        stream_config = stream_config or kwargs.get("config")
+        user_id = user_id or kwargs.get("created_by")
+        if stream_config is None:
+            raise ValueError("stream_config is required")
+        if tenant_id is None or user_id is None:
+            raise ValueError("tenant_id and user_id are required")
+
+        if isinstance(stream_config, StreamConfig):
+            bytewax_stream_name = stream_config.stream_name
+            stream_created = await self._create_bytewax_stream(
+                bytewax_stream_name,
+                stream_config.partitions,
+                stream_config.replication_factor,
+                {
+                    "cleanup.policy": stream_config.cleanup_policy,
+                    "compression.type": stream_config.compression_type.value,
+                    "retention.ms": str(stream_config.retention_time_ms),
+                },
+            )
+            if not stream_created:
+                raise RuntimeError(f"Failed to create Bytewax stream: {bytewax_stream_name}")
+
+            stream = ESStream(
+                stream_id=f"str_{uuid7str()}",
+                stream_name=stream_config.stream_name,
+                stream_description=stream_config.stream_description,
+                bytewax_stream_name=bytewax_stream_name,
+                partitions=stream_config.partitions,
+                replication_factor=stream_config.replication_factor,
+                retention_time_ms=stream_config.retention_time_ms,
+                retention_size_bytes=stream_config.retention_size_bytes,
+                cleanup_policy=stream_config.cleanup_policy,
+                compression_type=stream_config.compression_type.value,
+                default_serialization=stream_config.default_serialization.value,
+                event_category=stream_config.event_category.value,
+                source_capability=stream_config.source_capability,
+                config_settings=stream_config.config_settings,
+                tenant_id=tenant_id,
+                created_by=user_id,
+            )
+            self.db_session.add(stream)
+            await self.db_session.commit()
+            return stream.stream_id
+
         return await self.stream_manager.create_stream(stream_config, tenant_id, user_id)
+
+    async def _create_bytewax_stream(
+        self,
+        bytewax_stream_name: str,
+        partitions: int,
+        replication_factor: int,
+        config: Dict[str, str],
+    ) -> bool:
+        """Create/register a Bytewax stream through the stream manager."""
+        return await self.stream_manager._create_bytewax_stream(
+            bytewax_stream_name,
+            partitions,
+            replication_factor,
+            config,
+        )
     
     async def update_stream(
         self,

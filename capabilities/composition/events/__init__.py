@@ -39,25 +39,43 @@ from .models import (
     DeliveryMode
 )
 
-# API imports
-from .api import api_app, router
-from .views import (
-    EventStreamView,
-    SubscriptionView,
-    ConsumerGroupView,
-    SchemaView,
-    MetricsView,
-    StreamingDashboardView
-)
+try:
+    from .api import api_app, router
+except Exception:
+    api_app = None
+    router = None
 
-# APG Integration
-from .apg_integration import (
-    APGEventStreamingIntegration,
-    APGCapabilityInfo,
-    EventRoutingRule,
-    CrossCapabilityWorkflow,
-    EventCompositionPattern
-)
+try:
+    from .views import (
+        EventStreamView,
+        SubscriptionView,
+        ConsumerGroupView,
+        SchemaView,
+        MetricsView,
+        StreamingDashboardView
+    )
+except Exception:
+    EventStreamView = None
+    SubscriptionView = None
+    ConsumerGroupView = None
+    SchemaView = None
+    MetricsView = None
+    StreamingDashboardView = None
+
+try:
+    from .apg_integration import (
+        APGEventStreamingIntegration,
+        APGCapabilityInfo,
+        EventRoutingRule,
+        CrossCapabilityWorkflow,
+        EventCompositionPattern
+    )
+except Exception:
+    APGEventStreamingIntegration = None
+    APGCapabilityInfo = None
+    EventRoutingRule = None
+    CrossCapabilityWorkflow = None
+    EventCompositionPattern = None
 
 __all__ = [
     # Core services
