@@ -31,90 +31,122 @@ __email__ = "nyimbi@gmail.com"
 __company__ = "Datacraft"
 __website__ = "www.datacraft.co.ke"
 
-# Core service and manager imports
-from .service import (
-    MDMService,
-    EntityService, 
-    QualityService,
-    MatchingService,
-    AuditService,
-    MDMOperationType,
-    MDMOperationContext
+from .capability_contract import (
+    get_capability_contract,
+    evaluate_capability_rules
 )
 
-from .database import (
-    MDMDatabaseManager,
-    DatabaseHealthStatus
-)
+try:
+    # Core service and manager imports
+    from .service import (
+        MDMService,
+        EntityService,
+        QualityService,
+        MatchingService,
+        AuditService,
+        MDMOperationType,
+        MDMOperationContext
+    )
 
-# Data model imports
-from .models import (
-    # Core entity models
-    MdEntity,
-    MdEntityVersion, 
-    MdGoldenRecord,
-    MdDataQualityAssessment,
-    MdCrossReference,
-    
-    # Pydantic models for API
-    MdEntityCreate,
-    MdEntityUpdate,
-    
-    # Enums
-    EntityType,
-    EntityStatus,
-    DataQualityStatus,
-    MatchConfidence
-)
+    from .database import (
+        MDMDatabaseManager,
+        DatabaseHealthStatus
+    )
 
-# View models for serialization
-from .views import (
-    # Response containers
-    EntityResponse,
-    EntityListResponse,
-    QualityAssessmentResponse,
-    DuplicateDetectionResponse,
-    
-    # View models
-    EntityDetailView,
-    EntitySummaryView,
-    QualityAssessmentView,
-    DuplicateCandidateView
-)
+    # Data model imports
+    from .models import (
+        # Core entity models
+        MdEntity,
+        MdEntityVersion,
+        MdGoldenRecord,
+        MdDataQualityAssessment,
+        MdCrossReference,
 
-# AI engines
-from .ai_engines import (
-    EntityMatchingEngine,
-    DataQualityEngine,
-    AnomalyDetectionEngine,
-    AIEngineConfig
-)
+        # Pydantic models for API
+        MdEntityCreate,
+        MdEntityUpdate,
 
-# APG integration
-from .integrations import (
-    APGIntegrationManager,
-    EventPublisher,
-    CacheManager,
-    APGAuditLogger,
-    ConfigurationManager,
-    MDMEvent
-)
+        # Enums
+        EntityType,
+        EntityStatus,
+        DataQualityStatus,
+        MatchConfidence
+    )
 
-# API components
-from .api import (
-    create_mdm_app,
-    MDMRouter,
-    get_mdm_service
-)
+    # View models for serialization
+    from .views import (
+        # Response containers
+        EntityResponse,
+        EntityListResponse,
+        QualityAssessmentResponse,
+        DuplicateDetectionResponse,
 
-# Flask blueprint
-from .blueprint import (
-    mdm_bp,
-    register_mdm_views,
-    MDMDashboardView,
-    EntityManagementView,
-    QualityManagementView
-)
+        # View models
+        EntityDetailView,
+        EntitySummaryView,
+        QualityAssessmentView,
+        DuplicateCandidateView
+    )
+
+    # AI engines
+    from .ai_engines import (
+        EntityMatchingEngine,
+        DataQualityEngine,
+        AnomalyDetectionEngine,
+        AIEngineConfig
+    )
+
+    # APG integration
+    from .integrations import (
+        APGIntegrationManager,
+        EventPublisher,
+        CacheManager,
+        APGAuditLogger,
+        ConfigurationManager,
+        MDMEvent
+    )
+
+    # API components
+    from .api import (
+        create_mdm_app,
+        MDMRouter,
+        get_mdm_service
+    )
+
+    # Flask blueprint
+    from .blueprint import (
+        mdm_bp,
+        register_mdm_views,
+        MDMDashboardView,
+        EntityManagementView,
+        QualityManagementView
+    )
+    _RUNTIME_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+    _RUNTIME_IMPORT_ERROR = exc
+    MDMService = EntityService = QualityService = MatchingService = AuditService = None
+    MDMOperationType = MDMOperationContext = None
+    MDMDatabaseManager = DatabaseHealthStatus = None
+    MdEntity = MdEntityVersion = MdGoldenRecord = MdDataQualityAssessment = MdCrossReference = None
+    MdEntityCreate = MdEntityUpdate = None
+    EntityType = EntityStatus = DataQualityStatus = MatchConfidence = None
+    EntityResponse = EntityListResponse = QualityAssessmentResponse = DuplicateDetectionResponse = None
+    EntityDetailView = EntitySummaryView = QualityAssessmentView = DuplicateCandidateView = None
+    EntityMatchingEngine = DataQualityEngine = AnomalyDetectionEngine = AIEngineConfig = None
+    APGIntegrationManager = EventPublisher = CacheManager = APGAuditLogger = ConfigurationManager = MDMEvent = None
+    MDMRouter = None
+    mdm_bp = None
+    MDMDashboardView = EntityManagementView = QualityManagementView = None
+
+    def _runtime_unavailable(*args, **kwargs):
+        """Require optional MDM runtime dependencies before use."""
+        raise ModuleNotFoundError(
+            "MDM runtime requires optional database/UI dependencies such as asyncpg"
+        ) from _RUNTIME_IMPORT_ERROR
+
+    create_mdm_app = _runtime_unavailable
+    get_mdm_service = _runtime_unavailable
+    register_mdm_views = _runtime_unavailable
 
 # Configuration constants
 MDM_DEFAULT_CONFIG = {
@@ -216,8 +248,85 @@ __all__ = [
     "DatabaseHealthStatus",
     
     # Configuration
-    "MDM_DEFAULT_CONFIG"
+    "MDM_DEFAULT_CONFIG",
+    "register_capability",
+    "get_capability_info",
+    "get_capability_contract",
+    "evaluate_capability_rules"
 ]
+
+
+def register_capability() -> dict:
+    """Register master data management with the APG composition engine."""
+    contract = get_capability_contract()
+    return {
+        "name": "mdm",
+        "aliases": ["master_data_management", "golden_records", "data_stewardship"],
+        "display_name": "Master Data Management",
+        "description": "Entity lifecycle, golden records, quality scoring, and stewardship governance",
+        "version": __version__,
+        "dependencies": ["auth", "audl", "conf", "mten"],
+        "optional_dependencies": ["meta", "mqeb", "moni", "cach", "aicr"],
+        "configuration": contract["configuration"],
+        "configuration_schema": contract["configuration_schema"],
+        "rule_engine": contract["rule_engine"],
+        "capabilities": {
+            "entity_lifecycle": "Create, version, publish, and retire tenant-aware master entities",
+            "golden_records": "Manage survivorship and canonical entity views",
+            "data_quality": "Score master data across quality dimensions",
+            "duplicate_review": "Detect and review duplicate entity candidates",
+            "stewardship": "Route governance work to data stewards and owners",
+            "capability_rules": "Evaluate deterministic master-data governance rules",
+            "visual_theming": "Apply golden-record console theme tokens and components"
+        },
+        "endpoints": {
+            "entities": "/mdm/api/v1/entities",
+            "golden_records": "/mdm/api/v1/golden-records",
+            "quality": "/mdm/api/v1/quality",
+            "duplicates": "/mdm/api/v1/duplicates",
+            "stewardship": "/mdm/api/v1/stewardship",
+            "analytics": "/mdm/api/v1/analytics"
+        },
+        "ui_components": {
+            route["name"]: route["path"]
+            for route in contract["ui"]["routes"]
+        },
+        "ui_manifest": contract["ui"],
+        "theme": contract["theme"],
+        "permissions": [
+            "mdm:view",
+            "mdm:manage_entities",
+            "mdm:manage_golden_records",
+            "mdm:view_quality",
+            "mdm:review_duplicates",
+            "mdm:steward",
+            "mdm:view_analytics",
+            "mdm:admin"
+        ]
+    }
+
+
+def get_capability_info() -> dict:
+    """Get MDM capability information for composition and marketplace discovery."""
+    return {
+        "metadata": {
+            "name": "mdm",
+            "display_name": "Master Data Management",
+            "version": __version__,
+            "author": __author__,
+            "company": __company__,
+            "dependencies": ["auth", "audl", "conf", "mten"]
+        },
+        "contract": get_capability_contract(),
+        "features": [
+            "Entity lifecycle management",
+            "AI-powered quality assessment",
+            "Semantic duplicate detection",
+            "Golden record management",
+            "Multi-tenant security",
+            "Comprehensive audit trails"
+        ]
+    }
 
 # Package-level convenience functions
 async def create_default_mdm_service(config: dict = None) -> MDMService:
@@ -235,6 +344,11 @@ async def create_default_mdm_service(config: dict = None) -> MDMService:
         >>> health = await mdm.health_check()
         >>> print(f"Status: {health['status']}")
     """
+    if MDMService is None:
+        raise ModuleNotFoundError(
+            "MDM runtime requires optional database/UI dependencies such as asyncpg"
+        ) from _RUNTIME_IMPORT_ERROR
+
     from .database import MDMDatabaseManager
     from .integrations import APGIntegrationManager
     

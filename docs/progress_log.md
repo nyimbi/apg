@@ -460,3 +460,24 @@ Current broader MONI/HLTH execution findings:
 - MONI and HLTH contract discovery/registration now work without starting their monitoring or health runtimes.
 - The focused HLTH contract test lives outside `capabilities/common/hlth/tests/` because that directory's existing `conftest.py` imports the full health service stack and currently hits a pre-existing `HealthThreshold` model/service mismatch.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 08:46 EAT
+
+Completed checkpoint:
+
+- Made the MDM data-governance capability executable as a first-class APG capability with tenant-scoped entity, quality, matching, governance, integration, UI, and theme configuration.
+- Added deterministic MDM master-data governance rules for tenant context, data-owner assignment, low-quality publish blocking, duplicate review, golden-record survivorship, and restricted-entity audit evidence.
+- Made the META data-catalog capability executable as a first-class APG capability with tenant-scoped catalog, discovery, classification, lineage, quality, governance, UI, and theme configuration.
+- Added deterministic META metadata-governance rules for tenant context, asset ownership, restricted classification, certified lineage, low-confidence classification review, and stale asset review.
+- Exposed MDM and META contract helpers through package registration/info surfaces while guarding optional database/search runtime imports for lightweight composition-time discovery.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mdm/__init__.py capabilities/common/mdm/capability_contract.py capabilities/common/mdm/test_capability_contract.py capabilities/common/meta/__init__.py capabilities/common/meta/capability_contract.py capabilities/common/meta/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/mdm/test_capability_contract.py capabilities/common/meta/test_capability_contract.py` -> 6 passed, 15 warnings
+
+Current broader MDM/META execution findings:
+
+- MDM and META contract discovery/registration now work without optional database/search dependencies such as `asyncpg`.
+- Focused MDM and META contract tests live outside existing heavyweight runtime test folders so metadata discovery remains isolated from database fixtures.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

@@ -10,53 +10,88 @@ Copyright: © 2025 Datacraft
 from typing import Dict, List, Any, Optional, Union
 import asyncio
 
-# Core service and components
-from .service import (
-	APGMetadataService,
-	ServiceStatus,
-	ServiceHealth,
-	create_metadata_service,
-	get_metadata_service,
-	shutdown_metadata_service
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
 )
 
-# Database and models
-from .database import MetaDatabaseManager, create_database_manager
-from .models import (
-	MetaAsset,
-	MetaColumn,
-	MetaLineage,
-	MetaClassification,
-	MetaQualityAssessment,
-	MetaDiscoveryJob,
-	MetaDiscoverySchedule,
-	AssetType,
-	AssetStatus,
-	DataType,
-	ClassificationType,
-	LineageType,
-	QualityDimension
-)
+try:
+	# Core service and components
+	from .service import (
+		APGMetadataService,
+		ServiceStatus,
+		ServiceHealth,
+		create_metadata_service,
+		get_metadata_service,
+		shutdown_metadata_service
+	)
 
-# AI and discovery components
-from .ai_classifier import AIClassificationEngine, create_ai_classifier
-from .discovery import MetadataDiscoveryService, DiscoverySchedule, create_discovery_service
-from .lineage_engine import DataLineageEngine, LineageEdge, create_lineage_engine
-from .search_engine import MetadataSearchEngine, SearchQuery, create_search_engine
+	# Database and models
+	from .database import MetaDatabaseManager, create_database_manager
+	from .models import (
+		MetaAsset,
+		MetaColumn,
+		MetaLineage,
+		MetaClassification,
+		MetaQualityAssessment,
+		MetaDiscoveryJob,
+		MetaDiscoverySchedule,
+		AssetType,
+		AssetStatus,
+		DataType,
+		ClassificationType,
+		LineageType,
+		QualityDimension
+	)
 
-# Connectors
-from .connectors import (
-	ConnectorConfig,
-	ConnectorType,
-	BaseConnector,
-	DatabaseConnector,
-	PostgreSQLConnector,
-	MySQLConnector,
-	MongoDBConnector
-)
+	# AI and discovery components
+	from .ai_classifier import AIClassificationEngine, create_ai_classifier
+	from .discovery import MetadataDiscoveryService, DiscoverySchedule, create_discovery_service
+	from .lineage_engine import DataLineageEngine, LineageEdge, create_lineage_engine
+	from .search_engine import MetadataSearchEngine, SearchQuery, create_search_engine
 
-# Integration framework
-from .integrations import APGMetadataIntegrationManager, create_apg_integration_manager
+	# Connectors
+	from .connectors import (
+		ConnectorConfig,
+		ConnectorType,
+		BaseConnector,
+		DatabaseConnector,
+		PostgreSQLConnector,
+		MySQLConnector,
+		MongoDBConnector
+	)
+
+	# Integration framework
+	from .integrations import APGMetadataIntegrationManager, create_apg_integration_manager
+	_RUNTIME_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+	_RUNTIME_IMPORT_ERROR = exc
+	APGMetadataService = ServiceStatus = ServiceHealth = None
+	MetaDatabaseManager = None
+	MetaAsset = MetaColumn = MetaLineage = MetaClassification = MetaQualityAssessment = None
+	MetaDiscoveryJob = MetaDiscoverySchedule = None
+	AssetType = AssetStatus = DataType = ClassificationType = LineageType = QualityDimension = None
+	AIClassificationEngine = MetadataDiscoveryService = DataLineageEngine = MetadataSearchEngine = None
+	ConnectorConfig = ConnectorType = BaseConnector = DatabaseConnector = None
+	PostgreSQLConnector = MySQLConnector = MongoDBConnector = None
+	APGMetadataIntegrationManager = None
+	DiscoverySchedule = LineageEdge = SearchQuery = None
+
+	def _runtime_unavailable(*args, **kwargs):
+		"""Require optional META runtime dependencies before use."""
+		raise ModuleNotFoundError(
+			"META runtime requires optional database/search dependencies such as asyncpg"
+		) from _RUNTIME_IMPORT_ERROR
+
+	create_metadata_service = _runtime_unavailable
+	get_metadata_service = _runtime_unavailable
+	shutdown_metadata_service = _runtime_unavailable
+	create_database_manager = _runtime_unavailable
+	create_ai_classifier = _runtime_unavailable
+	create_discovery_service = _runtime_unavailable
+	create_lineage_engine = _runtime_unavailable
+	create_search_engine = _runtime_unavailable
+	create_apg_integration_manager = _runtime_unavailable
 
 # Version information
 __version__ = "1.0.0"
@@ -114,6 +149,10 @@ async def initialize_capability(config: Dict[str, Any] = None) -> APGMetadataSer
 	
 	if _service_instance is not None:
 		return _service_instance
+	if APGMetadataService is None:
+		raise ModuleNotFoundError(
+			"META runtime requires optional database/search dependencies such as asyncpg"
+		) from _RUNTIME_IMPORT_ERROR
 	
 	# Default configuration
 	default_config = {
@@ -184,7 +223,59 @@ async def shutdown_capability():
 
 def get_capability_info() -> Dict[str, Any]:
 	"""Get capability information"""
-	return CAPABILITY_INFO.copy()
+	info = CAPABILITY_INFO.copy()
+	info["contract"] = get_capability_contract()
+	return info
+
+
+def register_capability() -> Dict[str, Any]:
+	"""Register metadata management with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "meta",
+		"aliases": ["metadata_management", "catalog", "data_catalog"],
+		"display_name": CAPABILITY_INFO["display_name"],
+		"description": CAPABILITY_INFO["description"],
+		"version": CAPABILITY_INFO["version"],
+		"dependencies": ["mdm", "auth", "audl"],
+		"optional_dependencies": ["aicr", "conn", "etlp", "mqeb", "moni"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"asset_catalog": "Register, search, and govern metadata assets",
+			"auto_discovery": "Discover metadata from approved data sources",
+			"ai_classification": "Classify sensitive assets with reviewable confidence",
+			"lineage_tracking": "Capture upstream/downstream asset lineage",
+			"impact_analysis": "Analyze downstream impact from asset changes",
+			"capability_rules": "Evaluate deterministic metadata governance rules",
+			"visual_theming": "Apply catalog-console theme tokens and components"
+		},
+		"endpoints": {
+			"assets": "/meta/api/v1/assets",
+			"discovery": "/meta/api/v1/discovery",
+			"classification": "/meta/api/v1/classification",
+			"lineage": "/meta/api/v1/lineage",
+			"quality": "/meta/api/v1/quality",
+			"search": "/meta/api/v1/search"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"meta:view",
+			"meta:view_assets",
+			"meta:run_discovery",
+			"meta:view_lineage",
+			"meta:classify",
+			"meta:view_quality",
+			"meta:search",
+			"meta:admin"
+		]
+	}
 
 
 async def quick_start(
@@ -372,6 +463,9 @@ __all__ = [
 	"get_capability_instance",
 	"shutdown_capability",
 	"get_capability_info",
+	"register_capability",
+	"get_capability_contract",
+	"evaluate_capability_rules",
 	"quick_start",
 	
 	# Convenience functions
