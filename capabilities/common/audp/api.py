@@ -8,6 +8,7 @@ Copyright © 2025 Datacraft
 Author: APG Development Team
 """
 
+from copy import deepcopy
 from datetime import datetime
 from typing import Any, Dict, List
 from uuid import UUID
@@ -30,6 +31,12 @@ from uuid_extensions import uuid7str
 
 # API Router for audio processing endpoints
 router = APIRouter(prefix="/api/v1/audio", tags=["audio_processing"])
+
+# In-process job status registry for API-created jobs.
+#
+# This preserves executable status semantics in the current service process. A
+# durable deployment should back this with APG's shared job/event store.
+JOB_STATUS_REGISTRY: Dict[str, Dict[str, Any]] = {}
 
 # Request/Response Models
 
@@ -145,6 +152,51 @@ class WorkflowResponse(BaseModel):
 	total_processing_time: float = None
 	results: Dict[str, Any] = None
 	steps_completed: List[str] = None
+
+def _utcnow_iso() -> str:
+	"""Return an API-safe UTC timestamp."""
+	return datetime.utcnow().isoformat()
+
+def _status_value(status: Any) -> Any:
+	"""Serialize enum-like status values without forcing callers to use enums."""
+	return getattr(status, "value", status)
+
+def _record_workflow_job_status(
+	result: Dict[str, Any],
+	request: WorkflowRequest,
+	tenant_id: str,
+	user_id: str | None
+) -> Dict[str, Any]:
+	"""Persist workflow execution status for subsequent API lookups."""
+	workflow_id = result["workflow_id"]
+	now = _utcnow_iso()
+	existing = JOB_STATUS_REGISTRY.get(workflow_id, {})
+	results = result.get("results") or {}
+	status = {
+		"job_id": workflow_id,
+		"workflow_id": workflow_id,
+		"job_type": "workflow",
+		"status": _status_value(result.get("status")),
+		"tenant_id": tenant_id,
+		"user_id": user_id,
+		"workflow_type": request.workflow_type,
+		"audio_source": deepcopy(request.audio_source),
+		"parameters": deepcopy(request.parameters),
+		"total_processing_time": result.get("total_processing_time"),
+		"steps_completed": deepcopy(results.get("steps_completed", [])),
+		"results": deepcopy(results),
+		"created_at": existing.get("created_at", now),
+		"updated_at": now
+	}
+	JOB_STATUS_REGISTRY[workflow_id] = status
+	return deepcopy(status)
+
+def _get_recorded_job_status(job_id: str, tenant_id: str) -> Dict[str, Any] | None:
+	"""Return a tenant-visible recorded job status, if present."""
+	status = JOB_STATUS_REGISTRY.get(job_id)
+	if not status or status.get("tenant_id") != tenant_id:
+		return None
+	return deepcopy(status)
 
 # API Endpoints
 
@@ -471,6 +523,7 @@ async def execute_workflow(
 			user_id=user_id,
 			**request.parameters
 		)
+		_record_workflow_job_status(result, request, tenant_id, user_id)
 		
 		return WorkflowResponse(
 			workflow_id=result["workflow_id"],
@@ -489,13 +542,14 @@ async def execute_workflow(
 @router.get("/jobs/{job_id}", response_model=Dict[str, Any])
 async def get_job_status(job_id: str, tenant_id: str = "default"):
 	"""Get status of a processing job"""
-	# This would typically query a job tracking system
-	# For now, return a placeholder response
-	return {
-		"job_id": job_id,
-		"status": "completed",
-		"message": "Job status endpoint - implementation varies by service"
-	}
+	status = _get_recorded_job_status(job_id, tenant_id)
+	if status:
+		return status
+
+	raise HTTPException(
+		status_code=HTTP_404_NOT_FOUND,
+		detail=f"Job {job_id} not found"
+	)
 
 @router.get("/voices", response_model=List[Dict[str, Any]])
 async def list_voices(tenant_id: str = "default"):
@@ -549,10 +603,19 @@ async def delete_voice(model_id: str, tenant_id: str = "default"):
 async def get_workflow_status(workflow_id: str, tenant_id: str = "default"):
 	"""Get status of a running workflow"""
 	try:
+		recorded_status = _get_recorded_job_status(workflow_id, tenant_id)
+		if recorded_status:
+			return recorded_status
+
 		orchestrator = create_workflow_orchestrator()
 		status = await orchestrator.get_workflow_status(workflow_id)
 		
 		if status:
+			if status.get("tenant_id") not in (None, tenant_id):
+				raise HTTPException(
+					status_code=HTTP_404_NOT_FOUND,
+					detail=f"Workflow {workflow_id} not found"
+				)
 			return status
 		else:
 			raise HTTPException(

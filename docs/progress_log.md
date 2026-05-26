@@ -1026,3 +1026,24 @@ Current broader AICR monitoring findings:
 
 - The previously placeholder email/webhook alert channels are now executable runtime paths.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 15:58 EAT
+
+Completed checkpoint:
+
+- Replaced AUDP `/api/v1/audio/jobs/{job_id}` placeholder success responses with an in-process, tenant-scoped job status registry for API-created workflow executions.
+- Recorded workflow job metadata at execution time, including tenant, user, workflow type, source configuration, parameters, processing time, completed steps, result payload, and timestamps.
+- Updated `/api/v1/audio/workflows/{workflow_id}/status` to return recorded workflow execution state before falling back to orchestrator state, avoiding a new empty orchestrator instance as the only status path.
+- Added the missing `VoiceSynthesisProvider.CUSTOM_NEURAL` enum value required by existing AUDP synthesis service imports.
+- Added a focused AUDP API job-status contract test for workflow execution registration, tenant isolation, and workflow-status lookup.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/audp/api.py capabilities/common/audp/models.py capabilities/common/audp/test_api_job_status.py`
+- `.venv/bin/python -m pytest -q capabilities/common/audp/test_api_job_status.py` -> 3 passed, 16 warnings
+
+Current broader AUDP runtime findings:
+
+- AUDP workflow jobs now have an executable status lookup path for jobs created during the current API process lifetime.
+- The current registry is intentionally in-process; durable production deployment still needs an APG shared job/event store backing this contract.
+- Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities and AUDP Pydantic request model style.

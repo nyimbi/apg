@@ -91,6 +91,7 @@ class VoiceSynthesisProvider(str, Enum):
 	AWS_POLLY = "aws_polly"
 	ELEVEN_LABS = "eleven_labs"
 	CUSTOM_VOICE = "custom_voice"
+	CUSTOM_NEURAL = "custom_neural"
 
 
 class ProcessingStatus(str, Enum):
