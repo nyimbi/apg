@@ -12,6 +12,7 @@ from flask_appbuilder.security.decorators import protect
 from datetime import datetime, date
 from typing import Dict, List, Any
 
+from .context import get_tenant_id_from_request
 from .service import ReplenishmentService
 
 
@@ -69,7 +70,8 @@ class ReplenishmentApi(BaseApi):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 
 
 def register_api_views(appbuilder: AppBuilder):

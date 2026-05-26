@@ -10,12 +10,14 @@ from flask_appbuilder import ModelView, BaseView, expose, has_access
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.actions import action
 from datetime import datetime, timedelta
+from sqlalchemy import and_
 
 from .models import (
 	IMRRSupplier, IMRRSupplierItem, IMRRReplenishmentRule,
 	IMRRReplenishmentSuggestion, IMRRPurchaseOrder, 
 	IMRRPurchaseOrderLine, IMRRDemandForecast
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import ReplenishmentService
 
 
@@ -60,7 +62,7 @@ class IMRRSupplierView(ModelView):
 	}
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMRRReplenishmentRuleView(ModelView):
@@ -120,7 +122,7 @@ class IMRRReplenishmentRuleView(ModelView):
 		return redirect(self.get_redirect())
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMRRReplenishmentSuggestionView(ModelView):
@@ -207,10 +209,10 @@ class IMRRReplenishmentSuggestionView(ModelView):
 		return redirect(self.get_redirect())
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_current_user_id(self):
-		return "current_user"
+		return get_current_user_id()
 
 
 class IMRRPurchaseOrderView(ModelView):
@@ -251,7 +253,7 @@ class IMRRPurchaseOrderView(ModelView):
 	}
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class ReplenishmentDashboardView(BaseView):
@@ -304,4 +306,4 @@ class ReplenishmentDashboardView(BaseView):
 		return []  # Simplified for now
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
