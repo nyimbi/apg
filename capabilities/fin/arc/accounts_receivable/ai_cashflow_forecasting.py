@@ -7,6 +7,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 import asyncio
+from copy import deepcopy
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from enum import Enum
@@ -264,6 +265,9 @@ class APGCashFlowForecastingService(APGServiceBase):
 		self.ai_orchestration = None
 		self.notification_service = None
 		self.audit_logger = None
+		self._forecast_store: Dict[str, List[CashFlowDataPoint]] = {}
+		self._forecast_summaries: Dict[str, CashFlowForecastSummary] = {}
+		self._model_performance_history: List[Dict[str, Any]] = []
 	
 	async def _initialize_services(self):
 		"""Initialize APG service dependencies."""
@@ -318,8 +322,11 @@ class APGCashFlowForecastingService(APGServiceBase):
 			
 			# 6. Generate forecast summary
 			summary = await self._generate_forecast_summary(final_forecast, forecast_input)
+
+			# 7. Retain forecast for later accuracy monitoring
+			await self._store_forecast(summary, final_forecast)
 			
-			# 7. Log forecast generation
+			# 8. Log forecast generation
 			await self._log_forecast_generation(forecast_input, summary)
 			
 			return final_forecast, summary
@@ -805,16 +812,31 @@ class APGCashFlowForecastingService(APGServiceBase):
 		
 		return recommendations
 	
-	# Additional helper methods would be implemented here...
+	async def _store_forecast(
+		self,
+		summary: CashFlowForecastSummary,
+		forecast_points: List[CashFlowDataPoint]
+	):
+		"""Store generated forecast output for accuracy monitoring."""
+		self._forecast_store[summary.forecast_id] = deepcopy(forecast_points)
+		self._forecast_summaries[summary.forecast_id] = deepcopy(summary)
+
 	async def _retrieve_forecast_by_id(self, forecast_id: str) -> Optional[List[CashFlowDataPoint]]:
-		"""Retrieve forecast by ID (placeholder implementation)."""
-		# This would query the database to retrieve stored forecast
-		return None
+		"""Retrieve a stored forecast by ID."""
+		forecast = self._forecast_store.get(forecast_id)
+		return deepcopy(forecast) if forecast is not None else None
 	
 	async def _update_model_performance_tracking(self, accuracy_metrics: Dict[str, float]):
-		"""Update model performance tracking (placeholder implementation)."""
-		# This would update performance metrics in the database
-		pass
+		"""Record model performance metrics for trend analysis."""
+		record = {
+			"tenant_id": self.tenant_id,
+			"model_name": self.config.forecasting_model_name,
+			"model_version": "ar_cashflow_forecast_v1.0",
+			"recorded_at": datetime.utcnow(),
+			"metrics": dict(accuracy_metrics),
+		}
+		self._model_performance_history.append(record)
+		return record
 
 
 # =============================================================================

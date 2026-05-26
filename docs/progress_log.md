@@ -2111,3 +2111,24 @@ Verification:
 - `.venv/bin/python -c "from capabilities.fin.bil.payment_processors import PaymentProcessorManager; print(PaymentProcessorManager.__name__)"` -> `PaymentProcessorManager`
 - `.venv/bin/python -m pytest -q tests/test_fin_bil_payment_processors_imports.py tests/test_fin_cos_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed
 - `git diff --check -- capabilities/fin/bil/__init__.py capabilities/fin/bil/payment_processors.py capabilities/fin/bil/tax_services.py capabilities/fin/bil/email_services.py capabilities/fin/bil/webhook_system.py capabilities/fin/bil/views.py tests/test_fin_bil_payment_processors_imports.py` -> no issues
+
+### 2026-05-26 22:17 EAT
+
+Completed checkpoint:
+
+- Replaced Accounts Receivable cash-flow forecast retrieval and model-performance placeholders with executable in-memory retention.
+- Generated cash-flow forecasts now store forecast points and summaries by forecast ID before audit logging so later accuracy monitoring can retrieve the original forecast.
+- Accuracy monitoring now appends model performance records with tenant, model name/version, timestamp, and metrics instead of dropping the result.
+- Added focused root-level regression coverage for forecast retrieval copy semantics and `monitor_forecast_accuracy()` using a stored forecast.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/arc/accounts_receivable/ai_cashflow_forecasting.py tests/test_ar_cashflow_forecast_retention.py`
+- `.venv/bin/python -m pytest -q tests/test_ar_cashflow_forecast_retention.py` -> 2 passed
+- `.venv/bin/python -m pytest -q tests/test_ar_cashflow_forecast_retention.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "Retrieve forecast by ID \(placeholder implementation\)|Update model performance tracking \(placeholder implementation\)|Additional helper methods would be implemented here" capabilities/fin/arc/accounts_receivable/ai_cashflow_forecasting.py` -> no matches
+- `git diff --check -- capabilities/fin/arc/accounts_receivable/ai_cashflow_forecasting.py tests/test_ar_cashflow_forecast_retention.py` -> no issues
+
+Known verification gap:
+
+- Directly invoking `capabilities/fin/arc/accounts_receivable/tests/ci/test_ai_cashflow_forecasting.py::TestAPGCashFlowForecastingService::test_calculate_accuracy_metrics` from the repo root still fails during collection because that package-local test uses relative imports without a package collector context.
