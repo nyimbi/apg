@@ -1,37 +1,64 @@
 """
-APG Natural Language Processing Models
+NLPC Data Models - Natural Language Processing Core
 
-Pydantic v2 models for enterprise NLP platform with multi-model orchestration,
-real-time streaming, collaborative annotation, and domain adaptation.
+Copyright © 2025 Datacraft
+Author: Nyimbi Odero
+Email: nyimbi@gmail.com
+Website: www.datacraft.co.ke
 
-All models follow APG coding standards with async patterns, modern typing,
-and comprehensive validation.
+This module defines core data models for the Natural Language Processing Core (NLPC) capability.
+All models follow APG standards with Pydantic v2, async support, and multi-tenancy.
 """
 
+from __future__ import annotations
+
+import asyncio
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Union, Literal
 from enum import Enum
+from typing import Any, Annotated, Optional
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, field_validator, computed_field
-from pydantic.types import Json
-from typing import Annotated, get_type_hints
 
-# APG Model Configuration
-MODEL_CONFIG = ConfigDict(
-	extra='forbid',
-	validate_by_name=True,
-	validate_by_alias=True,
-	str_strip_whitespace=True,
-	validate_default=True,
-	use_enum_values=True
-)
+from pydantic import BaseModel, Field, ConfigDict, AfterValidator, field_validator, model_validator
 
-# Enumerations for Type Safety
+
+class NLPTask(str, Enum):
+	"""Enumeration of supported NLP tasks."""
+	TOKENIZATION = "tokenization"
+	SENTENCE_SEGMENTATION = "sentence_segmentation"
+	LANGUAGE_DETECTION = "language_detection"
+	POS_TAGGING = "pos_tagging"
+	PART_OF_SPEECH_TAGGING = "part_of_speech_tagging"
+	NER = "named_entity_recognition"
+	NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
+	DEPENDENCY_PARSING = "dependency_parsing"
+	CONSTITUENCY_PARSING = "constituency_parsing"
+	SENTIMENT_ANALYSIS = "sentiment_analysis"
+	ENTITY_EXTRACTION = "entity_extraction"
+	EMOTION_DETECTION = "emotion_detection"
+	INTENT_CLASSIFICATION = "intent_classification"
+	TOPIC_MODELING = "topic_modeling"
+	SEMANTIC_SIMILARITY = "semantic_similarity"
+	TEXT_SIMILARITY = "text_similarity"
+	TEXT_SUMMARIZATION = "text_summarization"
+	RELATION_EXTRACTION = "relation_extraction"
+	COREFERENCE_RESOLUTION = "coreference_resolution"
+	TEMPORAL_EXTRACTION = "temporal_extraction"
+	EVENT_EXTRACTION = "event_extraction"
+	QUESTION_ANSWERING = "question_answering"
+	TEXT_GENERATION = "text_generation"
+	TEXT_TRANSLATION = "text_translation"
+	PII_DETECTION = "pii_detection"
+	TEXT_CLASSIFICATION = "text_classification"
+	KEYWORD_EXTRACTION = "keyword_extraction"
+	ENTITY_LINKING = "entity_linking"
+	TEXT_NORMALIZATION = "text_normalization"
+	TEXT_CLUSTERING = "text_clustering"
+
 
 class NLPTaskType(str, Enum):
-	"""NLP task types for processing classification"""
+	"""Legacy NLP task names retained for older APG tests and callers."""
 	SENTIMENT_ANALYSIS = "sentiment_analysis"
-	ENTITY_EXTRACTION = "entity_extraction" 
+	ENTITY_EXTRACTION = "entity_extraction"
 	TEXT_CLASSIFICATION = "text_classification"
 	TEXT_SUMMARIZATION = "text_summarization"
 	LANGUAGE_DETECTION = "language_detection"
@@ -45,31 +72,26 @@ class NLPTaskType(str, Enum):
 	KEYWORD_EXTRACTION = "keyword_extraction"
 	TEXT_CLUSTERING = "text_clustering"
 
+
 class ModelProvider(str, Enum):
-	"""On-device model providers"""
+	"""Legacy on-device model providers."""
 	OLLAMA = "ollama"
 	TRANSFORMERS = "transformers"
-	SPACY = "spacy" 
+	SPACY = "spacy"
 	NLTK = "nltk"
 	CUSTOM = "custom"
 
-class ProcessingStatus(str, Enum):
-	"""Processing status for async operations"""
-	PENDING = "pending"
-	PROCESSING = "processing"
-	COMPLETED = "completed"
-	FAILED = "failed"
-	CANCELLED = "cancelled"
 
 class QualityLevel(str, Enum):
-	"""Quality vs speed tradeoff levels"""
+	"""Quality versus latency preference for legacy callers."""
 	FAST = "fast"
 	BALANCED = "balanced"
 	ACCURATE = "accurate"
 	BEST = "best"
 
+
 class DocumentType(str, Enum):
-	"""Document content types"""
+	"""Legacy document content types."""
 	PLAIN_TEXT = "plain_text"
 	HTML = "html"
 	MARKDOWN = "markdown"
@@ -78,647 +100,736 @@ class DocumentType(str, Enum):
 	PDF = "pdf"
 	DOCX = "docx"
 
-class LanguageCode(str, Enum):
-	"""Supported language codes"""
-	AUTO = "auto"  # Automatic detection
-	EN = "en"      # English
-	ES = "es"      # Spanish
-	FR = "fr"      # French
-	DE = "de"      # German
-	IT = "it"      # Italian
-	PT = "pt"      # Portuguese
-	RU = "ru"      # Russian
-	ZH = "zh"      # Chinese
-	JA = "ja"      # Japanese
-	KO = "ko"      # Korean
-	AR = "ar"      # Arabic
-	HI = "hi"      # Hindi
 
-# Core Data Models
+class ProcessingStatus(str, Enum):
+	"""Enumeration of processing status values."""
+	PENDING = "pending"
+	PROCESSING = "processing"
+	IN_PROGRESS = "in_progress"
+	COMPLETED = "completed"
+	FAILED = "failed"
+	CANCELLED = "cancelled"
+	RETRY = "retry"
+
+
+class ModelType(str, Enum):
+	"""Enumeration of supported model types."""
+	SPACY = "spacy"
+	NLTK = "nltk"
+	TEXTBLOB = "textblob"
+	GENSIM = "gensim"
+	TRANSFORMERS = "transformers"
+	SKLEARN = "sklearn"
+	CUSTOM = "custom"
+	ENSEMBLE = "ensemble"
+
+
+class LanguageCode(str, Enum):
+	"""Common language codes (ISO 639-1)."""
+	AUTO = "auto"
+	ENGLISH = "en"
+	EN = "en"
+	SPANISH = "es"
+	ES = "es"
+	FRENCH = "fr"
+	FR = "fr"
+	GERMAN = "de"
+	DE = "de"
+	ITALIAN = "it"
+	IT = "it"
+	PORTUGUESE = "pt"
+	PT = "pt"
+	RUSSIAN = "ru"
+	RU = "ru"
+	CHINESE = "zh"
+	ZH = "zh"
+	JAPANESE = "ja"
+	JA = "ja"
+	KOREAN = "ko"
+	KO = "ko"
+	ARABIC = "ar"
+	AR = "ar"
+	HINDI = "hi"
+	HI = "hi"
+	AUTO_DETECT = "auto"
+	MULTILINGUAL = "multi"
+	AFRIKAANS = "af"
+	AFAR = "aa"
+	AKAN = "ak"
+	AMHARIC = "am"
+	BAMBARA = "bm"
+	EWE = "ee"
+	FULAH = "ff"
+	HAUSA = "ha"
+	IGBO = "ig"
+	KANURI = "kr"
+	KIKUYU = "ki"
+	KINYARWANDA = "rw"
+	KIRUNDI = "rn"
+	KONGO = "kg"
+	LINGALA = "ln"
+	LUGANDA = "lg"
+	MALAGASY = "mg"
+	NYANJA = "ny"
+	OROMO = "om"
+	SANGO = "sg"
+	SHONA = "sn"
+	SOMALI = "so"
+	SOUTHERN_SOTHO = "st"
+	SWAHILI = "sw"
+	SWATI = "ss"
+	TIGRINYA = "ti"
+	TSONGA = "ts"
+	TSWANA = "tn"
+	TWI = "tw"
+	VENDA = "ve"
+	WOLOF = "wo"
+	XHOSA = "xh"
+	YORUBA = "yo"
+	ZULU = "zu"
+	KABYLE = "kab"
+	KAMBA = "kam"
+	LUO = "luo"
+	MAASAI = "mas"
+	MERU = "mer"
+	MOORE = "mos"
+	NUER = "nus"
+	SUKUMA = "suk"
+	TAMAZIGHT = "tzm"
+	TIGRE = "tig"
+	UMBUNDU = "umb"
+
+
+class PriorityLevel(str, Enum):
+	"""Processing priority levels."""
+	LOW = "low"
+	NORMAL = "medium"
+	MEDIUM = "medium"
+	HIGH = "high"
+	URGENT = "high"
+	CRITICAL = "critical"
+
+
+def _validate_confidence_score(value: float) -> float:
+	"""Validate confidence score is between 0 and 1."""
+	if not 0.0 <= value <= 1.0:
+		raise ValueError("Confidence score must be between 0.0 and 1.0")
+	return value
+
+
+def _validate_positive_float(value: float) -> float:
+	"""Validate float is positive."""
+	if value < 0:
+		raise ValueError("Value must be positive")
+	return value
+
+
+def _validate_non_empty_string(value: str) -> str:
+	"""Validate string is not empty."""
+	if not value or not value.strip():
+		raise ValueError("String cannot be empty")
+	return value.strip()
+
+
+class BaseNLPCModel(BaseModel):
+	"""Base model for all NLPC entities with common fields."""
+	model_config = ConfigDict(
+		extra='forbid',
+		validate_by_name=True,
+		validate_by_alias=True,
+		str_strip_whitespace=True,
+		use_enum_values=True
+	)
+
+	id: str = Field(default_factory=uuid7str, description="Unique identifier")
+	tenant_id: str = Field(description="Tenant identifier for multi-tenancy")
+	created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
+	updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Last update timestamp")
+	version: int = Field(default=1, ge=1, description="Version number for optimistic locking")
+
 
 class TextDocument(BaseModel):
-	"""Rich text document with metadata and processing history"""
-	model_config = MODEL_CONFIG
-	
-	# Identity and tenant isolation
-	id: str = Field(default_factory=uuid7str, description="Unique document identifier")
-	tenant_id: str = Field(..., description="Tenant ID for multi-tenancy")
-	
-	# Document content
-	content: str = Field(..., min_length=1, description="Document text content")
-	title: Optional[str] = Field(None, max_length=500, description="Document title")
-	language: Optional[LanguageCode] = Field(None, description="Document language")
-	detected_language: Optional[LanguageCode] = Field(None, description="Auto-detected language")
-	content_type: DocumentType = Field(DocumentType.PLAIN_TEXT, description="Content format type")
-	
-	# Document metadata
-	metadata: Dict[str, Any] = Field(default_factory=dict, description="Custom metadata")
-	source_url: Optional[str] = Field(None, description="Source URL if applicable")
-	author: Optional[str] = Field(None, description="Document author")
-	created_date: Optional[datetime] = Field(None, description="Original creation date")
-	
-	# Processing information
-	processing_history: List[str] = Field(default_factory=list, description="Processing step IDs")
-	quality_score: float = Field(0.0, ge=0.0, le=1.0, description="Content quality score")
-	word_count: Optional[int] = Field(None, ge=0, description="Word count")
-	character_count: Optional[int] = Field(None, ge=0, description="Character count")
-	
-	# APG audit fields
-	created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
-	updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update timestamp")
-	created_by: Optional[str] = Field(None, description="User ID who created document") 
-	updated_by: Optional[str] = Field(None, description="User ID who last updated document")
-	
+	"""Legacy rich text document with metadata and processing hints."""
+	model_config = ConfigDict(
+		extra='forbid',
+		validate_by_name=True,
+		validate_by_alias=True,
+		str_strip_whitespace=True,
+		use_enum_values=True
+	)
+
+	id: str = Field(default_factory=uuid7str)
+	tenant_id: str
+	content: str
+	title: Optional[str] = Field(default=None, max_length=500)
+	language: Optional[LanguageCode] = None
+	metadata: dict[str, Any] = Field(default_factory=dict)
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	updated_at: datetime = Field(default_factory=datetime.utcnow)
+
 	@field_validator('content')
 	@classmethod
-	def validate_content_length(cls, v: str) -> str:
-		"""Validate content is not empty and within reasonable limits"""
-		if len(v.strip()) == 0:
+	def validate_content(cls, value: str) -> str:
+		if not value or not value.strip():
 			raise ValueError("Content cannot be empty")
-		if len(v) > 10_000_000:  # 10MB limit
-			raise ValueError("Content exceeds maximum length of 10MB")
-		return v
-	
-	@computed_field
+		if len(value) > 10_000_000:
+			raise ValueError("Content exceeds maximum length")
+		return value.strip()
+
 	@property
 	def estimated_processing_time(self) -> float:
-		"""Estimate processing time in seconds based on content length"""
-		base_time = 0.1
-		length_factor = len(self.content) / 1000  # 1ms per 1000 characters
-		return base_time + (length_factor * 0.001)
-	
-	def _log_document_created(self) -> None:
-		"""Log document creation for audit trail"""
-		print(f"Document created: {self.id} ({len(self.content)} chars, {self.language})")
+		return 0.1 + (len(self.content) / 1_000_000)
 
-class NLPModel(BaseModel):
-	"""On-device NLP model configuration and metadata"""
-	model_config = MODEL_CONFIG
-	
-	# Model identity
-	id: str = Field(default_factory=uuid7str, description="Unique model identifier")
-	tenant_id: str = Field(..., description="Tenant ID for multi-tenancy")
-	name: str = Field(..., min_length=1, max_length=200, description="Model display name")
-	model_key: str = Field(..., description="Unique model key for identification")
-	version: str = Field("1.0.0", description="Model version")
-	
-	# Model provider and configuration
-	provider: ModelProvider = Field(..., description="Model provider type")
-	provider_model_name: str = Field(..., description="Provider-specific model name")
-	model_path: Optional[str] = Field(None, description="Local model path")
-	config_params: Dict[str, Any] = Field(default_factory=dict, description="Model configuration")
-	
-	# Model capabilities
-	supported_tasks: List[NLPTaskType] = Field(..., description="Supported NLP tasks")
-	supported_languages: List[LanguageCode] = Field(..., description="Supported languages")
-	max_input_length: Optional[int] = Field(None, ge=1, description="Maximum input length")
-	context_window: Optional[int] = Field(None, ge=1, description="Context window size")
-	
-	# Performance characteristics
-	average_latency_ms: float = Field(0.0, ge=0.0, description="Average processing latency")
-	throughput_docs_per_minute: int = Field(0, ge=0, description="Processing throughput")
-	memory_usage_mb: float = Field(0.0, ge=0.0, description="Memory usage in MB")
-	accuracy_score: float = Field(0.0, ge=0.0, le=1.0, description="Model accuracy score")
-	
-	# Model status and health
-	is_active: bool = Field(True, description="Is model active and available")
-	is_loaded: bool = Field(False, description="Is model loaded in memory")
-	health_status: Literal["healthy", "degraded", "unhealthy", "unknown"] = Field("unknown")
-	last_health_check: Optional[datetime] = Field(None, description="Last health check time")
-	
-	# Usage statistics
-	total_requests: int = Field(0, ge=0, description="Total processing requests")
-	successful_requests: int = Field(0, ge=0, description="Successful requests")
-	failed_requests: int = Field(0, ge=0, description="Failed requests")
-	
-	# APG audit fields
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-	updated_at: datetime = Field(default_factory=datetime.utcnow)
-	created_by: Optional[str] = Field(None)
-	updated_by: Optional[str] = Field(None)
-	
-	@computed_field
-	@property
-	def success_rate(self) -> float:
-		"""Calculate model success rate percentage"""
-		total = self.successful_requests + self.failed_requests
-		if total == 0:
-			return 0.0
-		return (self.successful_requests / total) * 100
-	
-	@computed_field
-	@property
-	def is_available(self) -> bool:
-		"""Check if model is available for processing"""
-		return (self.is_active and 
-				self.is_loaded and 
-				self.health_status in ["healthy", "degraded"])
-	
-	def _log_model_status_change(self, old_status: str, new_status: str) -> None:
-		"""Log model status changes for monitoring"""
-		print(f"Model {self.name} status changed: {old_status} -> {new_status}")
 
-class ProcessingRequest(BaseModel):
-	"""Request for NLP processing with configuration options"""
-	model_config = MODEL_CONFIG
+class NLPDocument(BaseNLPCModel):
+	"""Model representing a document to be processed."""
 	
-	# Request identity
-	id: str = Field(default_factory=uuid7str, description="Unique request identifier")
-	tenant_id: str = Field(..., description="Tenant ID for multi-tenancy")
-	user_id: Optional[str] = Field(None, description="User ID who made request")
-	session_id: Optional[str] = Field(None, description="Session identifier")
-	
-	# Processing configuration
-	task_type: NLPTaskType = Field(..., description="Type of NLP task to perform")
-	document_id: Optional[str] = Field(None, description="Document ID if processing existing document")
-	text_content: Optional[str] = Field(None, description="Direct text content to process")
-	language: Optional[LanguageCode] = Field(None, description="Text language hint")
-	quality_level: QualityLevel = Field(QualityLevel.BALANCED, description="Quality vs speed preference")
-	
-	# Model selection preferences
-	preferred_model: Optional[str] = Field(None, description="Preferred model ID")
-	preferred_provider: Optional[ModelProvider] = Field(None, description="Preferred provider")
-	fallback_enabled: bool = Field(True, description="Enable model fallback on failure")
-	
-	# Processing options
-	parameters: Dict[str, Any] = Field(default_factory=dict, description="Task-specific parameters")
-	timeout_seconds: int = Field(300, ge=1, le=3600, description="Processing timeout")
-	priority: Literal["low", "normal", "high", "urgent"] = Field("normal", description="Request priority")
-	
-	# Output options
-	include_confidence: bool = Field(True, description="Include confidence scores")
-	include_explanations: bool = Field(False, description="Include processing explanations")
-	output_format: Literal["json", "xml", "text"] = Field("json", description="Output format")
-	
-	# APG audit fields
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-	created_by: Optional[str] = Field(None)
-	
-	@field_validator('text_content')
+	document_id: str = Field(default_factory=uuid7str, description="Unique document identifier")
+	content: str = Field(
+		description="Text content to be processed",
+		max_length=10_000_000  # 10MB text limit
+	)
+	language: Optional[LanguageCode] = Field(
+		default=None,
+		description="Document language (auto-detected if not specified)"
+	)
+	metadata: dict[str, Any] = Field(
+		default_factory=dict,
+		description="Additional document metadata"
+	)
+	source: Optional[str] = Field(default=None, description="Document source system")
+	source_id: Optional[str] = Field(default=None, description="Original document ID in source system")
+	processing_history: list['ProcessingRecord'] = Field(
+		default_factory=list,
+		description="History of processing operations"
+	)
+	content_hash: Optional[str] = Field(default=None, description="Content hash for deduplication")
+	content_type: str = Field(default="text/plain", description="MIME type of content")
+	word_count: Optional[int] = Field(default=None, ge=0, description="Approximate word count")
+	char_count: Optional[int] = Field(default=None, ge=0, description="Character count")
+	is_sensitive: bool = Field(default=False, description="Contains sensitive/PII data")
+	retention_days: Optional[int] = Field(default=None, ge=1, description="Data retention period in days")
+
+	@field_validator('content')
 	@classmethod
-	def validate_text_or_document(cls, v: Optional[str], info) -> Optional[str]:
-		"""Ensure either text_content or document_id is provided"""
-		document_id = info.data.get('document_id')
-		if not v and not document_id:
-			raise ValueError("Either text_content or document_id must be provided")
-		if v and len(v) > 1_000_000:  # 1MB limit for direct text
-			raise ValueError("Direct text content exceeds 1MB limit")
-		return v
-	
-	def _log_request_created(self) -> None:
-		"""Log request creation for audit trail"""
-		print(f"Processing request created: {self.id} ({self.task_type}, {self.quality_level})")
+	def validate_document_content(cls, value: str) -> str:
+		if not value or not value.strip():
+			raise ValueError("content cannot be empty")
+		return value.strip()
 
-class ProcessingResult(BaseModel):
-	"""Comprehensive NLP processing result with metadata"""
-	model_config = MODEL_CONFIG
+
+class ProcessingRequest(BaseNLPCModel):
+	"""Model for NLP processing requests."""
 	
-	# Result identity
-	id: str = Field(default_factory=uuid7str, description="Unique result identifier")
-	request_id: str = Field(..., description="Originating request ID")
-	tenant_id: str = Field(..., description="Tenant ID for multi-tenancy")
+	request_id: str = Field(default_factory=uuid7str, description="Unique request identifier")
+	document_id: Optional[str] = Field(default=None, description="Document to process")
+	tasks: list[NLPTask] = Field(default_factory=list, description="List of NLP tasks to perform")
+	priority: PriorityLevel = Field(default=PriorityLevel.NORMAL, description="Processing priority")
+	model_preferences: dict[str, str] = Field(
+		default_factory=dict,
+		description="Preferred models for specific tasks"
+	)
+	parameters: dict[str, Any] = Field(
+		default_factory=dict,
+		description="Task-specific parameters"
+	)
+	callback_url: Optional[str] = Field(default=None, description="Webhook URL for completion notification")
+	max_processing_time: Optional[int] = Field(
+		default=None,
+		ge=1,
+		description="Maximum processing time in seconds"
+	)
+	require_explanation: bool = Field(default=False, description="Include model explanations")
+	batch_id: Optional[str] = Field(default=None, description="Batch identifier for grouped processing")
+	user_id: Optional[str] = Field(default=None, description="User requesting processing")
+	task_type: Optional[Any] = Field(default=None, description="Legacy single-task request type")
+	text_content: Optional[str] = Field(default=None, description="Legacy inline text content")
+	preferred_model: Optional[str] = Field(default=None, description="Legacy preferred model identifier")
+	quality_level: Optional[Any] = Field(default=None, description="Legacy quality preference")
+	options: dict[str, Any] = Field(default_factory=dict, description="Legacy task options")
+	performance_requirements: dict[str, Any] = Field(default_factory=dict, description="Performance requirements")
+	fallback_enabled: bool = Field(default=True, description="Whether fallback processing is allowed")
+
+	@model_validator(mode='after')
+	def validate_processing_target(self) -> 'ProcessingRequest':
+		if not self.tasks and self.task_type is None:
+			raise ValueError("at least one task must be specified")
+		if self.task_type is not None and not self.text_content and not self.document_id:
+			raise ValueError("Either text_content or document_id must be provided")
+		if self.text_content is not None and len(self.text_content) > 1_000_000:
+			raise ValueError("Direct text content exceeds 1MB limit")
+		if self.document_id is None and self.text_content is not None:
+			self.document_id = uuid7str()
+		return self
+
+
+class ProcessingResult(BaseNLPCModel):
+	"""Model representing the result of an NLP processing operation."""
 	
-	# Processing metadata
-	task_type: NLPTaskType = Field(..., description="Task type that was performed")
-	model_used: str = Field(..., description="Model ID that processed the request")
-	provider_used: ModelProvider = Field(..., description="Provider that was used")
-	language_detected: Optional[LanguageCode] = Field(None, description="Detected language")
-	
-	# Processing performance
-	processing_time_ms: float = Field(..., ge=0.0, description="Processing time in milliseconds")
-	queue_time_ms: float = Field(0.0, ge=0.0, description="Time spent in queue")
-	total_time_ms: float = Field(..., ge=0.0, description="Total request time")
-	confidence_score: float = Field(0.0, ge=0.0, le=1.0, description="Overall confidence")
-	
-	# Processing results
-	results: Dict[str, Any] = Field(..., description="Task-specific results")
-	metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-	explanations: Optional[List[str]] = Field(None, description="Processing explanations")
-	warnings: List[str] = Field(default_factory=list, description="Processing warnings")
-	
-	# Quality metrics
-	quality_score: float = Field(0.0, ge=0.0, le=1.0, description="Result quality score")
-	completeness_score: float = Field(0.0, ge=0.0, le=1.0, description="Completeness score")
-	
-	# Status and error handling
-	status: ProcessingStatus = Field(ProcessingStatus.COMPLETED, description="Processing status")
-	error_message: Optional[str] = Field(None, description="Error message if failed")
-	error_code: Optional[str] = Field(None, description="Error code if failed")
-	
-	# APG audit fields
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-	processed_by: Optional[str] = Field(None, description="User context for processing")
-	
-	@computed_field
+	result_id: str = Field(default_factory=uuid7str, description="Unique result identifier")
+	request_id: str = Field(default_factory=uuid7str, description="Reference to processing request")
+	document_id: str = Field(default="", description="Reference to processed document")
+	task: Optional[Any] = Field(default=None, description="Legacy task field")
+	task_type: Any = Field(default=NLPTask.TEXT_CLASSIFICATION, description="The NLP task that was performed")
+	status: ProcessingStatus = Field(default=ProcessingStatus.COMPLETED, description="Processing status")
+	confidence_score: Optional[float] = Field(
+		default=None,
+		description="Confidence score for the result",
+		ge=0.0,
+		le=1.0
+	)
+	processing_time: Annotated[float, AfterValidator(_validate_positive_float)] = Field(
+		default=0.0,
+		description="Processing time in seconds",
+		ge=0.0
+	)
+	result_data: dict[str, Any] = Field(default_factory=dict, description="Actual processing results")
+	model_version: str = Field(default="1.0", description="Version of the model used")
+	model_type: ModelType = Field(default=ModelType.CUSTOM, description="Type of model used")
+	error_message: Optional[str] = Field(default=None, description="Error message if processing failed")
+	explanation: Optional[dict[str, Any]] = Field(
+		default=None,
+		description="Model explanation if requested"
+	)
+	performance_metrics: dict[str, float] = Field(
+		default_factory=dict,
+		description="Performance metrics for this operation"
+	)
+	cache_key: Optional[str] = Field(default=None, description="Cache key for result reuse")
+	model_used: Optional[str] = Field(default=None, description="Legacy model identifier")
+	provider_used: Optional[Any] = Field(default=None, description="Legacy provider identifier")
+	processing_time_ms: float = Field(default=0.0, ge=0.0, description="Legacy processing time in ms")
+	total_time_ms: float = Field(default=0.0, ge=0.0, description="Legacy total time in ms")
+	results: dict[str, Any] = Field(default_factory=dict, description="Legacy result payload")
+	context_used: bool = Field(default=False, description="Whether context was applied")
+	security_applied: bool = Field(default=False, description="Whether security controls were applied")
+	encryption_applied: bool = Field(default=False, description="Whether encryption controls were applied")
+	cache_used: bool = Field(default=False, description="Whether a cached result was used")
+	optimization_applied: bool = Field(default=False, description="Whether performance optimization was applied")
+
 	@property
 	def is_successful(self) -> bool:
-		"""Check if processing was successful"""
-		return self.status == ProcessingStatus.COMPLETED and self.error_message is None
-	
-	@computed_field
+		"""Whether the processing request completed successfully."""
+		return self.status == ProcessingStatus.COMPLETED or self.status == ProcessingStatus.COMPLETED.value
+
 	@property
-	def performance_rating(self) -> Literal["excellent", "good", "acceptable", "poor"]:
-		"""Performance rating based on processing time"""
+	def performance_rating(self) -> str:
 		if self.processing_time_ms < 50:
 			return "excellent"
-		elif self.processing_time_ms < 100:
+		if self.processing_time_ms < 150:
 			return "good"
-		elif self.processing_time_ms < 500:
+		if self.processing_time_ms < 500:
 			return "acceptable"
+		return "poor"
+
+	@model_validator(mode='after')
+	def sync_task_fields(self) -> 'ProcessingResult':
+		if self.task is not None:
+			self.task_type = self.task
 		else:
-			return "poor"
+			self.task = self.task_type
+		if not self.result_data and self.results:
+			self.result_data = self.results
+		if not self.results and self.result_data:
+			self.results = self.result_data
+		return self
+
+
+class ProcessingRecord(BaseModel):
+	"""Record of a processing operation for audit trail."""
+	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True, use_enum_values=True)
 	
-	def _log_processing_completed(self) -> None:
-		"""Log processing completion for monitoring"""
-		print(f"Processing completed: {self.id} ({self.processing_time_ms}ms, {self.confidence_score:.2f})")
+	record_id: str = Field(default_factory=uuid7str, description="Unique record identifier")
+	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Processing timestamp")
+	task: Optional[NLPTask] = Field(default=None, description="Legacy task field")
+	task_type: Optional[NLPTask] = Field(default=None, description="Type of NLP task performed")
+	status: ProcessingStatus = Field(default=ProcessingStatus.COMPLETED, description="Processing status")
+	model_used: str = Field(default="", description="Model identifier used for processing")
+	results: dict[str, Any] = Field(default_factory=dict, description="Legacy processing results")
+	processing_time: float = Field(default=0.0, ge=0.0, description="Processing time in seconds")
+	input_size: int = Field(default=0, ge=0, description="Size of input in characters")
+	result_id: Optional[str] = Field(default=None, description="Reference to processing result")
+	error_code: Optional[str] = Field(default=None, description="Error code if failed")
+	user_id: Optional[str] = Field(default=None, description="User who initiated processing")
 
-# Specialized Result Models
+	@model_validator(mode='after')
+	def sync_task_fields(self) -> 'ProcessingRecord':
+		if self.task is not None and self.task_type is None:
+			self.task_type = self.task
+		if self.task is None and self.task_type is not None:
+			self.task = self.task_type
+		return self
 
-class SentimentResult(BaseModel):
-	"""Sentiment analysis specific results"""
-	model_config = MODEL_CONFIG
+
+class ModelConfiguration(BaseNLPCModel):
+	"""Configuration for NLP models."""
 	
-	sentiment: Literal["positive", "negative", "neutral"] = Field(..., description="Overall sentiment")
-	confidence: float = Field(..., ge=0.0, le=1.0, description="Sentiment confidence")
-	scores: Dict[str, float] = Field(..., description="Detailed sentiment scores")
-	aspects: Optional[List[Dict[str, Any]]] = Field(None, description="Aspect-based sentiment")
-	emotions: Optional[Dict[str, float]] = Field(None, description="Emotion detection scores")
+	config_id: str = Field(default_factory=uuid7str, description="Unique configuration identifier")
+	name: Annotated[str, AfterValidator(_validate_non_empty_string)] = Field(
+		default="default",
+		description="Configuration name",
+		min_length=1,
+		max_length=100
+	)
+	model_type: ModelType = Field(description="Type of model")
+	model_name: str = Field(default="default", description="Specific model name/path")
+	language: Optional[LanguageCode] = Field(default=None, description="Primary model language")
+	supported_tasks: list[NLPTask] = Field(default_factory=lambda: [NLPTask.TEXT_CLASSIFICATION], description="Tasks this model supports", min_items=1)
+	supported_languages: list[LanguageCode] = Field(
+		default_factory=lambda: [LanguageCode.EN],
+		description="Languages this model supports",
+		min_items=1
+	)
+	configuration: dict[str, Any] = Field(
+		default_factory=dict,
+		description="Model-specific configuration parameters"
+	)
+	performance_metrics: dict[str, float] = Field(
+		default_factory=dict,
+		description="Model performance benchmarks"
+	)
+	memory_requirements: Optional[int] = Field(
+		default=None,
+		ge=0,
+		description="Memory requirements in MB"
+	)
+	gpu_required: bool = Field(default=False, description="Whether GPU is required")
+	is_active: bool = Field(default=True, description="Whether this configuration is active")
+	load_priority: int = Field(default=50, ge=1, le=100, description="Model loading priority")
 
-class EntityResult(BaseModel):
-	"""Named entity recognition results"""
-	model_config = MODEL_CONFIG
-	
-	entities: List[Dict[str, Any]] = Field(..., description="Extracted entities")
-	entity_types_found: List[str] = Field(..., description="Types of entities found")
-	total_entities: int = Field(..., ge=0, description="Total number of entities")
-	confidence_distribution: Dict[str, int] = Field(..., description="Confidence score distribution")
 
-class ClassificationResult(BaseModel):
-	"""Text classification results"""
-	model_config = MODEL_CONFIG
-	
-	predicted_class: str = Field(..., description="Predicted class label")
-	confidence: float = Field(..., ge=0.0, le=1.0, description="Prediction confidence")
-	class_probabilities: Dict[str, float] = Field(..., description="All class probabilities")
-	top_k_classes: List[Dict[str, float]] = Field(..., description="Top K most likely classes")
+class ModelConfig(BaseModel):
+	"""Legacy service-level model configuration."""
+	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
 
-# Streaming and Real-time Models
+	enable_ollama: bool = True
+	enable_transformers: bool = True
+	enable_spacy: bool = True
+	default_quality_level: QualityLevel = QualityLevel.BALANCED
+	max_concurrent_requests: int = 10
+	model_cache_size: int = 5
+
+
+class NLPModel(BaseModel):
+	"""Legacy NLP model metadata used by migrated tests and callers."""
+	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(default_factory=uuid7str)
+	tenant_id: str
+	name: str
+	model_key: str
+	provider: ModelProvider
+	provider_model_name: str
+	version: str = "1.0.0"
+	supported_tasks: list[NLPTaskType] = Field(default_factory=list)
+	supported_languages: list[LanguageCode] = Field(default_factory=list)
+	max_input_length: Optional[int] = None
+	context_window: Optional[int] = None
+	is_active: bool = True
+	is_loaded: bool = True
+	health_status: str = "unknown"
+	successful_requests: int = 0
+	failed_requests: int = 0
+
+	@property
+	def is_available(self) -> bool:
+		return self.is_active and self.is_loaded and self.health_status in {"healthy", "unknown"}
+
+	@property
+	def success_rate(self) -> float:
+		total = self.successful_requests + self.failed_requests
+		return (self.successful_requests / total * 100) if total else 0.0
+
 
 class StreamingSession(BaseModel):
-	"""Real-time streaming processing session"""
-	model_config = MODEL_CONFIG
-	
-	# Session identity
-	id: str = Field(default_factory=uuid7str, description="Unique session identifier")
-	tenant_id: str = Field(..., description="Tenant ID for multi-tenancy")
-	user_id: str = Field(..., description="User ID who created session")
-	
-	# Session configuration
-	task_type: NLPTaskType = Field(..., description="Task type for streaming")
-	model_id: Optional[str] = Field(None, description="Preferred model for processing")
-	language: Optional[LanguageCode] = Field(None, description="Expected language")
-	
-	# Streaming parameters
-	chunk_size: int = Field(1000, ge=100, le=10000, description="Text chunk size")
-	overlap_size: int = Field(100, ge=0, le=1000, description="Chunk overlap size")
-	aggregation_window_ms: int = Field(5000, ge=1000, le=60000, description="Result aggregation window")
-	
-	# Session status
-	status: Literal["active", "paused", "stopped", "error"] = Field("active", description="Session status")
-	is_connected: bool = Field(True, description="WebSocket connection status")
-	connection_id: Optional[str] = Field(None, description="WebSocket connection ID")
-	
-	# Processing metrics
-	chunks_processed: int = Field(0, ge=0, description="Number of chunks processed")
-	total_characters: int = Field(0, ge=0, description="Total characters processed")
-	average_latency_ms: float = Field(0.0, ge=0.0, description="Average processing latency")
-	
-	# APG audit fields
+	"""Legacy streaming session state."""
+	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(default_factory=uuid7str)
+	tenant_id: str
+	user_id: str
+	task_type: NLPTaskType
+	chunk_size: int = Field(default=1000, ge=100, le=10000)
+	overlap_size: int = 0
+	status: str = "active"
+	chunks_processed: int = 0
+	total_characters: int = 0
+	average_latency_ms: float = 0.0
 	created_at: datetime = Field(default_factory=datetime.utcnow)
-	last_activity: datetime = Field(default_factory=datetime.utcnow)
-	
-	def _log_session_activity(self, activity: str) -> None:
-		"""Log session activity for monitoring"""
-		print(f"Streaming session {self.id}: {activity}")
+
+	@property
+	def is_connected(self) -> bool:
+		return self.status == "active"
+
 
 class StreamingChunk(BaseModel):
-	"""Individual chunk in streaming processing"""
-	model_config = MODEL_CONFIG
-	
-	# Chunk identity
-	id: str = Field(default_factory=uuid7str, description="Unique chunk identifier")
-	session_id: str = Field(..., description="Parent streaming session ID")
-	sequence_number: int = Field(..., ge=0, description="Chunk sequence number")
-	
-	# Chunk content
-	text_content: str = Field(..., min_length=1, description="Chunk text content")
-	start_position: int = Field(..., ge=0, description="Start position in original text")
-	end_position: int = Field(..., ge=0, description="End position in original text")
-	
-	# Processing metadata
-	processing_time_ms: Optional[float] = Field(None, ge=0.0, description="Chunk processing time")
-	confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0, description="Processing confidence")
-	
-	# Chunk results
-	results: Optional[Dict[str, Any]] = Field(None, description="Processing results")
-	status: ProcessingStatus = Field(ProcessingStatus.PENDING, description="Processing status")
-	
-	# APG audit fields
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-	processed_at: Optional[datetime] = Field(None, description="Processing completion time")
+	"""Legacy streaming text chunk."""
+	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
 
-# Collaborative Annotation Models
+	id: str = Field(default_factory=uuid7str)
+	session_id: str
+	sequence_number: int
+	text_content: Annotated[str, AfterValidator(_validate_non_empty_string)]
+	start_position: int
+	end_position: int
+	status: ProcessingStatus = ProcessingStatus.PENDING
+	results: Optional[dict[str, Any]] = None
 
-class AnnotationProject(BaseModel):
-	"""Collaborative annotation project configuration"""
-	model_config = MODEL_CONFIG
-	
-	# Project identity
-	id: str = Field(default_factory=uuid7str, description="Unique project identifier")
-	tenant_id: str = Field(..., description="Tenant ID for multi-tenancy")
-	name: str = Field(..., min_length=1, max_length=200, description="Project name")
-	description: Optional[str] = Field(None, max_length=1000, description="Project description")
-	
-	# Project configuration
-	annotation_type: NLPTaskType = Field(..., description="Type of annotation task")
-	annotation_schema: Dict[str, Any] = Field(..., description="Annotation schema definition")
-	guidelines: Optional[str] = Field(None, description="Annotation guidelines")
-	
-	# Team and collaboration
-	team_members: List[str] = Field(..., description="List of annotator user IDs")
-	project_manager: str = Field(..., description="Project manager user ID")
-	consensus_threshold: float = Field(0.8, ge=0.5, le=1.0, description="Consensus threshold")
-	quality_requirements: Dict[str, Any] = Field(default_factory=dict, description="Quality requirements and thresholds")
-	
-	# Project status
-	status: Literal["planning", "active", "review", "completed", "archived"] = Field("planning")
-	is_training_enabled: bool = Field(False, description="Enable model training from annotations")
-	
-	# Document management
-	document_count: int = Field(0, ge=0, description="Number of documents to annotate")
-	completed_annotations: int = Field(0, ge=0, description="Number of completed annotations")
-	
-	# Quality metrics
-	inter_annotator_agreement: Optional[float] = Field(None, ge=0.0, le=1.0)
-	average_annotation_time: Optional[float] = Field(None, ge=0.0)
-	quality_score: float = Field(0.0, ge=0.0, le=1.0)
-	
-	# APG audit fields
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-	updated_at: datetime = Field(default_factory=datetime.utcnow)
-	created_by: str = Field(..., description="User ID who created project")
-	
-	@computed_field
-	@property
-	def completion_percentage(self) -> float:
-		"""Calculate project completion percentage"""
-		if self.document_count == 0:
-			return 0.0
-		return min(100.0, (self.completed_annotations / self.document_count) * 100)
-	
-	def _log_project_milestone(self, milestone: str) -> None:
-		"""Log project milestones for tracking"""
-		print(f"Annotation project {self.name}: {milestone}")
-
-class TextAnnotation(BaseModel):
-	"""Individual text annotation with consensus tracking"""
-	model_config = MODEL_CONFIG
-	
-	# Annotation identity
-	id: str = Field(default_factory=uuid7str, description="Unique annotation identifier")
-	project_id: str = Field(..., description="Parent project ID")
-	document_id: str = Field(..., description="Document being annotated")
-	annotator_id: str = Field(..., description="Annotator user ID")
-	
-	# Annotation content
-	start_position: int = Field(..., ge=0, description="Start position of annotation")
-	end_position: int = Field(..., ge=0, description="End position of annotation")
-	annotated_text: str = Field(..., description="Text that was annotated")
-	annotation_value: Union[str, Dict[str, Any]] = Field(..., description="Annotation value")
-	
-	# Annotation metadata
-	confidence: float = Field(1.0, ge=0.0, le=1.0, description="Annotator confidence")
-	notes: Optional[str] = Field(None, description="Annotator notes")
-	time_spent_seconds: Optional[float] = Field(None, ge=0.0, description="Time spent on annotation")
-	
-	# Consensus and quality
-	consensus_score: Optional[float] = Field(None, ge=0.0, le=1.0, description="Consensus with other annotators")
-	quality_score: float = Field(0.0, ge=0.0, le=1.0, description="Annotation quality score")
-	is_gold_standard: bool = Field(False, description="Is this a gold standard annotation")
-	
-	# Validation and review
-	is_validated: bool = Field(False, description="Has annotation been validated")
-	validation_feedback: Optional[str] = Field(None, description="Validation feedback")
-	validated_by: Optional[str] = Field(None, description="User who validated annotation")
-	validated_at: Optional[datetime] = Field(None, description="Validation timestamp")
-	
-	# APG audit fields
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-	updated_at: datetime = Field(default_factory=datetime.utcnow)
-	
-	def _log_annotation_created(self) -> None:
-		"""Log annotation creation for quality tracking"""
-		print(f"Annotation created: {self.id} by {self.annotator_id} (confidence: {self.confidence})")
-
-# Analytics and Intelligence Models
-
-class TextAnalytics(BaseModel):
-	"""Advanced text analytics with business intelligence"""
-	model_config = MODEL_CONFIG
-	
-	# Analytics identity
-	id: str = Field(default_factory=uuid7str, description="Unique analytics identifier")
-	tenant_id: str = Field(..., description="Tenant ID for multi-tenancy")
-	name: str = Field(..., description="Analytics session name")
-	
-	# Analytics configuration
-	analysis_type: Literal["sentiment_trends", "entity_analysis", "topic_modeling", "custom"] = Field(...)
-	time_period_start: datetime = Field(..., description="Analysis start time")
-	time_period_end: datetime = Field(..., description="Analysis end time")
-	
-	# Data sources
-	document_ids: List[str] = Field(..., description="Documents included in analysis")
-	filter_criteria: Dict[str, Any] = Field(default_factory=dict, description="Analysis filters")
-	
-	# Analysis results
-	insights: List[Dict[str, Any]] = Field(default_factory=list, description="Generated insights")
-	trends: List[Dict[str, Any]] = Field(default_factory=list, description="Detected trends")
-	predictions: List[Dict[str, Any]] = Field(default_factory=list, description="Predictive insights")
-	
-	# Quality and confidence
-	confidence_score: float = Field(0.0, ge=0.0, le=1.0, description="Overall confidence")
-	data_quality_score: float = Field(0.0, ge=0.0, le=1.0, description="Input data quality")
-	statistical_significance: Optional[float] = Field(None, ge=0.0, le=1.0)
-	
-	# Processing metadata
-	processing_time_seconds: float = Field(..., ge=0.0, description="Analysis processing time")
-	model_versions: Dict[str, str] = Field(default_factory=dict, description="Models used")
-	
-	# APG audit fields
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-	created_by: str = Field(..., description="User who requested analytics")
-	
-	def _log_analytics_completed(self) -> None:
-		"""Log analytics completion for monitoring"""
-		print(f"Analytics completed: {self.name} ({len(self.insights)} insights, {self.confidence_score:.2f})")
-
-# Model Training and Adaptation
-
-class ModelTrainingConfig(BaseModel):
-	"""Configuration for custom model training and domain adaptation"""
-	model_config = MODEL_CONFIG
-	
-	# Training identity
-	id: str = Field(default_factory=uuid7str, description="Unique training configuration ID")
-	tenant_id: str = Field(..., description="Tenant ID for multi-tenancy")
-	name: str = Field(..., description="Training configuration name")
-	
-	# Base model configuration
-	base_model_id: str = Field(..., description="Base model to adapt")
-	target_task: NLPTaskType = Field(..., description="Target task type")
-	domain: Optional[str] = Field(None, description="Target domain")
-	
-	# Training data
-	training_data_source: Literal["annotations", "documents", "external"] = Field(...)
-	annotation_project_id: Optional[str] = Field(None, description="Source annotation project")
-	training_document_ids: List[str] = Field(default_factory=list, description="Training documents")
-	validation_split: float = Field(0.2, ge=0.1, le=0.5, description="Validation data split")
-	
-	# Training parameters
-	learning_rate: float = Field(0.001, gt=0.0, le=1.0, description="Learning rate")
-	batch_size: int = Field(32, ge=1, le=512, description="Training batch size")
-	max_epochs: int = Field(10, ge=1, le=1000, description="Maximum training epochs")
-	early_stopping_patience: int = Field(5, ge=1, le=100, description="Early stopping patience")
-	
-	# Resource configuration
-	use_gpu: bool = Field(True, description="Use GPU for training if available")
-	max_memory_gb: Optional[float] = Field(None, gt=0.0, description="Maximum memory usage")
-	parallel_workers: int = Field(1, ge=1, le=16, description="Number of parallel workers")
-	
-	# Training status
-	status: Literal["pending", "preparing", "training", "evaluating", "completed", "failed"] = Field("pending")
-	progress_percentage: float = Field(0.0, ge=0.0, le=100.0, description="Training progress")
-	
-	# Results and metrics
-	final_accuracy: Optional[float] = Field(None, ge=0.0, le=1.0, description="Final model accuracy")
-	training_loss: Optional[float] = Field(None, ge=0.0, description="Final training loss")
-	validation_loss: Optional[float] = Field(None, ge=0.0, description="Final validation loss")
-	training_time_seconds: Optional[float] = Field(None, ge=0.0, description="Total training time")
-	
-	# APG audit fields
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-	started_at: Optional[datetime] = Field(None, description="Training start time")
-	completed_at: Optional[datetime] = Field(None, description="Training completion time")
-	created_by: str = Field(..., description="User who initiated training")
-	
-	@computed_field
-	@property 
-	def estimated_completion_time(self) -> Optional[datetime]:
-		"""Estimate training completion time based on progress"""
-		if not self.started_at or self.progress_percentage <= 0:
-			return None
-		
-		elapsed = (datetime.utcnow() - self.started_at).total_seconds()
-		estimated_total = elapsed / (self.progress_percentage / 100)
-		remaining = estimated_total - elapsed
-		
-		return datetime.utcnow().replace(microsecond=0) + timedelta(seconds=remaining)
-	
-	def _log_training_progress(self, current_epoch: int, current_loss: float) -> None:
-		"""Log training progress for monitoring"""
-		print(f"Training {self.name} - Epoch {current_epoch}: loss={current_loss:.4f}")
-
-# System Health and Monitoring
 
 class SystemHealth(BaseModel):
-	"""System health and performance monitoring"""
-	model_config = MODEL_CONFIG
-	
-	# Health check identity
-	id: str = Field(default_factory=uuid7str, description="Unique health check ID")
-	tenant_id: Optional[str] = Field(None, description="Tenant ID (None for system-wide)")
-	
-	# System status
-	overall_status: Literal["healthy", "degraded", "unhealthy", "maintenance"] = Field(...)
-	component_status: Dict[str, str] = Field(..., description="Individual component status")
-	
-	# Performance metrics
-	average_response_time_ms: float = Field(..., ge=0.0, description="Average API response time")
-	requests_per_minute: int = Field(..., ge=0, description="Current request rate")
-	active_sessions: int = Field(..., ge=0, description="Active streaming sessions")
-	queue_depth: int = Field(..., ge=0, description="Processing queue depth")
-	
-	# Resource utilization
-	cpu_usage_percent: float = Field(..., ge=0.0, le=100.0, description="CPU utilization")
-	memory_usage_percent: float = Field(..., ge=0.0, le=100.0, description="Memory utilization")
-	gpu_usage_percent: Optional[float] = Field(None, ge=0.0, le=100.0, description="GPU utilization")
-	disk_usage_percent: float = Field(..., ge=0.0, le=100.0, description="Disk utilization")
-	
-	# Model status summary
-	total_models: int = Field(..., ge=0, description="Total configured models")
-	active_models: int = Field(..., ge=0, description="Currently active models")
-	loaded_models: int = Field(..., ge=0, description="Currently loaded models")
-	failed_models: int = Field(..., ge=0, description="Models in failed state")
-	
-	# Error and alert information
-	recent_errors: List[Dict[str, Any]] = Field(default_factory=list, description="Recent error summary")
-	active_alerts: List[str] = Field(default_factory=list, description="Active system alerts")
-	
-	# APG audit fields
-	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Health check timestamp")
-	
-	@computed_field
+	"""Legacy aggregate service health model."""
+	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
+
+	tenant_id: str
+	overall_status: str
+	component_status: dict[str, Any] = Field(default_factory=dict)
+	components: dict[str, Any] = Field(default_factory=dict)
+	average_response_time_ms: float = 0.0
+	requests_per_minute: int = 0
+	active_sessions: int = 0
+	queue_depth: int = 0
+	cpu_usage_percent: float = 0.0
+	memory_usage_percent: float = 0.0
+	disk_usage_percent: float = 0.0
+	total_models: int = 0
+	active_models: int = 0
+	loaded_models: int = 0
+	failed_models: int = 0
+	error_messages: list[str] = Field(default_factory=list)
+	last_check: datetime = Field(default_factory=datetime.utcnow)
+	timestamp: datetime = Field(default_factory=datetime.utcnow)
+
 	@property
 	def model_availability_percent(self) -> float:
-		"""Calculate percentage of models that are available"""
-		if self.total_models == 0:
-			return 0.0
-		return (self.active_models / self.total_models) * 100
-	
-	@computed_field
-	@property
-	def performance_rating(self) -> Literal["excellent", "good", "acceptable", "poor"]:
-		"""Overall performance rating based on metrics"""
-		if (self.average_response_time_ms < 100 and 
-			self.cpu_usage_percent < 70 and 
-			self.memory_usage_percent < 80):
-			return "excellent"
-		elif (self.average_response_time_ms < 200 and 
-			  self.cpu_usage_percent < 85 and 
-			  self.memory_usage_percent < 90):
-			return "good"
-		elif (self.average_response_time_ms < 500 and 
-			  self.cpu_usage_percent < 95 and 
-			  self.memory_usage_percent < 95):
-			return "acceptable"
-		else:
-			return "poor"
-	
-	def _log_health_status(self) -> None:
-		"""Log system health status for monitoring"""
-		print(f"System health: {self.overall_status} ({self.performance_rating} performance)")
+		return (self.loaded_models / self.total_models * 100) if self.total_models else 0.0
 
-# Export all models for API usage
-__all__ = [
-	# Enums
-	"NLPTaskType", "ModelProvider", "ProcessingStatus", "QualityLevel", 
-	"DocumentType", "LanguageCode",
+	@property
+	def performance_rating(self) -> str:
+		if (
+			self.average_response_time_ms < 100
+			and self.cpu_usage_percent < 70
+			and self.memory_usage_percent < 80
+			and self.queue_depth <= 5
+		):
+			return "excellent"
+		if self.average_response_time_ms < 250 and self.cpu_usage_percent < 85 and self.memory_usage_percent < 90:
+			return "good"
+		if self.average_response_time_ms < 500 and self.cpu_usage_percent < 95 and self.memory_usage_percent < 95:
+			return "acceptable"
+		return "poor"
+
+
+class ContextSession(BaseNLPCModel):
+	"""Session for maintaining context across multiple processing requests."""
 	
-	# Core models
-	"TextDocument", "NLPModel", "ProcessingRequest", "ProcessingResult",
+	session_id: str = Field(default_factory=uuid7str, description="Unique session identifier")
+	name: Optional[str] = Field(default=None, description="Human-readable session name")
+	context_type: str = Field(default="conversation", description="Type of context being maintained")
+	context_data: list[dict[str, Any]] = Field(
+		default_factory=list,
+		description="Context information"
+	)
+	max_context_length: int = Field(default=10000, gt=0, description="Maximum context length")
+	ttl_seconds: int = Field(default=3600, ge=60, description="Session TTL in seconds")
+	last_accessed: datetime = Field(default_factory=datetime.utcnow, description="Last access time")
+	is_active: bool = Field(default=True, description="Whether session is active")
+	document_ids: list[str] = Field(
+		default_factory=list,
+		description="Documents associated with this session"
+	)
+	user_id: Optional[str] = Field(default=None, description="Legacy user owner")
+	session_name: Optional[str] = Field(default=None, description="Legacy session name")
+	context_window_size: int = Field(default=10, ge=1, description="Legacy context window size")
+	enable_learning: bool = Field(default=True, description="Whether context learning is enabled")
+	learning_rate: float = Field(default=0.1, ge=0.0, description="Context learning rate")
+	context_decay_rate: float = Field(default=0.05, ge=0.0, description="Context decay rate")
+	max_context_age_hours: int = Field(default=24, ge=1, description="Maximum retained context age")
+	memory_retention_hours: int = Field(default=24, gt=0, description="Legacy memory retention")
+	session_metadata: dict[str, Any] = Field(default_factory=dict, description="Legacy session metadata")
+	context_history: list[dict[str, Any]] = Field(default_factory=list, description="Context history")
+	performance_history: list[dict[str, Any]] = Field(default_factory=list, description="Context performance history")
+
+
+class TextAnnotation(BaseModel):
+	"""Annotation attached to a text document."""
+	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True, use_enum_values=True)
+
+	id: str = Field(default_factory=uuid7str)
+	document_id: Optional[str] = None
+	annotator_id: Optional[str] = None
+	annotation_type: Optional[Any] = None
+	label: Optional[str] = None
+	start_position: Optional[int] = None
+	end_position: Optional[int] = None
+	confidence_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+	metadata: dict[str, Any] = Field(default_factory=dict)
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AnnotationProject(BaseNLPCModel):
+	"""Human annotation project for supervised NLP workflows."""
+
+	name: Annotated[str, AfterValidator(_validate_non_empty_string)]
+	description: Optional[str] = None
+	annotation_type: Any
+	team_members: list[str] = Field(default_factory=list)
+	project_manager: str
+	annotation_schema: dict[str, Any] = Field(default_factory=dict)
+	status: str = "planning"
+	consensus_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
+	document_count: int = Field(default=0, ge=0)
+	completed_annotations: int = Field(default=0, ge=0)
+
+	@property
+	def completion_percentage(self) -> float:
+		return (self.completed_annotations / self.document_count * 100) if self.document_count else 0.0
+
+
+class ModelTrainingConfig(BaseModel):
+	"""Configuration for training or fine-tuning NLP models."""
+	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True, use_enum_values=True)
+
+	id: str = Field(default_factory=uuid7str)
+	tenant_id: str
+	name: str = "training-config"
+	base_model: Optional[str] = None
+	task_type: Optional[Any] = None
+	training_parameters: dict[str, Any] = Field(default_factory=dict)
+	dataset_ids: list[str] = Field(default_factory=list)
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class TextAnalytics(BaseModel):
+	"""Aggregated analytics for a text corpus."""
+	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(default_factory=uuid7str)
+	tenant_id: str
+	document_count: int = Field(default=0, ge=0)
+	token_count: int = Field(default=0, ge=0)
+	language_distribution: dict[str, int] = Field(default_factory=dict)
+	task_metrics: dict[str, Any] = Field(default_factory=dict)
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class BatchProcessingJob(BaseNLPCModel):
+	"""Model for batch processing jobs."""
 	
-	# Specialized results
-	"SentimentResult", "EntityResult", "ClassificationResult",
+	job_id: str = Field(default_factory=uuid7str, description="Unique job identifier")
+	name: Annotated[str, AfterValidator(_validate_non_empty_string)] = Field(
+		description="Job name",
+		min_length=1,
+		max_length=200
+	)
+	description: Optional[str] = Field(default=None, description="Job description")
+	status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, description="Job status")
+	document_ids: list[str] = Field(description="Documents to process", min_items=1)
+	tasks: list[NLPTask] = Field(description="NLP tasks to perform", min_items=1)
+	priority: PriorityLevel = Field(default=PriorityLevel.NORMAL, description="Processing priority")
+	progress: float = Field(default=0.0, ge=0.0, le=100.0, description="Progress percentage")
+	total_documents: int = Field(ge=1, description="Total number of documents")
+	processed_documents: int = Field(default=0, ge=0, description="Number of processed documents")
+	failed_documents: int = Field(default=0, ge=0, description="Number of failed documents")
+	started_at: Optional[datetime] = Field(default=None, description="Job start time")
+	completed_at: Optional[datetime] = Field(default=None, description="Job completion time")
+	estimated_completion: Optional[datetime] = Field(default=None, description="Estimated completion time")
+	results_location: Optional[str] = Field(default=None, description="Location of results")
+	error_summary: Optional[str] = Field(default=None, description="Summary of errors")
+	configuration: dict[str, Any] = Field(
+		default_factory=dict,
+		description="Job configuration parameters"
+	)
+
+
+# Model relationships and forward references
+NLPDocument.model_rebuild()
+ProcessingRequest.model_rebuild()
+ProcessingResult.model_rebuild()
+BatchProcessingJob.model_rebuild()
+
+
+def _log_model_validation_error(model_name: str, error: Exception) -> str:
+	"""Log model validation errors for debugging."""
+	error_msg = f"Model validation error in {model_name}: {str(error)}"
+	print(f"[NLPC Models] {error_msg}")
+	return error_msg
+
+
+async def validate_models_async() -> dict[str, bool]:
+	"""
+	Async validation of all model classes.
 	
-	# Streaming models
-	"StreamingSession", "StreamingChunk",
+	Returns:
+		Dictionary mapping model names to validation status
+	"""
+	models_to_test = [
+		('NLPDocument', NLPDocument),
+		('ProcessingRequest', ProcessingRequest),
+		('ProcessingResult', ProcessingResult),
+		('ProcessingRecord', ProcessingRecord),
+		('ModelConfiguration', ModelConfiguration),
+		('ContextSession', ContextSession),
+		('BatchProcessingJob', BatchProcessingJob)
+	]
 	
-	# Collaboration models
-	"AnnotationProject", "TextAnnotation",
+	validation_results = {}
 	
-	# Analytics models
-	"TextAnalytics", "ModelTrainingConfig",
+	for model_name, model_class in models_to_test:
+		try:
+			# Test basic instantiation
+			if model_name == 'NLPDocument':
+				test_instance = model_class(
+					tenant_id="test_tenant",
+					content="Test document content"
+				)
+			elif model_name == 'ProcessingRequest':
+				test_instance = model_class(
+					tenant_id="test_tenant",
+					document_id="test_doc_id",
+					tasks=[NLPTask.TOKENIZATION]
+				)
+			elif model_name == 'ProcessingResult':
+				test_instance = model_class(
+					tenant_id="test_tenant",
+					request_id="test_request",
+					document_id="test_doc",
+					task_type=NLPTask.TOKENIZATION,
+					status=ProcessingStatus.COMPLETED,
+					confidence_score=0.95,
+					processing_time=0.1,
+					result_data={"tokens": ["test"]},
+					model_version="1.0",
+					model_type=ModelType.SPACY
+				)
+			elif model_name == 'BatchProcessingJob':
+				test_instance = model_class(
+					tenant_id="test_tenant",
+					name="Test Job",
+					document_ids=["doc1"],
+					tasks=[NLPTask.TOKENIZATION],
+					total_documents=1
+				)
+			else:
+				# For other models, try with minimal required fields
+				test_instance = model_class(tenant_id="test_tenant")
+			
+			# Test serialization/deserialization
+			dict_data = test_instance.model_dump()
+			restored_instance = model_class.model_validate(dict_data)
+			
+			validation_results[model_name] = True
+			
+		except Exception as e:
+			_log_model_validation_error(model_name, e)
+			validation_results[model_name] = False
 	
-	# System models
-	"SystemHealth"
-]
+	return validation_results
+
+
+def _log_successful_model_load() -> None:
+	"""Log successful model loading."""
+	print("[NLPC Models] All NLP data models loaded successfully")
+
+
+# Initialize models on module load
+_log_successful_model_load()

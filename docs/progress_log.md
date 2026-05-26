@@ -153,3 +153,44 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_performance_optimization.py::test_integrated_system tests/test_performance_optimization.py::test_performance_benchmarks` -> 2 passed
 - `.venv/bin/python -m pytest -q tests/test_parser.py tests/test_semantic_analyzer.py` -> 29 passed
 - `.venv/bin/python -m pytest -q tests` -> 204 passed, 16 warnings
+
+### 2026-05-26 02:40 EAT
+
+Completed checkpoint:
+
+- Added 45 African language codes to `LanguageCode`, using ISO 639-1 values where available and ISO 639-3 values for major languages without two-letter codes.
+- Mirrored the expanded African language set in NLPC capability metadata and the NLPC service supported-language set.
+- Added regression coverage that requires at least 40 African language codes in the enum and verifies the capability metadata exposes them.
+- Added the missing `capabilities/common/nlpc/tests/ci/__init__.py` package marker so CI-style NLPC tests can use relative imports during collection.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/nlpc/models.py capabilities/common/nlpc/service.py capabilities/common/nlpc/__init__.py capabilities/common/nlpc/tests/test_language_codes.py capabilities/common/nlpc/tests/ci/__init__.py`
+- `.venv/bin/python -c "from capabilities.common.nlpc.models import LanguageCode; codes={'af','aa','ak','am','bm','ee','ff','ha','ig','kr','ki','rw','rn','kg','ln','lg','mg','ny','om','sg','sn','so','st','sw','ss','ti','ts','tn','tw','ve','wo','xh','yo','zu','kab','kam','luo','mas','mer','mos','nus','suk','tzm','tig','umb'}; enum_values={item.value for item in LanguageCode}; missing=sorted(codes-enum_values); print(len(codes)); print(missing)"` -> 45, `[]`
+- `.venv/bin/python -m pytest -q capabilities/common/nlpc/tests/test_language_codes.py` -> 2 passed, 14 warnings
+- `.venv/bin/python -m pytest --collect-only -q capabilities/common/nlpc/tests/test_service.py capabilities/common/nlpc/tests/ci/test_service.py` -> 58 tests collected, 14 warnings
+
+Current broader NLPC execution findings:
+
+- `.venv/bin/python -m pytest -q capabilities/common/nlpc/tests/test_language_codes.py capabilities/common/nlpc/tests/test_service.py capabilities/common/nlpc/tests/ci/test_service.py` -> 32 passed, 28 failed, 14 warnings
+- Remaining failures are not language-code related; they cluster around optional `transformers` test patch targets, expected compatibility keys in preprocessing/chunking outputs, context-session compatibility fields, security-context result shape, and incomplete NLPC service compatibility methods.
+
+### 2026-05-26 03:02 EAT
+
+Completed checkpoint:
+
+- Closed the NLPC compatibility gap behind the African language-code expansion by making the moved NLPC test suite executable end to end.
+- Added deterministic NLPC service support for optional APG backend patch targets, legacy model/request/result shapes, context sessions, model selection, pipeline orchestration, external model calls, service health, performance caching, and tenant-aware integration helpers.
+- Added security/compliance execution paths for PII detection/masking, document encryption and key rotation, privacy-preserving numeric aggregation, audit chain verification, GDPR/HIPAA/SOX checks, classification access control, session/business-hours checks, anomaly detection, brute-force detection, exfiltration detection, and incident-response actions.
+- Added `ProcessingResult.encryption_applied` so secure processing can explicitly report encryption controls.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/nlpc/models.py capabilities/common/nlpc/service.py`
+- `.venv/bin/python -m pytest -q capabilities/common/nlpc/tests/ci/test_security.py` -> 21 passed, 14 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/nlpc/tests` -> 181 passed, 14 warnings
+
+Current broader NLPC execution findings:
+
+- NLPC tests now collect and execute cleanly from `capabilities/common/nlpc/tests`.
+- Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports.
