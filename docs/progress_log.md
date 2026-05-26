@@ -2232,3 +2232,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_bia_tsa_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|return str\(current_user\.id\)|from flask_appbuilder.security import current_user" capabilities/bia/tsa/views.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 22:55 EAT
+
+Completed checkpoint:
+
+- Replaced Sourcing & Supplier Selection API/view tenant defaults with a shared request-context resolver.
+- Sourcing dashboard and RFQ API service construction now resolve tenant IDs from payload, Flask context/current user, `g.user`, tenant headers, query args, request environment, and `APG_DEFAULT_TENANT_ID` fallback.
+- Added focused regression coverage that rejects hardcoded source/API tenant defaults and verifies tenant precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/scm/src/context.py capabilities/scm/src/views.py capabilities/scm/src/api.py tests/test_scm_src_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_scm_src_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|TODO: Get tenant" capabilities/scm/src/views.py capabilities/scm/src/api.py` -> no matches
+- `git diff --check` -> no issues

@@ -10,6 +10,7 @@ from flask_appbuilder.api import BaseApi, expose
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.security.decorators import has_access_api
 
+from .context import get_tenant_id_from_request
 from .models import PPSRFQHeader
 from .service import SourcingSupplierSelectionService
 
@@ -51,7 +52,7 @@ class SourcingApi(BaseApi):
 			}), 400
 	
 	def get_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 def register_api_views(appbuilder: AppBuilder):

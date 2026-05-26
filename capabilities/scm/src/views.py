@@ -7,6 +7,7 @@ Flask-AppBuilder views for RFQ/RFP management and supplier evaluation.
 from flask_appbuilder import ModelView, BaseView, expose, has_access
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 
+from .context import get_tenant_id_from_request
 from .models import PPSRFQHeader, PPSRFQLine, PPSBid, PPSBidLine, PPSSupplierEvaluation, PPSAwardRecommendation
 from .service import SourcingSupplierSelectionService
 
@@ -212,4 +213,4 @@ class SourcingDashboardView(BaseView):
 		)
 	
 	def get_tenant_id(self) -> str:
-		return "default_tenant"
+		return get_tenant_id_from_request()
