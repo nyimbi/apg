@@ -2450,3 +2450,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_bfc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|return \"current_user\"|request\.headers\.get\('X-Tenant-ID', 'default_tenant'\)|Implementation would depend on your authentication system" capabilities/fin/bfc/budgeting_forecasting/views.py capabilities/fin/bfc/budgeting_forecasting/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:54 EAT
+
+Completed checkpoint:
+
+- Replaced General Ledger API tenant/user session fallbacks with shared request-context helpers.
+- GL Account, Period, Currency, Journal Entry, Trial Balance, Account Ledger, Period REST, and Currency REST API surfaces now resolve tenant/user identity from payload, Flask context/current user, `g.user`, session, APG headers, query args, request environment, and configured fallbacks.
+- Added focused regression coverage that rejects stale GL session tenant/user fallbacks and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/glr/general_ledger/context.py capabilities/fin/glr/general_ledger/api.py tests/test_fin_glr_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_glr_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "session\.get\('tenant_id', 'default_tenant'\)|return session\.get\('user_id'\)|from flask import session" capabilities/fin/glr/general_ledger/api.py` -> no matches
+- `git diff --check` -> no issues

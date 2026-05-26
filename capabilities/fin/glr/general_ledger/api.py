@@ -36,6 +36,7 @@ from .service import (
 	GeneralLedgerService, AccountCreationRequest, JournalEntryRequest,
 	TrialBalanceParams, FinancialReportingResult, GLServiceException
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -69,9 +70,8 @@ def handle_gl_exceptions(f):
 
 def get_tenant_context():
 	"""Get tenant context from session"""
-	from flask import session
-	tenant_id = session.get('tenant_id')
-	user_id = session.get('user_id')
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
 	
 	if not tenant_id:
 		raise ValueError("Tenant context not available")
@@ -292,14 +292,12 @@ class GLAccountApi(BaseApi):
 	]
 	
 	def get_tenant_id(self):
-		"""Get tenant ID from session or default"""
-		from flask import session
-		return session.get('tenant_id', 'default_tenant')
+		"""Get tenant ID from request context"""
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self):
-		"""Get user ID from session"""
-		from flask import session
-		return session.get('user_id')
+		"""Get user ID from request context"""
+		return get_current_user_id()
 	
 	@expose('/hierarchy')
 	def get_hierarchy(self):
@@ -665,14 +663,12 @@ class GLPeriodApi(BaseApi):
 					'fiscal_year', 'is_current', 'closed_date', 'created_on']
 	
 	def get_tenant_id(self):
-		"""Get tenant ID from session"""
-		from flask import session
-		return session.get('tenant_id', 'default_tenant')
+		"""Get tenant ID from request context"""
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self):
-		"""Get user ID from session"""
-		from flask import session
-		return session.get('user_id')
+		"""Get user ID from request context"""
+		return get_current_user_id()
 	
 	@expose('/current')
 	def get_current_period(self):
@@ -741,14 +737,12 @@ class GLCurrencyApi(BaseApi):
 					'rate_type', 'is_active', 'created_on']
 	
 	def get_tenant_id(self):
-		"""Get tenant ID from session"""
-		from flask import session
-		return session.get('tenant_id', 'default_tenant')
+		"""Get tenant ID from request context"""
+		return get_tenant_id_from_request()
 	
 	def get_user_id(self):
-		"""Get user ID from session"""
-		from flask import session
-		return session.get('user_id')
+		"""Get user ID from request context"""
+		return get_current_user_id()
 	
 	@expose('/rates/<from_currency>/<to_currency>')
 	def get_exchange_rate(self, from_currency, to_currency):
@@ -911,13 +905,13 @@ class GLAccountResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		from flask import session
-		return session.get('tenant_id', 'default_tenant')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 	
 	def _get_user_id(self):
 		"""Get user ID from request context"""
-		from flask import session
-		return session.get('user_id')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_current_user_id(payload)
 
 
 class GLJournalEntryResource(Resource):
@@ -981,13 +975,13 @@ class GLJournalEntryResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		from flask import session
-		return session.get('tenant_id', 'default_tenant')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 	
 	def _get_user_id(self):
 		"""Get user ID from request context"""
-		from flask import session
-		return session.get('user_id')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_current_user_id(payload)
 
 
 class GLTrialBalanceResource(Resource):
@@ -1028,13 +1022,13 @@ class GLTrialBalanceResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		from flask import session
-		return session.get('tenant_id', 'default_tenant')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 	
 	def _get_user_id(self):
 		"""Get user ID from request context"""
-		from flask import session
-		return session.get('user_id')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_current_user_id(payload)
 
 
 class GLAccountLedgerResource(Resource):
@@ -1063,13 +1057,13 @@ class GLAccountLedgerResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		from flask import session
-		return session.get('tenant_id', 'default_tenant')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 	
 	def _get_user_id(self):
 		"""Get user ID from request context"""
-		from flask import session
-		return session.get('user_id')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_current_user_id(payload)
 
 
 class GLPeriodResource(Resource):
@@ -1124,13 +1118,13 @@ class GLPeriodResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		from flask import session
-		return session.get('tenant_id', 'default_tenant')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 	
 	def _get_user_id(self):
 		"""Get user ID from request context"""
-		from flask import session
-		return session.get('user_id')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_current_user_id(payload)
 
 
 class GLCurrencyResource(Resource):
@@ -1191,13 +1185,13 @@ class GLCurrencyResource(Resource):
 	
 	def _get_tenant_id(self):
 		"""Get tenant ID from request context"""
-		from flask import session
-		return session.get('tenant_id', 'default_tenant')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 	
 	def _get_user_id(self):
 		"""Get user ID from request context"""
-		from flask import session
-		return session.get('user_id')
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_current_user_id(payload)
 
 
 # =====================================
