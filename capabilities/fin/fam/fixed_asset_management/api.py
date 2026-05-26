@@ -21,6 +21,7 @@ from .models import (
 	CFAMAssetInsurance, CFAMAssetValuation, CFAMAssetLease
 )
 from .service import FixedAssetManagementService
+from .tenant import get_tenant_id_from_request
 from ...auth_rbac.models import db
 
 
@@ -338,9 +339,8 @@ class FAMAssetApi(Resource):
 			return {'error': str(e)}, 500
 	
 	def _get_tenant_id(self):
-		"""Get current tenant ID - placeholder implementation"""
-		# TODO: Implement proper tenant context
-		return "default_tenant"
+		"""Get current tenant ID from request/auth context."""
+		return get_tenant_id_from_request()
 
 
 class FAMAssetTransferApi(Resource):
@@ -365,7 +365,7 @@ class FAMAssetTransferApi(Resource):
 			return {'error': str(e)}, 500
 	
 	def _get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class FAMDepreciationApi(Resource):
@@ -418,7 +418,7 @@ class FAMDepreciationApi(Resource):
 			return {'error': str(e)}, 500
 	
 	def _get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class FAMAssetMaintenanceApi(Resource):
@@ -477,7 +477,7 @@ class FAMAssetMaintenanceApi(Resource):
 			return {'error': str(e)}, 500
 	
 	def _get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class FAMAssetInsuranceApi(Resource):
@@ -515,7 +515,7 @@ class FAMAssetInsuranceApi(Resource):
 			return {'error': str(e)}, 500
 	
 	def _get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class FAMDashboardApi(Resource):
@@ -582,7 +582,7 @@ class FAMDashboardApi(Resource):
 			return {'error': str(e)}, 500
 	
 	def _get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 # Additional API Resource Classes (simplified for brevity)
@@ -603,7 +603,7 @@ class FAMAssetCategoryApi(Resource):
 			return {'categories': self.schema.dump(categories, many=True)}
 	
 	def _get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class FAMDepreciationMethodApi(Resource):
@@ -622,7 +622,7 @@ class FAMDepreciationMethodApi(Resource):
 			return {'methods': self.schema.dump(methods, many=True)}
 	
 	def _get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 def create_api_blueprint() -> Blueprint:
@@ -751,9 +751,8 @@ class FAMAssetAppBuilderApi(BaseApi):
 			return self.response_400(message=str(e))
 	
 	def get_tenant_id(self):
-		"""Get current tenant ID"""
-		# TODO: Implement proper tenant context from security context
-		return "default_tenant"
+		"""Get current tenant ID from request/auth context."""
+		return get_tenant_id_from_request()
 
 
 class FAMDepreciationAppBuilderApi(BaseApi):
@@ -809,7 +808,7 @@ class FAMDepreciationAppBuilderApi(BaseApi):
 			return self.response_400(message=str(e))
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class FAMDashboardAppBuilderApi(BaseApi):
@@ -886,4 +885,4 @@ class FAMDashboardAppBuilderApi(BaseApi):
 			return self.response_400(message=str(e))
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()

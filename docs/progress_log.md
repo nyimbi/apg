@@ -2132,3 +2132,19 @@ Verification:
 Known verification gap:
 
 - Directly invoking `capabilities/fin/arc/accounts_receivable/tests/ci/test_ai_cashflow_forecasting.py::TestAPGCashFlowForecastingService::test_calculate_accuracy_metrics` from the repo root still fails during collection because that package-local test uses relative imports without a package collector context.
+
+### 2026-05-26 22:23 EAT
+
+Completed checkpoint:
+
+- Replaced Fixed Asset Management tenant placeholder methods with a shared tenant resolver.
+- FAM REST API resources and Flask-AppBuilder API/view surfaces now resolve tenant IDs from request payloads, Flask context/current user, tenant headers, query args, request environment, and `APG_DEFAULT_TENANT_ID` fallback.
+- Added focused regression coverage that rejects hardcoded `default_tenant` returns and exercises the tenant precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/fam/fixed_asset_management/api.py capabilities/fin/fam/fixed_asset_management/views.py capabilities/fin/fam/fixed_asset_management/tenant.py tests/test_fin_fam_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_fam_tenant_resolution.py` -> 2 passed
+- `.venv/bin/python -m pytest -q tests/test_fin_fam_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|Get current tenant ID - placeholder implementation|TODO: Implement proper tenant context" capabilities/fin/fam/fixed_asset_management/api.py capabilities/fin/fam/fixed_asset_management/views.py capabilities/fin/fam/fixed_asset_management/tenant.py` -> no matches
+- `git diff --check -- capabilities/fin/fam/fixed_asset_management/api.py capabilities/fin/fam/fixed_asset_management/views.py capabilities/fin/fam/fixed_asset_management/tenant.py tests/test_fin_fam_tenant_resolution.py` -> no issues

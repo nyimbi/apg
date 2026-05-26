@@ -23,6 +23,7 @@ from .models import (
 	CFAMAssetInsurance, CFAMAssetValuation, CFAMAssetLease
 )
 from .service import FixedAssetManagementService
+from .tenant import get_tenant_id_from_request
 from ...auth_rbac.models import db
 
 
@@ -911,6 +912,5 @@ class FAMDashboardView(BaseView):
 		return jsonify(alerts)
 	
 	def get_tenant_id(self) -> str:
-		"""Get current tenant ID - placeholder implementation"""
-		# TODO: Implement proper tenant context
-		return "default_tenant"
+		"""Get current tenant ID from request/auth context."""
+		return get_tenant_id_from_request()
