@@ -2325,3 +2325,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_scm_req_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|return \"current_user\"|TODO: Implement tenant resolution|TODO: Get from Flask-Login|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)" capabilities/scm/req/views.py capabilities/scm/req/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:19 EAT
+
+Completed checkpoint:
+
+- Replaced the API Service Mesh gateway tenant dependency placeholder with request-context tenant resolution.
+- Gateway tenant resolution now checks FastAPI request state, tenant headers, query parameters, request scope, and `APG_DEFAULT_TENANT_ID` fallback.
+- Added missing imports for `asynccontextmanager` and `timezone` so the touched gateway API module compiles cleanly.
+- Added focused regression coverage that rejects the stale gateway tenant placeholder and verifies tenant precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/context.py capabilities/composition/gateway/api.py tests/test_composition_gateway_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_gateway_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|extract tenant ID from JWT token or headers" capabilities/composition/gateway/api.py` -> no matches
+- `git diff --check` -> no issues

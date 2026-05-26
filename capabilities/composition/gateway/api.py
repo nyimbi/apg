@@ -23,15 +23,16 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 from typing import Dict, List, Optional, Any, Union
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
+from contextlib import asynccontextmanager
 import asyncio
 import json
 import uuid
 from enum import Enum
 import io
 
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, BackgroundTasks, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -54,6 +55,7 @@ from .models import (
 	ServiceStatus, EndpointProtocol, LoadBalancerAlgorithm, HealthStatus
 )
 from .views import NaturalLanguagePolicyRequest
+from .context import get_tenant_id_from_request
 
 # =============================================================================
 # Pydantic Models for API
@@ -251,10 +253,9 @@ async def get_asm_service() -> ASMService:
 	# For now, return None as placeholder
 	return None
 
-async def get_tenant_id() -> str:
+async def get_tenant_id(request: Request) -> str:
 	"""Get tenant ID from request context."""
-	# This would extract tenant ID from JWT token or headers
-	return "default_tenant"
+	return get_tenant_id_from_request(request)
 
 # =============================================================================
 # Service Management Endpoints
