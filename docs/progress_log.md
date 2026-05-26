@@ -1881,3 +1881,20 @@ Verification:
 - `.venv/bin/python -m pytest -q capabilities/composition/events/tests/integration/test_event_flow.py` -> 13 passed
 - `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py` -> 80 passed
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed
+
+### 2026-05-26 21:06 EAT
+
+Completed checkpoint:
+
+- Applied the explicit platform correction that APG Event Streaming should use Bytewax dataflow semantics, not a Kafka-shaped broker API.
+- Added a dependency-light `BytewaxDataflowRuntime` facade with native stream registration, append, and read-batch operations over the local stream ledger.
+- Moved Event Publishing and Stream Management service calls to dataflow-native append/register-stream APIs while retaining thin compatibility aliases for older producer/topic-oriented tests.
+- Replaced stale Bytewax JMX/admin wording in the service metrics path with local dataflow ledger metrics.
+- Added a focused unit test proving Bytewax stream registration and append behavior through the native facade.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/events/service.py capabilities/composition/events/tests/unit/test_services.py`
+- `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_services.py::test_bytewax_runtime_uses_dataflow_native_stream_registration capabilities/composition/events/tests/unit/test_services.py::TestEventPublishingService::test_publish_event_success capabilities/composition/events/tests/unit/test_services.py::TestEventStreamingService::test_create_stream_success` -> 3 passed
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 1 passed
+- `git grep -n -i -E "kafka|confluent|redpanda|bootstrap\\.servers|bootstrap_servers|BYTEWAX_BROKERS|Bytewax broker|Bytewax brokers|broker connection string" -- ':!uploads' ':!tmp' ':!node_modules' ':!**/swagger-ui-bundle.js' ':!.venv' ':!.git' ':!docs/progress_log.md' ':!tests/test_repository_hygiene.py'` -> no matches

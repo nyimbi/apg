@@ -15,12 +15,39 @@ from uuid_extensions import uuid7str
 from ...service import (
 	EventStreamingService, EventPublishingService, EventConsumptionService,
 	StreamProcessingService, EventSourcingService, SchemaRegistryService,
-	StreamManagementService, ConsumerManagementService
+	StreamManagementService, ConsumerManagementService,
+	BYTEWAX_STREAMS, BytewaxAdminClient, BytewaxDataflowRuntime,
+	BytewaxResourceType, BytewaxStreamDefinition
 )
 from ...models import (
 	EventConfig, StreamConfig, SubscriptionConfig, SchemaConfig,
 	EventStatus, StreamStatus, EventType, EventPriority, ProcessorType
 )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_bytewax_runtime_uses_dataflow_native_stream_registration():
+	"""Bytewax facade should register streams and append records without topic APIs."""
+	BYTEWAX_STREAMS.clear()
+	runtime = BytewaxDataflowRuntime(flow_id="unit-flow")
+	admin = BytewaxAdminClient(flow_id="unit-flow")
+
+	result = admin.register_streams([
+		BytewaxStreamDefinition(name="agent_events", stream_config={"retention": "durable"})
+	])
+	await runtime.start()
+	future = await runtime.append(
+		stream="agent_events",
+		value={"agent": "Planner", "event": "handoff"},
+		key="Planner",
+	)
+	metadata = await future
+
+	assert set(result) == {"agent_events"}
+	assert BytewaxResourceType.STREAM == "stream"
+	assert metadata.stream == "agent_events"
+	assert BYTEWAX_STREAMS["agent_events"][0]["value"]["event"] == "handoff"
 
 # =============================================================================
 # Event Publishing Service Tests
