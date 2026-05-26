@@ -982,3 +982,27 @@ Current broader SHDN/USRM/SEOP/PLFD/TENS execution findings:
 - SHDN, USRM, SEOP, PLFD, and TENS are no longer placeholders at the composition layer.
 - All currently listed `capabilities/common/*/__init__.py` placeholder packages found in the common capability backlog have now been promoted to first-class registration/contract surfaces.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 15:46 EAT
+
+Completed checkpoint:
+
+- Moved root-level APG language roadmap content from `TODO.md` to `docs/roadmaps/apg_language_implementation_roadmap.md`.
+- Moved the ERP/marketplace implementation roadmap script to `docs/roadmaps/erp_marketplace_implementation_roadmap.py`.
+- Moved executable capability specification artifacts to `docs/specifications/`.
+- Moved the archived general cross-functional capability bundle to `docs/archive/assets/general_cross_functional.zip`.
+- Moved generated demo output artifacts to `examples/generated/`.
+- Updated `complete_demo.py` so its code-generation check follows the moved generated demo output.
+- Added README indexes for `docs/roadmaps/`, `docs/specifications/`, and `examples/generated/`, and linked the new planning/specification locations from `docs/README.md`.
+
+Verification:
+
+- `.venv/bin/python -m py_compile complete_demo.py docs/roadmaps/erp_marketplace_implementation_roadmap.py docs/specifications/comprehensive_capabilities.py docs/specifications/erp_ecommerce_marketplace_specifications.py examples/generated/demo_functional_output.py examples/generated/apg_comprehensive_app.py`
+- `.venv/bin/python -c "from pathlib import Path; import complete_demo; result = complete_demo.demo_code_generation(); assert result['success'], result; assert Path('examples/generated/demo_functional_output.py').exists(); print('demo_code_generation_ok')"` -> `demo_code_generation_ok`
+- `git ls-files | awk 'index($0,"/")==0 {print}' | sort` confirms the moved roadmap/spec/demo/archive artifacts are no longer tracked at repository root.
+
+Current broader root cleanup findings:
+
+- Root tracked files are now closer to entrypoints, package/build metadata, and generator utilities rather than mixed documentation/spec/demo artifacts.
+- No root-level tracked `test_*.py` files were found; tests are already under `tests/` or capability-local test directories.
+- Remaining root dirty files are unrelated pre-existing workspace changes and were intentionally left untouched.

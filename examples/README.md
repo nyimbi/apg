@@ -2,6 +2,10 @@
 
 A comprehensive Flask-AppBuilder application showcasing the powerful combination of computer vision and IoT management capabilities built with the APG framework.
 
+Additional generated APG demonstration outputs live under `examples/generated/`.
+Those files are retained as runnable/reference artifacts but are kept out of the
+repository root so root-level entrypoints remain easy to scan.
+
 ## Features
 
 ### 🎯 **Computer Vision Capabilities**

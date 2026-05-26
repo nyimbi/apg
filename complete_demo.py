@@ -323,7 +323,7 @@ def demo_code_generation() -> Dict[str, Any]:
 	console.print("[blue]Testing code generation capabilities...[/blue]")
 	
 	# Check functional output demo
-	demo_output_file = apg_root / 'demo_functional_output.py'
+	demo_output_file = apg_root / 'examples' / 'generated' / 'demo_functional_output.py'
 	
 	if not demo_output_file.exists():
 		return {
@@ -774,7 +774,7 @@ def demo_complete_functionality() -> Dict[str, Any]:
 			functionality_results['compiler_working'] = 'class APGCompiler' in compiler_content
 		
 		# Code generation
-		demo_file = apg_root / 'demo_functional_output.py'
+		demo_file = apg_root / 'examples' / 'generated' / 'demo_functional_output.py'
 		if demo_file.exists():
 			demo_content = demo_file.read_text()
 			functionality_results['code_generation'] = len(demo_content) > 10000  # Substantial output

@@ -37,6 +37,8 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 ### Development
 - [API Reference](./api/README.md) - Complete API documentation
 - [Goal Progress Log](./progress_log.md) - Durable progress, verification evidence, and next work for the active APG closure goal
+- [Roadmaps](./roadmaps/) - Implementation roadmaps and active planning artifacts moved out of the repository root
+- [Specifications](./specifications/) - Capability specification artifacts and executable specification summaries
 - [Deployment Guide](./deployment.md) - Production deployment strategies
 - [Reports](./reports/README.md) - Historical implementation and validation reports
 - [Documentation Archive](./archive/README.md) - Older root README variants and planning references
@@ -51,6 +53,7 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 | **Getting Started** | [Installation](./installation.md) → [Quick Start](./quickstart.md) |
 | **Core Platform** | [Architecture](./architecture.md) → [Language Reference](./language_reference.md) → [API Reference](./api/README.md) |
 | **Capabilities** | [Capabilities](./capabilities/README.md) → [AI Agent Composition](./ai_agent_composition.md) → [Marketplace Guide](./marketplace_microservices_guide.md) |
+| **Planning** | [Roadmaps](./roadmaps/) → [Specifications](./specifications/) → [Progress Log](./progress_log.md) |
 | **Operations** | [Deployment](./deployment.md) → [Reports](./reports/README.md) → [Progress Log](./progress_log.md) |
 
 ## 🏗️ System Requirements
