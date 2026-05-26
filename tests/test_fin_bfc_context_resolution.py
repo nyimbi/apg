@@ -33,6 +33,29 @@ def _context_helpers() -> dict[str, Any]:
 	return namespace
 
 
+def _api_identity_helpers(jwt_identity: Any = None, jwt_error: Exception | None = None) -> dict[str, Any]:
+	source = API_PATH.read_text(encoding="utf-8")
+	start = source.index("def get_tenant_id")
+	end = source.index("def handle_api_error")
+	context_helpers = _context_helpers()
+
+	def get_jwt_identity_stub():
+		if jwt_error:
+			raise jwt_error
+		return jwt_identity
+
+	namespace: dict[str, Any] = {
+		"Any": Any,
+		"Dict": Dict,
+		"get_current_user_id": context_helpers["get_current_user_id"],
+		"get_jwt_identity": get_jwt_identity_stub,
+		"get_tenant_id_from_request": context_helpers["get_tenant_id_from_request"],
+		"request": request,
+	}
+	exec(compile(source[start:end], str(API_PATH), "exec"), namespace)
+	return namespace
+
+
 def test_budgeting_forecasting_surfaces_delegate_context_resolution():
 	api_source = API_PATH.read_text(encoding="utf-8")
 	views_source = VIEWS_PATH.read_text(encoding="utf-8")
@@ -50,10 +73,12 @@ def test_budgeting_forecasting_surfaces_delegate_context_resolution():
 		assert stale_text not in context_source
 		assert stale_text not in blueprint_source
 
-	assert "from .context import get_tenant_id_from_request" in api_source
+	assert "from .context import get_current_user_id, get_tenant_id_from_request" in api_source
 	assert "from .context import get_current_user_id, get_tenant_id_from_request" in views_source
 	assert "from .context import get_current_user_id, get_tenant_id_from_request" in blueprint_source
 	assert "get_tenant_id_from_request(payload)" in api_source
+	assert "return 'api_user'" not in api_source
+	assert "return get_current_user_id(payload)" in api_source
 	assert "get_tenant_id_from_request()" in views_source
 	assert "get_current_user_id()" in views_source
 	assert "def _build_tenant_context(payload: Optional[Dict[str, Any]] = None) -> APGTenantContext:" in blueprint_source
@@ -97,3 +122,21 @@ def test_budgeting_forecasting_context_resolves_tenant_and_user(monkeypatch):
 
 	with app.test_request_context("/budget", environ_base={"APG_TENANT_ID": "request-env-tenant"}):
 		assert resolve_tenant({}) == "request-env-tenant"
+
+
+def test_budgeting_forecasting_api_user_id_falls_back_to_request_context(monkeypatch):
+	app = Flask(__name__)
+	app.secret_key = "test-secret"
+
+	with app.test_request_context("/budget", json={"user_id": "payload-user"}):
+		assert _api_identity_helpers(jwt_identity="jwt-user")["get_user_id"]() == "jwt-user"
+
+	monkeypatch.setenv("APG_DEFAULT_USER_ID", "bfc-env-user")
+	with app.test_request_context("/budget", json={"user_id": "payload-user"}):
+		assert _api_identity_helpers(jwt_identity=None)["get_user_id"]() == "payload-user"
+
+	with app.test_request_context("/budget", headers={"X-APG-User-ID": "header-user"}):
+		assert _api_identity_helpers(jwt_error=RuntimeError("missing jwt"))["get_user_id"]() == "header-user"
+
+	with app.test_request_context("/budget"):
+		assert _api_identity_helpers(jwt_identity=None)["get_user_id"]() == "bfc-env-user"

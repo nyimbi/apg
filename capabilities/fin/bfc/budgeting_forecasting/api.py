@@ -20,7 +20,7 @@ from .models import (
 	CFBFForecast, CFBFForecastLine, CFBFActualVsBudget, CFBFDrivers,
 	CFBFTemplate, CFBFApproval, CFBFAllocation
 )
-from .context import get_tenant_id_from_request
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import CFBFBudgetService, CFBFVarianceAnalysisService, CFBFForecastService, CFBFDriverService
 from ...auth_rbac.decorators import require_permission
 from ...database import db
@@ -148,11 +148,15 @@ def get_tenant_id() -> str:
 
 
 def get_user_id() -> str:
-	"""Get user ID from JWT token"""
+	"""Get user ID from JWT token or request context"""
 	try:
-		return get_jwt_identity()
-	except:
-		return 'api_user'
+		jwt_user_id = get_jwt_identity()
+		if jwt_user_id:
+			return jwt_user_id
+	except Exception:
+		pass
+	payload = request.get_json(silent=True) if request.is_json else None
+	return get_current_user_id(payload)
 
 
 def handle_api_error(error: Exception) -> Dict[str, Any]:

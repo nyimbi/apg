@@ -3033,3 +3033,18 @@ Verification:
 - `rg -n "tenant_default|'system'|\"system\"|Kafka|kafka" capabilities/pde/pim/app_integration.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:25 EAT
+
+Completed checkpoint:
+
+- Replaced Budgeting & Forecasting API's fixed JWT failure actor fallback with the existing APG context helper while preserving JWT identity precedence.
+- Expanded focused BFC context regression coverage to prove API user resolution falls back through payload, headers, and environment context.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/bfc/budgeting_forecasting/api.py tests/test_fin_bfc_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_bfc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "return 'api_user'|api_user|Kafka|kafka" capabilities/fin/bfc/budgeting_forecasting/api.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
