@@ -1975,3 +1975,16 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composable_template_executable_defaults.py` -> 3 passed
 - `.venv/bin/python -m pytest -q tests/test_composable_template_executable_defaults.py tests/test_composition_engine.py` -> 4 passed
 - `rg -n "TODO: Implement|TODO: Add usage examples|TODO: Add more examples|placeholder implementation|pass$" templates/composable/base_template.py templates/composable/capability.py templates/composable/bases templates/composable/capabilities` -> no matches
+
+### 2026-05-26 21:34 EAT
+
+Completed checkpoint:
+
+- Removed the generated project scaffold's remaining workflow-step TODO.
+- The scaffolded sample workflow now advances only declared steps and rejects unknown step names instead of returning unconditional success.
+- Added a focused regression that creates a project, checks the generated APG source has executable workflow logic, and parses the scaffolded `app.apg`.
+
+Verification:
+
+- `.venv/bin/python -m py_compile cli.py tests/test_cli_project_scaffold.py`
+- `.venv/bin/python -m pytest -q tests/test_cli_project_scaffold.py` -> 1 passed

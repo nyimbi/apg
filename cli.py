@@ -808,8 +808,11 @@ workflow SampleWorkflow {{
 	current_step: int = 0;
 	
 	execute_step: (step_name: str) -> bool = {{
-		// TODO: Implement step logic
-		return true;
+		if (step_name in steps) {{
+			current_step = current_step + 1;
+			return true;
+		}}
+		return false;
 	}};
 	
 	get_progress: () -> dict = {{
