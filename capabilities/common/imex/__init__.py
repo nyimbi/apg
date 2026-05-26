@@ -8,6 +8,12 @@ high-performance processing, and world-class user experience.
 
 from uuid_extensions import uuid7str
 from datetime import datetime, timezone
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules
+)
+
+__version__ = "1.0.0"
 
 # APG Capability Metadata
 capability_metadata = {
@@ -182,11 +188,63 @@ class ImportExportCapability:
 
 		return health_data
 
+
+def register_capability() -> dict:
+	"""Register IMEX with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "imex",
+		"aliases": ["import_export", "data_migration", "bulk_transfer"],
+		"display_name": capability_metadata["display_name"],
+		"description": capability_metadata["description"],
+		"version": capability_metadata["version"],
+		"dependencies": capability_metadata["dependencies"],
+		"optional_dependencies": [],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"bulk_operations": "Run high-throughput tenant-aware import/export jobs",
+			"data_migration": "Coordinate governed data migration workflows",
+			"schema_mapping": "Map source and target schemas with validation",
+			"format_conversion": "Convert between supported enterprise file/data formats",
+			"capability_rules": "Evaluate deterministic import/export governance rules",
+			"visual_theming": "Apply transfer-console theme tokens and components"
+		},
+		"endpoints": {
+			"jobs": "/imex/api/v1/jobs",
+			"workflows": "/imex/api/v1/workflows",
+			"schemas": "/imex/api/v1/schemas",
+			"mappings": "/imex/api/v1/mappings",
+			"validation": "/imex/api/v1/validation",
+			"monitoring": "/imex/api/v1/monitoring"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": capability_metadata["permissions"]
+	}
+
+
+def get_capability_info() -> dict:
+	"""Get IMEX capability information for composition and marketplace discovery."""
+	info = capability_metadata.copy()
+	info["contract"] = get_capability_contract()
+	return info
+
 # Export capability instance for APG composition
 imex_capability = ImportExportCapability()
 
 __all__ = [
 	"ImportExportCapability",
 	"imex_capability",
-	"capability_metadata"
+	"capability_metadata",
+	"register_capability",
+	"get_capability_info",
+	"get_capability_contract",
+	"evaluate_capability_rules",
+	"__version__"
 ]

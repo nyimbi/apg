@@ -523,3 +523,22 @@ Current broader APIG/REGY execution findings:
 - APIG and REGY contract discovery/registration now provide executable configuration/rules/UI/theme surfaces without starting gateway or registry runtime services.
 - Focused APIG and REGY contract tests live outside existing heavyweight runtime test folders.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 09:16 EAT
+
+Completed checkpoint:
+
+- Made the IMEX integration capability executable as a first-class APG capability with tenant-scoped jobs, formats, validation, security, orchestration, UI, and theme configuration.
+- Added deterministic IMEX import/export governance rules for tenant context, job ownership, production approval, sensitive export encryption, preview validation, and low-quality transfer review.
+- Exposed IMEX contract helpers through package registration/info surfaces while preserving the existing `ImportExportCapability` object for runtime composition.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/imex/__init__.py capabilities/common/imex/capability_contract.py capabilities/common/imex/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/imex/test_capability_contract.py` -> 3 passed, 15 warnings
+
+Current broader IMEX execution findings:
+
+- IMEX contract discovery/registration now provides the executable configuration/rules/UI/theme surface used by the rest of the Phase 2 data and integration backbone.
+- Focused IMEX contract tests live outside the existing heavyweight runtime test folder.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
