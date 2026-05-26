@@ -379,3 +379,22 @@ Current broader SECU execution findings:
 
 - SECU contract discovery/registration now works without initializing the full security runtime.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 08:14 EAT
+
+Completed checkpoint:
+
+- Made the MTEN infrastructure capability executable as a first-class APG capability with tenant-scoped provisioning, isolation, resource governance, orchestration, analytics, UI, and theme configuration.
+- Added deterministic MTEN governance rules for missing tenant context, cross-tenant membership, suspended-tenant mutations, DNS validation, capacity overcommit review, and live-migration runbook requirements.
+- Exposed MTEN contract helpers through capability registration while guarding optional Flask/AppBuilder blueprint imports for lightweight contract discovery.
+- Added focused MTEN regression coverage for contract shape, rule evaluation, and registration payloads.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mten/__init__.py capabilities/common/mten/capability_contract.py capabilities/common/mten/tests/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/mten/tests/test_capability_contract.py` -> 3 passed, 15 warnings
+
+Current broader MTEN execution findings:
+
+- MTEN contract discovery/registration now works without importing optional blueprint dependencies.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
