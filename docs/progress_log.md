@@ -908,3 +908,27 @@ Current broader AGNT execution findings:
 - AI agent composition is now represented both in the compiler/runtime path and as a first-class APG capability package.
 - Fast-changing agent backends remain behind provider-neutral runtime adapter names instead of hardwired SDK-specific dependencies.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:49 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder DTWN package into a first-class APG digital-twin capability with tenant-scoped twin, telemetry, simulation, governance, UI, and theme configuration.
+- Added deterministic DTWN rules for tenant context, twin ownership, simulation models, authenticated telemetry, production simulation approval, and high-risk prediction review.
+- Promoted the placeholder IOTD package into a first-class APG IoT device capability with tenant-scoped device, telemetry, command, governance, UI, and theme configuration.
+- Added deterministic IOTD rules for tenant context, device identity, telemetry encryption, dangerous command approval, firmware signatures, and stale device review.
+- Promoted the placeholder BCLG package into a first-class APG blockchain-ledger capability with tenant-scoped ledger, transaction, smart-contract, governance, UI, and theme configuration.
+- Added deterministic BCLG rules for tenant context, ledger ownership, transaction signing, key custody, smart-contract review, and high-value transaction review.
+- Promoted the placeholder QUAN package into a first-class APG quantum-computing capability with tenant-scoped backend, circuit, job, governance, UI, and theme configuration.
+- Added deterministic QUAN rules for tenant context, backend approval, circuit ownership, sensitive input encryption, job quota policy, and large job review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/dtwn/__init__.py capabilities/common/dtwn/capability_contract.py capabilities/common/dtwn/test_capability_contract.py capabilities/common/iotd/__init__.py capabilities/common/iotd/capability_contract.py capabilities/common/iotd/test_capability_contract.py capabilities/common/bclg/__init__.py capabilities/common/bclg/capability_contract.py capabilities/common/bclg/test_capability_contract.py capabilities/common/quan/__init__.py capabilities/common/quan/capability_contract.py capabilities/common/quan/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/dtwn/test_capability_contract.py capabilities/common/iotd/test_capability_contract.py capabilities/common/bclg/test_capability_contract.py capabilities/common/quan/test_capability_contract.py` -> 12 passed, 10 warnings
+
+Current broader DTWN/IOTD/BCLG/QUAN execution findings:
+
+- DTWN, IOTD, BCLG, and QUAN are no longer placeholders at the composition layer.
+- Phase 11 emerging/advanced infrastructure now has first-class registration/contract coverage.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
