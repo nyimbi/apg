@@ -2602,3 +2602,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_frec_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "request\.headers\.get\('X-Tenant-ID', 'default_tenant'\)|default_tenant" capabilities/common/frec/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:36 EAT
+
+Completed checkpoint:
+
+- Replaced Accounts Receivable blueprint tenant/user header defaults and default-data `default_tenant` literals with the existing AR request-context helpers.
+- AR customer/tax-code/GL default-data checks now use configured tenant context outside request handling and APG request context inside routes, while user resolution delegates to the shared AR context helper.
+- Extended focused AR regression coverage to cover blueprint delegation and stale default literals.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/arc/accounts_receivable/context.py capabilities/fin/arc/accounts_receivable/blueprint.py tests/test_fin_arc_views_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_arc_views_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "['\"]default_tenant['\"]|['\"]system_user['\"]|request\.headers\.get\('X-Tenant-ID'|request\.headers\.get\('X-User-ID'" capabilities/fin/arc/accounts_receivable/blueprint.py capabilities/fin/arc/accounts_receivable/context.py` -> no matches
+- `git diff --check` -> no issues

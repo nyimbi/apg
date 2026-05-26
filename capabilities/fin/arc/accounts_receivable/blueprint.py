@@ -48,6 +48,7 @@ from .views import (
 	ARPaymentCreateView, ARPaymentUpdateView, ARPaymentDetailView,
 	CreditScoringRequestView, CollectionsOptimizationView, CashFlowForecastView
 )
+from .context import get_current_user_id as resolve_current_user_id, get_tenant_id_from_request
 
 
 # =============================================================================
@@ -209,14 +210,12 @@ def async_route(f):
 
 def get_current_tenant_id():
 	"""Get current tenant ID from session or request context."""
-	# This would integrate with APG auth_rbac to get tenant context
-	return request.headers.get('X-Tenant-ID', 'default_tenant')
+	return get_tenant_id_from_request()
 
 
 def get_current_user_id():
 	"""Get current user ID from session or request context."""
-	# This would integrate with APG auth_rbac to get user context
-	return request.headers.get('X-User-ID', 'system_user')
+	return resolve_current_user_id() or "system"
 
 
 # =============================================================================
@@ -648,8 +647,8 @@ def _init_default_data(appbuilder: AppBuilder):
 		from .models import ARCustomer
 		from apg.auth_rbac.models import db
 		
-		# Check if customers already exist (use a default tenant for now)
-		existing_customers = ARCustomer.query.filter_by(tenant_id='default_tenant').count()
+		tenant_id = get_tenant_id_from_request()
+		existing_customers = ARCustomer.query.filter_by(tenant_id=tenant_id).count()
 		
 		if existing_customers == 0:
 			print("No existing customers found - would initialize sample data in production")
@@ -1038,8 +1037,8 @@ def _init_default_data(appbuilder: AppBuilder):
 	from . import get_default_tax_codes
 	
 	try:
-		# Check if tax codes already exist (use a default tenant for now)
-		existing_tax_codes = CFARTaxCode.query.filter_by(tenant_id='default_tenant').count()
+		tenant_id = get_tenant_id_from_request()
+		existing_tax_codes = CFARTaxCode.query.filter_by(tenant_id=tenant_id).count()
 		
 		if existing_tax_codes == 0:
 			# Create default tax codes
@@ -1047,7 +1046,7 @@ def _init_default_data(appbuilder: AppBuilder):
 			
 			for tax_data in default_tax_codes:
 				tax_code = CFARTaxCode(
-					tenant_id='default_tenant',
+					tenant_id=tenant_id,
 					code=tax_data['code'],
 					name=tax_data['name'],
 					description=tax_data['description'],
@@ -1192,11 +1191,12 @@ def setup_ar_integration(appbuilder: AppBuilder):
 		from . import get_default_gl_account_mappings
 		
 		# Ensure required GL accounts exist
+		tenant_id = get_tenant_id_from_request()
 		gl_mappings = get_default_gl_account_mappings()
 		
 		for account_type, account_code in gl_mappings.items():
 			existing_account = CFGLAccount.query.filter_by(
-				tenant_id='default_tenant',
+				tenant_id=tenant_id,
 				account_code=account_code
 			).first()
 			

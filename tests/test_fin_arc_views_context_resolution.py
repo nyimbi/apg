@@ -11,6 +11,7 @@ from flask import Flask, g, has_request_context, request
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTEXT_PATH = REPO_ROOT / "capabilities" / "fin" / "arc" / "accounts_receivable" / "context.py"
 VIEWS_PATH = REPO_ROOT / "capabilities" / "fin" / "arc" / "accounts_receivable" / "views.py"
+BLUEPRINT_PATH = REPO_ROOT / "capabilities" / "fin" / "arc" / "accounts_receivable" / "blueprint.py"
 
 
 def _context_helpers() -> dict[str, Any]:
@@ -31,7 +32,10 @@ def _context_helpers() -> dict[str, Any]:
 
 
 def test_ar_views_delegate_context_resolution():
+	context_source = CONTEXT_PATH.read_text(encoding="utf-8")
 	source = VIEWS_PATH.read_text(encoding="utf-8")
+
+	assert '"default_tenant"' not in context_source
 
 	for stale_text in (
 		'return "default_tenant"',
@@ -43,6 +47,22 @@ def test_ar_views_delegate_context_resolution():
 	assert "from .context import get_current_user_id, get_tenant_id_from_request" in source
 	assert source.count("get_tenant_id_from_request()") >= 10
 	assert source.count("get_current_user_id()") >= 7
+
+
+def test_ar_blueprint_delegates_context_resolution():
+	source = BLUEPRINT_PATH.read_text(encoding="utf-8")
+
+	for stale_text in (
+		"request.headers.get('X-Tenant-ID', 'default_tenant')",
+		"request.headers.get('X-User-ID', 'system_user')",
+		"tenant_id='default_tenant'",
+		"use a default tenant for now",
+	):
+		assert stale_text not in source
+
+	assert "from .context import get_current_user_id as resolve_current_user_id, get_tenant_id_from_request" in source
+	assert "return get_tenant_id_from_request()" in source
+	assert 'return resolve_current_user_id() or "system"' in source
 
 
 def test_ar_context_resolves_tenant_and_user_from_request(monkeypatch):
