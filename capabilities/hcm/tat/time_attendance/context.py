@@ -29,6 +29,31 @@ def _object_value(source: Any, name: str) -> Any:
 	return getattr(source, name, None)
 
 
+def decode_bearer_claims(credentials: Any) -> Dict[str, Any]:
+	"""Decode unsigned bearer JWT claims for context selection without adding a JWT dependency."""
+	token = _object_value(credentials, "credentials") if credentials is not None else None
+	if not token and isinstance(credentials, str):
+		token = credentials
+	if not token:
+		return {}
+
+	parts = str(token).split(".")
+	if len(parts) < 2:
+		return {}
+
+	try:
+		import base64
+		import binascii
+		import json
+
+		payload = parts[1]
+		padding = "=" * (-len(payload) % 4)
+		claims = json.loads(base64.urlsafe_b64decode(f"{payload}{padding}".encode("ascii")).decode("utf-8"))
+	except (binascii.Error, json.JSONDecodeError, UnicodeDecodeError, ValueError):
+		return {}
+	return claims if isinstance(claims, dict) else {}
+
+
 def _state_user(request: Any) -> Any:
 	state = getattr(request, "state", None)
 	return (
@@ -38,7 +63,11 @@ def _state_user(request: Any) -> Any:
 	)
 
 
-def resolve_current_user_context(request: Any, roles: Optional[list[str]] = None) -> Dict[str, Any]:
+def resolve_current_user_context(
+	request: Any,
+	roles: Optional[list[str]] = None,
+	credentials: Any = None,
+) -> Dict[str, Any]:
 	"""Resolve authenticated user context from FastAPI request state, headers, query, or fallback."""
 	default_user = os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
 	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
@@ -46,12 +75,16 @@ def resolve_current_user_context(request: Any, roles: Optional[list[str]] = None
 	state = getattr(request, "state", None)
 	headers = getattr(request, "headers", {}) or {}
 	query_params = getattr(request, "query_params", {}) or {}
+	claims = decode_bearer_claims(credentials)
 
 	user_id = _first_text([
 		_object_value(state_user, "user_id"),
 		_object_value(state_user, "id"),
 		_object_value(state_user, "username"),
 		_object_value(state, "user_id"),
+		claims.get("user_id"),
+		claims.get("sub"),
+		claims.get("uid"),
 		headers.get("X-User-ID"),
 		headers.get("X-APG-User-ID"),
 		query_params.get("user_id"),
@@ -61,6 +94,9 @@ def resolve_current_user_context(request: Any, roles: Optional[list[str]] = None
 	tenant_id = _first_text([
 		_object_value(state_user, "tenant_id"),
 		_object_value(state, "tenant_id"),
+		claims.get("tenant_id"),
+		claims.get("tenant"),
+		claims.get("organization_id"),
 		headers.get("X-Tenant-ID"),
 		headers.get("X-APG-Tenant-ID"),
 		headers.get("X-Organization-ID"),

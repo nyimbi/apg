@@ -12,6 +12,7 @@ Email: nyimbi@gmail.com
 import asyncio
 import logging
 import json
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass, asdict
@@ -511,14 +512,17 @@ class BusinessMetricsMonitor:
 class MonitoringDashboard:
 	"""Real-time monitoring dashboard"""
 	
-	def __init__(self):
+	def __init__(self, tenant_id: Optional[str] = None):
 		self.performance_monitor = PerformanceMonitor()
 		self.alert_manager = AlertManager()
 		self.business_monitor = None  # Will be set when service is available
+		self.tenant_id = tenant_id or os.getenv("APG_MONITORING_TENANT_ID") or os.getenv("APG_TENANT_ID") or "system"
 		
-	async def start_monitoring(self, service: TimeAttendanceService):
+	async def start_monitoring(self, service: TimeAttendanceService, tenant_id: Optional[str] = None):
 		"""Start the monitoring system"""
 		self.business_monitor = BusinessMetricsMonitor(service)
+		if tenant_id:
+			self.tenant_id = tenant_id
 		
 		# Start monitoring loops
 		asyncio.create_task(self._system_monitoring_loop())
@@ -571,8 +575,7 @@ class MonitoringDashboard:
 		while True:
 			try:
 				if self.business_monitor:
-					# For demo, monitor default tenant
-					tenant_id = "tenant_default"
+					tenant_id = self.tenant_id
 					
 					# Generate health report
 					health_report = await self.business_monitor.generate_health_report(tenant_id)

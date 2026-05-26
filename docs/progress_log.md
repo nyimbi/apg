@@ -3110,3 +3110,20 @@ Verification:
 - `rg -n "EmployeeAPIGateway\(\"default_tenant\"\)|default_tenant|Kafka|kafka" capabilities/hcm/chr/employee_data_management/api_integration.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:52 EAT
+
+Completed checkpoint:
+
+- Replaced Time & Attendance mobile API's fixed mobile user, tenant, employee, and device identity with APG request/JWT/header/query/environment context resolution.
+- Extended the shared TAT context helper to consume bearer JWT-shaped claims without adding a new dependency.
+- Replaced the monitoring dashboard's fixed `tenant_default` business metrics loop with runtime tenant selection from constructor, startup call, or APG environment.
+- Added focused HCM TAT regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/context.py capabilities/hcm/tat/time_attendance/mobile_api.py capabilities/hcm/tat/time_attendance/monitoring.py tests/test_hcm_tat_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_hcm_tat_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed
+- `rg -n "mobile_user_123|emp_123|device_mobile_123|tenant_default|TODO: Implement mobile-specific JWT validation|Kafka|kafka" capabilities/hcm/tat/time_attendance/context.py capabilities/hcm/tat/time_attendance/mobile_api.py capabilities/hcm/tat/time_attendance/monitoring.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

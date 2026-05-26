@@ -15,8 +15,8 @@ from datetime import datetime, date, timedelta
 from typing import Dict, List, Any, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Path, BackgroundTasks
-from fastapi.security import HTTPBearer
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, BackgroundTasks, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, ConfigDict
 
 from .service import TimeAttendanceService
@@ -24,6 +24,7 @@ from .websocket import websocket_manager, RealTimeEvent
 from .ai_fraud_detection import fraud_engine
 from .models import WorkMode, AIAgentType, ProductivityMetric, RemoteWorkStatus
 from .config import get_config
+from .context import decode_bearer_claims, resolve_current_user_context
 
 
 logger = logging.getLogger(__name__)
@@ -110,17 +111,63 @@ class OfflineSyncRequest(BaseModel):
 
 
 # Mobile Authentication Helper
-async def get_mobile_user(credentials=Depends(security)) -> Dict[str, Any]:
+def _clean_mobile_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _first_mobile_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_mobile_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def _request_state_value(request: Request, name: str) -> Any:
+	state = getattr(request, "state", None)
+	if state is None:
+		return None
+	current_user = getattr(state, "current_user", None)
+	if isinstance(current_user, dict) and current_user.get(name) is not None:
+		return current_user.get(name)
+	if current_user is not None and getattr(current_user, name, None) is not None:
+		return getattr(current_user, name)
+	return getattr(state, name, None)
+
+
+async def get_mobile_user(
+	request: Request,
+	credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> Dict[str, Any]:
 	"""Get mobile user with enhanced context"""
-	# TODO: Implement mobile-specific JWT validation with device binding
-	return {
-		"user_id": "mobile_user_123",
-		"tenant_id": "tenant_default", 
-		"employee_id": "emp_123",
-		"device_id": "device_mobile_123",
-		"roles": ["employee"],
-		"mobile_verified": True
-	}
+	claims = decode_bearer_claims(credentials)
+	context = resolve_current_user_context(request, credentials=credentials, roles=["employee"])
+	headers = request.headers or {}
+	query_params = request.query_params or {}
+
+	context["employee_id"] = _first_mobile_text([
+		_request_state_value(request, "employee_id"),
+		claims.get("employee_id"),
+		claims.get("employee"),
+		headers.get("X-Employee-ID"),
+		headers.get("X-APG-Employee-ID"),
+		query_params.get("employee_id"),
+		query_params.get("employee"),
+	], context["user_id"])
+	context["device_id"] = _first_mobile_text([
+		_request_state_value(request, "device_id"),
+		claims.get("device_id"),
+		claims.get("device"),
+		headers.get("X-Device-ID"),
+		headers.get("X-APG-Device-ID"),
+		query_params.get("device_id"),
+		query_params.get("device"),
+	], f"mobile:{context['user_id']}")
+	context["mobile_verified"] = bool(context["user_id"] and context["tenant_id"])
+	return context
 
 
 async def get_mobile_service() -> TimeAttendanceService:
