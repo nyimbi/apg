@@ -5,9 +5,10 @@ REST API endpoints for production planning functionality including
 master production schedules, production orders, demand forecasts, and capacity planning.
 """
 
+import os
 from datetime import datetime, date
-from typing import List, Optional
-from flask import Blueprint, request, jsonify, current_app
+from typing import Any, List, Optional
+from flask import Blueprint, g, request, jsonify, current_app, session
 from flask_restx import Api, Resource, fields, Namespace
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -120,13 +121,66 @@ async def get_service() -> ProductionPlanningService:
 	session = async_session()
 	return ProductionPlanningService(session)
 
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
 def get_current_tenant_id() -> str:
 	"""Get current tenant ID from request context"""
-	return request.headers.get('X-Tenant-ID', 'default-tenant')
+	current_user = (
+		_object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	current_tenant = _object_value(g, "current_tenant")
+	return _first_text([
+		_object_value(current_user, "tenant_id"),
+		_object_value(g, "tenant_id"),
+		_object_value(current_tenant, "tenant_id"),
+		current_tenant,
+		session.get("tenant_id"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], os.getenv("APG_DEFAULT_TENANT_ID", "default"))
 
 def get_current_user_id() -> str:
 	"""Get current user ID from request context"""
-	return request.headers.get('X-User-ID', 'current-user')
+	current_user = (
+		_object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	return _first_text([
+		_object_value(current_user, "user_id"),
+		_object_value(current_user, "id"),
+		_object_value(current_user, "username"),
+		_object_value(g, "user_id"),
+		session.get("user_id"),
+		request.headers.get("X-User-ID"),
+		request.headers.get("X-APG-User-ID"),
+		request.args.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
 
 # Master Production Schedule endpoints
 @ns_schedule.route('/')

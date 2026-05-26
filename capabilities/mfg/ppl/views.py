@@ -5,9 +5,11 @@ Flask-AppBuilder views for production planning functionality including
 master production schedules, production orders, demand forecasts, and capacity planning.
 """
 
+import os
 from datetime import datetime, date
 from decimal import Decimal
-from flask import flash, redirect, url_for, request
+from typing import Any, Optional
+from flask import flash, g, redirect, url_for, request, session
 from flask_appbuilder import ModelView, BaseView, expose
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.charts.views import DirectByChartView
@@ -19,6 +21,65 @@ from .models import (
 	ProductionOrderStatus, SchedulingPriority, PlanningHorizon
 )
 from .service import ProductionPlanningService
+
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+def _first_text(candidates: list[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+def resolve_current_tenant_id() -> str:
+	current_user = (
+		_object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	current_tenant = _object_value(g, "current_tenant")
+	return _first_text([
+		_object_value(current_user, "tenant_id"),
+		_object_value(g, "tenant_id"),
+		_object_value(current_tenant, "tenant_id"),
+		current_tenant,
+		session.get("tenant_id"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], os.getenv("APG_DEFAULT_TENANT_ID", "default"))
+
+def resolve_current_user_id() -> str:
+	current_user = (
+		_object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	return _first_text([
+		_object_value(current_user, "user_id"),
+		_object_value(current_user, "id"),
+		_object_value(current_user, "username"),
+		_object_value(g, "user_id"),
+		session.get("user_id"),
+		request.headers.get("X-User-ID"),
+		request.headers.get("X-APG-User-ID"),
+		request.args.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
 
 class MasterProductionScheduleView(ModelView):
 	"""Master Production Schedule management view"""
@@ -354,11 +415,11 @@ class ProductionPlanningDashboardView(BaseView):
 	
 	def get_current_tenant_id(self) -> str:
 		"""Get current tenant ID from session/context"""
-		return "default-tenant"  # Replace with actual tenant resolution
+		return resolve_current_tenant_id()
 	
 	def get_current_user_id(self) -> str:
 		"""Get current user ID from session/context"""
-		return "current-user"  # Replace with actual user resolution
+		return resolve_current_user_id()
 
 class ProductionOrderStatusChartView(DirectByChartView):
 	"""Chart view for production order status distribution"""

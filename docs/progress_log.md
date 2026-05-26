@@ -2899,3 +2899,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_nlpc_jwt_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "\"user_id\": \"demo_user\"|demo_user|Kafka|kafka" capabilities/common/nlpc/api_gateway.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:52 EAT
+
+Completed checkpoint:
+
+- Replaced Manufacturing Production Planning API's fixed `default-tenant` and `current-user` helpers with Flask request/session/context, APG header, query, and environment identity resolution.
+- Replaced Manufacturing Production Planning FAB view fixed tenant/user helpers with the same APG-aware context resolution.
+- Added focused MFG PPL context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/mfg/ppl/api.py capabilities/mfg/ppl/views.py tests/test_mfg_ppl_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_mfg_ppl_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "default-tenant|current-user|Replace with actual tenant resolution|Replace with actual user resolution|Kafka|kafka" capabilities/mfg/ppl/api.py capabilities/mfg/ppl/views.py` -> no matches
+- `git diff --check` -> no issues
