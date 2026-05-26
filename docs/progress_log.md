@@ -745,3 +745,27 @@ Current broader VIDC/HELP/ESGN execution findings:
 - VIDC, HELP, and ESGN are no longer placeholders at the composition layer.
 - Phase 6 now has uniform first-class registration/contract coverage across communication, collaboration, help, video, and digital forms/e-sign.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:11 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder WFLO package into a first-class APG workflow-orchestration capability with tenant-scoped definition, execution, approval, governance, UI, and theme configuration.
+- Added deterministic WFLO rules for tenant context, workflow ownership, publication approval, external trigger policy, AI step policy, and long-running execution review.
+- Promoted the placeholder SCHD package into a first-class APG scheduling/job-orchestration capability with tenant-scoped schedule, job, worker, governance, UI, and theme configuration.
+- Added deterministic SCHD rules for tenant context, schedule ownership, timezone, critical job monitoring, external job approval, and long-running job review.
+- Promoted the placeholder SCPT package into a first-class APG custom-scripting capability with tenant-scoped script, sandbox, package, governance, UI, and theme configuration.
+- Added deterministic SCPT rules for tenant context, script ownership, sandboxing, dangerous permission approval, external network policy, and high-resource review.
+- Promoted the placeholder NCOD package into a first-class APG no-code/low-code capability with tenant-scoped app, builder, extension, governance, UI, and theme configuration.
+- Added deterministic NCOD rules for tenant context, app ownership, publishing approval, script extension policy, external connector policy, and production-change review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/wflo/__init__.py capabilities/common/wflo/capability_contract.py capabilities/common/wflo/test_capability_contract.py capabilities/common/schd/__init__.py capabilities/common/schd/capability_contract.py capabilities/common/schd/test_capability_contract.py capabilities/common/scpt/__init__.py capabilities/common/scpt/capability_contract.py capabilities/common/scpt/test_capability_contract.py capabilities/common/ncod/__init__.py capabilities/common/ncod/capability_contract.py capabilities/common/ncod/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/wflo/test_capability_contract.py capabilities/common/schd/test_capability_contract.py capabilities/common/scpt/test_capability_contract.py capabilities/common/ncod/test_capability_contract.py` -> 12 passed, 11 warnings
+
+Current broader WFLO/SCHD/SCPT/NCOD execution findings:
+
+- WFLO, SCHD, SCPT, and NCOD are no longer placeholders at the composition layer.
+- Phase 7 now has uniform first-class registration/contract coverage across workflow orchestration, scheduling, custom scripting, and no-code/low-code automation.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
