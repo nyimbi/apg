@@ -1958,3 +1958,20 @@ Verification:
 - `.venv/bin/python -m py_compile templates/composable/composition_engine.py tests/test_composition_capability_contracts.py`
 - `.venv/bin/python -m pytest -q tests/test_composition_capability_contracts.py` -> 4 passed
 - `.venv/bin/python -m pytest -q capabilities/test_capability_contract_registry.py tests/test_capability_contract_public_api.py tests/test_cli_capability_contracts.py tests/test_composition_capability_contracts.py` -> 14 passed
+
+### 2026-05-26 21:30 EAT
+
+Completed checkpoint:
+
+- Removed the remaining checked-in `TODO: Implement ... application structure` bodies from composable base app templates.
+- Added executable dependency-free defaults for API-only, analytics-dashboard, and real-time base templates.
+- Real-time base templates now expose an in-process stream ledger with `publish_event`, `read_stream`, and `health_check` around a Bytewax-style flow id instead of placeholder text.
+- Tightened the composable template regression so checked-in base app templates render and compile, not just generated fallback templates.
+- Fixed older Flask and microservice app templates whose rendered capability logging f-strings could produce invalid Python when capabilities render as JSON strings.
+
+Verification:
+
+- `.venv/bin/python -m py_compile templates/composable/base_template.py tests/test_composable_template_executable_defaults.py`
+- `.venv/bin/python -m pytest -q tests/test_composable_template_executable_defaults.py` -> 3 passed
+- `.venv/bin/python -m pytest -q tests/test_composable_template_executable_defaults.py tests/test_composition_engine.py` -> 4 passed
+- `rg -n "TODO: Implement|TODO: Add usage examples|TODO: Add more examples|placeholder implementation|pass$" templates/composable/base_template.py templates/composable/capability.py templates/composable/bases templates/composable/capabilities` -> no matches

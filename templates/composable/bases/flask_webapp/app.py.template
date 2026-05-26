@@ -65,6 +65,6 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG', '1') == '1'
     
     log.info(f"Starting {{project_name}} on {host}:{port}")
-    log.info(f"Capabilities enabled: {', '.join({{capabilities|tojson}})}")
+    log.info("Capabilities enabled: %s", ", ".join({{capabilities|tojson}}))
     
     app.run(host=host, port=port, debug=debug)

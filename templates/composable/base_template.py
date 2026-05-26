@@ -236,7 +236,7 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG', '1') == '1'
 
     log.info(f"Starting {{project_name}} on {host}:{port}")
-    log.info(f"Capabilities enabled: {', '.join({{capabilities|tojson}})}")
+    log.info("Capabilities enabled: %s", ", ".join({{capabilities|tojson}}))
 
     app.run(host=host, port=port, debug=debug)
 '''
@@ -303,7 +303,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
 
     logger.info(f"Starting {{project_name}} microservice on {host}:{port}")
-    logger.info(f"Capabilities: {', '.join({{capabilities|tojson}})}")
+    logger.info("Capabilities: %s", ", ".join({{capabilities|tojson}}))
 
     uvicorn.run(app, host=host, port=port)
 '''

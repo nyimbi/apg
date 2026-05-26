@@ -59,6 +59,6 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     
     logger.info(f"Starting {{project_name}} microservice on {host}:{port}")
-    logger.info(f"Capabilities: {', '.join({{capabilities|tojson}})}")
+    logger.info("Capabilities: %s", ", ".join({{capabilities|tojson}}))
     
     uvicorn.run(app, host=host, port=port)

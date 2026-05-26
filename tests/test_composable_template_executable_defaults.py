@@ -81,6 +81,7 @@ def test_checked_in_composable_templates_do_not_emit_placeholder_bodies():
     searched = [
         COMPOSABLE_ROOT / "capability.py",
         COMPOSABLE_ROOT / "base_template.py",
+        *COMPOSABLE_ROOT.glob("bases/*/app.py.template"),
         *COMPOSABLE_ROOT.glob("capabilities/*/*/README.md"),
         *COMPOSABLE_ROOT.glob("capabilities/*/*/API.md"),
         *COMPOSABLE_ROOT.glob("capabilities/*/*/integration.py.template"),
@@ -100,5 +101,14 @@ def test_checked_in_composable_templates_do_not_emit_placeholder_bodies():
                 if line.strip() == "pass":
                     offenders.append(f"{path.relative_to(REPO_ROOT)}:{line_number}")
             compile(text, str(path.relative_to(REPO_ROOT)), "exec")
+        if path.match("*/bases/*/app.py.template"):
+            rendered = Template(text).render(
+                project_name="Template Smoke",
+                base_template=path.parent.name,
+                version="1.0.0",
+                project_description="Template smoke test",
+                capabilities=["auth"],
+            )
+            compile(rendered, str(path.relative_to(REPO_ROOT)), "exec")
 
     assert offenders == []
