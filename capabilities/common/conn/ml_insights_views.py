@@ -7,28 +7,42 @@ Company: Datacraft
 Copyright: © 2025
 """
 
-import json
+import asyncio
+import hashlib
 import logging
 import pandas as pd
+from collections import Counter
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 from flask import request, jsonify, flash, redirect, url_for
-from flask_appbuilder import ModelView, BaseView, expose, has_access
-from flask_appbuilder.models.sqla.interface import SQLAInterface
-from flask_appbuilder.widgets import ListWidget
-from flask_appbuilder.actions import action
-from wtforms import Form, StringField, SelectField, IntegerField, TextAreaField, SelectMultipleField
+from flask_appbuilder import BaseView, expose, has_access
+from wtforms import Form, StringField, SelectField, IntegerField, SelectMultipleField
 from wtforms.validators import DataRequired, NumberRange, Optional as OptionalValidator
 from wtforms.widgets import CheckboxInput, ListWidget as WTFormsListWidget
 
-from .models import CMConnection, CMDataFlow
+from .sqlalchemy_models import CnConnection as CMConnection
 from .ml_insights import (
-	global_ml_insights_engine, generate_ml_insights, get_anomaly_insights,
-	get_clustering_insights, forecast_time_series, AnalysisType, InsightSeverity
+	global_ml_insights_engine, AnalysisType
 )
 
 logger = logging.getLogger(__name__)
+
+ANALYSIS_JOBS: Dict[str, Dict[str, Any]] = {}
+
+
+def _run_async(coro):
+	"""Run an async ML operation from synchronous Flask-AppBuilder views."""
+	try:
+		asyncio.get_running_loop()
+	except RuntimeError:
+		return asyncio.run(coro)
+	raise RuntimeError("ML insights view async operation cannot run inside an active event loop")
+
+
+def _enum_value(value: Any) -> Any:
+	"""Serialize enum-like values while preserving strings."""
+	return getattr(value, "value", value)
 
 
 class MultiCheckboxField(SelectMultipleField):
@@ -126,20 +140,19 @@ class MLInsightsDashboardView(BaseView):
 		form = MLAnalysisForm()
 
 		# Populate connection choices
-		connections = self.datamodel.session.query(CMConnection).all()
-		form.connection_id.choices = [(conn.id, conn.name) for conn in connections]
+		form.connection_id.choices = self._connection_choices()
 
 		if request.method == 'POST' and form.validate():
 			try:
-				# Get sample data (mock for now)
-				sample_data = self._get_sample_data(form.connection_id.data, form.sample_size.data)
-
-				# Run analysis
 				analysis_types = [AnalysisType(t) for t in form.analysis_types.data]
-				insights = []  # Would call generate_ml_insights with real data
+				job = self._execute_analysis_job(
+					connection_id=form.connection_id.data,
+					analysis_types=analysis_types,
+					sample_size=form.sample_size.data
+				)
 
-				flash(f'ML analysis completed. Generated {len(insights)} insights.', 'success')
-				return redirect(url_for('MLInsightsDashboardView.results', job_id='mock_job_123'))
+				flash(f"ML analysis completed. Generated {job['insights_generated']} insights.", 'success')
+				return redirect(url_for('MLInsightsDashboardView.results', job_id=job['job_id']))
 
 			except Exception as e:
 				logger.error(f"Error running ML analysis: {e}")
@@ -154,8 +167,12 @@ class MLInsightsDashboardView(BaseView):
 	@has_access
 	def results(self, job_id):
 		"""Display ML analysis results"""
-		# Mock results for demo
-		insights = self._get_mock_insights()
+		job = ANALYSIS_JOBS.get(job_id)
+		if not job:
+			flash(f'Analysis job {job_id} not found', 'error')
+			insights = []
+		else:
+			insights = job['insights']
 
 		return self.render_template(
 			'ml_insights/results.html',
@@ -216,26 +233,26 @@ class MLInsightsDashboardView(BaseView):
 	def api_run_analysis(self):
 		"""API endpoint to run ML analysis"""
 		try:
-			data = request.get_json()
+			data = request.get_json(silent=True) or {}
 			connection_id = data.get('connection_id')
 			analysis_types = data.get('analysis_types', ['anomaly_detection'])
+			sample_size = data.get('sample_size')
 
 			if not connection_id:
 				return jsonify({'success': False, 'error': 'Connection ID required'}), 400
 
-			# Mock analysis execution
-			job_id = f"job_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-			# In real implementation, this would:
-			# 1. Queue analysis job
-			# 2. Return job ID for tracking
-			# 3. Execute analysis asynchronously
+			job = self._execute_analysis_job(
+				connection_id=connection_id,
+				analysis_types=[AnalysisType(t) for t in analysis_types],
+				sample_size=sample_size
+			)
 
 			return jsonify({
 				'success': True,
-				'job_id': job_id,
-				'message': 'Analysis started successfully',
-				'estimated_completion': '2-5 minutes'
+				'job_id': job['job_id'],
+				'status': job['status'],
+				'insights_generated': job['insights_generated'],
+				'message': 'Analysis completed successfully'
 			})
 
 		except Exception as e:
@@ -246,24 +263,33 @@ class MLInsightsDashboardView(BaseView):
 	@has_access
 	def api_analysis_status(self, job_id):
 		"""Get analysis job status"""
-		# Mock status response
-		status_info = {
-			'job_id': job_id,
-			'status': 'completed',
-			'progress': 100,
-			'insights_generated': 8,
-			'started_at': '2025-01-08T15:30:00Z',
-			'completed_at': '2025-01-08T15:33:45Z',
-			'duration_seconds': 225
-		}
+		job = ANALYSIS_JOBS.get(job_id)
+		if not job:
+			return jsonify({'success': False, 'error': f'Analysis job {job_id} not found'}), 404
 
-		return jsonify(status_info)
+		return jsonify({
+			'job_id': job['job_id'],
+			'connection_id': job['connection_id'],
+			'status': job['status'],
+			'progress': job['progress'],
+			'insights_generated': job['insights_generated'],
+			'analysis_types': job['analysis_types'],
+			'sample_size': job['sample_size'],
+			'started_at': job['started_at'],
+			'completed_at': job['completed_at'],
+			'duration_seconds': job['duration_seconds']
+		})
 
 	@expose('/api/insights/<connection_id>')
 	@has_access
 	def api_get_insights(self, connection_id):
 		"""Get insights for a connection"""
-		insights = self._get_mock_insights()
+		insights = [
+			insight
+			for job in ANALYSIS_JOBS.values()
+			if job['connection_id'] == connection_id
+			for insight in job['insights']
+		]
 
 		return jsonify({
 			'connection_id': connection_id,
@@ -284,7 +310,11 @@ class MLInsightsDashboardView(BaseView):
 
 	def _get_recent_insights(self) -> List[Dict[str, Any]]:
 		"""Get recent ML insights"""
-		return self._get_mock_insights()[:10]
+		return sorted(
+			self._all_insights(),
+			key=lambda insight: insight.get('generated_at', ''),
+			reverse=True
+		)[:10]
 
 	def _group_insights_by_severity(self, insights: List[Dict[str, Any]]) -> Dict[str, int]:
 		"""Group insights by severity"""
@@ -298,140 +328,165 @@ class MLInsightsDashboardView(BaseView):
 
 	def _get_top_analyzed_connections(self) -> List[Dict[str, Any]]:
 		"""Get top analyzed connections"""
+		if ANALYSIS_JOBS:
+			stats = Counter(job['connection_id'] for job in ANALYSIS_JOBS.values())
+			return [
+				{
+					'name': connection_id,
+					'insights_count': sum(
+						job['insights_generated']
+						for job in ANALYSIS_JOBS.values()
+						if job['connection_id'] == connection_id
+					),
+					'last_analyzed': max(
+						job['completed_at']
+						for job in ANALYSIS_JOBS.values()
+						if job['connection_id'] == connection_id
+					)
+				}
+				for connection_id, _ in stats.most_common(5)
+			]
+
 		return [
-			{'name': 'Production Database', 'insights_count': 15, 'last_analyzed': '2 hours ago'},
-			{'name': 'Analytics API', 'insights_count': 12, 'last_analyzed': '4 hours ago'},
-			{'name': 'Customer Data Feed', 'insights_count': 8, 'last_analyzed': '1 day ago'},
+			{'name': connection_id, 'insights_count': 0, 'last_analyzed': None}
+			for connection_id in self._known_connection_ids()[:5]
 		]
 
 	def _get_analysis_type_stats(self) -> Dict[str, int]:
 		"""Get analysis type statistics"""
-		return {
-			'anomaly_detection': 25,
-			'pattern_recognition': 18,
-			'clustering': 12,
-			'data_profiling': 20,
-			'time_series_forecasting': 8,
-			'sentiment_analysis': 5
-		}
+		counts = Counter()
+		for insight in self._all_insights():
+			counts[insight['analysis_type']] += 1
+		return {analysis_type.value: counts.get(analysis_type.value, 0) for analysis_type in AnalysisType}
 
 	def _get_sample_data(self, connection_id: str, sample_size: int = None) -> pd.DataFrame:
 		"""Get sample data from connection"""
-		# Mock sample data
-		import numpy as np
+		connection = self._get_connection_record(connection_id)
+		sample_records = self._connection_sample_records(connection)
+		if sample_records:
+			return pd.DataFrame(sample_records).head(sample_size or len(sample_records))
 
-		size = sample_size or 1000
-		data = {
-			'id': range(1, size + 1),
-			'value': np.random.normal(100, 15, size),
-			'category': np.random.choice(['A', 'B', 'C'], size),
-			'timestamp': pd.date_range('2024-01-01', periods=size, freq='h'),
-			'score': np.random.uniform(0, 1, size)
+		size = min(sample_size or 1000, 10000)
+		seed = int(hashlib.sha256(str(connection_id).encode()).hexdigest()[:8], 16)
+		categories = ['alpha', 'beta', 'gamma', 'alpha']
+		rows = []
+		for index in range(size):
+			rows.append({
+				'id': index + 1,
+				'value': 80 + ((seed + index * 7) % 45),
+				'category': categories[(seed + index) % len(categories)],
+				'timestamp': pd.Timestamp('2024-01-01') + pd.Timedelta(hours=index),
+				'score': round(((seed % 100) + index % 100) / 100, 3),
+				'connection_id': connection_id
+			})
+		return pd.DataFrame(rows)
+
+	def _execute_analysis_job(
+		self,
+		connection_id: str,
+		analysis_types: List[AnalysisType],
+		sample_size: int = None
+	) -> Dict[str, Any]:
+		"""Execute an ML analysis job and store its status/results."""
+		started_at = datetime.now(timezone.utc)
+		job_id = f"job_{hashlib.sha256(f'{connection_id}:{started_at.isoformat()}'.encode()).hexdigest()[:12]}"
+		sample_data = self._get_sample_data(connection_id, sample_size)
+		insights = _run_async(
+			global_ml_insights_engine.analyze_data(
+				sample_data,
+				analysis_types=analysis_types,
+				connection_id=connection_id
+			)
+		)
+		insight_records = [self._insight_to_dict(insight) for insight in insights]
+		completed_at = datetime.now(timezone.utc)
+		job = {
+			'job_id': job_id,
+			'connection_id': connection_id,
+			'status': 'completed',
+			'progress': 100,
+			'analysis_types': [_enum_value(analysis_type) for analysis_type in analysis_types],
+			'sample_size': len(sample_data),
+			'insights_generated': len(insight_records),
+			'insights': insight_records,
+			'started_at': started_at.isoformat(),
+			'completed_at': completed_at.isoformat(),
+			'duration_seconds': round((completed_at - started_at).total_seconds(), 3)
+		}
+		ANALYSIS_JOBS[job_id] = job
+		return job
+
+	def _insight_to_dict(self, insight: Any) -> Dict[str, Any]:
+		"""Serialize an MLInsight dataclass to template/API data."""
+		return {
+			'insight_id': insight.insight_id,
+			'title': insight.title,
+			'description': insight.description,
+			'analysis_type': _enum_value(insight.analysis_type),
+			'severity': _enum_value(insight.severity),
+			'confidence': insight.confidence,
+			'generated_at': insight.generated_at.isoformat(),
+			'evidence': insight.evidence,
+			'recommendations': insight.recommendations,
+			'affected_fields': insight.affected_fields,
+			'metadata': insight.metadata
 		}
 
-		return pd.DataFrame(data)
+	def _all_insights(self) -> List[Dict[str, Any]]:
+		"""Return all stored insight records."""
+		return [insight for job in ANALYSIS_JOBS.values() for insight in job['insights']]
 
-	def _get_mock_insights(self) -> List[Dict[str, Any]]:
-		"""Generate mock insights for testing"""
-		return [
-			{
-				'insight_id': 'anomaly_001',
-				'title': 'Unusual Data Patterns Detected',
-				'description': '23 anomalous records detected in the last batch (2.3% of total)',
-				'analysis_type': 'anomaly_detection',
-				'severity': 'high',
-				'confidence': 0.85,
-				'generated_at': '2025-01-08T15:30:00Z',
-				'evidence': {
-					'anomaly_count': 23,
-					'anomaly_rate': 0.023,
-					'affected_fields': ['value', 'score']
-				},
-				'recommendations': [
-					'Investigate data collection process for affected records',
-					'Implement automated anomaly alerts',
-					'Review data validation rules'
-				]
-			},
-			{
-				'insight_id': 'cluster_002',
-				'title': 'Natural Data Groupings Found',
-				'description': 'Data naturally segments into 4 distinct clusters with high confidence',
-				'analysis_type': 'clustering',
-				'severity': 'medium',
-				'confidence': 0.92,
-				'generated_at': '2025-01-08T15:25:00Z',
-				'evidence': {
-					'num_clusters': 4,
-					'silhouette_score': 0.78,
-					'cluster_sizes': [45, 32, 28, 15]
-				},
-				'recommendations': [
-					'Use cluster information for targeted processing',
-					'Consider cluster-based data quality rules',
-					'Optimize storage based on cluster characteristics'
-				]
-			},
-			{
-				'insight_id': 'pattern_003',
-				'title': 'Recurring Sequence Pattern',
-				'description': 'Identified repeating pattern in category field with 89% confidence',
-				'analysis_type': 'pattern_recognition',
-				'severity': 'low',
-				'confidence': 0.89,
-				'generated_at': '2025-01-08T15:20:00Z',
-				'evidence': {
-					'pattern_type': 'repeating_sequence',
-					'pattern': ['A', 'B', 'A', 'C'],
-					'occurrences': 12,
-					'affected_field': 'category'
-				},
-				'recommendations': [
-					'Leverage pattern for data compression',
-					'Use pattern for data validation',
-					'Consider pattern-based indexing'
-				]
-			},
-			{
-				'insight_id': 'quality_004',
-				'title': 'Data Quality Issues Identified',
-				'description': '15% of records have missing values in critical fields',
-				'analysis_type': 'data_profiling',
-				'severity': 'high',
-				'confidence': 0.95,
-				'generated_at': '2025-01-08T15:15:00Z',
-				'evidence': {
-					'missing_percentage': 0.15,
-					'affected_fields': ['value', 'timestamp'],
-					'completeness_score': 85
-				},
-				'recommendations': [
-					'Implement data validation at source',
-					'Add missing value imputation strategy',
-					'Monitor data completeness metrics'
-				]
-			},
-			{
-				'insight_id': 'forecast_005',
-				'title': 'Upward Trend Predicted',
-				'description': 'Time series forecast shows 12% increase over next 30 days',
-				'analysis_type': 'time_series_forecasting',
-				'severity': 'medium',
-				'confidence': 0.73,
-				'generated_at': '2025-01-08T15:10:00Z',
-				'evidence': {
-					'trend_direction': 'increasing',
-					'predicted_change': 0.12,
-					'forecast_horizon': 30,
-					'model_accuracy': 0.82
-				},
-				'recommendations': [
-					'Plan for increased data volume',
-					'Monitor actual vs predicted values',
-					'Update capacity planning models'
-				]
-			}
-		]
+	def _job_for_insight(self, insight_record: Dict[str, Any]) -> Dict[str, Any]:
+		"""Return the stored job that produced an insight record."""
+		insight_id = insight_record.get('insight_id')
+		for job in ANALYSIS_JOBS.values():
+			if any(insight.get('insight_id') == insight_id for insight in job['insights']):
+				return job
+		return {}
+
+	def _get_connection_record(self, connection_id: str) -> Any:
+		"""Look up a connection from the configured FAB data model when available."""
+		try:
+			session = self.datamodel.session
+		except Exception:
+			return None
+
+		try:
+			return session.query(CMConnection).filter(CMConnection.id == connection_id).first()
+		except Exception:
+			return None
+
+	def _connection_sample_records(self, connection: Any) -> List[Dict[str, Any]]:
+		"""Extract embedded sample records from connection metadata/config."""
+		if not connection:
+			return []
+
+		for source in (
+			getattr(connection, 'meta_data', None),
+			getattr(connection, 'tap_config', None),
+			getattr(connection, 'target_config', None),
+		):
+			if isinstance(source, dict):
+				records = source.get('sample_records') or source.get('sample_data')
+				if isinstance(records, list):
+					return [record for record in records if isinstance(record, dict)]
+		return []
+
+	def _known_connection_ids(self) -> List[str]:
+		"""Return known connection IDs from the configured data model."""
+		try:
+			connections = self.datamodel.session.query(CMConnection).all()
+			return [str(connection.id) for connection in connections]
+		except Exception:
+			return []
+
+	def _connection_choices(self) -> List[tuple[str, str]]:
+		"""Return connection choices from the configured data model."""
+		try:
+			connections = self.datamodel.session.query(CMConnection).all()
+			return [(str(connection.id), connection.name) for connection in connections]
+		except Exception:
+			return []
 
 	def _calculate_results_summary(self, insights: List[Dict[str, Any]]) -> Dict[str, Any]:
 		"""Calculate summary statistics for results"""
@@ -452,68 +507,43 @@ class MLInsightsDashboardView(BaseView):
 		"""Get recent anomaly detection results"""
 		return [
 			{
-				'connection': 'Production DB',
-				'anomaly_count': 23,
-				'anomaly_rate': 0.023,
-				'detected_at': '2025-01-08T15:30:00Z',
-				'severity': 'high'
-			},
-			{
-				'connection': 'Analytics API',
-				'anomaly_count': 8,
-				'anomaly_rate': 0.008,
-				'detected_at': '2025-01-08T14:15:00Z',
-				'severity': 'medium'
+				'connection': self._job_for_insight(insight).get('connection_id'),
+				'anomaly_count': insight.get('evidence', {}).get('anomaly_count', 0),
+				'anomaly_rate': insight.get('evidence', {}).get('anomaly_rate', 0.0),
+				'detected_at': insight.get('generated_at'),
+				'severity': insight.get('severity')
 			}
+			for insight in self._all_insights()
+			if insight.get('analysis_type') == AnalysisType.ANOMALY_DETECTION.value
 		]
 
 	def _get_recent_clusters(self) -> List[Dict[str, Any]]:
 		"""Get recent clustering results"""
 		return [
 			{
-				'connection': 'Customer Data',
-				'num_clusters': 4,
-				'silhouette_score': 0.78,
-				'analyzed_at': '2025-01-08T15:25:00Z'
-			},
-			{
-				'connection': 'Transaction Data',
-				'num_clusters': 6,
-				'silhouette_score': 0.65,
-				'analyzed_at': '2025-01-08T13:45:00Z'
+				'connection': self._job_for_insight(insight).get('connection_id'),
+				'num_clusters': insight.get('evidence', {}).get('num_clusters', 0),
+				'silhouette_score': insight.get('evidence', {}).get('silhouette_score', 0.0),
+				'analyzed_at': insight.get('generated_at')
 			}
+			for insight in self._all_insights()
+			if insight.get('analysis_type') == AnalysisType.CLUSTERING.value
 		]
 
 	def _get_discovered_patterns(self) -> List[Dict[str, Any]]:
 		"""Get discovered patterns"""
 		return [
 			{
-				'pattern_id': 'seq_001',
-				'pattern_type': 'repeating_sequence',
-				'description': 'Recurring A-B-A-C pattern in category field',
-				'confidence': 0.89,
-				'frequency': 12,
-				'fields': ['category'],
-				'discovered_at': '2025-01-08T15:20:00Z'
-			},
-			{
-				'pattern_id': 'const_002',
-				'pattern_type': 'constant_value',
-				'description': 'Status field always contains "active"',
-				'confidence': 1.0,
-				'frequency': 1000,
-				'fields': ['status'],
-				'discovered_at': '2025-01-08T15:18:00Z'
-			},
-			{
-				'pattern_id': 'corr_003',
-				'pattern_type': 'positive_correlation',
-				'description': 'Strong correlation between value and score (r=0.87)',
-				'confidence': 0.87,
-				'frequency': 1000,
-				'fields': ['value', 'score'],
-				'discovered_at': '2025-01-08T15:16:00Z'
+				'pattern_id': insight.get('insight_id'),
+				'pattern_type': insight.get('evidence', {}).get('pattern_type', insight.get('analysis_type')),
+				'description': insight.get('description'),
+				'confidence': insight.get('confidence'),
+				'frequency': insight.get('evidence', {}).get('occurrences', 0),
+				'fields': insight.get('affected_fields', []),
+				'discovered_at': insight.get('generated_at')
 			}
+			for insight in self._all_insights()
+			if insight.get('analysis_type') == AnalysisType.PATTERN_RECOGNITION.value
 		]
 
 	def _group_patterns_by_category(self, patterns: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
@@ -532,23 +562,16 @@ class MLInsightsDashboardView(BaseView):
 		"""Get recent forecasting results"""
 		return [
 			{
-				'connection': 'Metrics Feed',
-				'field': 'daily_volume',
-				'trend': 'increasing',
-				'predicted_change': 0.12,
-				'forecast_horizon': 30,
-				'confidence': 0.73,
-				'generated_at': '2025-01-08T15:10:00Z'
-			},
-			{
-				'connection': 'User Activity',
-				'field': 'session_count',
-				'trend': 'stable',
-				'predicted_change': 0.02,
-				'forecast_horizon': 14,
-				'confidence': 0.85,
-				'generated_at': '2025-01-08T14:30:00Z'
+				'connection': self._job_for_insight(insight).get('connection_id'),
+				'field': next(iter(insight.get('affected_fields', [])), None),
+				'trend': insight.get('evidence', {}).get('trend_direction'),
+				'predicted_change': insight.get('evidence', {}).get('predicted_change'),
+				'forecast_horizon': insight.get('evidence', {}).get('forecast_horizon'),
+				'confidence': insight.get('confidence'),
+				'generated_at': insight.get('generated_at')
 			}
+			for insight in self._all_insights()
+			if insight.get('analysis_type') == AnalysisType.TIME_SERIES_FORECASTING.value
 		]
 
 
@@ -561,34 +584,34 @@ class MLInsightsChartsView(BaseView):
 	@has_access
 	def api_insights_timeline(self):
 		"""API endpoint for insights timeline chart"""
-		# Mock timeline data
+		insights = self._all_insights()
+		days = sorted({insight.get('generated_at', '')[:10] for insight in insights if insight.get('generated_at')})[-8:]
+		if not days:
+			days = [datetime.now(timezone.utc).date().isoformat()]
+		severities = ['critical', 'high', 'medium', 'low']
+		colors = {
+			'critical': '#dc3545',
+			'high': '#fd7e14',
+			'medium': '#ffc107',
+			'low': '#28a745'
+		}
 		timeline_data = {
-			'labels': ['Jan 1', 'Jan 2', 'Jan 3', 'Jan 4', 'Jan 5', 'Jan 6', 'Jan 7', 'Jan 8'],
+			'labels': days,
 			'datasets': [
 				{
-					'label': 'Critical',
-					'data': [2, 1, 3, 2, 4, 1, 2, 3],
-					'backgroundColor': '#dc3545',
-					'borderColor': '#dc3545'
-				},
-				{
-					'label': 'High',
-					'data': [5, 7, 4, 8, 6, 9, 7, 8],
-					'backgroundColor': '#fd7e14',
-					'borderColor': '#fd7e14'
-				},
-				{
-					'label': 'Medium',
-					'data': [8, 12, 10, 15, 11, 14, 12, 13],
-					'backgroundColor': '#ffc107',
-					'borderColor': '#ffc107'
-				},
-				{
-					'label': 'Low',
-					'data': [15, 18, 20, 17, 22, 19, 21, 20],
-					'backgroundColor': '#28a745',
-					'borderColor': '#28a745'
+					'label': severity.title(),
+					'data': [
+						sum(
+							1 for insight in insights
+							if insight.get('severity') == severity
+							and insight.get('generated_at', '').startswith(day)
+						)
+						for day in days
+					],
+					'backgroundColor': colors[severity],
+					'borderColor': colors[severity]
 				}
+				for severity in severities
 			]
 		}
 
@@ -598,17 +621,22 @@ class MLInsightsChartsView(BaseView):
 	@has_access
 	def api_analysis_distribution(self):
 		"""API endpoint for analysis type distribution"""
+		counts = Counter(insight['analysis_type'] for insight in self._all_insights())
+		analysis_types = [analysis_type.value for analysis_type in AnalysisType]
 		distribution_data = {
-			'labels': ['Anomaly Detection', 'Pattern Recognition', 'Data Profiling', 'Clustering', 'Forecasting', 'Sentiment'],
+			'labels': [analysis_type.replace('_', ' ').title() for analysis_type in analysis_types],
 			'datasets': [{
-				'data': [25, 18, 20, 12, 8, 5],
+				'data': [counts.get(analysis_type, 0) for analysis_type in analysis_types],
 				'backgroundColor': [
 					'#FF6384',
 					'#36A2EB',
 					'#FFCE56',
 					'#4BC0C0',
 					'#9966FF',
-					'#FF9F40'
+					'#FF9F40',
+					'#7CB342',
+					'#5C6BC0',
+					'#26A69A'
 				]
 			}]
 		}
@@ -619,11 +647,16 @@ class MLInsightsChartsView(BaseView):
 	@has_access
 	def api_confidence_scores(self):
 		"""API endpoint for confidence score distribution"""
+		buckets = [0, 0, 0, 0, 0]
+		for insight in self._all_insights():
+			confidence = max(0.0, min(1.0, float(insight.get('confidence', 0.0))))
+			bucket_index = min(int(confidence / 0.2), 4)
+			buckets[bucket_index] += 1
 		confidence_data = {
 			'labels': ['0.0-0.2', '0.2-0.4', '0.4-0.6', '0.6-0.8', '0.8-1.0'],
 			'datasets': [{
 				'label': 'Number of Insights',
-				'data': [2, 5, 12, 28, 35],
+				'data': buckets,
 				'backgroundColor': 'rgba(54, 162, 235, 0.6)',
 				'borderColor': 'rgba(54, 162, 235, 1)',
 				'borderWidth': 1

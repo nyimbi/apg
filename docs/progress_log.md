@@ -1109,3 +1109,24 @@ Current broader CONN monitoring findings:
 - Active connection and active flow metrics now have an executable in-process source instead of always reporting empty lists.
 - Service-level connection lifecycle changes now synchronize to the monitoring registry for active/inactive connection status.
 - Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities.
+
+### 2026-05-26 16:24 EAT
+
+Completed checkpoint:
+
+- Fixed CONN ML insights views so they import the actual SQLAlchemy connection model instead of failing on missing `CMConnection` aliases from the Pydantic model module.
+- Replaced ML insights view mock job IDs, mock status responses, and hardcoded insight lists with an in-process analysis job registry.
+- Wired ML analysis view/API execution to the existing `global_ml_insights_engine`, using deterministic connection-derived sample data or embedded `sample_records`/`sample_data` from connection metadata/config.
+- Reworked dashboard summaries, recent insights, connection stats, anomaly/cluster/pattern/forecast views, and chart payloads to derive from stored analysis jobs.
+- Added focused ML insights view runtime tests for job execution/storage, insight statistics, and embedded connection sample-record extraction.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/ml_insights_views.py capabilities/common/conn/tests/test_ml_insights_views_runtime.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_ml_insights_views_runtime.py` -> 3 passed, 12 warnings
+
+Current broader CONN ML insights findings:
+
+- ML insights UI/API routes now have an executable local analysis path instead of hardcoded demo results.
+- The view-level job registry is intentionally in-process; durable/background execution still needs APG shared job/event storage before cross-process analysis status is guaranteed.
+- Remaining warnings during focused pytest are pre-existing adjacent deprecation warnings plus a pandas dtype-selection warning in the underlying ML profiling code.
