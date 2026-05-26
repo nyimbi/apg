@@ -40,7 +40,7 @@ spec:
   sessionAffinity: None
 
 ---
-# Headless Service for StatefulSet (if needed for Bytewax)
+# Headless Service for API peer discovery
 apiVersion: v1
 kind: Service
 metadata:
@@ -144,64 +144,6 @@ spec:
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: apg-esb-redis
 
----
-# Bytewax Service
-apiVersion: v1
-kind: Service
-metadata:
-  name: bytewax
-  namespace: apg-event-streaming-bus
-  labels:
-    app.kubernetes.io/name: bytewax
-    app.kubernetes.io/instance: apg-esb-bytewax
-    app.kubernetes.io/component: message-broker
-spec:
-  type: ClusterIP
-  ports:
-    - name: bytewax
-      port: 9092
-      targetPort: 9092
-      protocol: TCP
-    - name: jmx
-      port: 9101
-      targetPort: 9101
-      protocol: TCP
-  selector:
-    app.kubernetes.io/name: bytewax
-    app.kubernetes.io/instance: apg-esb-bytewax
-
----
-# Bytewax Headless Service for StatefulSet
-apiVersion: v1
-kind: Service
-metadata:
-  name: bytewax-headless
-  namespace: apg-event-streaming-bus
-  labels:
-    app.kubernetes.io/name: bytewax
-    app.kubernetes.io/instance: apg-esb-bytewax
-    app.kubernetes.io/component: headless-service
-spec:
-  type: ClusterIP
-  clusterIP: None
-  ports:
-    - name: bytewax
-      port: 9092
-      targetPort: 9092
-      protocol: TCP
-    - name: bytewax-internal
-      port: 29092
-      targetPort: 29092
-      protocol: TCP
-    - name: controller
-      port: 29093
-      targetPort: 29093
-      protocol: TCP
-  selector:
-    app.kubernetes.io/name: bytewax
-    app.kubernetes.io/instance: apg-esb-bytewax
-
----
 # Monitoring Service for Prometheus Discovery
 apiVersion: v1
 kind: Service

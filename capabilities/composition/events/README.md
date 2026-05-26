@@ -342,9 +342,9 @@ DATABASE_MAX_OVERFLOW=30
 
 # Bytewax Configuration
 BYTEWAX_FLOW_ID=apg-event-streaming
-BYTEWAX_SECURITY_PROTOCOL=PLAINTEXT
-BYTEWAX_ACKS=all
-BYTEWAX_RETRIES=3
+BYTEWAX_WORKERS_PER_PROCESS=2
+BYTEWAX_RECOVERY_DIR=/app/data/bytewax-recovery
+BYTEWAX_EPOCH_INTERVAL_MS=1000
 
 # Redis Configuration
 REDIS_URL=redis://localhost:6379/0
@@ -509,7 +509,8 @@ docker run -d \
   --name esb \
   -p 8080:8080 \
   -e DATABASE_URL=postgresql://... \
-  -e BYTEWAX_FLOW_ID=bytewax:9092 \
+  -e BYTEWAX_FLOW_ID=apg-esb-production-flow \
+  -e BYTEWAX_RECOVERY_DIR=/app/data/bytewax-recovery \
   -e REDIS_URL=redis://redis:6379 \
   apg-event-streaming-bus
 ```
@@ -566,9 +567,8 @@ spec:
 
 **High Consumer Lag**
 ```bash
-# Check consumer group status
-bytewax-console-consumer.sh --bootstrap-server apg-event-streaming \
-  --describe --group your-consumer-group
+# Check APG stream status
+curl http://localhost:8080/api/v1/streams
 
 # Scale up consumers
 kubectl scale deployment consumer --replicas=6
@@ -579,14 +579,14 @@ kubectl scale deployment consumer --replicas=6
 # Check memory usage
 curl http://localhost:8080/api/v1/metrics | grep memory
 
-# Tune JVM settings for Bytewax
-export BYTEWAX_HEAP_OPTS="-Xmx2G -Xms2G"
+# Tune Bytewax worker parallelism
+export BYTEWAX_WORKERS_PER_PROCESS=2
 ```
 
 **Network Connectivity**
 ```bash
-# Test Bytewax connectivity
-bytewax-topics.sh --bootstrap-server apg-event-streaming --list
+# Check Bytewax dataflow configuration
+printenv BYTEWAX_FLOW_ID BYTEWAX_RECOVERY_DIR BYTEWAX_WORKERS_PER_PROCESS
 
 # Test Redis connectivity
 redis-cli ping

@@ -19,7 +19,9 @@ services:
       - ENV=development
       - DATABASE_URL=postgresql://esb_user:esb_password@postgres:5432/apg_event_streaming_bus
       - REDIS_URL=redis://redis:6379/0
-      - BYTEWAX_FLOW_ID=bytewax:9092
+      - BYTEWAX_FLOW_ID=apg-esb-dev-flow
+      - BYTEWAX_WORKERS_PER_PROCESS=2
+      - BYTEWAX_RECOVERY_DIR=/app/data/bytewax-recovery
       - LOG_LEVEL=DEBUG
       - API_PORT=8080
       - METRICS_PORT=9090
@@ -30,8 +32,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      bytewax:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
@@ -87,58 +87,6 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
-
-  # Bytewax (Zookeeper-less KRaft mode)
-  bytewax:
-    image: confluentinc/cp-bytewax:7.4.0
-    container_name: apg-esb-bytewax
-    ports:
-      - "9092:9092"
-      - "9101:9101"
-    environment:
-      BYTEWAX_NODE_ID: 1
-      BYTEWAX_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
-      BYTEWAX_ADVERTISED_LISTENERS: 'PLAINTEXT://bytewax:29092,PLAINTEXT_HOST://apg-event-streaming'
-      BYTEWAX_LISTENERS: 'PLAINTEXT://bytewax:29092,CONTROLLER://bytewax:29093,PLAINTEXT_HOST://0.0.0.0:9092'
-      BYTEWAX_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      BYTEWAX_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      BYTEWAX_CONTROLLER_QUORUM_VOTERS: '1@bytewax:29093'
-      BYTEWAX_PROCESS_ROLES: 'broker,controller'
-      BYTEWAX_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      BYTEWAX_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      BYTEWAX_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      BYTEWAX_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      BYTEWAX_LOG_DIRS: '/tmp/kraft-combined-logs'
-      BYTEWAX_JMX_PORT: 9101
-      BYTEWAX_JMX_HOSTNAME: localhost
-      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
-    volumes:
-      - bytewax_data:/tmp/kraft-combined-logs
-    networks:
-      - apg-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "bytewax-broker-api-versions", "--bootstrap-server", "bytewax:29092"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Bytewax UI for development
-  bytewax-ui:
-    image: provectuslabs/bytewax-ui:latest
-    container_name: apg-esb-bytewax-ui
-    ports:
-      - "8081:8080"
-    environment:
-      BYTEWAX_CLUSTERS_0_NAME: local
-      BYTEWAX_CLUSTERS_0_BOOTSTRAPSERVERS: bytewax:29092
-      BYTEWAX_CLUSTERS_0_METRICS_PORT: 9101
-    depends_on:
-      - bytewax
-    networks:
-      - apg-network
-    restart: unless-stopped
 
   # Prometheus for metrics collection
   prometheus:
@@ -227,8 +175,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  bytewax_data:
     driver: local
   prometheus_data:
     driver: local

@@ -21,13 +21,13 @@ data:
   METRICS_ENABLED: "true"
   TRACING_ENABLED: "true"
   
-  # Bytewax configuration
-  BYTEWAX_ACKS: "all"
-  BYTEWAX_RETRIES: "3"
-  BYTEWAX_COMPRESSION_TYPE: "snappy"
-  BYTEWAX_BATCH_SIZE: "16384"
-  BYTEWAX_LINGER_MS: "10"
-  BYTEWAX_MAX_REQUEST_SIZE: "1048576"
+  # Bytewax dataflow configuration
+  BYTEWAX_FLOW_ID: "apg-esb-production-flow"
+  BYTEWAX_WORKERS_PER_PROCESS: "2"
+  BYTEWAX_PROCESSES: "3"
+  BYTEWAX_RECOVERY_DIR: "/app/data/bytewax-recovery"
+  BYTEWAX_SNAPSHOT_INTERVAL_MS: "30000"
+  BYTEWAX_EPOCH_INTERVAL_MS: "1000"
   
   # Database configuration
   DATABASE_POOL_SIZE: "20"
@@ -76,65 +76,25 @@ metadata:
     app.kubernetes.io/instance: apg-esb-bytewax
     app.kubernetes.io/component: config
 data:
-  server.properties: |
-    # Bytewax broker configuration for APG Event Streaming Bus
-    
-    # Basic settings
-    broker.id=1
-    listeners=PLAINTEXT://0.0.0.0:9092
-    advertised.listeners=PLAINTEXT://bytewax:9092
-    
-    # Zookeeper connection (if using Zookeeper mode)
-    # zookeeper.connect=zookeeper:2181
-    
-    # KRaft mode settings (recommended)
-    process.roles=broker,controller
-    node.id=1
-    controller.quorum.voters=1@bytewax:9093
-    controller.listener.names=CONTROLLER
-    listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-    
-    # Log settings
-    log.dirs=/bytewax/bytewax-logs
-    num.network.threads=8
-    num.io.threads=8
-    socket.send.buffer.bytes=102400
-    socket.receive.buffer.bytes=102400
-    socket.request.max.bytes=104857600
-    
-    # Topic defaults
-    num.partitions=6
-    default.replication.factor=3
-    min.insync.replicas=2
-    
-    # Log retention
-    log.retention.hours=168
-    log.retention.bytes=1073741824
-    log.segment.bytes=1073741824
-    log.retention.check.interval.ms=300000
-    log.cleanup.policy=delete
-    
-    # Compression
-    compression.type=snappy
-    
-    # Performance tuning
-    replica.fetch.max.bytes=1048576
-    message.max.bytes=1000000
-    replica.socket.timeout.ms=30000
-    replica.socket.receive.buffer.bytes=65536
-    
-    # Group coordinator settings
-    group.initial.rebalance.delay.ms=3000
-    
-    # Transaction settings
-    transaction.state.log.replication.factor=3
-    transaction.state.log.min.isr=2
-    
-    # Metrics
-    metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
-    confluent.metrics.reporter.bootstrap.servers=bytewax:9092
-    confluent.metrics.reporter.topic.replicas=3
-    confluent.metrics.enable=true
+  dataflow.yaml: |
+    # Bytewax dataflow configuration for APG Event Streaming Bus.
+    # The dataflow runs in the APG API/worker containers; no external broker,
+    # controller quorum, or bootstrap endpoint is required.
+    flow_id: apg-esb-production-flow
+    module: capabilities.composition.events.service
+    runtime:
+      workers_per_process: 2
+      processes: 3
+      epoch_interval_ms: 1000
+      snapshot_interval_ms: 30000
+    recovery:
+      enabled: true
+      directory: /app/data/bytewax-recovery
+    streams:
+      events: apg-events
+      dead_letter: apg-events-dlq
+      metrics: apg-metrics
+      audit: apg-audit
 
 ---
 # Redis Configuration

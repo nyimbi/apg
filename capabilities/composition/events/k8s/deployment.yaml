@@ -129,19 +129,19 @@ spec:
             # Bytewax configuration
             - name: BYTEWAX_FLOW_ID
               valueFrom:
-                secretKeyRef:
-                  name: esb-secrets
-                  key: bytewax-bootstrap-servers
-            - name: BYTEWAX_ACKS
+                configMapKeyRef:
+                  name: esb-config
+                  key: BYTEWAX_FLOW_ID
+            - name: BYTEWAX_WORKERS_PER_PROCESS
               valueFrom:
                 configMapKeyRef:
                   name: esb-config
-                  key: BYTEWAX_ACKS
-            - name: BYTEWAX_RETRIES
+                  key: BYTEWAX_WORKERS_PER_PROCESS
+            - name: BYTEWAX_RECOVERY_DIR
               valueFrom:
                 configMapKeyRef:
                   name: esb-config
-                  key: BYTEWAX_RETRIES
+                  key: BYTEWAX_RECOVERY_DIR
             
             # Security configuration
             - name: JWT_SECRET_KEY
@@ -310,13 +310,6 @@ spec:
               done
               echo "Redis is ready"
               
-              echo "Waiting for Bytewax..."
-              until nc -z bytewax 9092; do
-                echo "Bytewax is not ready. Waiting..."
-                sleep 2
-              done
-              echo "Bytewax is ready"
-              
               echo "All dependencies are ready"
           securityContext:
             allowPrivilegeEscalation: false
@@ -404,9 +397,19 @@ spec:
                   key: redis-url
             - name: BYTEWAX_FLOW_ID
               valueFrom:
-                secretKeyRef:
-                  name: esb-secrets
-                  key: bytewax-bootstrap-servers
+                configMapKeyRef:
+                  name: esb-config
+                  key: BYTEWAX_FLOW_ID
+            - name: BYTEWAX_WORKERS_PER_PROCESS
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: BYTEWAX_WORKERS_PER_PROCESS
+            - name: BYTEWAX_RECOVERY_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: esb-config
+                  key: BYTEWAX_RECOVERY_DIR
             - name: POD_NAME
               valueFrom:
                 fieldRef:

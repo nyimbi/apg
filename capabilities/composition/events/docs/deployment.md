@@ -46,20 +46,23 @@ LOG_LEVEL=DEBUG
 DATABASE_URL=postgresql://esb_user:esb_password@localhost:5432/apg_esb_dev
 REDIS_URL=redis://localhost:6379/0
 BYTEWAX_FLOW_ID=apg-event-streaming
+BYTEWAX_RECOVERY_DIR=./data/bytewax-recovery
 
 # Staging (.env.staging)
 ENV=staging
 LOG_LEVEL=INFO
 DATABASE_URL=postgresql://esb_user:esb_password@postgres:5432/apg_esb_staging
 REDIS_URL=redis://redis:6379/0
-BYTEWAX_FLOW_ID=bytewax:9092
+BYTEWAX_FLOW_ID=apg-esb-staging-flow
+BYTEWAX_RECOVERY_DIR=/app/data/bytewax-recovery
 
 # Production (.env.prod)
 ENV=production
 LOG_LEVEL=INFO
 DATABASE_URL=postgresql://esb_user:esb_password@postgres:5432/apg_esb_prod
 REDIS_URL=redis://redis:6379/0
-BYTEWAX_FLOW_ID=bytewax:9092
+BYTEWAX_FLOW_ID=apg-esb-production-flow
+BYTEWAX_RECOVERY_DIR=/app/data/bytewax-recovery
 ```
 
 ### Security Configuration
@@ -125,7 +128,8 @@ docker run -d \
   -p 9090:9090 \
   -e DATABASE_URL=postgresql://... \
   -e REDIS_URL=redis://... \
-  -e BYTEWAX_FLOW_ID=bytewax:9092 \
+  -e BYTEWAX_FLOW_ID=apg-esb-production-flow \
+  -e BYTEWAX_RECOVERY_DIR=/app/data/bytewax-recovery \
   apg-event-streaming-bus:latest
 ```
 
@@ -388,15 +392,15 @@ kubectl run db-test --rm -i --restart=Never --image=postgres:15 -- \
 kubectl logs -f postgres-0 -n apg-event-streaming-bus
 ```
 
-#### 3. Bytewax Connection Issues
+#### 3. Bytewax Dataflow Issues
 
 ```bash
-# Test Bytewax connectivity
-kubectl run bytewax-test --rm -i --restart=Never --image=confluentinc/cp-bytewax:7.4.0 -- \
-  bytewax-topics --bootstrap-server bytewax:9092 --list
+# Check Bytewax dataflow configuration
+kubectl exec deploy/event-streaming-bus -n apg-event-streaming-bus -- \
+  printenv BYTEWAX_FLOW_ID BYTEWAX_RECOVERY_DIR BYTEWAX_WORKERS_PER_PROCESS
 
-# Check Bytewax logs
-kubectl logs -f bytewax-0 -n apg-event-streaming-bus
+# Check APG worker logs for Bytewax flow state
+kubectl logs -f deploy/event-streaming-bus-worker -n apg-event-streaming-bus
 ```
 
 #### 4. Memory Issues

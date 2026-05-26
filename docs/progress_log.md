@@ -1621,3 +1621,21 @@ Verification:
 - `.venv/bin/python -m py_compile capabilities/__init__.py tests/test_capability_contract_public_api.py`
 - `.venv/bin/python cli.py capabilities validate-contracts` -> `✓ Validated 101 capability contracts`
 - `git diff --check -- capabilities/__init__.py tests/test_capability_contract_public_api.py docs/capability_contracts.md docs/README.md README.md`
+
+### 2026-05-26 18:52 EAT
+
+Completed checkpoint:
+
+- Applied the platform direction that APG uses Bytewax dataflows, not a Kafka-compatible broker layer.
+- Removed the Event Streaming Bus Docker Compose Bytewax broker sidecar, Confluent UI, broker health check, and broker volume.
+- Replaced container entrypoint broker polling and topic creation with Bytewax dataflow configuration and recovery-directory initialization.
+- Reworked Kubernetes Bytewax configuration from broker/controller/bootstrap settings to dataflow, worker, recovery, epoch, and snapshot settings.
+- Removed Kubernetes Bytewax broker services and changed API/worker pods to receive `BYTEWAX_FLOW_ID`, `BYTEWAX_WORKERS_PER_PROCESS`, and `BYTEWAX_RECOVERY_DIR` from config.
+- Updated Event Streaming Bus deployment docs and README examples so Bytewax values are flow ids and recovery paths rather than broker endpoints.
+
+Verification:
+
+- Event Streaming Bus targeted legacy broker identifier search -> no matches
+- `bash -n capabilities/composition/events/docker/entrypoint.sh`
+- `.venv/bin/python -c "import yaml, pathlib; ..."` -> parsed 5 YAML files
+- `git diff --check -- capabilities/composition/events/docker-compose.yml capabilities/composition/events/docker/entrypoint.sh capabilities/composition/events/k8s/configmap.yaml capabilities/composition/events/k8s/secret.yaml capabilities/composition/events/k8s/deployment.yaml capabilities/composition/events/k8s/service.yaml capabilities/composition/events/README.md capabilities/composition/events/docs/deployment.md docs/progress_log.md`

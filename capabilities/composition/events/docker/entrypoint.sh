@@ -110,27 +110,24 @@ except Exception as e:
         success "Redis is ready"
     fi
     
-    # Wait for Bytewax
+    # Validate Bytewax runtime configuration. Bytewax runs as an in-process
+    # dataflow runtime for this service, so there is no broker endpoint to poll.
     if [ -n "$BYTEWAX_FLOW_ID" ]; then
-        log "Waiting for Bytewax..."
-        while ! python -c "
-from bytewax import BytewaxProducer
+        log "Validating Bytewax dataflow runtime..."
+        python -c "
 import os
-try:
-    producer = BytewaxProducer(
-        flow_id=os.environ['BYTEWAX_FLOW_ID'].split(','),
-        request_timeout_ms=5000
-    )
-    producer.close()
-    print('Bytewax is ready')
-except Exception as e:
-    print(f'Bytewax not ready: {e}')
-    exit(1)
-" 2>/dev/null; do
-            warn "Bytewax is not ready. Waiting..."
-            sleep 2
-        done
-        success "Bytewax is ready"
+flow_id = os.environ['BYTEWAX_FLOW_ID'].strip()
+if not flow_id:
+    raise SystemExit('BYTEWAX_FLOW_ID must not be empty')
+recovery_dir = os.environ.get('BYTEWAX_RECOVERY_DIR')
+if recovery_dir:
+    os.makedirs(recovery_dir, exist_ok=True)
+print(f'Bytewax flow configured: {flow_id}')
+" || {
+            error "Bytewax dataflow configuration is invalid"
+            exit 1
+        }
+        success "Bytewax dataflow runtime configured"
     fi
 }
 
@@ -154,37 +151,21 @@ initialize_database() {
     fi
 }
 
-# Initialize Bytewax topics
+# Initialize Bytewax dataflow state
 initialize_bytewax() {
-    log "Initializing Bytewax topics..."
+    log "Initializing Bytewax dataflow state..."
     
     if [ -n "$BYTEWAX_FLOW_ID" ]; then
-        # Create default topics
         python -c "
-from bytewax.admin import BytewaxAdminClient, NewTopic
 import os
 
-admin_client = BytewaxAdminClient(
-    flow_id=os.environ['BYTEWAX_FLOW_ID'].split(','),
-    client_id='esb_admin'
-)
-
-topics = [
-    NewTopic(name='apg-events', num_partitions=6, replication_factor=1),
-    NewTopic(name='apg-events-dlq', num_partitions=3, replication_factor=1),
-    NewTopic(name='apg-metrics', num_partitions=3, replication_factor=1),
-    NewTopic(name='apg-audit', num_partitions=3, replication_factor=1)
-]
-
-try:
-    admin_client.create_topics(topics)
-    print('Bytewax topics created successfully')
-except Exception as e:
-    print(f'Bytewax topic creation: {e}')
-finally:
-    admin_client.close()
+flow_id = os.environ['BYTEWAX_FLOW_ID'].strip()
+recovery_dir = os.environ.get('BYTEWAX_RECOVERY_DIR', '/app/data/bytewax-recovery')
+workers = os.environ.get('BYTEWAX_WORKERS_PER_PROCESS', '1')
+os.makedirs(recovery_dir, exist_ok=True)
+print(f'Bytewax flow {flow_id} initialized with {workers} worker(s) per process')
 "
-        success "Bytewax topics initialized"
+        success "Bytewax dataflow state initialized"
     else
         warn "No BYTEWAX_FLOW_ID provided, skipping Bytewax initialization"
     fi
