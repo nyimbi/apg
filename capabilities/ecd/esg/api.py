@@ -13,10 +13,11 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Any, Optional, Union
-from fastapi import FastAPI, HTTPException, Depends, Query, Path, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Depends, Query, Path, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, ValidationError
@@ -61,13 +62,81 @@ async def get_database_session() -> Session:
 	# In real implementation, this would use APG's database session manager
 	pass
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
-	"""Get current authenticated user from APG auth service"""
-	# Implementation would integrate with APG's auth_rbac service
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a non-empty stripped string or None."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+def _split_permissions(value: Any) -> List[str]:
+	if value is None:
+		return []
+	if isinstance(value, (list, tuple, set)):
+		return [text for item in value if (text := _clean_text(item))]
+	return [text for item in str(value).replace(" ", "").split(",") if (text := _clean_text(item))]
+
+async def get_current_user(
+	request: Request,
+	credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> Dict[str, Any]:
+	"""Resolve authenticated APG user context from request state, headers, query, or environment."""
+	state = getattr(request, "state", None)
+	state_user = (
+		_object_value(state, "current_user")
+		or _object_value(state, "user")
+		or _object_value(state, "auth_user")
+	)
+	headers = request.headers
+	query = request.query_params
+
+	user_id = _first_text([
+		_object_value(state_user, "user_id"),
+		_object_value(state_user, "id"),
+		_object_value(state_user, "username"),
+		_object_value(state, "user_id"),
+		headers.get("X-User-ID"),
+		headers.get("X-APG-User-ID"),
+		query.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
+	tenant_id = _first_text([
+		_object_value(state_user, "tenant_id"),
+		_object_value(state, "tenant_id"),
+		headers.get("X-Tenant-ID"),
+		headers.get("X-APG-Tenant-ID"),
+		headers.get("X-Organization-ID"),
+		query.get("tenant_id"),
+		query.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], os.getenv("APG_DEFAULT_TENANT_ID", "default"))
+	permissions = (
+		_split_permissions(_object_value(state_user, "permissions"))
+		or _split_permissions(_object_value(state, "permissions"))
+		or _split_permissions(headers.get("X-APG-Permissions"))
+		or _split_permissions(os.getenv("APG_DEFAULT_PERMISSIONS"))
+		or ["esg:read"]
+	)
+
 	return {
-		"user_id": "demo_user",
-		"tenant_id": "demo_tenant",
-		"permissions": ["esg:read", "esg:write", "esg:admin"]
+		"user_id": user_id,
+		"tenant_id": tenant_id,
+		"permissions": permissions,
+		"token_scheme": credentials.scheme,
 	}
 
 async def get_esg_service(

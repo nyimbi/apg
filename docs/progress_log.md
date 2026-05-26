@@ -2788,3 +2788,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_context_fallback_hygiene.py tests/test_bia_tsa_context_resolution.py tests/test_common_cvsn_context_resolution.py tests/test_common_geos_context_resolution.py tests/test_composition_gateway_tenant_resolution.py tests/test_ecd_esg_context_resolution.py tests/test_fin_apy_context_resolution.py tests/test_fin_auc_context_resolution.py tests/test_fin_fed_context_resolution.py tests/test_fin_glr_context_resolution.py tests/test_fin_rpt_context_resolution.py tests/test_hcm_employee_context_resolution.py tests/test_hcm_tat_context_resolution.py tests/test_mfg_mro_context_resolution.py tests/test_pde_pim_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 30 passed
 - `rg -n "os\\.getenv\\(['\"]APG_DEFAULT_TENANT_ID['\"], ['\"]default_tenant['\"]\\)|['\"]default_tenant['\"]" capabilities/pde/pim/context.py capabilities/hcm/tat/time_attendance/context.py capabilities/ecd/esg/context.py capabilities/bia/tsa/context.py capabilities/fin/glr/general_ledger/context.py capabilities/fin/rpt/context.py capabilities/fin/fed/context.py capabilities/fintech/gateway/context.py capabilities/hcm/chr/employee_data_management/context.py capabilities/fin/auc/context.py capabilities/common/geos/context.py capabilities/fin/apy/accounts_payable/context.py capabilities/composition/gateway/context.py capabilities/mfg/mro/context.py capabilities/common/cvsn/context.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:28 EAT
+
+Completed checkpoint:
+
+- Replaced the ESG FastAPI auth dependency's fixed `demo_user`/`demo_tenant`/admin permission context with request-derived APG identity.
+- ESG API auth now resolves user, tenant, and permissions from FastAPI request state, APG headers, query args, and configured environment fallbacks.
+- Reduced the fallback permission from fixed admin privileges to `esg:read` when no APG permissions are provided.
+- Extended focused ESG context regression coverage to include the FastAPI auth dependency.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/ecd/esg/api.py tests/test_ecd_esg_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_ecd_esg_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "demo_user|demo_tenant|esg:admin|fixed demo|Implementation would integrate" capabilities/ecd/esg/api.py` -> no matches
+- `git diff --check` -> no issues
