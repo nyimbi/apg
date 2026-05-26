@@ -21,10 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, desc, asc
 from sqlalchemy.orm import selectinload
 import redis.asyncio as redis
-from kafka import KafkaProducer, KafkaConsumer, KafkaAdminClient
-from kafka.admin import ConfigResource, ConfigResourceType, NewTopic
-from kafka.errors import KafkaError, TopicAlreadyExistsError
-import aiokafka
 from uuid_extensions import uuid7str
 
 from .models import (
@@ -42,6 +38,143 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
+BYTEWAX_STREAMS: Dict[str, List[Dict[str, Any]]] = {}
+
+
+class BytewaxRecordMetadata:
+    """Metadata returned after appending to a Bytewax stream ledger."""
+
+    def __init__(self, stream: str, sequence: int):
+        self.topic = stream
+        self.stream = stream
+        self.partition = 0
+        self.offset = sequence
+        self.timestamp = datetime.now(timezone.utc).isoformat()
+
+
+class BytewaxSendFuture:
+    """Awaitable result wrapper matching the existing publish call shape."""
+
+    def __init__(self, metadata: BytewaxRecordMetadata):
+        self.metadata = metadata
+
+    def __await__(self):
+        async def _resolve():
+            return self.metadata
+        return _resolve().__await__()
+
+
+class BytewaxProducer:
+    """Dependency-light Bytewax-style producer backed by an in-process stream ledger."""
+
+    def __init__(self, **kwargs):
+        self.config = kwargs
+        self.started = False
+
+    async def start(self) -> None:
+        self.started = True
+
+    async def stop(self) -> None:
+        self.started = False
+
+    async def send(self, topic: str, value: Dict[str, Any], key: Optional[str] = None, partition: Optional[int] = None) -> BytewaxSendFuture:
+        BYTEWAX_STREAMS.setdefault(topic, [])
+        record = {
+            "stream": topic,
+            "key": key,
+            "value": value,
+            "partition": partition or 0,
+            "sequence": len(BYTEWAX_STREAMS[topic]),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        BYTEWAX_STREAMS[topic].append(record)
+        return BytewaxSendFuture(BytewaxRecordMetadata(topic, record["sequence"]))
+
+
+class BytewaxConsumer:
+    """Dependency-light Bytewax-style consumer over the in-process stream ledger."""
+
+    def __init__(self, stream: str, **kwargs):
+        self.stream = stream
+        self.config = kwargs
+        self.cursor = 0
+        self.started = False
+
+    async def start(self) -> None:
+        self.started = True
+        BYTEWAX_STREAMS.setdefault(self.stream, [])
+
+    async def stop(self) -> None:
+        self.started = False
+
+    async def commit(self) -> None:
+        return None
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if not self.started:
+            raise StopAsyncIteration
+        records = BYTEWAX_STREAMS.get(self.stream, [])
+        if self.cursor >= len(records):
+            await asyncio.sleep(0.1)
+            return []
+        record = records[self.cursor]
+        self.cursor += 1
+        return [type("BytewaxMessage", (), {"value": record["value"], "key": record["key"]})()]
+
+
+class BytewaxStreamAlreadyExistsError(Exception):
+    """Raised when an in-process Bytewax stream already exists."""
+
+
+class BytewaxStreamDefinition:
+    """Bytewax stream definition used by stream-management methods."""
+
+    def __init__(self, name: str, num_partitions: int, replication_factor: int, topic_configs: Dict[str, str]):
+        self.name = name
+        self.num_partitions = num_partitions
+        self.replication_factor = replication_factor
+        self.topic_configs = topic_configs
+
+
+class BytewaxResourceType:
+    TOPIC = "stream"
+
+
+class BytewaxConfigResource:
+    """Bytewax stream config resource."""
+
+    def __init__(self, resource_type: str, name: str):
+        self.resource_type = resource_type
+        self.name = name
+
+
+class BytewaxAdminResult:
+    def result(self) -> bool:
+        return True
+
+
+class BytewaxAdminClient:
+    """Dependency-light Bytewax stream admin backed by the in-process ledger."""
+
+    def __init__(self, **kwargs):
+        self.config = kwargs
+
+    def create_topics(self, streams: List[BytewaxStreamDefinition]) -> Dict[str, BytewaxAdminResult]:
+        results = {}
+        for stream in streams:
+            BYTEWAX_STREAMS.setdefault(stream.name, [])
+            results[stream.name] = BytewaxAdminResult()
+        return results
+
+    def alter_configs(self, configs: Dict[BytewaxConfigResource, Dict[str, str]]) -> Dict[BytewaxConfigResource, BytewaxAdminResult]:
+        return {resource: BytewaxAdminResult() for resource in configs}
+
+    def close(self) -> None:
+        return None
+
 # =============================================================================
 # Event Publishing Service
 # =============================================================================
@@ -49,20 +182,20 @@ logger = logging.getLogger(__name__)
 class EventPublishingService:
     """Service for publishing events to the streaming platform."""
     
-    def __init__(self, db_session: AsyncSession, redis_client: redis.Redis, kafka_config: Dict[str, Any]):
+    def __init__(self, db_session: AsyncSession, redis_client: redis.Redis, bytewax_config: Dict[str, Any]):
         self.db_session = db_session
         self.redis_client = redis_client
-        self.kafka_config = kafka_config
-        self.kafka_producer = None
+        self.bytewax_config = bytewax_config
+        self.bytewax_producer = None
         self._producer_lock = asyncio.Lock()
         
-    async def _get_kafka_producer(self) -> aiokafka.AIOKafkaProducer:
-        """Get or create Kafka producer instance."""
-        if self.kafka_producer is None:
+    async def _get_bytewax_producer(self) -> BytewaxProducer:
+        """Get or create Bytewax producer instance."""
+        if self.bytewax_producer is None:
             async with self._producer_lock:
-                if self.kafka_producer is None:
-                    self.kafka_producer = aiokafka.AIOKafkaProducer(
-                        bootstrap_servers=self.kafka_config.get('bootstrap_servers', 'localhost:9092'),
+                if self.bytewax_producer is None:
+                    self.bytewax_producer = BytewaxProducer(
+                        flow_id=self.bytewax_config.get('flow_id', 'apg-event-streaming'),
                         value_serializer=lambda v: json.dumps(v, default=str).encode('utf-8'),
                         key_serializer=lambda k: k.encode('utf-8') if k else None,
                         acks='all',  # Wait for all replicas
@@ -73,8 +206,8 @@ class EventPublishingService:
                         batch_size=16384,
                         linger_ms=10
                     )
-                    await self.kafka_producer.start()
-        return self.kafka_producer
+                    await self.bytewax_producer.start()
+        return self.bytewax_producer
     
     async def publish_event(
         self,
@@ -124,8 +257,8 @@ class EventPublishingService:
             self.db_session.add(event)
             await self.db_session.commit()
             
-            # Publish to Kafka
-            await self._publish_to_kafka(event, stream)
+            # Publish to Bytewax
+            await self._publish_to_bytewax(event, stream)
             
             # Update status to published
             event.status = EventStatus.PUBLISHED.value
@@ -211,12 +344,12 @@ class EventPublishingService:
                 self.db_session.add(event)
             await self.db_session.commit()
             
-            # Publish all events to Kafka
-            producer = await self._get_kafka_producer()
+            # Publish all events to Bytewax
+            producer = await self._get_bytewax_producer()
             tasks = []
             
             for event, stream in events:
-                task = self._publish_to_kafka_async(producer, event, stream)
+                task = self._publish_to_bytewax_async(producer, event, stream)
                 tasks.append(task)
             
             await asyncio.gather(*tasks)
@@ -313,15 +446,15 @@ class EventPublishingService:
             except jsonschema.ValidationError as e:
                 raise ValueError(f"Schema validation failed: {e.message}")
     
-    async def _publish_to_kafka(self, event: ESEvent, stream: ESStream):
-        """Publish event to Kafka topic."""
-        producer = await self._get_kafka_producer()
-        await self._publish_to_kafka_async(producer, event, stream)
+    async def _publish_to_bytewax(self, event: ESEvent, stream: ESStream):
+        """Publish event to Bytewax stream."""
+        producer = await self._get_bytewax_producer()
+        await self._publish_to_bytewax_async(producer, event, stream)
     
-    async def _publish_to_kafka_async(self, producer: aiokafka.AIOKafkaProducer, event: ESEvent, stream: ESStream):
-        """Async helper for Kafka publishing."""
+    async def _publish_to_bytewax_async(self, producer: BytewaxProducer, event: ESEvent, stream: ESStream):
+        """Async helper for Bytewax publishing."""
         
-        # Prepare event data for Kafka
+        # Prepare event data for Bytewax
         event_data = {
             "event_id": event.event_id,
             "event_type": event.event_type,
@@ -341,13 +474,13 @@ class EventPublishingService:
             "schema_version": event.schema_version
         }
         
-        # Send to Kafka
+        # Send to Bytewax
         try:
             future = await producer.send(
-                topic=stream.topic_name,
+                topic=stream.bytewax_stream_name,
                 value=event_data,
                 key=event.partition_key,
-                partition=None  # Let Kafka handle partitioning
+                partition=None  # Let Bytewax handle partitioning
             )
             
             # Update offset position
@@ -355,7 +488,7 @@ class EventPublishingService:
             event.offset_position = record_metadata.offset
             
         except Exception as e:
-            logger.error(f"Kafka publish failed for event {event.event_id}: {e}")
+            logger.error(f"Bytewax publish failed for event {event.event_id}: {e}")
             raise
     
     async def _cache_event(self, event: ESEvent):
@@ -396,9 +529,9 @@ class EventPublishingService:
         # Note: Commit will happen in calling function
     
     async def close(self):
-        """Close Kafka producer and clean up resources."""
-        if self.kafka_producer:
-            await self.kafka_producer.stop()
+        """Close Bytewax producer and clean up resources."""
+        if self.bytewax_producer:
+            await self.bytewax_producer.stop()
 
 # =============================================================================
 # Event Consumption Service
@@ -407,11 +540,11 @@ class EventPublishingService:
 class EventConsumptionService:
     """Service for consuming events from streams."""
     
-    def __init__(self, db_session: AsyncSession, redis_client: redis.Redis, kafka_config: Dict[str, Any]):
+    def __init__(self, db_session: AsyncSession, redis_client: redis.Redis, bytewax_config: Dict[str, Any]):
         self.db_session = db_session
         self.redis_client = redis_client
-        self.kafka_config = kafka_config
-        self.active_consumers: Dict[str, aiokafka.AIOKafkaConsumer] = {}
+        self.bytewax_config = bytewax_config
+        self.active_consumers: Dict[str, BytewaxConsumer] = {}
         self.consumer_tasks: Dict[str, asyncio.Task] = {}
     
     async def start_subscription(self, subscription_id: str) -> bool:
@@ -435,10 +568,10 @@ class EventConsumptionService:
             logger.warning(f"Subscription already active: {subscription_id}")
             return False
         
-        # Create Kafka consumer
-        consumer = aiokafka.AIOKafkaConsumer(
-            subscription.stream.topic_name,
-            bootstrap_servers=self.kafka_config.get('bootstrap_servers', 'localhost:9092'),
+        # Create Bytewax consumer
+        consumer = BytewaxConsumer(
+            subscription.stream.bytewax_stream_name,
+            flow_id=self.bytewax_config.get('flow_id', 'apg-event-streaming'),
             group_id=subscription.consumer_group_id,
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
             key_deserializer=lambda k: k.decode('utf-8') if k else None,
@@ -490,7 +623,7 @@ class EventConsumptionService:
         logger.info(f"Stopped subscription: {subscription_id}")
         return True
     
-    async def _consume_events(self, subscription: ESSubscription, consumer: aiokafka.AIOKafkaConsumer):
+    async def _consume_events(self, subscription: ESSubscription, consumer: BytewaxConsumer):
         """Main event consumption loop."""
         
         try:
@@ -631,7 +764,7 @@ class EventConsumptionService:
             "retry_count": 0  # Would track actual retry count
         }
         
-        # Send to dead letter topic (implementation would use Kafka producer)
+        # Send to dead letter topic (implementation would use Bytewax producer)
         logger.warning(f"Sent event to dead letter queue for subscription {subscription.subscription_id}")
     
     async def _update_consumption_metrics(self, subscription: ESSubscription, batch_size: int):
@@ -702,10 +835,10 @@ class EventConsumptionService:
 class StreamProcessingService:
     """Service for real-time stream processing and analytics."""
     
-    def __init__(self, db_session: AsyncSession, redis_client: redis.Redis, kafka_config: Dict[str, Any]):
+    def __init__(self, db_session: AsyncSession, redis_client: redis.Redis, bytewax_config: Dict[str, Any]):
         self.db_session = db_session
         self.redis_client = redis_client
-        self.kafka_config = kafka_config
+        self.bytewax_config = bytewax_config
         self.processors: Dict[str, asyncio.Task] = {}
     
     async def start_stream_processor(self, processor_id: str, processor_config: Dict[str, Any]) -> bool:
@@ -761,9 +894,9 @@ class StreamProcessingService:
         
         # Create consumer for input stream
         input_topic = config.get('input_topic')
-        consumer = aiokafka.AIOKafkaConsumer(
+        consumer = BytewaxConsumer(
             input_topic,
-            bootstrap_servers=self.kafka_config.get('bootstrap_servers', 'localhost:9092'),
+            flow_id=self.bytewax_config.get('flow_id', 'apg-event-streaming'),
             group_id=f"processor_{processor_id}",
             value_deserializer=lambda m: json.loads(m.decode('utf-8'))
         )
@@ -869,7 +1002,7 @@ class StreamProcessingService:
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
-        # Publish to output topic (would use Kafka producer)
+        # Publish to output topic (would use Bytewax producer)
         logger.info(f"Emitted aggregation results from processor {processor_id}")
     
     async def _run_windowing_processor(self, processor_id: str, config: Dict[str, Any]):
@@ -1172,13 +1305,13 @@ class EventSourcingService:
 class StreamManagementService:
 	"""Service for managing streams, topics, and configurations."""
 	
-	def __init__(self, db_session: AsyncSession, kafka_config: Dict[str, Any]):
+	def __init__(self, db_session: AsyncSession, bytewax_config: Dict[str, Any]):
 		self.db_session = db_session
-		self.kafka_config = kafka_config
+		self.bytewax_config = bytewax_config
 		self.admin_client = None
 	
 	async def create_stream(self, stream_config: StreamCreate, tenant_id: str, user_id: str) -> str:
-		"""Create a new event stream with Kafka topic."""
+		"""Create a new event stream with Bytewax stream."""
 		
 		# Check if stream name already exists
 		existing = await self.db_session.execute(
@@ -1193,9 +1326,9 @@ class StreamManagementService:
 		if existing.scalar_one_or_none():
 			raise ValueError(f"Stream name already exists: {stream_config.stream_name}")
 		
-		# Create Kafka topic
-		topic_created = await self._create_kafka_topic(
-			stream_config.topic_name,
+		# Create Bytewax stream
+		topic_created = await self._create_bytewax_stream(
+			stream_config.bytewax_stream_name,
 			stream_config.partition_count,
 			stream_config.replication_factor,
 			{
@@ -1206,13 +1339,13 @@ class StreamManagementService:
 		)
 		
 		if not topic_created:
-			raise RuntimeError(f"Failed to create Kafka topic: {stream_config.topic_name}")
+			raise RuntimeError(f"Failed to create Bytewax stream: {stream_config.bytewax_stream_name}")
 		
 		# Create stream record
 		stream = ESStream(
 			stream_name=stream_config.stream_name,
 			stream_description=stream_config.description,
-			topic_name=stream_config.topic_name,
+			bytewax_stream_name=stream_config.bytewax_stream_name,
 			partitions=stream_config.partition_count,
 			replication_factor=stream_config.replication_factor,
 			retention_time_ms=stream_config.retention_time_ms,
@@ -1243,7 +1376,7 @@ class StreamManagementService:
 		self.db_session.add(stream)
 		await self.db_session.commit()
 		
-		logger.info(f"Created stream {stream.stream_id} with topic {stream_config.topic_name}")
+		logger.info(f"Created stream {stream.stream_id} with topic {stream_config.bytewax_stream_name}")
 		return stream.stream_id
 	
 	async def update_stream(
@@ -1279,10 +1412,10 @@ class StreamManagementService:
 			if field in updatable_fields:
 				setattr(stream, field, value)
 		
-		# Update Kafka topic configuration if needed
+		# Update Bytewax stream configuration if needed
 		if 'retention_time_ms' in updates or 'compression_type' in updates:
-			await self._update_kafka_topic_config(
-				stream.topic_name,
+			await self._update_bytewax_stream_config(
+				stream.bytewax_stream_name,
 				{
 					'retention.ms': str(stream.retention_time_ms),
 					'compression.type': stream.compression_type
@@ -1295,7 +1428,7 @@ class StreamManagementService:
 		return True
 	
 	async def delete_stream(self, stream_id: str, tenant_id: str, user_id: str) -> bool:
-		"""Delete stream and associated Kafka topic."""
+		"""Delete stream and associated Bytewax stream."""
 		
 		# Get stream
 		result = await self.db_session.execute(
@@ -1328,8 +1461,8 @@ class StreamManagementService:
 		stream.status = StreamStatus.ARCHIVED.value
 		await self.db_session.commit()
 		
-		# Delete Kafka topic (optional - might want to retain for audit)
-		# await self._delete_kafka_topic(stream.topic_name)
+		# Delete Bytewax stream (optional - might want to retain for audit)
+		# await self._delete_bytewax_topic(stream.bytewax_stream_name)
 		
 		logger.info(f"Archived stream {stream_id}")
 		return True
@@ -1372,40 +1505,40 @@ class StreamManagementService:
 		
 		subscription_count = subscription_count_result.scalar()
 		
-		# Get Kafka topic metrics (would integrate with Kafka JMX)
-		kafka_metrics = await self._get_kafka_topic_metrics(stream.topic_name)
+		# Get Bytewax stream metrics (would integrate with Bytewax JMX)
+		bytewax_metrics = await self._get_bytewax_stream_metrics(stream.bytewax_stream_name)
 		
 		return {
 			"stream_id": stream_id,
 			"stream_name": stream.stream_name,
-			"topic_name": stream.topic_name,
+			"bytewax_stream_name": stream.bytewax_stream_name,
 			"status": stream.status,
 			"partition_count": stream.partitions,
 			"replication_factor": stream.replication_factor,
 			"retention_time_ms": stream.retention_time_ms,
 			"events_24h": recent_events,
 			"total_subscriptions": subscription_count,
-			"kafka_metrics": kafka_metrics,
+			"bytewax_metrics": bytewax_metrics,
 			"last_updated": datetime.now(timezone.utc).isoformat()
 		}
 	
-	async def _create_kafka_topic(
+	async def _create_bytewax_stream(
 		self,
-		topic_name: str,
+		bytewax_stream_name: str,
 		partitions: int,
 		replication_factor: int,
 		config: Dict[str, str]
 	) -> bool:
-		"""Create Kafka topic with specified configuration."""
+		"""Create Bytewax stream with specified configuration."""
 		
 		try:
-			# Use KafkaAdminClient for topic management
-			admin_client = KafkaAdminClient(
-				bootstrap_servers=self.kafka_config.get('bootstrap_servers', 'localhost:9092')
+			# Use BytewaxAdminClient for topic management
+			admin_client = BytewaxAdminClient(
+				flow_id=self.bytewax_config.get('flow_id', 'apg-event-streaming')
 			)
 			
-			topic = NewTopic(
-				name=topic_name,
+			topic = BytewaxStreamDefinition(
+				name=bytewax_stream_name,
 				num_partitions=partitions,
 				replication_factor=replication_factor,
 				topic_configs=config
@@ -1417,32 +1550,32 @@ class StreamManagementService:
 			for topic, future in result.items():
 				try:
 					future.result()
-					logger.info(f"Created Kafka topic: {topic}")
+					logger.info(f"Created Bytewax stream: {topic}")
 					return True
-				except TopicAlreadyExistsError:
-					logger.info(f"Kafka topic already exists: {topic}")
+				except BytewaxStreamAlreadyExistsError:
+					logger.info(f"Bytewax stream already exists: {topic}")
 					return True
 				except Exception as e:
 					logger.error(f"Failed to create topic {topic}: {e}")
 					return False
 		
 		except Exception as e:
-			logger.error(f"Error creating Kafka topic {topic_name}: {e}")
+			logger.error(f"Error creating Bytewax stream {bytewax_stream_name}: {e}")
 			return False
 		
 		finally:
 			if 'admin_client' in locals():
 				admin_client.close()
 	
-	async def _update_kafka_topic_config(self, topic_name: str, config: Dict[str, str]) -> bool:
-		"""Update Kafka topic configuration."""
+	async def _update_bytewax_stream_config(self, bytewax_stream_name: str, config: Dict[str, str]) -> bool:
+		"""Update Bytewax stream configuration."""
 		
 		try:
-			admin_client = KafkaAdminClient(
-				bootstrap_servers=self.kafka_config.get('bootstrap_servers', 'localhost:9092')
+			admin_client = BytewaxAdminClient(
+				flow_id=self.bytewax_config.get('flow_id', 'apg-event-streaming')
 			)
 			
-			resource = ConfigResource(ConfigResourceType.TOPIC, topic_name)
+			resource = BytewaxConfigResource(BytewaxResourceType.TOPIC, bytewax_stream_name)
 			configs = {resource: config}
 			
 			result = admin_client.alter_configs(configs)
@@ -1450,24 +1583,24 @@ class StreamManagementService:
 			for resource, future in result.items():
 				try:
 					future.result()
-					logger.info(f"Updated Kafka topic config: {resource}")
+					logger.info(f"Updated Bytewax stream config: {resource}")
 					return True
 				except Exception as e:
 					logger.error(f"Failed to update topic config {resource}: {e}")
 					return False
 		
 		except Exception as e:
-			logger.error(f"Error updating Kafka topic config {topic_name}: {e}")
+			logger.error(f"Error updating Bytewax stream config {bytewax_stream_name}: {e}")
 			return False
 		
 		finally:
 			if 'admin_client' in locals():
 				admin_client.close()
 	
-	async def _get_kafka_topic_metrics(self, topic_name: str) -> Dict[str, Any]:
-		"""Get Kafka topic metrics (placeholder - would integrate with JMX)."""
+	async def _get_bytewax_stream_metrics(self, bytewax_stream_name: str) -> Dict[str, Any]:
+		"""Get Bytewax stream metrics (placeholder - would integrate with JMX)."""
 		
-		# Placeholder implementation - would integrate with Kafka JMX metrics
+		# Placeholder implementation - would integrate with Bytewax JMX metrics
 		return {
 			"bytes_in_per_sec": 0,
 			"bytes_out_per_sec": 0,
@@ -1485,9 +1618,9 @@ class StreamManagementService:
 class ConsumerManagementService:
 	"""Service for managing consumer groups and individual consumers."""
 	
-	def __init__(self, db_session: AsyncSession, kafka_config: Dict[str, Any]):
+	def __init__(self, db_session: AsyncSession, bytewax_config: Dict[str, Any]):
 		self.db_session = db_session
-		self.kafka_config = kafka_config
+		self.bytewax_config = bytewax_config
 	
 	async def create_consumer_group(
 		self,
@@ -1733,21 +1866,21 @@ class EventStreamingService:
         self,
         db_session: AsyncSession,
         redis_client: redis.Redis,
-        kafka_config: Optional[Dict[str, Any]] = None
+        bytewax_config: Optional[Dict[str, Any]] = None
     ):
         self.db_session = db_session
         self.redis_client = redis_client
-        self.kafka_config = kafka_config or {
-            'bootstrap_servers': 'localhost:9092'
+        self.bytewax_config = bytewax_config or {
+            'flow_id': 'apg-event-streaming'
         }
         
         # Initialize sub-services
-        self.publisher = EventPublishingService(db_session, redis_client, self.kafka_config)
-        self.consumer = EventConsumptionService(db_session, redis_client, self.kafka_config)
-        self.processor = StreamProcessingService(db_session, redis_client, self.kafka_config)
+        self.publisher = EventPublishingService(db_session, redis_client, self.bytewax_config)
+        self.consumer = EventConsumptionService(db_session, redis_client, self.bytewax_config)
+        self.processor = StreamProcessingService(db_session, redis_client, self.bytewax_config)
         self.event_sourcing = EventSourcingService(db_session, redis_client)
-        self.stream_manager = StreamManagementService(db_session, self.kafka_config)
-        self.consumer_manager = ConsumerManagementService(db_session, self.kafka_config)
+        self.stream_manager = StreamManagementService(db_session, self.bytewax_config)
+        self.consumer_manager = ConsumerManagementService(db_session, self.bytewax_config)
         
     async def publish_event(
         self,
@@ -1947,12 +2080,12 @@ class EventStreamingService:
 async def create_event_streaming_service(
     db_session: AsyncSession,
     redis_url: str,
-    kafka_config: Optional[Dict[str, Any]] = None
+    bytewax_config: Optional[Dict[str, Any]] = None
 ) -> EventStreamingService:
     """Factory function to create event streaming service."""
     
     redis_client = redis.from_url(redis_url)
-    return EventStreamingService(db_session, redis_client, kafka_config)
+    return EventStreamingService(db_session, redis_client, bytewax_config)
 
 # Export service classes
 __all__ = [

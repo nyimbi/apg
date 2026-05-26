@@ -487,12 +487,12 @@ def register_apg_integration(apg_registry):
 		'capability_id': 'event_streaming_bus',
 		'capability_name': 'Event Streaming Bus',
 		'capability_version': '1.0.0',
-		'capability_description': 'Enterprise-grade event streaming platform with Apache Kafka',
+		'capability_description': 'Enterprise-grade event streaming platform with Bytewax',
 		'capability_category': 'composition_orchestration',
 		'author': 'Nyimbi Odero',
 		'company': 'Datacraft',
 		'requires_dependencies': [
-			'apache_kafka',
+			'bytewax',
 			'redis',
 			'postgresql'
 		],
@@ -516,10 +516,10 @@ def register_apg_integration(apg_registry):
 			'schemas': '/eventschemaview/list'
 		},
 		'configuration_schema': {
-			'kafka_brokers': {
+			'bytewax_flow_id': {
 				'type': 'string',
 				'required': True,
-				'description': 'Kafka broker connection string'
+				'description': 'Bytewax broker connection string'
 			},
 			'redis_url': {
 				'type': 'string',

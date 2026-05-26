@@ -1369,7 +1369,7 @@ async def get_system_status():
 			"timestamp": datetime.utcnow().isoformat(),
 			"components": {
 				"api": "healthy",
-				"kafka": "healthy",
+				"bytewax": "healthy",
 				"redis": "healthy",
 				"postgresql": "healthy"
 			},

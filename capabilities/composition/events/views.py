@@ -67,12 +67,12 @@ class EventStreamView(ModelView):
 	
 	# List view configuration
 	list_columns = [
-		'stream_name', 'topic_name', 'source_capability', 'status',
+		'stream_name', 'stream_name', 'source_capability', 'status',
 		'partitions', 'replication_factor', 'event_category', 'created_at'
 	]
 	
 	search_columns = [
-		'stream_name', 'topic_name', 'source_capability', 'event_category', 'status'
+		'stream_name', 'stream_name', 'source_capability', 'event_category', 'status'
 	]
 	
 	order_columns = ['stream_name', 'created_at', 'status']
@@ -80,7 +80,7 @@ class EventStreamView(ModelView):
 	
 	# Show view configuration
 	show_columns = [
-		'stream_id', 'stream_name', 'stream_description', 'topic_name',
+		'stream_id', 'stream_name', 'stream_description', 'stream_name',
 		'partitions', 'replication_factor', 'retention_time_ms', 'retention_size_bytes',
 		'compression_type', 'default_serialization', 'event_category',
 		'source_capability', 'status', 'tenant_id', 'created_at', 'updated_at', 'created_by'
@@ -88,7 +88,7 @@ class EventStreamView(ModelView):
 	
 	# Form configuration
 	add_columns = [
-		'stream_name', 'stream_description', 'topic_name', 'partitions',
+		'stream_name', 'stream_description', 'stream_name', 'partitions',
 		'replication_factor', 'retention_time_ms', 'retention_size_bytes',
 		'cleanup_policy', 'compression_type', 'default_serialization',
 		'event_category', 'source_capability', 'config_settings'
@@ -115,7 +115,7 @@ class EventStreamView(ModelView):
 		'stream_id': 'Stream ID',
 		'stream_name': 'Stream Name',
 		'stream_description': 'Description',
-		'topic_name': 'Kafka Topic',
+		'stream_name': 'Bytewax Stream',
 		'partitions': 'Partitions',
 		'replication_factor': 'Replication',
 		'retention_time_ms': 'Retention Time (ms)',
@@ -135,7 +135,7 @@ class EventStreamView(ModelView):
 	
 	description_columns = {
 		'stream_name': 'Unique name for the event stream',
-		'topic_name': 'Underlying Kafka topic name',
+		'stream_name': 'Underlying Bytewax stream name',
 		'partitions': 'Number of partitions for parallel processing',
 		'replication_factor': 'Number of replicas for fault tolerance',
 		'retention_time_ms': 'How long to retain events (milliseconds)',
@@ -352,7 +352,7 @@ class SubscriptionView(ModelView):
 		'stream_id', 'consumer_group_id', 'consumer_name', 'event_type_patterns',
 		'filter_criteria', 'delivery_mode', 'batch_size', 'max_wait_time_ms',
 		'start_position', 'specific_offset', 'retry_policy', 'dead_letter_enabled',
-		'dead_letter_topic', 'webhook_url', 'webhook_headers', 'webhook_timeout_ms',
+		'dead_letter_stream', 'webhook_url', 'webhook_headers', 'webhook_timeout_ms',
 		'status', 'last_consumed_offset', 'last_consumed_at', 'tenant_id',
 		'created_at', 'updated_at', 'created_by'
 	]
@@ -363,13 +363,13 @@ class SubscriptionView(ModelView):
 		'consumer_group_id', 'consumer_name', 'event_type_patterns',
 		'filter_criteria', 'delivery_mode', 'batch_size', 'max_wait_time_ms',
 		'start_position', 'specific_offset', 'retry_policy', 'dead_letter_enabled',
-		'dead_letter_topic', 'webhook_url', 'webhook_headers', 'webhook_timeout_ms'
+		'dead_letter_stream', 'webhook_url', 'webhook_headers', 'webhook_timeout_ms'
 	]
 	
 	edit_columns = [
 		'subscription_description', 'event_type_patterns', 'filter_criteria',
 		'delivery_mode', 'batch_size', 'max_wait_time_ms', 'retry_policy',
-		'dead_letter_enabled', 'dead_letter_topic', 'webhook_url',
+		'dead_letter_enabled', 'dead_letter_stream', 'webhook_url',
 		'webhook_headers', 'webhook_timeout_ms', 'status'
 	]
 	
@@ -416,7 +416,7 @@ class SubscriptionView(ModelView):
 		'specific_offset': 'Specific Offset',
 		'retry_policy': 'Retry Policy',
 		'dead_letter_enabled': 'Dead Letter Queue',
-		'dead_letter_topic': 'DLQ Topic',
+		'dead_letter_stream': 'DLQ Topic',
 		'webhook_url': 'Webhook URL',
 		'webhook_headers': 'Webhook Headers',
 		'webhook_timeout_ms': 'Webhook Timeout',
@@ -447,12 +447,12 @@ class SubscriptionView(ModelView):
 			flash('Subscription not found', 'error')
 			return self.list()
 		
-		# Calculate lag (simplified - would need Kafka admin client in production)
+		# Calculate lag (simplified - would need Bytewax admin client in production)
 		lag_data = {
 			'subscription': subscription,
-			'consumer_lag': 0,  # Would calculate from Kafka
+			'consumer_lag': 0,  # Would calculate from Bytewax
 			'last_processed': subscription.last_consumed_offset or 0,
-			'latest_offset': 0,  # Would get from Kafka
+			'latest_offset': 0,  # Would get from Bytewax
 			'processing_rate': 0  # Events per second
 		}
 		

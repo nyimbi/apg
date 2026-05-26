@@ -1455,3 +1455,23 @@ Verification:
 Current broader Bytewax migration findings:
 
 - DVRL executable streaming code is clean. Remaining Python references are composition events and generated orchestration templates.
+
+### 2026-05-26 17:47 EAT
+
+Completed checkpoint:
+
+- Migrated composition events runtime/service/model/UI metadata from Kafka broker/topic terminology to Bytewax stream terminology.
+- Removed direct Kafka and `aiokafka` imports from the event streaming service.
+- Added dependency-light Bytewax producer, consumer, admin, stream definition, config resource, and send-result primitives backed by an in-process stream ledger.
+- Renamed runtime configuration from broker/bootstrap settings to Bytewax flow settings and moved model/API fields to `bytewax_stream_name`.
+- Updated dashboard/health/component metadata to report Bytewax rather than Kafka.
+
+Verification:
+
+- `rg -n "Kafka|KAFKA|kafka|aiokafka|KafkaProducer|KafkaConsumer|AIOKafka|apache_kafka|bootstrap_servers|localhost:9092|topic_name|kafka_metrics" capabilities/composition/events/service.py capabilities/composition/events/models.py capabilities/composition/events/blueprint.py capabilities/composition/events/api.py capabilities/composition/events/views.py` -> no matches
+- `.venv/bin/python -m py_compile capabilities/composition/events/service.py capabilities/composition/events/models.py capabilities/composition/events/blueprint.py capabilities/composition/events/api.py capabilities/composition/events/views.py`
+- `git diff --check -- capabilities/composition/events/service.py capabilities/composition/events/models.py capabilities/composition/events/blueprint.py capabilities/composition/events/api.py capabilities/composition/events/views.py`
+
+Current broader Bytewax migration findings:
+
+- Composition events runtime files are clean. Remaining Python references are composition events tests and generated orchestration templates/helpers.

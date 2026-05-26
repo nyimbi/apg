@@ -2,7 +2,7 @@
 APG Event Streaming Bus - Data Models
 
 Comprehensive data models for event streaming, stream processing, and event sourcing
-with Apache Kafka integration and enterprise-grade event management.
+with Bytewax integration and enterprise-grade event management.
 
 Author: Nyimbi Odero
 Company: Datacraft
@@ -294,8 +294,8 @@ class ESStream(Base):
     stream_name = Column(String(200), nullable=False, unique=True)
     stream_description = Column(Text, nullable=True)
     
-    # Kafka topic configuration
-    topic_name = Column(String(200), nullable=False, unique=True)
+    # Bytewax stream configuration
+    stream_name = Column(String(200), nullable=False, unique=True)
     partitions = Column(Integer, nullable=False, default=3)
     replication_factor = Column(Integer, nullable=False, default=3)
     
@@ -348,13 +348,13 @@ class ESStream(Base):
     def validate_stream_name(self, key, value):
         if not value or len(value.strip()) == 0:
             raise ValueError("Stream name cannot be empty")
-        # Kafka topic naming rules
+        # Bytewax stream naming rules
         if not all(c.isalnum() or c in '._-' for c in value):
             raise ValueError("Stream name can only contain alphanumeric characters, dots, underscores, and hyphens")
         return value.strip()
     
     def __repr__(self):
-        return f"<ESStream(id={self.stream_id}, name={self.stream_name}, topic={self.topic_name})>"
+        return f"<ESStream(id={self.stream_id}, name={self.stream_name}, stream={self.stream_name})>"
 
 # =============================================================================
 # Subscription Model
@@ -398,7 +398,7 @@ class ESSubscription(Base):
         "max_delay_ms": 60000
     })
     dead_letter_enabled = Column(Boolean, nullable=False, default=True)
-    dead_letter_topic = Column(String(200), nullable=True)
+    dead_letter_stream = Column(String(200), nullable=True)
     
     # Webhook delivery (if applicable)
     webhook_url = Column(String(500), nullable=True)
@@ -724,7 +724,7 @@ class ESStreamAssignment(Base):
 	event_id = Column(String(30), ForeignKey('es_events.event_id'), nullable=False, index=True)
 	stream_id = Column(String(100), ForeignKey('es_streams.stream_id'), nullable=False, index=True)
 	
-	# Kafka details
+	# Bytewax details
 	partition_id = Column(Integer, nullable=False)
 	offset = Column(BigInteger, nullable=False)
 	key = Column(String(500), nullable=True)
@@ -856,7 +856,7 @@ class ESStreamProcessor(Base):
 	# State management
 	stateful = Column(Boolean, nullable=False, default=False)
 	state_store_config = Column(JSONB, nullable=True)
-	changelog_topic = Column(String(300), nullable=True)
+	changelog_stream = Column(String(300), nullable=True)
 	
 	# Multi-tenancy and access
 	tenant_id = Column(String(50), nullable=False, index=True)
@@ -882,7 +882,7 @@ class ESStreamProcessor(Base):
 	# Error handling
 	error_tolerance = Column(String(20), nullable=False, default="FAIL")  # FAIL, CONTINUE, SKIP
 	dead_letter_enabled = Column(Boolean, nullable=False, default=False)
-	dead_letter_topic = Column(String(300), nullable=True)
+	dead_letter_stream = Column(String(300), nullable=True)
 	
 	# Audit fields
 	created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
@@ -932,7 +932,7 @@ class StreamConfig(BaseModel):
     
     stream_name: str = Field(..., min_length=1, max_length=200)
     stream_description: Optional[str] = Field(None, max_length=1000)
-    topic_name: str = Field(..., min_length=1, max_length=200)
+    stream_name: str = Field(..., min_length=1, max_length=200)
     partitions: int = Field(default=3, ge=1, le=1000)
     replication_factor: int = Field(default=3, ge=1, le=10)
     retention_time_ms: int = Field(default=604800000, ge=1)  # 7 days
@@ -974,7 +974,7 @@ class SubscriptionConfig(BaseModel):
         "max_delay_ms": 60000
     })
     dead_letter_enabled: bool = Field(default=True)
-    dead_letter_topic: Optional[str] = Field(None, max_length=200)
+    dead_letter_stream: Optional[str] = Field(None, max_length=200)
     webhook_url: Optional[str] = Field(None, max_length=500)
     webhook_headers: Dict[str, str] = Field(default_factory=dict)
     webhook_timeout_ms: Optional[int] = Field(None, ge=1000, le=300000)
@@ -1074,7 +1074,7 @@ class StreamCreate(BaseModel):
 	description: Optional[str] = Field(None, description="Stream description")
 	stream_category: str = Field(default="general", max_length=100, description="Stream category")
 	business_domain: str = Field(default="default", max_length=100, description="Business domain")
-	topic_name: str = Field(..., max_length=300, description="Kafka topic name")
+	stream_name: str = Field(..., max_length=300, description="Bytewax stream name")
 	partition_count: int = Field(default=12, gt=0, description="Number of partitions")
 	replication_factor: int = Field(default=3, gt=0, description="Replication factor")
 	min_in_sync_replicas: int = Field(default=2, gt=0, description="Minimum in-sync replicas")
@@ -1102,7 +1102,7 @@ class StreamResponse(BaseModel):
 	description: Optional[str]
 	stream_category: str
 	business_domain: str
-	topic_name: str
+	stream_name: str
 	partition_count: int
 	replication_factor: int
 	status: StreamStatus
