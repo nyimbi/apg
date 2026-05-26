@@ -16,7 +16,7 @@ Website: www.datacraft.co.ke
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, timedelta
 import logging
-from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, File, UploadFile
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, File, UploadFile, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, ValidationError
@@ -32,6 +32,7 @@ from .service import (
 	GLSFuzzyMatchingService, GLSTrajectoryAnalysisService, GLSHotspotDetectionService, 
 	GLSPredictiveModelingService, GLSAnomalyDetectionService, GLSVisualizationService, GLSRealTimeStreamingService
 )
+from .context import resolve_current_user_id, resolve_tenant_id
 
 # =============================================================================
 # Router and Security Configuration
@@ -313,15 +314,19 @@ class GLSAdvancedAnalyticsResponse(BaseModel):
 # Dependency Functions
 # =============================================================================
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+async def get_current_user(
+	request: Request,
+	credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> str:
 	"""Extract user ID from JWT token."""
-	# In production, decode JWT and extract user ID
-	return "user_123"
+	return resolve_current_user_id(request)
 
-async def get_tenant_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+async def get_tenant_id(
+	request: Request,
+	credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> str:
 	"""Extract tenant ID from JWT token."""
-	# In production, decode JWT and extract tenant ID
-	return "tenant_123"
+	return resolve_tenant_id(request)
 
 async def get_gls_service() -> GeographicalLocationService:
 	"""Get geographical location service instance."""
