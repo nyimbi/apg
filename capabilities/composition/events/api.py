@@ -10,11 +10,14 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 import json
 import asyncio
+import base64
+import binascii
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Union
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -254,10 +257,71 @@ connection_manager = ConnectionManager()
 # Dependency Injection
 # =============================================================================
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-	"""Extract user information from JWT token."""
-	# In production, validate JWT token and extract user info
-	return {"user_id": "api_user", "tenant_id": "default_tenant"}
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a stripped string value when present."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+def _first_text(*values: Any) -> Optional[str]:
+	"""Return the first non-empty text value."""
+	for value in values:
+		text = _clean_text(value)
+		if text:
+			return text
+	return None
+
+def _decode_bearer_claims(token: str) -> Dict[str, Any]:
+	"""Decode JWT-style bearer claims without accepting malformed payloads."""
+	parts = token.split(".")
+	if len(parts) < 2:
+		return {}
+	payload = parts[1]
+	padding = "=" * (-len(payload) % 4)
+	try:
+		decoded = base64.urlsafe_b64decode(f"{payload}{padding}".encode("ascii"))
+		claims = json.loads(decoded.decode("utf-8"))
+	except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError):
+		return {}
+	return claims if isinstance(claims, dict) else {}
+
+async def get_current_user(
+	request: Request,
+	credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+	"""Extract user and tenant context from bearer claims and APG request carriers."""
+	claims = _decode_bearer_claims(credentials.credentials)
+	user_id = _first_text(
+		claims.get("user_id"),
+		claims.get("sub"),
+		claims.get("username"),
+		request.headers.get("X-APG-User-ID"),
+		request.headers.get("X-User-ID"),
+		request.query_params.get("user_id"),
+		os.getenv("APG_USER_ID"),
+		os.getenv("APG_DEFAULT_USER_ID"),
+	)
+	tenant_id = _first_text(
+		claims.get("tenant_id"),
+		claims.get("tenant"),
+		claims.get("organization_id"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.query_params.get("tenant_id"),
+		request.query_params.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+		os.getenv("APG_DEFAULT_TENANT_ID"),
+	)
+	if not user_id or not tenant_id:
+		raise HTTPException(status_code=401, detail="Bearer token must resolve user and tenant context")
+	return {
+		"user_id": user_id,
+		"tenant_id": tenant_id,
+		"permissions": claims.get("permissions", []),
+		"scopes": claims.get("scopes", claims.get("scope", [])),
+	}
 
 async def get_event_streaming_service():
 	"""Get event streaming service instance."""

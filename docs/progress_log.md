@@ -2956,3 +2956,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_nlpc_api_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:07 EAT
+
+Completed checkpoint:
+
+- Replaced Composition Event API's fixed `api_user`/`default_tenant` dependency with bearer-claim, APG header, query, and environment identity resolution.
+- Replaced Central Configuration API-key auth's fixed identity with APG request/environment context and made OAuth bearer auth optional so API-key auth can work as an alternate path.
+- Added focused composition API auth-context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/events/api.py capabilities/composition/config/api.py tests/test_composition_api_auth_context.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_api_auth_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "\"api_user\"|\"default_tenant\"|For now, simple validation|your-secret-key-here|Kafka|kafka" capabilities/composition/events/api.py capabilities/composition/config/api.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

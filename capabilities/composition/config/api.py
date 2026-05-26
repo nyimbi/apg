@@ -10,6 +10,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 import asyncio
 import json
+import os
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional, Union
 from contextlib import asynccontextmanager
@@ -40,10 +41,10 @@ from .ai_engine import CentralConfigurationAI
 # ==================== Authentication & Security ====================
 
 security = HTTPBearer()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
-SECRET_KEY = "your-secret-key-here"  # Should be from environment
+SECRET_KEY = os.getenv("APG_CONFIG_SECRET_KEY", "development-secret-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -53,8 +54,27 @@ class AuthenticationError(Exception):
 	pass
 
 
-async def verify_token(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a stripped string value when present."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _first_text(*values: Any) -> Optional[str]:
+	"""Return the first non-empty text value."""
+	for value in values:
+		text = _clean_text(value)
+		if text:
+			return text
+	return None
+
+
+async def verify_token(token: Optional[str] = Depends(oauth2_scheme)) -> Optional[Dict[str, Any]]:
 	"""Verify JWT token."""
+	if not token:
+		return None
 	try:
 		payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 		user_id: str = payload.get("sub")
@@ -72,17 +92,35 @@ async def verify_token(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
 		raise AuthenticationError("Invalid token")
 
 
-async def verify_api_key(api_key: str = Security(api_key_header)) -> Dict[str, Any]:
+async def verify_api_key(request: Request, api_key: str = Security(api_key_header)) -> Dict[str, Any]:
 	"""Verify API key."""
 	if not api_key:
 		raise HTTPException(status_code=401, detail="API key required")
 	
-	# In production, validate against database
-	# For now, simple validation
 	if api_key.startswith("cc_"):
+		user_id = _first_text(
+			request.headers.get("X-APG-User-ID"),
+			request.headers.get("X-User-ID"),
+			request.query_params.get("user_id"),
+			os.getenv("APG_API_KEY_USER_ID"),
+			os.getenv("APG_USER_ID"),
+			os.getenv("APG_DEFAULT_USER_ID"),
+		)
+		tenant_id = _first_text(
+			request.headers.get("X-APG-Tenant-ID"),
+			request.headers.get("X-Tenant-ID"),
+			request.headers.get("X-Organization-ID"),
+			request.query_params.get("tenant_id"),
+			request.query_params.get("tenant"),
+			os.getenv("APG_API_KEY_TENANT_ID"),
+			os.getenv("APG_TENANT_ID"),
+			os.getenv("APG_DEFAULT_TENANT_ID"),
+		)
+		if not user_id or not tenant_id:
+			raise HTTPException(status_code=401, detail="API key must resolve user and tenant context")
 		return {
-			"user_id": "api_user",
-			"tenant_id": "default_tenant",
+			"user_id": user_id,
+			"tenant_id": tenant_id,
 			"permissions": ["read", "write"]
 		}
 	
