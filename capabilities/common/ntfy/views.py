@@ -21,6 +21,7 @@ from .models import (
 	NENotification, NETemplate, NEDelivery, NEInteraction, NECampaign,
 	NECampaignStep, NEUserPreference, NEProvider
 )
+from .context import get_tenant_id_from_context
 
 
 class NotificationEngineBaseView(BaseView):
@@ -37,7 +38,7 @@ class NotificationEngineBaseView(BaseView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_context()
 	
 	def _format_delivery_rate(self, rate: float) -> str:
 		"""Format delivery rate for display"""
@@ -159,7 +160,7 @@ class NENotificationModelView(ModelView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_context()
 
 
 class NETemplateModelView(ModelView):
@@ -300,7 +301,7 @@ class NETemplateModelView(ModelView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_context()
 
 
 class NECampaignModelView(ModelView):
@@ -450,7 +451,7 @@ class NECampaignModelView(ModelView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_context()
 
 
 class NEUserPreferenceModelView(ModelView):
@@ -524,7 +525,7 @@ class NEUserPreferenceModelView(ModelView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_context()
 
 
 class NotificationDashboardView(NotificationEngineBaseView):

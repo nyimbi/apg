@@ -2373,3 +2373,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_scm_stc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|return \"current_user\"|TODO: Implement tenant resolution|TODO: Implement proper tenant resolution|TODO: Implement proper user resolution|TODO: Get tenant" capabilities/scm/inv/stock_tracking_control/views.py capabilities/scm/inv/stock_tracking_control/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:34 EAT
+
+Completed checkpoint:
+
+- Replaced Notification Engine tenant defaults across FAB views, REST tenant lookup, blueprint test-send service construction, WebSocket tenant extraction, and personalization auth/service construction with shared request-context helpers.
+- Notification and personalization API surfaces now resolve tenant/user identity from payload/auth data, Flask context/current user, `g.user`, APG headers, query args, request environment, and configured fallbacks.
+- WebSocket monitoring, collaboration, and analytics namespaces now join tenant rooms and stamp actor identity from authenticated payload/context instead of hardcoded tenant/user placeholders.
+- Added focused regression coverage that rejects stale notification tenant placeholders in the touched surfaces and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/ntfy/context.py capabilities/common/ntfy/views.py capabilities/common/ntfy/api.py capabilities/common/ntfy/blueprint.py capabilities/common/ntfy/websocket.py capabilities/common/ntfy/personalization/api.py tests/test_common_ntfy_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_common_ntfy_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "'default_tenant'|\"default_tenant\"|default_tenant" capabilities/common/ntfy/views.py capabilities/common/ntfy/api.py capabilities/common/ntfy/blueprint.py capabilities/common/ntfy/websocket.py capabilities/common/ntfy/personalization/api.py` -> no matches
+- `git diff --check` -> no issues

@@ -30,6 +30,7 @@ from .models import (
 from .service import NotificationService, create_notification_service
 from .channel_manager import UniversalChannelManager, ChannelConfig
 from .api_models import DeliveryChannel, NotificationPriority, CampaignType
+from .context import get_tenant_id_from_context
 
 
 # Create blueprint
@@ -157,7 +158,7 @@ class NotificationTemplateView(ModelView):
 				custom_vars = json.loads(request.form.get('variables', '{}'))
 				
 				# Use notification service to send test
-				service = create_notification_service('default_tenant')
+				service = create_notification_service(get_tenant_id_from_context())
 				# Would implement actual test sending
 				
 				flash(f"Test notification sent to {test_email}", "success")

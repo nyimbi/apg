@@ -22,6 +22,7 @@ from functools import wraps
 
 # Import parent capability components
 from ..api_models import DeliveryChannel, NotificationPriority
+from ..context import get_current_user_id, get_tenant_id_from_context
 
 # Import personalization components
 from .service import (
@@ -153,9 +154,8 @@ def require_auth(f):
 		if not auth_header or not auth_header.startswith('Bearer '):
 			abort(401, message='Authentication required')
 		
-		# Extract tenant_id from token (mock)
-		g.tenant_id = request.headers.get('X-Tenant-ID', 'default_tenant')
-		g.user_id = request.headers.get('X-User-ID', 'system')
+		g.tenant_id = get_tenant_id_from_context()
+		g.user_id = get_current_user_id()
 		
 		return f(*args, **kwargs)
 	return decorated_function
@@ -231,7 +231,7 @@ def create_personalization_api(app: Flask) -> Api:
 				enable_emotional_intelligence=True
 			)
 			personalization_service = create_personalization_service(
-				tenant_id=g.get('tenant_id', 'default_tenant'),
+				tenant_id=g.get('tenant_id') or get_tenant_id_from_context(),
 				config=config
 			)
 		return personalization_service
