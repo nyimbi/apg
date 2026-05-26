@@ -723,3 +723,25 @@ Current broader NTFY/CHAT/COLB execution findings:
 - CHAT is no longer a placeholder package at the composition layer.
 - Phase 6 communication core now has uniform first-class registration/contract coverage.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:05 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder VIDC package into a first-class APG video-conferencing capability with tenant-scoped meeting, media, recording, governance, UI, and theme configuration.
+- Added deterministic VIDC rules for tenant context, host presence, external guest policy, recording consent, recording encryption, and large-meeting review.
+- Promoted the placeholder HELP package into a first-class APG help/knowledge-base capability with tenant-scoped content, assisted-answer, search, governance, UI, and theme configuration.
+- Added deterministic HELP rules for tenant context, article ownership, publication approval, cited generated answers, restricted-content filtering, and stale-article review.
+- Promoted the placeholder ESGN package into a first-class APG digital-forms/e-sign capability with tenant-scoped form, signature, evidence, governance, UI, and theme configuration.
+- Added deterministic ESGN rules for tenant context, form template ownership, form publication approval, signer identity verification, encrypted evidence, and regulated-form compliance review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/vidc/__init__.py capabilities/common/vidc/capability_contract.py capabilities/common/vidc/test_capability_contract.py capabilities/common/help/__init__.py capabilities/common/help/capability_contract.py capabilities/common/help/test_capability_contract.py capabilities/common/esgn/__init__.py capabilities/common/esgn/capability_contract.py capabilities/common/esgn/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/vidc/test_capability_contract.py capabilities/common/help/test_capability_contract.py capabilities/common/esgn/test_capability_contract.py` -> 9 passed, 11 warnings
+
+Current broader VIDC/HELP/ESGN execution findings:
+
+- VIDC, HELP, and ESGN are no longer placeholders at the composition layer.
+- Phase 6 now has uniform first-class registration/contract coverage across communication, collaboration, help, video, and digital forms/e-sign.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
