@@ -13,6 +13,8 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 import logging
 
+from .capability_contract import evaluate_capability_rules, get_capability_contract
+
 # APG Capability Metadata for Composition Engine Registration
 APG_CAPABILITY_METADATA = {
 	"capability_id": "rag",
@@ -406,13 +408,58 @@ def get_api_configuration() -> Dict[str, Any]:
 	"""Get API configuration for endpoint registration"""
 	return APG_CAPABILITY_METADATA["api_endpoints"]
 
-# Initialize capability logging
-_log_capability_info()
+def register_capability() -> Dict[str, Any]:
+	"""Register RAGN as a first-class APG composition capability."""
+	contract = get_capability_contract()
+	return {
+		"name": "ragn",
+		"aliases": ["rag", "retrieval_augmented_generation", "intelligent_qa"],
+		"display_name": APG_CAPABILITY_METADATA["name"],
+		"description": APG_CAPABILITY_METADATA["description"],
+		"version": APG_CAPABILITY_METADATA["version"],
+		"dependencies": ["srch", "nlpc", "aicr"],
+		"optional_dependencies": ["auth", "audl", "cach", "kngr", "cvsn"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"intelligent_retrieval": "Retrieve tenant-scoped context from governed knowledge bases",
+			"contextual_generation": "Generate cited answers from approved retrieval context",
+			"conversation_memory": "Maintain governed conversation context and source trails",
+			"document_intelligence": "Ingest and enrich multimodal documents for retrieval",
+			"capability_rules": "Evaluate deterministic RAG governance rules",
+			"visual_theming": "Apply RAG studio theme tokens and components"
+		},
+		"endpoints": {
+			"query": "/ragn/api/v1/query",
+			"knowledge_bases": "/ragn/api/v1/knowledge-bases",
+			"documents": "/ragn/api/v1/documents",
+			"conversations": "/ragn/api/v1/conversations",
+			"generation": "/ragn/api/v1/generation"
+		},
+		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": ["ragn:view", "ragn:query", "ragn:manage_kb", "ragn:curate", "ragn:manage_models", "ragn:admin"]
+	}
+
+
+def get_capability_info() -> Dict[str, Any]:
+	"""Get RAGN capability information for composition and marketplace discovery."""
+	return {
+		"metadata": APG_CAPABILITY_METADATA,
+		"blueprint": APG_BLUEPRINT_CONFIG,
+		"contract": get_capability_contract()
+	}
 
 # Export key components for APG composition engine
 __all__ = [
 	"APG_CAPABILITY_METADATA",
 	"APG_BLUEPRINT_CONFIG",
+	"register_capability",
+	"get_capability_info",
+	"get_capability_contract",
+	"evaluate_capability_rules",
 	"get_capability_metadata",
 	"get_blueprint_config", 
 	"validate_apg_dependencies",

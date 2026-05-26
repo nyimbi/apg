@@ -631,3 +631,26 @@ Current broader SRCH/GRPH/KNGR execution findings:
 - SRCH, GRPH, and KNGR are no longer placeholder packages at the composition layer; all now advertise executable configuration/rules/UI/theme contracts.
 - Focused tests live next to each placeholder package so discovery and governance are verified without adding heavyweight search or graph runtime fixtures.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 10:02 EAT
+
+Completed checkpoint:
+
+- Made the existing RAGN capability executable as a first-class APG capability with tenant-scoped knowledge-base, retrieval, generation, governance, UI, and theme configuration.
+- Added deterministic RAGN RAG-governance rules for tenant context, knowledge-base ownership, restricted source filtering, generation citations, low context-confidence review, and external-model policy attachment.
+- Added a GRAG package registration surface and executable contract for tenant-scoped hybrid retrieval, reasoning, curation, governance, UI, and theme configuration.
+- Added deterministic GRAG GraphRAG-governance rules for tenant context, hybrid vector/graph index readiness, reasoning evidence paths, multi-hop review, and answer provenance.
+- Promoted the placeholder ONTO capability into a first-class APG capability with tenant-scoped ontology, vocabulary, mapping, governance, UI, and theme configuration.
+- Added deterministic ONTO ontology-governance rules for tenant context, term ownership, publication approval, breaking-change review, low-confidence mapping review, and duplicate term blocking.
+- Removed RAGN import-time initialization logging so composition discovery can import metadata without noisy runtime side effects.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/ragn/__init__.py capabilities/common/ragn/capability_contract.py capabilities/common/ragn/test_capability_contract.py capabilities/common/grag/__init__.py capabilities/common/grag/capability_contract.py capabilities/common/grag/test_capability_contract.py capabilities/common/onto/__init__.py capabilities/common/onto/capability_contract.py capabilities/common/onto/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/ragn/test_capability_contract.py capabilities/common/grag/test_capability_contract.py capabilities/common/onto/test_capability_contract.py` -> 9 passed, 11 warnings
+
+Current broader RAGN/GRAG/ONTO execution findings:
+
+- RAGN and GRAG had substantial runtime code but lacked the uniform first-class registration/contract surface used by the rest of the capability rollout.
+- ONTO is no longer a placeholder package at the composition layer and now advertises executable configuration/rules/UI/theme contracts.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
