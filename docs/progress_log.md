@@ -2263,3 +2263,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_scm_dpl_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|request\.headers\.get\('X-Tenant-ID', 'default'\)|request\.headers\.get\('X-User-ID', 'api_user'\)|Implementation depends on your multi-tenancy setup" capabilities/scm/dpl/demand_planning/views.py capabilities/scm/dpl/demand_planning/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:03 EAT
+
+Completed checkpoint:
+
+- Replaced Contract Management API/view tenant defaults with a shared request-context resolver.
+- Contract dashboard and expiring-contract API service construction now resolve tenant IDs from payload, Flask context/current user, `g.user`, tenant headers, query args, request environment, and `APG_DEFAULT_TENANT_ID` fallback.
+- Added focused regression coverage that rejects hardcoded Contract Management tenant defaults and verifies tenant precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/scm/ctm/contract_management/context.py capabilities/scm/ctm/contract_management/views.py capabilities/scm/ctm/contract_management/api.py tests/test_scm_ctm_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_scm_ctm_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|TODO: Get tenant" capabilities/scm/ctm/contract_management/views.py capabilities/scm/ctm/contract_management/api.py` -> no matches
+- `git diff --check` -> no issues
