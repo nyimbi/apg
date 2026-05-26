@@ -194,3 +194,25 @@ Current broader NLPC execution findings:
 
 - NLPC tests now collect and execute cleanly from `capabilities/common/nlpc/tests`.
 - Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports.
+
+### 2026-05-26 03:40 EAT
+
+Completed checkpoint:
+
+- Routed misplaced IMEX documentation into `capabilities/common/imex/docs/` and report JSON into `capabilities/common/imex/docs/reports/`.
+- Routed IMEX validation and test scripts into `capabilities/common/imex/tests/`.
+- Made IMEX import/collection resilient to optional local dependencies by adding test import aliases and no-op/fallback shims for unavailable `requests`, `flask_appbuilder.SQLA`, `flask_cors`, `flask_restx`, `asyncpg`, `cryptography.Fernet`, and `bcrypt`.
+- Restored executable IMEX model/service/database contracts for local no-database execution, including in-memory job/execution persistence, workflow creation/execution, health/performance facades, deterministic write behavior, schema mapping validation, streaming batches, AI engine compatibility metadata, empty-sample schema analysis, cache keys, security RBAC checks, and request-context-free audit logging.
+- Corrected IMEX service state so jobs remain in `active_jobs` and executions live in `job_executions` / `current_execution`.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/imex/service.py capabilities/common/imex/database.py`
+- `.venv/bin/python -m py_compile capabilities/common/imex/models.py capabilities/common/imex/ai_intelligence.py capabilities/common/imex/security.py`
+- `.venv/bin/python -m pytest -q capabilities/common/imex/tests/test_service.py` -> 37 passed, 19 warnings
+- `.venv/bin/python -m pytest -q capabilities/common/imex/tests` -> 110 passed, 29 warnings
+
+Current broader IMEX execution findings:
+
+- IMEX tests now collect and execute cleanly from `capabilities/common/imex/tests`.
+- Remaining warnings are pre-existing deprecation/context warnings from adjacent common capability imports and IMEX Pydantic v1-style validators.

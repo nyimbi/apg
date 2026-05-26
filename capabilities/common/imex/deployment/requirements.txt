@@ -1,0 +1,109 @@
+# APG IMEX Capability Production Requirements
+# Production-grade dependencies with pinned versions for security and stability
+
+# Web Framework and ASGI
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+gunicorn==21.2.0
+flask==3.0.0
+flask-login==0.6.3
+flask-cors==4.0.0
+werkzeug==3.0.1
+
+# Database and ORM
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# Data Validation and Serialization
+pydantic==2.5.0
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# Authentication and Security
+bcrypt==4.1.2
+cryptography==41.0.8
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Redis and Caching
+redis==5.0.1
+hiredis==2.2.3
+
+# Data Processing and Analysis
+pandas==2.1.4
+numpy==1.25.2
+openpyxl==3.1.2
+pyarrow==14.0.1
+
+# AI and ML
+httpx==0.25.2
+openai==1.3.6
+ollama==0.1.7
+
+# File Processing
+python-magic==0.4.27
+chardet==5.2.0
+
+# Monitoring and Observability
+prometheus-client==0.19.0
+structlog==23.2.0
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-sqlalchemy==0.42b0
+opentelemetry-instrumentation-redis==0.42b0
+
+# System and Performance
+psutil==5.9.6
+setproctitle==1.3.3
+ujson==5.8.0
+orjson==3.9.10
+
+# Configuration Management
+python-dotenv==1.0.0
+pyyaml==6.0.1
+toml==0.10.2
+
+# UUID and Time
+uuid7==0.1.0
+
+# Development and Testing (production-safe versions)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+coverage==7.3.2
+
+# Utilities
+click==8.1.7
+rich==13.7.0
+typer==0.9.0
+jinja2==3.1.2
+
+# Network and HTTP
+requests==2.31.0
+urllib3==2.1.0
+certifi==2023.11.17
+
+# Date/Time handling
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Async utilities
+asyncio-mqtt==0.16.1
+aiofiles==23.2.1
+aiohttp==3.9.1
+
+# Validation and Data Quality
+jsonschema==4.20.0
+cerberus==1.3.5
+
+# Image and File Processing
+pillow==10.1.0
+python-docx==1.1.0
+
+# Environment and Deployment
+supervisor==4.2.5
+flower==2.0.1

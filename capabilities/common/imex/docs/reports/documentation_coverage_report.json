@@ -1,0 +1,3825 @@
+{
+  "timestamp": "2025-08-15T11:38:56.034917+00:00",
+  "modules": {
+    "models": {
+      "module": "models",
+      "classes": {
+        "CompressionType": {
+          "name": "CompressionType",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "CompressionType.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function CompressionType.__init__ missing comprehensive docstring",
+                "Function CompressionType.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "CompressionType.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function CompressionType.__repr__ missing comprehensive docstring",
+                "Function CompressionType.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "CompressionType.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function CompressionType.__str__ missing comprehensive docstring",
+                "Function CompressionType.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "ConnectionTemplate": {
+          "name": "ConnectionTemplate",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ConnectionTemplate.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ConnectionTemplate.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.__repr__ missing comprehensive docstring",
+                "Function ConnectionTemplate.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ConnectionTemplate.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.__str__ missing comprehensive docstring",
+                "Function ConnectionTemplate.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "ConnectionTemplate.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "ConnectionTemplate.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.dict missing comprehensive docstring",
+                "Function ConnectionTemplate.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "ConnectionTemplate.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.json missing comprehensive docstring",
+                "Function ConnectionTemplate.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "ConnectionTemplate.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "ConnectionTemplate.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "ConnectionTemplate.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "ConnectionTemplate.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ConnectionTemplate.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "DataFormat": {
+          "name": "DataFormat",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "DataFormat.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataFormat.__init__ missing comprehensive docstring",
+                "Function DataFormat.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "DataFormat.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataFormat.__repr__ missing comprehensive docstring",
+                "Function DataFormat.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "DataFormat.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataFormat.__str__ missing comprehensive docstring",
+                "Function DataFormat.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "DataQualityReport": {
+          "name": "DataQualityReport",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "DataQualityReport.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "DataQualityReport.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.__repr__ missing comprehensive docstring",
+                "Function DataQualityReport.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "DataQualityReport.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.__str__ missing comprehensive docstring",
+                "Function DataQualityReport.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "DataQualityReport.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "DataQualityReport.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.dict missing comprehensive docstring",
+                "Function DataQualityReport.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "DataQualityReport.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.json missing comprehensive docstring",
+                "Function DataQualityReport.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "DataQualityReport.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "DataQualityReport.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "DataQualityReport.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "DataQualityReport.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityReport.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "ErrorHandlingStrategy": {
+          "name": "ErrorHandlingStrategy",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ErrorHandlingStrategy.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ErrorHandlingStrategy.__init__ missing comprehensive docstring",
+                "Function ErrorHandlingStrategy.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ErrorHandlingStrategy.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ErrorHandlingStrategy.__repr__ missing comprehensive docstring",
+                "Function ErrorHandlingStrategy.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ErrorHandlingStrategy.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ErrorHandlingStrategy.__str__ missing comprehensive docstring",
+                "Function ErrorHandlingStrategy.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "FieldMapping": {
+          "name": "FieldMapping",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "FieldMapping.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "FieldMapping.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.__repr__ missing comprehensive docstring",
+                "Function FieldMapping.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "FieldMapping.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.__str__ missing comprehensive docstring",
+                "Function FieldMapping.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "FieldMapping.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "FieldMapping.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.dict missing comprehensive docstring",
+                "Function FieldMapping.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "FieldMapping.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.json missing comprehensive docstring",
+                "Function FieldMapping.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "FieldMapping.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "FieldMapping.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "FieldMapping.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "FieldMapping.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldMapping.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "ImportExportJob": {
+          "name": "ImportExportJob",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ImportExportJob.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ImportExportJob.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.__repr__ missing comprehensive docstring",
+                "Function ImportExportJob.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ImportExportJob.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.__str__ missing comprehensive docstring",
+                "Function ImportExportJob.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "ImportExportJob.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "ImportExportJob.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.dict missing comprehensive docstring",
+                "Function ImportExportJob.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "ImportExportJob.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.json missing comprehensive docstring",
+                "Function ImportExportJob.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "ImportExportJob.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "ImportExportJob.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "ImportExportJob.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "ImportExportJob.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportJob.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "JobExecution": {
+          "name": "JobExecution",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "JobExecution.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "JobExecution.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.__repr__ missing comprehensive docstring",
+                "Function JobExecution.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "JobExecution.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.__str__ missing comprehensive docstring",
+                "Function JobExecution.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "JobExecution.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "JobExecution.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.dict missing comprehensive docstring",
+                "Function JobExecution.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "JobExecution.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.json missing comprehensive docstring",
+                "Function JobExecution.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "JobExecution.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "JobExecution.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "JobExecution.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "JobExecution.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobExecution.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "JobStatus": {
+          "name": "JobStatus",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "JobStatus.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobStatus.__init__ missing comprehensive docstring",
+                "Function JobStatus.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "JobStatus.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobStatus.__repr__ missing comprehensive docstring",
+                "Function JobStatus.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "JobStatus.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobStatus.__str__ missing comprehensive docstring",
+                "Function JobStatus.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "JobType": {
+          "name": "JobType",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "JobType.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobType.__init__ missing comprehensive docstring",
+                "Function JobType.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "JobType.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobType.__repr__ missing comprehensive docstring",
+                "Function JobType.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "JobType.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobType.__str__ missing comprehensive docstring",
+                "Function JobType.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "MonitoringAlert": {
+          "name": "MonitoringAlert",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "MonitoringAlert.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "MonitoringAlert.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.__repr__ missing comprehensive docstring",
+                "Function MonitoringAlert.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "MonitoringAlert.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.__str__ missing comprehensive docstring",
+                "Function MonitoringAlert.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "MonitoringAlert.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "MonitoringAlert.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.dict missing comprehensive docstring",
+                "Function MonitoringAlert.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "MonitoringAlert.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.json missing comprehensive docstring",
+                "Function MonitoringAlert.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "MonitoringAlert.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "MonitoringAlert.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "MonitoringAlert.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "MonitoringAlert.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function MonitoringAlert.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "ProcessingMetrics": {
+          "name": "ProcessingMetrics",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ProcessingMetrics.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ProcessingMetrics.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.__repr__ missing comprehensive docstring",
+                "Function ProcessingMetrics.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ProcessingMetrics.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.__str__ missing comprehensive docstring",
+                "Function ProcessingMetrics.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "ProcessingMetrics.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "ProcessingMetrics.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.dict missing comprehensive docstring",
+                "Function ProcessingMetrics.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "ProcessingMetrics.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.json missing comprehensive docstring",
+                "Function ProcessingMetrics.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "ProcessingMetrics.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "ProcessingMetrics.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "ProcessingMetrics.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "ProcessingMetrics.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingMetrics.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "ProcessingPriority": {
+          "name": "ProcessingPriority",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ProcessingPriority.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingPriority.__init__ missing comprehensive docstring",
+                "Function ProcessingPriority.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ProcessingPriority.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingPriority.__repr__ missing comprehensive docstring",
+                "Function ProcessingPriority.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ProcessingPriority.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingPriority.__str__ missing comprehensive docstring",
+                "Function ProcessingPriority.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "ScheduleConfig": {
+          "name": "ScheduleConfig",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ScheduleConfig.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ScheduleConfig.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.__repr__ missing comprehensive docstring",
+                "Function ScheduleConfig.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ScheduleConfig.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.__str__ missing comprehensive docstring",
+                "Function ScheduleConfig.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "ScheduleConfig.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "ScheduleConfig.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.dict missing comprehensive docstring",
+                "Function ScheduleConfig.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "ScheduleConfig.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.json missing comprehensive docstring",
+                "Function ScheduleConfig.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "ScheduleConfig.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "ScheduleConfig.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "ScheduleConfig.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "ScheduleConfig.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ScheduleConfig.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "SchemaMapping": {
+          "name": "SchemaMapping",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "SchemaMapping.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "SchemaMapping.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.__repr__ missing comprehensive docstring",
+                "Function SchemaMapping.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "SchemaMapping.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.__str__ missing comprehensive docstring",
+                "Function SchemaMapping.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "SchemaMapping.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "SchemaMapping.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.dict missing comprehensive docstring",
+                "Function SchemaMapping.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "SchemaMapping.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.json missing comprehensive docstring",
+                "Function SchemaMapping.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "SchemaMapping.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "SchemaMapping.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "SchemaMapping.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "SchemaMapping.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaMapping.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "SourceConfig": {
+          "name": "SourceConfig",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "SourceConfig.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "SourceConfig.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.__repr__ missing comprehensive docstring",
+                "Function SourceConfig.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "SourceConfig.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.__str__ missing comprehensive docstring",
+                "Function SourceConfig.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "SourceConfig.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "SourceConfig.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.dict missing comprehensive docstring",
+                "Function SourceConfig.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "SourceConfig.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.json missing comprehensive docstring",
+                "Function SourceConfig.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "SourceConfig.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "SourceConfig.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "SourceConfig.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "SourceConfig.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceConfig.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "SourceType": {
+          "name": "SourceType",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "SourceType.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceType.__init__ missing comprehensive docstring",
+                "Function SourceType.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "SourceType.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceType.__repr__ missing comprehensive docstring",
+                "Function SourceType.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "SourceType.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SourceType.__str__ missing comprehensive docstring",
+                "Function SourceType.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "TargetConfig": {
+          "name": "TargetConfig",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "TargetConfig.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "TargetConfig.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.__repr__ missing comprehensive docstring",
+                "Function TargetConfig.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "TargetConfig.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.__str__ missing comprehensive docstring",
+                "Function TargetConfig.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "TargetConfig.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "TargetConfig.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.dict missing comprehensive docstring",
+                "Function TargetConfig.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "TargetConfig.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.json missing comprehensive docstring",
+                "Function TargetConfig.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "TargetConfig.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "TargetConfig.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "TargetConfig.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "TargetConfig.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TargetConfig.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "TransformationStep": {
+          "name": "TransformationStep",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "TransformationStep.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "TransformationStep.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.__repr__ missing comprehensive docstring",
+                "Function TransformationStep.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "TransformationStep.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.__str__ missing comprehensive docstring",
+                "Function TransformationStep.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "TransformationStep.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "TransformationStep.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.dict missing comprehensive docstring",
+                "Function TransformationStep.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "TransformationStep.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.json missing comprehensive docstring",
+                "Function TransformationStep.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "TransformationStep.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "TransformationStep.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "TransformationStep.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "TransformationStep.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransformationStep.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "ValidationLevel": {
+          "name": "ValidationLevel",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ValidationLevel.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationLevel.__init__ missing comprehensive docstring",
+                "Function ValidationLevel.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ValidationLevel.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationLevel.__repr__ missing comprehensive docstring",
+                "Function ValidationLevel.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ValidationLevel.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationLevel.__str__ missing comprehensive docstring",
+                "Function ValidationLevel.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "ValidationRule": {
+          "name": "ValidationRule",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ValidationRule.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ValidationRule.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.__repr__ missing comprehensive docstring",
+                "Function ValidationRule.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ValidationRule.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.__str__ missing comprehensive docstring",
+                "Function ValidationRule.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "ValidationRule.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "ValidationRule.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.dict missing comprehensive docstring",
+                "Function ValidationRule.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "ValidationRule.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.json missing comprehensive docstring",
+                "Function ValidationRule.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "ValidationRule.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "ValidationRule.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "ValidationRule.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "ValidationRule.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ValidationRule.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "Workflow": {
+          "name": "Workflow",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "Workflow.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "Workflow.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.__repr__ missing comprehensive docstring",
+                "Function Workflow.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "Workflow.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.__str__ missing comprehensive docstring",
+                "Function Workflow.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "Workflow.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "Workflow.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.dict missing comprehensive docstring",
+                "Function Workflow.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "Workflow.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.json missing comprehensive docstring",
+                "Function Workflow.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "Workflow.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "Workflow.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "Workflow.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "Workflow.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function Workflow.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "WorkflowStep": {
+          "name": "WorkflowStep",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "WorkflowStep.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "WorkflowStep.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.__repr__ missing comprehensive docstring",
+                "Function WorkflowStep.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "WorkflowStep.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.__str__ missing comprehensive docstring",
+                "Function WorkflowStep.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "WorkflowStep.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "WorkflowStep.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.dict missing comprehensive docstring",
+                "Function WorkflowStep.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "WorkflowStep.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.json missing comprehensive docstring",
+                "Function WorkflowStep.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "WorkflowStep.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "WorkflowStep.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "WorkflowStep.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "WorkflowStep.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function WorkflowStep.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        }
+      },
+      "functions": {
+        "_validate_non_negative_float": {
+          "name": "_validate_non_negative_float",
+          "docstring_complete": true,
+          "has_type_hints": true,
+          "issues": []
+        },
+        "_validate_positive_int": {
+          "name": "_validate_positive_int",
+          "docstring_complete": true,
+          "has_type_hints": true,
+          "issues": []
+        },
+        "_validate_tenant_id": {
+          "name": "_validate_tenant_id",
+          "docstring_complete": true,
+          "has_type_hints": true,
+          "issues": []
+        }
+      },
+      "coverage": 58.2089552238806,
+      "issues": []
+    },
+    "database": {
+      "module": "database",
+      "classes": {
+        "ConnectionError": {
+          "name": "ConnectionError",
+          "docstring_complete": false,
+          "methods": {},
+          "coverage": 100,
+          "issues": [
+            "Class ConnectionError missing comprehensive docstring"
+          ]
+        },
+        "DatabaseConfig": {
+          "name": "DatabaseConfig",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "DatabaseConfig.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseConfig.__init__ missing comprehensive docstring",
+                "Function DatabaseConfig.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "DatabaseConfig.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseConfig.__repr__ missing comprehensive docstring",
+                "Function DatabaseConfig.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "DatabaseError": {
+          "name": "DatabaseError",
+          "docstring_complete": false,
+          "methods": {},
+          "coverage": 100,
+          "issues": [
+            "Class DatabaseError missing comprehensive docstring"
+          ]
+        },
+        "DatabaseManager": {
+          "name": "DatabaseManager",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "DatabaseManager.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.__init__ missing complete type hints"
+              ]
+            },
+            "close": {
+              "name": "DatabaseManager.close",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.close missing complete type hints"
+              ]
+            },
+            "create_execution": {
+              "name": "DatabaseManager.create_execution",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.create_execution missing complete type hints"
+              ]
+            },
+            "create_job": {
+              "name": "DatabaseManager.create_job",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.create_job missing complete type hints"
+              ]
+            },
+            "delete_job": {
+              "name": "DatabaseManager.delete_job",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.delete_job missing complete type hints"
+              ]
+            },
+            "get_job": {
+              "name": "DatabaseManager.get_job",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.get_job missing complete type hints"
+              ]
+            },
+            "get_job_executions": {
+              "name": "DatabaseManager.get_job_executions",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.get_job_executions missing complete type hints"
+              ]
+            },
+            "health_check": {
+              "name": "DatabaseManager.health_check",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.health_check missing complete type hints"
+              ]
+            },
+            "initialize": {
+              "name": "DatabaseManager.initialize",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.initialize missing complete type hints"
+              ]
+            },
+            "list_jobs": {
+              "name": "DatabaseManager.list_jobs",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.list_jobs missing complete type hints"
+              ]
+            },
+            "transaction": {
+              "name": "DatabaseManager.transaction",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.transaction missing complete type hints"
+              ]
+            },
+            "update_execution": {
+              "name": "DatabaseManager.update_execution",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.update_execution missing complete type hints"
+              ]
+            },
+            "update_job": {
+              "name": "DatabaseManager.update_job",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function DatabaseManager.update_job missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 100.0,
+          "issues": []
+        },
+        "HealthStatus": {
+          "name": "HealthStatus",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "HealthStatus.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function HealthStatus.__init__ missing comprehensive docstring",
+                "Function HealthStatus.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "HealthStatus.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function HealthStatus.__repr__ missing comprehensive docstring",
+                "Function HealthStatus.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "MigrationError": {
+          "name": "MigrationError",
+          "docstring_complete": false,
+          "methods": {},
+          "coverage": 100,
+          "issues": [
+            "Class MigrationError missing comprehensive docstring"
+          ]
+        },
+        "TransactionContext": {
+          "name": "TransactionContext",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "TransactionContext.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransactionContext.__init__ missing comprehensive docstring",
+                "Function TransactionContext.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "TransactionContext.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function TransactionContext.__repr__ missing comprehensive docstring",
+                "Function TransactionContext.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "TransactionError": {
+          "name": "TransactionError",
+          "docstring_complete": false,
+          "methods": {},
+          "coverage": 100,
+          "issues": [
+            "Class TransactionError missing comprehensive docstring"
+          ]
+        }
+      },
+      "functions": {
+        "create_database_manager": {
+          "name": "create_database_manager",
+          "docstring_complete": true,
+          "has_type_hints": false,
+          "issues": [
+            "Function create_database_manager missing complete type hints"
+          ]
+        }
+      },
+      "coverage": 59.130434782608695,
+      "issues": []
+    },
+    "ai_intelligence": {
+      "module": "ai_intelligence",
+      "classes": {
+        "AIEngineError": {
+          "name": "AIEngineError",
+          "docstring_complete": true,
+          "methods": {},
+          "coverage": 100,
+          "issues": []
+        },
+        "AIIntelligenceEngine": {
+          "name": "AIIntelligenceEngine",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "AIIntelligenceEngine.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AIIntelligenceEngine.__init__ missing complete type hints"
+              ]
+            },
+            "analyze_schema": {
+              "name": "AIIntelligenceEngine.analyze_schema",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AIIntelligenceEngine.analyze_schema missing complete type hints"
+              ]
+            },
+            "assess_data_quality": {
+              "name": "AIIntelligenceEngine.assess_data_quality",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AIIntelligenceEngine.assess_data_quality missing complete type hints"
+              ]
+            },
+            "initialize": {
+              "name": "AIIntelligenceEngine.initialize",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AIIntelligenceEngine.initialize missing complete type hints"
+              ]
+            },
+            "suggest_field_mappings": {
+              "name": "AIIntelligenceEngine.suggest_field_mappings",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AIIntelligenceEngine.suggest_field_mappings missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 100.0,
+          "issues": []
+        },
+        "FieldAnalysis": {
+          "name": "FieldAnalysis",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "FieldAnalysis.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldAnalysis.__init__ missing comprehensive docstring",
+                "Function FieldAnalysis.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "FieldAnalysis.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function FieldAnalysis.__repr__ missing comprehensive docstring",
+                "Function FieldAnalysis.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "QualityAssessment": {
+          "name": "QualityAssessment",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "QualityAssessment.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function QualityAssessment.__init__ missing comprehensive docstring",
+                "Function QualityAssessment.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "QualityAssessment.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function QualityAssessment.__repr__ missing comprehensive docstring",
+                "Function QualityAssessment.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "QualityAssessmentError": {
+          "name": "QualityAssessmentError",
+          "docstring_complete": false,
+          "methods": {},
+          "coverage": 100,
+          "issues": [
+            "Class QualityAssessmentError missing comprehensive docstring"
+          ]
+        },
+        "SchemaAnalysisError": {
+          "name": "SchemaAnalysisError",
+          "docstring_complete": false,
+          "methods": {},
+          "coverage": 100,
+          "issues": [
+            "Class SchemaAnalysisError missing comprehensive docstring"
+          ]
+        },
+        "SchemaAnalysisResult": {
+          "name": "SchemaAnalysisResult",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "SchemaAnalysisResult.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaAnalysisResult.__init__ missing comprehensive docstring",
+                "Function SchemaAnalysisResult.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "SchemaAnalysisResult.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaAnalysisResult.__repr__ missing comprehensive docstring",
+                "Function SchemaAnalysisResult.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        }
+      },
+      "functions": {},
+      "coverage": 59.036144578313255,
+      "issues": []
+    },
+    "service": {
+      "module": "service",
+      "classes": {
+        "ChunkProcessingResult": {
+          "name": "ChunkProcessingResult",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ChunkProcessingResult.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ChunkProcessingResult.__init__ missing comprehensive docstring",
+                "Function ChunkProcessingResult.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ChunkProcessingResult.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ChunkProcessingResult.__repr__ missing comprehensive docstring",
+                "Function ChunkProcessingResult.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "ConfigurationError": {
+          "name": "ConfigurationError",
+          "docstring_complete": true,
+          "methods": {},
+          "coverage": 100,
+          "issues": []
+        },
+        "DataProcessingError": {
+          "name": "DataProcessingError",
+          "docstring_complete": true,
+          "methods": {},
+          "coverage": 100,
+          "issues": []
+        },
+        "DataQualityMetrics": {
+          "name": "DataQualityMetrics",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "DataQualityMetrics.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityMetrics.__init__ missing comprehensive docstring",
+                "Function DataQualityMetrics.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "DataQualityMetrics.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function DataQualityMetrics.__repr__ missing comprehensive docstring",
+                "Function DataQualityMetrics.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "ImportExportError": {
+          "name": "ImportExportError",
+          "docstring_complete": true,
+          "methods": {},
+          "coverage": 100,
+          "issues": []
+        },
+        "ImportExportService": {
+          "name": "ImportExportService",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ImportExportService.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportService.__init__ missing complete type hints"
+              ]
+            },
+            "create_job": {
+              "name": "ImportExportService.create_job",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportService.create_job missing complete type hints"
+              ]
+            },
+            "detect_schema_automatically": {
+              "name": "ImportExportService.detect_schema_automatically",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportService.detect_schema_automatically missing complete type hints"
+              ]
+            },
+            "execute_job": {
+              "name": "ImportExportService.execute_job",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportService.execute_job missing complete type hints"
+              ]
+            },
+            "get_job_metrics": {
+              "name": "ImportExportService.get_job_metrics",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportService.get_job_metrics missing complete type hints"
+              ]
+            },
+            "health_check": {
+              "name": "ImportExportService.health_check",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportService.health_check missing complete type hints"
+              ]
+            },
+            "initialize": {
+              "name": "ImportExportService.initialize",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportService.initialize missing complete type hints"
+              ]
+            },
+            "suggest_field_mappings": {
+              "name": "ImportExportService.suggest_field_mappings",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportService.suggest_field_mappings missing complete type hints"
+              ]
+            },
+            "validate_data_quality": {
+              "name": "ImportExportService.validate_data_quality",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ImportExportService.validate_data_quality missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 100.0,
+          "issues": []
+        },
+        "ProcessingResult": {
+          "name": "ProcessingResult",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ProcessingResult.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingResult.__init__ missing comprehensive docstring",
+                "Function ProcessingResult.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ProcessingResult.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ProcessingResult.__repr__ missing comprehensive docstring",
+                "Function ProcessingResult.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "SchemaDetectionError": {
+          "name": "SchemaDetectionError",
+          "docstring_complete": true,
+          "methods": {},
+          "coverage": 100,
+          "issues": []
+        },
+        "SchemaDetectionResult": {
+          "name": "SchemaDetectionResult",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "SchemaDetectionResult.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaDetectionResult.__init__ missing comprehensive docstring",
+                "Function SchemaDetectionResult.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "SchemaDetectionResult.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaDetectionResult.__repr__ missing comprehensive docstring",
+                "Function SchemaDetectionResult.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "SchemaField": {
+          "name": "SchemaField",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "SchemaField.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaField.__init__ missing comprehensive docstring",
+                "Function SchemaField.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "SchemaField.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SchemaField.__repr__ missing comprehensive docstring",
+                "Function SchemaField.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "ValidationError": {
+          "name": "ValidationError",
+          "docstring_complete": true,
+          "methods": {},
+          "coverage": 100,
+          "issues": []
+        },
+        "WriteResult": {
+          "name": "WriteResult",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "WriteResult.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function WriteResult.__init__ missing comprehensive docstring",
+                "Function WriteResult.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "WriteResult.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function WriteResult.__repr__ missing comprehensive docstring",
+                "Function WriteResult.__repr__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        }
+      },
+      "functions": {
+        "get_imex_service": {
+          "name": "get_imex_service",
+          "docstring_complete": true,
+          "has_type_hints": true,
+          "issues": []
+        },
+        "set_imex_service": {
+          "name": "set_imex_service",
+          "docstring_complete": true,
+          "has_type_hints": true,
+          "issues": []
+        }
+      },
+      "coverage": 60.0,
+      "issues": []
+    },
+    "security": {
+      "module": "security",
+      "classes": {
+        "ApiKey": {
+          "name": "ApiKey",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "ApiKey.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ApiKey.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.__repr__ missing comprehensive docstring",
+                "Function ApiKey.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ApiKey.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.__str__ missing comprehensive docstring",
+                "Function ApiKey.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "ApiKey.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "ApiKey.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.dict missing comprehensive docstring",
+                "Function ApiKey.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "ApiKey.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.json missing comprehensive docstring",
+                "Function ApiKey.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "ApiKey.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "ApiKey.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "ApiKey.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "ApiKey.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function ApiKey.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "AuditLog": {
+          "name": "AuditLog",
+          "docstring_complete": false,
+          "methods": {
+            "__init__": {
+              "name": "AuditLog.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "AuditLog.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.__repr__ missing comprehensive docstring",
+                "Function AuditLog.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "AuditLog.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.__str__ missing comprehensive docstring",
+                "Function AuditLog.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "AuditLog.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "AuditLog.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.dict missing comprehensive docstring",
+                "Function AuditLog.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "AuditLog.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.json missing comprehensive docstring",
+                "Function AuditLog.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "AuditLog.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "AuditLog.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "AuditLog.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "AuditLog.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLog.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": [
+            "Class AuditLog missing comprehensive docstring"
+          ]
+        },
+        "AuditLogger": {
+          "name": "AuditLogger",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "AuditLogger.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLogger.__init__ missing comprehensive docstring",
+                "Function AuditLogger.__init__ missing complete type hints"
+              ]
+            },
+            "get_audit_logs": {
+              "name": "AuditLogger.get_audit_logs",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLogger.get_audit_logs missing complete type hints"
+              ]
+            },
+            "log_action": {
+              "name": "AuditLogger.log_action",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuditLogger.log_action missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 66.66666666666666,
+          "issues": []
+        },
+        "AuthenticationManager": {
+          "name": "AuthenticationManager",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "AuthenticationManager.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.__init__ missing comprehensive docstring",
+                "Function AuthenticationManager.__init__ missing complete type hints"
+              ]
+            },
+            "calculate_risk_score": {
+              "name": "AuthenticationManager.calculate_risk_score",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.calculate_risk_score missing complete type hints"
+              ]
+            },
+            "check_rate_limit": {
+              "name": "AuthenticationManager.check_rate_limit",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.check_rate_limit missing complete type hints"
+              ]
+            },
+            "decrypt_sensitive_data": {
+              "name": "AuthenticationManager.decrypt_sensitive_data",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.decrypt_sensitive_data missing complete type hints"
+              ]
+            },
+            "encrypt_sensitive_data": {
+              "name": "AuthenticationManager.encrypt_sensitive_data",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.encrypt_sensitive_data missing complete type hints"
+              ]
+            },
+            "generate_api_key": {
+              "name": "AuthenticationManager.generate_api_key",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.generate_api_key missing complete type hints"
+              ]
+            },
+            "generate_jwt_token": {
+              "name": "AuthenticationManager.generate_jwt_token",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.generate_jwt_token missing complete type hints"
+              ]
+            },
+            "hash_api_key": {
+              "name": "AuthenticationManager.hash_api_key",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.hash_api_key missing complete type hints"
+              ]
+            },
+            "hash_password": {
+              "name": "AuthenticationManager.hash_password",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.hash_password missing complete type hints"
+              ]
+            },
+            "verify_jwt_token": {
+              "name": "AuthenticationManager.verify_jwt_token",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.verify_jwt_token missing complete type hints"
+              ]
+            },
+            "verify_password": {
+              "name": "AuthenticationManager.verify_password",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function AuthenticationManager.verify_password missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 90.9090909090909,
+          "issues": []
+        },
+        "Permission": {
+          "name": "Permission",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "Permission.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function Permission.__init__ missing comprehensive docstring",
+                "Function Permission.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "Permission.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function Permission.__repr__ missing comprehensive docstring",
+                "Function Permission.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "Permission.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function Permission.__str__ missing comprehensive docstring",
+                "Function Permission.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "RBACManager": {
+          "name": "RBACManager",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "RBACManager.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function RBACManager.__init__ missing comprehensive docstring",
+                "Function RBACManager.__init__ missing complete type hints"
+              ]
+            },
+            "get_user_permissions": {
+              "name": "RBACManager.get_user_permissions",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function RBACManager.get_user_permissions missing complete type hints"
+              ]
+            },
+            "user_can_access_tenant": {
+              "name": "RBACManager.user_can_access_tenant",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function RBACManager.user_can_access_tenant missing complete type hints"
+              ]
+            },
+            "user_has_permission": {
+              "name": "RBACManager.user_has_permission",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function RBACManager.user_has_permission missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 75.0,
+          "issues": []
+        },
+        "SecurityConfig": {
+          "name": "SecurityConfig",
+          "docstring_complete": false,
+          "methods": {
+            "__init__": {
+              "name": "SecurityConfig.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "SecurityConfig.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.__repr__ missing comprehensive docstring",
+                "Function SecurityConfig.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "SecurityConfig.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.__str__ missing comprehensive docstring",
+                "Function SecurityConfig.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "SecurityConfig.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "SecurityConfig.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.dict missing comprehensive docstring",
+                "Function SecurityConfig.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "SecurityConfig.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.json missing comprehensive docstring",
+                "Function SecurityConfig.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "SecurityConfig.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "SecurityConfig.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "SecurityConfig.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "SecurityConfig.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityConfig.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": [
+            "Class SecurityConfig missing comprehensive docstring"
+          ]
+        },
+        "SecurityLevel": {
+          "name": "SecurityLevel",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "SecurityLevel.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityLevel.__init__ missing comprehensive docstring",
+                "Function SecurityLevel.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "SecurityLevel.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityLevel.__repr__ missing comprehensive docstring",
+                "Function SecurityLevel.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "SecurityLevel.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SecurityLevel.__str__ missing comprehensive docstring",
+                "Function SecurityLevel.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        },
+        "User": {
+          "name": "User",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "User.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "User.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.__repr__ missing comprehensive docstring",
+                "Function User.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "User.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.__str__ missing comprehensive docstring",
+                "Function User.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "User.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "User.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.dict missing comprehensive docstring",
+                "Function User.dict missing complete type hints"
+              ]
+            },
+            "get_id": {
+              "name": "User.get_id",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.get_id missing comprehensive docstring",
+                "Function User.get_id missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "User.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.json missing comprehensive docstring",
+                "Function User.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "User.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "User.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "User.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "User.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function User.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 54.54545454545454,
+          "issues": []
+        },
+        "UserRole": {
+          "name": "UserRole",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "UserRole.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function UserRole.__init__ missing comprehensive docstring",
+                "Function UserRole.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "UserRole.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function UserRole.__repr__ missing comprehensive docstring",
+                "Function UserRole.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "UserRole.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function UserRole.__str__ missing comprehensive docstring",
+                "Function UserRole.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": []
+        }
+      },
+      "functions": {
+        "create_security_config": {
+          "name": "create_security_config",
+          "docstring_complete": true,
+          "has_type_hints": true,
+          "issues": []
+        },
+        "rate_limit": {
+          "name": "rate_limit",
+          "docstring_complete": true,
+          "has_type_hints": false,
+          "issues": [
+            "Function rate_limit missing complete type hints"
+          ]
+        },
+        "require_permission": {
+          "name": "require_permission",
+          "docstring_complete": true,
+          "has_type_hints": false,
+          "issues": [
+            "Function require_permission missing complete type hints"
+          ]
+        },
+        "require_role": {
+          "name": "require_role",
+          "docstring_complete": true,
+          "has_type_hints": false,
+          "issues": [
+            "Function require_role missing complete type hints"
+          ]
+        },
+        "require_tenant_access": {
+          "name": "require_tenant_access",
+          "docstring_complete": true,
+          "has_type_hints": false,
+          "issues": [
+            "Function require_tenant_access missing complete type hints"
+          ]
+        },
+        "security_middleware": {
+          "name": "security_middleware",
+          "docstring_complete": true,
+          "has_type_hints": false,
+          "issues": [
+            "Function security_middleware missing complete type hints"
+          ]
+        }
+      },
+      "coverage": 60.810810810810814,
+      "issues": []
+    },
+    "performance": {
+      "module": "performance",
+      "classes": {
+        "AlertSeverity": {
+          "name": "AlertSeverity",
+          "docstring_complete": false,
+          "methods": {
+            "__init__": {
+              "name": "AlertSeverity.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function AlertSeverity.__init__ missing comprehensive docstring",
+                "Function AlertSeverity.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "AlertSeverity.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function AlertSeverity.__repr__ missing comprehensive docstring",
+                "Function AlertSeverity.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "AlertSeverity.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function AlertSeverity.__str__ missing comprehensive docstring",
+                "Function AlertSeverity.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": [
+            "Class AlertSeverity missing comprehensive docstring"
+          ]
+        },
+        "JobPerformanceMetrics": {
+          "name": "JobPerformanceMetrics",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "JobPerformanceMetrics.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "JobPerformanceMetrics.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.__repr__ missing comprehensive docstring",
+                "Function JobPerformanceMetrics.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "JobPerformanceMetrics.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.__str__ missing comprehensive docstring",
+                "Function JobPerformanceMetrics.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "JobPerformanceMetrics.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "JobPerformanceMetrics.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.dict missing comprehensive docstring",
+                "Function JobPerformanceMetrics.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "JobPerformanceMetrics.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.json missing comprehensive docstring",
+                "Function JobPerformanceMetrics.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "JobPerformanceMetrics.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "JobPerformanceMetrics.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "JobPerformanceMetrics.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "JobPerformanceMetrics.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function JobPerformanceMetrics.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "MetricType": {
+          "name": "MetricType",
+          "docstring_complete": false,
+          "methods": {
+            "__init__": {
+              "name": "MetricType.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function MetricType.__init__ missing comprehensive docstring",
+                "Function MetricType.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "MetricType.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function MetricType.__repr__ missing comprehensive docstring",
+                "Function MetricType.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "MetricType.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function MetricType.__str__ missing comprehensive docstring",
+                "Function MetricType.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": [
+            "Class MetricType missing comprehensive docstring"
+          ]
+        },
+        "PerformanceAlert": {
+          "name": "PerformanceAlert",
+          "docstring_complete": false,
+          "methods": {
+            "__init__": {
+              "name": "PerformanceAlert.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "PerformanceAlert.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.__repr__ missing comprehensive docstring",
+                "Function PerformanceAlert.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "PerformanceAlert.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.__str__ missing comprehensive docstring",
+                "Function PerformanceAlert.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "PerformanceAlert.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "PerformanceAlert.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.dict missing comprehensive docstring",
+                "Function PerformanceAlert.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "PerformanceAlert.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.json missing comprehensive docstring",
+                "Function PerformanceAlert.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "PerformanceAlert.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "PerformanceAlert.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "PerformanceAlert.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "PerformanceAlert.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceAlert.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": [
+            "Class PerformanceAlert missing comprehensive docstring"
+          ]
+        },
+        "PerformanceMetric": {
+          "name": "PerformanceMetric",
+          "docstring_complete": false,
+          "methods": {
+            "__init__": {
+              "name": "PerformanceMetric.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "PerformanceMetric.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.__repr__ missing comprehensive docstring",
+                "Function PerformanceMetric.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "PerformanceMetric.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.__str__ missing comprehensive docstring",
+                "Function PerformanceMetric.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "PerformanceMetric.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "PerformanceMetric.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.dict missing comprehensive docstring",
+                "Function PerformanceMetric.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "PerformanceMetric.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.json missing comprehensive docstring",
+                "Function PerformanceMetric.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "PerformanceMetric.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "PerformanceMetric.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "PerformanceMetric.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "PerformanceMetric.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMetric.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": [
+            "Class PerformanceMetric missing comprehensive docstring"
+          ]
+        },
+        "PerformanceMonitor": {
+          "name": "PerformanceMonitor",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "PerformanceMonitor.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.__init__ missing complete type hints"
+              ]
+            },
+            "finish_job_monitoring": {
+              "name": "PerformanceMonitor.finish_job_monitoring",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.finish_job_monitoring missing complete type hints"
+              ]
+            },
+            "get_active_alerts": {
+              "name": "PerformanceMonitor.get_active_alerts",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.get_active_alerts missing complete type hints"
+              ]
+            },
+            "get_job_performance_report": {
+              "name": "PerformanceMonitor.get_job_performance_report",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.get_job_performance_report missing complete type hints"
+              ]
+            },
+            "get_performance_statistics": {
+              "name": "PerformanceMonitor.get_performance_statistics",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.get_performance_statistics missing complete type hints"
+              ]
+            },
+            "get_system_metrics_summary": {
+              "name": "PerformanceMonitor.get_system_metrics_summary",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.get_system_metrics_summary missing complete type hints"
+              ]
+            },
+            "resolve_alert": {
+              "name": "PerformanceMonitor.resolve_alert",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.resolve_alert missing complete type hints"
+              ]
+            },
+            "start_job_monitoring": {
+              "name": "PerformanceMonitor.start_job_monitoring",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.start_job_monitoring missing complete type hints"
+              ]
+            },
+            "start_monitoring": {
+              "name": "PerformanceMonitor.start_monitoring",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.start_monitoring missing complete type hints"
+              ]
+            },
+            "stop_monitoring": {
+              "name": "PerformanceMonitor.stop_monitoring",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.stop_monitoring missing complete type hints"
+              ]
+            },
+            "update_job_progress": {
+              "name": "PerformanceMonitor.update_job_progress",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.update_job_progress missing complete type hints"
+              ]
+            },
+            "update_threshold": {
+              "name": "PerformanceMonitor.update_threshold",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceMonitor.update_threshold missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 100.0,
+          "issues": []
+        },
+        "PerformanceThreshold": {
+          "name": "PerformanceThreshold",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "PerformanceThreshold.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "PerformanceThreshold.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.__repr__ missing comprehensive docstring",
+                "Function PerformanceThreshold.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "PerformanceThreshold.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.__str__ missing comprehensive docstring",
+                "Function PerformanceThreshold.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "PerformanceThreshold.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "PerformanceThreshold.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.dict missing comprehensive docstring",
+                "Function PerformanceThreshold.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "PerformanceThreshold.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.json missing comprehensive docstring",
+                "Function PerformanceThreshold.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "PerformanceThreshold.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "PerformanceThreshold.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "PerformanceThreshold.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "PerformanceThreshold.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function PerformanceThreshold.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        },
+        "ResourceType": {
+          "name": "ResourceType",
+          "docstring_complete": false,
+          "methods": {
+            "__init__": {
+              "name": "ResourceType.__init__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ResourceType.__init__ missing comprehensive docstring",
+                "Function ResourceType.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "ResourceType.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ResourceType.__repr__ missing comprehensive docstring",
+                "Function ResourceType.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "ResourceType.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function ResourceType.__str__ missing comprehensive docstring",
+                "Function ResourceType.__str__ missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 0.0,
+          "issues": [
+            "Class ResourceType missing comprehensive docstring"
+          ]
+        },
+        "SystemResourceMetrics": {
+          "name": "SystemResourceMetrics",
+          "docstring_complete": true,
+          "methods": {
+            "__init__": {
+              "name": "SystemResourceMetrics.__init__",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.__init__ missing complete type hints"
+              ]
+            },
+            "__repr__": {
+              "name": "SystemResourceMetrics.__repr__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.__repr__ missing comprehensive docstring",
+                "Function SystemResourceMetrics.__repr__ missing complete type hints"
+              ]
+            },
+            "__str__": {
+              "name": "SystemResourceMetrics.__str__",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.__str__ missing comprehensive docstring",
+                "Function SystemResourceMetrics.__str__ missing complete type hints"
+              ]
+            },
+            "copy": {
+              "name": "SystemResourceMetrics.copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.copy missing complete type hints"
+              ]
+            },
+            "dict": {
+              "name": "SystemResourceMetrics.dict",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.dict missing comprehensive docstring",
+                "Function SystemResourceMetrics.dict missing complete type hints"
+              ]
+            },
+            "json": {
+              "name": "SystemResourceMetrics.json",
+              "docstring_complete": false,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.json missing comprehensive docstring",
+                "Function SystemResourceMetrics.json missing complete type hints"
+              ]
+            },
+            "model_copy": {
+              "name": "SystemResourceMetrics.model_copy",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.model_copy missing complete type hints"
+              ]
+            },
+            "model_dump": {
+              "name": "SystemResourceMetrics.model_dump",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.model_dump missing complete type hints"
+              ]
+            },
+            "model_dump_json": {
+              "name": "SystemResourceMetrics.model_dump_json",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.model_dump_json missing complete type hints"
+              ]
+            },
+            "model_post_init": {
+              "name": "SystemResourceMetrics.model_post_init",
+              "docstring_complete": true,
+              "has_type_hints": false,
+              "issues": [
+                "Function SystemResourceMetrics.model_post_init missing complete type hints"
+              ]
+            }
+          },
+          "coverage": 60.0,
+          "issues": []
+        }
+      },
+      "functions": {},
+      "coverage": 60.310421286031044,
+      "issues": []
+    }
+  },
+  "functionality_tests": {
+    "models": {
+      "passed": true,
+      "issues": []
+    },
+    "database": {
+      "passed": true,
+      "issues": []
+    },
+    "ai_intelligence": {
+      "passed": true,
+      "issues": []
+    },
+    "service": {
+      "passed": true,
+      "issues": []
+    },
+    "security": {
+      "passed": true,
+      "issues": []
+    },
+    "performance": {
+      "passed": true,
+      "issues": []
+    },
+    "overall": {
+      "passed": true,
+      "coverage": 100.0
+    }
+  },
+  "summary": {
+    "total_modules": 6,
+    "documentation_coverage": 60.3,
+    "functionality_coverage": 100.0,
+    "overall_score": 80.2,
+    "production_ready": false
+  },
+  "recommendations": [
+    "Documentation coverage (60.3%) below 85% threshold - add comprehensive docstrings"
+  ]
+}

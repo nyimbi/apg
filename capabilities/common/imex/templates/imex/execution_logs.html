@@ -1,0 +1,123 @@
+{% extends "appbuilder/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h2>{{ title }}</h2>
+
+            <!-- Execution Information -->
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Execution Details</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Execution ID:</strong> {{ execution.id }}</p>
+                            <p><strong>Job ID:</strong> {{ execution.job_id }}</p>
+                            <p><strong>Status:</strong>
+                                <span class="label label-{% if execution.status == 'running' %}warning{% elif execution.status == 'completed' %}success{% elif execution.status == 'failed' %}danger{% else %}default{% endif %}">
+                                    {{ execution.status|upper }}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Started:</strong> {{ execution.started_at.strftime('%Y-%m-%d %H:%M:%S') if execution.started_at else 'N/A' }}</p>
+                            <p><strong>Completed:</strong> {{ execution.completed_at.strftime('%Y-%m-%d %H:%M:%S') if execution.completed_at else 'N/A' }}</p>
+                            <p><strong>Worker Node:</strong> {{ execution.worker_node or 'N/A' }}</p>
+                        </div>
+                    </div>
+
+                    {% if execution.error_message %}
+                    <div class="alert alert-danger">
+                        <strong>Error:</strong> {{ execution.error_message }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Execution Logs -->
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Execution Logs</h3>
+                    <div class="panel-controls">
+                        <button class="btn btn-sm btn-default" onclick="refreshLogs()">
+                            <i class="fa fa-refresh"></i> Refresh
+                        </button>
+                        <button class="btn btn-sm btn-default" onclick="downloadLogs()">
+                            <i class="fa fa-download"></i> Download
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="log-container">
+                        <pre class="log-content" id="log-content">{{ logs if logs else 'No logs available' }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.log-container {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.log-content {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    border: none;
+    margin: 0;
+    padding: 15px;
+    max-height: 600px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+.panel-controls {
+    float: right;
+}
+.panel-controls .btn {
+    margin-left: 5px;
+}
+</style>
+
+<script>
+function refreshLogs() {
+    window.location.reload();
+}
+
+function downloadLogs() {
+    const logs = document.getElementById('log-content').textContent;
+    const blob = new Blob([logs], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'execution_{{ execution.id }}_logs.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+// Auto-scroll to bottom for running executions
+{% if execution.status == 'running' %}
+document.addEventListener('DOMContentLoaded', function() {
+    const logContent = document.getElementById('log-content');
+    logContent.scrollTop = logContent.scrollHeight;
+
+    // Auto-refresh logs every 5 seconds for running executions
+    setInterval(function() {
+        refreshLogs();
+    }, 5000);
+});
+{% endif %}
+</script>
+{% endblock %}

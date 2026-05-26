@@ -1,0 +1,160 @@
+{% extends "appbuilder/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>{{ title }}</h1>
+
+            <!-- System Overview Cards -->
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="panel panel-primary">
+                        <div class="panel-body text-center">
+                            <h2 id="total-jobs">-</h2>
+                            <p>Total Jobs</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="panel panel-warning">
+                        <div class="panel-body text-center">
+                            <h2 id="active-jobs">-</h2>
+                            <p>Active Jobs</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="panel panel-success">
+                        <div class="panel-body text-center">
+                            <h2 id="completed-jobs">-</h2>
+                            <p>Completed</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="panel panel-danger">
+                        <div class="panel-body text-center">
+                            <h2 id="failed-jobs">-</h2>
+                            <p>Failed</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Jobs Table -->
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Active Jobs</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="active-jobs-table">
+                            <thead>
+                                <tr>
+                                    <th>Job Name</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Performance Chart -->
+            <div class="panel panel-info">
+                <div class="panel-heading">
+                    <h3 class="panel-title">System Performance</h3>
+                </div>
+                <div class="panel-body">
+                    <canvas id="performance-chart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.panel {
+    margin-bottom: 20px;
+}
+.panel-body h2 {
+    margin: 0;
+    font-size: 2.5em;
+}
+#performance-chart {
+    width: 100% !important;
+    height: 300px !important;
+}
+</style>
+
+<script>
+// Real-time data updates
+function updateDashboard() {
+    // Fetch system metrics
+    fetch('{{ url_for("MonitoringDashboardView.api_system_metrics") }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Metrics error:', data.error);
+                return;
+            }
+
+            // Update metric cards
+            document.getElementById('total-jobs').textContent = data.jobs_created || 0;
+            document.getElementById('active-jobs').textContent = data.jobs_running || 0;
+            document.getElementById('completed-jobs').textContent = data.jobs_completed || 0;
+            document.getElementById('failed-jobs').textContent = data.jobs_failed || 0;
+        })
+        .catch(error => console.error('Error fetching metrics:', error));
+
+    // Fetch active jobs
+    fetch('{{ url_for("MonitoringDashboardView.api_active_jobs") }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Active jobs error:', data.error);
+                return;
+            }
+
+            const tbody = document.querySelector('#active-jobs-table tbody');
+            tbody.innerHTML = '';
+
+            data.forEach(job => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${job.name}</td>
+                    <td>${job.type}</td>
+                    <td><span class="label label-warning">${job.status}</span></td>
+                    <td>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-info" style="width: ${(job.progress / 1000) * 100}%"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <a href="/importexportjobview/monitor/${job.id}" class="btn btn-sm btn-primary">Monitor</a>
+                    </td>
+                `;
+            });
+
+            if (data.length === 0) {
+                const row = tbody.insertRow();
+                row.innerHTML = '<td colspan="5" class="text-center text-muted">No active jobs</td>';
+            }
+        })
+        .catch(error => console.error('Error fetching active jobs:', error));
+}
+
+// Initial load and periodic updates
+document.addEventListener('DOMContentLoaded', function() {
+    updateDashboard();
+    setInterval(updateDashboard, 10000); // Update every 10 seconds
+});
+</script>
+{% endblock %}
