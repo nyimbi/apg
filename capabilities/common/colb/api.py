@@ -6,11 +6,12 @@ Flask-AppBuilder page collaboration, and APG integration.
 """
 
 import asyncio
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from uuid_extensions import uuid7str
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +29,6 @@ from .models import RTCSession, RTCVideoCall, RTCPageCollaboration
 from .websocket_manager import websocket_manager
 
 
-# Mock dependencies (would be actual APG dependencies)
 async def get_async_session() -> AsyncSession:
 	"""Get async database session"""
 	# In real implementation, this would return SQLAlchemy AsyncSession
@@ -42,13 +42,81 @@ async def get_async_session() -> AsyncSession:
 			pass
 	return MockAsyncSession()
 
-async def get_current_user(token: str = None) -> Dict[str, Any]:
-	"""Mock current user from APG auth"""
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+def _split_permissions(value: Any) -> List[str]:
+	if value is None:
+		return []
+	if isinstance(value, (list, tuple, set)):
+		return [text for item in value if (text := _clean_text(item))]
+	return [text for item in str(value).replace(" ", "").split(",") if (text := _clean_text(item))]
+
+async def get_current_user(request: Request) -> Dict[str, Any]:
+	"""Resolve APG user context from FastAPI request state, headers, query, or environment."""
+	state = getattr(request, "state", None)
+	state_user = (
+		_object_value(state, "current_user")
+		or _object_value(state, "user")
+		or _object_value(state, "auth_user")
+	)
+	headers = request.headers
+	query = request.query_params
+
+	user_id = _first_text([
+		_object_value(state_user, "user_id"),
+		_object_value(state_user, "id"),
+		_object_value(state_user, "username"),
+		_object_value(state, "user_id"),
+		headers.get("X-User-ID"),
+		headers.get("X-APG-User-ID"),
+		query.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
+	tenant_id = _first_text([
+		_object_value(state_user, "tenant_id"),
+		_object_value(state, "tenant_id"),
+		headers.get("X-Tenant-ID"),
+		headers.get("X-APG-Tenant-ID"),
+		headers.get("X-Organization-ID"),
+		query.get("tenant_id"),
+		query.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], os.getenv("APG_DEFAULT_TENANT_ID", "default"))
+	permissions = (
+		_split_permissions(_object_value(state_user, "permissions"))
+		or _split_permissions(_object_value(state, "permissions"))
+		or _split_permissions(headers.get("X-APG-Permissions"))
+		or _split_permissions(os.getenv("APG_DEFAULT_PERMISSIONS"))
+		or ["rtc:read"]
+	)
+
 	return {
-		'user_id': 'user123',
-		'tenant_id': 'tenant123',
-		'username': 'testuser',
-		'permissions': ['rtc:*']
+		'user_id': user_id,
+		'tenant_id': tenant_id,
+		'username': _first_text([
+			_object_value(state_user, "username"),
+			headers.get("X-APG-Username"),
+			query.get("username"),
+		], user_id),
+		'permissions': permissions
 	}
 
 async def require_permission(permission: str):

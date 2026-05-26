@@ -2835,3 +2835,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_ckm_rtc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed
 - `rg -n "'user123'|'tenant123'|\"current_user_id\"|\"current_tenant_id\"|Mock current user from APG auth|return mock data|rtc:\*|Kafka|kafka" capabilities/ckm/rtc/api.py capabilities/ckm/rtc/views.py capabilities/ckm/rtc/websocket_manager.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:38 EAT
+
+Completed checkpoint:
+
+- Replaced common collaboration REST API's mock `user123`/`tenant123`/`rtc:*` auth dependency with request-derived APG identity and read-only fallback permissions.
+- Replaced common collaboration Flask join-session fixed collaboration context with Flask `g`, session, APG headers, and query argument resolution.
+- Replaced common collaboration WebSocket mock connection metadata with path/query/header/environment context resolution and non-empty identity validation.
+- Added focused common collaboration context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/colb/api.py capabilities/common/colb/views.py capabilities/common/colb/websocket_manager.py tests/test_common_colb_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_common_colb_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed
+- `rg -n "'user123'|'tenant123'|\"current_user_id\"|\"current_tenant_id\"|Mock current user from APG auth|return mock data|rtc:\*|Kafka|kafka" capabilities/common/colb/api.py capabilities/common/colb/views.py capabilities/common/colb/websocket_manager.py` -> no matches
+- `git diff --check` -> no issues

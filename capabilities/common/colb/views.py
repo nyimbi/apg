@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from uuid_extensions import uuid7str
 
-from flask import request, jsonify, render_template, redirect, url_for, flash
+from flask import g, request, jsonify, render_template, redirect, url_for, flash, session
 from flask_appbuilder import ModelView, BaseView, expose, has_access
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.widgets import ListWidget, ShowWidget, EditWidget
@@ -27,6 +27,68 @@ from .models import (
 	RTCPageCollaboration, RTCThirdPartyIntegration
 )
 from .service import CollaborationService, CollaborationContext
+
+
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def _resolve_current_user_id() -> str:
+	current_user = (
+		_object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	return _first_text([
+		_object_value(current_user, "user_id"),
+		_object_value(current_user, "id"),
+		_object_value(current_user, "username"),
+		_object_value(g, "user_id"),
+		session.get("user_id"),
+		request.headers.get("X-User-ID"),
+		request.headers.get("X-APG-User-ID"),
+		request.args.get("user_id"),
+	], "system")
+
+
+def _resolve_current_tenant_id() -> str:
+	current_user = (
+		_object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	current_tenant = _object_value(g, "current_tenant")
+	return _first_text([
+		_object_value(current_user, "tenant_id"),
+		_object_value(g, "tenant_id"),
+		_object_value(current_tenant, "tenant_id"),
+		current_tenant,
+		session.get("tenant_id"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+	], "default")
 
 
 # Pydantic models for view forms
@@ -133,9 +195,8 @@ class RTCSessionModelView(ModelView):
 	def join_session(self, session_id):
 		"""Join collaboration session"""
 		try:
-			# Get current user context
-			user_id = "current_user_id"  # Would get from APG auth
-			tenant_id = "current_tenant_id"
+			user_id = _resolve_current_user_id()
+			tenant_id = _resolve_current_tenant_id()
 			
 			context = CollaborationContext(
 				tenant_id=tenant_id,
