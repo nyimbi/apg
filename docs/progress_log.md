@@ -816,3 +816,25 @@ Current broader I18N/WALT/MCHN execution findings:
 - I18N, WALT, and MCHN are no longer placeholders at the composition layer.
 - Phase 8 now has uniform first-class registration/contract coverage across specialized AI, analytics, localization, payments, and multichannel output.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:28 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder LOGT package into a first-class APG logging/tracing capability with tenant-scoped ingestion, tracing, privacy, governance, UI, and theme configuration.
+- Added deterministic LOGT rules for tenant context, pipeline ownership, trace context, sensitive-log redaction, export approval, and large diagnostic query review.
+- Promoted the placeholder DEPL package into a first-class APG deployment-management capability with tenant-scoped release, rollout, evidence, governance, UI, and theme configuration.
+- Added deterministic DEPL rules for tenant context, release ownership, health gates, production approval, rollback plans, and large-canary review.
+- Promoted the placeholder ENVM package into a first-class APG environment-management capability with tenant-scoped environment, promotion, drift, governance, UI, and theme configuration.
+- Added deterministic ENVM rules for tenant context, environment ownership, production change approval, promotion path, secret scope policy, and drift review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/logt/__init__.py capabilities/common/logt/capability_contract.py capabilities/common/logt/test_capability_contract.py capabilities/common/depl/__init__.py capabilities/common/depl/capability_contract.py capabilities/common/depl/test_capability_contract.py capabilities/common/envm/__init__.py capabilities/common/envm/capability_contract.py capabilities/common/envm/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/logt/test_capability_contract.py capabilities/common/depl/test_capability_contract.py capabilities/common/envm/test_capability_contract.py` -> 9 passed, 10 warnings
+
+Current broader LOGT/DEPL/ENVM execution findings:
+
+- LOGT, DEPL, and ENVM are no longer placeholders at the composition layer.
+- Phase 9 operational infrastructure is now covered at the first-class registration/contract layer; remaining Phase 9 package-level gaps are DIST, EDGE, CICD, and BKUP.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
