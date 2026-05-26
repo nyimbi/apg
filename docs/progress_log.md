@@ -2278,3 +2278,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_scm_ctm_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|TODO: Get tenant" capabilities/scm/ctm/contract_management/views.py capabilities/scm/ctm/contract_management/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:07 EAT
+
+Completed checkpoint:
+
+- Replaced Batch & Lot Tracking API/view tenant defaults with a shared request-context resolver.
+- BLT model-view filters, dashboard service construction, and create-batch API service construction now resolve tenant IDs from payload, Flask context/current user, `g.user`, tenant headers, query args, request environment, and `APG_DEFAULT_TENANT_ID` fallback.
+- Added focused regression coverage that rejects hardcoded BLT tenant defaults and verifies tenant precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/scm/blt/context.py capabilities/scm/blt/views.py capabilities/scm/blt/api.py tests/test_scm_blt_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_scm_blt_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|TODO: Get tenant" capabilities/scm/blt/views.py capabilities/scm/blt/api.py` -> no matches
+- `git diff --check` -> no issues

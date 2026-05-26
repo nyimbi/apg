@@ -15,6 +15,7 @@ from .models import (
 	IMBLTBatch, IMBLTBatchTransaction, IMBLTQualityTest,
 	IMBLTRecallEvent, IMBLTRecallAction, IMBLTGenealogyTrace
 )
+from .context import get_tenant_id_from_request
 from .service import BatchLotService
 
 
@@ -82,7 +83,7 @@ class IMBLTBatchView(ModelView):
 		return redirect(self.get_redirect())
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMBLTQualityTestView(ModelView):
@@ -126,7 +127,7 @@ class IMBLTQualityTestView(ModelView):
 	}
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMBLTRecallEventView(ModelView):
@@ -168,7 +169,7 @@ class IMBLTRecallEventView(ModelView):
 	}
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class BatchLotDashboardView(BaseView):
@@ -211,4 +212,4 @@ class BatchLotDashboardView(BaseView):
 		return []  # Simplified for now
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
