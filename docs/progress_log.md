@@ -2884,3 +2884,18 @@ Verification:
 - `rg -n "return \"user-123\"|For now, return mock user|For now, return mock user ID|mock_user_001|mock_tenant_001|TODO: Implement proper JWT token validation|Kafka|kafka" capabilities/common/mten/api.py capabilities/crm/adv/api.py` -> no matches
 - `rg -n -i "\bkafka\b" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!**/__pycache__/**'` -> only `docs/progress_log.md` and `tests/test_repository_hygiene.py`
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:48 EAT
+
+Completed checkpoint:
+
+- Replaced NLPC API gateway's simulated JWT validation that returned fixed `demo_user` with lightweight JWT payload decoding.
+- NLPC bearer auth now requires a real user claim (`user_id`, `sub`, or `username`) and resolves tenant/scopes from token claims or APG environment context.
+- Added focused NLPC JWT regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/nlpc/api_gateway.py tests/test_common_nlpc_jwt_context.py`
+- `.venv/bin/python -m pytest -q tests/test_common_nlpc_jwt_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "\"user_id\": \"demo_user\"|demo_user|Kafka|kafka" capabilities/common/nlpc/api_gateway.py` -> no matches
+- `git diff --check` -> no issues

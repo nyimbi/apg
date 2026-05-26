@@ -18,6 +18,7 @@ Features:
 import asyncio
 import json
 import logging
+import os
 import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Union, Callable, Tuple
@@ -527,16 +528,48 @@ class APIGateway:
 	async def _validate_jwt_token(self, token: str) -> Optional[Dict[str, Any]]:
 		"""Validate JWT token (simplified implementation)"""
 		try:
-			# In production, would use proper JWT library for validation
-			# For demonstration, we'll simulate validation
+			parts = token.split(".")
+			if len(parts) != 3:
+				return None
+
+			payload_segment = parts[1]
+			padding = "=" * (-len(payload_segment) % 4)
+			payload = json.loads(base64.urlsafe_b64decode(f"{payload_segment}{padding}").decode("utf-8"))
+			user_id = self._clean_claim(
+				payload.get("user_id")
+				or payload.get("sub")
+				or payload.get("username")
+			)
+			if not user_id:
+				return None
+
+			tenant_id = self._clean_claim(
+				payload.get("tenant_id")
+				or payload.get("tenant")
+				or payload.get("organization_id")
+				or os.getenv("APG_TENANT_ID")
+			) or self.tenant_id
+			scopes = payload.get("scopes") or payload.get("scope") or ["nlp:read"]
+			if isinstance(scopes, str):
+				scopes = [scope for item in scopes.split(" ") if (scope := item.strip())]
+			if not isinstance(scopes, list):
+				scopes = ["nlp:read"]
+
 			return {
-				"user_id": "demo_user",
-				"tenant_id": self.tenant_id,
-				"scopes": ["nlp:read", "nlp:write"]
+				"user_id": user_id,
+				"tenant_id": tenant_id,
+				"scopes": scopes
 			}
 		except Exception as e:
 			logger.warning(f"JWT validation failed: {str(e)}")
 			return None
+
+	@staticmethod
+	def _clean_claim(value: Any) -> Optional[str]:
+		if value is None:
+			return None
+		text = str(value).strip()
+		return text or None
 	
 	async def _check_rate_limit(self, request: APIRequest, endpoint: APIEndpoint) -> bool:
 		"""Check rate limiting for request"""
