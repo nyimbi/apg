@@ -2511,3 +2511,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_hcm_employee_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return ['\"]default_tenant['\"]|request\.headers\.get\(['\"]X-Tenant-ID['\"], ['\"]default_tenant['\"]\)|TODO: Implement tenant resolution|Would extract from user session|from flask_login import current_user|from flask import Blueprint, request, jsonify, g" capabilities/hcm/chr/employee_data_management/views.py capabilities/hcm/chr/employee_data_management/api.py capabilities/hcm/chr/employee_data_management/api_integration.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:13 EAT
+
+Completed checkpoint:
+
+- Made the Payment Gateway webhook API compile by replacing invalid `await` usage inside Flask-AppBuilder sync view methods with a local async service-call runner.
+- Replaced webhook endpoint create/list/event tenant defaults with shared request-context helpers and stamped endpoint creation with resolved actor identity.
+- Manual webhook event sending now resolves tenant identity from payload, gateway auth, Flask context/current user, `g.user`, session, APG headers, query args, request environment, and configured fallbacks instead of requiring caller-supplied tenant IDs.
+- Added focused regression coverage that rejects stale webhook tenant fallbacks, verifies sync async-call wiring, and verifies gateway tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fintech/gateway/context.py capabilities/fintech/gateway/webhook_api.py tests/test_fintech_gateway_webhook_context.py`
+- `.venv/bin/python -m pytest -q tests/test_fintech_gateway_webhook_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "data\['tenant_id'\] = data\.get\('tenant_id', 'default_tenant'\)|request\.args\.get\('tenant_id', 'default_tenant'\)|required_fields = \['tenant_id', 'event_type', 'payload'\]|await self\._ensure_initialized\(\)|SyntaxError" capabilities/fintech/gateway/webhook_api.py` -> no matches
+- `git diff --check` -> no issues

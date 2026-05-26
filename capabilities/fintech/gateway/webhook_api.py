@@ -23,6 +23,7 @@ from .webhook_service import (
     WebhookService, WebhookEndpoint, WebhookEvent, WebhookEventType, 
     WebhookStatus, WebhookSecurityType, create_webhook_service
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 from .database import get_database_service
 from .auth import get_auth_service, require_permission
 
@@ -65,6 +66,10 @@ class WebhookAPIView(BaseView):
             await self.webhook_service.initialize()
             
             self._initialized = True
+
+    def _run_async(self, coroutine):
+        """Run async service calls from Flask-AppBuilder sync view methods."""
+        return asyncio.run(coroutine)
     
     # Webhook Endpoint Management
     
@@ -90,7 +95,7 @@ class WebhookAPIView(BaseView):
         }
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
             if not request.is_json:
                 raise BadRequest("Request must be JSON")
@@ -103,9 +108,8 @@ class WebhookAPIView(BaseView):
                 if field not in data:
                     raise BadRequest(f"Missing required field: {field}")
             
-            # Add tenant context from authentication
-            # In production, this would come from authenticated user context
-            data['tenant_id'] = data.get('tenant_id', 'default_tenant')
+            data['tenant_id'] = get_tenant_id_from_request(data)
+            data.setdefault('created_by', get_current_user_id(data))
             
             # Validate security type
             if 'security_type' in data:
@@ -125,7 +129,7 @@ class WebhookAPIView(BaseView):
                     raise BadRequest(f"Invalid event type. Must be one of: {valid_events}")
             
             # Create endpoint
-            endpoint = await self.webhook_service.create_endpoint(data)
+            endpoint = self._run_async(self.webhook_service.create_endpoint(data))
             
             return jsonify({
                 "success": True,
@@ -161,9 +165,9 @@ class WebhookAPIView(BaseView):
         GET /api/v1/webhooks/endpoints/{endpoint_id}
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
-            endpoint = await self.webhook_service.get_endpoint(endpoint_id)
+            endpoint = self._run_async(self.webhook_service.get_endpoint(endpoint_id))
             if not endpoint:
                 return jsonify({"error": "Webhook endpoint not found"}), 404
             
@@ -215,15 +219,15 @@ class WebhookAPIView(BaseView):
         GET /api/v1/webhooks/endpoints?tenant_id=tenant123&enabled=true
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
             # Parse query parameters
-            tenant_id = request.args.get('tenant_id', 'default_tenant')
+            tenant_id = get_tenant_id_from_request()
             merchant_id = request.args.get('merchant_id')
             enabled_only = request.args.get('enabled', '').lower() == 'true'
             
             # Get endpoints
-            endpoints = await self.webhook_service.list_endpoints(tenant_id, merchant_id)
+            endpoints = self._run_async(self.webhook_service.list_endpoints(tenant_id, merchant_id))
             
             # Apply filters
             if enabled_only:
@@ -273,7 +277,7 @@ class WebhookAPIView(BaseView):
         }
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
             if not request.is_json:
                 raise BadRequest("Request must be JSON")
@@ -300,7 +304,7 @@ class WebhookAPIView(BaseView):
                     raise BadRequest(f"Invalid event type. Must be one of: {valid_events}")
             
             # Update endpoint
-            endpoint = await self.webhook_service.update_endpoint(endpoint_id, updates)
+            endpoint = self._run_async(self.webhook_service.update_endpoint(endpoint_id, updates))
             if not endpoint:
                 return jsonify({"error": "Webhook endpoint not found"}), 404
             
@@ -333,9 +337,9 @@ class WebhookAPIView(BaseView):
         DELETE /api/v1/webhooks/endpoints/{endpoint_id}
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
-            success = await self.webhook_service.delete_endpoint(endpoint_id)
+            success = self._run_async(self.webhook_service.delete_endpoint(endpoint_id))
             if not success:
                 return jsonify({"error": "Webhook endpoint not found"}), 404
             
@@ -368,7 +372,7 @@ class WebhookAPIView(BaseView):
         }
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
             if not request.is_json:
                 raise BadRequest("Request must be JSON")
@@ -376,7 +380,7 @@ class WebhookAPIView(BaseView):
             data = request.get_json()
             
             # Validate required fields
-            required_fields = ['tenant_id', 'event_type', 'payload']
+            required_fields = ['event_type', 'payload']
             for field in required_fields:
                 if field not in data:
                     raise BadRequest(f"Missing required field: {field}")
@@ -389,13 +393,14 @@ class WebhookAPIView(BaseView):
                 raise BadRequest(f"Invalid event_type. Must be one of: {valid_events}")
             
             # Send webhook
-            event_ids = await self.webhook_service.send_webhook(
-                tenant_id=data['tenant_id'],
+            tenant_id = get_tenant_id_from_request(data)
+            event_ids = self._run_async(self.webhook_service.send_webhook(
+                tenant_id=tenant_id,
                 event_type=event_type,
                 payload=data['payload'],
                 merchant_id=data.get('merchant_id'),
                 metadata=data.get('metadata', {})
-            )
+            ))
             
             return jsonify({
                 "success": True,
@@ -422,9 +427,9 @@ class WebhookAPIView(BaseView):
         GET /api/v1/webhooks/events/{event_id}
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
-            event = await self.webhook_service.get_event(event_id)
+            event = self._run_async(self.webhook_service.get_event(event_id))
             if not event:
                 return jsonify({"error": "Webhook event not found"}), 404
             
@@ -462,9 +467,9 @@ class WebhookAPIView(BaseView):
         POST /api/v1/webhooks/events/{event_id}/retry
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
-            success = await self.webhook_service.retry_event(event_id)
+            success = self._run_async(self.webhook_service.retry_event(event_id))
             if not success:
                 return jsonify({"error": "Webhook event not found or cannot be retried"}), 404
             
@@ -490,9 +495,9 @@ class WebhookAPIView(BaseView):
         GET /api/v1/webhooks/endpoints/{endpoint_id}/statistics
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
-            stats = await self.webhook_service.get_endpoint_statistics(endpoint_id)
+            stats = self._run_async(self.webhook_service.get_endpoint_statistics(endpoint_id))
             
             if "error" in stats:
                 if stats["error"] == "Endpoint not found":
@@ -514,9 +519,9 @@ class WebhookAPIView(BaseView):
         GET /api/v1/webhooks/health
         """
         try:
-            await self._ensure_initialized()
+            self._run_async(self._ensure_initialized())
             
-            health = await self.webhook_service.get_service_health()
+            health = self._run_async(self.webhook_service.get_service_health())
             
             return jsonify({
                 "webhook_service": health,
