@@ -115,6 +115,7 @@ class AIAgentDeclaration(EntityDeclaration):
 	model: Optional[str] = None
 	runtime: Optional[str] = None
 	system_prompt: Optional[str] = None
+	capabilities: List[str] = field(default_factory=list)
 	tools: List[str] = field(default_factory=list)
 	memory: Optional[AgentMemory] = None
 	inputs: List[str] = field(default_factory=list)
@@ -130,6 +131,7 @@ class AIAgentDeclaration(EntityDeclaration):
 class AgentTeamDeclaration(EntityDeclaration):
 	"""Composition of first-class AI agents"""
 	agents: List[str] = field(default_factory=list)
+	capabilities: List[str] = field(default_factory=list)
 	flow: List[AgentHandoff] = field(default_factory=list)
 	policy: Dict[str, Any] = field(default_factory=dict)
 	configuration: Dict[str, Any] = field(default_factory=dict)

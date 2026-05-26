@@ -172,6 +172,7 @@ def _parse_agent(name: str, body: str, source_name: str, line: int, column: int)
 		model=_optional_string(props.get("model")),
 		runtime=_optional_string(props.get("runtime", props.get("runner"))),
 		system_prompt=_optional_string(props.get("system")),
+		capabilities=_string_list(props.get("capabilities", props.get("capability"))),
 		tools=tools,
 		memory=memory,
 		inputs=inputs,
@@ -207,10 +208,11 @@ def _parse_team(
 	if not agents:
 		agents = _unique([agent for edge in flow for agent in (edge.source, edge.target)])
 	agents = _unique([*(additional_agents or []), *agents])
+	capabilities = _string_list(props.get("capabilities", props.get("capability")))
 
 	policy = {
 		key: value for key, value in props.items()
-		if key not in {"agents", "flow", "config", "configuration", "rules", "ui", "theme"}
+		if key not in {"agents", "flow", "capability", "capabilities", "config", "configuration", "rules", "ui", "theme"}
 		and isinstance(value, (str, int, float, bool, list))
 	}
 
@@ -218,6 +220,7 @@ def _parse_team(
 		entity_type=EntityType.AGENT_TEAM,
 		name=name,
 		agents=agents,
+		capabilities=capabilities,
 		flow=flow,
 		policy=policy,
 		configuration=_dict_value(props.get("config", props.get("configuration"))),

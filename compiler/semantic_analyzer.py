@@ -23,6 +23,17 @@ from .ast_builder import (
 )
 
 
+KNOWN_AI_AGENT_RUNTIMES = {
+	"local", "offline", "test",
+	"codex", "codex_cli", "openai_codex",
+	"claude_code", "claude", "claude-code",
+	"opencode", "open_code",
+	"openai", "openai_chat",
+	"ollama", "local_llm",
+	"pi", "inflection_pi",
+}
+
+
 # ========================================
 # Type System and Symbol Table
 # ========================================
@@ -403,11 +414,16 @@ class SemanticAnalyzer:
 					entity,
 					"warning"
 				))
-			if entity.runtime and entity.runtime not in {"local", "codex", "claude_code", "opencode", "pi"}:
+			if entity.runtime and entity.runtime not in KNOWN_AI_AGENT_RUNTIMES:
 				self.warnings.append(SemanticError(
 					f"AI agent '{entity.name}' uses custom runtime '{entity.runtime}'; ensure an adapter is registered",
 					entity,
 					"warning"
+				))
+			if len(set(entity.capabilities)) != len(entity.capabilities):
+				self.errors.append(SemanticError(
+					f"AI agent '{entity.name}' declares duplicate capabilities",
+					entity
 				))
 			return
 
@@ -425,11 +441,17 @@ class SemanticAnalyzer:
 
 	def _validate_agent_team_constraints(self, entity: EntityDeclaration):
 		"""Validate AI agent team shape before cross-reference checks."""
-		if isinstance(entity, AgentTeamDeclaration) and not entity.agents:
-			self.errors.append(SemanticError(
-				f"Agent team '{entity.name}' must include at least one agent",
-				entity
-			))
+		if isinstance(entity, AgentTeamDeclaration):
+			if not entity.agents:
+				self.errors.append(SemanticError(
+					f"Agent team '{entity.name}' must include at least one agent",
+					entity
+				))
+			if len(set(entity.capabilities)) != len(entity.capabilities):
+				self.errors.append(SemanticError(
+					f"Agent team '{entity.name}' declares duplicate capabilities",
+					entity
+				))
 
 	def _validate_agent_composition(self, module: ModuleDeclaration):
 		"""Validate references between first-class AI agents and teams."""

@@ -249,6 +249,7 @@ class PythonCodeGenerator:
 				"model": agent.model,
 				"runtime": agent.runtime,
 				"system": agent.system_prompt,
+				"capabilities": agent.capabilities,
 				"tools": agent.tools,
 				"memory": (
 					{"kind": agent.memory.kind, "name": agent.memory.name}
@@ -270,6 +271,7 @@ class PythonCodeGenerator:
 		team_specs = {
 			team.name: {
 				"agents": team.agents,
+				"capabilities": team.capabilities,
 				"flow": [
 					{"source": edge.source, "target": edge.target, "condition": edge.condition}
 					for edge in team.flow
@@ -308,6 +310,7 @@ class AIAgentSpec:
     model: Optional[str]
     runtime: Optional[str]
     system: Optional[str]
+    capabilities: List[str]
     tools: List[str]
     memory: Optional[Dict[str, Optional[str]]]
     inputs: List[str]
@@ -323,6 +326,7 @@ class AIAgentSpec:
 class AgentTeamSpec:
     name: str
     agents: List[str]
+    capabilities: List[str]
     flow: List[Dict[str, str]]
     policy: Dict[str, Any]
     configuration: Dict[str, Any]
@@ -409,6 +413,7 @@ def describe_team(name: str) -> Dict[str, Any]:
     return {{
         "name": team.name,
         "agents": [AI_AGENTS[agent] for agent in team.agents],
+        "capabilities": team.capabilities,
         "flow": team.flow,
         "policy": team.policy,
     }}

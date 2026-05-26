@@ -1898,3 +1898,18 @@ Verification:
 - `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_services.py::test_bytewax_runtime_uses_dataflow_native_stream_registration capabilities/composition/events/tests/unit/test_services.py::TestEventPublishingService::test_publish_event_success capabilities/composition/events/tests/unit/test_services.py::TestEventStreamingService::test_create_stream_success` -> 3 passed
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 1 passed
 - `git grep -n -i -E "kafka|confluent|redpanda|bootstrap\\.servers|bootstrap_servers|BYTEWAX_BROKERS|Bytewax broker|Bytewax brokers|broker connection string" -- ':!uploads' ':!tmp' ':!node_modules' ':!**/swagger-ui-bundle.js' ':!.venv' ':!.git' ':!docs/progress_log.md' ':!tests/test_repository_hygiene.py'` -> no matches
+
+### 2026-05-26 21:11 EAT
+
+Completed checkpoint:
+
+- Extended the executable APG AI composition surface with terse, readable `capability`/`capabilities` members for agents and teams.
+- Carried agent and team `capabilities` through the AI composition parser, AST, generated runtime manifest, and team descriptions.
+- Expanded semantic runtime recognition to cover codex, Claude Code aliases, opencode aliases, OpenAI, Ollama, and Pi without custom-runtime warnings.
+- Added focused tests proving capability propagation and runtime alias catalog support for codex, claude, opencode, and pi.
+- Confirmed `spec/apg.g4` is owned by the `spec` gitlink in this checkout, so the parent repo can commit the executable compiler/runtime surface but not the grammar file itself.
+
+Verification:
+
+- `.venv/bin/python -m py_compile compiler/ast_builder.py compiler/ai_agent_composition.py compiler/code_generator.py compiler/semantic_analyzer.py tests/test_ai_agent_composition.py`
+- `.venv/bin/python -m pytest -q tests/test_ai_agent_composition.py` -> 4 passed
