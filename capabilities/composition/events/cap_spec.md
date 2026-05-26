@@ -41,7 +41,7 @@ Modern enterprise applications require:
 ### Core Components
 
 #### 1. **Event Store & Streaming Engine**
-- **Apache Kafka** as primary event streaming platform
+- **Bytewax** as primary event streaming platform
 - **Redis Streams** for lightweight real-time messaging
 - **Event Store** for append-only event persistence
 - **Topic Management** with auto-scaling and partitioning
@@ -55,7 +55,7 @@ Modern enterprise applications require:
 - **Event Correlation** for related event tracking
 
 #### 3. **Stream Processing Engine**
-- **Apache Kafka Streams** for real-time processing
+- **Bytewax dataflows** for real-time processing
 - **Event Aggregation** for analytics and reporting
 - **Stream Joins** for cross-stream data correlation
 - **Windowing Functions** for time-based operations
@@ -252,7 +252,7 @@ DELETE /api/v1/subscriptions/{sub_id}    # Cancel subscription
 ### Message Queue Integration
 ```
 AMQP   amqp://esb.apg.local:5672        # RabbitMQ compatibility
-Kafka  kafka://esb.apg.local:9092       # Native Kafka protocol
+Bytewax  bytewax://esb.apg.local:9092       # Native Bytewax protocol
 Redis  redis://esb.apg.local:6379       # Redis streams
 ```
 
@@ -299,7 +299,7 @@ Redis  redis://esb.apg.local:6379       # Redis streams
 
 ### Phase 1: Core Event Streaming (Weeks 1-2)
 - Event store and basic streaming
-- Kafka cluster setup and management
+- Bytewax cluster setup and management
 - Basic publish/subscribe functionality
 - Schema registry implementation
 

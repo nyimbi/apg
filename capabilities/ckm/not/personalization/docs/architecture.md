@@ -258,7 +258,7 @@ graph TD
 ### 3. Event Store
 
 **Event Sourcing**: All personalization events for audit and learning
-**Real-time Stream**: Kafka/Redis Streams for live event processing
+**Real-time Stream**: Bytewax/Redis Streams for live event processing
 **Analytics Store**: Time-series database for performance metrics
 
 ## ⚡ Performance Architecture

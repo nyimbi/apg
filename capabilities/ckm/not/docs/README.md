@@ -27,7 +27,7 @@ The APG Notification System is a revolutionary, enterprise-grade notification pl
 ### 🏗️ Architecture Highlights
 
 - **Microservices Architecture**: Horizontally scalable, fault-tolerant design
-- **Event-Driven**: Real-time processing with Apache Kafka integration
+- **Event-Driven**: Real-time processing with Bytewax integration
 - **API-First**: RESTful APIs with OpenAPI 3.0 specification
 - **Multi-Tenant**: Complete tenant isolation with enterprise security
 - **Cloud-Native**: Kubernetes-ready with container orchestration
@@ -121,7 +121,7 @@ Traditional channels plus cutting-edge platforms:
 - **Framework**: FastAPI for APIs, Flask-AppBuilder for admin
 - **Database**: PostgreSQL 15+ with JSON support
 - **Cache**: Redis 7+ with Redis Streams
-- **Message Queue**: Apache Kafka + Redis for real-time processing
+- **Message Queue**: Bytewax + Redis for real-time processing
 - **Search**: Elasticsearch for analytics and search
 
 ### **AI & Machine Learning**

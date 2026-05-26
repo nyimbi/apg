@@ -144,7 +144,7 @@ The **APG Financial Management General Ledger** serves as the foundational backb
 ### **Integration Layer**
 - **REST APIs**: Comprehensive RESTful API with OpenAPI documentation
 - **GraphQL Gateway**: Flexible query interface for complex data requirements
-- **Event Streaming**: Real-time event publishing via Kafka
+- **Event Streaming**: Real-time event publishing via Bytewax
 - **WebSocket Support**: Real-time updates for dashboard and monitoring
 
 ### **Security Framework**

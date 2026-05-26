@@ -110,27 +110,27 @@ except Exception as e:
         success "Redis is ready"
     fi
     
-    # Wait for Kafka
-    if [ -n "$KAFKA_BOOTSTRAP_SERVERS" ]; then
-        log "Waiting for Kafka..."
+    # Wait for Bytewax
+    if [ -n "$BYTEWAX_FLOW_ID" ]; then
+        log "Waiting for Bytewax..."
         while ! python -c "
-from kafka import KafkaProducer
+from bytewax import BytewaxProducer
 import os
 try:
-    producer = KafkaProducer(
-        bootstrap_servers=os.environ['KAFKA_BOOTSTRAP_SERVERS'].split(','),
+    producer = BytewaxProducer(
+        flow_id=os.environ['BYTEWAX_FLOW_ID'].split(','),
         request_timeout_ms=5000
     )
     producer.close()
-    print('Kafka is ready')
+    print('Bytewax is ready')
 except Exception as e:
-    print(f'Kafka not ready: {e}')
+    print(f'Bytewax not ready: {e}')
     exit(1)
 " 2>/dev/null; do
-            warn "Kafka is not ready. Waiting..."
+            warn "Bytewax is not ready. Waiting..."
             sleep 2
         done
-        success "Kafka is ready"
+        success "Bytewax is ready"
     fi
 }
 
@@ -154,18 +154,18 @@ initialize_database() {
     fi
 }
 
-# Initialize Kafka topics
-initialize_kafka() {
-    log "Initializing Kafka topics..."
+# Initialize Bytewax topics
+initialize_bytewax() {
+    log "Initializing Bytewax topics..."
     
-    if [ -n "$KAFKA_BOOTSTRAP_SERVERS" ]; then
+    if [ -n "$BYTEWAX_FLOW_ID" ]; then
         # Create default topics
         python -c "
-from kafka.admin import KafkaAdminClient, NewTopic
+from bytewax.admin import BytewaxAdminClient, NewTopic
 import os
 
-admin_client = KafkaAdminClient(
-    bootstrap_servers=os.environ['KAFKA_BOOTSTRAP_SERVERS'].split(','),
+admin_client = BytewaxAdminClient(
+    flow_id=os.environ['BYTEWAX_FLOW_ID'].split(','),
     client_id='esb_admin'
 )
 
@@ -178,15 +178,15 @@ topics = [
 
 try:
     admin_client.create_topics(topics)
-    print('Kafka topics created successfully')
+    print('Bytewax topics created successfully')
 except Exception as e:
-    print(f'Kafka topic creation: {e}')
+    print(f'Bytewax topic creation: {e}')
 finally:
     admin_client.close()
 "
-        success "Kafka topics initialized"
+        success "Bytewax topics initialized"
     else
-        warn "No KAFKA_BOOTSTRAP_SERVERS provided, skipping Kafka initialization"
+        warn "No BYTEWAX_FLOW_ID provided, skipping Bytewax initialization"
     fi
 }
 
@@ -302,7 +302,7 @@ main() {
     setup_environment
     wait_for_dependencies
     initialize_database
-    initialize_kafka
+    initialize_bytewax
     
     # Determine what to start based on command
     case "${1:-api}" in

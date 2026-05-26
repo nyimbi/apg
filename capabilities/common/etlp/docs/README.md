@@ -129,7 +129,7 @@ Navigate to: /etlp/dashboard
 ### Supported Data Sources
 - **Databases**: PostgreSQL, MySQL, Oracle, SQL Server, MongoDB, Cassandra
 - **Cloud Storage**: AWS S3, Azure Blob, Google Cloud Storage
-- **Streaming**: Kafka, Kinesis, Pub/Sub, Event Hubs
+- **Streaming**: Bytewax, Kinesis, Pub/Sub, Event Hubs
 - **APIs**: REST, GraphQL, SOAP, webhooks
 - **Files**: CSV, JSON, XML, Parquet, Avro, ORC
 

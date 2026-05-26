@@ -534,7 +534,7 @@ POST   /api/v1/analytics/custom             # Custom analytics queries
 - **REST API Support** - Standard RESTful API integration
 - **SOAP Web Services** - Legacy system integration support
 - **GraphQL Integration** - Modern API integration capabilities
-- **Event Streaming** - Apache Kafka, Azure Event Hubs, AWS Kinesis
+- **Event Streaming** - Bytewax, Azure Event Hubs, AWS Kinesis
 - **Message Queues** - RabbitMQ, Apache ActiveMQ, Amazon SQS
 
 ---

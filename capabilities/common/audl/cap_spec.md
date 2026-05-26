@@ -122,7 +122,7 @@ The APG Audit Logging capability delivers enterprise-grade audit trail managemen
 ```
 
 ### Data Architecture
-- **Stream Processing**: Apache Kafka for real-time event streaming
+- **Stream Processing**: Bytewax for real-time event streaming
 - **Time-Series Storage**: InfluxDB for high-performance time-series data
 - **Document Storage**: Elasticsearch for full-text search and analytics
 - **Metadata Storage**: PostgreSQL for configuration and metadata

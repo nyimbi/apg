@@ -24,7 +24,7 @@ Building a comprehensive event streaming platform for the APG ecosystem with ent
 - [ ] Metadata and audit models
 - [ ] PostgreSQL schema design
 - [ ] Redis data structures
-- [ ] Kafka topic configurations
+- [ ] Bytewax topic configurations
 - [ ] Event versioning strategy
 
 ### 🔄 Phase 3: Service Layer Implementation
@@ -126,14 +126,14 @@ Building a comprehensive event streaming platform for the APG ecosystem with ent
 ## 🎯 Key Technical Components
 
 ### Core Streaming Infrastructure
-- **Apache Kafka** cluster with auto-scaling
+- **Bytewax** cluster with auto-scaling
 - **Redis Streams** for lightweight messaging
 - **PostgreSQL** for metadata and configuration
 - **Schema Registry** for event validation
 - **Event Store** for immutable event logs
 
 ### Stream Processing Engine
-- **Kafka Streams** for real-time processing
+- **Bytewax dataflows** for real-time processing
 - **Event aggregation** and windowing
 - **Complex event processing** patterns
 - **Stream joins** and correlations
@@ -147,7 +147,7 @@ Building a comprehensive event streaming platform for the APG ecosystem with ent
 - **CQRS implementation** patterns
 
 ### Integration Layer
-- **Multi-protocol support** (Kafka, AMQP, WebSocket)
+- **Multi-protocol support** (Bytewax, AMQP, WebSocket)
 - **APG capability integration** patterns
 - **External system connectors**
 - **Webhook delivery** system
@@ -158,7 +158,7 @@ Building a comprehensive event streaming platform for the APG ecosystem with ent
 ### Backend Technologies
 - **Python 3.11+** with async/await
 - **FastAPI** for REST API
-- **Apache Kafka** for event streaming
+- **Bytewax** for event streaming
 - **Redis** for caching and messaging
 - **PostgreSQL** for metadata storage
 - **SQLAlchemy** with async support
@@ -204,7 +204,7 @@ Building a comprehensive event streaming platform for the APG ecosystem with ent
 ## 🚀 Next Steps
 
 1. **Begin Phase 2** - Models and Database Schema Design
-2. **Set up development environment** with Kafka and Redis
+2. **Set up development environment** with Bytewax and Redis
 3. **Create initial project structure** and dependencies
 4. **Implement core data models** and validation
 5. **Design event schema** and versioning strategy

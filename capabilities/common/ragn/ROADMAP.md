@@ -167,7 +167,7 @@ The foundational enterprise RAG platform with core capabilities:
   - Circuit breakers and fault tolerance
 
 - **Event-Driven Architecture**
-  - Apache Kafka integration for real-time events
+  - Bytewax integration for real-time events
   - Event sourcing for complete audit trails
   - CQRS pattern for read/write separation
   - Real-time data synchronization across regions

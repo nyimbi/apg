@@ -74,7 +74,7 @@
 - [ ] Cloud taps: AWS S3, Azure Blob, Google Cloud Storage
 - [ ] API taps: REST API generic, GraphQL, SOAP
 - [ ] File taps: CSV, JSON, XML, Parquet, Avro
-- [ ] Real-time taps: Kafka, Redis Streams, WebSocket
+- [ ] Real-time taps: Bytewax, Redis Streams, WebSocket
 
 ### 2.2: Custom APG Taps Development
 **Estimated Time**: 10 hours

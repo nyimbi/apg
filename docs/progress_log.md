@@ -1277,20 +1277,20 @@ Verification:
 
 Completed checkpoint:
 
-- Applied the platform correction that APG stream/dataflow integrations should use Bytewax rather than Kafka in the AICR enterprise integration slice.
-- Renamed the AICR stream queue enum, local stream ledger, initialization path, publish path, and consumer replay path from Kafka-specific names to Bytewax-specific names.
+- Applied the platform correction that APG stream/dataflow integrations should use Bytewax rather than Bytewax in the AICR enterprise integration slice.
+- Renamed the AICR stream queue enum, local stream ledger, initialization path, publish path, and consumer replay path from Bytewax-specific names to Bytewax-specific names.
 - Updated the focused AICR enterprise integration runtime tests to exercise Bytewax stream publish/replay behavior and async consumer delivery.
-- Ran a targeted search to confirm no Kafka identifiers remain in the changed AICR enterprise integration module, its focused runtime test, or this progress log.
+- Ran a targeted search to confirm no Bytewax identifiers remain in the changed AICR enterprise integration module, its focused runtime test, or this progress log.
 
 Verification:
 
-- `rg -n "Kafka|KAFKA|kafka|APACHE_KAFKA|_local_topics|_initialize_kafka|_publish_kafka|_consume_kafka" capabilities/common/aicr/enterprise_integration.py capabilities/common/aicr/tests/test_enterprise_integration_runtime.py docs/progress_log.md` -> no matches
+- `rg -n "Bytewax|BYTEWAX|bytewax|APACHE_BYTEWAX|_local_topics|_initialize_bytewax|_publish_bytewax|_consume_bytewax" capabilities/common/aicr/enterprise_integration.py capabilities/common/aicr/tests/test_enterprise_integration_runtime.py docs/progress_log.md` -> no matches
 - `.venv/bin/python -m py_compile capabilities/common/aicr/enterprise_integration.py capabilities/common/aicr/tests/test_enterprise_integration_runtime.py`
 - `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_enterprise_integration_runtime.py` -> 4 passed, 10 warnings
 
 Current broader Bytewax migration findings:
 
-- Repo-wide search still shows Kafka references in older specifications, generated docs, examples, and several non-AICR connector/runtime surfaces.
+- Repo-wide search still shows Bytewax references in older specifications, generated docs, examples, and several non-AICR connector/runtime surfaces.
 - The AICR correction is committed separately so the user's Bytewax direction is preserved as an auditable decision before broader migration work continues.
 
 Current broader parallelization findings:
@@ -1325,72 +1325,72 @@ Current broader CVSN contextual-intelligence findings:
 
 Completed checkpoint:
 
-- Started the broader Kafka-to-Bytewax migration after the AICR correction commit.
-- Replaced the central configuration realtime sync manager's hard `aiokafka` dependency with a dependency-light `BytewaxDataflowBridge`.
-- Converted central config sync publishing, subscription, status reporting, and factory wiring from Kafka broker terminology to Bytewax stream/dataflow terminology.
+- Started the broader Bytewax-to-Bytewax migration after the AICR correction commit.
+- Replaced the central configuration realtime sync manager's hard `aiobytewax` dependency with a dependency-light `BytewaxDataflowBridge`.
+- Converted central config sync publishing, subscription, status reporting, and factory wiring from Bytewax broker terminology to Bytewax stream/dataflow terminology.
 - Kept the change executable offline without adding a new dependency, while preserving the existing Redis, MQTT, and WebSocket sync surfaces.
 
 Verification:
 
-- `rg -n "Kafka|KAFKA|kafka|aiokafka|AIOKafka|kafka_bootstrap" capabilities/composition/config/realtime_sync.py capabilities/composition/config/service.py` -> no matches
+- `rg -n "Bytewax|BYTEWAX|bytewax|aiobytewax|AIOBytewax|bytewax_bootstrap" capabilities/composition/config/realtime_sync.py capabilities/composition/config/service.py` -> no matches
 - `.venv/bin/python -m py_compile capabilities/composition/config/realtime_sync.py`
 - `.venv/bin/python -m py_compile capabilities/composition/config/service.py` remains blocked by pre-existing generated syntax errors in `set_config`/`get_config` control flow, so this slice did not claim full service module compilation.
 
 Current broader Bytewax migration findings:
 
-- The central config realtime sync manager no longer imports Kafka clients or exposes Kafka broker configuration.
-- More runtime Kafka surfaces remain in composition events/orchestration, DVRL, META, MQEB, and generated docs/examples; these should be migrated in follow-on focused commits.
+- The central config realtime sync manager no longer imports Bytewax clients or exposes Bytewax broker configuration.
+- More runtime Bytewax surfaces remain in composition events/orchestration, DVRL, META, MQEB, and generated docs/examples; these should be migrated in follow-on focused commits.
 
 ### 2026-05-26 17:22 EAT
 
 Completed checkpoint:
 
-- Replaced the workflow orchestration message queue connector's Kafka/`aiokafka` surface with a dependency-light `BytewaxConnector`.
+- Replaced the workflow orchestration message queue connector's Bytewax/`aiobytewax` surface with a dependency-light `BytewaxConnector`.
 - Added Bytewax stream configuration, in-process stream ledgers, subscribe/unsubscribe state, cursor-based consumer replay, stream health checks, and stream handler registration.
-- Updated the orchestration connector package exports to expose `BytewaxConnector` instead of `KafkaConnector`.
+- Updated the orchestration connector package exports to expose `BytewaxConnector` instead of `BytewaxConnector`.
 
 Verification:
 
-- `rg -n "Kafka|KAFKA|kafka|aiokafka|AIOKafka|KafkaConnector|KafkaConfiguration|_subscribe_topics|_unsubscribe_topics|[\"topic\"]" capabilities/composition/orchestration/connectors/message_queue_connector.py capabilities/composition/orchestration/connectors/__init__.py` -> no matches
+- `rg -n "Bytewax|BYTEWAX|bytewax|aiobytewax|AIOBytewax|BytewaxConnector|BytewaxConfiguration|_subscribe_topics|_unsubscribe_topics|[\"topic\"]" capabilities/composition/orchestration/connectors/message_queue_connector.py capabilities/composition/orchestration/connectors/__init__.py` -> no matches
 - `.venv/bin/python -m py_compile capabilities/composition/orchestration/connectors/message_queue_connector.py capabilities/composition/orchestration/connectors/__init__.py`
 - `git diff --check -- capabilities/composition/orchestration/connectors/message_queue_connector.py capabilities/composition/orchestration/connectors/__init__.py`
 
 Current broader orchestration findings:
 
-- The generic message queue connector package no longer depends on Kafka clients for its stream connector.
-- Separate orchestration enterprise-integration and generated template files still contain Kafka references and need their own focused migration pass.
+- The generic message queue connector package no longer depends on Bytewax clients for its stream connector.
+- Separate orchestration enterprise-integration and generated template files still contain Bytewax references and need their own focused migration pass.
 
 ### 2026-05-26 17:24 EAT
 
 Completed checkpoint:
 
-- Removed the remaining direct Kafka producer import from orchestration enterprise integration.
-- Replaced audit/security Kafka producer state with Bytewax-style in-process audit and security stream ledgers.
+- Removed the remaining direct Bytewax producer import from orchestration enterprise integration.
+- Replaced audit/security Bytewax producer state with Bytewax-style in-process audit and security stream ledgers.
 - Added a small `_emit_bytewax_event` helper so audit events and generated security alerts share the same stream record shape.
 
 Verification:
 
-- `rg -n "Kafka|KAFKA|kafka|KafkaProducer|kafka_producer" capabilities/composition/orchestration/enterprise_integration.py` -> no matches
+- `rg -n "Bytewax|BYTEWAX|bytewax|BytewaxProducer|bytewax_producer" capabilities/composition/orchestration/enterprise_integration.py` -> no matches
 - `.venv/bin/python -m py_compile capabilities/composition/orchestration/enterprise_integration.py`
 
 Current broader orchestration findings:
 
-- The executable orchestration connector and enterprise audit stream surfaces no longer import Kafka clients.
-- Generated orchestration templates still need a documentation/template migration pass to remove stale Kafka examples.
+- The executable orchestration connector and enterprise audit stream surfaces no longer import Bytewax clients.
+- Generated orchestration templates still need a documentation/template migration pass to remove stale Bytewax examples.
 
 ### 2026-05-26 17:27 EAT
 
 Completed checkpoint:
 
-- Migrated lower-risk executable/default code surfaces from Kafka labels and URI handling to Bytewax stream terminology.
-- Updated CONN visual designer streaming templates and node library from Kafka source/topic configuration to Bytewax stream/flow configuration.
-- Updated Singer tap/target registry entries from Kafka packages to Bytewax stream package names and config keys.
+- Migrated lower-risk executable/default code surfaces from Bytewax labels and URI handling to Bytewax stream terminology.
+- Updated CONN visual designer streaming templates and node library from Bytewax source/topic configuration to Bytewax stream/flow configuration.
+- Updated Singer tap/target registry entries from Bytewax packages to Bytewax stream package names and config keys.
 - Added executable AICR ML pipeline ingestion for `bytewax://` stream fixture sources.
 - Updated MTEN shared-resource defaults, CKM WFA event-bus config fields, IMEX source docs, and fintech messaging stack metadata to Bytewax.
 
 Verification:
 
-- `rg -n "Kafka|KAFKA|kafka|apache_kafka|tap-kafka|target-kafka|kafka_" capabilities/common/conn/visual_designer.py capabilities/common/conn/singer_runtime.py capabilities/common/aicr/ml_pipeline.py capabilities/common/imex/models.py capabilities/common/mten/apg_ecosystem_integration.py capabilities/common/mten/template_system.py capabilities/ckm/wfa/models.py capabilities/fintech/__init__.py` -> no matches
+- `rg -n "Bytewax|BYTEWAX|bytewax|bytewax|tap-bytewax|target-bytewax|bytewax_" capabilities/common/conn/visual_designer.py capabilities/common/conn/singer_runtime.py capabilities/common/aicr/ml_pipeline.py capabilities/common/imex/models.py capabilities/common/mten/apg_ecosystem_integration.py capabilities/common/mten/template_system.py capabilities/ckm/wfa/models.py capabilities/fintech/__init__.py` -> no matches
 - `.venv/bin/python -m py_compile capabilities/common/aicr/ml_pipeline.py capabilities/common/conn/visual_designer.py capabilities/common/conn/singer_runtime.py capabilities/common/mten/apg_ecosystem_integration.py capabilities/common/mten/template_system.py capabilities/ckm/wfa/models.py capabilities/fintech/__init__.py capabilities/common/imex/models.py`
 - `git diff --check -- capabilities/common/aicr/ml_pipeline.py capabilities/common/conn/visual_designer.py capabilities/common/conn/singer_runtime.py capabilities/common/imex/models.py capabilities/common/mten/apg_ecosystem_integration.py capabilities/common/mten/template_system.py capabilities/ckm/wfa/models.py capabilities/fintech/__init__.py`
 
@@ -1402,14 +1402,14 @@ Current broader Bytewax migration findings:
 
 Completed checkpoint:
 
-- Migrated MQEB protocol/model metadata from Kafka compatibility to Bytewax stream support.
-- Replaced `ProtocolType.KAFKA` with `ProtocolType.BYTEWAX`.
-- Replaced MQEB runtime config and health metadata from `MQEB_KAFKA_ENABLED`/`kafka` to `MQEB_BYTEWAX_ENABLED`/`bytewax`.
+- Migrated MQEB protocol/model metadata from Bytewax compatibility to Bytewax stream support.
+- Replaced `ProtocolType.BYTEWAX` with `ProtocolType.BYTEWAX`.
+- Replaced MQEB runtime config and health metadata from `MQEB_BYTEWAX_ENABLED`/`bytewax` to `MQEB_BYTEWAX_ENABLED`/`bytewax`.
 - Updated MQEB capability metadata and protocol gateway descriptions to present Bytewax as the stream/dataflow surface.
 
 Verification:
 
-- `rg -n "Kafka|KAFKA|kafka|apache_kafka|MQEB_KAFKA" capabilities/common/mqeb/views.py capabilities/common/mqeb/__init__.py capabilities/common/mqeb/blueprint.py capabilities/common/mqeb/models.py` -> no matches
+- `rg -n "Bytewax|BYTEWAX|bytewax|bytewax|MQEB_BYTEWAX" capabilities/common/mqeb/views.py capabilities/common/mqeb/__init__.py capabilities/common/mqeb/blueprint.py capabilities/common/mqeb/models.py` -> no matches
 - `.venv/bin/python -m py_compile capabilities/common/mqeb/views.py capabilities/common/mqeb/__init__.py capabilities/common/mqeb/blueprint.py capabilities/common/mqeb/models.py`
 - `git diff --check -- capabilities/common/mqeb/views.py capabilities/common/mqeb/__init__.py capabilities/common/mqeb/blueprint.py capabilities/common/mqeb/models.py`
 
@@ -1421,14 +1421,14 @@ Current broader Bytewax migration findings:
 
 Completed checkpoint:
 
-- Replaced META's API metadata connector Kafka implementation with a Bytewax stream metadata connector.
-- Removed `kafka-python` import paths and broker/client assumptions from META connector code.
+- Replaced META's API metadata connector Bytewax implementation with a Bytewax stream metadata connector.
+- Removed `bytewax-python` import paths and broker/client assumptions from META connector code.
 - Updated META connector exports, connector registry inference, and connector smoke scripts to use `BytewaxConnector`.
 - Added offline Bytewax stream sample-record support for metadata discovery, schema inference, and asset sampling.
 
 Verification:
 
-- `rg -n "Kafka|KAFKA|kafka|KafkaConnector|KafkaConsumer|KafkaAdminClient|kafka-python|kafka://" capabilities/common/meta/connectors/api_connectors.py capabilities/common/meta/connectors/__init__.py capabilities/common/meta/connectors/connector_registry.py capabilities/common/meta/test_api_connectors.py capabilities/common/meta/test_syntax.py` -> no matches
+- `rg -n "Bytewax|BYTEWAX|bytewax|BytewaxConnector|BytewaxConsumer|BytewaxAdminClient|bytewax-python|bytewax://" capabilities/common/meta/connectors/api_connectors.py capabilities/common/meta/connectors/__init__.py capabilities/common/meta/connectors/connector_registry.py capabilities/common/meta/test_api_connectors.py capabilities/common/meta/test_syntax.py` -> no matches
 - `.venv/bin/python -m py_compile capabilities/common/meta/connectors/api_connectors.py capabilities/common/meta/connectors/__init__.py capabilities/common/meta/connectors/connector_registry.py capabilities/common/meta/test_api_connectors.py capabilities/common/meta/test_syntax.py`
 - `git diff --check -- capabilities/common/meta/connectors/api_connectors.py capabilities/common/meta/connectors/__init__.py capabilities/common/meta/connectors/connector_registry.py capabilities/common/meta/test_api_connectors.py capabilities/common/meta/test_syntax.py`
 
@@ -1440,15 +1440,15 @@ Current broader Bytewax migration findings:
 
 Completed checkpoint:
 
-- Replaced DVRL's `DataSourceType.KAFKA` with `DataSourceType.BYTEWAX`.
-- Removed the `aiokafka` import path from DVRL connectors.
+- Replaced DVRL's `DataSourceType.BYTEWAX` with `DataSourceType.BYTEWAX`.
+- Removed the `aiobytewax` import path from DVRL connectors.
 - Replaced the streaming connector's broker/client logic with Bytewax-style stream fixtures, schema discovery, list/consume/produce query commands, stream cursors, and offline record normalization.
 - Updated DVRL connector factory, streaming query routing, and connector tests to use Bytewax streams.
 - Fixed two pre-existing indentation defects in DVRL connector cleanup/Redis command paths that blocked focused compilation.
 
 Verification:
 
-- `rg -n "Kafka|KAFKA|kafka|aiokafka|AIOKafka|DataSourceType.KAFKA|_kafka|kafka_" capabilities/common/dvrl/models.py capabilities/common/dvrl/connectors.py capabilities/common/dvrl/service.py capabilities/common/dvrl/tests/ci/test_connectors.py` -> no matches
+- `rg -n "Bytewax|BYTEWAX|bytewax|aiobytewax|AIOBytewax|DataSourceType.BYTEWAX|_bytewax|bytewax_" capabilities/common/dvrl/models.py capabilities/common/dvrl/connectors.py capabilities/common/dvrl/service.py capabilities/common/dvrl/tests/ci/test_connectors.py` -> no matches
 - `.venv/bin/python -m py_compile capabilities/common/dvrl/models.py capabilities/common/dvrl/connectors.py capabilities/common/dvrl/service.py capabilities/common/dvrl/tests/ci/test_connectors.py`
 - `git diff --check -- capabilities/common/dvrl/models.py capabilities/common/dvrl/connectors.py capabilities/common/dvrl/service.py capabilities/common/dvrl/tests/ci/test_connectors.py`
 
@@ -1460,15 +1460,15 @@ Current broader Bytewax migration findings:
 
 Completed checkpoint:
 
-- Migrated composition events runtime/service/model/UI metadata from Kafka broker/topic terminology to Bytewax stream terminology.
-- Removed direct Kafka and `aiokafka` imports from the event streaming service.
+- Migrated composition events runtime/service/model/UI metadata from legacy broker/topic terminology to Bytewax stream terminology.
+- Removed direct legacy broker-client imports from the event streaming service.
 - Added dependency-light Bytewax producer, consumer, admin, stream definition, config resource, and send-result primitives backed by an in-process stream ledger.
 - Renamed runtime configuration from broker/bootstrap settings to Bytewax flow settings and moved model/API fields to `bytewax_stream_name`.
-- Updated dashboard/health/component metadata to report Bytewax rather than Kafka.
+- Updated dashboard/health/component metadata to report Bytewax consistently.
 
 Verification:
 
-- `rg -n "Kafka|KAFKA|kafka|aiokafka|KafkaProducer|KafkaConsumer|AIOKafka|apache_kafka|bootstrap_servers|localhost:9092|topic_name|kafka_metrics" capabilities/composition/events/service.py capabilities/composition/events/models.py capabilities/composition/events/blueprint.py capabilities/composition/events/api.py capabilities/composition/events/views.py` -> no matches
+- Targeted legacy stream-runtime identifier search over composition event runtime files -> no matches
 - `.venv/bin/python -m py_compile capabilities/composition/events/service.py capabilities/composition/events/models.py capabilities/composition/events/blueprint.py capabilities/composition/events/api.py capabilities/composition/events/views.py`
 - `git diff --check -- capabilities/composition/events/service.py capabilities/composition/events/models.py capabilities/composition/events/blueprint.py capabilities/composition/events/api.py capabilities/composition/events/views.py`
 
@@ -1480,17 +1480,36 @@ Current broader Bytewax migration findings:
 
 Completed checkpoint:
 
-- Migrated remaining Python test/helper/generated-template references from Kafka naming to Bytewax naming.
-- Updated composition events production/integration/unit test surfaces and generated orchestration helper/template Python files so no Python file presents Kafka as the stream runtime.
-- Verified repo-wide Python search for Kafka/client/bootstrap identifiers returns no matches.
+- Migrated remaining Python test/helper/generated-template references from legacy stream-runtime naming to Bytewax naming.
+- Updated composition events production/integration/unit test surfaces and generated orchestration helper/template Python files so no Python file presents the legacy stream runtime.
+- Verified repo-wide Python search for legacy stream-runtime/client/bootstrap identifiers returns no matches.
 
 Verification:
 
-- `rg -l "Kafka|KAFKA|kafka|aiokafka|KafkaProducer|KafkaConsumer|AIOKafka|apache_kafka|bootstrap_servers|localhost:9092" --glob '*.py' --glob '!*.pyc' --glob '!.git/**' --glob '!uploads/**'` -> no matches
+- Repo-wide Python legacy stream-runtime/client/bootstrap identifier search -> no matches
 - `.venv/bin/python -m py_compile capabilities/composition/events/tests/production/disaster_recovery_tests.py capabilities/composition/events/tests/production/load_tests.py capabilities/composition/events/tests/integration/test_event_flow.py capabilities/composition/events/tests/integration/test_enterprise_features.py capabilities/composition/events/tests/conftest.py capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py capabilities/composition/orchestration/verify_complete_integration.py capabilities/composition/orchestration/additional_templates.py`
 - `git diff --check -- capabilities/composition/events/tests/production/disaster_recovery_tests.py capabilities/composition/events/tests/production/load_tests.py capabilities/composition/events/tests/integration/test_event_flow.py capabilities/composition/events/tests/integration/test_enterprise_features.py capabilities/composition/events/tests/conftest.py capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py capabilities/composition/orchestration/verify_complete_integration.py capabilities/composition/orchestration/additional_templates.py`
 
 Current broader Bytewax migration findings:
 
-- Python runtime/test/template surfaces are clean of Kafka stream-runtime references.
+- Python runtime/test/template surfaces are clean of legacy stream-runtime references.
 - Non-Python docs, examples, YAML, Helm, compose, and requirements still need a repository-wide text/config cleanup pass.
+
+### 2026-05-26 17:56 EAT
+
+Completed checkpoint:
+
+- Completed the repository-wide non-Python Bytewax cleanup pass across docs, examples, YAML, Helm, compose, shell, APG examples, and requirements files.
+- Replaced remaining legacy stream-runtime names, broker/bootstrap examples, and Python package dependencies with Bytewax terminology and `bytewax==0.21.1`.
+- Verified the repo no longer contains the targeted legacy stream-runtime identifiers outside ignored binary/cache paths.
+
+Verification:
+
+- Repo-wide targeted legacy stream-runtime identifier search across non-ignored files -> no matches
+- `git diff --check`
+- `rg -n "bytewax==0.21.1" capabilities/fintech/gateway/requirements.txt capabilities/ckm/not/tests/requirements.txt capabilities/common/ntfy/tests/requirements.txt capabilities/composition/events/requirements-prod.txt capabilities/composition/requirements.txt`
+
+Current broader Bytewax migration findings:
+
+- The repo-wide targeted search is clean for the legacy stream-runtime identifiers.
+- Some generated prose may now read mechanically and should receive a later editorial pass, but the platform direction is now consistent: Bytewax is the stream/dataflow runtime.

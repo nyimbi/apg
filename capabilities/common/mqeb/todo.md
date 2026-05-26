@@ -77,11 +77,11 @@
   - [ ] Prefetch count and consumer acknowledgments
   - [ ] SSL/TLS encryption and SASL authentication
 
-- [ ] **Apache Kafka compatibility**
-  - [ ] `KafkaCompatibilityAdapter` for existing Kafka clients
+- [ ] **Bytewax compatibility**
+  - [ ] `BytewaxCompatibilityAdapter` for existing Bytewax clients
   - [ ] Producer and consumer protocol implementation
   - [ ] Offset management and consumer group coordination
-  - [ ] Kafka wire protocol compatibility layer
+  - [ ] Bytewax wire protocol compatibility layer
   - [ ] Topic and partition metadata management
   - [ ] Idempotent producer and transactional messaging
 
@@ -535,7 +535,7 @@
   - [ ] Maintain P99 latency <5ms under load
   - [ ] Support 1M+ concurrent connections
   - [ ] 99.99% availability with <30s recovery time
-  - [ ] 90% reduction in operational overhead vs Kafka
+  - [ ] 90% reduction in operational overhead vs Bytewax
   - [ ] Cross-protocol translation overhead <0.1ms
 
 ### Business Impact KPIs  

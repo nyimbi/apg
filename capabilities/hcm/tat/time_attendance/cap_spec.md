@@ -197,7 +197,7 @@ IoT Sensors → Analytics Engine → Executive Dashboard → Compliance Reports
 - **Natural Language**: Voice command processing
 
 ### Real-time Processing Pipeline
-- **Event Streaming**: Apache Kafka integration
+- **Event Streaming**: Bytewax integration
 - **Edge Computing**: Local processing nodes
 - **Caching Strategy**: Redis for performance
 - **Database Optimization**: PostgreSQL with partitioning

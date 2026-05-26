@@ -72,7 +72,7 @@
    - Add authentication and rate limiting
 
 5. **Implement Real StreamingConnector**
-   - Replace mock with Apache Kafka client
+   - Replace mock with Bytewax client
    - Add real topic discovery and schema registry
    - Implement message consumption and processing
    - Add stream processing capabilities

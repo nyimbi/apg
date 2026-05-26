@@ -54,7 +54,7 @@
 - **Geocoding Provider**: Google Maps API, Mapbox, or OpenCage
 - **Weather Service**: OpenWeatherMap or AccuWeather (optional)
 - **Authentication**: JWT token provider
-- **Message Queue**: Redis Streams or Apache Kafka
+- **Message Queue**: Redis Streams or Bytewax
 
 #### Network Requirements
 - **Outbound HTTPS**: Access to geocoding APIs

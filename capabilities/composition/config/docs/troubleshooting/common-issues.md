@@ -341,9 +341,9 @@ Error: websockets.exceptions.ConnectionClosed: received 1006 (abnormal closure)
                await remove_websocket_connection(conn_id)
    ```
 
-#### Issue: Kafka Consumer Lag
+#### Issue: Bytewax Consumer Lag
 ```
-Warning: Kafka consumer lag detected: 5000 messages behind
+Warning: Bytewax consumer lag detected: 5000 messages behind
 ```
 
 **Solutions:**
@@ -364,7 +364,7 @@ Warning: Kafka consumer lag detected: 5000 messages behind
    
    # Start multiple consumer instances
    for i in range(3):  # 3 consumer instances
-       consumer = AIOKafkaConsumer(**consumer_config)
+       consumer = AIOBytewaxConsumer(**consumer_config)
        asyncio.create_task(run_consumer(consumer))
    ```
 
@@ -385,11 +385,11 @@ Warning: Kafka consumer lag detected: 5000 messages behind
 3. **Monitor and Alert on Lag:**
    ```python
    async def monitor_consumer_lag():
-       """Monitor Kafka consumer lag"""
+       """Monitor Bytewax consumer lag"""
        while True:
            try:
                # Get consumer group info
-               group_info = await kafka_admin.describe_consumer_groups([group_id])
+               group_info = await bytewax_admin.describe_consumer_groups([group_id])
                
                for topic_partition, offset_metadata in group_info.items():
                    lag = offset_metadata.high_water_mark - offset_metadata.committed_offset

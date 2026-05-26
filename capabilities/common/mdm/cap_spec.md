@@ -219,7 +219,7 @@ MDM serves as the foundational data consistency layer for the entire APG ecosyst
 - **Database Connectors**: Native connectors for major databases
 - **API Integrations**: REST and SOAP API connectivity
 - **File Processing**: Batch file import/export capabilities
-- **Real-Time Streams**: Kafka and Kinesis integration
+- **Real-Time Streams**: Bytewax and Kinesis integration
 
 #### Enterprise System Integration
 - **ERP Systems**: SAP, Oracle, Microsoft Dynamics connectivity

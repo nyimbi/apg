@@ -18,8 +18,8 @@ global:
         address: "consul.apg-platform:8500"
     eventBus:
       enabled: true
-      kafka:
-        brokers: "kafka.apg-platform:9092"
+      bytewax:
+        brokers: "bytewax.apg-platform:9092"
 
 # Application configuration
 app:

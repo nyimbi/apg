@@ -414,7 +414,7 @@ platform RideSharingPlatform {
 				};
 				
 				streaming: {
-					platform: "kafka";
+					platform: "bytewax";
 					topics: [
 						{
 							name: "location_updates";
@@ -475,7 +475,7 @@ platform RideSharingPlatform {
 				};
 				
 				real_time_processing: {
-					stream_processor: "kafka_streams";
+					stream_processor: "bytewax_streams";
 					processing_guarantees: "exactly_once";
 					state_stores: ["location_state", "driver_state"];
 					windowing: {

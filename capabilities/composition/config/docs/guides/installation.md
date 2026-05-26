@@ -16,7 +16,7 @@
 - **Redis**: 6+ (caching and pub/sub)
 
 #### Optional Services (for advanced features)
-- **Apache Kafka**: 2.8+ (real-time synchronization)
+- **Bytewax**: 2.8+ (real-time synchronization)
 - **MQTT Broker**: Eclipse Mosquitto or equivalent
 - **Kubernetes**: 1.20+ (for container deployment)
 
@@ -112,7 +112,7 @@ QUANTUM_CRYPTO_ENABLED=true
 
 # Real-time Synchronization
 REALTIME_SYNC_ENABLED=true
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+BYTEWAX_FLOW_ID=apg-event-streaming
 MQTT_BROKER_HOST=localhost
 MQTT_BROKER_PORT=1883
 

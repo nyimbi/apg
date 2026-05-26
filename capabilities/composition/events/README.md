@@ -177,7 +177,7 @@ The Event Streaming Bus provides a comprehensive REST API:
 #### Event Publishing
 ```
 POST   /api/v1/events                    # Publish single event
-POST   /api/v1/events/batch              # Publish event batch  
+POST   /api/v1/events/batch              # Publish event batch
 GET    /api/v1/events/{event_id}         # Get event by ID
 POST   /api/v1/events/query              # Query events with filters
 ```
@@ -236,7 +236,7 @@ Real-time streaming via WebSocket:
 
 ```
 /ws/events/{stream_name}                 # Real-time event stream
-/ws/subscriptions/{subscription_id}      # Subscription updates  
+/ws/subscriptions/{subscription_id}      # Subscription updates
 /ws/monitoring                           # Real-time metrics
 ```
 
@@ -245,7 +245,7 @@ Real-time streaming via WebSocket:
 ```python
 from event_streaming_bus import (
     EventStreamingService,
-    EventPublishingService, 
+    EventPublishingService,
     EventConsumptionService,
     StreamProcessingService,
     EventSourcingService,
@@ -304,7 +304,7 @@ integration = APGEventStreamingIntegration(
 ├──────────────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
 │  │   Apache     │  │    Redis     │  │ PostgreSQL   │  │ Monitoring   │     │
-│  │   Kafka      │  │   Streams    │  │  Database    │  │ & Metrics    │     │
+│  │   Bytewax      │  │   Streams    │  │  Database    │  │ & Metrics    │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -313,7 +313,7 @@ integration = APGEventStreamingIntegration(
 
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  Producer   │───▶│   Schema    │───▶│   Kafka     │───▶│  Stream     │
+│  Producer   │───▶│   Schema    │───▶│   Bytewax     │───▶│  Stream     │
 │ Application │    │ Validation  │    │   Broker    │    │ Processor   │
 └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
        │                  │                  │                  │
@@ -340,11 +340,11 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/apg_esb
 DATABASE_POOL_SIZE=20
 DATABASE_MAX_OVERFLOW=30
 
-# Kafka Configuration  
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-KAFKA_SECURITY_PROTOCOL=PLAINTEXT
-KAFKA_ACKS=all
-KAFKA_RETRIES=3
+# Bytewax Configuration
+BYTEWAX_FLOW_ID=apg-event-streaming
+BYTEWAX_SECURITY_PROTOCOL=PLAINTEXT
+BYTEWAX_ACKS=all
+BYTEWAX_RETRIES=3
 
 # Redis Configuration
 REDIS_URL=redis://localhost:6379/0
@@ -379,7 +379,7 @@ streams:
     retention_time_ms: 604800000  # 7 days
     compression_type: snappy
     cleanup_policy: delete
-    
+
   order_events:
     partitions: 12
     replication_factor: 3
@@ -409,8 +409,8 @@ curl http://localhost:8080/health
 # Detailed status
 curl http://localhost:8080/api/v1/status
 
-# Kafka cluster health
-curl http://localhost:8080/api/v1/kafka/health
+# Bytewax cluster health
+curl http://localhost:8080/api/v1/bytewax/health
 
 # Database health
 curl http://localhost:8080/api/v1/database/health
@@ -438,7 +438,7 @@ Structured logging with configurable levels:
 ### Prerequisites
 
 - Python 3.11+
-- Apache Kafka 3.0+
+- Bytewax 3.0+
 - Redis 7.0+
 - PostgreSQL 15+
 
@@ -509,7 +509,7 @@ docker run -d \
   --name esb \
   -p 8080:8080 \
   -e DATABASE_URL=postgresql://... \
-  -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+  -e BYTEWAX_FLOW_ID=bytewax:9092 \
   -e REDIS_URL=redis://redis:6379 \
   apg-event-streaming-bus
 ```
@@ -554,10 +554,10 @@ spec:
 ### Production Considerations
 
 - **Resource Planning**: Plan for 2-4 CPU cores and 4-8GB RAM per instance
-- **Storage**: Use SSD storage for Kafka brokers and database
+- **Storage**: Use SSD storage for Bytewax brokers and database
 - **Networking**: Configure proper network segmentation and security groups
 - **Monitoring**: Set up comprehensive monitoring and alerting
-- **Backup**: Implement regular backups of PostgreSQL and Kafka topics
+- **Backup**: Implement regular backups of PostgreSQL and Bytewax topics
 - **Security**: Use TLS for all communications and proper authentication
 
 ## Troubleshooting
@@ -567,7 +567,7 @@ spec:
 **High Consumer Lag**
 ```bash
 # Check consumer group status
-kafka-console-consumer.sh --bootstrap-server localhost:9092 \
+bytewax-console-consumer.sh --bootstrap-server apg-event-streaming \
   --describe --group your-consumer-group
 
 # Scale up consumers
@@ -579,16 +579,16 @@ kubectl scale deployment consumer --replicas=6
 # Check memory usage
 curl http://localhost:8080/api/v1/metrics | grep memory
 
-# Tune JVM settings for Kafka
-export KAFKA_HEAP_OPTS="-Xmx2G -Xms2G"
+# Tune JVM settings for Bytewax
+export BYTEWAX_HEAP_OPTS="-Xmx2G -Xms2G"
 ```
 
 **Network Connectivity**
 ```bash
-# Test Kafka connectivity
-kafka-topics.sh --bootstrap-server localhost:9092 --list
+# Test Bytewax connectivity
+bytewax-topics.sh --bootstrap-server apg-event-streaming --list
 
-# Test Redis connectivity  
+# Test Redis connectivity
 redis-cli ping
 
 # Test database connectivity
@@ -601,7 +601,7 @@ Enable debug logging:
 
 ```bash
 export LOG_LEVEL=DEBUG
-export KAFKA_LOG_LEVEL=DEBUG
+export BYTEWAX_LOG_LEVEL=DEBUG
 ```
 
 ## Contributing

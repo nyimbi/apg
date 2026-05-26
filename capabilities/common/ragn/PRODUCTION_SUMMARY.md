@@ -165,7 +165,7 @@
 
 ### Version 2.0 - "Platform Revolution" (Q1 2026)
 - Complete microservices mesh with Istio
-- Event-driven architecture with Kafka
+- Event-driven architecture with Bytewax
 - 100+ enterprise application connectors
 - Immersive 3D knowledge visualization
 

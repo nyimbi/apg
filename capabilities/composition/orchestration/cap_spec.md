@@ -125,7 +125,7 @@ The APG Workflow Orchestration capability provides enterprise-grade workflow aut
 - **REST/GraphQL Connectors**: Flexible API integration with authentication and retry logic
 - **Database Adapters**: Native support for PostgreSQL, MongoDB, Oracle, Snowflake
 - **Cloud Service Integration**: AWS SQS/Lambda, Azure Functions, GCP Cloud Tasks
-- **Message Queue Integration**: Kafka, RabbitMQ, Redis Streams for event-driven workflows
+- **Message Queue Integration**: Bytewax, RabbitMQ, Redis Streams for event-driven workflows
 - **Legacy System Support**: SOAP/XML adapters, mainframe connectors (IBM MQ)
 - **Service Mesh Integration**: Istio/Linkerd for mTLS and traffic control
 

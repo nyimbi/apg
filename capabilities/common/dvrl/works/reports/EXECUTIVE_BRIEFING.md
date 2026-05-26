@@ -63,7 +63,7 @@ DVRL represents a **fundamental advancement** in data virtualization technology:
 #### 🌐 **Universal Connectivity**
 - **Singer.io Integration**: 100+ data source types supported
 - Traditional databases, modern SaaS platforms, cloud warehouses
-- Real-time streaming data sources (Kafka, Pulsar, Kinesis)
+- Real-time streaming data sources (Bytewax, Pulsar, Kinesis)
 - API and microservice integration capabilities
 
 #### ⚡ **Breakthrough Performance**

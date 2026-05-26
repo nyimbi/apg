@@ -30,10 +30,10 @@ scrape_configs:
     params:
       format: ['prometheus']
 
-  # Kafka Metrics (JMX Exporter)
-  - job_name: 'kafka'
+  # Bytewax Metrics (JMX Exporter)
+  - job_name: 'bytewax'
     static_configs:
-      - targets: ['kafka:9101']
+      - targets: ['bytewax:9101']
     metrics_path: '/metrics'
     scrape_interval: 30s
 
@@ -193,15 +193,15 @@ alerting_rules:
           summary: "Event Streaming Bus service is down"
           description: "Event Streaming Bus service has been down for more than 1 minute"
 
-      - alert: ESBKafkaDown
-        expr: up{job="kafka"} == 0
+      - alert: ESBBytewaxDown
+        expr: up{job="bytewax"} == 0
         for: 2m
         labels:
           severity: critical
-          service: kafka
+          service: bytewax
         annotations:
-          summary: "Kafka service is down"
-          description: "Kafka service has been down for more than 2 minutes"
+          summary: "Bytewax service is down"
+          description: "Bytewax service has been down for more than 2 minutes"
 
       - alert: ESBDatabaseDown
         expr: up{job="postgres"} == 0

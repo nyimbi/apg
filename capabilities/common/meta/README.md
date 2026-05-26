@@ -257,7 +257,7 @@ asyncio.run(initialize_capability())
 |-------------|--------|----------|
 | **REST APIs** | ✅ Production | OpenAPI/Swagger parsing, endpoint discovery |
 | **GraphQL** | ✅ Production | Schema introspection, type analysis |
-| **Apache Kafka** | ✅ Production | Topic discovery, message sampling |
+| **Bytewax** | ✅ Production | Topic discovery, message sampling |
 | **Confluent Cloud** | 📋 Planned | Schema registry integration |
 
 ### ML Platforms
@@ -716,7 +716,7 @@ We welcome contributions from the community! Please see our [Contributing Guidel
 
 ### Q1 2025
 - [ ] **Advanced ML Models** - Custom classification models with transfer learning
-- [ ] **Real-Time Streaming** - Apache Kafka integration for real-time metadata updates
+- [ ] **Real-Time Streaming** - Bytewax integration for real-time metadata updates
 - [ ] **Data Mesh Integration** - Federated metadata management across domains
 - [ ] **Mobile App** - iOS/Android apps for metadata browsing
 

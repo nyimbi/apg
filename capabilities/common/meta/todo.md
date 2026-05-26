@@ -80,7 +80,7 @@ This development plan outlines the complete implementation of APG's Metadata Man
    - **Acceptance Criteria**:
      - 20+ database connectors (PostgreSQL, MySQL, Oracle, MongoDB, etc.)
      - 10+ file format processors (CSV, JSON, Parquet, Avro, etc.)
-     - 15+ API connectors (REST, GraphQL, Kafka, etc.)
+     - 15+ API connectors (REST, GraphQL, Bytewax, etc.)
      - 10+ ML platform connectors (MLflow, Kubeflow, SageMaker, etc.)
      - Incremental discovery with change detection
      - Schema inference with high accuracy (>98%)
@@ -427,7 +427,7 @@ This development plan outlines the complete implementation of APG's Metadata Man
 - **Neo4j 4.4+**: Graph database for complex lineage relationships
 - **Redis 6.0+**: Caching and session management
 - **Ollama**: Local AI model deployment for classification
-- **Apache Kafka**: Real-time event streaming and message processing
+- **Bytewax**: Real-time event streaming and message processing
 
 ### Development Tools
 - **Python 3.12+**: Async development with modern typing

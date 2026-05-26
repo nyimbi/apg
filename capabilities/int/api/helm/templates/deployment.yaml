@@ -147,8 +147,8 @@ spec:
           value: {{ .Values.global.apgPlatform.serviceDiscovery.consul.address }}
         {{- end }}
         {{- if .Values.global.apgPlatform.eventBus.enabled }}
-        - name: KAFKA_BROKERS
-          value: {{ .Values.global.apgPlatform.eventBus.kafka.brokers }}
+        - name: BYTEWAX_BROKERS
+          value: {{ .Values.global.apgPlatform.eventBus.bytewax.brokers }}
         {{- end }}
         {{- end }}
         ports:

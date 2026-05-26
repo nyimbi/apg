@@ -6,16 +6,16 @@
 
 ## 🚀 Overview
 
-The APG Message Queue Event Bus (MQEB) is a revolutionary AI-powered messaging platform that delivers **10x performance improvements** over industry leaders like Apache Kafka, RabbitMQ, and Amazon EventBridge. Built for the APG (Application Programming Generation) ecosystem, MQEB provides intelligent message routing, quantum-safe security, and universal protocol support.
+The APG Message Queue Event Bus (MQEB) is a revolutionary AI-powered messaging platform that delivers **10x performance improvements** over industry leaders like Bytewax, RabbitMQ, and Amazon EventBridge. Built for the APG (Application Programming Generation) ecosystem, MQEB provides intelligent message routing, quantum-safe security, and universal protocol support.
 
 ### 🎯 Key Performance Advantages
 
-| Metric | Apache Kafka | RabbitMQ | Amazon EventBridge | **MQEB** | **Improvement** |
+| Metric | Bytewax | RabbitMQ | Amazon EventBridge | **MQEB** | **Improvement** |
 |--------|--------------|----------|---------------------|----------|-----------------|
 | **Throughput** | 1M msg/sec | 100K msg/sec | 10K msg/sec | **10M+ msg/sec** | **10x** |
 | **P99 Latency** | 20ms | 10ms | 50ms | **<5ms** | **4x better** |
 | **Connections** | 100K | 50K | N/A (serverless) | **1M+** | **10x** |
-| **Protocols** | Kafka only | AMQP only | HTTP only | **6 protocols** | **Universal** |
+| **Protocols** | Bytewax only | AMQP only | HTTP only | **6 protocols** | **Universal** |
 | **AI Features** | None | None | None | **Full AI** | **Revolutionary** |
 
 ## 🌟 Revolutionary Features
@@ -31,7 +31,7 @@ The APG Message Queue Event Bus (MQEB) is a revolutionary AI-powered messaging p
 - **WebSocket**: Real-time bidirectional communication
 - **MQTT 5.0**: IoT-optimized with QoS guarantees
 - **AMQP 1.0**: Enterprise messaging with transactions
-- **Kafka-Compatible**: Drop-in replacement for Kafka clients
+- **Bytewax-Compatible**: Drop-in replacement for Bytewax clients
 - **gRPC**: High-performance binary streaming
 
 ### 3. **Quantum-Safe Security**
@@ -279,7 +279,7 @@ MQEB_DATABASE_URL=postgresql://mqeb_user:mqeb_pass@localhost/mqeb_db
 # Protocol Configuration
 MQEB_MQTT_ENABLED=true
 MQEB_AMQP_ENABLED=true
-MQEB_KAFKA_ENABLED=true
+MQEB_BYTEWAX_ENABLED=true
 MQEB_WEBSOCKET_ENABLED=true
 MQEB_GRPC_ENABLED=true
 

@@ -406,7 +406,7 @@ class MetaClassification:
 #### APIs & Services (15+ types)
 - REST APIs with OpenAPI specs
 - GraphQL endpoints
-- Kafka topics and streams
+- Bytewax topics and streams
 - Salesforce, ServiceNow, SAP
 
 #### ML & Analytics (10+ platforms)
@@ -482,7 +482,7 @@ async def search_metadata(
 - **Compute**: Kubernetes cluster with auto-scaling (4-100 nodes)
 - **Storage**: PostgreSQL cluster + Neo4j for graph data
 - **Caching**: Redis cluster for search result caching
-- **Message Queue**: Apache Kafka for real-time event processing
+- **Message Queue**: Bytewax for real-time event processing
 - **AI/ML**: Local Ollama deployment for classification models
 
 ### Scalability Design

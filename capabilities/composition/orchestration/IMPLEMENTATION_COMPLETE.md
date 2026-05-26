@@ -194,7 +194,7 @@ All 35 phases of the APG Workflow Orchestration capability have been successfull
 - REST/GraphQL APIs with authentication
 - Database connections (PostgreSQL, MySQL, MongoDB)
 - Cloud services (AWS, Azure, GCP)
-- Message queues (RabbitMQ, Apache Kafka)
+- Message queues (RabbitMQ, Bytewax)
 - File systems and object storage
 - Third-party services and webhooks
 

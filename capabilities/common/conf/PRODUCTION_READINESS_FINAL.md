@@ -334,7 +334,7 @@ The **APG Configuration Management** capability has been successfully developed 
 - **Application Servers**: 3+ instances for redundancy
 - **Database**: Primary/replica with automatic failover
 - **Cache Layer**: Redis cluster with persistence
-- **Message Queue**: RabbitMQ or Apache Kafka
+- **Message Queue**: RabbitMQ or Bytewax
 
 ---
 

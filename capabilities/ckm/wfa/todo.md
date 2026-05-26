@@ -485,7 +485,7 @@ This document outlines the complete development plan for the APG Workflow & Busi
 - **scikit-learn** - Machine learning for process optimization
 - **pandas** - Data analysis and process mining
 - **NumPy** - Numerical computing for analytics
-- **Apache Kafka** - Real-time event streaming and processing
+- **Bytewax** - Real-time event streaming and processing
 - **Elasticsearch** - Full-text search and analytics
 - **Grafana** - Real-time monitoring and visualization
 

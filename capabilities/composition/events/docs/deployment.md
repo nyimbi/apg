@@ -29,7 +29,7 @@ This guide provides comprehensive instructions for deploying the APG Event Strea
 
 - **PostgreSQL** 15+
 - **Redis** 7.0+
-- **Apache Kafka** 3.0+
+- **Bytewax** 3.0+
 - **Prometheus** (for monitoring)
 - **Grafana** (for visualization)
 
@@ -45,21 +45,21 @@ ENV=development
 LOG_LEVEL=DEBUG
 DATABASE_URL=postgresql://esb_user:esb_password@localhost:5432/apg_esb_dev
 REDIS_URL=redis://localhost:6379/0
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+BYTEWAX_FLOW_ID=apg-event-streaming
 
 # Staging (.env.staging)
 ENV=staging
 LOG_LEVEL=INFO
 DATABASE_URL=postgresql://esb_user:esb_password@postgres:5432/apg_esb_staging
 REDIS_URL=redis://redis:6379/0
-KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+BYTEWAX_FLOW_ID=bytewax:9092
 
 # Production (.env.prod)
 ENV=production
 LOG_LEVEL=INFO
 DATABASE_URL=postgresql://esb_user:esb_password@postgres:5432/apg_esb_prod
 REDIS_URL=redis://redis:6379/0
-KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+BYTEWAX_FLOW_ID=bytewax:9092
 ```
 
 ### Security Configuration
@@ -86,7 +86,7 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
 # Start services
-docker-compose up -d postgres redis kafka
+docker-compose up -d postgres redis bytewax
 
 # Initialize database
 python -m alembic upgrade head
@@ -125,7 +125,7 @@ docker run -d \
   -p 9090:9090 \
   -e DATABASE_URL=postgresql://... \
   -e REDIS_URL=redis://... \
-  -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+  -e BYTEWAX_FLOW_ID=bytewax:9092 \
   apg-event-streaming-bus:latest
 ```
 
@@ -195,8 +195,8 @@ kubectl apply -f k8s/postgres.yaml
 # Deploy Redis
 kubectl apply -f k8s/redis.yaml
 
-# Deploy Kafka
-kubectl apply -f k8s/kafka.yaml
+# Deploy Bytewax
+kubectl apply -f k8s/bytewax.yaml
 ```
 
 ### Scaling
@@ -388,15 +388,15 @@ kubectl run db-test --rm -i --restart=Never --image=postgres:15 -- \
 kubectl logs -f postgres-0 -n apg-event-streaming-bus
 ```
 
-#### 3. Kafka Connection Issues
+#### 3. Bytewax Connection Issues
 
 ```bash
-# Test Kafka connectivity
-kubectl run kafka-test --rm -i --restart=Never --image=confluentinc/cp-kafka:7.4.0 -- \
-  kafka-topics --bootstrap-server kafka:9092 --list
+# Test Bytewax connectivity
+kubectl run bytewax-test --rm -i --restart=Never --image=confluentinc/cp-bytewax:7.4.0 -- \
+  bytewax-topics --bootstrap-server bytewax:9092 --list
 
-# Check Kafka logs
-kubectl logs -f kafka-0 -n apg-event-streaming-bus
+# Check Bytewax logs
+kubectl logs -f bytewax-0 -n apg-event-streaming-bus
 ```
 
 #### 4. Memory Issues

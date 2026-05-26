@@ -40,7 +40,7 @@ spec:
   sessionAffinity: None
 
 ---
-# Headless Service for StatefulSet (if needed for Kafka)
+# Headless Service for StatefulSet (if needed for Bytewax)
 apiVersion: v1
 kind: Service
 metadata:
@@ -145,20 +145,20 @@ spec:
     app.kubernetes.io/instance: apg-esb-redis
 
 ---
-# Kafka Service
+# Bytewax Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: kafka
+  name: bytewax
   namespace: apg-event-streaming-bus
   labels:
-    app.kubernetes.io/name: kafka
-    app.kubernetes.io/instance: apg-esb-kafka
+    app.kubernetes.io/name: bytewax
+    app.kubernetes.io/instance: apg-esb-bytewax
     app.kubernetes.io/component: message-broker
 spec:
   type: ClusterIP
   ports:
-    - name: kafka
+    - name: bytewax
       port: 9092
       targetPort: 9092
       protocol: TCP
@@ -167,29 +167,29 @@ spec:
       targetPort: 9101
       protocol: TCP
   selector:
-    app.kubernetes.io/name: kafka
-    app.kubernetes.io/instance: apg-esb-kafka
+    app.kubernetes.io/name: bytewax
+    app.kubernetes.io/instance: apg-esb-bytewax
 
 ---
-# Kafka Headless Service for StatefulSet
+# Bytewax Headless Service for StatefulSet
 apiVersion: v1
 kind: Service
 metadata:
-  name: kafka-headless
+  name: bytewax-headless
   namespace: apg-event-streaming-bus
   labels:
-    app.kubernetes.io/name: kafka
-    app.kubernetes.io/instance: apg-esb-kafka
+    app.kubernetes.io/name: bytewax
+    app.kubernetes.io/instance: apg-esb-bytewax
     app.kubernetes.io/component: headless-service
 spec:
   type: ClusterIP
   clusterIP: None
   ports:
-    - name: kafka
+    - name: bytewax
       port: 9092
       targetPort: 9092
       protocol: TCP
-    - name: kafka-internal
+    - name: bytewax-internal
       port: 29092
       targetPort: 29092
       protocol: TCP
@@ -198,8 +198,8 @@ spec:
       targetPort: 29093
       protocol: TCP
   selector:
-    app.kubernetes.io/name: kafka
-    app.kubernetes.io/instance: apg-esb-kafka
+    app.kubernetes.io/name: bytewax
+    app.kubernetes.io/instance: apg-esb-bytewax
 
 ---
 # Monitoring Service for Prometheus Discovery

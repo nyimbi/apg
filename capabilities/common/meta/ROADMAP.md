@@ -48,7 +48,7 @@ class PredictiveQualityWidget:
 ```
 
 #### 🔄 **Real-Time Streaming Analytics**
-- Apache Kafka integration for real-time metadata updates
+- Bytewax integration for real-time metadata updates
 - Stream processing with Apache Flink/Spark Streaming
 - Real-time data quality monitoring
 - Live lineage updates as data flows
@@ -214,7 +214,7 @@ async def check_personal_data_retention(asset: Asset) -> ComplianceResult:
 
 ### **High Priority (Q1 2025)**
 1. **Advanced ML Classification Models** - Industry-specific models
-2. **Real-Time Streaming Integration** - Kafka/Flink integration
+2. **Real-Time Streaming Integration** - Bytewax/Flink integration
 3. **Predictive Analytics Dashboard** - Quality and usage forecasting
 4. **Mobile Application Development** - iOS/Android apps
 
@@ -303,7 +303,7 @@ class AutomatedDataDocumentation:
 - **AI/ML Platforms**: Integration with MLflow, SageMaker, Vertex AI
 
 ### **Open Source Ecosystem**
-- **Apache Foundation Projects**: Contributions to Atlas, Kafka, Spark
+- **Apache Foundation Projects**: Contributions to Atlas, Bytewax, Spark
 - **CNCF Projects**: Cloud-native metadata standards
 - **Linux Foundation**: Data governance best practices
 - **OpenAPI Initiative**: Metadata API standardization

@@ -117,7 +117,7 @@ Supports connections to 15+ data source types with automatic capability detectio
 - **NoSQL**: MongoDB, Cassandra, Redis, Elasticsearch
 - **Cloud Warehouses**: Snowflake, BigQuery, Redshift
 - **APIs**: REST, GraphQL
-- **Streaming**: Kafka, Kinesis
+- **Streaming**: Bytewax, Kinesis
 - **Files**: CSV, JSON, Parquet, S3, HDFS
 
 #### Key Features

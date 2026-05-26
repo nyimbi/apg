@@ -26,7 +26,7 @@ value = await config_service.get_config("app.database.host")
 ## Key Features
 
 - **Multi-Tenant Architecture**: Secure tenant isolation with role-based access control
-- **Real-Time Synchronization**: WebSocket, Kafka, and MQTT support for instant updates
+- **Real-Time Synchronization**: WebSocket, Bytewax, and MQTT support for instant updates
 - **Quantum-Resistant Encryption**: Post-quantum cryptography with Kyber768 and Dilithium3
 - **Enterprise Integrations**: 10+ connectors including Discord, Zendesk, Splunk, GitHub
 - **Interactive Applets**: Dynamic capability management with validation and rollback
@@ -53,7 +53,7 @@ docs/
 ├── integrations/               # Integration documentation
 │   ├── enterprise-connectors.md # Enterprise system integrations
 │   ├── cloud-providers.md      # Multi-cloud deployment
-│   └── messaging-systems.md    # Kafka, MQTT, WebSocket setup
+│   └── messaging-systems.md    # Bytewax, MQTT, WebSocket setup
 ├── security/                   # Security documentation
 │   ├── encryption.md           # Quantum-resistant encryption
 │   ├── authentication.md       # OAuth2 and access control

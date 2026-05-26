@@ -1067,7 +1067,7 @@ marketplace FreelanceHub {
 		};
 		
 		real_time_analytics: {
-			stream_processing: "apache_kafka + flink";
+			stream_processing: "bytewax + flink";
 			metrics: [
 				"active_users", "concurrent_sessions", "transaction_volume",
 				"search_queries", "message_volume", "system_performance"

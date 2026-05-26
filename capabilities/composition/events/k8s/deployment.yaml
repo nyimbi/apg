@@ -126,22 +126,22 @@ spec:
                   name: esb-config
                   key: REDIS_MAX_CONNECTIONS
             
-            # Kafka configuration
-            - name: KAFKA_BOOTSTRAP_SERVERS
+            # Bytewax configuration
+            - name: BYTEWAX_FLOW_ID
               valueFrom:
                 secretKeyRef:
                   name: esb-secrets
-                  key: kafka-bootstrap-servers
-            - name: KAFKA_ACKS
+                  key: bytewax-bootstrap-servers
+            - name: BYTEWAX_ACKS
               valueFrom:
                 configMapKeyRef:
                   name: esb-config
-                  key: KAFKA_ACKS
-            - name: KAFKA_RETRIES
+                  key: BYTEWAX_ACKS
+            - name: BYTEWAX_RETRIES
               valueFrom:
                 configMapKeyRef:
                   name: esb-config
-                  key: KAFKA_RETRIES
+                  key: BYTEWAX_RETRIES
             
             # Security configuration
             - name: JWT_SECRET_KEY
@@ -310,12 +310,12 @@ spec:
               done
               echo "Redis is ready"
               
-              echo "Waiting for Kafka..."
-              until nc -z kafka 9092; do
-                echo "Kafka is not ready. Waiting..."
+              echo "Waiting for Bytewax..."
+              until nc -z bytewax 9092; do
+                echo "Bytewax is not ready. Waiting..."
                 sleep 2
               done
-              echo "Kafka is ready"
+              echo "Bytewax is ready"
               
               echo "All dependencies are ready"
           securityContext:
@@ -402,11 +402,11 @@ spec:
                 secretKeyRef:
                   name: esb-secrets
                   key: redis-url
-            - name: KAFKA_BOOTSTRAP_SERVERS
+            - name: BYTEWAX_FLOW_ID
               valueFrom:
                 secretKeyRef:
                   name: esb-secrets
-                  key: kafka-bootstrap-servers
+                  key: bytewax-bootstrap-servers
             - name: POD_NAME
               valueFrom:
                 fieldRef:

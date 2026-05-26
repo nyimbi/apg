@@ -239,7 +239,7 @@ APG Financial Reporting
 - **Redis**: Real-time caching and session management
 - **ClickHouse**: Time-series analytics for trend analysis
 - **Elasticsearch**: Full-text search across financial documents
-- **Apache Kafka**: Real-time data streaming and event processing
+- **Bytewax**: Real-time data streaming and event processing
 
 ### AI/ML Integration
 

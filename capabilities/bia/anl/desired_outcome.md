@@ -9,7 +9,7 @@ The Advanced Analytics Platform provides enterprise-grade data analytics, machin
 ### 1. Real-Time Data Processing & Stream Analytics
 - **High-Velocity Data Ingestion**: Process millions of events per second from all APG capabilities
 - **Real-Time Analytics**: Sub-second analytics processing with complex event processing (CEP)
-- **Stream Processing Engine**: Apache Kafka, Apache Flink, and custom streaming architectures
+- **Stream Processing Engine**: Bytewax, Apache Flink, and custom streaming architectures
 - **Data Lake Integration**: Seamless integration with cloud data lakes (AWS S3, Google Cloud Storage, Azure Data Lake)
 - **Edge Analytics**: Distributed analytics processing at edge locations for reduced latency
 

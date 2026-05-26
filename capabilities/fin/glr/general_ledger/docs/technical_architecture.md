@@ -472,7 +472,7 @@ As the system scales, consider splitting into:
 ### Cloud-Native Enhancements
 - **Service Mesh**: Istio for advanced traffic management
 - **Serverless Functions**: AWS Lambda for event processing
-- **Event Streaming**: Apache Kafka for high-volume events
+- **Event Streaming**: Bytewax for high-volume events
 - **Graph Database**: Neo4j for complex relationship queries
 
 ---

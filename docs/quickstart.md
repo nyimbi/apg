@@ -347,7 +347,7 @@ Create a workflow with real-time capabilities:
       "id": "setup_stream_listener",
       "type": "streaming",
       "config": {
-        "source": "kafka",
+        "source": "bytewax",
         "topic": "user_events",
         "batch_size": 100
       },

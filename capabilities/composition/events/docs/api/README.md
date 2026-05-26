@@ -569,7 +569,7 @@ GET /api/v1/status
   "timestamp": "2025-01-26T10:30:00.000Z",
   "components": {
     "api": "healthy",
-    "kafka": "healthy",
+    "bytewax": "healthy",
     "redis": "healthy",
     "postgresql": "healthy"
   },

@@ -528,7 +528,7 @@ APG_CAPABILITY_METADATA = {
 - **Identity Providers**: LDAP, SAML, OAuth2
 - **Storage Systems**: S3, MinIO, NFS
 - **Monitoring**: Prometheus, Grafana, ELK
-- **Message Queues**: Redis, RabbitMQ, Kafka
+- **Message Queues**: Redis, RabbitMQ, Bytewax
 
 ### API Architecture
 
@@ -655,7 +655,7 @@ RAG_METRICS = {
 
 1. **Microservices Decomposition**
    - Service mesh with Istio
-   - Event-driven architecture with Kafka
+   - Event-driven architecture with Bytewax
    - Independent scaling and deployment
 
 2. **Advanced AI Integration**

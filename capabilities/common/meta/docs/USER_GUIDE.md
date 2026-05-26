@@ -23,12 +23,12 @@ APG Metadata Management is a revolutionary enterprise metadata platform that pro
 
 ### Key Capabilities
 
-🔍 **Intelligent Discovery** - Automated metadata discovery from 15+ data sources  
-🧠 **AI Classification** - Automatic PII/PHI detection and data classification  
-📊 **Visual Lineage** - Interactive data lineage visualization and impact analysis  
-🔍 **Natural Language Search** - Search your data using plain English  
-⚡ **Real-time Updates** - Live metadata synchronization and change detection  
-🔒 **Enterprise Security** - Multi-tenant architecture with role-based access  
+🔍 **Intelligent Discovery** - Automated metadata discovery from 15+ data sources
+🧠 **AI Classification** - Automatic PII/PHI detection and data classification
+📊 **Visual Lineage** - Interactive data lineage visualization and impact analysis
+🔍 **Natural Language Search** - Search your data using plain English
+⚡ **Real-time Updates** - Live metadata synchronization and change detection
+🔒 **Enterprise Security** - Multi-tenant architecture with role-based access
 
 ---
 
@@ -52,7 +52,7 @@ APG Metadata Management is a revolutionary enterprise metadata platform that pro
 2. **Initialize the service:**
    ```python
    from capabilities.common.meta import initialize_capability
-   
+
    service = await initialize_capability()
    ```
 
@@ -98,7 +98,7 @@ Asset Metadata
 **Lineage** tracks how data flows through your organization:
 
 - **Column-Level Lineage** - Track individual field transformations
-- **Table-Level Lineage** - Understand dataset relationships  
+- **Table-Level Lineage** - Understand dataset relationships
 - **Cross-System Lineage** - Follow data across multiple platforms
 - **Impact Analysis** - Assess downstream effects of changes
 
@@ -124,7 +124,7 @@ The main dashboard provides a comprehensive view of your data landscape:
 
 **Key Metrics Panel:**
 - Total assets discovered
-- Data quality trends  
+- Data quality trends
 - Classification distribution
 - Discovery job status
 - User activity summary
@@ -143,13 +143,13 @@ The main dashboard provides a comprehensive view of your data landscape:
 
 ### Navigation Menu
 
-**📊 Dashboard** - Overview and key metrics  
-**🔍 Discovery** - Manage data source connections and discovery jobs  
-**📁 Assets** - Browse and manage metadata assets  
-**🔍 Search** - Intelligent search across all assets  
-**📈 Lineage** - Interactive lineage visualization  
-**🧠 Classification** - AI classification rules and results  
-**⚙️ Settings** - System configuration and user management  
+**📊 Dashboard** - Overview and key metrics
+**🔍 Discovery** - Manage data source connections and discovery jobs
+**📁 Assets** - Browse and manage metadata assets
+**🔍 Search** - Intelligent search across all assets
+**📈 Lineage** - Interactive lineage visualization
+**🧠 Classification** - AI classification rules and results
+**⚙️ Settings** - System configuration and user management
 
 ---
 
@@ -166,7 +166,7 @@ Navigate to **Discovery → Data Sources → Add New Source**
 **Database Connection Example:**
 ```
 Connection Name: Production PostgreSQL
-Type: PostgreSQL  
+Type: PostgreSQL
 Host: prod-db.company.com
 Port: 5432
 Database: ecommerce
@@ -192,7 +192,7 @@ Include Patterns:
 - /warehouse/*/*
 - /analytics/reports/*
 
-Exclude Patterns:  
+Exclude Patterns:
 - /temp/*
 - /staging/test_*
 ```
@@ -208,7 +208,7 @@ Exclude Patterns:
 - Automated metadata updates
 - Change detection and alerting
 
-**Real-time Discovery:**  
+**Real-time Discovery:**
 - Event-driven updates
 - Integration with data pipeline systems
 - Immediate reflection of schema changes
@@ -216,7 +216,7 @@ Exclude Patterns:
 #### Step 3: Run Discovery Job
 
 1. Click **"Run Discovery"** for immediate execution
-2. Monitor progress in the **"Discovery Jobs"** section  
+2. Monitor progress in the **"Discovery Jobs"** section
 3. Review discovered assets in the **Assets** tab
 4. Check for any errors or warnings
 
@@ -242,7 +242,7 @@ After discovery completes, you'll see:
 - Anomaly detection
 
 **Classification Results:**
-- Automatic PII/PHI detection  
+- Automatic PII/PHI detection
 - Sensitivity classification
 - Compliance tag assignment
 - Risk assessment
@@ -261,7 +261,7 @@ The **Assets** section provides multiple ways to explore your metadata catalog:
 - Quick filters and search
 - Bulk operations support
 
-#### Card View  
+#### Card View
 - Visual asset cards with key metrics
 - Quality score indicators
 - Classification badges
@@ -269,7 +269,7 @@ The **Assets** section provides multiple ways to explore your metadata catalog:
 
 #### Tree View
 - Hierarchical organization by source system
-- Expandable database/schema structure  
+- Expandable database/schema structure
 - Context-aware navigation
 - Breadcrumb navigation
 
@@ -286,12 +286,12 @@ Each asset has a comprehensive details page with multiple tabs:
 
 #### 📊 Schema
 - Column definitions and data types
-- Primary/foreign key relationships  
+- Primary/foreign key relationships
 - Constraints and indexes
 - Column-level classifications
 - Data profiling statistics
 
-#### 📈 Lineage  
+#### 📈 Lineage
 - Interactive lineage diagram
 - Upstream and downstream relationships
 - Transformation logic display
@@ -305,7 +305,7 @@ Each asset has a comprehensive details page with multiple tabs:
 
 #### 👥 Usage
 - Query frequency and patterns
-- User access statistics  
+- User access statistics
 - Popular column usage
 - Performance metrics
 
@@ -321,7 +321,7 @@ Users can enhance discovered metadata:
 
 **Basic Information:**
 - Update descriptions and display names
-- Assign owners and stewards  
+- Assign owners and stewards
 - Add business tags
 - Set custom attributes
 
@@ -334,7 +334,7 @@ Users can enhance discovered metadata:
 **Quality Rules:**
 - Define custom quality checks
 - Set quality thresholds
-- Configure alerting rules  
+- Configure alerting rules
 - Schedule quality monitoring
 
 ---
@@ -349,7 +349,7 @@ APG's search capabilities go far beyond simple text matching:
 Ask questions in plain English:
 
 - *"Show me all customer data with email addresses"*
-- *"Find high quality tables from the sales system"*  
+- *"Find high quality tables from the sales system"*
 - *"What contains PII information?"*
 - *"Tables updated last week with quality issues"*
 
@@ -377,7 +377,7 @@ Tables ✓  Views ✓  Files ✓  APIs ✗  Models ✗
 Quality Score: [>=] [0.8] (High quality assets only)
 ```
 
-**By Source System:**  
+**By Source System:**
 ```
 PostgreSQL ✓  MySQL ✗  S3 ✓  Snowflake ✗
 ```
@@ -404,7 +404,7 @@ Use faceted navigation to drill down into your catalog:
 **Source Systems → Databases → Schemas → Tables**
 ```
 PostgreSQL (1,245 assets)
-├── ecommerce_prod (892 assets)  
+├── ecommerce_prod (892 assets)
 │   ├── public (445 assets)
 │   ├── analytics (321 assets)
 │   └── staging (126 assets)
@@ -417,7 +417,7 @@ PostgreSQL (1,245 assets)
 ```
 CONFIDENTIAL (2,341 assets)
 ├── Financial Data (892 assets)
-├── Customer Data (654 assets)  
+├── Customer Data (654 assets)
 ├── Employee Data (432 assets)
 └── Strategic Data (363 assets)
 ```
@@ -456,7 +456,7 @@ The lineage viewer provides an interactive network diagram:
 
 **Layout Options:**
 - **Hierarchical** - Top-down or left-right flow
-- **Force-Directed** - Automatic optimal positioning  
+- **Force-Directed** - Automatic optimal positioning
 - **Circular** - Circular arrangement around central asset
 - **Timeline** - Chronological data flow sequence
 
@@ -467,7 +467,7 @@ The lineage viewer provides an interactive network diagram:
 raw_customers → customer_cleansing → customer_360 → customer_reports
 ```
 
-**Column-Level Lineage:**  
+**Column-Level Lineage:**
 ```
 customers.email → cleansed.email_clean → analytics.customer_email
 customers.phone → cleansed.phone_clean → analytics.contact_phone
@@ -496,7 +496,7 @@ Direct Impact:
 - customer_analytics view (CRITICAL) - References removed column
 - daily_report ETL (HIGH) - Uses column in JOIN operation
 
-Indirect Impact:  
+Indirect Impact:
 - executive_dashboard (MEDIUM) - Via customer_analytics dependency
 - customer_segmentation_model (LOW) - Uses aggregated data
 
@@ -531,7 +531,7 @@ The system automatically detects lineage through:
 
 **SQL Analysis:**
 - Parse SELECT, INSERT, UPDATE statements
-- Extract table and column references  
+- Extract table and column references
 - Identify JOIN relationships
 - Detect aggregation and transformation logic
 
@@ -539,7 +539,7 @@ The system automatically detects lineage through:
 - Airflow DAG analysis
 - dbt model parsing
 - Spark job monitoring
-- Kafka topic tracing
+- Bytewax topic tracing
 
 **API Call Tracing:**
 - REST API dependency mapping
@@ -608,7 +608,7 @@ The system uses multiple AI techniques:
 
 **Natural Language Processing:**
 - Column name semantic analysis
-- Description and comment analysis  
+- Description and comment analysis
 - Business glossary term matching
 - Context-aware classification
 
@@ -616,7 +616,7 @@ The system uses multiple AI techniques:
 
 **Personally Identifiable Information (PII):**
 - Names, emails, phone numbers
-- Addresses, ZIP codes  
+- Addresses, ZIP codes
 - Social security numbers
 - Driver's license numbers
 
@@ -626,7 +626,7 @@ The system uses multiple AI techniques:
 - Biometric identifiers
 - Full face photographs
 
-**Financial Information:**  
+**Financial Information:**
 - Credit card numbers
 - Bank account numbers
 - Financial account identifiers
@@ -664,7 +664,7 @@ Create organization-specific rules:
 **Rule Creation:**
 ```
 Rule Name: Customer Contact Information
-Classification: PII  
+Classification: PII
 Confidence: 0.9
 
 Conditions:
@@ -675,7 +675,7 @@ Conditions:
 
 Actions:
 - Apply PII classification
-- Add "contact_info" tag  
+- Add "contact_info" tag
 - Set retention period: 7 years
 - Enable data masking
 ```
@@ -753,7 +753,7 @@ await sync.import_edc_catalog()
 - Update column descriptions automatically
 - Track usage analytics
 
-**Power BI Integration:**  
+**Power BI Integration:**
 - Dataset metadata synchronization
 - Report lineage tracking
 - Semantic model documentation
@@ -779,7 +779,7 @@ sync = DbtSync(
     profiles_dir="~/.dbt"
 )
 
-# Extract model lineage and documentation  
+# Extract model lineage and documentation
 await sync.sync_models()
 ```
 
@@ -810,12 +810,12 @@ CREATE TRIGGER schema_change_trigger
     EXECUTE FUNCTION notify_schema_change();
 ```
 
-**Kafka Integration:**  
+**Bytewax Integration:**
 ```python
-from apg_metadata.integrations import KafkaListener
+from apg_metadata.integrations import BytewaxListener
 
-listener = KafkaListener(
-    bootstrap_servers='kafka.company.com:9092',
+listener = BytewaxListener(
+    flow_id='bytewax.company.com:9092',
     topics=['schema-changes', 'data-quality-alerts']
 )
 
@@ -940,7 +940,7 @@ Data Owner (Business):
 - Makes classification decisions
 - Approves usage for new purposes
 
-Data Steward (Technical):  
+Data Steward (Technical):
 - Maintains metadata accuracy
 - Monitors data quality
 - Implements governance policies
@@ -964,7 +964,7 @@ Business Classification:
 └── Restricted (HR, Legal, Security)
 
 Technical Classification:
-├── PII (Names, Emails, Addresses)  
+├── PII (Names, Emails, Addresses)
 ├── Sensitive PII (SSN, Medical, Financial)
 ├── Anonymized (De-identified data)
 └── Synthetic (Test/Demo data)
@@ -1000,7 +1000,7 @@ quality_rules = [
         "severity": "high"
     },
     {
-        "name": "Customer ID Uniqueness", 
+        "name": "Customer ID Uniqueness",
         "description": "Customer IDs must be unique within the table",
         "rule_type": "uniqueness",
         "column": "customer_id",
@@ -1021,7 +1021,7 @@ quality_rules = [
 ## Business Purpose
 Brief description of what this asset represents and how it's used.
 
-## Data Dictionary  
+## Data Dictionary
 | Column | Type | Description | Business Rules |
 |--------|------|-------------|----------------|
 | id     | INT  | Unique identifier | Primary key, auto-increment |
@@ -1034,7 +1034,7 @@ Brief description of what this asset represents and how it's used.
 
 ## Access Information
 - Owner: data.team@company.com
-- Steward: jane.smith@company.com  
+- Steward: jane.smith@company.com
 - Access Level: Internal
 - Request Process: Submit ticket to IT
 
@@ -1114,14 +1114,14 @@ results = await client.search_assets(query="*", limit=10000)
 ```
 Metadata Admin:
 - Full system configuration access
-- User management capabilities  
+- User management capabilities
 - Global settings modification
 - Discovery job management
 
 Data Steward:
 - Asset metadata editing
 - Classification management
-- Quality rule configuration  
+- Quality rule configuration
 - Usage monitoring
 
 Business User:
@@ -1150,7 +1150,7 @@ Auditor:
 # Mask sensitive data in samples
 masked_samples = [
     "user_****@company.com",  # Email masking
-    "555-***-1234",           # Phone masking  
+    "555-***-1234",           # Phone masking
     "****-****-****-1234"     # Credit card masking
 ]
 ```
@@ -1196,7 +1196,7 @@ masked_samples = [
 4. Look for case sensitivity issues in pattern matching
 5. Increase query timeout for large catalogs
 
-#### Search Issues  
+#### Search Issues
 
 **Issue: Search returns no results for known assets**
 
@@ -1287,7 +1287,7 @@ for error in job_details['errors']:
 
 **Important Log Locations:**
 - Application logs: `/var/log/apg-metadata/app.log`
-- Discovery logs: `/var/log/apg-metadata/discovery.log`  
+- Discovery logs: `/var/log/apg-metadata/discovery.log`
 - Database logs: `/var/log/postgresql/`
 - Search logs: `/var/log/apg-metadata/search.log`
 
@@ -1299,7 +1299,7 @@ grep "connection.*error" /var/log/apg-metadata/app.log
 # Find discovery failures
 grep "discovery.*failed" /var/log/apg-metadata/discovery.log
 
-# Check classification issues  
+# Check classification issues
 grep "classification.*error" /var/log/apg-metadata/app.log
 
 # Monitor performance issues
@@ -1310,7 +1310,7 @@ grep "timeout\|slow" /var/log/apg-metadata/*.log
 
 **Key Metrics to Monitor:**
 - Discovery job success rate and duration
-- Search response time and error rate  
+- Search response time and error rate
 - Database connection pool utilization
 - Memory and CPU usage patterns
 - Cache hit rate and eviction frequency

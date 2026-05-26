@@ -21,13 +21,13 @@ data:
   METRICS_ENABLED: "true"
   TRACING_ENABLED: "true"
   
-  # Kafka configuration
-  KAFKA_ACKS: "all"
-  KAFKA_RETRIES: "3"
-  KAFKA_COMPRESSION_TYPE: "snappy"
-  KAFKA_BATCH_SIZE: "16384"
-  KAFKA_LINGER_MS: "10"
-  KAFKA_MAX_REQUEST_SIZE: "1048576"
+  # Bytewax configuration
+  BYTEWAX_ACKS: "all"
+  BYTEWAX_RETRIES: "3"
+  BYTEWAX_COMPRESSION_TYPE: "snappy"
+  BYTEWAX_BATCH_SIZE: "16384"
+  BYTEWAX_LINGER_MS: "10"
+  BYTEWAX_MAX_REQUEST_SIZE: "1048576"
   
   # Database configuration
   DATABASE_POOL_SIZE: "20"
@@ -65,24 +65,24 @@ data:
   STATE_STORE_TYPE: "rocksdb"
 
 ---
-# Kafka Configuration
+# Bytewax Configuration
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kafka-config
+  name: bytewax-config
   namespace: apg-event-streaming-bus
   labels:
-    app.kubernetes.io/name: kafka
-    app.kubernetes.io/instance: apg-esb-kafka
+    app.kubernetes.io/name: bytewax
+    app.kubernetes.io/instance: apg-esb-bytewax
     app.kubernetes.io/component: config
 data:
   server.properties: |
-    # Kafka broker configuration for APG Event Streaming Bus
+    # Bytewax broker configuration for APG Event Streaming Bus
     
     # Basic settings
     broker.id=1
     listeners=PLAINTEXT://0.0.0.0:9092
-    advertised.listeners=PLAINTEXT://kafka:9092
+    advertised.listeners=PLAINTEXT://bytewax:9092
     
     # Zookeeper connection (if using Zookeeper mode)
     # zookeeper.connect=zookeeper:2181
@@ -90,12 +90,12 @@ data:
     # KRaft mode settings (recommended)
     process.roles=broker,controller
     node.id=1
-    controller.quorum.voters=1@kafka:9093
+    controller.quorum.voters=1@bytewax:9093
     controller.listener.names=CONTROLLER
     listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
     
     # Log settings
-    log.dirs=/kafka/kafka-logs
+    log.dirs=/bytewax/bytewax-logs
     num.network.threads=8
     num.io.threads=8
     socket.send.buffer.bytes=102400
@@ -132,7 +132,7 @@ data:
     
     # Metrics
     metric.reporters=io.confluent.metrics.reporter.ConfluentMetricsReporter
-    confluent.metrics.reporter.bootstrap.servers=kafka:9092
+    confluent.metrics.reporter.bootstrap.servers=bytewax:9092
     confluent.metrics.reporter.topic.replicas=3
     confluent.metrics.enable=true
 

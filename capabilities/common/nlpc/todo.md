@@ -138,7 +138,7 @@ This comprehensive plan implements the NLPC capability following APG standards w
 ### Task 5.1: Stream Processing Architecture *(8 hours)*
 **Status**: Pending
 **Acceptance Criteria**:
-- Apache Kafka integration for text streams
+- Bytewax integration for text streams
 - Real-time NLP pipeline processing
 - Sliding window analysis for continuous text
 - Event-driven processing with APG composition

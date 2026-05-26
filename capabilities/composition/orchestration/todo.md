@@ -101,7 +101,7 @@ This document defines the comprehensive development plan for the APG Workflow Or
 - [ ] Implement REST/GraphQL API connectors
 - [ ] Create database adapters (PostgreSQL, MongoDB)
 - [ ] Build cloud service integrations (AWS, Azure, GCP)
-- [ ] Add message queue connectors (Kafka, RabbitMQ)
+- [ ] Add message queue connectors (Bytewax, RabbitMQ)
 - [ ] Implement file system and FTP connectors
 
 #### Task 4.3: Connector Framework

@@ -215,7 +215,7 @@ The APG Audit Logging capability implements 10 breakthrough improvements that fu
 - **NLP Engine**: Deep integration with APG NLP service for natural language processing
 - **Graph Analytics**: NetworkX and PyTorch Geometric for graph neural networks
 - **Time Series Analysis**: Prophet, ARIMA, and ensemble methods for predictive analytics
-- **Real-time Processing**: Apache Kafka and Redis for high-throughput event processing
+- **Real-time Processing**: Bytewax and Redis for high-throughput event processing
 
 ### APG Integration Points
 - **NLP Service**: Natural language understanding and generation

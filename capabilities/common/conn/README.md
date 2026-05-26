@@ -323,13 +323,13 @@ salesforce_connection = await connection_manager.create_connection({
 ### 3. Real-time Streaming
 
 ```python
-# Stream data from Kafka to analytics database
-kafka_connection = await connection_manager.create_connection({
+# Stream data from Bytewax to analytics database
+bytewax_connection = await connection_manager.create_connection({
     "name": "Event Stream",
     "connection_type": "stream",
-    "singer_tap": "tap-kafka",
+    "singer_tap": "tap-bytewax",
     "tap_config": {
-        "bootstrap_servers": "kafka.company.com:9092",
+        "flow_id": "bytewax.company.com:9092",
         "topic": "user_events",
         "group_id": "analytics_consumer"
     }

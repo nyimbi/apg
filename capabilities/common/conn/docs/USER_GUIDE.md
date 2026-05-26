@@ -117,7 +117,7 @@ The main dashboard provides an overview of your data integration platform:
 | **Database** | SQL databases | tap-postgres, tap-mysql, tap-mssql |
 | **API** | REST/GraphQL APIs | tap-salesforce, tap-hubspot, tap-stripe |
 | **File** | CSV, JSON, Parquet | tap-csv, tap-s3-csv, tap-google-sheets |
-| **Stream** | Real-time streams | tap-kafka, tap-kinesis |
+| **Stream** | Real-time streams | tap-bytewax, tap-kinesis |
 
 ### 3. Visual Flow Designer
 

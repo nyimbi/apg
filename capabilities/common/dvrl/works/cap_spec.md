@@ -289,7 +289,7 @@ class DVRLCapability(APGCapability):
 **File Systems:**
 - HDFS, S3, Azure Blob, Google Cloud Storage
 - Local file systems with various formats
-- Streaming platforms (Kafka, Kinesis, Pulsar)
+- Streaming platforms (Bytewax, Kinesis, Pulsar)
 
 **APIs and Services:**
 - REST APIs with automatic schema discovery

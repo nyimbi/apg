@@ -139,7 +139,7 @@
 - [ ] Create NoSQL adapters (MongoDB, Cassandra, etc.)
 - [ ] Build file system adapters (S3, HDFS, etc.)
 - [ ] Add API adapters (REST, GraphQL, etc.)
-- [ ] Implement streaming adapters (Kafka, Kinesis, etc.)
+- [ ] Implement streaming adapters (Bytewax, Kinesis, etc.)
 
 **Acceptance Criteria:**
 - ✅ Connect to major SQL databases

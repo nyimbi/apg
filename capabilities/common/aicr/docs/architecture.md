@@ -203,7 +203,7 @@ class AICoreService:
 │   (PostgreSQL)  │   (S3/MinIO)    │   (InfluxDB)           │
 ├─────────────────┼─────────────────┼─────────────────────────┤
 │   Cache Layer   │   Search Index  │   Event Stream          │
-│   (Redis)       │   (Elasticsearch)│  (Kafka/RabbitMQ)      │
+│   (Redis)       │   (Elasticsearch)│  (Bytewax/RabbitMQ)      │
 ├─────────────────┼─────────────────┼─────────────────────────┤
 │              Data Processing Pipeline                       │
 └─────────────────┴─────────────────┴─────────────────────────┘

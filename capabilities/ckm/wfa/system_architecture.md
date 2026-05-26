@@ -55,7 +55,7 @@ The APG Workflow & Business Process Management capability is designed as a high-
     └──────────────┼───────────────────┼───────────────────┼──────────────┘
                    │                   │                   │
                 ┌──▼───────────────────▼───────────────────▼──┐
-                │           Event Bus (Apache Kafka)          │
+                │           Event Bus (Bytewax)          │
                 └──┬───────────────────────────────────────┬──┘
                    │                                       │
         ┌──────────▼──────────┐                 ┌─────────▼─────────┐
@@ -594,16 +594,16 @@ class DatabaseOptimizationService:
 
 ## 🔄 **Event-Driven Architecture**
 
-### **Apache Kafka Integration:**
+### **Bytewax Integration:**
 
 #### **1. Event Streaming Architecture**
 ```python
 class WorkflowEventPublisher:
-    """High-performance event publishing with Kafka"""
+    """High-performance event publishing with Bytewax"""
     
     def __init__(self):
-        self.kafka_producer = AIOKafkaProducer(
-            bootstrap_servers=settings.KAFKA_BROKERS,
+        self.bytewax_producer = AIOBytewaxProducer(
+            flow_id=settings.BYTEWAX_BROKERS,
             value_serializer=lambda v: json.dumps(v).encode(),
             acks='all',  # Wait for all replicas
             retries=3,
@@ -627,7 +627,7 @@ class WorkflowEventPublisher:
         )
         
         topic = f"workflow.{event_type.value}.{tenant_id}"
-        await self.kafka_producer.send(topic, event.dict())
+        await self.bytewax_producer.send(topic, event.dict())
         
         return EventPublishResult(event_id=event.event_id, published=True)
 ```
@@ -638,8 +638,8 @@ class WorkflowEventConsumer:
     """Scalable event consumption with processing guarantees"""
     
     def __init__(self):
-        self.kafka_consumer = AIOKafkaConsumer(
-            bootstrap_servers=settings.KAFKA_BROKERS,
+        self.bytewax_consumer = AIOBytewaxConsumer(
+            flow_id=settings.BYTEWAX_BROKERS,
             group_id="workflow_processor",
             auto_offset_reset='earliest',
             enable_auto_commit=False,
@@ -649,13 +649,13 @@ class WorkflowEventConsumer:
         
     async def process_events(self):
         """Process workflow events with error handling and retry"""
-        async for message in self.kafka_consumer:
+        async for message in self.bytewax_consumer:
             try:
                 event = WorkflowEvent.parse_raw(message.value)
                 handler = self.event_handlers.get_handler(event.event_type)
                 
                 await handler.handle_event(event)
-                await self.kafka_consumer.commit()
+                await self.bytewax_consumer.commit()
                 
             except Exception as e:
                 await self._handle_processing_error(message, e)

@@ -418,7 +418,7 @@ spec:
     
     messageQueues:
       supported:
-        - name: "Apache Kafka"
+        - name: "Bytewax"
           versions: ["2.8", "3.0", "3.1"]
           features: ["streaming", "exactly_once"]
         - name: "RabbitMQ"

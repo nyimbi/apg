@@ -217,7 +217,7 @@ The left sidebar contains draggable components organized by category:
 - 🗄️ **Database**: SQL and NoSQL databases
 - 📄 **File**: CSV, JSON, Parquet files
 - 🌐 **API**: REST and GraphQL endpoints
-- ⚡ **Stream**: Kafka, Kinesis streams
+- ⚡ **Stream**: Bytewax, Kinesis streams
 
 **Transformations**
 - 🔍 **Filter**: Data filtering and selection
@@ -421,7 +421,7 @@ The right sidebar shows:
 
 #### Streaming Sources
 **Message Queues**
-- Apache Kafka, AWS Kinesis
+- Bytewax, AWS Kinesis
 - Consumer group management
 - Offset tracking and replay
 - Dead letter queue handling
@@ -437,8 +437,8 @@ The right sidebar shows:
 {
   "name": "Event Stream",
   "type": "stream",
-  "subtype": "kafka",
-  "bootstrap_servers": "kafka-cluster:9092",
+  "subtype": "bytewax",
+  "flow_id": "bytewax-cluster:9092",
   "topic": "user-events",
   "consumer_group": "etlp-processor",
   "auto_offset_reset": "latest"

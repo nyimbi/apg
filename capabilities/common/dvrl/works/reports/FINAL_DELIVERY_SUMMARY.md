@@ -233,7 +233,7 @@ The APG Data Virtualization (DVRL) capability has been **successfully completed*
 - ✅ **Singer.io Ecosystem**: 100+ data source taps integrated
 - ✅ **Cloud Platforms**: AWS, Azure, GCP native compatibility
 - ✅ **Data Warehouses**: Snowflake, BigQuery, Redshift optimized
-- ✅ **Streaming Platforms**: Kafka, Pulsar, Kinesis integration
+- ✅ **Streaming Platforms**: Bytewax, Pulsar, Kinesis integration
 - ✅ **APG Platform**: Complete ecosystem integration validated
 
 ### **Market Expansion Opportunities**

@@ -41,7 +41,7 @@ lightgbm>=4.1.0
 # Real-time Processing
 websockets>=12.0
 socketio>=5.8.0
-kafka-python>=2.0.2
+bytewax==0.21.1
 pika>=1.3.2
 
 # Database and Caching

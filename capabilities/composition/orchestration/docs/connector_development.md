@@ -847,7 +847,7 @@ class StreamingConnector(BaseConnector):
 			display_name="Streaming Data Connector",
 			description="Process streaming data in real-time",
 			category="messaging",
-			tags=["streaming", "realtime", "kafka", "rabbitmq", "redis"],
+			tags=["streaming", "realtime", "bytewax", "rabbitmq", "redis"],
 			supported_operations=["consume", "produce", "stream_process"],
 			author="APG Development Team",
 			version="1.0.0"

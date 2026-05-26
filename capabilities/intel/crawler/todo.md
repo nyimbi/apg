@@ -225,7 +225,7 @@ This development plan follows the APG methodology with 10 comprehensive phases d
 #### 5.1 Real-Time Streaming Architecture
 - **Deliverable:** High-performance data streaming system
 - **Time Estimate:** 5 days
-- **Dependencies:** Apache Kafka, WebSocket infrastructure
+- **Dependencies:** Bytewax, WebSocket infrastructure
 - **Acceptance Criteria:**
   - [ ] Sub-second latency for data streaming
   - [ ] Scalable streaming architecture with partitioning

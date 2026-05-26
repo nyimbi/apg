@@ -187,8 +187,8 @@ APG Platform environment variables
 {{- if .Values.global.apgPlatform.eventBus.enabled }}
 - name: EVENT_BUS_ENABLED
   value: "true"
-- name: KAFKA_BROKERS
-  value: {{ .Values.global.apgPlatform.eventBus.kafka.brokers }}
+- name: BYTEWAX_BROKERS
+  value: {{ .Values.global.apgPlatform.eventBus.bytewax.brokers }}
 {{- end }}
 {{- end }}
 {{- end }}

@@ -133,7 +133,7 @@ After comprehensive analysis of the competitive landscape, we've identified fund
 - **🗄️ PostgreSQL** with optimized schema, full-text search, and multi-tenant architecture
 - **🤖 Playwright** integration for JavaScript-heavy sites and browser automation
 - **🔒 CloudScraper** priority stealth with intelligent protection detection and bypass
-- **📊 Apache Kafka** for real-time data streaming and distributed event processing
+- **📊 Bytewax** for real-time data streaming and distributed event processing
 
 ### Core Crawler Processing Engine
 

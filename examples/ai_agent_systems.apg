@@ -248,7 +248,7 @@ agent SystemMonitor {
     
     @monitoring_capabilities: {
         real_time_analysis: {
-            streaming_data_processing: apache_kafka + apache_storm + real_time_analytics;
+            streaming_data_processing: bytewax + apache_storm + real_time_analytics;
             anomaly_detection: statistical_methods + machine_learning + deep_learning;
             pattern_recognition: seasonal_patterns + trend_analysis + correlation_detection;
             threshold_monitoring: static_thresholds + dynamic_thresholds + adaptive_baselines;

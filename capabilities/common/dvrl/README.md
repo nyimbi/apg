@@ -33,7 +33,7 @@ The APG Data Virtualization (DVRL) capability is a **world-class, AI-native data
 - Traditional databases (PostgreSQL, MySQL, MongoDB, etc.)
 - Modern SaaS platforms (Salesforce, Stripe, HubSpot, GitHub)
 - Cloud data warehouses (Snowflake, BigQuery, Redshift)
-- Streaming platforms (Kafka, Pulsar, Kinesis)
+- Streaming platforms (Bytewax, Pulsar, Kinesis)
 - File systems and object storage (S3, HDFS, GCS)
 
 ### ⚡ Real-time Streaming Federation

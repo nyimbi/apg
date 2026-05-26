@@ -56,7 +56,7 @@ The **Advanced Analytics Platform** capability has been successfully implemented
 ### **Real-Time Data Processing & Stream Analytics**
 - High-velocity data ingestion (millions of events per second)
 - Sub-second analytics processing with complex event processing
-- Real-time streaming with Apache Kafka and Flink integration
+- Real-time streaming with Bytewax and Flink integration
 - Edge analytics for reduced latency
 
 ### **Advanced Machine Learning & AI Platform**
@@ -145,7 +145,7 @@ This will build upon the analytics platform to provide specialized business inte
 
 - **Architecture:** Microservices-based with event-driven communication
 - **Technology Stack:** FastAPI, Pydantic v2, PostgreSQL, Redis, async/await
-- **Data Processing:** Apache Spark, Kafka, Flink integration ready
+- **Data Processing:** Apache Spark, Bytewax, Flink integration ready
 - **ML Framework:** Multi-framework support (TensorFlow, PyTorch, scikit-learn)
 - **Security:** Enterprise-grade with role-based access control
 - **Monitoring:** Comprehensive logging and real-time metrics

@@ -307,7 +307,7 @@ This comprehensive analysis examines the computer vision industry landscape to i
 - Event sourcing for audit trails
 - CQRS (Command Query Responsibility Segregation)
 - Message queues for reliability
-- Event streaming with Apache Kafka
+- Event streaming with Bytewax
 
 #### Microservices Integration:
 - Service mesh for communication
@@ -433,7 +433,7 @@ This comprehensive analysis examines the computer vision industry landscape to i
 
 #### Data Architecture:
 - **Multi-Modal Storage**: Images, video, documents, metadata
-- **Real-time Streaming**: Apache Kafka for event processing
+- **Real-time Streaming**: Bytewax for event processing
 - **Data Lake**: Centralized repository for training data
 - **Feature Store**: Reusable feature engineering pipeline
 - **Model Registry**: Versioned model storage and deployment

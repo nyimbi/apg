@@ -90,7 +90,7 @@ The Natural Language Processing Core (NLPC) capability provides comprehensive te
 ### 9. **Streaming NLP Processing**
 **Problem Solved**: Batch processing creates delays for real-time applications
 **Our Solution**: Stream processing architecture handling millions of texts per second
-**Implementation**: Apache Kafka integration with sliding window analysis and incremental model updates
+**Implementation**: Bytewax integration with sliding window analysis and incremental model updates
 **Business Impact**: Real-time insights for chat applications, social media monitoring, live document analysis
 
 ### 10. **Self-Optimizing Performance**
@@ -289,7 +289,7 @@ POST /api/v1/nlp/train
 ### Async Processing Architecture
 - Celery-based task queue for heavy NLP operations
 - Redis for fast caching and session management
-- Apache Kafka for streaming text processing
+- Bytewax for streaming text processing
 - Event-driven architecture with APG composition engine
 
 ### Job Management
