@@ -1320,3 +1320,23 @@ Current broader CVSN contextual-intelligence findings:
 - Trend insight generation no longer depends on placeholder behavior or initialized ML models for basic contextual output.
 - The focused test file stubs optional ML packages so the deterministic business logic remains verifiable in minimal/offline environments.
 - Remaining warnings during focused pytest are pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+
+### 2026-05-26 17:16 EAT
+
+Completed checkpoint:
+
+- Started the broader Kafka-to-Bytewax migration after the AICR correction commit.
+- Replaced the central configuration realtime sync manager's hard `aiokafka` dependency with a dependency-light `BytewaxDataflowBridge`.
+- Converted central config sync publishing, subscription, status reporting, and factory wiring from Kafka broker terminology to Bytewax stream/dataflow terminology.
+- Kept the change executable offline without adding a new dependency, while preserving the existing Redis, MQTT, and WebSocket sync surfaces.
+
+Verification:
+
+- `rg -n "Kafka|KAFKA|kafka|aiokafka|AIOKafka|kafka_bootstrap" capabilities/composition/config/realtime_sync.py capabilities/composition/config/service.py` -> no matches
+- `.venv/bin/python -m py_compile capabilities/composition/config/realtime_sync.py`
+- `.venv/bin/python -m py_compile capabilities/composition/config/service.py` remains blocked by pre-existing generated syntax errors in `set_config`/`get_config` control flow, so this slice did not claim full service module compilation.
+
+Current broader Bytewax migration findings:
+
+- The central config realtime sync manager no longer imports Kafka clients or exposes Kafka broker configuration.
+- More runtime Kafka surfaces remain in composition events/orchestration, DVRL, META, MQEB, and generated docs/examples; these should be migrated in follow-on focused commits.

@@ -26,7 +26,6 @@ from websockets.exceptions import ConnectionClosed, WebSocketException
 
 # Message queuing and event streaming
 import redis.asyncio as redis
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 import asyncio_mqtt
 
 # APG integrations
@@ -34,6 +33,65 @@ from ..common.real_time_collaboration.websocket_manager import websocket_manager
 from .error_handling import ErrorHandler, ErrorCategory, ErrorSeverity, with_error_handling
 
 logger = logging.getLogger(__name__)
+
+
+async def _maybe_await(result: Any) -> Any:
+	"""Await callback results only when the callback is asynchronous."""
+	if asyncio.iscoroutine(result):
+		return await result
+	return result
+
+
+@dataclass
+class BytewaxStreamRecord:
+	"""In-process Bytewax-style stream item used by offline/runtime-light sync."""
+	stream: str
+	key: Optional[str]
+	value: Dict[str, Any]
+	sequence: int
+	emitted_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class BytewaxDataflowBridge:
+	"""Dependency-light bridge that models Bytewax dataflow emit/subscribe behavior."""
+
+	def __init__(self, stream_names: List[str]):
+		self.streams: Dict[str, List[BytewaxStreamRecord]] = {
+			stream_name: [] for stream_name in stream_names
+		}
+		self.subscribers: Dict[str, List[Callable[[BytewaxStreamRecord], Any]]] = {
+			stream_name: [] for stream_name in stream_names
+		}
+		self.active = False
+
+	async def start(self) -> None:
+		self.active = True
+
+	async def emit(self, stream: str, key: Optional[str], value: Dict[str, Any]) -> BytewaxStreamRecord:
+		self.streams.setdefault(stream, [])
+		self.subscribers.setdefault(stream, [])
+		record = BytewaxStreamRecord(
+			stream=stream,
+			key=key,
+			value=value,
+			sequence=len(self.streams[stream])
+		)
+		self.streams[stream].append(record)
+
+		if self.active:
+			for subscriber in self.subscribers.get(stream, []):
+				await _maybe_await(subscriber(record))
+
+		return record
+
+	async def subscribe(self, stream: str, callback: Callable[[BytewaxStreamRecord], Any]) -> None:
+		self.streams.setdefault(stream, [])
+		self.subscribers.setdefault(stream, []).append(callback)
+		for record in self.streams[stream]:
+			await _maybe_await(callback(record))
+
+	async def stop(self) -> None:
+		self.active = False
 
 class SyncEventType(Enum):
 	"""Types of synchronization events."""
@@ -114,13 +172,13 @@ class RealtimeSyncManager:
 	def __init__(
 		self,
 		redis_client: redis.Redis,
-		kafka_bootstrap_servers: Optional[List[str]] = None,
+		bytewax_stream_names: Optional[List[str]] = None,
 		mqtt_broker_host: Optional[str] = None,
 		mqtt_broker_port: int = 1883,
 		node_id: Optional[str] = None
 	):
 		self.redis_client = redis_client
-		self.kafka_bootstrap_servers = kafka_bootstrap_servers or ["localhost:9092"]
+		self.bytewax_stream_names = bytewax_stream_names or ["apg_config_sync", "apg_config_conflicts"]
 		self.mqtt_broker_host = mqtt_broker_host or "localhost"
 		self.mqtt_broker_port = mqtt_broker_port
 		self.node_id = node_id or f"node_{uuid7str()[:8]}"
@@ -146,8 +204,7 @@ class RealtimeSyncManager:
 		self.event_handlers: Dict[SyncEventType, List[Callable]] = {}
 		
 		# Message queuing
-		self.kafka_producer: Optional[AIOKafkaProducer] = None
-		self.kafka_consumer: Optional[AIOKafkaConsumer] = None
+		self.bytewax_dataflow: Optional[BytewaxDataflowBridge] = None
 		self.mqtt_client: Optional[asyncio_mqtt.Client] = None
 		
 		# Initialize event handlers
@@ -169,9 +226,9 @@ class RealtimeSyncManager:
 	async def initialize(self):
 		"""Initialize all synchronization components."""
 		try:
-			# Initialize Kafka producer/consumer
-			if self.kafka_bootstrap_servers:
-				await self._initialize_kafka()
+			# Initialize Bytewax dataflow bridge
+			if self.bytewax_stream_names:
+				await self._initialize_bytewax()
 			
 			# Initialize MQTT client
 			if self.mqtt_broker_host:
@@ -191,40 +248,18 @@ class RealtimeSyncManager:
 			)
 			raise
 	
-	async def _initialize_kafka(self):
-		"""Initialize Kafka producer and consumer."""
+	async def _initialize_bytewax(self):
+		"""Initialize Bytewax-style dataflow streams."""
 		try:
-			self.kafka_producer = AIOKafkaProducer(
-				bootstrap_servers=self.kafka_bootstrap_servers,
-				value_serializer=lambda x: json.dumps(x).encode('utf-8'),
-				key_serializer=lambda x: x.encode('utf-8') if x else None,
-				compression_type="gzip",
-				max_request_size=10485760,  # 10MB
-				request_timeout_ms=30000,
-				retry_backoff_ms=1000,
-				retries=3
-			)
-			await self.kafka_producer.start()
-			
-			self.kafka_consumer = AIOKafkaConsumer(
-				"apg_config_sync",
-				"apg_config_conflicts",
-				bootstrap_servers=self.kafka_bootstrap_servers,
-				group_id=f"sync_group_{self.node_id}",
-				value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-				auto_offset_reset='latest',
-				enable_auto_commit=True,
-				auto_commit_interval_ms=1000
-			)
-			await self.kafka_consumer.start()
-			
-			# Start consumer task
-			asyncio.create_task(self._kafka_message_handler())
+			self.bytewax_dataflow = BytewaxDataflowBridge(self.bytewax_stream_names)
+			await self.bytewax_dataflow.start()
+			await self.bytewax_dataflow.subscribe("apg_config_sync", self._bytewax_record_handler)
+			await self.bytewax_dataflow.subscribe("apg_config_conflicts", self._bytewax_record_handler)
 			
 		except Exception as e:
 			await self.error_handler.handle_error(
 				e, ErrorCategory.EXTERNAL_SERVICE_ERROR, ErrorSeverity.HIGH,
-				"initialize_kafka", {"bootstrap_servers": self.kafka_bootstrap_servers}
+				"initialize_bytewax", {"stream_names": self.bytewax_stream_names}
 			)
 			raise
 	
@@ -299,9 +334,9 @@ class RealtimeSyncManager:
 				})
 			)
 			
-			# Publish to Kafka for cross-region sync
-			if self.kafka_producer:
-				await self.kafka_producer.send(
+			# Publish to Bytewax-style dataflow for cross-region sync
+			if self.bytewax_dataflow:
+				await self.bytewax_dataflow.emit(
 					"apg_config_sync",
 					key=event.config_key or event.event_id,
 					value={
@@ -759,42 +794,34 @@ class RealtimeSyncManager:
 		# This would send current configuration state to new connections
 		pass
 	
-	async def _kafka_message_handler(self):
-		"""Handle incoming Kafka messages."""
-		if not self.kafka_consumer:
+	async def _bytewax_record_handler(self, record: BytewaxStreamRecord):
+		"""Handle incoming Bytewax-style stream records."""
+		if not self.bytewax_dataflow:
 			return
 		
 		try:
-			async for message in self.kafka_consumer:
-				try:
-					event_data = message.value
-					event = SyncEvent(
-						event_id=event_data.get("event_id"),
-						event_type=SyncEventType(event_data.get("event_type")),
-						timestamp=datetime.fromisoformat(event_data.get("timestamp")),
-						source_node=event_data.get("source_node"),
-						tenant_id=event_data.get("tenant_id"),
-						config_key=event_data.get("config_key"),
-						old_value=event_data.get("old_value"),
-						new_value=event_data.get("new_value"),
-						version=event_data.get("version", 1),
-						metadata=event_data.get("metadata", {})
-					)
-					
-					# Skip events from our own node to avoid loops
-					if event.source_node != self.node_id:
-						await self._process_remote_sync_event(event)
-				
-				except Exception as e:
-					await self.error_handler.handle_error(
-						e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.MEDIUM,
-						"kafka_message_processing", {"message": str(message)}
-					)
+			event_data = record.value
+			event = SyncEvent(
+				event_id=event_data.get("event_id"),
+				event_type=SyncEventType(event_data.get("event_type")),
+				timestamp=datetime.fromisoformat(event_data.get("timestamp")),
+				source_node=event_data.get("source_node"),
+				tenant_id=event_data.get("tenant_id"),
+				config_key=event_data.get("config_key"),
+				old_value=event_data.get("old_value"),
+				new_value=event_data.get("new_value"),
+				version=event_data.get("version", 1),
+				metadata=event_data.get("metadata", {})
+			)
+
+			# Skip events from our own node to avoid loops
+			if event.source_node != self.node_id:
+				await self._process_remote_sync_event(event)
 		
 		except Exception as e:
 			await self.error_handler.handle_error(
-				e, ErrorCategory.EXTERNAL_SERVICE_ERROR, ErrorSeverity.HIGH,
-				"kafka_message_handler", {}
+				e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.MEDIUM,
+				"bytewax_record_processing", {"stream": record.stream, "sequence": record.sequence}
 			)
 	
 	async def _mqtt_message_handler(self):
@@ -839,11 +866,9 @@ class RealtimeSyncManager:
 	
 	async def close(self):
 		"""Clean up resources."""
-		# Close Kafka connections
-		if self.kafka_producer:
-			await self.kafka_producer.stop()
-		if self.kafka_consumer:
-			await self.kafka_consumer.stop()
+		# Close Bytewax dataflow bridge
+		if self.bytewax_dataflow:
+			await self.bytewax_dataflow.stop()
 		
 		# Close MQTT connection
 		if self.mqtt_client:
@@ -858,14 +883,14 @@ class RealtimeSyncManager:
 # Factory functions
 async def create_realtime_sync_manager(
 	redis_client: redis.Redis,
-	kafka_bootstrap_servers: Optional[List[str]] = None,
+	bytewax_stream_names: Optional[List[str]] = None,
 	mqtt_broker_host: Optional[str] = None,
 	node_id: Optional[str] = None
 ) -> RealtimeSyncManager:
 	"""Create and initialize real-time synchronization manager."""
 	manager = RealtimeSyncManager(
 		redis_client=redis_client,
-		kafka_bootstrap_servers=kafka_bootstrap_servers,
+		bytewax_stream_names=bytewax_stream_names,
 		mqtt_broker_host=mqtt_broker_host,
 		node_id=node_id
 	)

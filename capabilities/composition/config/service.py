@@ -178,7 +178,7 @@ class CentralConfigurationService:
         etcd_client: Optional[etcd3.Etcd3Client] = None,
         vault_client: Optional[hvac.Client] = None,
         encryption_key: Optional[str] = None,
-        kafka_bootstrap_servers: Optional[List[str]] = None,
+        bytewax_stream_names: Optional[List[str]] = None,
         mqtt_broker_host: Optional[str] = None,
         enable_realtime_sync: bool = True
     ):
@@ -230,7 +230,7 @@ class CentralConfigurationService:
         # Real-time synchronization
         self.enable_realtime_sync = enable_realtime_sync
         self.sync_manager: Optional[RealtimeSyncManager] = None
-        self.kafka_bootstrap_servers = kafka_bootstrap_servers
+        self.bytewax_stream_names = bytewax_stream_names
         self.mqtt_broker_host = mqtt_broker_host
         
         # Initialize sync manager if enabled
@@ -242,7 +242,7 @@ class CentralConfigurationService:
         try:
             self.sync_manager = await create_realtime_sync_manager(
                 redis_client=self.redis_client,
-                kafka_bootstrap_servers=self.kafka_bootstrap_servers,
+                bytewax_stream_names=self.bytewax_stream_names,
                 mqtt_broker_host=self.mqtt_broker_host
             )
             logger.info("Real-time synchronization manager initialized")
@@ -640,7 +640,7 @@ class CentralConfigurationService:
             "node_id": self.sync_manager.node_id,
             "active_connections": len(self.sync_manager.websocket_connections),
             "active_locks": len(self.sync_manager.active_locks),
-            "kafka_enabled": self.sync_manager.kafka_producer is not None,
+            "bytewax_enabled": self.sync_manager.bytewax_dataflow is not None,
             "mqtt_enabled": self.sync_manager.mqtt_client is not None,
             "last_heartbeat": datetime.now(timezone.utc).isoformat()
         }
