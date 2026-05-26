@@ -519,7 +519,7 @@ def register_apg_integration(apg_registry):
 			'bytewax_flow_id': {
 				'type': 'string',
 				'required': True,
-				'description': 'Bytewax broker connection string'
+				'description': 'Bytewax dataflow identifier'
 			},
 			'redis_url': {
 				'type': 'string',

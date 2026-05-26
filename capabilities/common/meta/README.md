@@ -258,7 +258,7 @@ asyncio.run(initialize_capability())
 | **REST APIs** | ✅ Production | OpenAPI/Swagger parsing, endpoint discovery |
 | **GraphQL** | ✅ Production | Schema introspection, type analysis |
 | **Bytewax** | ✅ Production | Topic discovery, message sampling |
-| **Confluent Cloud** | 📋 Planned | Schema registry integration |
+| **Bytewax** | 📋 Planned | Dataflow and stream-processing integration |
 
 ### ML Platforms
 | Data Source | Status | Features |

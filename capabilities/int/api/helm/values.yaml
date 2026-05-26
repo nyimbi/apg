@@ -19,7 +19,9 @@ global:
     eventBus:
       enabled: true
       bytewax:
-        brokers: "bytewax.apg-platform:9092"
+        flowId: "apg.integration.api"
+        workersPerProcess: "2"
+        recoveryDir: "/var/lib/apg/bytewax-recovery"
 
 # Application configuration
 app:

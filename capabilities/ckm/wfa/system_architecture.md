@@ -599,15 +599,13 @@ class DatabaseOptimizationService:
 #### **1. Event Streaming Architecture**
 ```python
 class WorkflowEventPublisher:
-    """High-performance event publishing with Bytewax"""
+    """High-performance event publishing through a Bytewax dataflow"""
     
     def __init__(self):
-        self.bytewax_producer = AIOBytewaxProducer(
-            flow_id=settings.BYTEWAX_BROKERS,
-            value_serializer=lambda v: json.dumps(v).encode(),
-            acks='all',  # Wait for all replicas
-            retries=3,
-            enable_idempotence=True
+        self.bytewax_flow = BytewaxWorkflowFlow(
+            flow_id=settings.BYTEWAX_FLOW_ID,
+            recovery_dir=settings.BYTEWAX_RECOVERY_DIR,
+            workers_per_process=settings.BYTEWAX_WORKERS_PER_PROCESS
         )
         
     async def publish_process_event(
@@ -626,8 +624,8 @@ class WorkflowEventPublisher:
             source_service="workflow_engine"
         )
         
-        topic = f"workflow.{event_type.value}.{tenant_id}"
-        await self.bytewax_producer.send(topic, event.dict())
+        stream = f"workflow.{event_type.value}.{tenant_id}"
+        await self.bytewax_flow.emit(stream, event.dict())
         
         return EventPublishResult(event_id=event.event_id, published=True)
 ```
@@ -635,34 +633,32 @@ class WorkflowEventPublisher:
 #### **2. Event Consumer Architecture**
 ```python
 class WorkflowEventConsumer:
-    """Scalable event consumption with processing guarantees"""
+    """Scalable event consumption through a Bytewax dataflow"""
     
     def __init__(self):
-        self.bytewax_consumer = AIOBytewaxConsumer(
-            flow_id=settings.BYTEWAX_BROKERS,
-            group_id="workflow_processor",
-            auto_offset_reset='earliest',
-            enable_auto_commit=False,
-            max_poll_records=100
+        self.bytewax_flow = BytewaxWorkflowFlow(
+            flow_id=settings.BYTEWAX_FLOW_ID,
+            recovery_dir=settings.BYTEWAX_RECOVERY_DIR,
+            workers_per_process=settings.BYTEWAX_WORKERS_PER_PROCESS
         )
         self.event_handlers = EventHandlerRegistry()
         
     async def process_events(self):
         """Process workflow events with error handling and retry"""
-        async for message in self.bytewax_consumer:
+        async for message in self.bytewax_flow.read("workflow.*"):
             try:
                 event = WorkflowEvent.parse_raw(message.value)
                 handler = self.event_handlers.get_handler(event.event_type)
                 
                 await handler.handle_event(event)
-                await self.bytewax_consumer.commit()
+                await self.bytewax_flow.ack(message)
                 
             except Exception as e:
                 await self._handle_processing_error(message, e)
                 
     async def _handle_processing_error(
         self,
-        message: ConsumerRecord,
+        message: WorkflowStreamRecord,
         error: Exception
     ):
         """Handle event processing errors with dead letter queue"""

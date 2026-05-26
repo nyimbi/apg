@@ -205,7 +205,7 @@ The APG Data Virtualization (DVRL) capability represents a **revolutionary advan
 #### **Data Platform Partners**
 - **Snowflake**: Native connector and joint solutions
 - **Databricks**: Lakehouse integration and AI/ML workflows
-- **Confluent**: Real-time streaming data integration
+- **Bytewax**: Real-time dataflow and stream-processing integration
 - **Benefits**: Ecosystem integration, technical validation, customer access
 
 ### Tier 2: System Integrator Partnerships

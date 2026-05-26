@@ -303,8 +303,8 @@ integration = APGEventStreamingIntegration(
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   Apache     │  │    Redis     │  │ PostgreSQL   │  │ Monitoring   │     │
-│  │   Bytewax      │  │   Streams    │  │  Database    │  │ & Metrics    │     │
+│  │   Bytewax    │  │    Redis     │  │ PostgreSQL   │  │ Monitoring   │     │
+│  │  Dataflows   │  │   Streams    │  │  Database    │  │ & Metrics    │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -314,7 +314,7 @@ integration = APGEventStreamingIntegration(
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │  Producer   │───▶│   Schema    │───▶│   Bytewax     │───▶│  Stream     │
-│ Application │    │ Validation  │    │   Broker    │    │ Processor   │
+│ Application │    │ Validation  │    │  Dataflow   │    │ Processor   │
 └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
        │                  │                  │                  │
        ▼                  ▼                  ▼                  ▼
@@ -555,10 +555,10 @@ spec:
 ### Production Considerations
 
 - **Resource Planning**: Plan for 2-4 CPU cores and 4-8GB RAM per instance
-- **Storage**: Use SSD storage for Bytewax brokers and database
+- **Storage**: Use SSD storage for Bytewax recovery state, stream snapshots, and database
 - **Networking**: Configure proper network segmentation and security groups
 - **Monitoring**: Set up comprehensive monitoring and alerting
-- **Backup**: Implement regular backups of PostgreSQL and Bytewax topics
+- **Backup**: Implement regular backups of PostgreSQL and Bytewax recovery directories
 - **Security**: Use TLS for all communications and proper authentication
 
 ## Troubleshooting

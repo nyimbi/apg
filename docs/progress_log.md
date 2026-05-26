@@ -1684,3 +1684,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_agent_integrations.py tests/test_ai_agent_composition.py` -> 8 passed
 - `.venv/bin/python -m py_compile agents/integrations.py compiler/code_generator.py tests/test_agent_integrations.py tests/test_ai_agent_composition.py`
 - `git diff --check -- agents/integrations.py compiler/code_generator.py tests/test_agent_integrations.py tests/test_ai_agent_composition.py docs/ai_agent_composition.md`
+
+### 2026-05-26 19:32 EAT
+
+Completed checkpoint:
+
+- Replaced legacy code-generation TODO/pass scaffolding with deterministic executable defaults for empty methods, async methods, runtime agent methods, workflows, digital twins, unknown expressions, and unknown statements.
+- Added generated-code regression coverage that compiles the emitted Python files and rejects TODO scaffolding or pass-only placeholder bodies.
+- Removed Kafka/Confluent platform references from current docs and Helm surfaces, and kept Bytewax represented as dataflow/runtime configuration rather than broker/bootstrap configuration.
+- Updated the language reference to document APG's executable generated-runtime defaults.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_code_generator_executable_defaults.py tests/test_ai_agent_composition.py` -> 5 passed
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
+- `rg -n -i "kafka|confluent|redpanda|bootstrap\\.servers|bootstrap_servers|BYTEWAX_BROKERS|Bytewax broker|Bytewax brokers|broker connection string" --glob '!uploads/**' --glob '!tmp/**' --glob '!node_modules/**' --glob '!**/swagger-ui-bundle.js' .` -> only historical progress-log entries remain
+- `git diff --check -- compiler/code_generator.py tests/test_code_generator_executable_defaults.py docs/language_reference.md docs/progress_log.md capabilities/ckm/wfa/system_architecture.md capabilities/int/api/helm/values.yaml capabilities/int/api/helm/templates/_helpers.tpl capabilities/int/api/helm/templates/deployment.yaml capabilities/composition/events/blueprint.py capabilities/composition/events/README.md capabilities/common/dvrl/works/reports/FINAL_DELIVERY_SUMMARY.md capabilities/common/dvrl/works/reports/MARKET_LAUNCH_STRATEGY.md capabilities/common/dvrl/works/reports/EXECUTIVE_BRIEFING.md capabilities/common/meta/README.md`

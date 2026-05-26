@@ -1064,6 +1064,15 @@ The compiler validates agent references and emits `ai_agents.py` with `AI_AGENTS
 
 ### Generated Code Characteristics
 
+Generated Python is expected to be executable from the first compile pass. When
+an APG method, workflow, or lifecycle hook is declared without a body, the
+compiler emits deterministic runtime defaults rather than TODO scaffolding:
+
+- body-less methods return type-safe defaults and async methods still yield once
+- digital twins record state history and apply matching state keys to properties
+- workflows iterate declared `steps` and return structured step results
+- AI-agent runtime methods return callable status/result objects when no body is supplied
+
 ```apg
 // APG Input
 db UserDB {

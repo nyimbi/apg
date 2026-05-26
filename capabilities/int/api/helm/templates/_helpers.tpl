@@ -187,8 +187,12 @@ APG Platform environment variables
 {{- if .Values.global.apgPlatform.eventBus.enabled }}
 - name: EVENT_BUS_ENABLED
   value: "true"
-- name: BYTEWAX_BROKERS
-  value: {{ .Values.global.apgPlatform.eventBus.bytewax.brokers }}
+- name: BYTEWAX_FLOW_ID
+  value: {{ .Values.global.apgPlatform.eventBus.bytewax.flowId | quote }}
+- name: BYTEWAX_WORKERS_PER_PROCESS
+  value: {{ .Values.global.apgPlatform.eventBus.bytewax.workersPerProcess | quote }}
+- name: BYTEWAX_RECOVERY_DIR
+  value: {{ .Values.global.apgPlatform.eventBus.bytewax.recoveryDir | quote }}
 {{- end }}
 {{- end }}
 {{- end }}

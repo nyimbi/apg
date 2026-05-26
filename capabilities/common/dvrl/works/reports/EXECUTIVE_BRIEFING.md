@@ -161,7 +161,7 @@ DVRL represents a **fundamental advancement** in data virtualization technology:
 
 ### Tier 1 Technology Partners
 - **Cloud Providers**: AWS, Microsoft Azure, Google Cloud
-- **Data Platforms**: Snowflake, Databricks, Confluent
+- **Data Platforms**: Snowflake, Databricks, Bytewax
 - **Benefits**: Enterprise credibility, co-selling opportunities, technical validation
 
 ### Tier 2 Implementation Partners

@@ -239,7 +239,7 @@ The APG Data Virtualization (DVRL) capability has been **successfully completed*
 ### **Market Expansion Opportunities**
 - 🎯 **System Integrators**: Accenture, Deloitte, IBM Services partnerships
 - 🎯 **Cloud Marketplaces**: AWS, Azure, GCP marketplace listings
-- 🎯 **Technology Alliances**: Databricks, Confluent, Elastic integrations
+- 🎯 **Technology Alliances**: Databricks, Bytewax, Elastic integrations
 - 🎯 **Industry Partners**: Vertical solution development opportunities
 
 ---
