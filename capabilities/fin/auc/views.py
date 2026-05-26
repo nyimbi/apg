@@ -21,6 +21,7 @@ from .models import (
 	ACAuditLog, ACComplianceRule, ACComplianceViolation, ACDataRetentionPolicy,
 	ACComplianceReport, ACSystemConfiguration
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 
 
 class AuditComplianceBaseView(BaseView):
@@ -32,12 +33,11 @@ class AuditComplianceBaseView(BaseView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID from security context"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def _format_compliance_score(self, score: float) -> str:
 		"""Format compliance score for display"""
@@ -251,7 +251,7 @@ class ACComplianceRuleModelView(ModelView):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class ACComplianceViolationModelView(ModelView):
@@ -374,12 +374,11 @@ class ACComplianceViolationModelView(ModelView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class ACComplianceReportModelView(ModelView):
@@ -517,12 +516,11 @@ class ACComplianceReportModelView(ModelView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class AuditComplianceDashboardView(AuditComplianceBaseView):

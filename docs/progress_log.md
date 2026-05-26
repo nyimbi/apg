@@ -2165,3 +2165,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_mfg_mro_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|return str\(current_user\.id\).*is_authenticated|from flask_appbuilder.security import current_user" capabilities/mfg/mro/views.py` -> no matches
 - `git diff --check -- capabilities/mfg/mro/views.py capabilities/mfg/mro/context.py tests/test_mfg_mro_context_resolution.py` -> no issues
+
+### 2026-05-26 22:33 EAT
+
+Completed checkpoint:
+
+- Replaced Audit & Compliance view tenant and current-user placeholders with shared request-context helpers.
+- Audit & Compliance views now resolve tenant IDs from payload, Flask context/current user, tenant headers, query args, request environment, and `APG_DEFAULT_TENANT_ID` fallback.
+- Current-user resolution now supports Flask context, APG user headers, environment values, and Flask-AppBuilder security fallback.
+- Added focused regression coverage for the helper wiring and tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/auc/views.py capabilities/fin/auc/context.py tests/test_fin_auc_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_auc_context_resolution.py` -> 2 passed
+- `.venv/bin/python -m pytest -q tests/test_fin_auc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|return str\(current_user\.id\).*is_authenticated|from flask_appbuilder.security import current_user" capabilities/fin/auc/views.py` -> no matches
+- `git diff --check -- capabilities/fin/auc/views.py capabilities/fin/auc/context.py tests/test_fin_auc_context_resolution.py` -> no issues
