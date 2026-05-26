@@ -3003,3 +3003,18 @@ Verification:
 - `rg -n "api_user|In production: extract from JWT token or APG auth context|Kafka|kafka" capabilities/common/cach/api.py tests/test_common_cach_api_context.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:18 EAT
+
+Completed checkpoint:
+
+- Replaced System Health API alert/remediation fixed actor fallbacks with Flask request, context, session, APG header, query, and environment user resolution.
+- Added focused HLTH API actor-context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/hlth/api.py tests/test_common_hlth_api_context.py`
+- `.venv/bin/python -m pytest -q tests/test_common_hlth_api_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "api_user|request\.headers\.get\('X-User-ID'|Kafka|kafka" capabilities/common/hlth/api.py tests/test_common_hlth_api_context.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

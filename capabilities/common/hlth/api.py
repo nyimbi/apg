@@ -8,10 +8,11 @@ Copyright: © 2025 Datacraft
 """
 
 import asyncio
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 
-from flask import request, jsonify, Blueprint
+from flask import request, jsonify, Blueprint, g, session
 from flask_restful import Resource, Api, reqparse
 from marshmallow import Schema, fields, validate, ValidationError
 
@@ -26,6 +27,57 @@ from .service import SystemHealthService
 # Create Flask Blueprint
 health_api_bp = Blueprint('health_api', __name__, url_prefix='/api/v1/health')
 api = Api(health_api_bp)
+
+
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a non-empty stripped string or None."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: Any, keys: List[str]) -> Optional[str]:
+	"""Read the first present text value from a dict-like or object source."""
+	if source is None:
+		return None
+	for key in keys:
+		if isinstance(source, dict):
+			value = source.get(key)
+		else:
+			value = getattr(source, key, None)
+		text = _clean_text(value)
+		if text:
+			return text
+	return None
+
+
+def _first_text(*values: Any) -> str:
+	"""Return the first non-empty text value."""
+	for value in values:
+		text = _clean_text(value)
+		if text:
+			return text
+	return "system"
+
+
+def resolve_current_user_id() -> str:
+	"""Resolve current user from Flask/APG request context."""
+	current_user = getattr(request, "current_user", None)
+	g_user = getattr(g, "current_user", None) or getattr(g, "user", None) or getattr(g, "auth_user", None)
+	return _first_text(
+		_object_value(current_user, ["user_id", "id", "username", "email", "sub"]),
+		getattr(request, "current_user_id", None),
+		_object_value(g_user, ["user_id", "id", "username", "email", "sub"]),
+		getattr(g, "user_id", None),
+		session.get("user_id"),
+		request.headers.get("X-APG-User-ID"),
+		request.headers.get("X-User-ID"),
+		request.args.get("user_id"),
+		os.getenv("APG_USER_ID"),
+		os.getenv("APG_DEFAULT_USER_ID"),
+		"system",
+	)
 
 
 # Marshmallow Schemas for API Validation
@@ -341,7 +393,7 @@ class HealthAlertsResource(Resource):
 
 	def _get_current_user(self) -> str:
 		"""Get current user from request context"""
-		return request.headers.get('X-User-ID', 'api_user')
+		return resolve_current_user_id()
 
 	def _get_health_service(self) -> SystemHealthService:
 		"""Get health service instance"""
@@ -609,7 +661,7 @@ class RemediationResource(Resource):
 
 	def _get_current_user(self) -> str:
 		"""Get current user from request context"""
-		return request.headers.get('X-User-ID', 'api_user')
+		return resolve_current_user_id()
 
 	def _get_health_service(self) -> SystemHealthService:
 		"""Get health service instance"""
