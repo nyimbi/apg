@@ -5,7 +5,7 @@ This module provides comprehensive enterprise integration capabilities including
 - Active Directory/LDAP authentication integration
 - Enterprise SSO with SAML 2.0 and OAuth2/OIDC
 - API gateway integration for service mesh architectures
-- Enterprise message queue systems (RabbitMQ, Apache Kafka)
+- Enterprise stream and message systems (RabbitMQ, Bytewax)
 - Enterprise database connectors (Oracle, SQL Server, DB2)
 - Workflow automation with enterprise business process engines
 - Audit logging and compliance reporting
@@ -83,7 +83,7 @@ class AuthenticationMethod(str, Enum):
 class MessageQueueType(str, Enum):
 	"""Enterprise message queue systems."""
 	RABBITMQ = "rabbitmq"
-	APACHE_KAFKA = "apache_kafka"
+	BYTEWAX = "bytewax"
 	IBM_MQ = "ibm_mq"
 	AZURE_SERVICE_BUS = "azure_service_bus"
 	AWS_SQS = "aws_sqs"
@@ -645,7 +645,7 @@ class MessageQueueIntegration:
 		self.config = config
 		self._connection = None
 		self._channel = None
-		self._local_topics: Dict[str, List[Dict[str, Any]]] = {}
+		self._bytewax_streams: Dict[str, List[Dict[str, Any]]] = {}
 		self._local_consumers: List[Callable[[Dict[str, Any]], None]] = []
 		self.logger = logging.getLogger(f"{__name__}.MessageQueueIntegration")
 
@@ -654,8 +654,8 @@ class MessageQueueIntegration:
 		try:
 			if self.config.queue_type == MessageQueueType.RABBITMQ:
 				await self._initialize_rabbitmq()
-			elif self.config.queue_type == MessageQueueType.APACHE_KAFKA:
-				await self._initialize_kafka()
+			elif self.config.queue_type == MessageQueueType.BYTEWAX:
+				await self._initialize_bytewax()
 			else:
 				raise NotImplementedError(f"Queue type {self.config.queue_type} not implemented")
 
@@ -676,8 +676,8 @@ class MessageQueueIntegration:
 
 			if self.config.queue_type == MessageQueueType.RABBITMQ:
 				return await self._publish_rabbitmq(message_data, routing_key)
-			elif self.config.queue_type == MessageQueueType.APACHE_KAFKA:
-				return await self._publish_kafka(message_data, routing_key)
+			elif self.config.queue_type == MessageQueueType.BYTEWAX:
+				return await self._publish_bytewax(message_data, routing_key)
 
 			return False
 
@@ -690,8 +690,8 @@ class MessageQueueIntegration:
 		try:
 			if self.config.queue_type == MessageQueueType.RABBITMQ:
 				await self._consume_rabbitmq(callback)
-			elif self.config.queue_type == MessageQueueType.APACHE_KAFKA:
-				await self._consume_kafka(callback)
+			elif self.config.queue_type == MessageQueueType.BYTEWAX:
+				await self._consume_bytewax(callback)
 
 		except Exception as e:
 			self.logger.error(f"Failed to consume messages: {e}")
@@ -766,23 +766,25 @@ class MessageQueueIntegration:
 
 		await queue.consume(process_message)
 
-	async def _initialize_kafka(self) -> None:
-		"""Initialize Apache Kafka connection."""
-		self._local_topics.setdefault(self.config.routing_key or self.config.queue_name, [])
+	async def _initialize_bytewax(self) -> None:
+		"""Initialize a Bytewax-compatible local dataflow stream."""
+		stream_name = self.config.routing_key or self.config.queue_name
+		self._bytewax_streams.setdefault(stream_name, [])
 		self._connection = {
-			"type": MessageQueueType.APACHE_KAFKA.value,
+			"type": MessageQueueType.BYTEWAX.value,
 			"connection_url": self.config.connection_url,
+			"stream_name": stream_name,
 			"offline": True
 		}
 
-	async def _publish_kafka(self, message: Dict[str, Any], topic: Optional[str] = None) -> bool:
-		"""Publish message to Kafka."""
-		topic_name = topic or self.config.routing_key or self.config.queue_name
-		self._local_topics.setdefault(topic_name, []).append({
-			"topic": topic_name,
-			"offset": len(self._local_topics[topic_name]),
+	async def _publish_bytewax(self, message: Dict[str, Any], stream_name: Optional[str] = None) -> bool:
+		"""Publish an item into the local Bytewax-style dataflow stream."""
+		target_stream = stream_name or self.config.routing_key or self.config.queue_name
+		self._bytewax_streams.setdefault(target_stream, []).append({
+			"stream": target_stream,
+			"sequence": len(self._bytewax_streams[target_stream]),
 			"message": message,
-			"published_at": datetime.utcnow().isoformat()
+			"emitted_at": datetime.utcnow().isoformat()
 		})
 
 		for callback in self._local_consumers:
@@ -790,11 +792,11 @@ class MessageQueueIntegration:
 
 		return True
 
-	async def _consume_kafka(self, callback: Callable[[Dict[str, Any]], None]) -> None:
-		"""Consume messages from Kafka."""
+	async def _consume_bytewax(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+		"""Attach a consumer to the local Bytewax-style dataflow stream."""
 		self._local_consumers.append(callback)
-		topic_name = self.config.routing_key or self.config.queue_name
-		for entry in self._local_topics.get(topic_name, []):
+		stream_name = self.config.routing_key or self.config.queue_name
+		for entry in self._bytewax_streams.get(stream_name, []):
 			await _maybe_await(callback(entry["message"]))
 
 

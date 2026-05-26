@@ -1243,10 +1243,10 @@ Current broader AICR advanced-ML findings:
 Completed checkpoint:
 
 - Made AICR enterprise integration importable when optional enterprise SDKs such as `aiofiles`, `aiohttp`, `ldap3`, or `pysaml2` are not installed.
-- Replaced Apache Kafka adapter placeholders with an executable in-process topic ledger, publish path, and sync/async consumer replay path.
+- Replaced stream adapter placeholders with an executable Bytewax-style in-process stream ledger, publish path, and sync/async consumer replay path.
 - Replaced Oracle and SQL Server database placeholders with deterministic metadata-backed query execution for simple SELECT queries and configured query-result fixtures.
 - Added an offline database query log so adapter execution is inspectable in tests and diagnostics.
-- Added focused runtime tests for local Kafka publish/replay, async consumer delivery, Oracle metadata-backed filtering, and SQL Server configured query results.
+- Added focused runtime tests for local Bytewax-style stream publish/replay, async consumer delivery, Oracle metadata-backed filtering, and SQL Server configured query results.
 
 Verification:
 
@@ -1255,7 +1255,7 @@ Verification:
 
 Current broader AICR enterprise-integration findings:
 
-- Enterprise queue/database adapters now have executable offline behavior instead of no-op placeholders for Kafka, Oracle, and SQL Server.
+- Enterprise stream/database adapters now have executable offline behavior instead of no-op placeholders for Bytewax-style streams, Oracle, and SQL Server.
 - Real network integrations still need their respective optional SDKs and service endpoints, but the module no longer fails at import time in minimal/offline environments.
 - Remaining warnings during focused pytest are pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
 
@@ -1272,6 +1272,26 @@ Verification:
 
 - `.venv/bin/python -m py_compile capabilities/common/conn/transformations.py capabilities/common/conn/tests/test_transformations_runtime.py`
 - `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_transformations_runtime.py` -> 4 passed, 10 warnings
+
+### 2026-05-26 17:11 EAT
+
+Completed checkpoint:
+
+- Applied the platform correction that APG stream/dataflow integrations should use Bytewax rather than Kafka in the AICR enterprise integration slice.
+- Renamed the AICR stream queue enum, local stream ledger, initialization path, publish path, and consumer replay path from Kafka-specific names to Bytewax-specific names.
+- Updated the focused AICR enterprise integration runtime tests to exercise Bytewax stream publish/replay behavior and async consumer delivery.
+- Ran a targeted search to confirm no Kafka identifiers remain in the changed AICR enterprise integration module, its focused runtime test, or this progress log.
+
+Verification:
+
+- `rg -n "Kafka|KAFKA|kafka|APACHE_KAFKA|_local_topics|_initialize_kafka|_publish_kafka|_consume_kafka" capabilities/common/aicr/enterprise_integration.py capabilities/common/aicr/tests/test_enterprise_integration_runtime.py docs/progress_log.md` -> no matches
+- `.venv/bin/python -m py_compile capabilities/common/aicr/enterprise_integration.py capabilities/common/aicr/tests/test_enterprise_integration_runtime.py`
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_enterprise_integration_runtime.py` -> 4 passed, 10 warnings
+
+Current broader Bytewax migration findings:
+
+- Repo-wide search still shows Kafka references in older specifications, generated docs, examples, and several non-AICR connector/runtime surfaces.
+- The AICR correction is committed separately so the user's Bytewax direction is preserved as an auditable decision before broader migration work continues.
 
 Current broader parallelization findings:
 

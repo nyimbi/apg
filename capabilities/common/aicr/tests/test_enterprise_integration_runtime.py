@@ -13,12 +13,12 @@ from capabilities.common.aicr.enterprise_integration import (
 
 
 @pytest.mark.asyncio
-async def test_kafka_adapter_publishes_and_replays_local_messages():
+async def test_bytewax_adapter_publishes_and_replays_local_stream_items():
 	config = MessageQueueConfig(
-		queue_type=MessageQueueType.APACHE_KAFKA,
-		connection_url="kafka://offline",
+		queue_type=MessageQueueType.BYTEWAX,
+		connection_url="bytewax://offline",
 		queue_name="aicr-events",
-		routing_key="model-events"
+		routing_key="model-stream"
 	)
 	integration = MessageQueueIntegration(config)
 	await integration.initialize()
@@ -33,14 +33,14 @@ async def test_kafka_adapter_publishes_and_replays_local_messages():
 		"timestamp": received[0]["timestamp"],
 		"data": {"event": "model.deployed"}
 	}]
-	assert integration._local_topics["model-events"][0]["offset"] == 0
+	assert integration._bytewax_streams["model-stream"][0]["sequence"] == 0
 
 
 @pytest.mark.asyncio
-async def test_kafka_adapter_delivers_to_registered_async_consumer():
+async def test_bytewax_adapter_delivers_to_registered_async_consumer():
 	config = MessageQueueConfig(
-		queue_type=MessageQueueType.APACHE_KAFKA,
-		connection_url="kafka://offline",
+		queue_type=MessageQueueType.BYTEWAX,
+		connection_url="bytewax://offline",
 		queue_name="aicr-events"
 	)
 	integration = MessageQueueIntegration(config)
