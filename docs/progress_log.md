@@ -1668,3 +1668,19 @@ Verification:
 
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 2 passed
 - `git ls-files .DS_Store docs/.DS_Store tests/__pycache__/test_parser.cpython-311-pytest-9.0.3.pyc` -> no tracked files
+
+### 2026-05-26 19:20 EAT
+
+Completed checkpoint:
+
+- Extended the provider-neutral AI agent integration registry with runtime aliases and runtime validation/description APIs.
+- Added OpenAI-compatible HTTP runtime entries for `openai` and local `ollama` alongside the existing `codex`, `claude_code`, `opencode`, `pi`, and `local` adapters.
+- Made generated `ai_agents.py` carry a dependency-free runtime catalog plus helpers to list runtimes, resolve aliases, group agents by runtime, and validate declared runtime references.
+- Updated AI-agent composition documentation with generated runtime validation examples and the expanded runtime catalog.
+- Added focused tests for runtime alias resolution, runtime validation, generated manifest runtime helpers, and generated runtime availability errors.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_agent_integrations.py tests/test_ai_agent_composition.py` -> 8 passed
+- `.venv/bin/python -m py_compile agents/integrations.py compiler/code_generator.py tests/test_agent_integrations.py tests/test_ai_agent_composition.py`
+- `git diff --check -- agents/integrations.py compiler/code_generator.py tests/test_agent_integrations.py tests/test_ai_agent_composition.py docs/ai_agent_composition.md`

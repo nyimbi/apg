@@ -103,9 +103,18 @@ The file contains:
 - `AI_AGENTS`: registry keyed by agent name.
 - `AI_AGENT_TEAMS`: registry keyed by team name.
 - `get_agent(name)`, `get_team(name)`, and `describe_team(name)` helpers.
+- `AI_AGENT_RUNTIME_DATA`: dependency-free runtime catalog for generated apps.
+- `list_agent_runtimes()`, `canonical_runtime()`, `agents_by_runtime()`, and `validate_agent_runtimes()` helpers.
 - Per-agent and per-team `configuration`, `rules`, `ui`, and `theme` metadata.
 
-The runtime manifest is dependency-free. Provider SDK wiring belongs in the selected AI capability integration, while `ai_agents.py` remains the stable contract between APG syntax and application code.
+The runtime manifest is dependency-free. Provider SDK wiring belongs in the selected AI capability integration, while `ai_agents.py` remains the stable contract between APG syntax and application code. Generated apps can still validate declared runtimes before deployment:
+
+```python
+from ai_agents import agents_by_runtime, validate_agent_runtimes
+
+assert validate_agent_runtimes()["errors"] == []
+codex_agents = agents_by_runtime().get("codex", [])
+```
 
 ## Runtime Integration
 
@@ -148,7 +157,11 @@ The built-in `agents.integrations` registry includes:
 | `codex` | CLI | Workspace-aware coding-agent execution through a local `codex` command. |
 | `claude_code` | CLI | Workspace-aware coding-agent execution through a local `claude` command. |
 | `opencode` | CLI | Workspace-aware execution through a local `opencode` command. |
+| `openai` | HTTP | OpenAI-compatible chat-completions execution when `OPENAI_API_KEY` is present. |
+| `ollama` | HTTP | Local OpenAI-compatible model execution through an Ollama endpoint. |
 | `pi` | HTTP | Chat-agent execution through the Inflection API using `inflection_3_pi` when `INFLECTION_API_KEY` is present. |
+
+The registry resolves aliases such as `claude`, `claude-code`, `open_code`, `offline`, and `inflection_pi` to canonical runtime names. Use `DEFAULT_AGENT_INTEGRATIONS.validate_runtime(name)` to check whether a declared runtime is known and currently available without executing it.
 
 Register additional adapters in Python rather than adding grammar keywords:
 

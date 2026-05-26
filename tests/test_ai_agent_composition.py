@@ -107,6 +107,8 @@ def test_ai_agent_composition_generates_runtime_manifest():
     runtime = result.generated_files["ai_agents.py"]
     assert "AI_AGENTS" in runtime
     assert "AI_AGENT_TEAMS" in runtime
+    assert "AI_AGENT_RUNTIME_DATA" in runtime
+    assert "validate_agent_runtimes" in runtime
     assert "'Planner'" in runtime
     assert "'SupportCrew'" in runtime
     assert "openai:gpt-4.1-mini" in runtime
@@ -115,3 +117,14 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert "'rules': [{'name': 'ticket_required'" in runtime
     assert "'ui': {'view': 'SupportCrewDashboard', 'route': '/support/crew'}" in runtime
     assert "'theme': {'name': 'support_ops'}" in runtime
+
+    namespace = {}
+    exec(compile(runtime, "ai_agents.py", "exec"), namespace)
+
+    assert "codex" in namespace["list_agent_runtimes"]()
+    assert namespace["canonical_runtime"]("claude") == "claude_code"
+    assert namespace["agents_by_runtime"]()["codex"][0].name == "Planner"
+    assert namespace["validate_agent_runtimes"]()["errors"] == []
+    assert namespace["validate_agent_runtimes"](["local"])["errors"] == [
+        "Planner references unavailable runtime codex"
+    ]

@@ -282,6 +282,12 @@ class PythonCodeGenerator:
 			}
 			for team in teams
 		}
+		runtime_catalog = self._default_agent_runtime_catalog()
+		runtime_aliases = {
+			alias: name
+			for name, spec in runtime_catalog.items()
+			for alias in spec.get("aliases", [])
+		}
 		return f'''"""
 AI Agent Composition Runtime
 ============================
@@ -327,6 +333,8 @@ class AgentTeamSpec:
 
 AI_AGENT_DATA: Dict[str, Dict[str, Any]] = {agent_specs!r}
 AI_TEAM_DATA: Dict[str, Dict[str, Any]] = {team_specs!r}
+AI_AGENT_RUNTIME_DATA: Dict[str, Dict[str, Any]] = {runtime_catalog!r}
+AI_AGENT_RUNTIME_ALIASES: Dict[str, str] = {runtime_aliases!r}
 
 
 AI_AGENTS: Dict[str, AIAgentSpec] = {{
@@ -347,6 +355,55 @@ def get_team(name: str) -> AgentTeamSpec:
     return AI_AGENT_TEAMS[name]
 
 
+def list_agent_runtimes(include_aliases: bool = False) -> List[str]:
+    names = set(AI_AGENT_RUNTIME_DATA)
+    if include_aliases:
+        names.update(AI_AGENT_RUNTIME_ALIASES)
+    return sorted(names)
+
+
+def canonical_runtime(name: Optional[str]) -> str:
+    runtime = name or "local"
+    if runtime in AI_AGENT_RUNTIME_DATA:
+        return runtime
+    if runtime in AI_AGENT_RUNTIME_ALIASES:
+        return AI_AGENT_RUNTIME_ALIASES[runtime]
+    raise KeyError(f"Unknown AI agent runtime: {{runtime}}")
+
+
+def describe_agent_runtimes() -> Dict[str, Dict[str, Any]]:
+    return {{
+        name: dict(spec)
+        for name, spec in AI_AGENT_RUNTIME_DATA.items()
+    }}
+
+
+def agents_by_runtime() -> Dict[str, List[AIAgentSpec]]:
+    grouped: Dict[str, List[AIAgentSpec]] = {{}}
+    for agent in AI_AGENTS.values():
+        runtime = canonical_runtime(agent.runtime)
+        grouped.setdefault(runtime, []).append(agent)
+    return grouped
+
+
+def validate_agent_runtimes(available_runtimes: Optional[List[str]] = None) -> Dict[str, Any]:
+    allowed = set(available_runtimes or list_agent_runtimes(include_aliases=True))
+    errors: List[str] = []
+    validated: List[str] = []
+    for agent in AI_AGENTS.values():
+        runtime = agent.runtime or "local"
+        try:
+            canonical = canonical_runtime(runtime)
+        except KeyError:
+            errors.append(f"{{agent.name}} references unknown runtime {{runtime}}")
+            continue
+        if runtime not in allowed and canonical not in allowed:
+            errors.append(f"{{agent.name}} references unavailable runtime {{runtime}}")
+            continue
+        validated.append(agent.name)
+    return {{"errors": errors, "validated_agents": sorted(validated)}}
+
+
 def describe_team(name: str) -> Dict[str, Any]:
     team = get_team(name)
     return {{
@@ -356,6 +413,60 @@ def describe_team(name: str) -> Dict[str, Any]:
         "policy": team.policy,
     }}
 '''
+
+	def _default_agent_runtime_catalog(self) -> Dict[str, Dict[str, Any]]:
+		"""Return dependency-free metadata for generated AI agent manifests."""
+		return {
+			"local": {
+				"kind": "local",
+				"aliases": ["offline", "test"],
+				"supports_workspace": False,
+				"requires_token": False,
+				"family": "deterministic",
+			},
+			"codex": {
+				"kind": "cli",
+				"aliases": ["codex_cli", "openai_codex"],
+				"supports_workspace": True,
+				"requires_token": False,
+				"family": "coding_agent",
+			},
+			"claude_code": {
+				"kind": "cli",
+				"aliases": ["claude", "claude-code"],
+				"supports_workspace": True,
+				"requires_token": False,
+				"family": "coding_agent",
+			},
+			"opencode": {
+				"kind": "cli",
+				"aliases": ["open_code"],
+				"supports_workspace": True,
+				"requires_token": False,
+				"family": "coding_agent",
+			},
+			"openai": {
+				"kind": "http",
+				"aliases": ["openai_chat"],
+				"supports_workspace": False,
+				"requires_token": True,
+				"family": "chat_agent",
+			},
+			"ollama": {
+				"kind": "http",
+				"aliases": ["local_llm"],
+				"supports_workspace": False,
+				"requires_token": False,
+				"family": "local_model",
+			},
+			"pi": {
+				"kind": "http",
+				"aliases": ["inflection_pi"],
+				"supports_workspace": False,
+				"requires_token": True,
+				"family": "chat_agent",
+			},
+		}
 	
 	def _generate_module(self, module: ModuleDeclaration) -> str:
 		"""Generate the main module Python file"""

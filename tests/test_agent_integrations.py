@@ -18,7 +18,31 @@ def test_default_agent_integration_registry_has_fast_changing_runtimes():
 	assert "codex" in names
 	assert "claude_code" in names
 	assert "opencode" in names
+	assert "openai" in names
+	assert "ollama" in names
 	assert "pi" in names
+
+
+def test_agent_integration_registry_resolves_aliases_and_describes_specs():
+	assert DEFAULT_AGENT_INTEGRATIONS.canonical_name("claude") == "claude_code"
+	assert DEFAULT_AGENT_INTEGRATIONS.canonical_name("claude-code") == "claude_code"
+	assert DEFAULT_AGENT_INTEGRATIONS.spec("open_code").name == "opencode"
+
+	description = DEFAULT_AGENT_INTEGRATIONS.describe()
+	assert description["codex"]["supports_workspace"] is True
+	assert "claude" in description["claude_code"]["aliases"]
+	assert description["ollama"]["metadata"]["protocol"] == "openai_chat_completions"
+
+
+def test_agent_integration_registry_validates_runtime_names_without_running_them():
+	local = DEFAULT_AGENT_INTEGRATIONS.validate_runtime("offline")
+	unknown = DEFAULT_AGENT_INTEGRATIONS.validate_runtime("missing_runtime")
+
+	assert local["valid"] is True
+	assert local["canonical_name"] == "local"
+	assert local["available"] is True
+	assert unknown["valid"] is False
+	assert "Unknown agent backend" in unknown["error"]
 
 
 def test_cli_backend_builds_workspace_command_without_running_external_tool():

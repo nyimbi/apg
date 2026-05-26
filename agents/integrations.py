@@ -47,6 +47,7 @@ class AgentBackendSpec:
 
 	name: str
 	kind: str
+	aliases: tuple[str, ...] = ()
 	model: str | None = None
 	command: str | None = None
 	args: list[str] = field(default_factory=list)
@@ -211,15 +212,28 @@ class AgentIntegrationRegistry:
 
 	def __init__(self):
 		self._specs: dict[str, AgentBackendSpec] = {}
+		self._aliases: dict[str, str] = {}
 
 	def register(self, spec: AgentBackendSpec) -> None:
 		self._specs[spec.name] = spec
+		for alias in spec.aliases:
+			self._aliases[alias] = spec.name
 
-	def names(self) -> list[str]:
-		return sorted(self._specs)
+	def names(self, include_aliases: bool = False) -> list[str]:
+		names = set(self._specs)
+		if include_aliases:
+			names.update(self._aliases)
+		return sorted(names)
+
+	def canonical_name(self, name: str) -> str:
+		if name in self._specs:
+			return name
+		if name in self._aliases:
+			return self._aliases[name]
+		raise KeyError(f"Unknown agent backend: {name}")
 
 	def spec(self, name: str) -> AgentBackendSpec:
-		return self._specs[name]
+		return self._specs[self.canonical_name(name)]
 
 	def create(self, name: str) -> AgentBackend:
 		spec = self.spec(name)
@@ -234,15 +248,62 @@ class AgentIntegrationRegistry:
 	async def run(self, backend_name: str, invocation: AgentInvocation) -> AgentRunResult:
 		return await self.create(backend_name).run(invocation)
 
+	def describe(self) -> dict[str, dict[str, Any]]:
+		"""Return serializable metadata for registered runtime adapters."""
+		return {
+			name: {
+				"kind": spec.kind,
+				"aliases": list(spec.aliases),
+				"model": spec.model,
+				"command": spec.command,
+				"args": list(spec.args),
+				"env_token": spec.env_token,
+				"endpoint": spec.endpoint,
+				"supports_workspace": spec.supports_workspace,
+				"metadata": dict(spec.metadata),
+			}
+			for name, spec in sorted(self._specs.items())
+		}
+
+	def validate_runtime(self, name: str) -> dict[str, Any]:
+		"""Validate one runtime name without executing it."""
+		try:
+			canonical_name = self.canonical_name(name)
+			backend = self.create(canonical_name)
+			return {
+				"valid": True,
+				"name": name,
+				"canonical_name": canonical_name,
+				"kind": backend.spec.kind,
+				"available": backend.available(),
+				"requires_token": bool(backend.spec.env_token),
+				"supports_workspace": backend.spec.supports_workspace,
+				"metadata": dict(backend.spec.metadata),
+			}
+		except KeyError:
+			return {
+				"valid": False,
+				"name": name,
+				"canonical_name": None,
+				"available": False,
+				"error": f"Unknown agent backend: {name}",
+			}
+
 
 def default_agent_integration_registry() -> AgentIntegrationRegistry:
 	"""Return APG's built-in volatile AI runtime adapters."""
 
 	registry = AgentIntegrationRegistry()
-	registry.register(AgentBackendSpec(name="local", kind="local"))
+	registry.register(AgentBackendSpec(
+		name="local",
+		kind="local",
+		aliases=("offline", "test"),
+		metadata={"family": "deterministic"},
+	))
 	registry.register(AgentBackendSpec(
 		name="codex",
 		kind="cli",
+		aliases=("codex_cli", "openai_codex"),
 		command="codex",
 		args=["exec", "{prompt}"],
 		supports_workspace=True,
@@ -251,6 +312,7 @@ def default_agent_integration_registry() -> AgentIntegrationRegistry:
 	registry.register(AgentBackendSpec(
 		name="claude_code",
 		kind="cli",
+		aliases=("claude", "claude-code"),
 		command="claude",
 		args=["-p", "{prompt}"],
 		supports_workspace=True,
@@ -259,14 +321,31 @@ def default_agent_integration_registry() -> AgentIntegrationRegistry:
 	registry.register(AgentBackendSpec(
 		name="opencode",
 		kind="cli",
+		aliases=("open_code",),
 		command="opencode",
 		args=["run", "{prompt}"],
 		supports_workspace=True,
 		metadata={"family": "coding_agent"},
 	))
 	registry.register(AgentBackendSpec(
+		name="openai",
+		kind="http",
+		model="provider_selected",
+		endpoint="https://api.openai.com/v1/chat/completions",
+		env_token="OPENAI_API_KEY",
+		metadata={"family": "chat_agent", "protocol": "openai_chat_completions"},
+	))
+	registry.register(AgentBackendSpec(
+		name="ollama",
+		kind="http",
+		model="provider_selected",
+		endpoint="http://localhost:11434/v1/chat/completions",
+		metadata={"family": "local_model", "protocol": "openai_chat_completions"},
+	))
+	registry.register(AgentBackendSpec(
 		name="pi",
 		kind="http",
+		aliases=("inflection_pi",),
 		model="inflection_3_pi",
 		endpoint="https://api.inflection.ai/v1/chat/completions",
 		env_token="INFLECTION_API_KEY",
