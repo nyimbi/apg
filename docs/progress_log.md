@@ -2709,3 +2709,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_pharma_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "tenant_id=['\"]default_tenant['\"]|['\"]default_tenant['\"]" capabilities/pharma/blueprint.py capabilities/pharma/rec/blueprint.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:05 EAT
+
+Completed checkpoint:
+
+- Replaced Cost Accounting default-data initialization's fixed `default_tenant` writes with the existing Cost Accounting tenant resolver.
+- Scoped Cost Accounting default category, driver, activity, parent-category, and primary-driver lookups by the resolved tenant.
+- Replaced the Cost Accounting resolver's literal `default_tenant` environment fallback with `APG_DEFAULT_TENANT_ID`, `APG_TENANT_ID`, then `default`.
+- Extended focused Cost Accounting regression coverage to include tenant-scoped default-data seeding and stale fallback removal.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/cos/tenant.py capabilities/fin/cos/blueprint.py tests/test_fin_cos_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_cos_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "tenant_id=['\"]default_tenant['\"]|['\"]default_tenant['\"]" capabilities/fin/cos/tenant.py capabilities/fin/cos/blueprint.py` -> no matches
+- `git diff --check` -> no issues

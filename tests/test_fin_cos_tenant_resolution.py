@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 API_PATH = REPO_ROOT / "capabilities" / "fin" / "cos" / "api.py"
 VIEWS_PATH = REPO_ROOT / "capabilities" / "fin" / "cos" / "views.py"
 TENANT_PATH = REPO_ROOT / "capabilities" / "fin" / "cos" / "tenant.py"
+BLUEPRINT_PATH = REPO_ROOT / "capabilities" / "fin" / "cos" / "blueprint.py"
 
 
 def _tenant_helpers() -> dict[str, Any]:
@@ -34,20 +35,35 @@ def _tenant_helpers() -> dict[str, Any]:
 def test_fin_cos_surfaces_use_shared_tenant_resolver():
 	api_source = API_PATH.read_text(encoding="utf-8")
 	views_source = VIEWS_PATH.read_text(encoding="utf-8")
+	tenant_source = TENANT_PATH.read_text(encoding="utf-8")
 
 	for stale_lookup in (
 		"request.args.get('tenant_id', 'default_tenant')",
 		"request.json.get('tenant_id', 'default_tenant')",
 		"data.get('tenant_id', 'default_tenant')",
 		"CostAccountingService(tenant_id='default_tenant')",
+		'"default_tenant"',
 	):
 		assert stale_lookup not in api_source
 		assert stale_lookup not in views_source
+		assert stale_lookup not in tenant_source
 
 	assert "from .tenant import get_tenant_id_from_request" in api_source
 	assert "from .tenant import get_tenant_id_from_request" in views_source
 	assert api_source.count("get_tenant_id_from_request(") >= 9
 	assert views_source.count("get_tenant_id_from_request(") >= 11
+
+
+def test_fin_cos_default_seed_data_uses_current_tenant_context():
+	source = BLUEPRINT_PATH.read_text(encoding="utf-8")
+
+	assert "from .tenant import get_tenant_id_from_request" in source
+	assert "tenant_id = get_tenant_id_from_request()" in source
+	assert "tenant_id='default_tenant'" not in source
+	assert '"default_tenant"' not in source
+	assert "filter_by(tenant_id=tenant_id)" in source
+	assert "tenant_id=tenant_id,\n\t\t\t\t\t\tcategory_code=cat_data['parent_category']" in source
+	assert "tenant_id=tenant_id,\n\t\t\t\t\tdriver_code=activity_data['primary_driver']" in source
 
 
 def test_tenant_resolver_prefers_payload_context_headers_and_query(monkeypatch):

@@ -8,6 +8,7 @@ Registers all views, API endpoints, and URL routes.
 from flask import Blueprint
 from flask_appbuilder import AppBuilder
 
+from .tenant import get_tenant_id_from_request
 from .views import (
 	CACostCenterModelView, CACostCategoryModelView, CACostDriverModelView,
 	CACostAllocationModelView, CACostPoolModelView, CAActivityModelView,
@@ -311,10 +312,11 @@ def _init_default_data(appbuilder: AppBuilder):
 	from .models import CFCACostCategory, CFCACostDriver, CFCAActivity
 	from ...auth_rbac.models import db
 	from . import get_default_cost_categories, get_default_cost_drivers, get_default_activities
+	tenant_id = get_tenant_id_from_request()
 	
 	try:
 		# Create default cost categories if they don't exist
-		existing_categories = CFCACostCategory.query.filter_by(tenant_id='default_tenant').count()
+		existing_categories = CFCACostCategory.query.filter_by(tenant_id=tenant_id).count()
 		
 		if existing_categories == 0:
 			default_categories = get_default_cost_categories()
@@ -323,7 +325,7 @@ def _init_default_data(appbuilder: AppBuilder):
 			for cat_data in default_categories:
 				if 'parent_category' not in cat_data:
 					category = CFCACostCategory(
-						tenant_id='default_tenant',
+						tenant_id=tenant_id,
 						category_code=cat_data['category_code'],
 						category_name=cat_data['category_name'],
 						description=cat_data['description'],
@@ -346,13 +348,13 @@ def _init_default_data(appbuilder: AppBuilder):
 			for cat_data in default_categories:
 				if 'parent_category' in cat_data:
 					parent = CFCACostCategory.query.filter_by(
-						tenant_id='default_tenant',
+						tenant_id=tenant_id,
 						category_code=cat_data['parent_category']
 					).first()
 					
 					if parent:
 						category = CFCACostCategory(
-							tenant_id='default_tenant',
+							tenant_id=tenant_id,
 							category_code=cat_data['category_code'],
 							category_name=cat_data['category_name'],
 							description=cat_data['description'],
@@ -373,14 +375,14 @@ def _init_default_data(appbuilder: AppBuilder):
 			print("Default cost categories created")
 		
 		# Create default cost drivers if they don't exist
-		existing_drivers = CFCACostDriver.query.filter_by(tenant_id='default_tenant').count()
+		existing_drivers = CFCACostDriver.query.filter_by(tenant_id=tenant_id).count()
 		
 		if existing_drivers == 0:
 			default_drivers = get_default_cost_drivers()
 			
 			for driver_data in default_drivers:
 				driver = CFCACostDriver(
-					tenant_id='default_tenant',
+					tenant_id=tenant_id,
 					driver_code=driver_data['driver_code'],
 					driver_name=driver_data['driver_name'],
 					description=driver_data['description'],
@@ -397,7 +399,7 @@ def _init_default_data(appbuilder: AppBuilder):
 			print("Default cost drivers created")
 		
 		# Create default activities if they don't exist
-		existing_activities = CFCAActivity.query.filter_by(tenant_id='default_tenant').count()
+		existing_activities = CFCAActivity.query.filter_by(tenant_id=tenant_id).count()
 		
 		if existing_activities == 0:
 			default_activities = get_default_activities()
@@ -405,12 +407,12 @@ def _init_default_data(appbuilder: AppBuilder):
 			for activity_data in default_activities:
 				# Find the primary driver
 				primary_driver = CFCACostDriver.query.filter_by(
-					tenant_id='default_tenant',
+					tenant_id=tenant_id,
 					driver_code=activity_data['primary_driver']
 				).first()
 				
 				activity = CFCAActivity(
-					tenant_id='default_tenant',
+					tenant_id=tenant_id,
 					activity_code=activity_data['activity_code'],
 					activity_name=activity_data['activity_name'],
 					description=activity_data['description'],
