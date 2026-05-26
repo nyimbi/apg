@@ -608,3 +608,26 @@ Current broader PRED/ANOM execution findings:
 - PRED and ANOM are no longer placeholder packages at the composition layer; both now advertise executable configuration/rules/UI/theme contracts.
 - Focused tests live next to each placeholder package to avoid inventing runtime fixtures for capabilities that currently only have registration-level implementation.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 09:56 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder SRCH capability into a first-class APG capability with tenant-scoped indexing, query, governance, UI, and theme configuration.
+- Added deterministic SRCH search-governance rules for tenant context, index ownership, restricted-content RBAC filtering, semantic embedding readiness, large result-window review, and bulk-index source lineage.
+- Promoted the placeholder GRPH capability into a first-class APG capability with tenant-scoped graph, storage, governance, UI, and theme configuration.
+- Added deterministic GRPH graph-governance rules for tenant context, node ownership, edge typing, restricted relationship review, deep traversal review, and lineage source-asset linkage.
+- Promoted the placeholder KNGR capability into a first-class APG capability with tenant-scoped knowledge, reasoning, governance, UI, and theme configuration.
+- Added deterministic KNGR knowledge-graph rules for tenant context, entity source evidence, enrichment confidence review, reasoning evidence, deep reasoning review, and curated-publication enforcement.
+- Exposed SRCH, GRPH, and KNGR contract helpers through package registration/info surfaces for lightweight composition-time discovery.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/srch/__init__.py capabilities/common/srch/capability_contract.py capabilities/common/srch/test_capability_contract.py capabilities/common/grph/__init__.py capabilities/common/grph/capability_contract.py capabilities/common/grph/test_capability_contract.py capabilities/common/kngr/__init__.py capabilities/common/kngr/capability_contract.py capabilities/common/kngr/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/srch/test_capability_contract.py capabilities/common/grph/test_capability_contract.py capabilities/common/kngr/test_capability_contract.py` -> 9 passed, 11 warnings
+
+Current broader SRCH/GRPH/KNGR execution findings:
+
+- SRCH, GRPH, and KNGR are no longer placeholder packages at the composition layer; all now advertise executable configuration/rules/UI/theme contracts.
+- Focused tests live next to each placeholder package so discovery and governance are verified without adding heavyweight search or graph runtime fixtures.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
