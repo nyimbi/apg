@@ -1575,3 +1575,17 @@ Verification:
 - `.venv/bin/python -m pytest -q capabilities/test_spec_capability_contracts.py` -> 1 passed
 - `.venv/bin/python -m py_compile capabilities/capability_contract_factory.py capabilities/test_spec_capability_contracts.py`
 - `git diff --check -- capabilities docs/progress_log.md`
+
+### 2026-05-26 18:33 EAT
+
+Completed checkpoint:
+
+- Added `capabilities/capability_contract_registry.py` as the platform-wide discovery and validation API for executable capability contracts.
+- The registry discovers every `capability_contract.py`, loads the contract, validates the required APG surfaces, indexes contracts by capability id, returns individual contracts, and evaluates deterministic rules.
+- Added focused registry tests covering discovery/validation across 100+ contracts, lookup for a spec-backed capability, and deterministic rule evaluation.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q capabilities/test_capability_contract_registry.py` -> 3 passed
+- `.venv/bin/python -m py_compile capabilities/capability_contract_registry.py capabilities/test_capability_contract_registry.py`
+- `git diff --check -- capabilities/capability_contract_registry.py capabilities/test_capability_contract_registry.py`
