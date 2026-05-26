@@ -863,3 +863,27 @@ Current broader DIST/EDGE/CICD/BKUP execution findings:
 - CICD and BKUP are no longer placeholders at the composition layer.
 - Phase 9 now has uniform first-class registration/contract coverage across advanced operations, distributed computing, edge, CI/CD, and backup/restore.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:40 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder THEM package into a first-class APG theming/branding capability with tenant-scoped theme, token, brand, governance, UI, and theme configuration.
+- Added deterministic THEM rules for tenant context, theme ownership, publishing approval, brand-asset licensing, contrast validation, and large-rollout review.
+- Promoted the placeholder ACCS package into a first-class APG accessibility capability with tenant-scoped standards, audits, assistive metadata, governance, UI, and theme configuration.
+- Added deterministic ACCS rules for tenant context, audit standards, remediation ownership, published UI contrast, media captions, and critical-issue review.
+- Promoted the placeholder WSBL package into a first-class APG website-builder capability with tenant-scoped site, page, publishing, governance, UI, and theme configuration.
+- Added deterministic WSBL rules for tenant context, site ownership, publishing approval, custom component review, public-site accessibility, and consent policy attachment.
+- Promoted the placeholder CONS package into a first-class APG consent/privacy capability with tenant-scoped purpose, consent, privacy-request, governance, UI, and theme configuration.
+- Added deterministic CONS rules for tenant context, legal basis, consent notice, active consent, identity verification, and stale-consent review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/them/__init__.py capabilities/common/them/capability_contract.py capabilities/common/them/test_capability_contract.py capabilities/common/accs/__init__.py capabilities/common/accs/capability_contract.py capabilities/common/accs/test_capability_contract.py capabilities/common/wsbl/__init__.py capabilities/common/wsbl/capability_contract.py capabilities/common/wsbl/test_capability_contract.py capabilities/common/cons/__init__.py capabilities/common/cons/capability_contract.py capabilities/common/cons/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/them/test_capability_contract.py capabilities/common/accs/test_capability_contract.py capabilities/common/wsbl/test_capability_contract.py capabilities/common/cons/test_capability_contract.py` -> 12 passed, 10 warnings
+
+Current broader THEM/ACCS/WSBL/CONS execution findings:
+
+- THEM, ACCS, WSBL, and CONS are no longer placeholders at the composition layer.
+- Phase 10 UX/privacy work now has first-class registration/contract coverage for theming, accessibility, site building, and consent/privacy.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
