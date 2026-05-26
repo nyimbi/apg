@@ -56,7 +56,11 @@ See [API.md](API.md) for detailed API documentation.
 ## Usage Examples
 
 ```python
-# TODO: Add usage examples
+from capabilities.data.vector_database.integration import VectorDatabaseCapability
+
+capability = VectorDatabaseCapability()
+health = capability._initialize_capability()
+status = capability.get_status()
 ```
 
 ## Testing

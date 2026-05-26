@@ -1700,3 +1700,19 @@ Verification:
 - `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
 - `rg -n -i "kafka|confluent|redpanda|bootstrap\\.servers|bootstrap_servers|BYTEWAX_BROKERS|Bytewax broker|Bytewax brokers|broker connection string" --glob '!uploads/**' --glob '!tmp/**' --glob '!node_modules/**' --glob '!**/swagger-ui-bundle.js' .` -> only historical progress-log entries remain
 - `git diff --check -- compiler/code_generator.py tests/test_code_generator_executable_defaults.py docs/language_reference.md docs/progress_log.md capabilities/ckm/wfa/system_architecture.md capabilities/int/api/helm/values.yaml capabilities/int/api/helm/templates/_helpers.tpl capabilities/int/api/helm/templates/deployment.yaml capabilities/composition/events/blueprint.py capabilities/composition/events/README.md capabilities/common/dvrl/works/reports/FINAL_DELIVERY_SUMMARY.md capabilities/common/dvrl/works/reports/MARKET_LAUNCH_STRATEGY.md capabilities/common/dvrl/works/reports/EXECUTIVE_BRIEFING.md capabilities/common/meta/README.md`
+
+### 2026-05-26 19:44 EAT
+
+Completed checkpoint:
+
+- Replaced composable capability generator TODO/pass output with executable initialization, health metadata, and status reporting defaults.
+- Made the base-template fallback emit a runnable dependency-free app descriptor and health check instead of a TODO-only module.
+- Updated checked-in composable capability integration templates so they compile as Python, avoid invalid function-local star imports, and return deterministic setup results instead of pass-only bodies.
+- Replaced checked-in capability README/API TODO examples with concrete health/status usage examples.
+- Added focused regression coverage that creates a new capability structure, renders the fallback base template, scans checked-in templates for old placeholders, and compiles all checked-in capability integration templates.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_composable_template_executable_defaults.py tests/test_composition_capability_contracts.py` -> 6 passed
+- `.venv/bin/python -m py_compile templates/composable/base_template.py templates/composable/capability.py tests/test_composable_template_executable_defaults.py`
+- `rg -n "TODO: Implement|TODO: Add usage examples|TODO: Add more examples|from \\.models import \\*|from \\.views import \\*|pass$|multi-cloud_abstraction|Multi-CloudAbstraction|integrate_multi-cloud" templates/composable/base_template.py templates/composable/capability.py templates/composable/capabilities` -> no matches

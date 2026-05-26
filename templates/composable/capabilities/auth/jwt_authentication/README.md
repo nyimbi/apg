@@ -57,7 +57,11 @@ See [API.md](API.md) for detailed API documentation.
 ## Usage Examples
 
 ```python
-# TODO: Add usage examples
+from capabilities.auth.jwt_authentication.integration import JWTAuthenticationCapability
+
+capability = JWTAuthenticationCapability()
+health = capability._initialize_capability()
+status = capability.get_status()
 ```
 
 ## Testing

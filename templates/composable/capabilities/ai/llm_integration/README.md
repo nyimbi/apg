@@ -59,7 +59,11 @@ See [API.md](API.md) for detailed API documentation.
 ## Usage Examples
 
 ```python
-# TODO: Add usage examples
+from capabilities.ai.llm_integration.integration import LLMIntegrationCapability
+
+capability = LLMIntegrationCapability()
+health = capability._initialize_capability()
+status = capability.get_status()
 ```
 
 ## Testing

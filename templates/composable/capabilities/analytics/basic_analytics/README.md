@@ -57,7 +57,11 @@ See [API.md](API.md) for detailed API documentation.
 ## Usage Examples
 
 ```python
-# TODO: Add usage examples
+from capabilities.analytics.basic_analytics.integration import BasicAnalyticsCapability
+
+capability = BasicAnalyticsCapability()
+health = capability._initialize_capability()
+status = capability.get_status()
 ```
 
 ## Testing

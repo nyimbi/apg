@@ -7,6 +7,7 @@ This module handles integrating the capability into the base application.
 """
 
 import logging
+from importlib import import_module
 from flask import Blueprint
 from flask_appbuilder import BaseView
 
@@ -26,7 +27,7 @@ jwt_authentication_bp = Blueprint(
 def integrate_jwt_authentication(app, appbuilder, db):
     """
     Integrate JWT Authentication capability into the application.
-    
+
     Args:
         app: Flask application instance
         appbuilder: Flask-AppBuilder instance
@@ -35,23 +36,25 @@ def integrate_jwt_authentication(app, appbuilder, db):
     try:
         # Register blueprint
         app.register_blueprint(jwt_authentication_bp)
-        
-        # Import and register models
-        from .models import *  # noqa
-        
-        # Import and register views
-        from .views import *  # noqa
-        
+
+        # Import optional capability modules without invalid function-local star imports
+        package_prefix = f"{__package__}." if __package__ else ""
+        for module_name in ("models", "views"):
+            try:
+                import_module(f"{package_prefix}{module_name}")
+            except ImportError as import_error:
+                log.debug(f"Optional module {module_name} not loaded: {import_error}")
+
         # Register views with AppBuilder
         # appbuilder.add_view(YourView, "Your View", category="JWT Authentication")
-        
+
         # Apply configuration
         config_additions = {}
         for key, value in config_additions.items():
             app.config[key] = value
-        
+
         log.info(f"Successfully integrated JWT Authentication capability")
-        
+
     except Exception as e:
         log.error(f"Failed to integrate JWT Authentication capability: {e}")
         raise
@@ -60,28 +63,30 @@ def integrate_jwt_authentication(app, appbuilder, db):
 class JWTAuthenticationCapability:
     """
     Main capability class for JWT Authentication.
-    
+
     This class provides the core functionality of the JWT Authentication capability.
     """
-    
+
     def __init__(self, app=None, appbuilder=None, db=None):
         self.app = app
         self.appbuilder = appbuilder
         self.db = db
-        
+
         if app is not None:
             self.init_app(app, appbuilder, db)
-    
+
     def init_app(self, app, appbuilder, db):
         """Initialize the capability with the application"""
         self.app = app
         self.appbuilder = appbuilder
         self.db = db
-        
+
         # Capability-specific initialization
         self._initialize_capability()
-    
+
     def _initialize_capability(self):
         """Initialize capability-specific components"""
-        # TODO: Implement capability initialization
-        pass
+        self.config = dict(getattr(self.app, "config", {}) if self.app is not None else {})
+        self.initialized = True
+        self.health = {"status": "healthy", "capability": self.__class__.__name__}
+        return self.health

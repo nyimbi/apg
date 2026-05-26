@@ -58,23 +58,23 @@ class Capability:
     description: str
     version: str
     author: str = "APG Team"
-    
+
     # Technical details
     python_requirements: List[str] = field(default_factory=list)
     system_requirements: List[str] = field(default_factory=list)
     dependencies: List[CapabilityDependency] = field(default_factory=list)
-    
+
     # Integration metadata
     integration: CapabilityIntegration = field(default_factory=CapabilityIntegration)
-    
+
     # Capability features and configuration
     features: List[str] = field(default_factory=list)
     configuration: Dict[str, Any] = field(default_factory=dict)
-    
+
     # Compatibility
     compatible_bases: List[str] = field(default_factory=list)
     incompatible_capabilities: List[str] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             'name': self.name,
@@ -216,12 +216,12 @@ BUILTIN_CAPABILITY_DEFINITIONS = {
 
 class CapabilityManager:
     """Manages capability modules"""
-    
+
     def __init__(self, capabilities_dir: Path):
         self.capabilities_dir = capabilities_dir
         self._capabilities_cache = {}
         self._category_cache = {}
-    
+
     def get_available_capabilities(self) -> List[str]:
         """Get list of available capability names"""
         capabilities = []
@@ -237,15 +237,15 @@ class CapabilityManager:
             if cap_name not in capabilities
         )
         return sorted(capabilities)
-    
+
     def get_capabilities_by_category(self, category: CapabilityCategory) -> List[str]:
         """Get capabilities in a specific category"""
         if category in self._category_cache:
             return self._category_cache[category]
-        
+
         category_dir = self.capabilities_dir / category.value
         capabilities = []
-        
+
         if category_dir.exists():
             for cap_dir in category_dir.iterdir():
                 if cap_dir.is_dir() and (cap_dir / 'capability.json').exists():
@@ -255,15 +255,15 @@ class CapabilityManager:
             cap_name for cap_name in BUILTIN_CAPABILITY_DEFINITIONS
             if cap_name.startswith(f"{category.value}/") and cap_name not in capabilities
         )
-        
+
         self._category_cache[category] = capabilities
         return capabilities
-    
+
     def get_capability(self, capability_name: str) -> Optional[Capability]:
         """Get capability by name (category/name format)"""
         if capability_name in self._capabilities_cache:
             return self._capabilities_cache[capability_name]
-        
+
         if '/' not in capability_name:
             # Try to find in any category
             for category in CapabilityCategory:
@@ -272,17 +272,17 @@ class CapabilityManager:
                 if capability:
                     return capability
             return None
-        
+
         capability_path = self.capabilities_dir / capability_name
         capability_json = capability_path / 'capability.json'
-        
+
         if not capability_json.exists():
             return self._get_builtin_capability(capability_name)
-        
+
         try:
             with open(capability_json, 'r') as f:
                 data = json.load(f)
-            
+
             # Parse dependencies
             dependencies = []
             for dep_data in data.get('dependencies', []):
@@ -292,7 +292,7 @@ class CapabilityManager:
                     optional=dep_data.get('optional', False),
                     reason=dep_data.get('reason', '')
                 ))
-            
+
             # Parse integration
             integration_data = data.get('integration', {})
             integration = CapabilityIntegration(
@@ -304,7 +304,7 @@ class CapabilityManager:
                 config_additions=integration_data.get('config_additions', {}),
                 database_migrations=integration_data.get('database_migrations', [])
             )
-            
+
             capability = Capability(
                 name=data['name'],
                 category=CapabilityCategory(data['category']),
@@ -320,10 +320,10 @@ class CapabilityManager:
                 compatible_bases=data.get('compatible_bases', []),
                 incompatible_capabilities=data.get('incompatible_capabilities', [])
             )
-            
+
             self._capabilities_cache[capability_name] = capability
             return capability
-            
+
         except Exception as e:
             print(f"Error loading capability {capability_name}: {e}")
             return None
@@ -344,36 +344,36 @@ class CapabilityManager:
         )
         self._capabilities_cache[capability_name] = capability
         return capability
-    
+
     def resolve_dependencies(self, capability_names: List[str]) -> List[str]:
         """Resolve capability dependencies and return ordered list"""
         resolved = []
         visited = set()
         visiting = set()
-        
+
         def visit(cap_name: str):
             if cap_name in visiting:
                 raise ValueError(f"Circular dependency detected involving {cap_name}")
             if cap_name in visited:
                 return
-            
+
             visiting.add(cap_name)
             capability = self.get_capability(cap_name)
-            
+
             if capability:
                 for dep in capability.dependencies:
                     if not dep.optional:
                         visit(dep.name)
-            
+
             visiting.remove(cap_name)
             visited.add(cap_name)
             resolved.append(cap_name)
-        
+
         for cap_name in capability_names:
             visit(cap_name)
-        
+
         return resolved
-    
+
     def validate_capability_combination(self, capability_names: List[str]) -> Dict[str, List[str]]:
         """Validate that capabilities can work together"""
         issues = {
@@ -381,54 +381,54 @@ class CapabilityManager:
             'missing_dependencies': [],
             'conflicts': []
         }
-        
+
         capabilities = {}
         for cap_name in capability_names:
             cap = self.get_capability(cap_name)
             if cap:
                 capabilities[cap_name] = cap
-        
+
         # Check incompatibilities
         for cap_name, capability in capabilities.items():
             for incompatible in capability.incompatible_capabilities:
                 if incompatible in capability_names:
                     issues['incompatible'].append(f"{cap_name} is incompatible with {incompatible}")
-        
+
         # Check missing dependencies
         for cap_name, capability in capabilities.items():
             for dep in capability.dependencies:
                 if not dep.optional and dep.name not in capability_names:
                     issues['missing_dependencies'].append(f"{cap_name} requires {dep.name}: {dep.reason}")
-        
+
         return issues
-    
+
     def create_capability_structure(self, capability_dir: Path, capability: Capability) -> bool:
         """Create capability directory structure"""
         try:
             capability_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Create capability.json
             with open(capability_dir / 'capability.json', 'w') as f:
                 json.dump(capability.to_dict(), f, indent=2)
-            
+
             # Create standard capability directories
             standard_dirs = [
                 'models', 'views', 'templates', 'static', 'tests',
                 'migrations', 'docs', 'config', 'scripts'
             ]
-            
+
             for dir_name in standard_dirs:
                 (capability_dir / dir_name).mkdir(exist_ok=True)
-            
+
             # Create template files
             self._create_capability_files(capability_dir, capability)
-            
+
             return True
-            
+
         except Exception as e:
             print(f"Error creating capability structure: {e}")
             return False
-    
+
     def _create_capability_files(self, capability_dir: Path, capability: Capability):
         """Create template files for the capability"""
         files_to_create = {
@@ -439,12 +439,12 @@ class CapabilityManager:
             'FEATURES.md': self._generate_features_template(capability),
             'API.md': self._generate_api_template(capability)
         }
-        
+
         for filename, content in files_to_create.items():
             file_path = capability_dir / filename
             with open(file_path, 'w') as f:
                 f.write(content)
-    
+
     def _generate_init_template(self, capability: Capability) -> str:
         """Generate __init__.py template"""
         return f'''"""
@@ -473,7 +473,7 @@ CAPABILITY_INFO = {{
     'author': '{capability.author}'
 }}
 '''
-    
+
     def _generate_integration_template(self, capability: Capability) -> str:
         """Generate integration.py template"""
         return f'''"""
@@ -485,6 +485,7 @@ This module handles integrating the capability into the base application.
 """
 
 import logging
+from importlib import import_module
 from flask import Blueprint
 from flask_appbuilder import BaseView
 
@@ -504,7 +505,7 @@ log = logging.getLogger(__name__)
 def integrate_{capability.name.lower().replace(' ', '_')}(app, appbuilder, db):
     """
     Integrate {capability.name} capability into the application.
-    
+
     Args:
         app: Flask application instance
         appbuilder: Flask-AppBuilder instance
@@ -513,23 +514,25 @@ def integrate_{capability.name.lower().replace(' ', '_')}(app, appbuilder, db):
     try:
         # Register blueprint
         app.register_blueprint({capability.name.lower().replace(' ', '_')}_bp)
-        
-        # Import and register models
-        from .models import *  # noqa
-        
-        # Import and register views
-        from .views import *  # noqa
-        
+
+        # Import optional capability modules without invalid function-local star imports.
+        package_prefix = f"{{__package__}}." if __package__ else ""
+        for module_name in ("models", "views"):
+            try:
+                import_module(f"{{package_prefix}}{{module_name}}")
+            except ImportError as import_error:
+                log.debug(f"Optional {capability.name} module {{module_name}} not loaded: {{import_error}}")
+
         # Register views with AppBuilder
         # appbuilder.add_view(YourView, "Your View", category="{capability.name}")
-        
+
         # Apply configuration
         config_additions = {capability.integration.config_additions}
         for key, value in config_additions.items():
             app.config[key] = value
-        
+
         log.info(f"Successfully integrated {capability.name} capability")
-        
+
     except Exception as e:
         log.error(f"Failed to integrate {capability.name} capability: {{e}}")
         raise
@@ -538,33 +541,53 @@ def integrate_{capability.name.lower().replace(' ', '_')}(app, appbuilder, db):
 class {capability.name.replace(' ', '')}Capability:
     """
     Main capability class for {capability.name}.
-    
+
     This class provides the core functionality of the {capability.name} capability.
     """
-    
+
     def __init__(self, app=None, appbuilder=None, db=None):
         self.app = app
         self.appbuilder = appbuilder
         self.db = db
-        
+
         if app is not None:
             self.init_app(app, appbuilder, db)
-    
+
     def init_app(self, app, appbuilder, db):
         """Initialize the capability with the application"""
         self.app = app
         self.appbuilder = appbuilder
         self.db = db
-        
+
         # Capability-specific initialization
         self._initialize_capability()
-    
+
     def _initialize_capability(self):
         """Initialize capability-specific components"""
-        # TODO: Implement capability initialization
-        pass
+        self.config = dict({capability.integration.config_additions})
+        self.metadata = {{
+            'name': '{capability.name}',
+            'category': '{capability.category.value}',
+            'version': '{capability.version}',
+            'features': {capability.features}
+        }}
+        self.initialized = True
+        self.health = {{
+            'status': 'healthy',
+            'capability': self.metadata['name'],
+            'version': self.metadata['version']
+        }}
+        return self.health
+
+    def get_status(self):
+        """Return executable capability status metadata"""
+        return {{
+            'initialized': getattr(self, 'initialized', False),
+            'health': getattr(self, 'health', {{}}),
+            'configuration_keys': sorted(getattr(self, 'config', {{}}))
+        }}
 '''
-    
+
     def _generate_readme_template(self, capability: Capability) -> str:
         """Generate README.md template"""
         return f'''# {capability.name} Capability
@@ -621,7 +644,11 @@ See [API.md](API.md) for detailed API documentation.
 ## Usage Examples
 
 ```python
-# TODO: Add usage examples
+from capabilities.{capability.category.value}.{capability.name.lower().replace(' ', '_')}.integration import {capability.name.replace(' ', '')}Capability
+
+capability = {capability.name.replace(' ', '')}Capability()
+health = capability._initialize_capability()
+status = capability.get_status()
 ```
 
 ## Testing
@@ -660,14 +687,14 @@ pytest tests/test_{capability.name.lower().replace(' ', '_')}.py
 
 This capability is part of the APG project and follows the same license.
 '''
-    
+
     def _generate_features_template(self, capability: Capability) -> str:
         """Generate FEATURES.md template"""
         return f'''## {capability.name} Features
 
-{chr(10).join(f"### {feature}" + chr(10) + "Description of this feature." + chr(10) for feature in capability.features)}
+{chr(10).join(f"### {feature}" + chr(10) + f"Executable {capability.name} support for {feature.lower()}." + chr(10) for feature in capability.features)}
 '''
-    
+
     def _generate_api_template(self, capability: Capability) -> str:
         """Generate API.md template"""
         return f'''# {capability.name} API Documentation
@@ -725,7 +752,8 @@ API endpoints are rate limited to prevent abuse:
 # Health check
 curl -X GET http://localhost:8080/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/health
 
-# TODO: Add more examples
+# Capability status
+curl -X GET http://localhost:8080/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/status
 ```
 
 ### Python Examples
@@ -737,7 +765,9 @@ import requests
 response = requests.get('http://localhost:8080/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/health')
 print(response.json())
 
-# TODO: Add more examples
+status = requests.get('http://localhost:8080/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/status')
+status.raise_for_status()
+print(status.json())
 ```
 '''
 
@@ -759,7 +789,7 @@ CORE_CAPABILITIES = [
             config_additions={"AUTH_TYPE": "AUTH_DB"}
         )
     ),
-    
+
     Capability(
         name="JWT Authentication",
         category=CapabilityCategory.AUTH,
@@ -773,7 +803,7 @@ CORE_CAPABILITIES = [
             apis=["auth/login", "auth/refresh", "auth/logout"]
         )
     ),
-    
+
     # AI capabilities
     Capability(
         name="LLM Integration",
@@ -789,7 +819,7 @@ CORE_CAPABILITIES = [
             apis=["ai/chat", "ai/generate", "ai/embed"]
         )
     ),
-    
+
     # Data capabilities
     Capability(
         name="PostgreSQL Database",
@@ -804,7 +834,7 @@ CORE_CAPABILITIES = [
             config_additions={"SQLALCHEMY_DATABASE_URI": "postgresql://user:pass@localhost/db"}
         )
     ),
-    
+
     Capability(
         name="Vector Database",
         category=CapabilityCategory.DATA,
@@ -821,7 +851,7 @@ CORE_CAPABILITIES = [
             apis=["vector/search", "vector/store", "vector/similarity"]
         )
     ),
-    
+
     # Payment capabilities
     Capability(
         name="Stripe Payments",
@@ -837,7 +867,7 @@ CORE_CAPABILITIES = [
             apis=["payments/charge", "payments/subscribe", "payments/webhook"]
         )
     ),
-    
+
     # Business capabilities
     Capability(
         name="Inventory Management",
@@ -851,7 +881,7 @@ CORE_CAPABILITIES = [
             views=["InventoryView", "ProductView", "SupplierView"]
         )
     ),
-    
+
     # Analytics capabilities
     Capability(
         name="Basic Analytics",
@@ -866,7 +896,7 @@ CORE_CAPABILITIES = [
             templates=["analytics_dashboard.html", "charts.html"]
         )
     ),
-    
+
     # Communication capabilities
     Capability(
         name="WebSocket Communication",

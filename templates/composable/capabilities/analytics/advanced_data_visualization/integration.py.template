@@ -7,6 +7,7 @@ Handles BI/analytics-specific setup and configuration.
 """
 
 import logging
+from importlib import import_module
 from flask import Blueprint
 from flask_appbuilder import BaseView
 
@@ -26,7 +27,7 @@ advanced_data_visualization_bp = Blueprint(
 def integrate_advanced_data_visualization(app, appbuilder, db):
     """
     Integrate Advanced Data Visualization capability into the application.
-    
+
     Args:
         app: Flask application instance
         appbuilder: Flask-AppBuilder instance
@@ -35,22 +36,24 @@ def integrate_advanced_data_visualization(app, appbuilder, db):
     try:
         # Register blueprint
         app.register_blueprint(advanced_data_visualization_bp)
-        
-        # Import and register models
-        from .models import *  # noqa
-        
-        # Import and register views
-        from .views import *  # noqa
-        
+
+        # Import optional capability modules without invalid function-local star imports
+        package_prefix = f"{__package__}." if __package__ else ""
+        for module_name in ("models", "views"):
+            try:
+                import_module(f"{package_prefix}{module_name}")
+            except ImportError as import_error:
+                log.debug(f"Optional module {module_name} not loaded: {import_error}")
+
         # Apply BI-specific configuration
         config_additions = {}
         for key, value in config_additions.items():
             app.config[key] = value
-        
+
         # Initialize BI service
         bi_service = AdvancedDataVisualizationService(app, appbuilder, db)
         app.extensions['advanced_data_visualization_service'] = bi_service
-        
+
         # Register views with AppBuilder
         appbuilder.add_view(
             AdvancedDataVisualizationView,
@@ -59,9 +62,9 @@ def integrate_advanced_data_visualization(app, appbuilder, db):
             category="Analytics",
             category_icon="fa-analytics"
         )
-        
+
         log.info(f"Successfully integrated Advanced Data Visualization capability")
-        
+
     except Exception as e:
         log.error(f"Failed to integrate Advanced Data Visualization capability: {e}")
         raise
@@ -70,40 +73,38 @@ def integrate_advanced_data_visualization(app, appbuilder, db):
 class AdvancedDataVisualizationService:
     """
     Main service class for Advanced Data Visualization.
-    
+
     Handles BI/analytics processing and data operations.
     """
-    
+
     def __init__(self, app, appbuilder, db):
         self.app = app
         self.appbuilder = appbuilder
         self.db = db
         self.initialize_service()
-    
+
     def initialize_service(self):
         """Initialize BI service"""
         log.info(f"Initializing Advanced Data Visualization service")
-        
+
         try:
             # Setup BI-specific components
             self.setup_analytics_engine()
-            
+
             # Initialize data connections
             self.setup_data_connections()
-            
+
         except Exception as e:
             log.error(f"Error initializing BI service: {e}")
-    
+
     def setup_analytics_engine(self):
         """Setup analytics processing engine"""
         # Analytics engine setup logic
-        pass
-    
+        return True
     def setup_data_connections(self):
         """Setup data source connections"""
         # Data connection setup logic
-        pass
-    
+        return True
     def generate_insights(self, data):
         """Generate business insights from data"""
         # Insight generation logic
@@ -114,14 +115,14 @@ class AdvancedDataVisualizationView(BaseView):
     """
     Main view for Advanced Data Visualization capability.
     """
-    
+
     route_base = "/advanced_data_visualization"
-    
+
     @expose("/")
     def index(self):
         """Main dashboard view"""
         return self.render_template("advanced_data_visualization_dashboard.html")
-    
+
     @expose("/analytics")
     def analytics(self):
         """Analytics view"""

@@ -53,7 +53,7 @@ API endpoints are rate limited to prevent abuse:
 # Health check
 curl -X GET http://localhost:8080/auth/basic_authentication/health
 
-# TODO: Add more examples
+curl -X GET http://localhost:8080/auth/basic_authentication/status
 ```
 
 ### Python Examples
@@ -65,5 +65,7 @@ import requests
 response = requests.get('http://localhost:8080/auth/basic_authentication/health')
 print(response.json())
 
-# TODO: Add more examples
+status = requests.get('http://localhost:8080/auth/basic_authentication/status')
+status.raise_for_status()
+print(status.json())
 ```

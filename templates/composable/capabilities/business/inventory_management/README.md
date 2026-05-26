@@ -56,7 +56,11 @@ See [API.md](API.md) for detailed API documentation.
 ## Usage Examples
 
 ```python
-# TODO: Add usage examples
+from capabilities.business.inventory_management.integration import InventoryManagementCapability
+
+capability = InventoryManagementCapability()
+health = capability._initialize_capability()
+status = capability.get_status()
 ```
 
 ## Testing

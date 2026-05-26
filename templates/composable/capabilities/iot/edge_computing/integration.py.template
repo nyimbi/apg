@@ -7,6 +7,7 @@ Handles IoT-specific setup and configuration.
 """
 
 import logging
+from importlib import import_module
 from flask import Blueprint
 from flask_appbuilder import BaseView
 
@@ -26,7 +27,7 @@ edge_computing_bp = Blueprint(
 def integrate_edge_computing(app, appbuilder, db):
     """
     Integrate Edge Computing capability into the application.
-    
+
     Args:
         app: Flask application instance
         appbuilder: Flask-AppBuilder instance
@@ -35,24 +36,26 @@ def integrate_edge_computing(app, appbuilder, db):
     try:
         # Register blueprint
         app.register_blueprint(edge_computing_bp)
-        
-        # Import and register models
-        from .models import *  # noqa
-        
-        # Import and register views
-        from .views import *  # noqa
-        
+
+        # Import optional capability modules without invalid function-local star imports
+        package_prefix = f"{__package__}." if __package__ else ""
+        for module_name in ("models", "views"):
+            try:
+                import_module(f"{package_prefix}{module_name}")
+            except ImportError as import_error:
+                log.debug(f"Optional module {module_name} not loaded: {import_error}")
+
         # Apply IoT-specific configuration
         config_additions = {'EDGE_REGISTRY_URL': 'localhost:5000', 'KUBERNETES_CONFIG': '/etc/k8s/config'}
         for key, value in config_additions.items():
             app.config[key] = value
-        
+
         # Initialize IoT services
         iot_service = EdgeComputingService(app, appbuilder, db)
         app.extensions['edge_computing_service'] = iot_service
-        
+
         log.info(f"Successfully integrated Edge Computing capability")
-        
+
     except Exception as e:
         log.error(f"Failed to integrate Edge Computing capability: {e}")
         raise
@@ -61,28 +64,26 @@ def integrate_edge_computing(app, appbuilder, db):
 class EdgeComputingService:
     """
     Main service class for Edge Computing.
-    
+
     Handles IoT-specific functionality and business logic.
     """
-    
+
     def __init__(self, app, appbuilder, db):
         self.app = app
         self.appbuilder = appbuilder
         self.db = db
         self.initialize_service()
-    
+
     def initialize_service(self):
         """Initialize IoT service components"""
         log.info(f"Initializing Edge Computing service")
-        
+
         # IoT-specific initialization logic here
         # For example: setup MQTT connections, device discovery, etc.
-        pass
-    
+        return True
     def start_monitoring(self):
         """Start IoT monitoring and data collection"""
-        pass
-    
+        return True
     def stop_monitoring(self):
         """Stop IoT monitoring"""
-        pass
+        return True

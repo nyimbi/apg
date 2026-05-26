@@ -57,7 +57,11 @@ See [API.md](API.md) for detailed API documentation.
 ## Usage Examples
 
 ```python
-# TODO: Add usage examples
+from capabilities.data.postgresql_database.integration import PostgreSQLDatabaseCapability
+
+capability = PostgreSQLDatabaseCapability()
+health = capability._initialize_capability()
+status = capability.get_status()
 ```
 
 ## Testing

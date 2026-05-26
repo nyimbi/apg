@@ -17,7 +17,7 @@ from enum import Enum
 class BaseTemplateType(Enum):
     """Available base template types"""
     FLASK_WEBAPP = "flask_webapp"
-    MICROSERVICE = "microservice" 
+    MICROSERVICE = "microservice"
     API_ONLY = "api_only"
     DASHBOARD = "dashboard"
     REAL_TIME = "real_time"
@@ -35,7 +35,7 @@ class BaseTemplate:
     default_capabilities: List[str]
     structure: Dict[str, Any]
     requirements: List[str]
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             'name': self.name,
@@ -51,32 +51,32 @@ class BaseTemplate:
 
 class BaseTemplateManager:
     """Manages base templates"""
-    
+
     def __init__(self, bases_dir: Path):
         self.bases_dir = bases_dir
         self._templates_cache = {}
-        
+
     def get_available_bases(self) -> List[BaseTemplateType]:
         """Get list of available base template types"""
         return list(BaseTemplateType)
-    
+
     def get_base_template(self, template_type: BaseTemplateType) -> Optional[BaseTemplate]:
         """Get base template by type"""
         if template_type in self._templates_cache:
             return self._templates_cache[template_type]
-            
+
         template_dir = self.bases_dir / template_type.value
         if not template_dir.exists():
             return None
-            
+
         template_json = template_dir / "base.json"
         if not template_json.exists():
             return None
-            
+
         try:
             with open(template_json, 'r') as f:
                 data = json.load(f)
-            
+
             template = BaseTemplate(
                 name=data['name'],
                 type=template_type,
@@ -87,35 +87,35 @@ class BaseTemplateManager:
                 structure=data.get('structure', {}),
                 requirements=data.get('requirements', [])
             )
-            
+
             self._templates_cache[template_type] = template
             return template
-            
+
         except Exception as e:
             print(f"Error loading base template {template_type.value}: {e}")
             return None
-    
+
     def create_base_structure(self, template_dir: Path, template: BaseTemplate) -> bool:
         """Create base template directory structure"""
         try:
             template_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Create base.json
             with open(template_dir / "base.json", 'w') as f:
                 json.dump(template.to_dict(), f, indent=2)
-            
+
             # Create directory structure based on template.structure
             self._create_directories(template_dir, template.structure)
-            
+
             # Create template files
             self._create_template_files(template_dir, template)
-            
+
             return True
-            
+
         except Exception as e:
             print(f"Error creating base template structure: {e}")
             return False
-    
+
     def _create_directories(self, base_dir: Path, structure: Dict[str, Any]):
         """Create directory structure recursively"""
         for name, content in structure.items():
@@ -129,7 +129,7 @@ class BaseTemplateManager:
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 if not file_path.exists():
                     file_path.touch()
-    
+
     def _create_template_files(self, template_dir: Path, template: BaseTemplate):
         """Create template files for the base"""
         files_to_create = [
@@ -139,14 +139,14 @@ class BaseTemplateManager:
             'README.md.template',
             '__init__.py.template'
         ]
-        
+
         for filename in files_to_create:
             file_path = template_dir / filename
             if not file_path.exists():
                 content = self._generate_template_content(filename, template)
                 with open(file_path, 'w') as f:
                     f.write(content)
-    
+
     def _generate_template_content(self, filename: str, template: BaseTemplate) -> str:
         """Generate template file content"""
         if filename == 'app.py.template':
@@ -165,7 +165,7 @@ class BaseTemplateManager:
 # This file is part of the {template.name} base template.
 # Capabilities will be integrated into this base structure.
 """
-    
+
     def _generate_app_template(self, template: BaseTemplate) -> str:
         """Generate app.py template"""
         if template.type == BaseTemplateType.FLASK_WEBAPP:
@@ -234,13 +234,13 @@ if __name__ == '__main__':
     host = os.environ.get('FLASK_HOST', '127.0.0.1')
     port = int(os.environ.get('FLASK_PORT', 8080))
     debug = os.environ.get('FLASK_DEBUG', '1') == '1'
-    
+
     log.info(f"Starting {{project_name}} on {host}:{port}")
     log.info(f"Capabilities enabled: {', '.join({{capabilities|tojson}})}")
-    
+
     app.run(host=host, port=port, debug=debug)
 '''
-        
+
         elif template.type == BaseTemplateType.MICROSERVICE:
             return '''"""
 {{project_name}} - Microservice
@@ -301,13 +301,13 @@ async def health_check():
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", 8000))
-    
+
     logger.info(f"Starting {{project_name}} microservice on {host}:{port}")
     logger.info(f"Capabilities: {', '.join({{capabilities|tojson}})}")
-    
+
     uvicorn.run(app, host=host, port=port)
 '''
-        
+
         else:
             return f'''"""
 {{{{project_name}}}} - {template.name}
@@ -316,9 +316,39 @@ if __name__ == "__main__":
 Generated by APG using {template.name} base template.
 """
 
-# TODO: Implement {template.name} application structure
+from datetime import datetime
+from typing import Any, Dict
+
+CAPABILITIES = {{{{capabilities|tojson}}}}
+
+
+def create_app(config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """Create an executable descriptor for the generated application."""
+    return {{
+        "project": "{{{{project_name}}}}",
+        "base_template": "{template.type.value}",
+        "framework": "{template.framework}",
+        "capabilities": CAPABILITIES,
+        "config": dict(config or {{}}),
+    }}
+
+
+def health_check() -> Dict[str, Any]:
+    """Return a dependency-free health payload for this base template."""
+    app = create_app()
+    return {{
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "application": app["project"],
+        "base_template": app["base_template"],
+        "capabilities": app["capabilities"],
+    }}
+
+
+if __name__ == "__main__":
+    print(health_check())
 '''
-    
+
     def _generate_config_template(self, template: BaseTemplate) -> str:
         """Generate config.py template"""
         return '''"""
@@ -387,18 +417,18 @@ LOGGING_CONFIG = {
     }
 }
 '''
-    
+
     def _generate_requirements_template(self, template: BaseTemplate) -> str:
         """Generate requirements.txt template"""
         base_requirements = template.requirements.copy()
-        
+
         requirements_text = f"""# APG Generated Requirements - {template.name}
 # Base template requirements
 """
-        
+
         for req in base_requirements:
             requirements_text += f"{req}\n"
-        
+
         requirements_text += """
 # Capability-specific requirements
 {% for capability in capabilities %}
@@ -412,9 +442,9 @@ pytest-flask>=1.2.0
 black>=23.7.0
 flake8>=6.0.0
 """
-        
+
         return requirements_text
-    
+
     def _generate_readme_template(self, template: BaseTemplate) -> str:
         """Generate README.md template"""
         return '''# {{project_name}}
@@ -574,7 +604,7 @@ BASE_TEMPLATES = {
             "WTForms>=3.0.0"
         ]
     ),
-    
+
     BaseTemplateType.MICROSERVICE: BaseTemplate(
         name="Microservice",
         type=BaseTemplateType.MICROSERVICE,
@@ -595,7 +625,7 @@ BASE_TEMPLATES = {
             "sqlalchemy>=2.0.0"
         ]
     ),
-    
+
     BaseTemplateType.API_ONLY: BaseTemplate(
         name="API-Only Service",
         type=BaseTemplateType.API_ONLY,
@@ -614,7 +644,7 @@ BASE_TEMPLATES = {
             "uvicorn>=0.24.0"
         ]
     ),
-    
+
     BaseTemplateType.DASHBOARD: BaseTemplate(
         name="Analytics Dashboard",
         type=BaseTemplateType.DASHBOARD,
@@ -637,7 +667,7 @@ BASE_TEMPLATES = {
             "pandas>=2.0.0"
         ]
     ),
-    
+
     BaseTemplateType.REAL_TIME: BaseTemplate(
         name="Real-Time Application",
         type=BaseTemplateType.REAL_TIME,
