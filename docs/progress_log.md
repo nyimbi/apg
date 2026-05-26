@@ -1172,3 +1172,25 @@ Current broader CONN notification findings:
 - Real-time notification clients now have an executable APG security boundary instead of trusting client-supplied user and tenant IDs.
 - WebSocket authentication supports the existing APG security primitives without adding dependencies or network calls.
 - Remaining warnings during focused pytest are pre-existing adjacent deprecation warnings plus the current development JWT secret-length warning.
+
+### 2026-05-26 16:40 EAT
+
+Completed checkpoint:
+
+- Replaced CONN REST API demo-user authentication with executable validation of APG security sessions, JWT bearer tokens, and API keys.
+- Added reusable API credential normalization and identity extraction helpers that return user, tenant, role, session, and auth-source metadata.
+- Replaced the collaboration WebSocket hardcoded `websocket_user` with authenticated identity from the `Authorization` header or `token`/`access_token` query parameters.
+- Added an explicit WebSocket auth-failure response and policy close instead of joining collaboration sessions anonymously.
+- Updated the CONN API lineage request models from Pydantic v1 `regex` constraints to Pydantic v2 `pattern` constraints so the API module imports under the current environment.
+- Added focused API authentication tests for JWT bearer tokens, API keys, invalid tokens, WebSocket header auth, and WebSocket query-token auth.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/api.py capabilities/common/conn/tests/test_api_authentication.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_api_authentication.py` -> 5 passed, 18 warnings
+
+Current broader CONN API findings:
+
+- REST and collaboration WebSocket entrypoints now share an executable security boundary instead of static demo identities.
+- Importing `capabilities.common.conn.api` now succeeds under the current Pydantic v2 runtime.
+- Remaining warnings during focused pytest are pre-existing adjacent deprecation warnings, FastAPI `on_event` deprecation warnings, and the current development JWT secret-length warning.

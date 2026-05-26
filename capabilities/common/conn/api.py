@@ -13,7 +13,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, WebSocket
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from starlette.middleware.cors import CORSMiddleware
@@ -22,6 +22,7 @@ from .service import ConnectionManager, FlowExecutor, IntelligentConnector
 from .models import ConnectionStatus, ConnectionType, SyncMode
 from .visual_designer import VisualFlowDesigner
 from .data_lineage import DataLineageTracker
+from .security import AuthenticationError, SecurityContext, auth_manager
 
 # FastAPI App Configuration
 app = FastAPI(
@@ -126,11 +127,95 @@ class CreateVisualFlowRequest(BaseModel):
 	description: str = ""
 	template_name: Optional[str] = None
 
-# Authentication Dependency
+# Authentication helpers
+def _normalize_bearer_token(token: Optional[str]) -> Optional[str]:
+	if token is None:
+		return None
+
+	normalized = str(token).strip()
+	if not normalized:
+		return None
+
+	if normalized.lower().startswith("bearer "):
+		normalized = normalized[7:].strip()
+
+	return normalized or None
+
+
+def _user_from_security_context(context: SecurityContext, source: str) -> Dict[str, Any]:
+	return {
+		"user_id": context.user.user_id,
+		"username": context.user.username,
+		"tenant_id": context.tenant_id,
+		"roles": list(context.user.roles),
+		"is_admin": context.user.is_admin,
+		"session_id": context.session_id,
+		"auth_source": source
+	}
+
+
+def validate_api_credentials(
+	token: Optional[str],
+	authentication_manager=auth_manager
+) -> Dict[str, Any]:
+	"""Validate REST/WebSocket credentials against APG security primitives."""
+	normalized_token = _normalize_bearer_token(token)
+	if not normalized_token:
+		raise HTTPException(
+			status_code=status.HTTP_401_UNAUTHORIZED,
+			detail="Authentication token required"
+		)
+
+	session_context = authentication_manager.validate_session(normalized_token)
+	if session_context:
+		return _user_from_security_context(session_context, "session")
+
+	jwt_error: Optional[AuthenticationError] = None
+	try:
+		payload = authentication_manager.validate_jwt_token(normalized_token)
+	except AuthenticationError as error:
+		jwt_error = error
+	else:
+		user_id = payload.get("user_id")
+		tenant_id = payload.get("tenant_id")
+		if not user_id or not tenant_id:
+			raise HTTPException(
+				status_code=status.HTTP_401_UNAUTHORIZED,
+				detail="Authentication token missing required identity claims"
+			)
+		return {
+			"user_id": user_id,
+			"username": payload.get("username"),
+			"tenant_id": tenant_id,
+			"roles": payload.get("roles", []),
+			"is_admin": payload.get("is_admin", False),
+			"session_id": None,
+			"auth_source": "jwt"
+		}
+
+	try:
+		api_key_context = authentication_manager.authenticate_api_key(normalized_token)
+	except AuthenticationError as api_key_error:
+		raise HTTPException(
+			status_code=status.HTTP_401_UNAUTHORIZED,
+			detail="Invalid authentication token"
+		) from jwt_error or api_key_error
+
+	return _user_from_security_context(api_key_context, "api_key")
+
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-	"""Extract user from JWT token (simplified for demo)."""
-	# In production, validate JWT token and extract user information
-	return {"user_id": "demo_user", "tenant_id": "default"}
+	"""Extract the authenticated APG user from an HTTP bearer token."""
+	return validate_api_credentials(credentials.credentials)
+
+
+def get_websocket_user(websocket: WebSocket, authentication_manager=auth_manager) -> Dict[str, Any]:
+	"""Extract the authenticated APG user from WebSocket headers or query params."""
+	auth_header = websocket.headers.get("authorization")
+	token = _normalize_bearer_token(auth_header)
+	if not token:
+		token = websocket.query_params.get("token") or websocket.query_params.get("access_token")
+	return validate_api_credentials(token, authentication_manager=authentication_manager)
 
 # API Startup
 @app.on_event("startup")
@@ -590,18 +675,32 @@ async def get_connection_health(
 
 # WebSocket endpoint for real-time updates (simplified)
 @app.websocket("/api/v1/ws/{canvas_id}")
-async def websocket_endpoint(websocket, canvas_id: str):
+async def websocket_endpoint(websocket: WebSocket, canvas_id: str):
 	"""WebSocket endpoint for real-time collaboration."""
 	await websocket.accept()
 
-	# Join collaborative session
-	user_id = "websocket_user"  # In production, extract from token
+	try:
+		current_user = get_websocket_user(websocket)
+	except HTTPException as exc:
+		await websocket.send_json({"type": "auth_failed", "detail": exc.detail})
+		await websocket.close(code=1008)
+		return
+
+	user_id = current_user["user_id"]
 	session_info = await intelligent_connector.visual_designer.join_collaborative_session(
 		canvas_id,
 		user_id
 	)
 
-	await websocket.send_json({"type": "session_joined", "data": session_info})
+	await websocket.send_json({
+		"type": "session_joined",
+		"data": session_info,
+		"user": {
+			"user_id": current_user["user_id"],
+			"tenant_id": current_user["tenant_id"],
+			"auth_source": current_user["auth_source"]
+		}
+	})
 
 	try:
 		while True:
@@ -614,7 +713,11 @@ async def websocket_endpoint(websocket, canvas_id: str):
 					tuple(data["position"])
 				)
 
-			# In production, handle more message types
+			elif data["type"] == "ping":
+				await websocket.send_json({
+					"type": "pong",
+					"timestamp": datetime.now(timezone.utc).isoformat()
+				})
 
 	except Exception as e:
 		print(f"WebSocket error: {e}")
@@ -626,11 +729,11 @@ async def websocket_endpoint(websocket, canvas_id: str):
 # Data Lineage API Models
 class LineageVisualizationRequest(BaseModel):
 	node_id: Optional[str] = None
-	visualization_type: str = Field(default="full", regex="^(full|upstream|downstream|impact)$")
+	visualization_type: str = Field(default="full", pattern="^(full|upstream|downstream|impact)$")
 
 class LineageSearchRequest(BaseModel):
 	query: str = Field(..., min_length=1, max_length=100)
-	search_type: str = Field(default="all", regex="^(all|entities|fields|flows)$")
+	search_type: str = Field(default="all", pattern="^(all|entities|fields|flows)$")
 
 class TrackConnectionRequest(BaseModel):
 	connection_id: str
