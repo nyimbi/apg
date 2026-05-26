@@ -2914,3 +2914,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_mfg_ppl_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n "default-tenant|current-user|Replace with actual tenant resolution|Replace with actual user resolution|Kafka|kafka" capabilities/mfg/ppl/api.py capabilities/mfg/ppl/views.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:56 EAT
+
+Completed checkpoint:
+
+- Replaced Billing API's fixed `api-user` fallback with Flask request, session, context, APG header, query, and environment user resolution.
+- Made the Billing API error decorator coroutine-aware so async Flask-RESTX handlers are awaited and billing exceptions are caught.
+- Added focused Billing API context/decorator regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/bil/api.py tests/test_fin_bil_api_context.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_bil_api_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "api-user|Kafka|kafka" capabilities/fin/bil/api.py` -> no matches
+- `git diff --check` -> no issues

@@ -8,11 +8,14 @@ subscription management, usage tracking, invoice generation, and payments.
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
+import inspect
+import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
+from functools import wraps
 
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, g, request, jsonify, current_app, session
 from flask_restx import Api, Resource, fields, Namespace
 from flask_restx.reqparse import RequestParser
 
@@ -129,14 +132,70 @@ payment_model = api.model('Payment', {
 
 
 # Helper functions
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
 def get_current_user_id() -> str:
 	"""Get current user ID from request context"""
-	# In a real application, this would extract user ID from JWT token or session
-	return request.headers.get('X-User-ID', 'api-user')
+	current_user = (
+		_object_value(request, "current_user")
+		or _object_value(g, "current_user")
+		or _object_value(g, "user")
+		or _object_value(g, "auth_user")
+	)
+	return _first_text([
+		_object_value(current_user, "user_id"),
+		_object_value(current_user, "id"),
+		_object_value(current_user, "username"),
+		_object_value(request, "current_user_id"),
+		_object_value(g, "user_id"),
+		session.get("user_id"),
+		request.headers.get("X-User-ID"),
+		request.headers.get("X-APG-User-ID"),
+		request.args.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
 
 
 def handle_billing_error(func):
 	"""Decorator to handle billing service errors"""
+	async def _handle_async(*args, **kwargs):
+		try:
+			return await func(*args, **kwargs)
+		except BillingError as e:
+			return {'error': str(e), 'error_code': e.error_code}, 400
+		except SubscriptionError as e:
+			return {'error': str(e), 'error_code': e.error_code}, 400
+		except UsageError as e:
+			return {'error': str(e), 'error_code': e.error_code}, 400
+		except InvoiceError as e:
+			return {'error': str(e), 'error_code': e.error_code}, 400
+		except PaymentError as e:
+			return {'error': str(e), 'error_code': e.error_code}, 400
+		except Exception as e:
+			current_app.logger.error(f"Unexpected error: {e}")
+			return {'error': 'Internal server error'}, 500
+
 	def wrapper(*args, **kwargs):
 		try:
 			return func(*args, **kwargs)
@@ -153,7 +212,7 @@ def handle_billing_error(func):
 		except Exception as e:
 			current_app.logger.error(f"Unexpected error: {e}")
 			return {'error': 'Internal server error'}, 500
-	return wrapper
+	return wraps(func)(_handle_async if inspect.iscoroutinefunction(func) else wrapper)
 
 
 # Customer API endpoints
