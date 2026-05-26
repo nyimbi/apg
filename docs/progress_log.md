@@ -1655,3 +1655,16 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_engine.py tests/test_composition_capability_contracts.py` -> 4 passed
 - `.venv/bin/python -m py_compile templates/composable/composition_engine.py tests/test_composition_capability_contracts.py`
 - `git diff --check -- templates/composable/composition_engine.py tests/test_composition_capability_contracts.py docs/capability_contracts.md`
+
+### 2026-05-26 19:16 EAT
+
+Completed checkpoint:
+
+- Removed the tracked root `.DS_Store` artifact from version control while leaving local ignored desktop files alone.
+- Added a focused repository-hygiene regression that fails if generated cache artifacts are tracked.
+- Added a root layout regression that keeps root-level tests and markdown documents in their expected directories, with `README.md` as the only allowed root markdown document.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 2 passed
+- `git ls-files .DS_Store docs/.DS_Store tests/__pycache__/test_parser.cpython-311-pytest-9.0.3.pyc` -> no tracked files
