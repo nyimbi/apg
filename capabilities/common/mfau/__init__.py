@@ -1,190 +1,82 @@
-"""
-APG Multi-Factor Authentication (MFA) Capability
+"""APG Multi-Factor Authentication (MFAU) capability registration."""
 
-Enterprise-grade multi-factor authentication capability providing intelligent
-adaptive authentication, biometric support, and seamless APG integration.
+from __future__ import annotations
 
-Copyright © 2025 Datacraft
-Author: Nyimbi Odero <nyimbi@gmail.com>
-Website: www.datacraft.co.ke
-"""
+from datetime import datetime, timezone
+from typing import Any
 
-# Core models and types
-from .models import (
-	MFAUserProfile, MFAMethod, MFAMethodType, AuthEvent,
-	TrustLevel, AuthenticationStatus, DeviceInfo,
-	RiskAssessment, RiskFactor, BiometricTemplate,
-	RecoveryMethod, AuthToken, DeviceBinding
-)
-
-# Core services
-from .service import MFAService
-from .mfa_engine import MFAEngine
-from .risk_analyzer import RiskAnalyzer
-from .token_service import TokenService, HardwareTokenValidator, OfflineTokenVerifier
-from .biometric_service import BiometricService
-from .anti_spoofing import AntiSpoofingService
-from .enrollment_wizard import BiometricEnrollmentWizard
-from .recovery_service import RecoveryService, RecoveryRequest, SecurityQuestion, TrustedContact
-from .notification_service import MFANotificationService, MFANotificationType
-from .business_logic import BusinessLogicOrchestrator, BusinessRule, WorkflowContext
-
-# Integration and composition
-from .integration import APGIntegrationRouter
-from .composition import MFACompositionEngine, APGEvent, CapabilityWorkflow
-
-# Flask integration
-from .views import (
-	MFAUserProfileView, MFAMethodView, AuthEventView,
-	MFADashboardView, MFAAPIView, register_mfa_views
-)
-from .blueprint import MFABlueprint, create_mfa_blueprint, register_mfa_capability
-from .api import create_mfa_api, MFAWebSocketEvents
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
 __version__ = "1.0.0"
-__author__ = "Nyimbi Odero"
-__email__ = "nyimbi@gmail.com"
+__capability_id__ = "mfau"
+__capability_name__ = "Multi-Factor Authentication"
+__apg_dependencies__ = ["auth", "secu", "encr"]
 
-# APG Capability Metadata for composition engine registration
-APG_CAPABILITY_INFO = {
-	"id": "mfa",
-	"name": "Multi-Factor Authentication",
+capability_metadata: dict[str, Any] = {
+	"name": "mfau",
 	"version": __version__,
-	"description": "Enterprise-grade multi-factor authentication with biometric support",
-	"category": "security",
-	"author": __author__,
-	"email": __email__,
-	"company": "Datacraft",
-	"website": "www.datacraft.co.ke",
-	
-	# APG integration metadata
-	"apg_version": "1.0.0",
-	"dependencies": [
-		"auth_rbac",
-		"notification", 
-		"audit_compliance",
-		"ai_orchestration",
-		"computer_vision"
-	],
-	"provides": [
-		"multi_factor_authentication",
-		"biometric_authentication", 
-		"risk_assessment",
-		"account_recovery",
-		"security_analytics",
-		"intelligent_authentication",
-		"adaptive_security"
-	],
-	"endpoints": {
-		"api": "/api/mfa",
-		"health": "/mfa/health",
-		"dashboard": "/mfadashboardview/dashboard/",
-		"enrollment": "/mfadashboardview/enroll/",
-		"settings": "/mfadashboardview/settings/",
-		"recovery": "/mfadashboardview/recovery/"
-	},
-	
-	# Revolutionary differentiators that make this 10x better than industry leaders
-	"differentiators": [
-		"Intelligent Adaptive Authentication",
-		"Contextual Biometric Fusion",
-		"Zero-Friction Pre-Authentication", 
-		"AI-Powered Recovery Assistant",
-		"Seamless Offline Operations",
-		"Privacy-First Architecture",
-		"Enterprise-Grade Orchestration",
-		"Real-Time Collaboration Support",
-		"Immersive Security Analytics",
-		"Revolutionary UX Innovation"
-	],
-	
-	# Technical capabilities
-	"features": {
-		"authentication_methods": [
-			"TOTP", "HOTP", "SMS", "EMAIL", "PUSH",
-			"FACE_RECOGNITION", "VOICE_RECOGNITION", 
-			"BEHAVIORAL_BIOMETRIC", "HARDWARE_TOKEN"
-		],
-		"biometric_support": True,
-		"anti_spoofing": True,
-		"liveness_detection": True,
-		"risk_assessment": True,
-		"trust_scoring": True,
-		"account_recovery": True,
-		"backup_codes": True,
-		"offline_support": True,
-		"real_time_notifications": True,
-		"enterprise_policies": True,
-		"workflow_orchestration": True,
-		"audit_compliance": True,
-		"delegation_tokens": True,
-		"step_up_authentication": True,
-		"contextual_intelligence": True
-	},
-	
-	# Events published by this capability
-	"events": {
-		"publishes": [
-			"mfa.authentication.success",
-			"mfa.authentication.failure",
-			"mfa.authentication.blocked",
-			"mfa.method.enrolled",
-			"mfa.method.removed",
-			"mfa.method.verified",
-			"mfa.security.alert",
-			"mfa.recovery.initiated",
-			"mfa.recovery.completed",
-			"mfa.risk.assessment",
-			"mfa.biometric.enrolled",
-			"mfa.workflow.executed"
-		],
-		"subscribes": [
-			"auth.user.login",
-			"auth.user.logout",
-			"auth.session.expired",
-			"security.threat.detected",
-			"ai.analysis.complete",
-			"notification.delivered",
-			"audit.compliance.check"
-		]
-	},
-	
-	# Performance and scalability
-	"performance": {
-		"concurrent_users": "unlimited",
-		"authentication_latency": "<100ms",
-		"biometric_processing": "<2s", 
-		"risk_assessment": "<50ms",
-		"offline_capability": True,
-		"horizontal_scaling": True,
-		"multi_tenant": True
-	}
+	"display_name": __capability_name__,
+	"description": "Adaptive multi-factor authentication, enrollment, recovery, and risk-based step-up controls",
+	"category": "security_compliance",
+	"subcategory": "advanced_authentication",
+	"vendor": "Datacraft",
+	"author": "APG Platform Team",
+	"license": "Commercial",
+	"created_at": datetime.now(timezone.utc),
+	"dependencies": __apg_dependencies__,
+	"provides": ["adaptive_mfa", "factor_enrollment", "risk_step_up", "account_recovery", "phishing_resistant_auth"],
+	"permissions": ["mfau:view", "mfau:enroll", "mfau:challenge", "mfau:manage_methods", "mfau:recover", "mfau:admin"]
 }
 
-__all__ = [
-	# Core models
-	"MFAUserProfile", "MFAMethod", "MFAMethodType", "AuthEvent",
-	"TrustLevel", "AuthenticationStatus", "DeviceInfo",
-	"RiskAssessment", "RiskFactor", "BiometricTemplate",
-	"RecoveryMethod", "AuthToken", "DeviceBinding",
-	
-	# Core services
-	"MFAService", "MFAEngine", "RiskAnalyzer", 
-	"TokenService", "HardwareTokenValidator", "OfflineTokenVerifier",
-	"BiometricService", "AntiSpoofingService", "BiometricEnrollmentWizard",
-	"RecoveryService", "RecoveryRequest", "SecurityQuestion", "TrustedContact",
-	"MFANotificationService", "MFANotificationType",
-	"BusinessLogicOrchestrator", "BusinessRule", "WorkflowContext",
-	
-	# Integration and composition
-	"APGIntegrationRouter", "MFACompositionEngine", "APGEvent", "CapabilityWorkflow",
-	
-	# Flask integration
-	"MFAUserProfileView", "MFAMethodView", "AuthEventView",
-	"MFADashboardView", "MFAAPIView", "register_mfa_views",
-	"MFABlueprint", "create_mfa_blueprint", "register_mfa_capability",
-	"create_mfa_api", "MFAWebSocketEvents",
-	
-	# Capability metadata
-	"APG_CAPABILITY_INFO"
-]
+APG_CAPABILITY_INFO = capability_metadata
+
+
+def register_capability() -> dict[str, Any]:
+	"""Register MFAU with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "mfau",
+		"aliases": ["mfa", "multi_factor_authentication", "adaptive_authentication"],
+		"display_name": capability_metadata["display_name"],
+		"description": capability_metadata["description"],
+		"version": capability_metadata["version"],
+		"dependencies": capability_metadata["dependencies"],
+		"optional_dependencies": ["audl", "ntfy", "cvsn", "biop"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"adaptive_mfa": "Select factors and step-up requirements from tenant risk context",
+			"factor_enrollment": "Enroll, verify, disable, and rotate user authentication methods",
+			"risk_step_up": "Require stronger factors for elevated action or device risk",
+			"account_recovery": "Govern recovery channels, backup methods, and escalation flows",
+			"capability_rules": "Evaluate deterministic MFA governance rules",
+			"visual_theming": "Apply adaptive-auth console theme tokens and components"
+		},
+		"endpoints": {
+			"challenge": "/mfau/api/v1/challenge",
+			"methods": "/mfau/api/v1/methods",
+			"enrollment": "/mfau/api/v1/enrollment",
+			"risk": "/mfau/api/v1/risk",
+			"recovery": "/mfau/api/v1/recovery"
+		},
+		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": capability_metadata["permissions"]
+	}
+
+
+def get_capability_info() -> dict[str, Any]:
+	"""Get MFAU capability information for composition and marketplace discovery."""
+	info = capability_metadata.copy()
+	info["contract"] = get_capability_contract()
+	return info
+
+
+def register_mfa_capability() -> dict[str, Any]:
+	"""Compatibility alias for older MFA registration callers."""
+	return register_capability()
+
+
+__all__ = ["APG_CAPABILITY_INFO", "capability_metadata", "register_capability", "register_mfa_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]

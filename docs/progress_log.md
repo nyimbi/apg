@@ -654,3 +654,27 @@ Current broader RAGN/GRAG/ONTO execution findings:
 - RAGN and GRAG had substantial runtime code but lacked the uniform first-class registration/contract surface used by the rest of the capability rollout.
 - ONTO is no longer a placeholder package at the composition layer and now advertises executable configuration/rules/UI/theme contracts.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 10:51 EAT
+
+Completed checkpoint:
+
+- Made MFAU import-light and executable as a first-class APG capability with tenant-scoped method, risk, recovery, governance, UI, and theme configuration.
+- Added deterministic MFAU rules for tenant context, high-risk step-up, biometric consent, verified recovery channels, phishing-resistant privileged actions, and low-trust device review.
+- Made BIOP import-light and executable as a first-class APG capability with tenant-scoped modality, template, liveness, governance, UI, and theme configuration.
+- Added deterministic BIOP rules for tenant context, biometric consent, template encryption, liveness evidence, cross-border privacy review, and low-confidence match review.
+- Added first-class FREC package registration and executable facial-recognition contract for face enrollment, verification, identification, liveness, emotion-governance, watchlist, UI, and theme surfaces.
+- Promoted the placeholder IDFD package into a first-class identity-federation capability with provider, protocol, session, governance, UI, and theme contracts.
+- Kept package-level discovery lightweight for MFAU and BIOP instead of importing their heavier runtime modules, because those runtime imports currently fail before composition discovery can read metadata.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mfau/__init__.py capabilities/common/mfau/capability_contract.py capabilities/common/mfau/test_capability_contract.py capabilities/common/biop/__init__.py capabilities/common/biop/capability_contract.py capabilities/common/biop/test_capability_contract.py capabilities/common/frec/__init__.py capabilities/common/frec/capability_contract.py capabilities/common/frec/test_capability_contract.py capabilities/common/idfd/__init__.py capabilities/common/idfd/capability_contract.py capabilities/common/idfd/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/mfau/test_capability_contract.py capabilities/common/biop/test_capability_contract.py capabilities/common/frec/test_capability_contract.py capabilities/common/idfd/test_capability_contract.py` -> 12 passed, 11 warnings
+
+Current broader MFAU/BIOP/FREC/IDFD execution findings:
+
+- MFAU and BIOP had substantial runtime code but package imports were not composition-safe; this slice restores discovery/registration without starting the runtime stacks.
+- FREC had substantial runtime files but no package registration surface; it now advertises executable configuration/rules/UI/theme contracts.
+- IDFD is no longer a placeholder package at the composition layer.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

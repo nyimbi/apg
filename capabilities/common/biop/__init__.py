@@ -1,213 +1,86 @@
-"""
-APG Biometric Authentication Capability
+"""APG Biometric Processing (BIOP) capability registration."""
 
-Revolutionary biometric authentication with 10x superior capabilities including:
-- Contextual Intelligence Engine
-- Natural Language Identity Queries  
-- Predictive Identity Analytics
-- Real-Time Collaborative Verification
-- Immersive Identity Dashboard
-- Adaptive Security Intelligence
-- Universal Identity Orchestration
-- Behavioral Biometrics Fusion
-- Deepfake Quantum Detection
-- Zero-Friction Authentication
+from __future__ import annotations
 
-Author: Datacraft (nyimbi@gmail.com)
-Copyright: © 2025 Datacraft
-"""
+from datetime import datetime, timezone
+from typing import Any
 
-from .models import (
-	BiUser, BiVerification, BiBiometric, BiDocument, BiFraudRule,
-	BiComplianceRule, BiCollaboration, BiBehavioralSession, BiAuditLog,
-	BiVerificationStatus, BiModalityType, BiRiskLevel, BiComplianceFramework,
-	BiUserCreate, BiVerificationCreate, BiBiometricCreate, BiCollaborationCreate
-)
-
-from .service import (
-	BiometricAuthenticationService,
-	ContextualIntelligenceEngine,
-	PredictiveAnalyticsEngine,
-	BehavioralBiometricsFusion,
-	AdaptiveSecurityIntelligence,
-	UniversalIdentityOrchestration,
-	DeepfakeQuantumDetection,
-	ZeroFrictionAuthentication,
-	CollaborativeVerificationEngine
-)
-
-from .views import (
-	BiUserView, BiVerificationView, BiCollaborationView,
-	NaturalLanguageInterfaceView, AdaptiveSecurityView, UniversalComplianceView,
-	BiometricAnalyticsChartView, PredictiveAnalyticsChartView, CollaborativeMetricsChartView
-)
-
-from .api import biometric_bp
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
 __version__ = "1.0.0"
-__author__ = "Datacraft"
-__email__ = "nyimbi@gmail.com"
-__copyright__ = "© 2025 Datacraft"
+__capability_id__ = "biop"
+__capability_name__ = "Biometric Processing"
+__apg_dependencies__ = ["mfau", "cvsn", "aicr"]
 
-# APG Capability Metadata
-CAPABILITY_NAME = "biometric_authentication"
-CAPABILITY_VERSION = "1.0.0"
-CAPABILITY_DESCRIPTION = "Revolutionary biometric authentication with 10x superior capabilities"
-
-# APG Composition Keywords
-COMPOSITION_KEYWORDS = [
-	'biometric_authentication',
-	'identity_verification', 
-	'fraud_prevention',
-	'liveness_detection',
-	'multi_modal_biometrics',
-	'behavioral_analysis',
-	'compliance_automation',
-	'zero_friction_auth',
-	'predictive_identity',
-	'collaborative_verification',
-	'contextual_intelligence',
-	'deepfake_detection'
-]
-
-# Revolutionary Features
-REVOLUTIONARY_FEATURES = [
-	'contextual_intelligence_engine',
-	'natural_language_queries',
-	'predictive_analytics',
-	'collaborative_verification',
-	'immersive_dashboard',
-	'adaptive_security',
-	'universal_orchestration',
-	'behavioral_fusion',
-	'deepfake_detection',
-	'zero_friction_auth'
-]
-
-# Market Superiority Metrics
-MARKET_SUPERIORITY = {
-	'accuracy_advantage': '2x better than competitors (99.8% vs 97-98.5%)',
-	'speed_advantage': '3x faster than competitors (0.3s vs 0.8-1.26s)',
-	'cost_advantage': '70% cost reduction vs market leaders ($0.15 vs $0.50)',
-	'unique_features': 10,
-	'global_coverage': '200+ countries vs 50-195 competitor coverage'
+capability_metadata: dict[str, Any] = {
+	"name": "biop",
+	"version": __version__,
+	"display_name": __capability_name__,
+	"description": "Governed biometric enrollment, template protection, liveness, matching, and verification workflows",
+	"category": "security_compliance",
+	"subcategory": "biometric_processing",
+	"vendor": "Datacraft",
+	"author": "APG Platform Team",
+	"license": "Commercial",
+	"created_at": datetime.now(timezone.utc),
+	"dependencies": __apg_dependencies__,
+	"provides": ["biometric_enrollment", "template_governance", "liveness_detection", "biometric_verification", "consent_management"],
+	"permissions": ["biop:view", "biop:enroll", "biop:verify", "biop:manage_templates", "biop:review", "biop:admin"]
 }
 
-# Capability Dependencies
-CAPABILITY_DEPENDENCIES = {
-	'required': ['auth_rbac', 'audit_compliance', 'encryption_key_management'],
-	'enhanced': ['workflow_engine', 'business_intelligence', 'real_time_collaboration'],
-	'optional': ['document_management', 'notification_engine', 'mobile_platform']
-}
+CAPABILITY_NAME = "biometric_processing"
+CAPABILITY_VERSION = __version__
+CAPABILITY_DESCRIPTION = capability_metadata["description"]
+COMPOSITION_KEYWORDS = ["biometric_processing", "identity_verification", "liveness_detection", "template_governance", "consent_management"]
 
-# Performance Benchmarks
-PERFORMANCE_BENCHMARKS = {
-	'face_recognition': {'accuracy': 0.998, 'processing_time_ms': 200},
-	'voice_verification': {'accuracy': 0.995, 'processing_time_ms': 300},
-	'behavioral_biometrics': {'accuracy': 0.999, 'continuous_monitoring': True},
-	'liveness_detection': {'nist_pad_level': 3, 'processing_time_ms': 50},
-	'document_verification': {'accuracy': 0.997, 'processing_time_ms': 500},
-	'fraud_detection': {'prevention_rate': 0.99, 'false_positive_rate': 0.001}
-}
 
-# Global Compliance Support
-COMPLIANCE_FRAMEWORKS = [
-	'GDPR', 'CCPA', 'BIPA', 'HIPAA', 'KYC_AML', 'SOX', 'PCI_DSS',
-	'ISO_27001', 'SOC_2', 'NIST_CYBERSECURITY', 'FIDO2', 'COMMON_CRITERIA'
-]
-
-def get_capability_info() -> dict:
-	"""
-	Get comprehensive capability information for APG registration
-	
-	Returns:
-		dict: Complete capability metadata for APG composition engine
-	"""
+def register_capability() -> dict[str, Any]:
+	"""Register BIOP with the APG composition engine."""
+	contract = get_capability_contract()
 	return {
-		'name': CAPABILITY_NAME,
-		'version': CAPABILITY_VERSION,
-		'description': CAPABILITY_DESCRIPTION,
-		'author': __author__,
-		'email': __email__,
-		'copyright': __copyright__,
-		'composition_keywords': COMPOSITION_KEYWORDS,
-		'revolutionary_features': REVOLUTIONARY_FEATURES,
-		'market_superiority': MARKET_SUPERIORITY,
-		'dependencies': CAPABILITY_DEPENDENCIES,
-		'performance_benchmarks': PERFORMANCE_BENCHMARKS,
-		'compliance_frameworks': COMPLIANCE_FRAMEWORKS,
-		'api_endpoints': {
-			'verification': '/api/v1/biometric/auth/verify',
-			'natural_language': '/api/v1/biometric/nl/query',
-			'collaboration': '/api/v1/biometric/collaboration/start',
-			'behavioral': '/api/v1/biometric/behavioral/session/start',
-			'analytics': '/api/v1/biometric/analytics/dashboard',
-			'health': '/api/v1/biometric/health'
+		"name": "biop",
+		"aliases": ["biometric_processing", "biometric_authentication", "identity_verification"],
+		"display_name": capability_metadata["display_name"],
+		"description": capability_metadata["description"],
+		"version": capability_metadata["version"],
+		"dependencies": capability_metadata["dependencies"],
+		"optional_dependencies": ["auth", "audl", "encr", "frec"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"biometric_enrollment": "Enroll tenant-scoped biometric samples with explicit consent",
+			"template_governance": "Protect, rotate, retire, and audit biometric templates",
+			"liveness_detection": "Require presentation-attack checks for authentication flows",
+			"biometric_verification": "Run match and verification decisions with confidence thresholds",
+			"capability_rules": "Evaluate deterministic biometric-processing rules",
+			"visual_theming": "Apply biometric-control theme tokens and components"
 		},
-		'revolutionary_differentiators': {
-			'contextual_intelligence': 'Business-aware AI that learns organizational patterns',
-			'natural_language_queries': 'First conversational biometric interface',
-			'predictive_analytics': 'Prevents fraud before it occurs',
-			'collaborative_verification': 'Multi-expert real-time collaboration',
-			'immersive_dashboard': '3D/AR visualization with gesture control',
-			'adaptive_security': 'Self-evolving security system',
-			'universal_orchestration': 'Global compliance automation',
-			'behavioral_fusion': 'Physical + behavioral biometric integration',
-			'deepfake_detection': 'Quantum-inspired synthetic media detection',
-			'zero_friction_auth': 'Invisible background authentication'
-		}
+		"endpoints": {
+			"enrollments": "/biop/api/v1/enrollments",
+			"verification": "/biop/api/v1/verification",
+			"templates": "/biop/api/v1/templates",
+			"liveness": "/biop/api/v1/liveness",
+			"compliance": "/biop/api/v1/compliance"
+		},
+		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": capability_metadata["permissions"]
 	}
 
-def register_with_apg():
-	"""
-	Register biometric authentication capability with APG composition engine
-	
-	This function should be called during APG platform initialization to register
-	the capability and make it available for composition with other capabilities.
-	"""
-	capability_info = get_capability_info()
-	
-	# This would integrate with the actual APG composition engine
-	# For now, we'll return the registration data
-	return {
-		'registration_status': 'ready',
-		'capability_info': capability_info,
-		'composition_ready': True,
-		'revolutionary_features_validated': True
-	}
 
-__all__ = [
-	# Models
-	'BiUser', 'BiVerification', 'BiBiometric', 'BiDocument', 'BiFraudRule',
-	'BiComplianceRule', 'BiCollaboration', 'BiBehavioralSession', 'BiAuditLog',
-	'BiVerificationStatus', 'BiModalityType', 'BiRiskLevel', 'BiComplianceFramework',
-	'BiUserCreate', 'BiVerificationCreate', 'BiBiometricCreate', 'BiCollaborationCreate',
-	
-	# Services
-	'BiometricAuthenticationService',
-	'ContextualIntelligenceEngine',
-	'PredictiveAnalyticsEngine', 
-	'BehavioralBiometricsFusion',
-	'AdaptiveSecurityIntelligence',
-	'UniversalIdentityOrchestration',
-	'DeepfakeQuantumDetection',
-	'ZeroFrictionAuthentication',
-	'CollaborativeVerificationEngine',
-	
-	# Views
-	'BiUserView', 'BiVerificationView', 'BiCollaborationView',
-	'NaturalLanguageInterfaceView', 'AdaptiveSecurityView', 'UniversalComplianceView',
-	'BiometricAnalyticsChartView', 'PredictiveAnalyticsChartView', 'CollaborativeMetricsChartView',
-	
-	# API
-	'biometric_bp',
-	
-	# Capability Functions
-	'get_capability_info',
-	'register_with_apg',
-	
-	# Constants
-	'CAPABILITY_NAME', 'CAPABILITY_VERSION', 'COMPOSITION_KEYWORDS',
-	'REVOLUTIONARY_FEATURES', 'MARKET_SUPERIORITY', 'PERFORMANCE_BENCHMARKS',
-	'COMPLIANCE_FRAMEWORKS'
-]
+def get_capability_info() -> dict[str, Any]:
+	"""Get BIOP capability information for composition and marketplace discovery."""
+	info = capability_metadata.copy()
+	info["composition_keywords"] = COMPOSITION_KEYWORDS
+	info["contract"] = get_capability_contract()
+	return info
+
+
+def register_with_apg() -> dict[str, Any]:
+	"""Compatibility alias for older biometric registration callers."""
+	return {"registration_status": "ready", "capability_info": get_capability_info(), "registration": register_capability()}
+
+
+__all__ = ["CAPABILITY_NAME", "CAPABILITY_VERSION", "CAPABILITY_DESCRIPTION", "COMPOSITION_KEYWORDS", "capability_metadata", "register_capability", "register_with_apg", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
