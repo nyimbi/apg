@@ -23,6 +23,7 @@ from .models import (
 	PLManufacturingIntegration, PLDigitalTwinBinding
 )
 from . import PLMCapability, plm_capability, PLM_CAPABILITY_METADATA
+from .context import get_current_user_id, get_tenant_id_from_request
 
 
 class PLMFlaskIntegration:
@@ -144,6 +145,9 @@ class PLMFlaskIntegration:
 	def _create_sample_data(self) -> None:
 		"""Create sample PLM data for demonstration"""
 		try:
+			tenant_id = get_tenant_id_from_request()
+			user_id = get_current_user_id()
+
 			# Sample product types
 			sample_products = [
 				{
@@ -154,8 +158,8 @@ class PLMFlaskIntegration:
 					'lifecycle_phase': 'active',
 					'target_cost': 150000.00,
 					'current_cost': 145000.00,
-					'tenant_id': 'tenant_default',
-					'created_by': 'system'
+					'tenant_id': tenant_id,
+					'created_by': user_id
 				},
 				{
 					'product_name': 'PLM Collaboration Suite',
@@ -165,8 +169,8 @@ class PLMFlaskIntegration:
 					'lifecycle_phase': 'production',
 					'target_cost': 50000.00,
 					'current_cost': 48000.00,
-					'tenant_id': 'tenant_default',
-					'created_by': 'system'
+					'tenant_id': tenant_id,
+					'created_by': user_id
 				},
 				{
 					'product_name': 'AI Design Optimizer',
@@ -176,8 +180,8 @@ class PLMFlaskIntegration:
 					'lifecycle_phase': 'development',
 					'target_cost': 75000.00,
 					'current_cost': 80000.00,
-					'tenant_id': 'tenant_default',
-					'created_by': 'system'
+					'tenant_id': tenant_id,
+					'created_by': user_id
 				}
 			]
 			
@@ -265,8 +269,10 @@ class PLMFlaskIntegration:
 					asyncio.set_event_loop(loop)
 					
 					service = PLMProductService()
+					tenant_id = get_tenant_id_from_request()
+					user_id = get_current_user_id()
 					metrics = loop.run_until_complete(
-						service.get_capability_metrics('tenant_default', 'system')
+						service.get_capability_metrics(tenant_id, user_id)
 					)
 					return metrics, 200
 					

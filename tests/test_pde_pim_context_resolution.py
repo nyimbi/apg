@@ -11,6 +11,7 @@ from flask import Flask, g, has_request_context, request, session
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTEXT_PATH = REPO_ROOT / "capabilities" / "pde" / "pim" / "context.py"
 BLUEPRINT_PATH = REPO_ROOT / "capabilities" / "pde" / "pim" / "blueprint.py"
+APP_INTEGRATION_PATH = REPO_ROOT / "capabilities" / "pde" / "pim" / "app_integration.py"
 
 
 def _context_helpers() -> dict[str, Any]:
@@ -39,6 +40,17 @@ def test_pim_blueprint_delegates_context_resolution():
 	assert "from .context import get_current_user_id, get_tenant_id_from_request" in source
 	assert source.count("get_tenant_id_from_request()") >= 10
 	assert source.count("get_current_user_id()") >= 9
+
+
+def test_pim_app_integration_delegates_context_resolution():
+	source = APP_INTEGRATION_PATH.read_text(encoding="utf-8")
+
+	assert "'tenant_default'" not in source
+	assert "'system'" not in source
+	assert "from .context import get_current_user_id, get_tenant_id_from_request" in source
+	assert "tenant_id = get_tenant_id_from_request()" in source
+	assert "user_id = get_current_user_id()" in source
+	assert "service.get_capability_metrics(tenant_id, user_id)" in source
 
 
 def test_pim_context_resolves_tenant_and_user(monkeypatch):

@@ -3018,3 +3018,18 @@ Verification:
 - `rg -n "api_user|request\.headers\.get\('X-User-ID'|Kafka|kafka" capabilities/common/hlth/api.py tests/test_common_hlth_api_context.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:22 EAT
+
+Completed checkpoint:
+
+- Replaced Product Information Management app integration sample-data and metrics hard-coded tenant/user values with the existing APG context helpers.
+- Expanded focused PDE/PIM context regression coverage to include the app integration surface while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/pde/pim/app_integration.py tests/test_pde_pim_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_pde_pim_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "tenant_default|'system'|\"system\"|Kafka|kafka" capabilities/pde/pim/app_integration.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
