@@ -17,6 +17,11 @@ import logging
 from typing import Any, Dict, List, Optional
 from uuid_extensions import uuid7str
 
+from .capability_contract import (
+	evaluate_capability_rules,
+	get_capability_contract
+)
+
 # APG Capability Metadata
 CAPABILITY_INFO = {
 	"name": "nlpc",
@@ -216,10 +221,63 @@ def get_capability_info() -> dict[str, Any]:
 	Returns:
 		Capability metadata and configuration
 	"""
+	contract = get_capability_contract()
 	return {
 		"capability": CAPABILITY_INFO,
 		"service": SERVICE_REGISTRY,
-		"composition": COMPOSITION_SCHEMA
+		"composition": COMPOSITION_SCHEMA,
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"]
+	}
+
+
+def register_capability() -> dict[str, Any]:
+	"""Register NLPC as a first-class APG composition capability."""
+	contract = get_capability_contract()
+	return {
+		"name": "nlpc",
+		"aliases": ["nlp_core", "text_intelligence", "language_processing"],
+		"display_name": "NLP Core",
+		"description": CAPABILITY_INFO["description"],
+		"version": CAPABILITY_INFO["version"],
+		"dependencies": ["aicr", "mlcm", "conf"],
+		"optional_dependencies": ["auth", "audl", "mqeb", "cach", "ragn"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"text_processing": "Process tenant-scoped documents through NLP pipelines",
+			"language_analysis": "Detect and normalize languages, including broad African language coverage",
+			"sentiment_analysis": "Score sentiment, emotion, and intent for governed text workloads",
+			"entity_recognition": "Extract named entities, keywords, and PII signals",
+			"text_generation": "Route generation and summarization with safety controls",
+			"capability_rules": "Evaluate deterministic NLP governance rules",
+			"visual_theming": "Apply text-intelligence console theme tokens and components"
+		},
+		"endpoints": {
+			"documents": "/nlpc/api/v1/documents",
+			"process": "/nlpc/api/v1/process",
+			"models": "/nlpc/api/v1/models",
+			"languages": "/nlpc/api/v1/languages",
+			"analytics": "/nlpc/api/v1/analytics"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"nlpc:view",
+			"nlpc:process",
+			"nlpc:annotate",
+			"nlpc:manage_models",
+			"nlpc:govern",
+			"nlpc:admin"
+		]
 	}
 
 
@@ -287,14 +345,12 @@ __all__ = [
 	"SERVICE_REGISTRY", 
 	"COMPOSITION_SCHEMA",
 	"register_with_apg_composition",
+	"register_capability",
 	"initialize_nlpc_capability",
 	"get_capability_info",
+	"get_capability_contract",
+	"evaluate_capability_rules",
 	"get_supported_tasks",
 	"get_supported_languages",
 	"health_check"
 ]
-
-# Initialize capability on module load
-_log_capability_info("NLPC capability module loaded - ready for APG composition integration")
-_log_capability_info(f"Supported NLP tasks: {len(get_supported_tasks())}")
-_log_capability_info(f"Supported languages: {len(get_supported_languages())}")

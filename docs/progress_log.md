@@ -566,3 +566,24 @@ Current broader AICR/MLCM/FEDL execution findings:
 - MLCM and FEDL are no longer placeholder packages at the composition layer; both now advertise executable configuration/rules/UI/theme contracts.
 - Focused contract tests live outside existing heavyweight runtime test folders to keep this battery-constrained verification slice small.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 09:43 EAT
+
+Completed checkpoint:
+
+- Made the NLPC core AI service executable as a first-class APG capability with tenant-scoped processing, task, governance, UI, and theme configuration.
+- Added deterministic NLPC language/text-governance rules for tenant context, language detection, PII redaction policy, generation safety policy, low-confidence review, and large-batch async routing.
+- Preserved and relocated focused African language-code coverage so it avoids the heavyweight NLPC service-test fixture stack while still verifying 40+ African language codes in metadata and models.
+- Normalized CVSN registration with a first-class `register_capability()` surface for configuration, rules, UI components, theme, endpoints, dependencies, and permissions.
+- Removed CVSN import-time registration side effects so composition discovery can import metadata without printing or simulating runtime registration.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/nlpc/__init__.py capabilities/common/nlpc/capability_contract.py capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/models.py capabilities/common/cvsn/__init__.py capabilities/common/cvsn/capability_contract.py capabilities/common/cvsn/tests/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/cvsn/tests/test_capability_contract.py` -> 8 passed, 15 warnings
+
+Current broader NLPC/CVSN execution findings:
+
+- Attempting to run the old `capabilities/common/nlpc/tests/test_language_codes.py` location triggered `capabilities/common/nlpc/tests/conftest.py`, which imports the full NLPC service stack and currently fails before tests with `AttributeError: module 'nltk' has no attribute 'tokenize'`.
+- The lightweight language-code regression now lives at `capabilities/common/nlpc/test_language_codes.py` to avoid that unrelated heavy fixture path.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities and NLPC Pydantic v2 deprecations.

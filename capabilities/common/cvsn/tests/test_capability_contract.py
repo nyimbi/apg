@@ -1,6 +1,6 @@
 """Regression coverage for the CVSN executable capability contract."""
 
-from .. import get_capability_info
+from .. import get_capability_info, register_capability
 from ..capability_contract import evaluate_capability_rules, get_capability_contract
 
 
@@ -62,9 +62,14 @@ def test_rule_engine_denies_unsafe_vision_workloads():
 
 def test_registration_includes_full_capability_contract():
 	info = get_capability_info()
+	registration = register_capability()
 
 	assert info["configuration"]["tenant_id"] == "default"
 	assert info["rule_engine"]["type"] == "deterministic"
 	assert info["ui_manifest"]["requires_theme"] is True
 	assert info["theme"]["name"] == "cvsn_industrial"
 	assert {route["name"] for route in info["ui_manifest"]["routes"]} >= {"quality", "safety", "models"}
+	assert registration["name"] == "cvsn"
+	assert registration["ui_components"]["quality"] == "/cvsn/quality"
+	assert "aicr" in registration["dependencies"]
+	assert "cv:object_detection" in registration["permissions"]

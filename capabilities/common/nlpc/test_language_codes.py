@@ -1,7 +1,7 @@
 """Regression coverage for NLPC language-code support."""
 
-from ..models import LanguageCode
-from .. import CAPABILITY_INFO
+from capabilities.common.nlpc import CAPABILITY_INFO
+from capabilities.common.nlpc.models import LanguageCode
 
 
 AFRICAN_LANGUAGE_CODES = {

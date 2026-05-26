@@ -364,6 +364,46 @@ def get_capability_info() -> Dict[str, Any]:
 	}
 
 
+def register_capability() -> Dict[str, Any]:
+	"""Register CVSN as a first-class APG composition capability."""
+	contract = get_capability_contract()
+	return {
+		"name": "cvsn",
+		"aliases": ["computer_vision", "visual_intelligence", "vision_processing"],
+		"display_name": CAPABILITY_METADATA["capability_name"],
+		"description": CAPABILITY_METADATA["capability_description"],
+		"version": CAPABILITY_METADATA["version"],
+		"dependencies": ["aicr", "mlcm", "conf", "auth"],
+		"optional_dependencies": ["audl", "moni", "cach", "mqeb"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"document_ocr": "Extract text, tables, and forms from tenant-scoped documents",
+			"object_detection": "Detect, classify, and track visual objects in images and video",
+			"quality_control": "Run visual inspection workflows for manufacturing and operations",
+			"factory_safety": "Surface high-severity smoke, fire, OSHA, and people-counting signals",
+			"model_management": "Expose vision model deployment and tuning surfaces",
+			"capability_rules": "Evaluate deterministic computer-vision governance rules",
+			"visual_theming": "Apply industrial vision-console theme tokens and components"
+		},
+		"endpoints": {
+			"documents": "/cvsn/api/v1/documents",
+			"images": "/cvsn/api/v1/images",
+			"video": "/cvsn/api/v1/video",
+			"quality": "/cvsn/api/v1/quality",
+			"models": "/cvsn/api/v1/models"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": list(CAPABILITY_PERMISSIONS)
+	}
+
+
 def validate_capability_requirements() -> Dict[str, bool]:
 	"""Validate that all capability requirements are met"""
 	validation_results = {
@@ -403,13 +443,6 @@ def register_with_apg_platform() -> bool:
 		return False
 
 
-# Initialize capability registration on import
-if __name__ != "__main__":
-	registration_success = register_with_apg_platform()
-	if not registration_success:
-		raise RuntimeError("Computer Vision capability failed to register with APG platform")
-
-
 # Export main interfaces
 __all__ = [
 	"CAPABILITY_METADATA",
@@ -424,6 +457,7 @@ __all__ = [
 	"get_capability_contract",
 	"evaluate_capability_rules",
 	"get_capability_info",
+	"register_capability",
 	"validate_capability_requirements",
 	"register_with_apg_platform"
 ]
