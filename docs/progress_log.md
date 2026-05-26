@@ -2310,3 +2310,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_scm_rep_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|return \"current_user\"|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|TODO: Get tenant" capabilities/scm/rep/views.py capabilities/scm/rep/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:15 EAT
+
+Completed checkpoint:
+
+- Replaced Requisitioning API/view tenant defaults and current-user placeholders with shared request-context helpers.
+- Requisition approval, rejection, submission, cancellation, comments, dashboard, metrics, my-approvals, and my-requisitions paths now resolve tenant/user identity from payload, Flask context/current user, `g.user`, APG headers, query args, request environment, and configured fallbacks.
+- Added focused regression coverage that rejects stale Requisitioning tenant/user placeholders and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/scm/req/context.py capabilities/scm/req/views.py capabilities/scm/req/api.py tests/test_scm_req_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_scm_req_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|return \"current_user\"|TODO: Implement tenant resolution|TODO: Get from Flask-Login|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)" capabilities/scm/req/views.py capabilities/scm/req/api.py` -> no matches
+- `git diff --check` -> no issues

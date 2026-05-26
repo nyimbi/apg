@@ -17,6 +17,7 @@ from wtforms import validators, widgets
 from wtforms.fields import StringField, TextAreaField, SelectField, DateField, DecimalField, IntegerField
 
 from .models import PPRRequisition, PPRRequisitionLine, PPRApprovalWorkflow, PPRRequisitionComment
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import RequisitioningService
 
 
@@ -236,13 +237,11 @@ class RequisitionView(ModelView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		# TODO: Implement tenant resolution
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		# TODO: Get from Flask-Login or similar
-		return "current_user"
+		return get_current_user_id()
 
 
 class RequisitionLineView(ModelView):
@@ -521,13 +520,11 @@ class RequisitionDashboardView(BaseView):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		# TODO: Implement tenant resolution
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		# TODO: Get from Flask-Login or similar
-		return "current_user"
+		return get_current_user_id()
 
 
 class RequisitionChartView(DirectByChartView):

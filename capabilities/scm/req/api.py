@@ -16,6 +16,7 @@ from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.security.decorators import has_access_api
 
 from .models import PPRRequisition, PPRRequisitionLine, PPRApprovalWorkflow, PPRRequisitionComment
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import RequisitioningService
 
 
@@ -559,13 +560,13 @@ class RequisitionApi(BaseApi):
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		# TODO: Implement tenant resolution
-		return "default_tenant"
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 	
 	def get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		# TODO: Get from Flask-Login or similar
-		return "current_user"
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_current_user_id(payload)
 
 
 def register_api_views(appbuilder: AppBuilder):
