@@ -15,7 +15,7 @@ from datetime import datetime, date, timedelta
 from typing import Dict, List, Any, Optional, Union
 from decimal import Decimal
 
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query, Path, Body, BackgroundTasks
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query, Path, Body, BackgroundTasks, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -40,6 +40,7 @@ from .views import (
 )
 from .models import WorkMode, AIAgentType, ProductivityMetric
 from .config import get_config
+from .context import resolve_current_user_context
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -62,15 +63,12 @@ router = APIRouter(
 
 
 # Dependency functions
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+async def get_current_user(
+	request: Request,
+	credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> Dict[str, Any]:
 	"""Get current authenticated user"""
-	# TODO: Implement actual JWT token validation
-	# This is a placeholder for proper authentication
-	return {
-		"user_id": "user_123",
-		"tenant_id": "tenant_default",
-		"roles": ["employee", "manager"]
-	}
+	return resolve_current_user_context(request)
 
 
 async def get_tenant_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str:

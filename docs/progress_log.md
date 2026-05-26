@@ -2527,3 +2527,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fintech_gateway_webhook_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "data\['tenant_id'\] = data\.get\('tenant_id', 'default_tenant'\)|request\.args\.get\('tenant_id', 'default_tenant'\)|required_fields = \['tenant_id', 'event_type', 'payload'\]|await self\._ensure_initialized\(\)|SyntaxError" capabilities/fintech/gateway/webhook_api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:17 EAT
+
+Completed checkpoint:
+
+- Replaced the HCM Time & Attendance FastAPI auth dependency's hardcoded `user_123`/`tenant_default` identity with request-context resolution.
+- Time & Attendance API endpoints now receive actor and tenant identity from FastAPI request state, APG headers, query args, request environment/configured fallbacks, and preserve the existing downstream `current_user["tenant_id"]` / `current_user["user_id"]` contract.
+- Added focused regression coverage that rejects stale Time & Attendance auth placeholders and verifies request-context precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/context.py capabilities/hcm/tat/time_attendance/api.py tests/test_hcm_tat_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_hcm_tat_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "['\"]user_123['\"]|['\"]tenant_default['\"]|TODO: Implement actual JWT token validation" capabilities/hcm/tat/time_attendance/api.py` -> no matches
+- `git diff --check` -> no issues
