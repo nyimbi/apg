@@ -19,7 +19,7 @@ from .ast_builder import (
 	MethodDeclaration, Parameter, TypeAnnotation, Expression, Statement,
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
 	AssignmentStatement, ReturnStatement, BlockStatement, EntityType,
-	AIAgentDeclaration, AgentTeamDeclaration
+	AIAgentDeclaration, AgentTeamDeclaration, ListExpression, DictExpression
 )
 
 
@@ -556,8 +556,13 @@ class SemanticAnalyzer:
 		elif isinstance(stmt, ReturnStatement):
 			# Check return type compatibility
 			if self.current_method and self.current_method.return_type:
-				# Would need expression type inference here
-				pass
+				expected_type = self._apg_type_from_annotation(self.current_method.return_type)
+				actual_type = APGType.VOID if stmt.value is None else self._infer_expression_type(stmt.value)
+				if not self._types_compatible(expected_type, actual_type):
+					self.errors.append(SemanticError(
+						f"Method '{self.current_method.name}' returns {actual_type.value}, expected {expected_type.value}",
+						stmt
+					))
 	
 	# ========================================
 	# Phase 4: Dead Code Analysis
@@ -617,6 +622,56 @@ class SemanticAnalyzer:
 		}
 		
 		return type_map.get(annotation.type_name, APGType.ANY)
+
+	def _infer_expression_type(self, expression: Expression) -> APGType:
+		"""Infer a conservative APG type for executable semantic checks."""
+		if isinstance(expression, LiteralExpression):
+			literal_map = {
+				'string': APGType.STRING,
+				'integer': APGType.INTEGER,
+				'int': APGType.INTEGER,
+				'float': APGType.FLOAT,
+				'boolean': APGType.BOOLEAN,
+				'bool': APGType.BOOLEAN,
+				'null': APGType.NULL,
+			}
+			return literal_map.get(expression.literal_type, APGType.ANY)
+		if isinstance(expression, IdentifierExpression):
+			symbol = self.current_scope.lookup(expression.name)
+			return symbol.symbol_type if symbol else APGType.ANY
+		if isinstance(expression, ListExpression):
+			return APGType.LIST
+		if isinstance(expression, DictExpression):
+			return APGType.DICT
+		if isinstance(expression, CallExpression):
+			if isinstance(expression.function, IdentifierExpression):
+				signature = self.builtin_functions.get(expression.function.name)
+				if signature and signature.return_type:
+					return self._apg_type_from_annotation(signature.return_type)
+			return APGType.ANY
+		if isinstance(expression, BinaryExpression):
+			left_type = self._infer_expression_type(expression.left)
+			right_type = self._infer_expression_type(expression.right)
+			if expression.operator in {'==', '!=', '<', '>', '<=', '>=', '&&', '||', 'in'}:
+				return APGType.BOOLEAN
+			if APGType.FLOAT in {left_type, right_type}:
+				return APGType.FLOAT
+			if left_type == right_type == APGType.INTEGER:
+				return APGType.INTEGER
+			if expression.operator == '+' and left_type == right_type == APGType.STRING:
+				return APGType.STRING
+			return APGType.ANY
+		return APGType.ANY
+
+	def _types_compatible(self, expected: APGType, actual: APGType) -> bool:
+		"""Return whether an inferred type can satisfy a declared type."""
+		if expected == APGType.ANY or actual == APGType.ANY:
+			return True
+		if actual == APGType.NULL:
+			return expected in {APGType.ANY, APGType.NULL}
+		if expected == APGType.FLOAT and actual == APGType.INTEGER:
+			return True
+		return expected == actual
 	
 	def _initialize_builtins(self) -> Dict[str, FunctionSignature]:
 		"""Initialize built-in functions"""

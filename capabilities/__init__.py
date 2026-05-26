@@ -261,6 +261,7 @@ def load_capability(capability_name: str):
 
 def discover_subcapabilities(capability_name: str) -> List[str]:
 	"""Discover sub-capabilities for a given capability"""
+	discover_subcapabilities.last_error = None
 	try:
 		capability_module = load_capability(capability_name)
 		if hasattr(capability_module, 'get_subcapabilities'):
@@ -273,9 +274,11 @@ def discover_subcapabilities(capability_name: str) -> List[str]:
 			if capability_path.exists():
 				return [item.name for item in capability_path.iterdir() 
 						if item.is_dir() and not item.name.startswith('__')]
-	except Exception:
-		pass
+	except Exception as exc:
+		discover_subcapabilities.last_error = str(exc)
 	return []
+
+discover_subcapabilities.last_error = None
 
 def validate_capability_combination(capabilities: List[str]) -> Dict[str, Any]:
 	"""Validate a combination of capabilities for conflicts and dependencies"""

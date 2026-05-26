@@ -1733,3 +1733,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_cli_run_command.py` -> 4 passed
 - `.venv/bin/python -m py_compile cli/run_command.py cli/main.py cli/create_project.py tests/test_cli_run_command.py`
 - `rg -n "pass$" cli/run_command.py cli/main.py cli/create_project.py` -> no matches
+
+### 2026-05-26 19:56 EAT
+
+Completed checkpoint:
+
+- Replaced remaining central no-op marker bodies in AST base nodes with explicit `node_category` metadata.
+- Made semantic return validation executable for straightforward return statements, including literal returns, parameter identifier returns, lists, dictionaries, built-in calls, and binary expressions.
+- Added concrete errors when methods return a value from `void` methods or return a simple incompatible type.
+- Changed sub-capability discovery to record import/lookup failures on `discover_subcapabilities.last_error` instead of silently swallowing them.
+- Added focused tests for AST metadata, return type mismatch detection, parameter return compatibility, void return errors, and capability discovery diagnostics.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_semantic_executable_checks.py` -> 5 passed
+- `.venv/bin/python -m py_compile compiler/ast_builder.py compiler/semantic_analyzer.py capabilities/__init__.py tests/test_semantic_executable_checks.py`
+- `rg -n "TODO: Implement|TODO: Add|placeholder|stub|NotImplemented|pass$" cli compiler templates/composable capabilities/__init__.py capabilities/capability_contract_registry.py capabilities/capability_contract_factory.py agents --glob '*.py' --glob '*.md' --glob '!**/__pycache__/**'` -> no matches

@@ -195,7 +195,7 @@ class ValidationRule(ASTNode):
 @dataclass
 class Statement(ASTNode):
 	"""Base class for all statements"""
-	pass
+	node_category: str = field(default="statement", init=False)
 
 
 @dataclass
@@ -254,7 +254,7 @@ class WhileStatement(Statement):
 @dataclass
 class Expression(ASTNode):
 	"""Base class for all expressions"""
-	pass
+	node_category: str = field(default="expression", init=False)
 
 
 @dataclass
