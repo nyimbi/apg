@@ -3,10 +3,11 @@
 Create Template Structure
 ========================
 
-Creates the complete directory structure and placeholder files for all APG application templates.
+Creates the complete directory structure and executable starter files for all APG application templates.
 """
 
 import os
+import json
 from pathlib import Path
 from typing import Dict, List
 
@@ -343,7 +344,7 @@ def create_template_structure():
         # Create directory structure
         create_template_directories(template_path, metadata)
         
-        # Create placeholder files
+        # Create executable starter files
         create_template_files(template_path, metadata)
         
         print(f"✅ Created template: {template_id}")
@@ -374,16 +375,10 @@ def create_template_json(template_path: Path, template_id: str, metadata: Dict):
             "database_url": "{{database_url}}",
             "secret_key": "{{secret_key}}"
         },
-        "files": [
-            "app.py.template",
-            "config.py.template",
-            "requirements.txt.template",
-            "README.md.template"
-        ]
+        "files": template_file_manifest(metadata)
     }
     
     with open(template_path / 'template.json', 'w') as f:
-        import json
         json.dump(template_json, f, indent=2)
 
 def create_template_directories(template_path: Path, metadata: Dict):
@@ -410,9 +405,8 @@ def create_template_directories(template_path: Path, metadata: Dict):
     for directory in directories:
         (template_path / directory).mkdir(parents=True, exist_ok=True)
 
-def create_template_files(template_path: Path, metadata: Dict):
-    """Create template placeholder files"""
-    # Main files
+def template_file_manifest(metadata: Dict) -> List[str]:
+    """Return every template file registered for a generated template."""
     files_to_create = [
         'app.py.template',
         'config.py.template', 
@@ -421,36 +415,346 @@ def create_template_files(template_path: Path, metadata: Dict):
         'agents/__init__.py.template',
         'models/__init__.py.template',
         'views/__init__.py.template',
-        'tests/__init__.py.template'
+        'tests/__init__.py.template',
+        'tests/__main__.py.template'
     ]
     
-    # Add digital twins files if needed
     if metadata.get('digital_twins'):
         files_to_create.append('digital_twins/__init__.py.template')
-    
-    for file_path in files_to_create:
+
+    return sorted(files_to_create)
+
+
+def _slug(value: str) -> str:
+    return value.lower().replace('&', 'and').replace(' ', '_').replace('-', '_')
+
+
+def _json(value) -> str:
+    return json.dumps(value, ensure_ascii=True, indent=4)
+
+
+def _app_template(metadata: Dict) -> str:
+    return f'''"""Executable APG starter for {metadata['name']}."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+from agents import build_agent_registry
+from models import seed_records
+from views import build_dashboard_payload, list_routes
+
+
+TEMPLATE_NAME = {json.dumps(metadata['name'])}
+DESCRIPTION = {json.dumps(metadata['description'])}
+FEATURES = {_json(metadata['features'])}
+DATABASES = {_json(metadata.get('databases', []))}
+
+
+def create_application(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Create a dependency-free application descriptor."""
+    runtime_config = config or {{}}
+    records = seed_records()
+    agents = build_agent_registry()
+    return {{
+        "name": runtime_config.get("project_name", "{{{{project_name}}}}"),
+        "description": runtime_config.get("project_description", DESCRIPTION),
+        "template": TEMPLATE_NAME,
+        "features": list(FEATURES),
+        "databases": list(DATABASES),
+        "agents": list(agents),
+        "routes": list_routes(),
+        "records": [asdict(record) for record in records],
+        "dashboard": build_dashboard_payload(records, agents, runtime_config),
+    }}
+
+
+def health_check() -> dict[str, Any]:
+    app = create_application()
+    return {{
+        "status": "ready",
+        "template": TEMPLATE_NAME,
+        "feature_count": len(app["features"]),
+        "agent_count": len(app["agents"]),
+    }}
+
+
+if __name__ == "__main__":
+    status = health_check()
+    print(f"{{status['template']}}: {{status['status']}} ({{status['feature_count']}} features)")
+'''
+
+
+def _config_template(metadata: Dict) -> str:
+    return f'''"""Configuration defaults for {metadata['name']}."""
+
+from __future__ import annotations
+
+import os
+
+
+class Config:
+    PROJECT_NAME = os.environ.get("PROJECT_NAME", "{{{{project_name}}}}")
+    PROJECT_DESCRIPTION = os.environ.get("PROJECT_DESCRIPTION", "{{{{project_description}}}}")
+    AUTHOR = os.environ.get("PROJECT_AUTHOR", "{{{{author}}}}")
+    DATABASE_URL = os.environ.get("DATABASE_URL", "{{{{database_url}}}}")
+    SECRET_KEY = os.environ.get("SECRET_KEY", "{{{{secret_key}}}}")
+    TEMPLATE_NAME = {json.dumps(metadata['name'])}
+    DOMAIN = {json.dumps(metadata['domain'])}
+    FEATURES = {_json(metadata['features'])}
+    AGENTS = {_json(metadata.get('agents', []))}
+'''
+
+
+def _models_template(metadata: Dict) -> str:
+    items = [(_slug(feature), feature) for feature in metadata['features']] or [('core', 'Core Workflow')]
+    return f'''"""Domain records for {metadata['name']}."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+DATABASES = {_json(metadata.get('databases', []))}
+SEED_ITEMS = {_json(items)}
+
+
+@dataclass(slots=True)
+class TemplateRecord:
+    key: str
+    label: str
+    status: str = "ready"
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def activate(self) -> None:
+        self.status = "active"
+
+
+def seed_records() -> list[TemplateRecord]:
+    return [
+        TemplateRecord(key=key, label=label, metadata={{"database": DATABASES[index % len(DATABASES)] if DATABASES else "default"}})
+        for index, (key, label) in enumerate(SEED_ITEMS)
+    ]
+'''
+
+
+def _agents_template(metadata: Dict) -> str:
+    agents = metadata.get('agents', []) or ['ApplicationAgent']
+    return f'''"""Agent registry for {metadata['name']}."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+AGENTS = {_json(agents)}
+
+
+@dataclass(slots=True)
+class TemplateAgent:
+    name: str
+    capabilities: list[str] = field(default_factory=list)
+
+    def handle(self, event: dict[str, Any]) -> dict[str, Any]:
+        return {{
+            "agent": self.name,
+            "accepted": True,
+            "event": dict(event),
+            "handled_at": datetime.now(timezone.utc).isoformat(),
+        }}
+
+
+def build_agent_registry() -> dict[str, TemplateAgent]:
+    return {{
+        agent_name: TemplateAgent(agent_name, ["observe", "validate", "act"])
+        for agent_name in AGENTS
+    }}
+'''
+
+
+def _views_template(metadata: Dict) -> str:
+    routes = [
+        {"name": _slug(feature), "path": "/" + _slug(feature).replace('_', '-'), "feature": feature}
+        for feature in metadata['features']
+    ]
+    return f'''"""View payload builders for {metadata['name']}."""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+
+ROUTES = {_json(routes)}
+
+
+def list_routes() -> list[dict[str, str]]:
+    return [dict(route) for route in ROUTES]
+
+
+def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+    runtime_config = config or {{}}
+    return {{
+        "title": runtime_config.get("project_name", "{{{{project_name}}}}"),
+        "summary": {json.dumps(metadata['description'])},
+        "record_count": len(records),
+        "agent_count": len(agents),
+        "routes": list_routes(),
+        "records": [asdict(record) if hasattr(record, "__dataclass_fields__") else dict(record) for record in records],
+    }}
+'''
+
+
+def _tests_template(metadata: Dict) -> str:
+    return f'''"""Smoke tests for generated {metadata['name']} projects."""
+
+from __future__ import annotations
+
+
+def smoke_test() -> bool:
+    from app import create_application, health_check
+
+    application = create_application()
+    status = health_check()
+    assert status["status"] == "ready"
+    assert application["features"]
+    assert application["routes"]
+    return True
+'''
+
+
+def _tests_main_template(metadata: Dict) -> str:
+    return f'''"""Command-line smoke test runner for generated {metadata['name']} projects."""
+
+from __future__ import annotations
+
+from . import smoke_test
+
+
+if __name__ == "__main__":
+    raise SystemExit(0 if smoke_test() else 1)
+'''
+
+
+def _digital_twins_template(metadata: Dict) -> str:
+    twins = metadata.get('digital_twins') or ['AssetTwin']
+    return f'''"""Digital twin definitions for generated {metadata['name']} projects."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+
+
+TWIN_TYPES = {_json(twins)}
+
+
+@dataclass(slots=True)
+class DigitalTwin:
+    twin_id: str
+    twin_type: str
+    state: dict[str, Any] = field(default_factory=dict)
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def update(self, changes: dict[str, Any]) -> dict[str, Any]:
+        self.state.update(changes)
+        self.updated_at = datetime.now(timezone.utc).isoformat()
+        return dict(self.state)
+
+
+def seed_twins() -> list[DigitalTwin]:
+    return [DigitalTwin(twin_id=f"{{twin_type.lower()}}-001", twin_type=twin_type) for twin_type in TWIN_TYPES]
+'''
+
+
+def _readme_template(metadata: Dict) -> str:
+    features = '\n'.join(f'- {feature}' for feature in metadata['features'])
+    agents = '\n'.join(f'- {agent}' for agent in metadata.get('agents', [])) or '- ApplicationAgent'
+    databases = '\n'.join(f'- {database}' for database in metadata.get('databases', [])) or '- default'
+    return f'''# {{{{project_name}}}}
+
+Generated from the APG **{metadata['name']}** template.
+
+{metadata['description']}
+
+## Features
+
+{features}
+
+## Agents
+
+{agents}
+
+## Data Stores
+
+{databases}
+
+## Run
+
+```bash
+python app.py
+```
+
+## Smoke Test
+
+```bash
+python -c "from tests import smoke_test; smoke_test()"
+```
+'''
+
+
+def template_content(file_path: str, metadata: Dict) -> str:
+    """Build executable starter content for a template file."""
+    if file_path == 'app.py.template':
+        return _app_template(metadata)
+    if file_path == 'config.py.template':
+        return _config_template(metadata)
+    if file_path == 'requirements.txt.template':
+        return '\n'.join([
+            "Flask-AppBuilder>=4.3.0",
+            "Flask>=2.3.0",
+            "SQLAlchemy>=2.0.0",
+        ]) + '\n'
+    if file_path == 'README.md.template':
+        return _readme_template(metadata)
+    if file_path == 'agents/__init__.py.template':
+        return _agents_template(metadata)
+    if file_path == 'models/__init__.py.template':
+        return _models_template(metadata)
+    if file_path == 'views/__init__.py.template':
+        return _views_template(metadata)
+    if file_path == 'tests/__init__.py.template':
+        return _tests_template(metadata)
+    if file_path == 'tests/__main__.py.template':
+        return _tests_main_template(metadata)
+    if file_path == 'digital_twins/__init__.py.template':
+        return _digital_twins_template(metadata)
+    raise ValueError(f"Unsupported template file: {file_path}")
+
+
+def create_template_files(template_path: Path, metadata: Dict):
+    """Create executable starter template files."""
+    for file_path in template_file_manifest(metadata):
         full_path = template_path / file_path
         full_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Create placeholder content
-        content = f"""# APG Template File: {file_path}
-# Template: {metadata['name']}
-# Domain: {metadata['domain']}
-#
-# This file will contain the complete implementation for {metadata['name']}.
-# TODO: Implement {file_path} for {metadata['name']}
-"""
-        
+    
         with open(full_path, 'w') as f:
-            f.write(content)
+            f.write(template_content(file_path, metadata))
 
 if __name__ == '__main__':
     print("🚀 Creating APG Application Template Structure")
     print("=" * 60)
     create_template_structure()
     print(f"\n✅ Created {len(TEMPLATES)} application templates")
-    print("📁 Template structure ready for individual implementation")
+    print("📁 Template structure ready for use")
     print("\nNext steps:")
-    print("1. Implement each template individually")
-    print("2. Test each template as a working Flask-AppBuilder application")
+    print("1. Review generated template metadata")
+    print("2. Run generated starter smoke tests")
     print("3. Integrate with APG code generator")

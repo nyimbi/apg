@@ -2004,3 +2004,16 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_application_templates_materialized.py` -> 2 passed
 - `git diff --check -- templates/application_templates tests/test_application_templates_materialized.py`
 - `.venv/bin/python -m pytest -q tests/test_application_templates_materialized.py tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories` -> 3 passed
+
+### 2026-05-26 21:42 EAT
+
+Completed checkpoint:
+
+- Fixed `scripts/template_generation/create_template_structure.py` so future application-template generation emits executable starter files instead of recreating TODO-only shells.
+- The generator now registers every generated `.template` file, including smoke-test entrypoints and digital-twin starters when template metadata declares twins.
+- Extended the application-template regression to exercise the generator in a temporary directory, compile its Python templates, materialize a generated starter, and run its smoke test.
+
+Verification:
+
+- `.venv/bin/python -m py_compile scripts/template_generation/create_template_structure.py tests/test_application_templates_materialized.py`
+- `.venv/bin/python -m pytest -q tests/test_application_templates_materialized.py` -> 3 passed
