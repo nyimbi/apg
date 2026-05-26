@@ -593,6 +593,10 @@ from typing import Any, Dict, List
 
 
 REQUIRED_CONTRACT_KEYS = {"configuration", "configuration_schema", "rule_engine", "ui", "theme"}
+REQUIRED_SCHEMA_KEYS = {"tenant_id", "ui", "theme"}
+REQUIRED_RULE_KEYS = {"name", "condition", "effect"}
+REQUIRED_ROUTE_KEYS = {"name", "path", "component", "permission"}
+REQUIRED_THEME_TOKENS = {"border.radius"}
 
 CAPABILITY_CONTRACTS: Dict[str, Dict[str, Any]] = {{contracts_literal}}
 
@@ -618,22 +622,109 @@ def validate_capability_contracts() -> Dict[str, List[str]]:
     """Validate the generated contract shape without external dependencies."""
     errors: List[str] = []
     for capability_id, contract in CAPABILITY_CONTRACTS.items():
-        missing = sorted(REQUIRED_CONTRACT_KEYS - set(contract))
-        if missing:
-            errors.append(f"{capability_id} missing keys: {', '.join(missing)}")
-        if contract.get("capability") != capability_id:
-            errors.append(f"{capability_id} capability id mismatch")
-        if contract.get("rule_engine", {}).get("type") != "deterministic":
-            errors.append(f"{capability_id} rule_engine.type must be deterministic")
-        if not contract.get("rule_engine", {}).get("rules"):
-            errors.append(f"{capability_id} must define at least one rule")
-        if contract.get("ui", {}).get("requires_theme") is not True:
-            errors.append(f"{capability_id} ui.requires_theme must be true")
-        if not contract.get("ui", {}).get("routes"):
-            errors.append(f"{capability_id} must define UI routes")
-        if not contract.get("theme", {}).get("tokens"):
-            errors.append(f"{capability_id} must define theme tokens")
+        errors.extend(_validate_contract(capability_id, contract))
     return {"errors": errors, "validated": [] if errors else sorted(CAPABILITY_CONTRACTS)}
+
+
+def _validate_contract(capability_id: str, contract: Dict[str, Any]) -> List[str]:
+    errors: List[str] = []
+    missing = sorted(REQUIRED_CONTRACT_KEYS - set(contract))
+    if missing:
+        errors.append(f"{capability_id} missing keys: {', '.join(missing)}")
+        return errors
+    if contract.get("capability") != capability_id:
+        errors.append(f"{capability_id} capability id mismatch")
+    errors.extend(_validate_configuration(capability_id, contract.get("configuration"), contract.get("configuration_schema")))
+    errors.extend(_validate_rule_engine(capability_id, contract.get("rule_engine")))
+    errors.extend(_validate_ui(capability_id, contract.get("ui")))
+    errors.extend(_validate_theme(capability_id, contract.get("theme")))
+    return errors
+
+
+def _validate_configuration(capability_id: str, configuration: Any, schema: Any) -> List[str]:
+    errors: List[str] = []
+    if not isinstance(configuration, dict):
+        return [f"{capability_id} configuration must be a dict"]
+    if not isinstance(configuration.get("tenant_id"), str) or not configuration["tenant_id"]:
+        errors.append(f"{capability_id} configuration.tenant_id must be a non-empty string")
+    if not isinstance(schema, dict):
+        return [*errors, f"{capability_id} configuration_schema must be a dict"]
+    missing_schema = sorted(REQUIRED_SCHEMA_KEYS - set(schema.get("required", [])))
+    if missing_schema:
+        errors.append(f"{capability_id} configuration_schema.required missing: {', '.join(missing_schema)}")
+    return errors
+
+
+def _validate_rule_engine(capability_id: str, rule_engine: Any) -> List[str]:
+    if not isinstance(rule_engine, dict):
+        return [f"{capability_id} rule_engine must be a dict"]
+    errors: List[str] = []
+    if rule_engine.get("type") != "deterministic":
+        errors.append(f"{capability_id} rule_engine.type must be deterministic")
+    rules = rule_engine.get("rules")
+    if not isinstance(rules, list) or not rules:
+        return [*errors, f"{capability_id} rule_engine.rules must be a non-empty list"]
+    for index, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            errors.append(f"{capability_id} rule_engine.rules[{index}] must be a dict")
+            continue
+        missing = sorted(REQUIRED_RULE_KEYS - set(rule))
+        if missing:
+            errors.append(f"{capability_id} rule_engine.rules[{index}] missing: {', '.join(missing)}")
+        if not isinstance(rule.get("name"), str) or not rule["name"]:
+            errors.append(f"{capability_id} rule_engine.rules[{index}].name must be a non-empty string")
+        if not isinstance(rule.get("condition"), dict):
+            errors.append(f"{capability_id} rule_engine.rules[{index}].condition must be a dict")
+        if not isinstance(rule.get("effect"), dict):
+            errors.append(f"{capability_id} rule_engine.rules[{index}].effect must be a dict")
+        elif not rule["effect"].get("decision"):
+            errors.append(f"{capability_id} rule_engine.rules[{index}].effect.decision is required")
+    return errors
+
+
+def _validate_ui(capability_id: str, ui: Any) -> List[str]:
+    if not isinstance(ui, dict):
+        return [f"{capability_id} ui must be a dict"]
+    errors: List[str] = []
+    if ui.get("requires_theme") is not True:
+        errors.append(f"{capability_id} ui.requires_theme must be true")
+    if not isinstance(ui.get("shell"), str) or not ui["shell"]:
+        errors.append(f"{capability_id} ui.shell must be a non-empty string")
+    if not isinstance(ui.get("template_roots"), list) or not ui["template_roots"]:
+        errors.append(f"{capability_id} ui.template_roots must be a non-empty list")
+    routes = ui.get("routes")
+    if not isinstance(routes, list) or not routes:
+        return [*errors, f"{capability_id} ui.routes must be a non-empty list"]
+    for index, route in enumerate(routes):
+        if not isinstance(route, dict):
+            errors.append(f"{capability_id} ui.routes[{index}] must be a dict")
+            continue
+        missing = sorted(REQUIRED_ROUTE_KEYS - set(route))
+        if missing:
+            errors.append(f"{capability_id} ui.routes[{index}] missing: {', '.join(missing)}")
+        for key in REQUIRED_ROUTE_KEYS:
+            if key in route and (not isinstance(route[key], str) or not route[key]):
+                errors.append(f"{capability_id} ui.routes[{index}].{key} must be a non-empty string")
+        if isinstance(route.get("path"), str) and not route["path"].startswith("/"):
+            errors.append(f"{capability_id} ui.routes[{index}].path must start with /")
+    return errors
+
+
+def _validate_theme(capability_id: str, theme: Any) -> List[str]:
+    if not isinstance(theme, dict):
+        return [f"{capability_id} theme must be a dict"]
+    errors: List[str] = []
+    if not isinstance(theme.get("name"), str) or not theme["name"]:
+        errors.append(f"{capability_id} theme.name must be a non-empty string")
+    tokens = theme.get("tokens")
+    if not isinstance(tokens, dict) or not tokens:
+        return [*errors, f"{capability_id} theme.tokens must be a non-empty dict"]
+    missing_tokens = sorted(REQUIRED_THEME_TOKENS - set(tokens))
+    if missing_tokens:
+        errors.append(f"{capability_id} theme.tokens missing: {', '.join(missing_tokens)}")
+    if not isinstance(theme.get("components"), dict) or not theme["components"]:
+        errors.append(f"{capability_id} theme.components must be a non-empty dict")
+    return errors
 
 
 def evaluate_capability_rules(capability_id: str, context: Dict[str, Any], tenant_id: str = "default") -> Dict[str, Any]:

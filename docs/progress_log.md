@@ -1944,3 +1944,17 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_capability_contracts.py tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories` -> 4 passed
 - `.venv/bin/python cli.py capabilities validate-contracts` -> `Validated 101 capability contracts`
 - `python cli.py capabilities validate-contracts` -> failed before CLI dispatch because the system Python environment is missing `antlr4`; the project `.venv` command above is the authoritative verification.
+
+### 2026-05-26 21:24 EAT
+
+Completed checkpoint:
+
+- Brought generated application `capability_contracts.py` validation up to the same executable quality bar as the platform registry.
+- Generated apps now validate tenant-scoped configuration schema requirements, deterministic rule names/conditions/decisions, UI route metadata, and named visual theme tokens/components.
+- Added a negative generated-app regression that mutates a generated rule and verifies validation fails instead of silently accepting an incomplete rule surface.
+
+Verification:
+
+- `.venv/bin/python -m py_compile templates/composable/composition_engine.py tests/test_composition_capability_contracts.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_capability_contracts.py` -> 4 passed
+- `.venv/bin/python -m pytest -q capabilities/test_capability_contract_registry.py tests/test_capability_contract_public_api.py tests/test_cli_capability_contracts.py tests/test_composition_capability_contracts.py` -> 14 passed

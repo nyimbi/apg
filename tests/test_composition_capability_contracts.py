@@ -27,11 +27,32 @@ def test_generated_application_includes_executable_capability_contracts(engine, 
 	for capability_id, contract in contracts.items():
 		assert contract["capability"] == capability_id
 		assert contract["configuration"]["tenant_id"] == "tenant-alpha"
+		assert {"tenant_id", "ui", "theme"} <= set(contract["configuration_schema"]["required"])
 		assert contract["rule_engine"]["type"] == "deterministic"
 		assert contract["rule_engine"]["rules"]
+		for rule in contract["rule_engine"]["rules"]:
+			assert {"name", "condition", "effect"} <= set(rule)
+			assert rule["effect"]["decision"]
 		assert contract["ui"]["requires_theme"] is True
 		assert contract["ui"]["routes"]
+		for route in contract["ui"]["routes"]:
+			assert {"name", "path", "component", "permission"} <= set(route)
+			assert route["path"].startswith("/")
+		assert contract["theme"]["name"]
 		assert contract["theme"]["tokens"]
+		assert contract["theme"]["components"]
+
+
+def test_generated_contract_validator_rejects_incomplete_surfaces(engine, context):
+	files = engine.generate_application_files(context)
+	namespace = _exec_generated_module(files["capability_contracts.py"])
+	capability_id = next(iter(namespace["CAPABILITY_CONTRACTS"]))
+	namespace["CAPABILITY_CONTRACTS"][capability_id]["rule_engine"]["rules"][0].pop("effect")
+
+	validation = namespace["validate_capability_contracts"]()
+
+	assert validation["validated"] == []
+	assert any("effect" in error for error in validation["errors"])
 
 
 def test_generated_capability_contract_rules_are_executable(engine, context):
