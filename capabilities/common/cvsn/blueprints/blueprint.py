@@ -30,6 +30,7 @@ from .models import (
 	CVObjectDetection, CVFacialRecognition, CVQualityControl,
 	CVModel, CVAnalyticsReport
 )
+from ..context import resolve_current_user_info
 
 
 class ComputerVisionCapabilityBlueprint:
@@ -368,28 +369,21 @@ class ComputerVisionMiddleware:
 	
 	def _setup_tenant_context(self):
 		"""Setup multi-tenant context for the request"""
-		# Extract tenant information from request
-		tenant_id = self._extract_tenant_id()
+		user_info = resolve_current_user_info(request=request, session=session, g=g)
 		
-		# Set tenant context in Flask g object
-		g.tenant_id = tenant_id
+		g.tenant_id = user_info["tenant_id"]
+		g.user_id = user_info["user_id"]
+		g.user_permissions = user_info["permissions"]
 		g.cv_request_context = {
-			'tenant_id': tenant_id,
+			'tenant_id': user_info["tenant_id"],
+			'user_id': user_info["user_id"],
 			'timestamp': '2025-01-27T12:00:00Z',
 			'request_id': 'req_' + ''.join(['a'] * 10)  # Would generate actual UUID
 		}
 	
 	def _extract_tenant_id(self) -> str:
 		"""Extract tenant ID from request"""
-		# Check various sources for tenant ID
-		tenant_id = (
-			request.headers.get('X-Tenant-ID') or
-			session.get('tenant_id') or
-			request.args.get('tenant_id') or
-			'default'
-		)
-		
-		return tenant_id
+		return resolve_current_user_info(request=request, session=session, g=g)["tenant_id"]
 	
 	def _validate_permissions(self):
 		"""Validate user permissions for computer vision access"""

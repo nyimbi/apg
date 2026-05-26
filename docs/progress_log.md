@@ -2557,3 +2557,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_geos_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return ['\"]user_123['\"]|return ['\"]tenant_123['\"]|decode JWT and extract user ID|decode JWT and extract tenant ID" capabilities/common/geos/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:27 EAT
+
+Completed checkpoint:
+
+- Replaced Computer Vision service API/view hardcoded `user_123`/`tenant_456` identity with shared request-context resolution.
+- CVSN FastAPI dependencies, Flask-AppBuilder views, and Flask middleware now resolve actor, tenant, and permissions from request state/current user, `g`, headers, query args, session, and configured fallbacks while preserving existing downstream `user["tenant_id"]` / `user["user_id"]` contracts.
+- Added focused regression coverage that rejects stale CVSN identity placeholders, verifies API/view/middleware delegation, and verifies context precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/cvsn/context.py capabilities/common/cvsn/api.py capabilities/common/cvsn/views.py capabilities/common/cvsn/blueprints/blueprint.py tests/test_common_cvsn_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_common_cvsn_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "\"user_id\": \"user_123\"|\"tenant_id\": \"tenant_456\"|Placeholder implementation - would integrate with APG RBAC" capabilities/common/cvsn/api.py capabilities/common/cvsn/views.py` -> no matches
+- `git diff --check` -> no issues

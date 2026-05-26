@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 from uuid_extensions import uuid7str
 
-from flask import flash, redirect, request, url_for, jsonify, render_template_string
+from flask import flash, g, redirect, request, session, url_for, jsonify, render_template_string
 from flask_appbuilder import ModelView, BaseView, expose, has_access
 from flask_appbuilder.models.mixins import AuditMixin
 from flask_appbuilder.security.decorators import protect
@@ -34,6 +34,7 @@ from .service import (
 	CVImageClassificationService, CVFacialRecognitionService,
 	CVQualityControlService, CVVideoAnalysisService, CVSimilaritySearchService
 )
+from .context import resolve_current_user_info
 
 
 # ===== PYDANTIC V2 VIEW MODELS =====
@@ -240,12 +241,7 @@ class ComputerVisionBaseView(BaseView):
 	
 	def get_current_user_info(self) -> Dict[str, Any]:
 		"""Get current user information for multi-tenant access"""
-		# Placeholder - would integrate with APG RBAC
-		return {
-			"user_id": "user_123",
-			"tenant_id": "tenant_456",
-			"permissions": ["cv:read", "cv:write", "cv:admin"]
-		}
+		return resolve_current_user_info(request=request, session=session, g=g)
 
 
 class ComputerVisionDashboardView(ComputerVisionBaseView):

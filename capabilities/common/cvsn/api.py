@@ -45,6 +45,7 @@ from .service import (
 	CVImageClassificationService, CVFacialRecognitionService,
 	CVQualityControlService, CVVideoAnalysisService, CVSimilaritySearchService
 )
+from .context import resolve_current_user_info
 
 
 # API Request/Response Models
@@ -266,14 +267,12 @@ ALLOWED_DOCUMENT_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/t
 
 
 # Authentication and Authorization
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
-	"""Extract user information from JWT token"""
-	# Placeholder implementation - would integrate with APG RBAC
-	return {
-		"user_id": "user_123",
-		"tenant_id": "tenant_456",
-		"permissions": ["cv:read", "cv:write", "cv:admin"]
-	}
+async def get_current_user(
+	request: Request,
+	credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> Dict[str, Any]:
+	"""Resolve authenticated APG user context for CVSN endpoints."""
+	return resolve_current_user_info(request=request, credentials=credentials)
 
 
 async def verify_tenant_access(tenant_id: str, user: Dict[str, Any] = Depends(get_current_user)) -> bool:
