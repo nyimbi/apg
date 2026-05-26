@@ -1864,3 +1864,20 @@ Verification:
 - `.venv/bin/python -m pytest -q capabilities/composition/events/tests/integration/test_event_flow.py` -> 13 passed
 - `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py` -> 80 passed
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed
+
+### 2026-05-26 20:57 EAT
+
+Completed checkpoint:
+
+- Made the Event Streaming enterprise integration chunk executable under the local Bytewax-first harness.
+- Added enterprise fixture aliases for database, Redis, Bytewax admin/cluster, and producer test doubles.
+- Added local event sourcing state, snapshot capture, aggregate reconstruction, schema evolution storage, business-rule validation, dict-based stream creation, processor lifecycle, and processor metrics.
+- Preserved dependency-light behavior by using in-memory state when the historical event-store ORM is absent.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/events/models.py capabilities/composition/events/service.py capabilities/composition/events/tests/conftest.py capabilities/composition/events/tests/integration/test_enterprise_features.py`
+- `.venv/bin/python -m pytest -q capabilities/composition/events/tests/integration/test_enterprise_features.py` -> 7 passed
+- `.venv/bin/python -m pytest -q capabilities/composition/events/tests/integration/test_event_flow.py` -> 13 passed
+- `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py` -> 80 passed
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed

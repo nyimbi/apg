@@ -1133,6 +1133,7 @@ class EventConfig(BaseModel):
     schema_id: Optional[str] = Field(None, max_length=100)
     schema_version: str = Field(default="1.0", max_length=20)
     partition_key: Optional[str] = Field(None, max_length=200)
+    priority: EventPriority = Field(default=EventPriority.NORMAL)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 class StreamConfig(BaseModel):

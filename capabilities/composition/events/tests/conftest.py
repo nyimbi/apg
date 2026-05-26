@@ -294,6 +294,11 @@ def mock_database_session():
 	return session
 
 @pytest.fixture
+def test_database_session(mock_database_session):
+	"""Alias used by integration tests for a lightweight database session."""
+	return mock_database_session
+
+@pytest.fixture
 def mock_bytewax_producer():
 	"""Create mock Bytewax producer."""
 	producer = Mock()
@@ -303,6 +308,11 @@ def mock_bytewax_producer():
 	return producer
 
 @pytest.fixture
+def test_bytewax_producer(mock_bytewax_producer):
+	"""Alias used by integration tests for a lightweight Bytewax producer."""
+	return mock_bytewax_producer
+
+@pytest.fixture
 def mock_bytewax_admin():
 	"""Create mock Bytewax admin client."""
 	admin = Mock()
@@ -310,6 +320,16 @@ def mock_bytewax_admin():
 	admin.alter_configs = Mock(return_value={})
 	admin.close = Mock()
 	return admin
+
+@pytest.fixture
+def test_bytewax_admin(mock_bytewax_admin):
+	"""Alias used by integration tests for a lightweight Bytewax admin."""
+	return mock_bytewax_admin
+
+@pytest.fixture
+def test_bytewax_cluster(mock_bytewax_admin):
+	"""Lightweight Bytewax cluster handle for enterprise workflow tests."""
+	return mock_bytewax_admin
 
 @pytest.fixture
 def mock_bytewax_consumer():
@@ -333,6 +353,11 @@ def mock_redis_client():
 	redis.xadd = AsyncMock(return_value="stream-id")
 	redis.xread = AsyncMock(return_value=[])
 	return redis
+
+@pytest.fixture
+def test_redis_client(mock_redis_client):
+	"""Alias used by integration tests for a lightweight Redis client."""
+	return mock_redis_client
 
 # =============================================================================
 # Integration Test Fixtures

@@ -32,7 +32,7 @@ class TestEventSourcingIntegration:
 	"""Test event sourcing functionality end-to-end."""
 	
 	@pytest.fixture
-	async def sourcing_service(self, test_database_session, test_redis_client):
+	def sourcing_service(self, test_database_session, test_redis_client):
 		"""Create event sourcing service with test dependencies."""
 		service = EventSourcingService()
 		service.db_session = test_database_session
@@ -171,7 +171,7 @@ class TestStreamProcessingIntegration:
 	"""Test stream processing functionality end-to-end."""
 	
 	@pytest.fixture
-	async def stream_service(self, test_database_session, test_bytewax_admin, test_redis_client):
+	def stream_service(self, test_database_session, test_bytewax_admin, test_redis_client):
 		"""Create stream management service with test dependencies."""
 		service = StreamManagementService()
 		service.db_session = test_database_session
@@ -180,7 +180,7 @@ class TestStreamProcessingIntegration:
 		return service
 	
 	@pytest.fixture
-	async def publishing_service(self, test_database_session, test_bytewax_producer, test_redis_client):
+	def publishing_service(self, test_database_session, test_bytewax_producer, test_redis_client):
 		"""Create event publishing service for test data."""
 		service = EventPublishingService()
 		service.db_session = test_database_session
@@ -430,7 +430,7 @@ class TestEnhancedSchemaRegistryIntegration:
 	"""Test enhanced schema registry functionality end-to-end."""
 	
 	@pytest.fixture
-	async def schema_service(self, test_database_session, test_redis_client):
+	def schema_service(self, test_database_session, test_redis_client):
 		"""Create schema registry service with test dependencies."""
 		service = SchemaRegistryService()
 		service.db_session = test_database_session
