@@ -1377,3 +1377,23 @@ Current broader orchestration findings:
 
 - The executable orchestration connector and enterprise audit stream surfaces no longer import Kafka clients.
 - Generated orchestration templates still need a documentation/template migration pass to remove stale Kafka examples.
+
+### 2026-05-26 17:27 EAT
+
+Completed checkpoint:
+
+- Migrated lower-risk executable/default code surfaces from Kafka labels and URI handling to Bytewax stream terminology.
+- Updated CONN visual designer streaming templates and node library from Kafka source/topic configuration to Bytewax stream/flow configuration.
+- Updated Singer tap/target registry entries from Kafka packages to Bytewax stream package names and config keys.
+- Added executable AICR ML pipeline ingestion for `bytewax://` stream fixture sources.
+- Updated MTEN shared-resource defaults, CKM WFA event-bus config fields, IMEX source docs, and fintech messaging stack metadata to Bytewax.
+
+Verification:
+
+- `rg -n "Kafka|KAFKA|kafka|apache_kafka|tap-kafka|target-kafka|kafka_" capabilities/common/conn/visual_designer.py capabilities/common/conn/singer_runtime.py capabilities/common/aicr/ml_pipeline.py capabilities/common/imex/models.py capabilities/common/mten/apg_ecosystem_integration.py capabilities/common/mten/template_system.py capabilities/ckm/wfa/models.py capabilities/fintech/__init__.py` -> no matches
+- `.venv/bin/python -m py_compile capabilities/common/aicr/ml_pipeline.py capabilities/common/conn/visual_designer.py capabilities/common/conn/singer_runtime.py capabilities/common/mten/apg_ecosystem_integration.py capabilities/common/mten/template_system.py capabilities/ckm/wfa/models.py capabilities/fintech/__init__.py capabilities/common/imex/models.py`
+- `git diff --check -- capabilities/common/aicr/ml_pipeline.py capabilities/common/conn/visual_designer.py capabilities/common/conn/singer_runtime.py capabilities/common/imex/models.py capabilities/common/mten/apg_ecosystem_integration.py capabilities/common/mten/template_system.py capabilities/ckm/wfa/models.py capabilities/fintech/__init__.py`
+
+Current broader Bytewax migration findings:
+
+- Several small executable/default surfaces are now clean, reducing the remaining migration to larger capability families: composition events, DVRL, META, MQEB, and docs/examples.

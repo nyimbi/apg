@@ -79,7 +79,7 @@ CAPABILITY_META = {
 		'ai_ml': ['TensorFlow', 'PyTorch', 'Scikit-learn', 'XGBoost'],
 		'cloud': ['AWS', 'Azure', 'GCP', 'Kubernetes'],
 		'databases': ['PostgreSQL', 'MongoDB', 'Redis', 'InfluxDB'],
-		'messaging': ['Kafka', 'RabbitMQ', 'AWS SQS'],
+		'messaging': ['Bytewax', 'RabbitMQ', 'AWS SQS'],
 		'apis': ['REST', 'GraphQL', 'gRPC', 'WebSockets']
 	},
 	'security_standards': {

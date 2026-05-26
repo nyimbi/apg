@@ -472,9 +472,9 @@ class PipelineOrchestrator:
 			elif source.startswith("s3://"):
 				# S3 data source
 				data, meta = await self._ingest_s3_data(source, config)
-			elif source.startswith("kafka://"):
-				# Kafka streaming data
-				data, meta = await self._ingest_kafka_data(source, config)
+			elif source.startswith("bytewax://"):
+				# Bytewax streaming data
+				data, meta = await self._ingest_bytewax_data(source, config)
 			elif Path(source).exists():
 				# Local file data source
 				data, meta = await self._ingest_file_data(source, config)
@@ -499,6 +499,25 @@ class PipelineOrchestrator:
 				"total_records": sum(meta.get("record_count", 0) for meta in metadata.values()),
 				"data_quality_score": data_profile.get("quality_score", 0.0)
 			}
+		}
+
+	async def _ingest_bytewax_data(self, source: str, config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+		"""Ingest configured Bytewax stream fixtures for offline pipeline execution."""
+		stream_name = source.replace("bytewax://", "", 1)
+		stream_fixtures = config.get("bytewax_streams", {})
+		records = stream_fixtures.get(stream_name, [])
+		if isinstance(records, dict):
+			records = records.get("records", [])
+
+		normalized_records = [
+			record if isinstance(record, dict) else {"value": record}
+			for record in records
+		]
+		return normalized_records, {
+			"source": source,
+			"stream": stream_name,
+			"source_type": "bytewax",
+			"record_count": len(normalized_records)
 		}
 
 	async def _execute_data_validation(

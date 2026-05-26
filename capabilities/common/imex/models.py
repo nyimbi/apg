@@ -170,7 +170,7 @@ class SourceType(str, Enum):
 		FILE: Local or mounted file system
 		DATABASE: Relational or NoSQL database connection
 		API: RESTful or GraphQL API endpoint
-		STREAM: Real-time data stream (Kafka, Kinesis, etc.)
+		STREAM: Real-time data stream (Bytewax, Kinesis, etc.)
 		CLOUD_STORAGE: Cloud storage services (S3, GCS, Azure Blob)
 		FTP: File Transfer Protocol server
 		SFTP: Secure File Transfer Protocol server

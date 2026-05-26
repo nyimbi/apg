@@ -168,7 +168,7 @@ class VisualFlowDesigner:
 				"description": "Stream data processing pipeline",
 				"category": "streaming",
 				"nodes": [
-					{"type": "stream_source", "name": "Kafka Topic", "position": (50, 100)},
+					{"type": "stream_source", "name": "Bytewax Stream", "position": (50, 100)},
 					{"type": "processor", "name": "Stream Processor", "position": (250, 100)},
 					{"type": "stream_target", "name": "Analytics DB", "position": (450, 100)}
 				],
@@ -204,15 +204,15 @@ class VisualFlowDesigner:
 					"method": {"type": "string", "default": "GET"}
 				}
 			},
-			"kafka_source": {
-				"name": "Kafka Source",
+			"bytewax_source": {
+				"name": "Bytewax Source",
 				"type": "stream_source",
 				"icon": "stream",
 				"color": "#e74c3c",
 				"ports": {"output": ["stream"]},
 				"config_schema": {
-					"topic": {"type": "string", "required": True},
-					"bootstrap_servers": {"type": "string", "required": True}
+					"stream": {"type": "string", "required": True},
+					"flow_id": {"type": "string", "required": True}
 				}
 			},
 

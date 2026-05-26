@@ -1022,7 +1022,7 @@ class AdvancedTemplateSystem:
 		configuration = TemplateConfiguration(
 			base_configuration={
 				"data_processing": {
-					"streaming": "apache_kafka",
+					"streaming": "bytewax",
 					"batch": "apache_spark",
 					"storage": "data_lake",
 					"warehouse": "clickhouse"

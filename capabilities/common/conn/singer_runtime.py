@@ -495,14 +495,15 @@ class SingerRuntimeManager:
 		# Real-time and Streaming Taps
 		streaming_taps = [
 			{
-				"name": "tap-kafka",
-				"display_name": "Apache Kafka",
-				"description": "Extract streaming data from Kafka topics",
-				"python_package": "tap-kafka",
+				"name": "tap-bytewax",
+				"display_name": "Bytewax",
+				"description": "Extract streaming data from Bytewax streams",
+				"python_package": "tap-bytewax",
 				"connection_types": [ConnectionType.STREAM],
 				"supports_incremental": True,
 				"config_schema": {
-					"bootstrap_servers": {"type": "string", "required": True},
+					"stream": {"type": "string", "required": True},
+					"flow_id": {"type": "string", "required": True},
 					"topic": {"type": "string", "required": True},
 					"group_id": {"type": "string", "required": True}
 				}
@@ -730,14 +731,14 @@ class SingerRuntimeManager:
 		# Streaming Targets
 		streaming_targets = [
 			{
-				"name": "target-kafka",
-				"display_name": "Apache Kafka",
-				"description": "Stream data to Kafka topics",
-				"python_package": "target-kafka",
+				"name": "target-bytewax",
+				"display_name": "Bytewax",
+				"description": "Stream data to Bytewax streams",
+				"python_package": "target-bytewax",
 				"connection_types": [ConnectionType.STREAM],
 				"config_schema": {
-					"bootstrap_servers": {"type": "string", "required": True},
-					"topic": {"type": "string", "required": True}
+					"stream": {"type": "string", "required": True},
+					"flow_id": {"type": "string", "required": True}
 				}
 			}
 		]

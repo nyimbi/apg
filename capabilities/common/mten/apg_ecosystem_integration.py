@@ -1561,8 +1561,8 @@ class APGEcosystemIntegrationManager:
 			resource_type=ResourceType.QUEUE,
 			provider_capability="event_streaming_bus",
 			configuration={
-				"broker": "kafka",
-				"partitions": 12,
+				"runtime": "bytewax",
+				"workers": 12,
 				"replication_factor": 3
 			},
 			capacity={

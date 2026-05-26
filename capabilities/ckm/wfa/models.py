@@ -819,8 +819,8 @@ class WBPMServiceConfig(BaseModel):
 	apg_ai_service_url: str = Field(..., description="APG AI service URL")
 	
 	# Event Bus Configuration
-	kafka_brokers: List[str] = Field(default_factory=list, description="Kafka broker URLs")
-	kafka_topic_prefix: str = Field(default="wbpm", description="Kafka topic prefix")
+	bytewax_streams: List[str] = Field(default_factory=list, description="Bytewax stream names")
+	bytewax_stream_prefix: str = Field(default="wbpm", description="Bytewax stream prefix")
 	
 	# Security Configuration
 	encryption_key: str = Field(..., description="Encryption key for sensitive data")
