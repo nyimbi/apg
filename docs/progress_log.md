@@ -2465,3 +2465,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_glr_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "session\.get\('tenant_id', 'default_tenant'\)|return session\.get\('user_id'\)|from flask import session" capabilities/fin/glr/general_ledger/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:00 EAT
+
+Completed checkpoint:
+
+- Replaced Federated Learning view tenant defaults and inline current-user lookups with shared request-context helpers.
+- Federation creation, participant approval/creation, and learning-task creation now resolve tenant/user identity from payload, Flask context/current user, `g.user`, session, APG headers, query args, request environment, and configured fallbacks.
+- Added focused regression coverage that rejects stale Federated Learning tenant/user placeholders and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/fed/context.py capabilities/fin/fed/views.py tests/test_fin_fed_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_fed_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|from flask_appbuilder.security import current_user|return str\(current_user\.id\) if current_user and current_user\.is_authenticated else None" capabilities/fin/fed/views.py` -> no matches
+- `git diff --check` -> no issues

@@ -21,6 +21,7 @@ from .models import (
 	FLFederation, FLParticipant, FLLearningTask,
 	FLTrainingRound, FLLocalModel, FLModelUpdate, FLGlobalModel
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 
 
 class FederatedLearningBaseView(BaseView):
@@ -32,12 +33,11 @@ class FederatedLearningBaseView(BaseView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID from security context"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def _format_accuracy(self, accuracy: float) -> str:
 		"""Format accuracy for display"""
@@ -263,12 +263,11 @@ class FLFederationModelView(ModelView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class FLParticipantModelView(ModelView):
@@ -446,12 +445,11 @@ class FLParticipantModelView(ModelView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class FLLearningTaskModelView(ModelView):
@@ -647,12 +645,11 @@ class FLLearningTaskModelView(ModelView):
 	
 	def _get_current_user_id(self) -> str:
 		"""Get current user ID"""
-		from flask_appbuilder.security import current_user
-		return str(current_user.id) if current_user and current_user.is_authenticated else None
+		return get_current_user_id()
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class FLTrainingRoundModelView(ModelView):
