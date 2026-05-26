@@ -342,3 +342,22 @@ Current broader CVSN/foundation execution findings:
 - CVSN tests now collect and execute cleanly from `capabilities/common/cvsn/tests`.
 - Parallel capability build-out is active with non-overlapping ownership. AUTH is running as the next foundation lane.
 - Remaining warnings are pre-existing Pydantic/SQLAlchemy deprecation warnings surfaced through adjacent common capability imports.
+
+### 2026-05-26 07:57 EAT
+
+Completed checkpoint:
+
+- Made the AUTH foundation capability executable as a first-class APG capability with tenant-scoped auth/RBAC configuration, deterministic access-policy rules, UI route manifest, and visual theme tokens/components.
+- Exposed AUTH capability contract helpers and registration metadata while keeping optional crypto-backed runtime dependencies guarded until the relevant manager path is initialized.
+- Added focused AUTH regression coverage for contract shape, rule evaluation, and registration/info payloads.
+
+Verification:
+
+- `python -m py_compile capabilities/common/auth/capability_contract.py capabilities/common/auth/__init__.py capabilities/common/auth/tests/test_capability_contract.py` -> passed
+- `./.venv/bin/pytest capabilities/common/auth/tests/test_capability_contract.py -q` -> 3 passed
+- `git diff --check -- capabilities/common/auth` -> clean
+
+Current broader AUTH execution findings:
+
+- AUTH contract discovery/registration now works without importing optional crypto runtime modules.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

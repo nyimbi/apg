@@ -41,11 +41,41 @@ from .quantum_auth import QuantumResistantAuth, CRYSTALSKyber, CRYSTALSDilithium
 from .zk_proof import ZKProofAuthenticator, ZKChallenge, ZKProof, SchnorrProof
 from .biometric_fusion import BiometricFusionEngine, FusionMethod, LivenessStatus
 from .adaptive_policies import AdaptivePolicyEngine, PolicyOutcome, LearningMode
-from .identity_graph import IdentityGraphEngine, IdentityNode, TrustRelationship
-from .federated_mesh import FederatedIdentityMesh, MeshNode, IdentityAssertion, TrustLevel
+from .identity_graph import IdentityGraphEngine
 from .neuromorphic_processor import NeuromorphicProcessor, AuthenticationContext as NeuroContext
-from .privacy_analytics import PrivacyAnalyticsEngine, PrivacyPreservingQuery, AnalyticsQuery
-from .session_manager import EnhancedSessionManager, EnhancedSession, SessionType, RiskLevel as SessionRiskLevel
+from .capability_contract import (
+	get_capability_contract,
+	evaluate_capability_rules,
+)
+
+try:
+	from .federated_mesh import FederatedIdentityMesh, MeshNode, IdentityAssertion, TrustLevel
+	_FEDERATED_MESH_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+	FederatedIdentityMesh = None
+	MeshNode = Any
+	IdentityAssertion = Any
+	TrustLevel = Any
+	_FEDERATED_MESH_IMPORT_ERROR = exc
+
+try:
+	from .privacy_analytics import PrivacyAnalyticsEngine, PrivacyPreservingQuery, AnalyticsQuery
+	_PRIVACY_ANALYTICS_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+	PrivacyAnalyticsEngine = None
+	PrivacyPreservingQuery = Any
+	AnalyticsQuery = Any
+	_PRIVACY_ANALYTICS_IMPORT_ERROR = exc
+
+try:
+	from .session_manager import EnhancedSessionManager, EnhancedSession, SessionType, RiskLevel as SessionRiskLevel
+	_SESSION_MANAGER_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+	EnhancedSessionManager = None
+	EnhancedSession = Any
+	SessionType = Any
+	SessionRiskLevel = Any
+	_SESSION_MANAGER_IMPORT_ERROR = exc
 
 class UserStatus(str, Enum):
 	"""User account status options"""
@@ -783,9 +813,21 @@ class RevolutionaryAuthenticationManager:
 		self.biometric_fusion_engine = BiometricFusionEngine()
 		self.adaptive_policy_engine = AdaptivePolicyEngine()
 		self.identity_graph_engine = IdentityGraphEngine()
+		if FederatedIdentityMesh is None:
+			raise ModuleNotFoundError(
+				"capabilities.common.auth.federated_mesh requires optional cryptography dependencies"
+			) from _FEDERATED_MESH_IMPORT_ERROR
 		self.federated_mesh = FederatedIdentityMesh()
 		self.neuromorphic_processor = NeuromorphicProcessor()
+		if PrivacyAnalyticsEngine is None:
+			raise ModuleNotFoundError(
+				"capabilities.common.auth.privacy_analytics requires optional cryptography dependencies"
+			) from _PRIVACY_ANALYTICS_IMPORT_ERROR
 		self.privacy_analytics_engine = PrivacyAnalyticsEngine()
+		if EnhancedSessionManager is None:
+			raise ModuleNotFoundError(
+				"capabilities.common.auth.session_manager requires optional cryptography dependencies"
+			) from _SESSION_MANAGER_IMPORT_ERROR
 		self.enhanced_session_manager = EnhancedSessionManager(config)
 		
 		# Enhanced user storage
@@ -1929,3 +1971,83 @@ async def check_permission(permission: str, user_id: Optional[str] = None,
 	if user_id is None:
 		return False
 	return await manager.check_permission(user_id, permission, tenant_id)
+
+
+def get_capability_info(tenant_id: str = "default", overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+	"""Return executable AUTH capability metadata and contract details."""
+	contract = get_capability_contract(tenant_id, overrides)
+	return {
+		"metadata": {
+			"capability_id": "common/auth",
+			"name": "auth",
+			"display_name": "Authentication & RBAC",
+			"version": "1.0.0",
+			"aliases": ["auth_rbac"],
+			"description": "Tenant-aware identity, authentication, and authorization capability"
+		},
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+	}
+
+
+def register_capability() -> Dict[str, Any]:
+	"""Register the authentication capability with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "auth",
+		"aliases": ["auth_rbac"],
+		"display_name": "Authentication & RBAC",
+		"description": "Tenant-aware identity, session, and authorization control plane",
+		"version": "1.0.0",
+		"dependencies": [
+			"audl",
+			"mten",
+			"ntfy",
+			"keym"
+		],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"identity": "Manage tenant-scoped users and identity context",
+			"rbac": "Assign and evaluate roles and permissions",
+			"sessions": "Issue, monitor, and revoke enriched sessions",
+			"behavioral_auth": "Continuously score behavioral trust signals",
+			"biometrics": "Manage biometric fusion enrollment and verification",
+			"federation": "Coordinate trusted federated identity mesh flows",
+			"capability_rules": "Evaluate deterministic capability-specific controls",
+			"visual_theming": "Apply tenant-aware trust workspace theming"
+		},
+		"endpoints": {
+			"login": "/api/auth/login",
+			"users": "/api/users",
+			"sessions": "/api/sessions",
+			"biometrics": "/api/biometrics/register",
+			"behavioral": "/api/behavioral/analyze",
+			"quantum": "/api/quantum/keys",
+			"privacy": "/api/analytics/privacy-query",
+			"federation": "/api/federated/authenticate"
+		},
+		"ui_components": {
+			route["name"]: route["path"]
+			for route in contract["ui"]["routes"]
+		},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": [
+			"auth:view",
+			"auth:login",
+			"auth:manage_roles",
+			"auth:manage_sessions",
+			"auth:manage_biometrics",
+			"auth:manage_keys",
+			"auth:view_risk",
+			"auth:view_privacy",
+			"auth:manage_privacy",
+			"auth:manage_federation",
+			"auth:admin"
+		]
+	}
