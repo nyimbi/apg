@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, status, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, status, Query, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, validator
@@ -32,6 +32,7 @@ from .service import (
 	APVendorService, APInvoiceService, APPaymentService,
 	APWorkflowService, APAnalyticsService, get_ap_services
 )
+from .context import resolve_apg_user_context
 
 
 # Security setup
@@ -257,24 +258,11 @@ class APOptimizationRequest(BaseModel):
 # Authentication and Authorization
 
 async def get_current_user(
+	request: Request,
 	credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> APGUserContext:
-	"""Get current user context from APG authentication"""
-	# This would integrate with actual APG auth_rbac capability
-	# For now, return a mock user context
-	token = credentials.credentials
-	
-	# In real implementation, this would validate the JWT token
-	# and extract user information from APG auth service
-	return APGUserContext(
-		user_id="user_123",
-		tenant_id="tenant_456",
-		permissions=[
-			"ap.read", "ap.write", "ap.approve_invoice", 
-			"ap.process_payment", "ap.vendor_admin", "ap.admin"
-		],
-		roles=["ap_manager"]
-	)
+	"""Get current user context from APG authentication."""
+	return APGUserContext(**resolve_apg_user_context(request=request))
 
 
 async def require_permission(

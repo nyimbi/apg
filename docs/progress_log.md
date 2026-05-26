@@ -2572,3 +2572,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_cvsn_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "\"user_id\": \"user_123\"|\"tenant_id\": \"tenant_456\"|Placeholder implementation - would integrate with APG RBAC" capabilities/common/cvsn/api.py capabilities/common/cvsn/views.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:30 EAT
+
+Completed checkpoint:
+
+- Replaced Accounts Payable API hardcoded `user_123`/`tenant_456` auth dependency with shared APY request-context resolution.
+- APY FastAPI endpoints now receive `APGUserContext` identity, tenant, permissions, and roles from FastAPI request state, APG headers, query args, request environment/configured fallbacks, and preserve the existing `APGUserContext` service contract.
+- Added focused regression coverage that rejects stale APY mock-auth placeholders and verifies identity, permission, and role precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/apy/accounts_payable/context.py capabilities/fin/apy/accounts_payable/api.py tests/test_fin_apy_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_apy_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "user_id=\"user_123\"|tenant_id=\"tenant_456\"|return a mock user context|validate the JWT token" capabilities/fin/apy/accounts_payable/api.py` -> no matches
+- `git diff --check` -> no issues
