@@ -3048,3 +3048,18 @@ Verification:
 - `rg -n "return 'api_user'|api_user|Kafka|kafka" capabilities/fin/bfc/budgeting_forecasting/api.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:29 EAT
+
+Completed checkpoint:
+
+- Replaced Monitoring blueprint alert acknowledge/resolve fixed actor fallbacks with Flask request, context, session, APG header, query, and environment user resolution.
+- Added focused MONI blueprint actor-context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/moni/blueprint.py tests/test_common_moni_blueprint_context.py`
+- `.venv/bin/python -m pytest -q tests/test_common_moni_blueprint_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "api_user|request\.json\.get\('acknowledged_by'|request\.json\.get\('resolved_by'|Kafka|kafka" capabilities/common/moni/blueprint.py tests/test_common_moni_blueprint_context.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

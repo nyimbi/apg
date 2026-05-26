@@ -7,12 +7,13 @@ Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
 """
 
-from flask import Blueprint, jsonify, request, render_template, current_app
+from flask import Blueprint, jsonify, request, render_template, current_app, g, session
 from flask_appbuilder import AppBuilder, SQLA
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import json
 import asyncio
+import os
 
 from .views import (
 	MonitoringMetricView, MonitoringAlertView, MonitoringRuleView,
@@ -34,6 +35,68 @@ monitoring_blueprint = Blueprint(
 	template_folder='templates',
 	static_folder='static'
 )
+
+
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a non-empty stripped string or None."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: Any, keys: List[str]) -> Optional[str]:
+	"""Read the first present text value from a dict-like or object source."""
+	if source is None:
+		return None
+	for key in keys:
+		if isinstance(source, dict):
+			value = source.get(key)
+		else:
+			value = getattr(source, key, None)
+		text = _clean_text(value)
+		if text:
+			return text
+	return None
+
+
+def resolve_current_user_id(payload: Optional[Dict[str, Any]] = None) -> str:
+	"""Resolve the monitoring action actor from APG/Flask request context."""
+	current_user = getattr(request, "current_user", None)
+	g_user = getattr(g, "current_user", None) or getattr(g, "user", None) or getattr(g, "auth_user", None)
+	candidates: List[Any] = []
+	if payload:
+		candidates.extend(
+			[
+				payload.get("acknowledged_by"),
+				payload.get("resolved_by"),
+				payload.get("user_id"),
+				payload.get("current_user_id"),
+			]
+		)
+
+	candidates.extend(
+		[
+			_object_value(current_user, ["user_id", "id", "username", "email", "sub"]),
+			getattr(request, "current_user_id", None),
+			_object_value(g_user, ["user_id", "id", "username", "email", "sub"]),
+			getattr(g, "user_id", None),
+			session.get("user_id"),
+			request.headers.get("X-APG-User-ID"),
+			request.headers.get("X-User-ID"),
+			request.args.get("user_id"),
+			os.getenv("APG_USER_ID"),
+			os.getenv("APG_DEFAULT_USER_ID"),
+			"system",
+		]
+	)
+
+	for candidate in candidates:
+		user_id = _clean_text(candidate)
+		if user_id:
+			return user_id
+	return "system"
+
 
 # APG Capability Metadata for Composition Engine
 CAPABILITY_METADATA = {
@@ -407,7 +470,8 @@ def api_stats():
 def api_acknowledge_alert(alert_id: str):
 	"""Acknowledge an alert"""
 	try:
-		acknowledged_by = request.json.get('acknowledged_by', 'api_user') if request.json else 'api_user'
+		payload = request.get_json(silent=True) or {}
+		acknowledged_by = resolve_current_user_id(payload)
 		
 		if _monitoring_service:
 			loop = asyncio.new_event_loop()
@@ -447,7 +511,8 @@ def api_acknowledge_alert(alert_id: str):
 def api_resolve_alert(alert_id: str):
 	"""Resolve an alert"""
 	try:
-		resolved_by = request.json.get('resolved_by', 'api_user') if request.json else 'api_user'
+		payload = request.get_json(silent=True) or {}
+		resolved_by = resolve_current_user_id(payload)
 		
 		if _monitoring_service:
 			loop = asyncio.new_event_loop()
