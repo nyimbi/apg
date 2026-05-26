@@ -1,221 +1,77 @@
-"""
-APG Pose Estimation Capability
-=============================
+"""APG Pose Estimation (POSE) capability registration."""
 
-Revolutionary real-time human pose estimation with 10x improvements over industry leaders.
-Integrates seamlessly with APG's computer vision, AI orchestration, and collaboration capabilities.
-Uses open-source models from HuggingFace for transparent, reproducible results.
+from __future__ import annotations
 
-Key Differentiators:
-- Neural-adaptive model selection with 15+ HuggingFace models
-- Temporal consistency engine with Kalman filtering
-- 3D pose reconstruction from single RGB camera
-- Medical-grade biomechanical analysis (±1° accuracy)
-- Edge-optimized inference with 90% resource reduction
-- Collaborative multi-camera pose fusion
-- Privacy-preserving on-device processing
-- Production-grade enterprise deployment
-- Real-time multi-person tracking (<16ms latency)
-- APG ecosystem integration
+from datetime import datetime, timezone
+from typing import Any
 
-Copyright © 2025 Datacraft (nyimbi@gmail.com)
-"""
-
-# Core data models
-from .models import (
-	PoseEstimationModel,
-	PoseKeypoint,
-	PoseSession,
-	RealTimeTracking,
-	BiomechanicalAnalysis,
-	ModelPerformanceMetrics,
-	PoseEstimationRepository,
-	PoseModelType,
-	KeypointType,
-	SessionStatus
-)
-
-# Service layer with HuggingFace integration
-from .service import (
-	PoseEstimationService,
-	HuggingFaceModelManager,
-	TemporalConsistencyEngine,
-	BiomechanicalAnalysisEngine
-)
-
-# Pydantic v2 views and validation
-from .views import (
-	PoseEstimationRequest,
-	PoseEstimationResponse,
-	RealTimeTrackingRequest,
-	RealTimeTrackingResponse,
-	BiomechanicalAnalysisRequest,
-	BiomechanicalAnalysisResponse,
-	PoseSessionCreateRequest,
-	PoseSessionResponse,
-	ModelPerformanceResponse,
-	PoseKeypointRequest,
-	PoseKeypointResponse,
-	PoseModelTypeEnum,
-	KeypointTypeEnum,
-	SessionStatusEnum,
-	QualityGradeEnum
-)
-
-# REST API endpoints
-from .api import (
-	create_pose_api,
-	register_namespaces,
-	PoseEstimationEndpoint,
-	TrackingStartEndpoint,
-	BiomechanicalAnalysisEndpoint,
-	SessionCreateEndpoint,
-	ModelPerformanceEndpoint,
-	HealthEndpoint
-)
-
-# Flask-AppBuilder blueprint integration
-from .blueprint import (
-	pose_bp,
-	CAPABILITY_METADATA,
-	PoseEstimationCapability,
-	register_blueprint_with_apg,
-	PoseEstimationDashboardView,
-	PoseSessionModelView,
-	RealTimeTrackingView,
-	BiomechanicalAnalysisView
-)
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
 __version__ = "2.0.0"
-__author__ = "Datacraft"
+__capability_id__ = "pose"
+__capability_name__ = "Pose Estimation"
+__apg_dependencies__ = ["cvsn", "aicr", "mlcm"]
 
-# APG Capability Registration with comprehensive metadata
-CAPABILITY_INFO = {
-	"name": "pose_estimation",
+capability_metadata: dict[str, Any] = {
+	"name": "pose",
 	"version": __version__,
-	"description": "Revolutionary real-time human pose estimation with 10x improvements over industry leaders",
-	"category": "common",
-	"author": __author__,
-	"copyright": "© 2025 Datacraft",
-	"license": "Proprietary",
-	"dependencies": [
-		"computer_vision",
-		"ai_orchestration", 
-		"real_time_collaboration",
-		"visualization_3d",
-		"auth_rbac",
-		"audit_compliance"
-	],
-	"api_endpoints": [
-		"/api/v1/pose/estimate",
-		"/api/v1/pose/tracking/start",
-		"/api/v1/pose/tracking/{session_id}/{person_id}",
-		"/api/v1/pose/analysis/biomechanics",
-		"/api/v1/pose/session/create",
-		"/api/v1/pose/session/{session_id}",
-		"/api/v1/pose/models/performance",
-		"/api/v1/pose/health"
-	],
-	"capabilities": [
-		"real_time_estimation",
-		"multi_person_tracking", 
-		"3d_reconstruction",
-		"biomechanical_analysis",
-		"edge_inference",
-		"collaborative_tracking",
-		"temporal_consistency",
-		"medical_grade_accuracy",
-		"privacy_preserving",
-		"neural_adaptive_selection"
-	],
-	"models": [
-		"microsoft/swin-base-simmim-window7-224",
-		"google/movenet-multipose-lightning",
-		"openmmlab/rtmpose-m",
-		"facebook/vitpose-base",
-		"google/movenet-lightning"
-	],
-	"performance_targets": {
-		"accuracy": 99.7,  # % keypoint detection accuracy
-		"latency_ms": 16,  # Maximum response time
-		"throughput_fps": 60,  # Frames per second
-		"max_persons": 50,  # Simultaneous tracking
-		"resource_reduction_pct": 90  # vs competitors
-	},
-	"ui_components": [
-		"pose_dashboard",
-		"real_time_tracking",
-		"biomechanical_analysis",
-		"session_management"
-	],
-	"permissions": [
-		"pose_estimation.view",
-		"pose_estimation.create",
-		"pose_estimation.edit",
-		"pose_estimation.delete",
-		"pose_estimation.analyze",
-		"pose_estimation.track",
-		"pose_estimation.collaborate"
-	]
+	"display_name": __capability_name__,
+	"description": "Real-time human pose estimation, tracking, biomechanical analysis, 3D reconstruction, and privacy-governed visual intelligence",
+	"category": "specialized_ai_analytics",
+	"subcategory": "pose_estimation",
+	"vendor": "Datacraft",
+	"author": "APG Platform Team",
+	"license": "Commercial",
+	"created_at": datetime.now(timezone.utc),
+	"dependencies": __apg_dependencies__,
+	"provides": ["pose_estimation", "multi_person_tracking", "biomechanical_analysis", "pose_3d_reconstruction", "edge_pose_inference"],
+	"permissions": ["pose:view", "pose:estimate", "pose:track", "pose:analyze", "pose:manage_models", "pose:admin"]
 }
 
-# Comprehensive exports for APG integration
-__all__ = [
-	# Core data models
-	"PoseEstimationModel",
-	"PoseKeypoint", 
-	"PoseSession",
-	"RealTimeTracking",
-	"BiomechanicalAnalysis",
-	"ModelPerformanceMetrics",
-	"PoseEstimationRepository",
-	"PoseModelType",
-	"KeypointType",
-	"SessionStatus",
-	
-	# Service layer
-	"PoseEstimationService",
-	"HuggingFaceModelManager",
-	"TemporalConsistencyEngine",
-	"BiomechanicalAnalysisEngine",
-	
-	# Pydantic v2 views
-	"PoseEstimationRequest",
-	"PoseEstimationResponse", 
-	"RealTimeTrackingRequest",
-	"RealTimeTrackingResponse",
-	"BiomechanicalAnalysisRequest",
-	"BiomechanicalAnalysisResponse",
-	"PoseSessionCreateRequest",
-	"PoseSessionResponse",
-	"ModelPerformanceResponse",
-	"PoseKeypointRequest",
-	"PoseKeypointResponse",
-	"PoseModelTypeEnum",
-	"KeypointTypeEnum",
-	"SessionStatusEnum",
-	"QualityGradeEnum",
-	
-	# API endpoints
-	"create_pose_api",
-	"register_namespaces",
-	"PoseEstimationEndpoint",
-	"TrackingStartEndpoint",
-	"BiomechanicalAnalysisEndpoint",
-	"SessionCreateEndpoint",
-	"ModelPerformanceEndpoint",
-	"HealthEndpoint",
-	
-	# Flask-AppBuilder integration
-	"pose_bp",
-	"CAPABILITY_METADATA",
-	"PoseEstimationCapability",
-	"register_blueprint_with_apg",
-	"PoseEstimationDashboardView",
-	"PoseSessionModelView",
-	"RealTimeTrackingView",
-	"BiomechanicalAnalysisView",
-	
-	# APG registration
-	"CAPABILITY_INFO"
-]
+CAPABILITY_INFO = capability_metadata
+
+
+def register_capability() -> dict[str, Any]:
+	"""Register POSE with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "pose",
+		"aliases": ["pose_estimation", "human_pose", "biomechanical_analysis"],
+		"display_name": capability_metadata["display_name"],
+		"description": capability_metadata["description"],
+		"version": capability_metadata["version"],
+		"dependencies": capability_metadata["dependencies"],
+		"optional_dependencies": ["colb", "edge", "audl", "geos"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"pose_estimation": "Estimate human keypoints from tenant-scoped image and video streams",
+			"multi_person_tracking": "Track multiple people with temporal consistency and session policy",
+			"biomechanical_analysis": "Analyze movement, posture, angles, and ergonomic indicators",
+			"pose_3d_reconstruction": "Reconstruct 3D pose from camera streams when policy permits",
+			"capability_rules": "Evaluate deterministic pose-estimation governance rules",
+			"visual_theming": "Apply pose-intelligence theme tokens and components"
+		},
+		"endpoints": {
+			"estimate": "/pose/api/v1/estimate",
+			"tracking": "/pose/api/v1/tracking",
+			"analysis": "/pose/api/v1/analysis",
+			"sessions": "/pose/api/v1/sessions",
+			"models": "/pose/api/v1/models"
+		},
+		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": capability_metadata["permissions"]
+	}
+
+
+def get_capability_info() -> dict[str, Any]:
+	"""Get POSE capability information for composition and marketplace discovery."""
+	info = capability_metadata.copy()
+	info["contract"] = get_capability_contract()
+	return info
+
+
+__all__ = ["CAPABILITY_INFO", "capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]

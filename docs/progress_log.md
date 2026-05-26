@@ -769,3 +769,28 @@ Current broader WFLO/SCHD/SCPT/NCOD execution findings:
 - WFLO, SCHD, SCPT, and NCOD are no longer placeholders at the composition layer.
 - Phase 7 now has uniform first-class registration/contract coverage across workflow orchestration, scheduling, custom scripting, and no-code/low-code automation.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:18 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder RECS package into a first-class APG recommender-systems capability with tenant-scoped model, ranking, experiment, governance, UI, and theme configuration.
+- Added deterministic RECS rules for tenant context, profile consent, ranking policy, training-event sufficiency, high-impact explanations, and large-experiment review.
+- Made POSE import-light and executable as a first-class APG pose-estimation capability with tenant-scoped model, tracking, analysis, governance, UI, and theme configuration.
+- Added deterministic POSE rules for tenant context, subject consent, tracking session ownership, secure streams, sensitive-use approval, and low-quality pose review.
+- Made AUDP import-light and executable as a first-class APG audio-processing capability with tenant-scoped transcription, synthesis, analysis, governance, UI, and theme configuration.
+- Added deterministic AUDP rules for tenant context, recording consent, voice cloning consent, synthetic audio watermarking, audio model policy, and low-confidence transcript review.
+- Made GEOS import-light and executable as a first-class APG geo-spatial services capability with tenant-scoped geofencing, event, analytics, governance, UI, and theme configuration.
+- Added deterministic GEOS rules for tenant context, location consent, geofence ownership, event-source registration, sensitive-location review, and large-polygon review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/recs/__init__.py capabilities/common/recs/capability_contract.py capabilities/common/recs/test_capability_contract.py capabilities/common/pose/__init__.py capabilities/common/pose/capability_contract.py capabilities/common/pose/test_capability_contract.py capabilities/common/audp/__init__.py capabilities/common/audp/capability_contract.py capabilities/common/audp/test_capability_contract.py capabilities/common/geos/__init__.py capabilities/common/geos/capability_contract.py capabilities/common/geos/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/recs/test_capability_contract.py capabilities/common/pose/test_capability_contract.py capabilities/common/audp/test_capability_contract.py capabilities/common/geos/test_capability_contract.py` -> 12 passed, 10 warnings
+
+Current broader RECS/POSE/AUDP/GEOS execution findings:
+
+- RECS is no longer a placeholder package at the composition layer.
+- POSE, AUDP, and GEOS had substantial runtime code but now expose lightweight first-class registration/contract surfaces for composition-time discovery.
+- Phase 8 specialized AI/location work is partially complete; remaining Phase 8 package-level gaps are I18N, WALT, and MCHN.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.

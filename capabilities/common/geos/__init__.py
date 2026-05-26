@@ -1,109 +1,77 @@
-"""
-APG Geographical Location Services Capability
+"""APG Geo-Spatial Services (GEOS) capability registration."""
 
-Comprehensive geofencing, location intelligence, and spatial analytics
-capability for location-aware enterprise applications.
+from __future__ import annotations
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero <nyimbi@gmail.com>
-"""
+from datetime import datetime, timezone
+from typing import Any
 
-from typing import List, Dict, Any, Optional
-from enum import Enum
-from dataclasses import dataclass
-from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
-# Geographical Services Metadata
 __version__ = "1.0.0"
-__capability_id__ = "geographical_location_services"
-__description__ = "Comprehensive geofencing and location intelligence platform"
+__capability_id__ = "geos"
+__capability_name__ = "Geo-Spatial Services"
+__apg_dependencies__ = ["pred", "aicr", "mdm"]
 
-class GeofenceType(str, Enum):
-	"""Types of geofences supported."""
-	POLYGON = "polygon"
-	CIRCLE = "circle"
-	ADMINISTRATIVE = "administrative"
-	CUSTOM = "custom"
-
-class LocationEventType(str, Enum):
-	"""Types of location events."""
-	ENTER = "enter"
-	EXIT = "exit"
-	DWELL = "dwell"
-	MOVE = "move"
-
-@dataclass
-class Coordinate:
-	"""Geographical coordinate."""
-	latitude: float
-	longitude: float
-	altitude: Optional[float] = None
-
-class GCGeofence(BaseModel):
-	"""Geofence definition model."""
-	fence_id: str = Field(default_factory=uuid7str)
-	tenant_id: str
-	name: str
-	description: Optional[str] = None
-	fence_type: GeofenceType
-	coordinates: List[Coordinate]
-	radius_meters: Optional[float] = None  # For circular fences
-	rules: List[Dict[str, Any]] = Field(default_factory=list)
-	metadata: Dict[str, Any] = Field(default_factory=dict)
-	is_active: bool = True
-	created_at: str
-	updated_at: str
-
-class GCLocationEvent(BaseModel):
-	"""Location event model."""
-	event_id: str = Field(default_factory=uuid7str)
-	tenant_id: str
-	entity_id: str  # User, asset, device ID
-	entity_type: str  # user, asset, device, vehicle
-	fence_id: str
-	event_type: LocationEventType
-	coordinates: Coordinate
-	timestamp: str
-	metadata: Dict[str, Any] = Field(default_factory=dict)
-
-# APG Composition Engine Registration
-CAPABILITY_METADATA = {
-	"capability_id": "general_cross_functional.geographical_location_services",
+capability_metadata: dict[str, Any] = {
+	"name": "geos",
 	"version": __version__,
-	"category": "cross_functional",
-	"provides_services": [
-		"geofencing_engine",
-		"location_intelligence",
-		"spatial_analytics",
-		"location_compliance",
-		"territory_management"
-	],
-	"dependencies": [
-		"auth_rbac",
-		"audit_compliance",
-		"notification_engine",
-		"general_cross_functional.workflow_business_process_mgmt"
-	],
-	"integrates_with": [
-		"general_cross_functional.customer_relationship_management",
-		"general_cross_functional.enterprise_asset_management",
-		"core_business_operations.human_capital_management",
-		"emerging_technologies.edge_computing_iot"
-	],
-	"data_models": ["GCGeofence", "GCLocationEvent", "GCLocationRule", "GCTerritory"]
+	"display_name": __capability_name__,
+	"description": "Tenant-aware geofencing, spatial analytics, territory management, location events, and predictive location intelligence",
+	"category": "specialized_ai_analytics",
+	"subcategory": "geo_spatial_services",
+	"vendor": "Datacraft",
+	"author": "APG Platform Team",
+	"license": "Commercial",
+	"created_at": datetime.now(timezone.utc),
+	"dependencies": __apg_dependencies__,
+	"provides": ["geofencing", "location_events", "spatial_analytics", "territory_management", "location_prediction"],
+	"permissions": ["geos:view", "geos:manage_geofences", "geos:process_events", "geos:analyze", "geos:admin"]
 }
 
-def get_capability_info() -> Dict[str, Any]:
-	"""Get geographical location services capability information."""
-	return CAPABILITY_METADATA
+CAPABILITY_METADATA = capability_metadata
 
-__all__ = [
-	"GeofenceType",
-	"LocationEventType", 
-	"Coordinate",
-	"GCGeofence",
-	"GCLocationEvent",
-	"CAPABILITY_METADATA",
-	"get_capability_info"
-]
+
+def register_capability() -> dict[str, Any]:
+	"""Register GEOS with the APG composition engine."""
+	contract = get_capability_contract()
+	return {
+		"name": "geos",
+		"aliases": ["geo_spatial", "geofencing", "location_intelligence"],
+		"display_name": capability_metadata["display_name"],
+		"description": capability_metadata["description"],
+		"version": capability_metadata["version"],
+		"dependencies": capability_metadata["dependencies"],
+		"optional_dependencies": ["ntfy", "edge", "audl", "wflo"],
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rule_engine": contract["rule_engine"],
+		"capabilities": {
+			"geofencing": "Create and evaluate tenant-scoped geofences and spatial rules",
+			"location_events": "Process enter, exit, dwell, and movement events with policy controls",
+			"spatial_analytics": "Analyze density, proximity, routing, coverage, and territory patterns",
+			"territory_management": "Govern regions, service areas, routing zones, and ownership",
+			"capability_rules": "Evaluate deterministic geo-spatial governance rules",
+			"visual_theming": "Apply location-intelligence theme tokens and components"
+		},
+		"endpoints": {
+			"geofences": "/geos/api/v1/geofences",
+			"events": "/geos/api/v1/events",
+			"territories": "/geos/api/v1/territories",
+			"analytics": "/geos/api/v1/analytics",
+			"maps": "/geos/api/v1/maps"
+		},
+		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
+		"ui_manifest": contract["ui"],
+		"theme": contract["theme"],
+		"permissions": capability_metadata["permissions"]
+	}
+
+
+def get_capability_info() -> dict[str, Any]:
+	"""Get GEOS capability information for composition and marketplace discovery."""
+	info = capability_metadata.copy()
+	info["contract"] = get_capability_contract()
+	return info
+
+
+__all__ = ["CAPABILITY_METADATA", "capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
