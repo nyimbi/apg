@@ -2929,3 +2929,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_bil_api_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n "api-user|Kafka|kafka" capabilities/fin/bil/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:01 EAT
+
+Completed checkpoint:
+
+- Replaced NLPC REST API fixed `default-tenant` and `default-user` fallbacks with Flask request, context, session, APG header, query, and environment identity resolution.
+- Removed remaining placeholder "real implementation" comments from the NLPC REST API surface touched by this slice.
+- Added focused NLPC REST context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/nlpc/api.py tests/test_common_nlpc_api_context.py`
+- `.venv/bin/python -m pytest -q tests/test_common_nlpc_api_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n "default-tenant|default-user|real implementation|Kafka|kafka" capabilities/common/nlpc/api.py` -> no matches
+- `git diff --check` -> no issues

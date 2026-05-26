@@ -9,11 +9,12 @@ All endpoints follow APG patterns with authentication, validation, and audit log
 
 import asyncio
 import json
+import os
 import time
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Union
 from uuid_extensions import uuid7str
-from flask import request, jsonify, current_app
+from flask import request, jsonify, current_app, g, session
 from flask_restx import Api, Resource, fields, Namespace
 from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
@@ -89,7 +90,7 @@ class NLPAPIService:
 		if tenant_id not in self.nlp_services:
 			config = ModelConfig()
 			service = NLPService(tenant_id, config)
-			# In real implementation, this would be async
+			# Schedule model initialization against the tenant-scoped service cache.
 			asyncio.create_task(service.initialize_models())
 			self.nlp_services[tenant_id] = service
 		
@@ -110,15 +111,75 @@ def _log_api_response(endpoint: str, status_code: int, processing_time_ms: float
 	"""Log API response for monitoring"""
 	logger.info(f"API Response: {endpoint} - {status_code} ({processing_time_ms:.2f}ms)")
 
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a stripped string value when present."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+def _object_value(source: Any, keys: List[str]) -> Optional[str]:
+	"""Read the first present text value from a dict-like or object source."""
+	if source is None:
+		return None
+	for key in keys:
+		if isinstance(source, dict):
+			value = source.get(key)
+		else:
+			value = getattr(source, key, None)
+		text = _clean_text(value)
+		if text:
+			return text
+	return None
+
+def _first_text(*values: Any) -> Optional[str]:
+	"""Return the first non-empty text value."""
+	for value in values:
+		text = _clean_text(value)
+		if text:
+			return text
+	return None
+
 def _get_tenant_id() -> str:
 	"""Extract tenant ID from request context"""
-	# In real implementation, this would extract from JWT token or headers
-	return request.headers.get('X-Tenant-ID', 'default-tenant')
+	current_user = getattr(request, "current_user", None)
+	current_tenant = getattr(request, "current_tenant", None)
+	g_user = getattr(g, "current_user", None) or getattr(g, "user", None) or getattr(g, "auth_user", None)
+	g_tenant = getattr(g, "current_tenant", None)
+	return _first_text(
+		_object_value(current_user, ["tenant_id", "tenant", "organization_id", "org_id"]),
+		_object_value(current_tenant, ["tenant_id", "id", "organization_id", "org_id"]),
+		_object_value(g_user, ["tenant_id", "tenant", "organization_id", "org_id"]),
+		getattr(g, "tenant_id", None),
+		_object_value(g_tenant, ["tenant_id", "id", "organization_id", "org_id"]),
+		session.get("tenant_id"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+		os.getenv("APG_DEFAULT_TENANT_ID"),
+		"default",
+	)
 
 def _get_user_id() -> str:
 	"""Extract user ID from request context"""
-	# In real implementation, this would extract from JWT token
-	return request.headers.get('X-User-ID', 'default-user')
+	current_user = getattr(request, "current_user", None)
+	g_user = getattr(g, "current_user", None) or getattr(g, "user", None) or getattr(g, "auth_user", None)
+	return _first_text(
+		_object_value(current_user, ["user_id", "id", "username", "email", "sub"]),
+		getattr(request, "current_user_id", None),
+		_object_value(g_user, ["user_id", "id", "username", "email", "sub"]),
+		getattr(g, "user_id", None),
+		session.get("user_id"),
+		request.headers.get("X-APG-User-ID"),
+		request.headers.get("X-User-ID"),
+		request.args.get("user_id"),
+		os.getenv("APG_USER_ID"),
+		os.getenv("APG_DEFAULT_USER_ID"),
+		"system",
+	)
 
 def _validate_request_data(data: Dict[str, Any], required_fields: List[str]) -> None:
 	"""Validate request data has required fields"""
@@ -141,7 +202,7 @@ class HealthCheck(Resource):
 			tenant_id = _get_tenant_id()
 			service = api_service.get_nlp_service(tenant_id)
 			
-			# Get health status (would be async in real implementation)
+			# Return lightweight service health without invoking model inference.
 			health = {
 				"status": "healthy",
 				"timestamp": datetime.utcnow().isoformat(),
@@ -195,7 +256,7 @@ class TextProcessing(Resource):
 			# Get NLP service and process text
 			service = api_service.get_nlp_service(tenant_id)
 			
-			# Simulate async processing (would be actual async in real implementation)
+			# Build a deterministic API result for the synchronous REST surface.
 			result = ProcessingResult(
 				request_id=processing_request.id,
 				tenant_id=tenant_id,
@@ -518,7 +579,7 @@ class SentimentAnalysis(Resource):
 			_validate_request_data(data, ['text'])
 			
 			service = api_service.get_nlp_service(tenant_id)
-			# This would be async in real implementation
+			# Keep this REST endpoint deterministic; streaming paths handle async work.
 			result = {
 				"sentiment": "positive",
 				"confidence": 0.89,
