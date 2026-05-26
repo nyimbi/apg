@@ -27,6 +27,89 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+async def _maybe_await(value: Any) -> Any:
+	"""Await async model outputs while accepting sync model outputs."""
+	if asyncio.iscoroutine(value):
+		return await value
+	return value
+
+
+def _collect_numeric_values(value: Any) -> List[float]:
+	"""Collect numeric signal from nested inference payloads."""
+	if isinstance(value, bool):
+		return [1.0 if value else 0.0]
+	if isinstance(value, (int, float)):
+		return [float(value)]
+	if isinstance(value, str):
+		if not value:
+			return [0.0]
+		return [min(len(value) / 100.0, 1.0)]
+	if isinstance(value, dict):
+		values: List[float] = []
+		for nested_value in value.values():
+			values.extend(_collect_numeric_values(nested_value))
+		return values
+	if isinstance(value, (list, tuple, set)):
+		values: List[float] = []
+		for nested_value in value:
+			values.extend(_collect_numeric_values(nested_value))
+		return values
+	return []
+
+
+def _heuristic_prediction_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Create a deterministic local prediction when no registered model is available."""
+	values = _collect_numeric_values(payload)
+	score = float(np.mean(values)) if values else 0.5
+	normalized_score = max(0.0, min(score, 1.0))
+	label = "positive" if normalized_score >= 0.5 else "negative"
+	confidence = 0.5 + abs(normalized_score - 0.5)
+	return {
+		"prediction": label,
+		"predictions": {
+			"class": label,
+			"score": normalized_score,
+			"confidence": confidence
+		},
+		"confidence": confidence,
+		"logits": [1.0 - normalized_score, normalized_score],
+		"model_source": "heuristic"
+	}
+
+
+def _normalize_prediction_result(result: Any) -> Dict[str, Any]:
+	"""Normalize registered-model outputs to the AICR prediction envelope."""
+	if not isinstance(result, dict):
+		result = {"prediction": result}
+
+	predictions = result.get("predictions")
+	prediction = result.get("prediction")
+	if prediction is None and isinstance(predictions, dict):
+		prediction = predictions.get("class") or predictions.get("label")
+	if prediction is None:
+		prediction = "unknown"
+
+	confidence = result.get("confidence")
+	if confidence is None and isinstance(predictions, dict):
+		confidence = predictions.get("confidence")
+	if confidence is None:
+		confidence = 0.5
+
+	normalized = {
+		**result,
+		"prediction": prediction,
+		"predictions": predictions if isinstance(predictions, dict) else {
+			"class": prediction,
+			"confidence": confidence
+		},
+		"confidence": float(confidence),
+		"model_source": result.get("model_source", "registered")
+	}
+	if "logits" not in normalized:
+		normalized["logits"] = [1.0 - normalized["confidence"], normalized["confidence"]]
+	return normalized
+
+
 class ModelAdaptationType(str, Enum):
 	"""Types of model adaptation strategies."""
 	ONLINE_LEARNING = "online_learning"
@@ -497,14 +580,21 @@ class AdvancedMLEngine:
 		metadata: Dict[str, Any]
 	) -> Dict[str, Any]:
 		"""Run inference with fused multi-modal representation."""
-		# This would integrate with the main inference engine
-		# For now, return a mock result
-		await asyncio.sleep(0.1)  # Simulate processing time
+		start_time = datetime.utcnow()
+		prediction = await self._get_model_prediction(
+			model_id,
+			{
+				"fused_representation": fused_representation,
+				"metadata": metadata or {}
+			}
+		)
+		processing_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 
 		return {
-			"predictions": {"class": "positive", "confidence": 0.92},
-			"confidence": 0.92,
-			"processing_time_ms": 100.0
+			"predictions": prediction["predictions"],
+			"confidence": prediction["confidence"],
+			"processing_time_ms": processing_time_ms,
+			"model_source": prediction["model_source"]
 		}
 
 	async def _get_model_prediction(
@@ -513,14 +603,20 @@ class AdvancedMLEngine:
 		input_data: Dict[str, Any]
 	) -> Dict[str, Any]:
 		"""Get model prediction for explanation."""
-		# This would integrate with the main inference engine
-		await asyncio.sleep(0.05)  # Simulate inference time
+		model = self.active_models.get(model_id)
+		if model is None:
+			return _heuristic_prediction_from_payload(input_data)
 
-		return {
-			"prediction": "positive_sentiment",
-			"confidence": 0.87,
-			"logits": [0.1, 0.87, 0.03]
-		}
+		if hasattr(model, "run_inference"):
+			result = await _maybe_await(model.run_inference(input_data))
+		elif hasattr(model, "predict"):
+			result = await _maybe_await(model.predict(input_data))
+		elif callable(model):
+			result = await _maybe_await(model(input_data))
+		else:
+			result = model
+
+		return _normalize_prediction_result(result)
 
 	async def get_engine_status(self) -> Dict[str, Any]:
 		"""Get comprehensive engine status."""
@@ -1303,11 +1399,8 @@ class ExplainabilityEngine:
 		return alternatives
 
 	async def _get_model_prediction(self, model_id: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Get model prediction (mock implementation)."""
-		return {
-			"prediction": "positive_sentiment",
-			"confidence": 0.87
-		}
+		"""Get deterministic local prediction for alternative explanation generation."""
+		return _heuristic_prediction_from_payload(input_data)
 
 	async def get_status(self) -> Dict[str, Any]:
 		"""Get explainability engine status."""

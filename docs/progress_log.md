@@ -1216,3 +1216,24 @@ Current broader CONN composition findings:
 - Capability composition now has an executable local runtime surface instead of validation-only contracts.
 - The API-call path intentionally prepares deterministic call records rather than performing network calls; this keeps composition executable offline while preserving endpoint, payload, and correlation metadata.
 - Remaining `pass` statements in `composition_api.py` are abstract interface method bodies only.
+
+### 2026-05-26 16:49 EAT
+
+Completed checkpoint:
+
+- Replaced AICR advanced-ML fixed mock prediction helpers with executable registered-model invocation and deterministic local heuristic fallback.
+- Added normalization for sync callables, async callables, `predict`, and `run_inference` model surfaces so active models can participate without adapter boilerplate.
+- Updated fused multi-modal inference to delegate through the same prediction path and report measured local processing time.
+- Updated explainability alternative-prediction fallback to derive from actual input signal instead of returning a static prediction.
+- Added focused tests for registered async models, deterministic fallback predictions, fused inference delegation, and input-sensitive explainability predictions.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/aicr/advanced_ml.py capabilities/common/aicr/tests/test_advanced_ml_predictions.py`
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_advanced_ml_predictions.py` -> 4 passed, 10 warnings
+
+Current broader AICR advanced-ML findings:
+
+- Advanced-ML prediction helpers now execute against registered model objects when present and remain deterministic offline when no model is registered.
+- Focused tests avoid the heavier AICR integration suite per the battery-aware testing constraint.
+- Remaining warnings during focused pytest are pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
