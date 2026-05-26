@@ -1068,3 +1068,23 @@ Current broader CONN marketplace findings:
 - Marketplace discovery, detail lookup, version lookup, recommendations, and local installation now have a deterministic executable path when the remote marketplace is unavailable.
 - The remote marketplace remains the production path; the local catalog is a fallback and test/offline execution surface, not a replacement for the remote registry.
 - Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities.
+
+### 2026-05-26 16:09 EAT
+
+Completed checkpoint:
+
+- Rewired CONN marketplace browse, detail, and search UI paths to the same local catalog used by the marketplace backend instead of maintaining separate fake UI capability lists.
+- Updated marketplace install and uninstall API views to call the real installer/uninstaller paths, including generated local package metadata and installation manifest updates.
+- Replaced static UI trending-category and chart payloads with values derived from the catalog capabilities and their usage statistics.
+- Added focused marketplace view tests for catalog-backed search, capability detail versions/changelog, and trending category derivation.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/marketplace_views.py capabilities/common/conn/tests/test_marketplace_views.py`
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_marketplace_views.py` -> 3 passed, 10 warnings
+
+Current broader CONN marketplace UI findings:
+
+- Marketplace backend and UI catalog behavior now share one deterministic source for offline/test execution.
+- The synchronous Flask-AppBuilder install view now bridges to the async installer; it intentionally raises if called from an already-running event loop.
+- Remaining warnings during focused pytest are pre-existing deprecation warnings from adjacent common capabilities.
