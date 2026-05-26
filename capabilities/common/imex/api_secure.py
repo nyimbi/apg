@@ -150,7 +150,6 @@ def login():
 
         # Mock user authentication (in production, check database)
         mock_user = User(
-            id="user_123",
             username=auth_request.username,
             email=f"{auth_request.username}@example.com",
             password_hash=auth_manager.hash_password(auth_request.password),

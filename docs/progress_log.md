@@ -2617,3 +2617,17 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_fin_arc_views_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n "['\"]default_tenant['\"]|['\"]system_user['\"]|request\.headers\.get\('X-Tenant-ID'|request\.headers\.get\('X-User-ID'" capabilities/fin/arc/accounts_receivable/blueprint.py capabilities/fin/arc/accounts_receivable/context.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 00:38 EAT
+
+Completed checkpoint:
+
+- Removed the secure IMEX login path's fixed `user_123` actor ID and let the `User` model generate request-scoped identity while retaining username and tenant from the authentication request.
+- Added a focused source regression that rejects the stale fixed IMEX demo user ID.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/imex/api_secure.py tests/test_common_imex_secure_identity.py`
+- `.venv/bin/python -m pytest -q tests/test_common_imex_secure_identity.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 2 passed
+- `rg -n "user_123|id=\"user_123\"" capabilities/common/imex/api_secure.py` -> no matches
+- `git diff --check` -> no issues
