@@ -29,7 +29,7 @@ from .file_connectors import (
 from .api_connectors import (
 	RESTAPIConnector,
 	GraphQLConnector,
-	KafkaConnector
+	BytewaxConnector
 )
 from .ml_connectors import (
 	MLflowConnector,
@@ -66,7 +66,7 @@ __all__ = [
 	# API connectors
 	'RESTAPIConnector',
 	'GraphQLConnector',
-	'KafkaConnector',
+	'BytewaxConnector',
 	
 	# ML connectors
 	'MLflowConnector',

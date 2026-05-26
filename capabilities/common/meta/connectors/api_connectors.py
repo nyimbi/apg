@@ -19,14 +19,6 @@ try:
 except ImportError:
 	httpx = None
 
-try:
-	from kafka import KafkaConsumer, KafkaAdminClient
-	from kafka.structs import TopicPartition
-	from kafka.errors import KafkaError
-except ImportError:
-	KafkaConsumer = None
-	KafkaAdminClient = None
-
 from .base_connector import (
 	BaseConnector, ConnectorConfig, DiscoveryResult, AssetMetadata,
 	ColumnMetadata, ConnectorType, DataType, should_include_asset
@@ -984,409 +976,183 @@ class GraphQLConnector(BaseConnector):
 		return []
 
 
-class KafkaConnector(BaseConnector):
-	"""Apache Kafka metadata discovery connector"""
+class BytewaxConnector(BaseConnector):
+	"""Bytewax stream metadata discovery connector."""
 	
 	def __init__(self, config: ConnectorConfig):
 		super().__init__(config)
 		self.connector_type = ConnectorType.STREAMING
-		self.source_system = "kafka"
-		self.admin_client = None
-		self.consumer = None
-		self.bootstrap_servers = config.connection_string.split(",")
-		self.topics_metadata = {}
+		self.source_system = "bytewax"
+		self.stream_names = self._parse_stream_names(config.connection_string)
+		self.streams_metadata = {}
+		self.sample_records = config.additional_params.get("sample_records", {})
+
+	def _parse_stream_names(self, connection_string: str) -> List[str]:
+		"""Parse Bytewax stream names from a connection string."""
+		stream_part = connection_string.replace("bytewax://", "", 1)
+		return [stream.strip() for stream in stream_part.split(",") if stream.strip()]
 	
 	async def connect(self) -> bool:
-		"""Establish connection to Kafka cluster"""
-		try:
-			if KafkaAdminClient is None:
-				raise ImportError("kafka-python library is required for Kafka connector")
-			
-			# Setup connection config
-			config = {
-				'bootstrap_servers': self.bootstrap_servers,
-				'client_id': 'apg_metadata_connector',
-				'request_timeout_ms': self.config.connection_timeout * 1000,
-				'api_version': (0, 10, 1)
-			}
-			
-			# Add authentication if provided
-			if self.config.username and self.config.password:
-				config.update({
-					'security_protocol': 'SASL_PLAINTEXT',
-					'sasl_mechanism': 'PLAIN',
-					'sasl_plain_username': self.config.username,
-					'sasl_plain_password': self.config.password
-				})
-			
-			# Add SSL if enabled
-			if self.config.use_ssl:
-				config['security_protocol'] = 'SSL'
-				if self.config.ssl_cert_path:
-					config['ssl_certfile'] = self.config.ssl_cert_path
-				if self.config.ssl_key_path:
-					config['ssl_keyfile'] = self.config.ssl_key_path
-			
-			# Add additional parameters
-			config.update(self.config.additional_params)
-			
-			# Create admin client
-			self.admin_client = KafkaAdminClient(**config)
-			
-			# Test the connection
-			metadata = self.admin_client.describe_cluster()
-			if not metadata:
-				raise Exception("Failed to get cluster metadata")
-			
-			self.is_connected = True
-			return True
-			
-		except Exception as e:
-			await self._log_error(f"Failed to connect to Kafka cluster: {str(e)}")
-			return False
+		"""Establish connection to configured Bytewax stream metadata."""
+		if not self.stream_names:
+			self.stream_names = list(self.config.additional_params.get("streams", []))
+		self.is_connected = True
+		return True
 	
 	async def disconnect(self):
-		"""Close connection to Kafka cluster"""
-		if self.admin_client:
-			try:
-				self.admin_client.close()
-			except:
-				pass
-			self.admin_client = None
-		
-		if self.consumer:
-			try:
-				self.consumer.close()
-			except:
-				pass
-			self.consumer = None
-		
+		"""Close Bytewax metadata connector."""
 		self.is_connected = False
 	
 	async def test_connection(self) -> Dict[str, Any]:
-		"""Test connection to Kafka cluster"""
+		"""Test Bytewax stream metadata availability."""
 		if not self.is_connected:
-			if not await self.connect():
-				return {"status": "error", "message": "Failed to connect to Kafka cluster"}
-		
-		try:
-			# Get cluster metadata
-			metadata = self.admin_client.describe_cluster()
-			
-			return {
-				"status": "success",
-				"message": "Connected to Kafka cluster successfully",
-				"cluster_id": getattr(metadata, 'cluster_id', 'unknown'),
-				"brokers": len(getattr(metadata, 'brokers', [])),
-				"bootstrap_servers": self.bootstrap_servers
-			}
-			
-		except Exception as e:
-			return {"status": "error", "message": f"Connection test failed: {str(e)}"}
+			await self.connect()
+		return {
+			"status": "success",
+			"message": "Bytewax stream metadata is available",
+			"stream_count": len(self.stream_names),
+			"streams": self.stream_names
+		}
 	
 	async def discover_assets(self) -> DiscoveryResult:
-		"""Discover Kafka topics and their metadata"""
+		"""Discover Bytewax streams and their metadata."""
 		result = DiscoveryResult(self.connector_type, self.source_system)
-		
 		if not self.is_connected:
-			if not await self.connect():
-				result.add_error("Failed to connect to Kafka cluster")
-				result.complete_discovery()
-				return result
+			await self.connect()
 		
-		try:
-			# Get cluster metadata to discover topics
-			metadata = self.admin_client.describe_cluster()
-			topics = self.admin_client.list_topics()
-			
-			for topic_name in topics:
-				try:
-					# Skip internal topics if not explicitly included
-					if topic_name.startswith('__') and not self.config.additional_params.get('include_internal_topics', False):
-						continue
-					
-					if should_include_asset(topic_name, self.config.include_patterns, self.config.exclude_patterns):
-						asset = await self._create_topic_asset(topic_name)
-						if asset:
-							result.add_asset(asset)
-					
-				except Exception as e:
-					result.add_warning(f"Error processing topic {topic_name}: {str(e)}")
-					continue
-			
-		except Exception as e:
-			result.add_error(f"Error during Kafka topic discovery: {str(e)}")
+		for stream_name in self.stream_names:
+			try:
+				if should_include_asset(stream_name, self.config.include_patterns, self.config.exclude_patterns):
+					asset = await self._create_stream_asset(stream_name)
+					result.add_asset(asset)
+			except Exception as e:
+				result.add_warning(f"Error processing stream {stream_name}: {str(e)}")
 		
 		result.complete_discovery()
 		return result
 	
-	async def _create_topic_asset(self, topic_name: str) -> Optional[AssetMetadata]:
-		"""Create asset metadata for a Kafka topic"""
-		try:
-			# Get topic details
-			topic_details = self.admin_client.describe_topics([topic_name])
-			topic_info = topic_details.get(topic_name)
-			
-			if not topic_info:
-				return None
-			
-			# Get partition information
-			partitions = getattr(topic_info, 'partitions', {})
-			partition_count = len(partitions)
-			
-			# Get topic configuration
-			configs = {}
-			try:
-				config_result = self.admin_client.describe_configs(
-					config_resources=[('TOPIC', topic_name)]
-				)
-				if topic_name in config_result:
-					configs = config_result[topic_name]
-			except:
-				pass
-			
-			asset = AssetMetadata(
-				name=topic_name,
-				asset_type="kafka_topic",
-				source_system=self.source_system,
-				description=f"Kafka topic: {topic_name}",
-				location=f"kafka://{','.join(self.bootstrap_servers)}/{topic_name}",
-				properties={
-					"partition_count": partition_count,
-					"replication_factor": getattr(topic_info, 'replication_factor', 1),
-					"configs": {k: str(v) for k, v in configs.items()} if isinstance(configs, dict) else {},
-					"bootstrap_servers": self.bootstrap_servers
-				}
+	async def _create_stream_asset(self, stream_name: str) -> AssetMetadata:
+		"""Create asset metadata for a Bytewax stream."""
+		records = await self._sample_stream_records(stream_name, 10)
+		columns = [
+			ColumnMetadata(
+				name="__key",
+				data_type=DataType.STRING,
+				description="Stream item key",
+				is_nullable=True,
+				classification_hints=["message_key"]
+			),
+			ColumnMetadata(
+				name="__value",
+				data_type=DataType.STRING,
+				description="Stream item value",
+				is_nullable=True,
+				classification_hints=["message_value"]
+			),
+			ColumnMetadata(
+				name="__sequence",
+				data_type=DataType.INTEGER,
+				description="Stream item sequence",
+				is_nullable=False,
+				classification_hints=["stream_sequence"]
+			),
+			ColumnMetadata(
+				name="__timestamp",
+				data_type=DataType.TIMESTAMP,
+				description="Stream item timestamp",
+				is_nullable=True,
+				classification_hints=["timestamp"]
 			)
-			
-			# Create columns for message structure (if we can sample)
-			columns = []
-			
-			# Always add basic message metadata columns
-			columns.extend([
-				ColumnMetadata(
-					name="__key",
-					data_type=DataType.STRING,
-					description="Message key",
-					is_nullable=True,
-					classification_hints=["message_key"]
-				),
-				ColumnMetadata(
-					name="__value",
-					data_type=DataType.STRING,
-					description="Message value",
-					is_nullable=True,
-					classification_hints=["message_value"]
-				),
-				ColumnMetadata(
-					name="__partition",
-					data_type=DataType.INTEGER,
-					description="Message partition",
-					is_nullable=False,
-					classification_hints=["partition_id"]
-				),
-				ColumnMetadata(
-					name="__offset",
-					data_type=DataType.INTEGER,
-					description="Message offset",
-					is_nullable=False,
-					classification_hints=["message_offset"]
-				),
-				ColumnMetadata(
-					name="__timestamp",
-					data_type=DataType.TIMESTAMP,
-					description="Message timestamp",
-					is_nullable=True,
-					classification_hints=["timestamp"]
-				)
-			])
-			
-			# Try to sample messages to infer schema
-			if self.config.enable_schema_inference:
-				try:
-					sample_messages = await self._sample_topic_messages(topic_name, 10)
-					if sample_messages:
-						inferred_columns = await self._infer_message_schema(sample_messages)
-						columns.extend(inferred_columns)
-				except Exception as e:
-					await self._log_warning(f"Could not infer schema for topic {topic_name}: {str(e)}")
-			
-			asset.columns = columns
-			asset.column_count = len(columns)
-			asset.estimated_quality_score = self._estimate_quality_score(asset)
-			
-			# Cache topic metadata
-			self.topics_metadata[topic_name] = asset
-			
-			return asset
-			
-		except Exception as e:
-			await self._log_error(f"Error creating asset for topic {topic_name}: {str(e)}")
-			return None
-	
-	async def _sample_topic_messages(self, topic_name: str, max_messages: int = 10) -> List[Dict[str, Any]]:
-		"""Sample messages from a Kafka topic"""
-		messages = []
-		consumer = None
+		]
+		if self.config.enable_schema_inference and records:
+			columns.extend(await self._infer_record_schema(records))
 		
-		try:
-			# Create consumer for sampling
-			consumer_config = {
-				'bootstrap_servers': self.bootstrap_servers,
-				'group_id': f'apg_metadata_sampler_{topic_name}',
-				'auto_offset_reset': 'latest',  # Start from latest to avoid consuming too much
-				'enable_auto_commit': False,
-				'consumer_timeout_ms': 5000,  # 5 second timeout
-				'max_poll_records': max_messages,
-				'value_deserializer': lambda x: x.decode('utf-8', errors='ignore') if x else None,
-				'key_deserializer': lambda x: x.decode('utf-8', errors='ignore') if x else None
+		asset = AssetMetadata(
+			name=stream_name,
+			asset_type="bytewax_stream",
+			source_system=self.source_system,
+			description=f"Bytewax stream: {stream_name}",
+			location=f"bytewax://{stream_name}",
+			properties={
+				"stream": stream_name,
+				"record_count": len(self.sample_records.get(stream_name, [])),
+				"flow_id": self.config.additional_params.get("flow_id", "metadata-discovery")
 			}
-			
-			# Add authentication if available
-			if self.config.username and self.config.password:
-				consumer_config.update({
-					'security_protocol': 'SASL_PLAINTEXT',
-					'sasl_mechanism': 'PLAIN',
-					'sasl_plain_username': self.config.username,
-					'sasl_plain_password': self.config.password
-				})
-			
-			consumer = KafkaConsumer(topic_name, **consumer_config)
-			
-			# Poll for messages
-			message_count = 0
-			for message in consumer:
-				if message_count >= max_messages:
-					break
-				
-				messages.append({
-					"key": message.key,
-					"value": message.value,
-					"partition": message.partition,
-					"offset": message.offset,
-					"timestamp": message.timestamp
-				})
-				message_count += 1
-			
-		except Exception as e:
-			await self._log_warning(f"Error sampling messages from {topic_name}: {str(e)}")
-			
-		finally:
-			if consumer:
-				try:
-					consumer.close()
-				except:
-					pass
-		
-		return messages
+		)
+		asset.columns = columns
+		asset.column_count = len(columns)
+		asset.estimated_quality_score = self._estimate_quality_score(asset)
+		self.streams_metadata[stream_name] = asset
+		return asset
 	
-	async def _infer_message_schema(self, messages: List[Dict[str, Any]]) -> List[ColumnMetadata]:
-		"""Infer schema from sample messages"""
+	async def _sample_stream_records(self, stream_name: str, max_records: int = 10) -> List[Dict[str, Any]]:
+		"""Sample configured Bytewax stream records."""
+		records = self.sample_records.get(stream_name, [])
+		return [
+			record if isinstance(record, dict) else {"value": record}
+			for record in records[:max_records]
+		]
+
+	async def _infer_record_schema(self, records: List[Dict[str, Any]]) -> List[ColumnMetadata]:
+		"""Infer schema from Bytewax stream records."""
 		columns = []
-		value_schemas = []
-		
-		# Analyze message values
-		for message in messages:
-			value = message.get("value")
-			if value:
+		seen = set()
+		for record in records:
+			value = record.get("value", record)
+			if isinstance(value, str):
 				try:
-					# Try to parse as JSON
-					if isinstance(value, str) and (value.startswith('{') or value.startswith('[')):
-						parsed_value = json.loads(value)
-						value_schemas.append(parsed_value)
+					value = json.loads(value)
 				except (json.JSONDecodeError, ValueError):
-					# Not JSON, treat as string
-					value_schemas.append(value)
-		
-		# If we have JSON schemas, analyze the structure
-		if value_schemas:
-			for schema in value_schemas:
-				if isinstance(schema, dict):
-					for field_name, field_value in schema.items():
-						data_type = self._infer_data_type([field_value])
-						
-						# Check if column already exists
-						existing_column = next((c for c in columns if c.name == field_name), None)
-						if not existing_column:
-							column = ColumnMetadata(
-								name=field_name,
-								data_type=data_type,
-								is_nullable=True,
-								description=f"Field from message value: {field_name}",
-								sample_values=[str(field_value)] if field_value is not None else [],
-								classification_hints=["message_field"]
-							)
-							columns.append(column)
-						else:
-							# Update existing column with more sample values
-							if str(field_value) not in existing_column.sample_values:
-								existing_column.sample_values.append(str(field_value))
-								existing_column.sample_values = existing_column.sample_values[:10]  # Limit samples
-		
+					value = {"value": value}
+			if not isinstance(value, dict):
+				value = {"value": value}
+			for field_name, field_value in value.items():
+				if field_name in seen:
+					continue
+				seen.add(field_name)
+				columns.append(ColumnMetadata(
+					name=field_name,
+					data_type=self._infer_data_type([field_value]),
+					is_nullable=True,
+					description=f"Field from stream value: {field_name}",
+					sample_values=[str(field_value)] if field_value is not None else [],
+					classification_hints=["message_field"]
+				))
 		return columns
 	
 	async def get_asset_schema(self, asset_name: str) -> Optional[AssetMetadata]:
-		"""Get detailed schema information for a Kafka topic"""
-		if asset_name in self.topics_metadata:
-			return self.topics_metadata[asset_name]
-		
+		"""Get detailed schema information for a Bytewax stream."""
+		if asset_name in self.streams_metadata:
+			return self.streams_metadata[asset_name]
 		if not self.is_connected:
-			if not await self.connect():
-				return None
-		
-		try:
-			# Create asset for the specific topic
-			asset = await self._create_topic_asset(asset_name)
-			return asset
-			
-		except Exception as e:
-			await self._log_error(f"Error getting schema for topic {asset_name}: {str(e)}")
-		
-		return None
+			await self.connect()
+		if asset_name not in self.stream_names:
+			return None
+		return await self._create_stream_asset(asset_name)
 	
 	async def sample_asset_data(self, asset_name: str, limit: int = 100) -> List[Dict[str, Any]]:
-		"""Sample data from a Kafka topic"""
+		"""Sample data from a Bytewax stream."""
 		if not self.is_connected:
-			if not await self.connect():
-				return []
-		
-		try:
-			# Sample messages from the topic
-			messages = await self._sample_topic_messages(asset_name, min(limit, 100))
-			
-			# Format messages for return
-			formatted_messages = []
-			for message in messages:
-				value = message.get("value")
-				
-				# Try to parse JSON value
-				parsed_value = value
-				if isinstance(value, str):
-					try:
-						parsed_value = json.loads(value)
-					except (json.JSONDecodeError, ValueError):
-						pass
-				
-				formatted_message = {
-					"__key": message.get("key"),
-					"__value": parsed_value,
-					"__partition": message.get("partition"),
-					"__offset": message.get("offset"),
-					"__timestamp": message.get("timestamp")
-				}
-				
-				# If value is a dict, merge its fields
-				if isinstance(parsed_value, dict):
-					formatted_message.update(parsed_value)
-				
-				formatted_messages.append(formatted_message)
-			
-			return formatted_messages
-			
-		except Exception as e:
-			await self._log_error(f"Error sampling data from topic {asset_name}: {str(e)}")
-		
-		return []
+			await self.connect()
+		records = await self._sample_stream_records(asset_name, min(limit, 100))
+		formatted_records = []
+		for sequence, record in enumerate(records):
+			value = record.get("value", record)
+			if isinstance(value, str):
+				try:
+					value = json.loads(value)
+				except (json.JSONDecodeError, ValueError):
+					pass
+			formatted_record = {
+				"__key": record.get("key"),
+				"__value": value,
+				"__sequence": record.get("sequence", sequence),
+				"__timestamp": record.get("timestamp")
+			}
+			if isinstance(value, dict):
+				formatted_record.update(value)
+			formatted_records.append(formatted_record)
+		return formatted_records
 	
 	async def _log_warning(self, message: str):
 		"""Log warning message"""

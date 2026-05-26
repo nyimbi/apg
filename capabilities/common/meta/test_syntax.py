@@ -43,12 +43,12 @@ try:
     print("   ✓ GraphQL type mapping")
     print("   ✓ Authentication support")
     
-    print("\n3. KafkaConnector - Comprehensive Kafka discovery")
-    print("   ✓ Topic discovery and metadata")
-    print("   ✓ Partition and configuration analysis")
-    print("   ✓ Message sampling and schema inference")
+    print("\n3. BytewaxConnector - Comprehensive Bytewax discovery")
+    print("   ✓ Stream discovery and metadata")
+    print("   ✓ Flow and record analysis")
+    print("   ✓ Stream sampling and schema inference")
     print("   ✓ JSON message structure analysis")
-    print("   ✓ SASL and SSL authentication support")
+    print("   ✓ Offline stream fixture support")
     
     print("\nFeatures implemented for all connectors:")
     print("✓ Full connection management")

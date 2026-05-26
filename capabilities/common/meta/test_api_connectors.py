@@ -4,7 +4,7 @@ Test script for API connectors implementation
 """
 
 import asyncio
-from connectors.api_connectors import RESTAPIConnector, GraphQLConnector, KafkaConnector
+from connectors.api_connectors import RESTAPIConnector, GraphQLConnector, BytewaxConnector
 from connectors.base_connector import ConnectorConfig
 
 async def test_connectors():
@@ -74,24 +74,29 @@ async def test_connectors():
 	
 	await graphql_connector.disconnect()
 	
-	# Test Kafka Connector (will likely fail without Kafka setup, but tests the structure)
-	print("\n3. Testing Kafka Connector")
+	# Test Bytewax Connector with offline stream metadata
+	print("\n3. Testing Bytewax Connector")
 	print("-" * 30)
 	
-	kafka_config = ConnectorConfig(
-		connection_string="localhost:9092",
+	bytewax_config = ConnectorConfig(
+		connection_string="bytewax://orders",
 		include_patterns=["*"],
-		exclude_patterns=["__*"],  # Exclude internal topics
-		max_sample_rows=10
+		exclude_patterns=[],
+		max_sample_rows=10,
+		additional_params={
+			"sample_records": {
+				"orders": [{"value": {"id": 1, "status": "created"}}]
+			}
+		}
 	)
 	
-	kafka_connector = KafkaConnector(kafka_config)
+	bytewax_connector = BytewaxConnector(bytewax_config)
 	
-	# Test connection (expected to fail without Kafka running)
-	connection_result = await kafka_connector.test_connection()
+	# Test connection
+	connection_result = await bytewax_connector.test_connection()
 	print(f"Connection Test: {connection_result}")
 	
-	await kafka_connector.disconnect()
+	await bytewax_connector.disconnect()
 	
 	print("\n" + "=" * 50)
 	print("API Connectors Implementation Complete!")

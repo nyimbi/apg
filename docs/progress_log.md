@@ -1416,3 +1416,22 @@ Verification:
 Current broader Bytewax migration findings:
 
 - MQEB executable/model metadata is clean; remaining heavy runtime references are concentrated in composition events, DVRL, and META.
+
+### 2026-05-26 17:35 EAT
+
+Completed checkpoint:
+
+- Replaced META's API metadata connector Kafka implementation with a Bytewax stream metadata connector.
+- Removed `kafka-python` import paths and broker/client assumptions from META connector code.
+- Updated META connector exports, connector registry inference, and connector smoke scripts to use `BytewaxConnector`.
+- Added offline Bytewax stream sample-record support for metadata discovery, schema inference, and asset sampling.
+
+Verification:
+
+- `rg -n "Kafka|KAFKA|kafka|KafkaConnector|KafkaConsumer|KafkaAdminClient|kafka-python|kafka://" capabilities/common/meta/connectors/api_connectors.py capabilities/common/meta/connectors/__init__.py capabilities/common/meta/connectors/connector_registry.py capabilities/common/meta/test_api_connectors.py capabilities/common/meta/test_syntax.py` -> no matches
+- `.venv/bin/python -m py_compile capabilities/common/meta/connectors/api_connectors.py capabilities/common/meta/connectors/__init__.py capabilities/common/meta/connectors/connector_registry.py capabilities/common/meta/test_api_connectors.py capabilities/common/meta/test_syntax.py`
+- `git diff --check -- capabilities/common/meta/connectors/api_connectors.py capabilities/common/meta/connectors/__init__.py capabilities/common/meta/connectors/connector_registry.py capabilities/common/meta/test_api_connectors.py capabilities/common/meta/test_syntax.py`
+
+Current broader Bytewax migration findings:
+
+- META executable connector surfaces are clean. Remaining major runtime families are composition events and DVRL, plus generated examples/templates/docs.

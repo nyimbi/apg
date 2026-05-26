@@ -247,7 +247,7 @@ class ConnectorRegistry:
 			return ConnectorType.ML_PLATFORM
 		elif 'bi' in class_name or 'dashboard' in class_name:
 			return ConnectorType.BI_TOOL
-		elif 'stream' in class_name or 'kafka' in class_name:
+		elif 'stream' in class_name or 'bytewax' in class_name:
 			return ConnectorType.STREAMING
 		else:
 			return ConnectorType.CUSTOM
@@ -306,7 +306,7 @@ class ConnectorRegistry:
 				'http://', 'https://', 'api.', 'rest', 'graphql'
 			],
 			ConnectorType.STREAMING: [
-				'kafka://', 'stream', 'topic'
+				'bytewax://', 'stream'
 			]
 		}
 		
