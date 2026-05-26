@@ -838,3 +838,28 @@ Current broader LOGT/DEPL/ENVM execution findings:
 - LOGT, DEPL, and ENVM are no longer placeholders at the composition layer.
 - Phase 9 operational infrastructure is now covered at the first-class registration/contract layer; remaining Phase 9 package-level gaps are DIST, EDGE, CICD, and BKUP.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:33 EAT
+
+Completed checkpoint:
+
+- Made DIST import-light and executable as a first-class APG distributed-computing capability with tenant-scoped job, worker, coordination, governance, UI, and theme configuration.
+- Added deterministic DIST rules for tenant context, job ownership, idempotency, worker health checks, quota policy, and large partition plan review.
+- Made EDGE import-light and executable as a first-class APG edge-computing capability with tenant-scoped node, workload, sync, governance, UI, and theme configuration.
+- Added deterministic EDGE rules for tenant context, node attestation, signed workload artifacts, sync conflict policy, secure edge transport, and long offline-window review.
+- Promoted the placeholder CICD package into a first-class APG continuous-integration/delivery capability with tenant-scoped pipeline, build, gate, governance, UI, and theme configuration.
+- Added deterministic CICD rules for tenant context, pipeline ownership, build secret scopes, signed artifacts, quality gates, and high parallelism review.
+- Promoted the placeholder BKUP package into a first-class APG backup/restore capability with tenant-scoped plan, snapshot, restore, governance, UI, and theme configuration.
+- Added deterministic BKUP rules for tenant context, backup plan ownership, snapshot encryption, restore integrity checks, production restore approval, and stale restore-test review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/dist/__init__.py capabilities/common/dist/capability_contract.py capabilities/common/dist/test_capability_contract.py capabilities/common/edge/__init__.py capabilities/common/edge/capability_contract.py capabilities/common/edge/test_capability_contract.py capabilities/common/cicd/__init__.py capabilities/common/cicd/capability_contract.py capabilities/common/cicd/test_capability_contract.py capabilities/common/bkup/__init__.py capabilities/common/bkup/capability_contract.py capabilities/common/bkup/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/dist/test_capability_contract.py capabilities/common/edge/test_capability_contract.py capabilities/common/cicd/test_capability_contract.py capabilities/common/bkup/test_capability_contract.py` -> 12 passed, 10 warnings
+
+Current broader DIST/EDGE/CICD/BKUP execution findings:
+
+- DIST and EDGE had runtime modules but now expose lightweight first-class registration/contract surfaces for composition-time discovery.
+- CICD and BKUP are no longer placeholders at the composition layer.
+- Phase 9 now has uniform first-class registration/contract coverage across advanced operations, distributed computing, edge, CI/CD, and backup/restore.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
