@@ -30,13 +30,6 @@ scrape_configs:
     params:
       format: ['prometheus']
 
-  # Bytewax Metrics (JMX Exporter)
-  - job_name: 'bytewax'
-    static_configs:
-      - targets: ['bytewax:9101']
-    metrics_path: '/metrics'
-    scrape_interval: 30s
-
   # PostgreSQL Metrics
   - job_name: 'postgres'
     static_configs:

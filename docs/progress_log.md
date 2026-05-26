@@ -1749,3 +1749,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_semantic_executable_checks.py` -> 5 passed
 - `.venv/bin/python -m py_compile compiler/ast_builder.py compiler/semantic_analyzer.py capabilities/__init__.py tests/test_semantic_executable_checks.py`
 - `rg -n "TODO: Implement|TODO: Add|placeholder|stub|NotImplemented|pass$" cli compiler templates/composable capabilities/__init__.py capabilities/capability_contract_registry.py capabilities/capability_contract_factory.py agents --glob '*.py' --glob '*.md' --glob '!**/__pycache__/**'` -> no matches
+
+### 2026-05-26 20:06 EAT
+
+Completed checkpoint:
+
+- Enforced the platform direction that APG uses Bytewax dataflows, not Kafka-family brokers, as a repository hygiene regression.
+- Removed the remaining Event Streaming CI Confluent/Kafka service and replaced bootstrap-server environment with Bytewax flow, recovery, and worker settings.
+- Tightened Event Streaming deployment docs so Bytewax is described as the APG-hosted Python dataflow runtime instead of a separate service or cluster.
+- Removed the stale Prometheus scrape target for a non-existent external Bytewax service.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed
+- `.venv/bin/python -m py_compile tests/test_repository_hygiene.py`
+- `.venv/bin/python -c "import yaml, pathlib; ..."` -> parsed 2 YAML files
+- `rg -n -i "kafka|confluent|redpanda|bootstrap\\.servers|bootstrap_servers|BYTEWAX_BROKERS|Bytewax broker|Bytewax brokers|broker connection string" --glob '!uploads/**' --glob '!tmp/**' --glob '!node_modules/**' --glob '!**/swagger-ui-bundle.js' --glob '!**/.venv/**' --glob '!**/.git/**' --glob '!docs/progress_log.md' --glob '!tests/test_repository_hygiene.py' .` -> no matches
+- `rg -n "Bytewax 3\\.0|bytewax\\.yaml|bytewax:9101|Bytewax cluster|docker-compose up -d postgres redis bytewax" capabilities/composition/events/README.md capabilities/composition/events/docs/deployment.md capabilities/composition/events/docker/prometheus/prometheus.yml capabilities/composition/events/.github/workflows/ci-cd.yml` -> no matches

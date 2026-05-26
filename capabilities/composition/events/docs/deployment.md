@@ -29,7 +29,7 @@ This guide provides comprehensive instructions for deploying the APG Event Strea
 
 - **PostgreSQL** 15+
 - **Redis** 7.0+
-- **Bytewax** 3.0+
+- **Bytewax** Python runtime pinned by `requirements-prod.txt`
 - **Prometheus** (for monitoring)
 - **Grafana** (for visualization)
 
@@ -88,8 +88,8 @@ cd event_streaming_bus
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
-# Start services
-docker-compose up -d postgres redis bytewax
+# Start backing services. The APG container hosts the Bytewax dataflow runtime.
+docker-compose up -d postgres redis
 
 # Initialize database
 python -m alembic upgrade head
@@ -199,8 +199,8 @@ kubectl apply -f k8s/postgres.yaml
 # Deploy Redis
 kubectl apply -f k8s/redis.yaml
 
-# Deploy Bytewax
-kubectl apply -f k8s/bytewax.yaml
+# Bytewax runs inside the APG API/worker pods; no separate broker deployment is required.
+# The config map and secret above provide flow, worker, and recovery settings.
 ```
 
 ### Scaling

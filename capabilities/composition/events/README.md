@@ -409,7 +409,7 @@ curl http://localhost:8080/health
 # Detailed status
 curl http://localhost:8080/api/v1/status
 
-# Bytewax cluster health
+# Bytewax dataflow health
 curl http://localhost:8080/api/v1/bytewax/health
 
 # Database health
@@ -438,7 +438,7 @@ Structured logging with configurable levels:
 ### Prerequisites
 
 - Python 3.11+
-- Bytewax 3.0+
+- Bytewax Python runtime pinned by `requirements-prod.txt`
 - Redis 7.0+
 - PostgreSQL 15+
 

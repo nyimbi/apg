@@ -8,6 +8,26 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_ROOT_MARKDOWN = {"README.md"}
+FORBIDDEN_STREAMING_RUNTIME_TERMS = (
+	"kafka",
+	"confluent",
+	"redpanda",
+	"bootstrap.servers",
+	"bootstrap_servers",
+	"bytewax_brokers",
+	"bytewax broker",
+	"bytewax brokers",
+	"broker connection string",
+)
+STREAMING_TERM_EXCLUDED_PREFIXES = (
+	"tmp/",
+	"uploads/",
+)
+STREAMING_TERM_EXCLUDED_PATHS = {
+	"docs/progress_log.md",
+	"fab/flask_appbuilder/static/appbuilder/js/swagger-ui-bundle.js",
+	"tests/test_repository_hygiene.py",
+}
 
 
 def _tracked_files() -> list[str]:
@@ -44,3 +64,25 @@ def test_root_tests_and_docs_stay_in_expected_directories():
 	]
 
 	assert misplaced == []
+
+
+def test_apg_streaming_runtime_stays_bytewax_native():
+	violations: list[str] = []
+
+	for path in _tracked_files():
+		if path in STREAMING_TERM_EXCLUDED_PATHS:
+			continue
+		if path.startswith(STREAMING_TERM_EXCLUDED_PREFIXES):
+			continue
+
+		candidate = REPO_ROOT / path
+		if not candidate.is_file():
+			continue
+
+		content = candidate.read_text(encoding="utf-8", errors="ignore")
+		lowered = content.lower()
+		for term in FORBIDDEN_STREAMING_RUNTIME_TERMS:
+			if term in lowered:
+				violations.append(f"{path}: {term}")
+
+	assert violations == []

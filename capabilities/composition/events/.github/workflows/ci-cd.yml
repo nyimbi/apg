@@ -176,20 +176,6 @@ jobs:
         ports:
           - 6379:6379
       
-      kafka:
-        image: confluentinc/cp-kafka:7.4.0
-        env:
-          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-        options: >-
-          --health-cmd "kafka-broker-api-versions --bootstrap-server localhost:9092"
-          --health-interval 30s
-          --health-timeout 10s
-          --health-retries 3
-        ports:
-          - 9092:9092
-    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -220,8 +206,8 @@ jobs:
             sleep 2
           done
           
-          # Wait for Kafka
-          timeout 120 bash -c 'until kafka-broker-api-versions --bootstrap-server localhost:9092; do sleep 5; done'
+          # Bytewax runs in-process with APG; no external streaming broker is required.
+          mkdir -p /tmp/apg-bytewax-recovery
       
       - name: Setup Test Database
         run: |
@@ -235,7 +221,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:test_password@localhost:5432/test_esb
           REDIS_URL: redis://localhost:6379/0
-          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          BYTEWAX_FLOW_ID: apg-esb-ci-flow
+          BYTEWAX_RECOVERY_DIR: /tmp/apg-bytewax-recovery
+          BYTEWAX_WORKERS_PER_PROCESS: 1
           ENV: test
       
       - name: Upload Integration Test Results
@@ -282,7 +270,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://esb_user:esb_password@localhost:5432/apg_event_streaming_bus
           REDIS_URL: redis://localhost:6379/0
-          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          BYTEWAX_FLOW_ID: apg-esb-performance-flow
+          BYTEWAX_RECOVERY_DIR: /tmp/apg-bytewax-recovery
+          BYTEWAX_WORKERS_PER_PROCESS: 2
       
       - name: Upload Performance Results
         uses: actions/upload-artifact@v3
