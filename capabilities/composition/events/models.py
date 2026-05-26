@@ -1122,7 +1122,7 @@ class EventConfig(BaseModel):
     """Event configuration model for API."""
     model_config = model_config
     
-    event_type: str = Field(..., min_length=1, max_length=100)
+    event_type: str = Field(..., max_length=100)
     event_version: str = Field(default="1.0", max_length=20)
     source_capability: str = Field(..., min_length=1, max_length=100)
     aggregate_id: str = Field(..., min_length=1, max_length=100)

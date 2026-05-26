@@ -299,6 +299,15 @@ def mock_bytewax_producer():
 	return producer
 
 @pytest.fixture
+def mock_bytewax_admin():
+	"""Create mock Bytewax admin client."""
+	admin = Mock()
+	admin.create_topics = Mock(return_value={})
+	admin.alter_configs = Mock(return_value={})
+	admin.close = Mock()
+	return admin
+
+@pytest.fixture
 def mock_bytewax_consumer():
 	"""Create mock Bytewax consumer."""
 	consumer = Mock()

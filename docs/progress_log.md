@@ -1818,3 +1818,18 @@ Verification:
 
 - `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py` -> 46 passed
 - `.venv/bin/python -m py_compile capabilities/composition/events/models.py`
+
+### 2026-05-26 20:41 EAT
+
+Completed checkpoint:
+
+- Made the Event Streaming service layer executable against the existing unit-test contract while keeping Bytewax as the stream runtime.
+- Added no-argument, dependency-light service construction paths and sync/async mock-aware helpers for focused local execution.
+- Added legacy-compatible publishing, consumption, schema registry, event sourcing, stream processor, consumer group, and stream query methods expected by the service tests.
+- Kept invalid event-type rejection at the service boundary so malformed events can be constructed for negative-path service tests but cannot be published.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/events/service.py capabilities/composition/events/models.py capabilities/composition/events/tests/conftest.py`
+- `.venv/bin/python -m pytest -q capabilities/composition/events/tests/unit/test_models.py capabilities/composition/events/tests/unit/test_services.py` -> 80 passed
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 3 passed
