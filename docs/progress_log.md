@@ -794,3 +794,25 @@ Current broader RECS/POSE/AUDP/GEOS execution findings:
 - POSE, AUDP, and GEOS had substantial runtime code but now expose lightweight first-class registration/contract surfaces for composition-time discovery.
 - Phase 8 specialized AI/location work is partially complete; remaining Phase 8 package-level gaps are I18N, WALT, and MCHN.
 - Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
+
+### 2026-05-26 11:22 EAT
+
+Completed checkpoint:
+
+- Promoted the placeholder I18N package into a first-class APG internationalization capability with tenant-scoped locale, translation, publishing, governance, UI, and theme configuration.
+- Added deterministic I18N rules for tenant context, locale ownership, machine-translation review, publication approval, restricted-content filtering, and low-coverage review.
+- Promoted the placeholder WALT package into a first-class APG wallet/payment capability with tenant-scoped wallet, payment, settlement, governance, UI, and theme configuration.
+- Added deterministic WALT rules for tenant context, wallet ownership, payment-instrument encryption, high-value MFA, settlement reconciliation, and high-risk transaction review.
+- Promoted the placeholder MCHN package into a first-class APG multi-channel output capability with tenant-scoped channel, rendering, delivery, governance, UI, and theme configuration.
+- Added deterministic MCHN rules for tenant context, channel ownership, template approval, sensitive-output encryption, channel health, and large-delivery review.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/i18n/__init__.py capabilities/common/i18n/capability_contract.py capabilities/common/i18n/test_capability_contract.py capabilities/common/walt/__init__.py capabilities/common/walt/capability_contract.py capabilities/common/walt/test_capability_contract.py capabilities/common/mchn/__init__.py capabilities/common/mchn/capability_contract.py capabilities/common/mchn/test_capability_contract.py`
+- `.venv/bin/python -m pytest -q capabilities/common/i18n/test_capability_contract.py capabilities/common/walt/test_capability_contract.py capabilities/common/mchn/test_capability_contract.py` -> 9 passed, 10 warnings
+
+Current broader I18N/WALT/MCHN execution findings:
+
+- I18N, WALT, and MCHN are no longer placeholders at the composition layer.
+- Phase 8 now has uniform first-class registration/contract coverage across specialized AI, analytics, localization, payments, and multichannel output.
+- Remaining warnings during focused pytest are pre-existing warnings from adjacent common capabilities.
