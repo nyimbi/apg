@@ -2804,3 +2804,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_ecd_esg_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n "demo_user|demo_tenant|esg:admin|fixed demo|Implementation would integrate" capabilities/ecd/esg/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 01:32 EAT
+
+Completed checkpoint:
+
+- Replaced the EAM Asset FastAPI auth dependency's fixed `user-123`/`tenant-456` mock context with request-derived APG identity.
+- EAM API auth now resolves user, tenant, and permissions from FastAPI request state, APG headers, query args, and configured environment fallbacks.
+- Reduced unauthenticated fallback permissions from broad asset-create/work-order access to read-only `eam.asset.view`.
+- Added focused EAM API context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/eam/ast/api.py tests/test_eam_ast_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_eam_ast_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "user-123|tenant-456|mock user data|For now, return mock user|Kafka|kafka" capabilities/eam/ast/api.py` -> no matches
