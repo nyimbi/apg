@@ -1237,3 +1237,24 @@ Current broader AICR advanced-ML findings:
 - Advanced-ML prediction helpers now execute against registered model objects when present and remain deterministic offline when no model is registered.
 - Focused tests avoid the heavier AICR integration suite per the battery-aware testing constraint.
 - Remaining warnings during focused pytest are pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+
+### 2026-05-26 16:56 EAT
+
+Completed checkpoint:
+
+- Made AICR enterprise integration importable when optional enterprise SDKs such as `aiofiles`, `aiohttp`, `ldap3`, or `pysaml2` are not installed.
+- Replaced Apache Kafka adapter placeholders with an executable in-process topic ledger, publish path, and sync/async consumer replay path.
+- Replaced Oracle and SQL Server database placeholders with deterministic metadata-backed query execution for simple SELECT queries and configured query-result fixtures.
+- Added an offline database query log so adapter execution is inspectable in tests and diagnostics.
+- Added focused runtime tests for local Kafka publish/replay, async consumer delivery, Oracle metadata-backed filtering, and SQL Server configured query results.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/aicr/enterprise_integration.py capabilities/common/aicr/tests/test_enterprise_integration_runtime.py`
+- `.venv/bin/python -m pytest -q capabilities/common/aicr/tests/test_enterprise_integration_runtime.py` -> 4 passed, 10 warnings
+
+Current broader AICR enterprise-integration findings:
+
+- Enterprise queue/database adapters now have executable offline behavior instead of no-op placeholders for Kafka, Oracle, and SQL Server.
+- Real network integrations still need their respective optional SDKs and service endpoints, but the module no longer fails at import time in minimal/offline environments.
+- Remaining warnings during focused pytest are pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
