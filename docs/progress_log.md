@@ -3079,3 +3079,19 @@ Verification:
 - `rg -n "api_user|default_tenant|This would validate JWT tokens|Kafka|kafka" capabilities/fin/cbm/cash_management/api.py tests/test_fin_cbm_cash_api_context.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 02:38 EAT
+
+Completed checkpoint:
+
+- Replaced Cash Management FAB view tenant fallback with APG/Flask/AppBuilder request-context tenant resolution.
+- Fixed the Cash Management portfolio optimization view's reserved `yield=` keyword argument so the view module compiles.
+- Added focused CBM Cash view tenant-context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/cbm/cash_management/views.py tests/test_fin_cbm_cash_views_context.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_cbm_cash_views_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "'default_tenant'|\"default_tenant\"|Integration with APG authentication system|Kafka|kafka|\byield\s*=" capabilities/fin/cbm/cash_management/views.py tests/test_fin_cbm_cash_views_context.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

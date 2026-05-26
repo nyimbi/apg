@@ -9,11 +9,12 @@ Author: Nyimbi Odero | APG Platform Architect
 """
 
 import logging
+import os
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Any, Optional
 
-from flask import flash, redirect, request, jsonify, render_template, url_for
+from flask import flash, redirect, request, jsonify, render_template, url_for, g, session
 from flask_appbuilder import ModelView, BaseView, expose, has_access
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.charts.views import DirectByChartView, GroupByChartView
@@ -50,6 +51,65 @@ def _log_view_error(view_name: str, error: str, tenant_id: str) -> str:
 	"""Log view error with APG formatting"""
 	return f"APG_VIEW_ERROR | view={view_name} | error={error} | tenant={tenant_id}"
 
+
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a non-empty stripped string or None."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: Any, keys: List[str]) -> Optional[str]:
+	"""Read the first present text value from a dict-like or object source."""
+	if source is None:
+		return None
+	for key in keys:
+		if isinstance(source, dict):
+			value = source.get(key)
+		else:
+			value = getattr(source, key, None)
+		text = _clean_text(value)
+		if text:
+			return text
+	return None
+
+
+def _appbuilder_user(appbuilder: Any = None) -> Any:
+	"""Return the current Flask-AppBuilder user object when available."""
+	user = getattr(getattr(appbuilder, "sm", None), "user", None)
+	if hasattr(user, "_get_current_object"):
+		return user._get_current_object()
+	return user
+
+
+def resolve_tenant_id(appbuilder: Any = None) -> str:
+	"""Resolve current tenant ID from APG/Flask/AppBuilder context."""
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
+	appbuilder_user = _appbuilder_user(appbuilder)
+	current_tenant = getattr(g, "current_tenant", None)
+	current_user = getattr(g, "current_user", None)
+	g_user = getattr(g, "user", None)
+	for candidate in (
+		getattr(g, "tenant_id", None),
+		_object_value(current_tenant, ["tenant_id", "id", "organization_id", "org_id"]),
+		_object_value(current_user, ["tenant_id", "tenant", "organization_id", "org_id"]),
+		_object_value(g_user, ["tenant_id", "tenant", "organization_id", "org_id"]),
+		_object_value(appbuilder_user, ["tenant_id", "tenant", "organization_id", "org_id"]),
+		session.get("tenant_id"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+		request.environ.get("APG_TENANT_ID"),
+		default_tenant,
+	):
+		tenant_id = _clean_text(candidate)
+		if tenant_id:
+			return tenant_id
+	return default_tenant
+
 # ============================================================================
 # Custom Widgets for Enhanced UX
 # ============================================================================
@@ -83,8 +143,7 @@ class APGServiceMixin:
 	
 	def get_tenant_id(self) -> str:
 		"""Get current tenant ID from user session"""
-		# Integration with APG authentication system
-		return getattr(self.appbuilder.sm.user, 'tenant_id', 'default_tenant')
+		return resolve_tenant_id(self.appbuilder)
 	
 	def get_cash_service(self) -> CashManagementService:
 		"""Get APG cash management service instance"""
@@ -763,8 +822,8 @@ class InvestmentView(BaseView, APGServiceMixin):
 			
 			flash(_(
 				'Portfolio optimization completed. '
-				'Expected yield: %(yield)s, Risk score: %(risk)s',
-				yield=f"{optimization['expected_yield']:.2%}",
+				'Expected yield: %(expected_yield)s, Risk score: %(risk)s',
+				expected_yield=f"{optimization['expected_yield']:.2%}",
 				risk=f"{optimization['portfolio_risk_score']:.2f}"
 			), 'success')
 			
