@@ -2356,3 +2356,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_scm_edm_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n "return \"default_tenant\"|return \"current_user\"|request\.args\.get\('tenant_id', 'default_tenant'\)|request\.json\.get\('tenant_id', 'default_tenant'\)|TODO: Get tenant" capabilities/scm/edm/views.py capabilities/scm/edm/api.py` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-26 23:31 EAT
+
+Completed checkpoint:
+
+- Replaced Stock Tracking & Control API/view tenant defaults and current-user placeholders with shared request-context helpers.
+- Stock item/category/UOM/warehouse/location, stock level, movement, alert, dashboard/report, and movement chart filters now resolve tenant identity from payload, Flask context/current user, `g.user`, APG headers, query args, request environment, and configured fallbacks.
+- Stock receive/issue/transfer/adjust API actions and alert acknowledge/resolve actions now stamp actor identity from request/context/user headers or configured user fallback instead of hardcoded placeholders.
+- Fixed a Stock Tracking location view syntax typo so the touched view module compiles.
+- Added focused regression coverage that rejects stale Stock Tracking tenant/user placeholders and verifies tenant/user precedence behavior.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/scm/inv/stock_tracking_control/context.py capabilities/scm/inv/stock_tracking_control/views.py capabilities/scm/inv/stock_tracking_control/api.py tests/test_scm_stc_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_scm_stc_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "return \"default_tenant\"|return \"current_user\"|TODO: Implement tenant resolution|TODO: Implement proper tenant resolution|TODO: Implement proper user resolution|TODO: Get tenant" capabilities/scm/inv/stock_tracking_control/views.py capabilities/scm/inv/stock_tracking_control/api.py` -> no matches
+- `git diff --check` -> no issues

@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Optional
 from decimal import Decimal
 import json
 
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import StockTrackingService
 from .models import IMSTCItem, IMSTCStockLevel, IMSTCStockMovement, IMSTCStockAlert
 
@@ -285,7 +286,7 @@ class StockTrackingApi(BaseApi):
 					}), 400
 			
 			# Add user context
-			data['user_id'] = self._get_current_user_id()
+			data['user_id'] = self._get_current_user_id(data)
 			
 			with StockTrackingService(tenant_id) as service:
 				movement = service.receive_stock(data)
@@ -333,7 +334,7 @@ class StockTrackingApi(BaseApi):
 					}), 400
 			
 			# Add user context
-			data['user_id'] = self._get_current_user_id()
+			data['user_id'] = self._get_current_user_id(data)
 			
 			with StockTrackingService(tenant_id) as service:
 				movement = service.issue_stock(data)
@@ -382,7 +383,7 @@ class StockTrackingApi(BaseApi):
 					}), 400
 			
 			# Add user context
-			data['user_id'] = self._get_current_user_id()
+			data['user_id'] = self._get_current_user_id(data)
 			
 			with StockTrackingService(tenant_id) as service:
 				movement = service.transfer_stock(data)
@@ -434,7 +435,7 @@ class StockTrackingApi(BaseApi):
 					}), 400
 			
 			# Add user context
-			data['user_id'] = self._get_current_user_id()
+			data['user_id'] = self._get_current_user_id(data)
 			
 			with StockTrackingService(tenant_id) as service:
 				movement = service.adjust_stock(data)
@@ -567,13 +568,12 @@ class StockTrackingApi(BaseApi):
 	
 	def _get_tenant_id(self) -> str:
 		"""Get current tenant ID"""
-		# TODO: Implement proper tenant resolution from request context
-		return "default_tenant"
+		payload = request.get_json(silent=True) if request.is_json else None
+		return get_tenant_id_from_request(payload)
 	
-	def _get_current_user_id(self) -> str:
+	def _get_current_user_id(self, payload: Optional[Dict[str, Any]] = None) -> str:
 		"""Get current user ID"""
-		# TODO: Implement proper user resolution from request context  
-		return "current_user"
+		return get_current_user_id(payload)
 
 
 def register_api_views(appbuilder: AppBuilder):

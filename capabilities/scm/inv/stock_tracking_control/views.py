@@ -22,6 +22,7 @@ from .models import (
 	IMSTCStockMovement, IMSTCCycleCount, IMSTCCycleCountLine,
 	IMSTCStockAlert
 )
+from .context import get_current_user_id, get_tenant_id_from_request
 from .service import StockTrackingService
 
 
@@ -54,7 +55,7 @@ class IMSTCItemCategoryView(ModelView):
 	
 	def get_tenant_id(self):
 		"""Get current tenant ID"""
-		return "default_tenant"  # TODO: Implement tenant resolution
+		return get_tenant_id_from_request()
 
 
 class IMSTCUnitOfMeasureView(ModelView):
@@ -83,7 +84,7 @@ class IMSTCUnitOfMeasureView(ModelView):
 	}
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMSTCWarehouseView(ModelView):
@@ -128,7 +129,7 @@ class IMSTCWarehouseView(ModelView):
 	}
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMSTCLocationView(ModelView):
@@ -139,7 +140,7 @@ class IMSTCLocationView(ModelView):
 	list_columns = ['location_code', 'location_name', 'warehouse.warehouse_name', 'location_type', 'level', 'is_active']
 	show_columns = ['location_code', 'location_name', 'description', 'warehouse', 'parent_location',
 					'level', 'path', 'location_type', 'capacity_volume', 'capacity_weight',
-					'length', 'width', 'height', is_active', 'is_pickable', 'is_receivable',
+					'length', 'width', 'height', 'is_active', 'is_pickable', 'is_receivable',
 					'is_quarantine', 'is_damaged_goods', 'temperature_controlled', 'min_temperature',
 					'max_temperature', 'humidity_controlled', 'max_humidity', 'pick_sequence',
 					'put_sequence', 'abc_zone']
@@ -176,7 +177,7 @@ class IMSTCLocationView(ModelView):
 	}
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMSTCItemView(ModelView):
@@ -282,7 +283,7 @@ class IMSTCItemView(ModelView):
 								_flt_0_item_id=item.item_id))
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMSTCStockLevelView(ModelView):
@@ -335,7 +336,7 @@ class IMSTCStockLevelView(ModelView):
 	}
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMSTCStockMovementView(ModelView):
@@ -394,7 +395,7 @@ class IMSTCStockMovementView(ModelView):
 	}
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class IMSTCStockAlertView(ModelView):
@@ -480,11 +481,11 @@ class IMSTCStockAlertView(ModelView):
 		return redirect(self.get_redirect())
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
 	
 	def get_current_user_id(self):
 		"""Get current user ID"""
-		return "current_user"  # TODO: Implement user resolution
+		return get_current_user_id()
 
 
 class StockTrackingDashboardView(BaseView):
@@ -595,7 +596,7 @@ class StockTrackingDashboardView(BaseView):
 	
 	def get_tenant_id(self):
 		"""Get current tenant ID"""
-		return "default_tenant"
+		return get_tenant_id_from_request()
 
 
 class StockMovementChartView(GroupByChartView):
@@ -609,4 +610,4 @@ class StockMovementChartView(GroupByChartView):
 	base_filters = [['tenant_id', '==', 'get_tenant_id']]
 	
 	def get_tenant_id(self):
-		return "default_tenant"
+		return get_tenant_id_from_request()
