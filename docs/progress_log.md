@@ -4515,3 +4515,7 @@ Battery-conscious verification:
 - `.venv/bin/python - <<'PY' ... import every capabilities/crm/adv/*.py module ... PY` -> `FAILURES 0`
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pushed commit `4dd5750` (`Make advanced CRM package importable`) to `origin/main`.
