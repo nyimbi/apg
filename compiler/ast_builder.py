@@ -74,6 +74,7 @@ class EntityType(Enum):
 	AI_AGENT = "ai_agent"
 	AGENT_TEAM = "agent_team"
 	SWARM = "swarm"
+	CAPABILITY = "capability"
 	DIGITAL_TWIN = "digital_twin"
 	WORKFLOW = "workflow"
 	DATABASE = "database"
@@ -138,6 +139,27 @@ class AgentTeamDeclaration(EntityDeclaration):
 	rules: List[Dict[str, Any]] = field(default_factory=list)
 	ui: Dict[str, Any] = field(default_factory=dict)
 	theme: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class CapabilityDeclaration(EntityDeclaration):
+	"""First-class composable APG capability declaration"""
+	contract: Dict[str, Any] = field(default_factory=dict)
+	provides: List[str] = field(default_factory=list)
+	requires: List[str] = field(default_factory=list)
+	configuration: Dict[str, Any] = field(default_factory=dict)
+	rules: List[Dict[str, Any]] = field(default_factory=list)
+	rule_engine: Dict[str, Any] = field(default_factory=dict)
+	ui: Dict[str, Any] = field(default_factory=dict)
+	theme: Dict[str, Any] = field(default_factory=dict)
+	runtime: Dict[str, Any] = field(default_factory=dict)
+	erp_modules: List[str] = field(default_factory=list)
+	components: Any = field(default_factory=dict)
+	business_rules: List[Dict[str, Any]] = field(default_factory=list)
+	approvals: Any = field(default_factory=dict)
+	master_data: Any = field(default_factory=dict)
+	i18n: Dict[str, Any] = field(default_factory=dict)
+	streaming: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -455,6 +477,9 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		for kind, name, body in self._iter_source_entities(cleaned):
 			if kind == "module":
 				continue
+			if kind == "capability":
+				module.entities.append(self._parse_source_capability(name, body, source_file))
+				continue
 			properties, methods = self._parse_source_members(body, source_file)
 			entity_type = {
 				"agent": EntityType.AGENT,
@@ -477,7 +502,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		return re.sub(r"//.*", "", source_code)
 
 	def _iter_source_entities(self, source_code: str):
-		pattern = re.compile(r"\b(module|agent|digital_twin|workflow|db)\s+([^\s{]+)\s*(?:version\s+[^\s{]+)?\s*\{", re.UNICODE)
+		pattern = re.compile(r"\b(module|agent|capability|digital_twin|workflow|db)\s+([^\s{]+)\s*(?:version\s+[^\s{]+)?\s*\{", re.UNICODE)
 		position = 0
 		while True:
 			match = pattern.search(source_code, position)
@@ -494,6 +519,38 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				index += 1
 			yield match.group(1), match.group(2), source_code[body_start:index - 1]
 			position = index
+
+	def _parse_source_capability(self, name: str, body: str, source_file: Optional[str]) -> CapabilityDeclaration:
+		"""Parse the first-class capability contract surface from source text."""
+		from .ai_agent_composition import _dict_value, _parse_properties, _rule_list, _string_list
+
+		props = _parse_properties(body)
+		contract = _dict_value(props.get("contract", props.get("capability_contract")))
+
+		def contract_value(key: str, default: Any = None) -> Any:
+			return contract.get(key, props.get(key, default))
+
+		return CapabilityDeclaration(
+			entity_type=EntityType.CAPABILITY,
+			name=name,
+			contract=contract,
+			provides=_string_list(contract_value("provides")),
+			requires=_string_list(contract_value("requires")),
+			configuration=_dict_value(contract_value("configuration", props.get("config"))),
+			rules=_rule_list(contract_value("rules")),
+			rule_engine=_dict_value(contract_value("rule_engine")),
+			ui=_dict_value(contract_value("ui")),
+			theme=_dict_value(contract_value("theme")),
+			runtime=_dict_value(contract_value("runtime")),
+			erp_modules=_string_list(props.get("erp_modules")),
+			components=props.get("components", {}),
+			business_rules=_rule_list(props.get("business_rules")),
+			approvals=props.get("approvals", {}),
+			master_data=props.get("master_data", {}),
+			i18n=_dict_value(props.get("i18n", props.get("localization"))),
+			streaming=_dict_value(props.get("streaming")),
+			source_file=source_file,
+		)
 
 	def _parse_source_members(self, body: str, source_file: Optional[str]):
 		properties: List[PropertyDeclaration] = []

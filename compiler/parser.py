@@ -195,7 +195,7 @@ class APGParser:
 			return []
 
 		errors: List[APGSyntaxError] = []
-		if not re.search(r"\b(module|agent|digital_twin|workflow|db)\b", source_code):
+		if not re.search(r"\b(module|agent|capability|digital_twin|workflow|db)\b", source_code):
 			errors.append(APGSyntaxError("No APG declarations found", 1, 0, source_name))
 
 		if source_code.count("{") != source_code.count("}"):
@@ -209,7 +209,7 @@ class APGParser:
 
 		for index, line in enumerate(source_code.splitlines(), start=1):
 			code = line.split("//", 1)[0].strip()
-			if not code or code.endswith(("{", "}", ";")):
+			if not code or code.endswith(("{", "}", ";", ",")):
 				continue
 			if re.match(r"^[^\W\d]\w*\s*:\s*[^=]+=", code, re.UNICODE):
 				errors.append(APGSyntaxError("Missing semicolon", index, len(line), source_name))

@@ -19,7 +19,7 @@ from .ast_builder import (
 	MethodDeclaration, Parameter, TypeAnnotation, Expression, Statement,
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
 	AssignmentStatement, ReturnStatement, BlockStatement, EntityType,
-	AIAgentDeclaration, AgentTeamDeclaration, ListExpression, DictExpression
+	AIAgentDeclaration, AgentTeamDeclaration, CapabilityDeclaration, ListExpression, DictExpression
 )
 
 
@@ -393,6 +393,8 @@ class SemanticAnalyzer:
 			self._validate_agent_constraints(entity)
 		elif entity.entity_type == EntityType.AGENT_TEAM:
 			self._validate_agent_team_constraints(entity)
+		elif entity.entity_type == EntityType.CAPABILITY:
+			self._validate_capability_constraints(entity)
 		elif entity.entity_type == EntityType.DIGITAL_TWIN:
 			# Digital twin-specific validations
 			self._validate_digital_twin_constraints(entity)
@@ -441,6 +443,41 @@ class SemanticAnalyzer:
 				entity,
 				"warning"
 			))
+
+	def _validate_capability_constraints(self, entity: EntityDeclaration):
+		"""Validate first-class capability declaration shape."""
+		if not isinstance(entity, CapabilityDeclaration):
+			return
+		if not entity.contract:
+			self.errors.append(SemanticError(
+				f"Capability '{entity.name}' must declare a contract",
+				entity
+			))
+		if not entity.provides:
+			self.errors.append(SemanticError(
+				f"Capability '{entity.name}' must declare at least one provided capability or service",
+				entity
+			))
+		if len(set(entity.provides)) != len(entity.provides):
+			self.errors.append(SemanticError(
+				f"Capability '{entity.name}' declares duplicate provided services",
+				entity
+			))
+		if len(set(entity.requires)) != len(entity.requires):
+			self.errors.append(SemanticError(
+				f"Capability '{entity.name}' declares duplicate required services",
+				entity
+			))
+		for rule_set_name, rules in {
+			"rules": entity.rules,
+			"business_rules": entity.business_rules,
+		}.items():
+			for rule in rules:
+				if "name" not in rule:
+					self.errors.append(SemanticError(
+						f"Capability '{entity.name}' has a {rule_set_name} entry without a name",
+						entity
+					))
 
 	def _validate_agent_team_constraints(self, entity: EntityDeclaration):
 		"""Validate AI agent team shape before cross-reference checks."""

@@ -22,7 +22,7 @@ from .ast_builder import (
 	DictExpression,
 	AssignmentStatement, ReturnStatement, BlockStatement, ExpressionStatement, EntityType,
 	DatabaseDeclaration, DatabaseSchema, TableDeclaration,
-	AIAgentDeclaration, AgentTeamDeclaration
+	AIAgentDeclaration, AgentTeamDeclaration, CapabilityDeclaration
 )
 
 # Import composable template system
@@ -158,6 +158,7 @@ class PythonCodeGenerator:
 			# Generate application files
 			generated_files = engine.generate_application_files(context)
 			generated_files.update(self._generate_ai_agent_files(ast))
+			generated_files.update(self._generate_capability_files(ast))
 			
 			# Handle different output modes
 			if self.config.template_output_mode == "models_only":
@@ -222,6 +223,7 @@ class PythonCodeGenerator:
 		requirements = self._generate_requirements()
 		files["requirements.txt"] = requirements
 		files.update(self._generate_ai_agent_files(ast))
+		files.update(self._generate_capability_files(ast))
 		
 		# Generate HTML templates
 		template_files = self._generate_templates(ast)
@@ -236,6 +238,120 @@ class PythonCodeGenerator:
 		if not agents and not teams:
 			return {}
 		return {"ai_agents.py": self._generate_ai_agents_runtime(agents, teams)}
+
+	def _generate_capability_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Generate first-class capability composition runtime files."""
+		capabilities = [entity for entity in ast.entities if isinstance(entity, CapabilityDeclaration)]
+		if not capabilities:
+			return {}
+		return {"apg_capabilities.py": self._generate_capability_runtime(capabilities)}
+
+	def _generate_capability_runtime(self, capabilities: List[CapabilityDeclaration]) -> str:
+		"""Generate a dependency-free runtime manifest for APG capabilities."""
+		capability_specs = {
+			capability.name: {
+				"contract": capability.contract,
+				"provides": capability.provides,
+				"requires": capability.requires,
+				"configuration": capability.configuration,
+				"rules": capability.rules,
+				"rule_engine": capability.rule_engine,
+				"ui": capability.ui,
+				"theme": capability.theme,
+				"runtime": capability.runtime,
+				"erp_modules": capability.erp_modules,
+				"components": capability.components,
+				"business_rules": capability.business_rules,
+				"approvals": capability.approvals,
+				"master_data": capability.master_data,
+				"i18n": capability.i18n,
+				"streaming": capability.streaming,
+			}
+			for capability in capabilities
+		}
+		return f'''"""
+APG Capability Composition Runtime
+==================================
+
+Generated from first-class APG capability declarations.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Dict, List
+
+
+@dataclass(frozen=True)
+class CapabilitySpec:
+    name: str
+    contract: Dict[str, Any]
+    provides: List[str]
+    requires: List[str]
+    configuration: Dict[str, Any]
+    rules: List[Dict[str, Any]]
+    rule_engine: Dict[str, Any]
+    ui: Dict[str, Any]
+    theme: Dict[str, Any]
+    runtime: Dict[str, Any]
+    erp_modules: List[str]
+    components: Any
+    business_rules: List[Dict[str, Any]]
+    approvals: Any
+    master_data: Any
+    i18n: Dict[str, Any]
+    streaming: Dict[str, Any]
+
+
+CAPABILITY_DATA: Dict[str, Dict[str, Any]] = {capability_specs!r}
+CAPABILITIES: Dict[str, CapabilitySpec] = {{
+    name: CapabilitySpec(name=name, **data)
+    for name, data in CAPABILITY_DATA.items()
+}}
+
+
+def list_capabilities() -> List[str]:
+    return sorted(CAPABILITIES)
+
+
+def get_capability(name: str) -> CapabilitySpec:
+    return CAPABILITIES[name]
+
+
+def capabilities_by_erp_module() -> Dict[str, List[CapabilitySpec]]:
+    grouped: Dict[str, List[CapabilitySpec]] = {{}}
+    for capability in CAPABILITIES.values():
+        for module_name in capability.erp_modules:
+            grouped.setdefault(module_name, []).append(capability)
+    return grouped
+
+
+def provided_services() -> Dict[str, List[str]]:
+    services: Dict[str, List[str]] = {{}}
+    for capability in CAPABILITIES.values():
+        for service in capability.provides:
+            services.setdefault(service, []).append(capability.name)
+    return services
+
+
+def validate_capability_contracts() -> Dict[str, Any]:
+    providers = provided_services()
+    errors: List[str] = []
+    warnings: List[str] = []
+    for capability in CAPABILITIES.values():
+        if not capability.contract:
+            errors.append(f"{{capability.name}} is missing a contract")
+        if not capability.provides:
+            errors.append(f"{{capability.name}} does not provide any services")
+        for service in capability.requires:
+            if service not in providers and service not in CAPABILITIES:
+                warnings.append(f"{{capability.name}} requires external service {{service}}")
+        if len(set(capability.provides)) != len(capability.provides):
+            errors.append(f"{{capability.name}} declares duplicate provided services")
+        if len(set(capability.requires)) != len(capability.requires):
+            errors.append(f"{{capability.name}} declares duplicate required services")
+    return {{"errors": errors, "warnings": warnings}}
+'''
 
 	def _generate_ai_agents_runtime(
 		self,
