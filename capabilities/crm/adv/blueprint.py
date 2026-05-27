@@ -6,10 +6,11 @@ menu integration, permission management, and health monitoring.
 """
 
 import logging
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-from flask import Blueprint, current_app, g, request, jsonify
+from flask import Blueprint, current_app, g, request, jsonify, session, has_request_context
 from flask_appbuilder import AppBuilder, SQLA
 from flask_appbuilder.security.decorators import has_access
 from flask_babel import lazy_gettext as _
@@ -41,6 +42,87 @@ crm_blueprint = Blueprint(
 	template_folder='templates',
 	static_folder='static'
 )
+
+
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def _appbuilder_user(appbuilder: Optional[AppBuilder]) -> Any:
+	security_manager = getattr(appbuilder, "sm", None)
+	get_user = getattr(security_manager, "get_user", None)
+	if callable(get_user):
+		try:
+			return get_user()
+		except Exception:
+			return None
+	return getattr(security_manager, "user", None)
+
+
+def _resolve_crm_request_context(appbuilder: Optional[AppBuilder] = None) -> Dict[str, str]:
+	"""Resolve CRM Flask request tenant and actor context from APG runtime sources."""
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
+	default_user = os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
+
+	if not has_request_context():
+		return {"tenant_id": default_tenant, "user_id": default_user}
+
+	g_user = (
+		getattr(g, "current_user", None)
+		or getattr(g, "user", None)
+		or getattr(g, "auth_user", None)
+	)
+	app_user = _appbuilder_user(appbuilder)
+
+	tenant_id = _first_text([
+		getattr(g, "tenant_id", None),
+		_object_value(g_user, "tenant_id"),
+		_object_value(app_user, "tenant_id"),
+		session.get("tenant_id"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], default_tenant)
+
+	user_id = _first_text([
+		getattr(g, "user_id", None),
+		_object_value(g_user, "user_id"),
+		_object_value(g_user, "id"),
+		_object_value(g_user, "username"),
+		_object_value(app_user, "user_id"),
+		_object_value(app_user, "id"),
+		_object_value(app_user, "username"),
+		session.get("user_id"),
+		request.headers.get("X-User-ID"),
+		request.headers.get("X-APG-User-ID"),
+		request.args.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], default_user)
+
+	return {"tenant_id": tenant_id, "user_id": user_id}
+
 
 # CRM Configuration Class
 class CRMConfig:
@@ -752,8 +834,9 @@ def init_crm_capability(app, db: SQLA, appbuilder: AppBuilder) -> None:
 		def set_tenant_context():
 			"""Set tenant context for multi-tenancy"""
 			if request.endpoint and request.endpoint.startswith('crm'):
-				# Get tenant ID from user session or JWT token
-				g.tenant_id = getattr(g, 'user', {}).get('tenant_id', 'default_tenant')
+				context = _resolve_crm_request_context(appbuilder)
+				g.tenant_id = context['tenant_id']
+				g.user_id = context['user_id']
 		
 		# Add error handlers
 		@crm_blueprint.errorhandler(404)

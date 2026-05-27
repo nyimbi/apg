@@ -3159,3 +3159,19 @@ Verification:
 - `rg -n "default_tenant|payload\.get\(\"tenant_id\", \"default_tenant\"\)|getattr\(info\.context, 'tenant_id', 'default_tenant'\)|'created_by': 'current_user'|Kafka|kafka" capabilities/composition/orchestration/api.py capabilities/composition/orchestration/advanced_api.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:04 EAT
+
+Completed checkpoint:
+
+- Replaced CRM Flask blueprint tenant middleware's fixed `default_tenant` fallback with APG request-context resolution.
+- The CRM blueprint now resolves tenant and actor from Flask globals, AppBuilder security manager, session, APG headers, query params, and environment fallback.
+- Extended CRM/MTen auth context regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/adv/blueprint.py tests/test_mten_crm_auth_context.py`
+- `.venv/bin/python -m pytest -q tests/test_mten_crm_auth_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 6 passed
+- `rg -n "getattr\(g, 'user', \{\}\)\.get\('tenant_id', 'default_tenant'\)|'default_tenant'|\"default_tenant\"|Kafka|kafka" capabilities/crm/adv/blueprint.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
