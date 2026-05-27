@@ -30,7 +30,7 @@ pip install apg-lang
 
 ### Your First APG Program
 ```apg
-// Complete web application in 8 lines
+// Complete application manifest in 8 lines
 db UserDB {
     users: table {
         name: str;
@@ -320,16 +320,16 @@ APG compiles to high-quality Python code through a sophisticated multi-stage pro
 1. **Lexical Analysis**: Tokenization with domain-specific keywords
 2. **Parsing**: AST generation using ANTLR grammar
 3. **Semantic Analysis**: Type checking and validation
-4. **Code Generation**: Modern Python with type hints
+4. **Code Generation**: Dependency-light Python artifacts with type hints
 5. **Optimization**: Performance and resource optimization
-6. **Runtime Integration**: Framework and library binding
+6. **Runtime Integration**: Capability contracts and optional library binding
 
 ### Generated Python Features
 - **Modern Python 3.12+** with full type annotations
 - **Async/await** for concurrent operations
 - **Pydantic models** for data validation
-- **FastAPI** for web services
-- **SQLAlchemy** for database operations
+- **JSON manifests** for generated application metadata
+- **Executable capability contracts** for configuration, rules, UI manifests, and theme tokens
 - **Industrial libraries** for automation protocols
 - **ML frameworks** for AI integration
 
@@ -361,7 +361,7 @@ report PostList {
 }
 ```
 
-Generates complete FastAPI application with SQLAlchemy models, Pydantic schemas, and HTML templates.
+Generates a Python application artifact with typed data structures, executable health metadata, and manifest output that can be composed into larger APG systems.
 
 ### 2. IoT Sensor Network
 ```apg

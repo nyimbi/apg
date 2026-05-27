@@ -1116,10 +1116,10 @@ class UserSchema(BaseModel):
 
 ### Runtime Libraries
 
-APG generates code that integrates with:
+APG generates Python-first artifacts that can integrate with:
 
-- **Web Frameworks**: FastAPI, Django, Flask
-- **Database ORMs**: SQLAlchemy, Django ORM, Tortoise ORM
+- **Application Surfaces**: JSON manifests, UI contracts, API adapters
+- **Persistence Layers**: APG data contracts, SQL adapters, document stores
 - **ML Frameworks**: PyTorch, TensorFlow, scikit-learn
 - **Industrial Protocols**: python-opcua, pymodbus, snap7
 - **Computer Vision**: OpenCV, PIL, scikit-image

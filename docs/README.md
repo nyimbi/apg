@@ -84,8 +84,8 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 
 | Component | Technology Stack |
 |-----------|------------------|
-| **Backend** | Python, Flask-AppBuilder, SQLAlchemy, PostgreSQL |
-| **Frontend** | React, TypeScript, WebRTC, WebSocket |
+| **Backend** | Python artifacts, capability contracts, PostgreSQL-ready services |
+| **Frontend** | UI manifests, theming contracts, React/TypeScript adapters |
 | **Mobile** | BeeWare (Python-based cross-platform) |
 | **AI/ML** | PyTorch, Federated Learning, Real-time Analytics |
 | **Blockchain** | Web3.py, Solidity, Multi-chain support |

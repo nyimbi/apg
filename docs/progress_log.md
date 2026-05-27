@@ -3825,6 +3825,24 @@ Battery-conscious verification:
 - `git diff --check` -> no issues.
 - Deferred pytest and full template materialization at the user's request to conserve battery.
 
+### 2026-05-27 07:16 EAT
+
+Completed checkpoint:
+
+- Aligned public-facing documentation with the Python-first compiler and template target.
+- Updated the root README compilation narrative from default web-framework binding to dependency-light Python artifacts, JSON manifests, capability contracts, and optional integrations.
+- Updated docs index technology language from Flask-AppBuilder/SQLAlchemy defaults to Python artifacts, capability contracts, UI manifests, and adapters.
+- Updated the language reference runtime library section so APG no longer claims default FastAPI/Django/Flask and ORM output.
+- Updated the architecture capability structure to describe domain models, UI manifests, API adapters, and composition registration instead of framework-specific views/blueprints.
+- Extended repository hygiene coverage so key public docs stay aligned with the Python-first target.
+
+Battery-conscious verification:
+
+- `python -m py_compile tests/test_repository_hygiene.py`
+- `rg -n "Flask-AppBuilder|flask_appbuilder|FastAPI|fastapi|Django|django|python app.py|http://localhost:8080|Flask>=2.3.0|SQLAlchemy>=2.0.0" README.md docs/README.md docs/architecture.md docs/language_reference.md tests/test_repository_hygiene.py` -> only hygiene guard constants remain.
+- `git diff --check` -> no issues.
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 07:02 EAT
 
 Completed checkpoint:

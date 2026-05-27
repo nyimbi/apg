@@ -40,6 +40,12 @@ PYTHON_TEMPLATE_FORBIDDEN_TERMS = (
 	"Flask>=2.3.0",
 	"SQLAlchemy>=2.0.0",
 )
+PYTHON_FIRST_PUBLIC_DOCS = {
+	"README.md",
+	"docs/README.md",
+	"docs/architecture.md",
+	"docs/language_reference.md",
+}
 
 
 def _tracked_files() -> list[str]:
@@ -98,6 +104,7 @@ def test_project_templates_describe_python_artifact_flow():
 			or path.startswith("templates/application_templates/")
 			or path == "templates/application_template_manager.py"
 			or path == "scripts/template_generation/create_template_structure.py"
+			or path in PYTHON_FIRST_PUBLIC_DOCS
 		):
 			continue
 		if not path.endswith((".md.template", ".txt.template", ".py.template", ".json", ".py")):

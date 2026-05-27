@@ -243,11 +243,11 @@ Each capability follows a standardized structure:
 ```
 capability/
 ├── __init__.py           # Capability registration
-├── models.py             # SQLAlchemy models
+├── models.py             # Domain models and data contracts
 ├── service.py            # Business logic
-├── views.py              # Flask-AppBuilder views
-├── api.py                # REST API endpoints
-├── blueprint.py          # Flask blueprint
+├── views.py              # UI manifest and view adapters
+├── api.py                # API endpoints or adapter surface
+├── blueprint.py          # Composition registration
 ├── cap_spec.md           # Capability specification
 ├── desired_outcome.md    # Requirements document
 └── tests/                # Comprehensive tests
