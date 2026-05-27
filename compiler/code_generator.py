@@ -295,48 +295,6 @@ def list_entities() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES]
 '''
 	
-	def _generate_legacy_flask_app(self, ast: ModuleDeclaration) -> Dict[str, str]:
-		"""Legacy Flask-AppBuilder generation method"""
-		files = {}
-		
-		# Generate Flask-AppBuilder app.py (main application)
-		app_content = self._generate_flask_app(ast)
-		files["app.py"] = app_content
-		
-		# Generate views.py (Flask-AppBuilder views)
-		views_content = self._generate_views(ast)
-		files["views.py"] = views_content
-		
-		# Generate entity-specific files
-		for entity in ast.entities:
-			if entity.entity_type == EntityType.DATABASE:
-				# Generate database models
-				db_content = self._generate_database_models(entity)
-				files["models.py"] = db_content
-				# Generate ModelViews for database tables
-				model_views_content = self._generate_model_views(entity)
-				files["model_views.py"] = model_views_content
-		
-		# Generate Flask-AppBuilder configuration
-		config_content = self._generate_config()
-		files["config.py"] = config_content
-		
-		# Generate package __init__.py
-		init_content = self._generate_package_init(ast)
-		files["__init__.py"] = init_content
-		
-		# Generate requirements.txt
-		requirements = self._generate_requirements()
-		files["requirements.txt"] = requirements
-		files.update(self._generate_ai_agent_files(ast))
-		files.update(self._generate_capability_files(ast))
-		
-		# Generate HTML templates
-		template_files = self._generate_templates(ast)
-		files.update(template_files)
-		
-		return files
-
 	def _generate_ai_agent_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Generate first-class AI agent composition runtime files."""
 		agents = [entity for entity in ast.entities if isinstance(entity, AIAgentDeclaration)]

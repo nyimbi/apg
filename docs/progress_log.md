@@ -2957,6 +2957,21 @@ Verification:
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
 
+### 2026-05-27 07:47 EAT
+
+Completed checkpoint:
+
+- Removed the private `_generate_legacy_flask_app()` compiler escape hatch now that hybrid template output uses framework-neutral Python entity catalogs.
+- Added focused regression coverage so the legacy Flask-AppBuilder app generator stays absent.
+- Left the lower-level unused framework helper cleanup for a separate narrow slice.
+
+Verification:
+
+- `python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
+- `rg -n "_generate_legacy_flask_app|Legacy Flask-AppBuilder generation method" compiler/code_generator.py tests/test_code_generator_executable_defaults.py` -> only the absence-regression assertion remains
+- `git diff --check -- compiler/code_generator.py tests/test_code_generator_executable_defaults.py docs/progress_log.md` -> no issues
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 02:07 EAT
 
 Completed checkpoint:

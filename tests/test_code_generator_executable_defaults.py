@@ -140,3 +140,7 @@ def test_hybrid_template_mode_uses_python_entity_catalog(monkeypatch):
     assert "Flask-AppBuilder" not in files["entities.py"]
     assert "flask_appbuilder" not in files["entities.py"]
     compile(files["entities.py"], "entities.py", "exec")
+
+
+def test_legacy_flask_app_escape_hatch_is_removed():
+    assert not hasattr(PythonCodeGenerator, "_generate_legacy_flask_app")
