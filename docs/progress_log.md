@@ -3033,6 +3033,21 @@ Verification:
 - `git diff --check -- requirements_flask_appbuilder.txt tests/test_functional_generation.py tests/test_repository_hygiene.py` -> no issues
 - Deferred broader pytest at the user's request to conserve battery.
 
+### 2026-05-27 08:10 EAT
+
+Completed checkpoint:
+
+- Replaced the print-driven integrated code-generation script with focused pytest coverage for Python-first generated artifacts.
+- Added integrated coverage for first-class AI agents, agent teams, capability contracts, Bytewax runtime metadata, and hybrid Python entity catalogs.
+- Removed legacy fallback/web-app expectations from `tests/test_integrated_code_generation.py`.
+
+Verification:
+
+- `.venv/bin/python -m py_compile tests/test_integrated_code_generation.py`
+- `.venv/bin/python -m pytest -q tests/test_integrated_code_generation.py` -> 2 passed
+- `rg -n "legacy|Flask-AppBuilder|flask_appbuilder|views.py|model_views.py|localhost|python app.py|default Flask" tests/test_integrated_code_generation.py` -> only negative assertions and test naming remain
+- `git diff --check -- tests/test_integrated_code_generation.py` -> no issues
+
 ### 2026-05-27 02:07 EAT
 
 Completed checkpoint:
