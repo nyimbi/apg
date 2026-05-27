@@ -88,3 +88,37 @@ def test_pim_context_resolves_tenant_and_user(monkeypatch):
 
 	with app.test_request_context("/pim", environ_base={"APG_TENANT_ID": "request-env-tenant"}):
 		assert resolve_tenant({}) == "request-env-tenant"
+
+
+def test_pim_context_resolves_permissions_and_wildcards(monkeypatch):
+	helpers = _context_helpers()
+	resolve_permissions = helpers["get_current_permissions"]
+	has_permission = helpers["has_current_permission"]
+	permission_matches = helpers["permission_matches"]
+	app = Flask(__name__)
+	app.secret_key = "test-secret"
+
+	monkeypatch.setenv("APG_DEFAULT_PERMISSIONS", "plm.products.read,plm.changes.*")
+	assert resolve_permissions() == ["plm.products.read", "plm.changes.*"]
+	assert permission_matches("plm.changes.*", "plm.changes.approve")
+	assert not permission_matches("plm.products.read", "plm.products.delete")
+
+	with app.test_request_context("/pim", headers={"X-APG-Permissions": "plm.products.create plm.ai.*"}):
+		assert resolve_permissions({}) == ["plm.products.create", "plm.ai.*"]
+		assert has_permission("plm.products.create")
+		assert has_permission("plm.ai.insights")
+		assert not has_permission("plm.products.delete")
+
+	with app.test_request_context("/pim"):
+		session["permissions"] = ["plm.products.update", "plm.collaboration.*"]
+		assert has_permission("plm.products.update")
+		assert has_permission("plm.collaboration.participate")
+
+
+def test_pim_api_permission_check_no_longer_allows_every_authenticated_user():
+	source = (REPO_ROOT / "capabilities" / "pde" / "pim" / "api.py").read_text(encoding="utf-8")
+
+	assert "return True  # For now, allow all authenticated users" not in source
+	assert "from .context import get_current_permissions, permission_matches" in source
+	assert "auth_service = _get_auth_rbac_service()" in source
+	assert "return any(permission_matches(granted, permission) for granted in get_current_permissions())" in source

@@ -3297,3 +3297,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_ckm_wfa_visual_designer_persistence.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:38 EAT
+
+Completed checkpoint:
+
+- Replaced PIM API's blanket "allow all authenticated users" permission placeholder with an APG auth_rbac service boundary.
+- Added executable PIM permission resolution from payload, Flask user context, session, request headers, and environment fallback.
+- Added wildcard-aware PLM permission matching and focused authorization regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/pde/pim/context.py capabilities/pde/pim/api.py tests/test_pde_pim_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_pde_pim_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 6 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

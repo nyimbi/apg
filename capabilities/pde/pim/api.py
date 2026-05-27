@@ -8,13 +8,14 @@ Copyright © 2025 Datacraft
 Author: APG Development Team
 """
 
-from flask import Blueprint, request, jsonify, session, current_app, g
+from flask import Blueprint, request, jsonify, session, current_app, g, has_app_context
 from flask_restful import Api, Resource, abort, fields, marshal_with
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from marshmallow import Schema, fields as ma_fields, validate, ValidationError
 from functools import wraps
 import asyncio
+import inspect
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from uuid_extensions import uuid7str
@@ -26,6 +27,7 @@ from .views import (
 	PLMProductView, PLMProductStructureView, PLMEngineeringChangeView,
 	PLMProductConfigurationView, PLMCollaborationSessionView, PLMComplianceRecordView
 )
+from .context import get_current_permissions, permission_matches
 
 
 # Flask Blueprint and API setup
@@ -79,9 +81,64 @@ def require_permission(permission: str):
 
 def _check_user_permission(user_id: str, permission: str, tenant_id: str) -> bool:
 	"""Check user permission via APG auth_rbac integration"""
-	# Simulate APG auth_rbac integration
-	# In production, this would call the actual APG auth service
-	return True  # For now, allow all authenticated users
+	if not user_id or not tenant_id or not permission:
+		return False
+
+	auth_service = _get_auth_rbac_service()
+	if auth_service:
+		for method_name in ("has_permission", "check_permission", "user_has_permission"):
+			method = getattr(auth_service, method_name, None)
+			if callable(method):
+				result = _call_permission_method(method, user_id, permission, tenant_id)
+				if result is not None:
+					return result
+
+	return any(permission_matches(granted, permission) for granted in get_current_permissions())
+
+
+def _get_auth_rbac_service() -> Optional[Any]:
+	"""Resolve an APG auth_rbac service from the current Flask application."""
+	if not has_app_context():
+		return None
+
+	for extension_name in ("auth_rbac", "apg_auth_rbac", "security_manager"):
+		auth_service = current_app.extensions.get(extension_name)
+		if auth_service is not None:
+			return auth_service
+
+	return current_app.config.get("APG_AUTH_RBAC_SERVICE")
+
+
+def _call_permission_method(method: Any, user_id: str, permission: str, tenant_id: str) -> Optional[bool]:
+	"""Call a permission method while tolerating common APG auth signatures."""
+	call_patterns = (
+		lambda: method(user_id=user_id, permission=permission, tenant_id=tenant_id),
+		lambda: method(user_id, permission, tenant_id),
+		lambda: method(user_id, permission),
+	)
+	for call in call_patterns:
+		try:
+			return _coerce_permission_result(call())
+		except TypeError:
+			continue
+	return None
+
+
+def _coerce_permission_result(result: Any) -> bool:
+	"""Normalize sync or async APG auth responses into a boolean."""
+	if inspect.isawaitable(result):
+		try:
+			loop = asyncio.get_event_loop()
+		except RuntimeError:
+			return bool(asyncio.run(result))
+		if loop.is_running():
+			return False
+		return bool(loop.run_until_complete(result))
+	if isinstance(result, dict):
+		for key in ("allowed", "has_permission", "permitted", "success"):
+			if key in result:
+				return bool(result[key])
+	return bool(result)
 
 
 # Marshmallow schemas for API validation

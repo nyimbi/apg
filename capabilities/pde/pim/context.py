@@ -15,6 +15,39 @@ def _clean_text(value: Any) -> Optional[str]:
 	return text or None
 
 
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _split_permissions(value: Any) -> List[str]:
+	if value is None:
+		return []
+	if isinstance(value, (list, tuple, set)):
+		return [text for item in value if (text := _clean_text(item))]
+	return [text for item in str(value).replace(",", " ").split() if (text := _clean_text(item))]
+
+
+def permission_matches(granted_permission: str, required_permission: str) -> bool:
+	"""Return whether a granted APG permission covers the required permission."""
+	granted = _clean_text(granted_permission)
+	required = _clean_text(required_permission)
+	if not granted or not required:
+		return False
+	if granted in {"*", "admin", "plm.admin"}:
+		return True
+	if granted == required:
+		return True
+	for wildcard_suffix, separator in ((".*", "."), (":*", ":")):
+		if granted.endswith(wildcard_suffix):
+			prefix = granted[: -len(wildcard_suffix)]
+			return required == prefix or required.startswith(f"{prefix}{separator}")
+	return False
+
+
 def get_tenant_id_from_request(payload: Optional[Dict[str, Any]] = None) -> str:
 	"""Resolve tenant ID from payload, Flask context, session, request metadata, or fallback."""
 	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
@@ -96,3 +129,51 @@ def get_current_user_id(payload: Optional[Dict[str, Any]] = None) -> str:
 		if user_id:
 			return user_id
 	return default_user
+
+
+def get_current_permissions(payload: Optional[Dict[str, Any]] = None) -> List[str]:
+	"""Resolve APG permissions from payload, Flask context, session, headers, or environment."""
+	candidates: List[Any] = []
+	if payload:
+		candidates.extend(
+			[
+				payload.get("permissions"),
+				payload.get("permission"),
+				payload.get("scopes"),
+				payload.get("scope"),
+			]
+		)
+
+	if has_request_context():
+		current_user = getattr(g, "current_user", None)
+		fab_user = getattr(g, "user", None)
+		candidates.extend(
+			[
+				getattr(g, "permissions", None),
+				getattr(g, "user_permissions", None),
+				_object_value(current_user, "permissions"),
+				_object_value(current_user, "permission"),
+				_object_value(current_user, "scopes"),
+				_object_value(current_user, "scope"),
+				_object_value(fab_user, "permissions"),
+				_object_value(fab_user, "permission"),
+				_object_value(fab_user, "scopes"),
+				_object_value(fab_user, "scope"),
+				session.get("permissions"),
+				session.get("user_permissions"),
+				request.headers.get("X-APG-Permissions"),
+				request.headers.get("X-Permissions"),
+			]
+		)
+
+	candidates.append(os.getenv("APG_DEFAULT_PERMISSIONS"))
+	for candidate in candidates:
+		permissions = _split_permissions(candidate)
+		if permissions:
+			return permissions
+	return []
+
+
+def has_current_permission(permission: str, payload: Optional[Dict[str, Any]] = None) -> bool:
+	"""Check the resolved APG permission set for a required permission."""
+	return any(permission_matches(granted, permission) for granted in get_current_permissions(payload))
