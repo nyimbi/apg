@@ -3530,3 +3530,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_gateway_composition_health.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 4 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 05:06 EAT
+
+Completed checkpoint:
+
+- Replaced API Service Mesh production security validator mock posture checks with explicit configuration-backed validation.
+- Security validation now reads configured authentication mechanisms, RBAC state, admin counts, encryption/TLS posture, firewall/open-port state, input-validation controls, dependency vulnerability scan results, secret-management state, and certificate state instead of inventing canned findings.
+- Secure local defaults no longer emit the fake `example-lib` vulnerability or mock open-port/admin-user findings.
+- Made heavyweight production-validator dependencies optional at import time so focused validator components remain executable in the uv environment.
+- Added focused production-validator security regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/production_validator.py tests/test_gateway_production_validator_security_config.py`
+- `.venv/bin/python -m pytest -q tests/test_gateway_production_validator_security_config.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 4 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

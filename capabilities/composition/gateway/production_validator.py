@@ -30,8 +30,15 @@ import secrets
 import re
 
 # Performance testing
-import aiohttp
-import psutil
+try:
+    import aiohttp
+except ModuleNotFoundError:
+    aiohttp = None
+
+try:
+    import psutil
+except ModuleNotFoundError:
+    psutil = None
 
 # Database validation
 from sqlalchemy import text
@@ -90,7 +97,8 @@ class ValidationResult:
 class SecurityValidator:
     """Comprehensive security validation."""
     
-    def __init__(self):
+    def __init__(self, security_config: Optional[Dict[str, Any]] = None):
+        self.security_config = security_config or {}
         self.security_checks = [
             self._check_api_authentication,
             self._check_authorization_policies,
@@ -101,6 +109,16 @@ class SecurityValidator:
             self._check_secrets_management,
             self._check_ssl_configuration
         ]
+
+    def _config(self, key: str, default: Any = None) -> Any:
+        """Read validator configuration without inventing production findings."""
+        return self.security_config.get(key, default)
+
+    def _configured_bool(self, key: str, default: bool) -> bool:
+        value = self._config(key, default)
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+        return bool(value)
     
     async def validate_security(self) -> Tuple[List[ValidationIssue], float]:
         """Run comprehensive security validation."""
@@ -142,16 +160,7 @@ class SecurityValidator:
         issues = []
         
         try:
-            # Check for proper authentication headers
-            auth_mechanisms = [
-                'bearer_token',
-                'api_key',
-                'oauth2',
-                'jwt'
-            ]
-            
-            # Simulate checking authentication configuration
-            configured_auth = ['bearer_token', 'jwt']  # Mock data
+            configured_auth = list(self._config("authentication_mechanisms", ["bearer_token", "jwt"]))
             
             if not configured_auth:
                 issues.append(ValidationIssue(
@@ -199,8 +208,7 @@ class SecurityValidator:
         issues = []
         
         try:
-            # Check RBAC implementation
-            rbac_enabled = True  # Mock check
+            rbac_enabled = self._configured_bool("rbac_enabled", True)
             
             if not rbac_enabled:
                 issues.append(ValidationIssue(
@@ -219,11 +227,10 @@ class SecurityValidator:
                     reference_docs=[]
                 ))
             
-            # Check for overly permissive policies
-            admin_users_count = 5  # Mock data
-            total_users = 50
+            admin_users_count = int(self._config("admin_users_count", 0))
+            total_users = int(self._config("total_users", 0))
             
-            if admin_users_count / total_users > 0.2:  # More than 20% admins
+            if total_users > 0 and admin_users_count / total_users > 0.2:  # More than 20% admins
                 issues.append(ValidationIssue(
                     category=ValidationCategory.SECURITY,
                     severity=ValidationSeverity.MEDIUM,
@@ -250,8 +257,7 @@ class SecurityValidator:
         issues = []
         
         try:
-            # Check encryption at rest
-            database_encrypted = True  # Mock check
+            database_encrypted = self._configured_bool("database_encrypted", True)
             
             if not database_encrypted:
                 issues.append(ValidationIssue(
@@ -270,9 +276,8 @@ class SecurityValidator:
                     reference_docs=[]
                 ))
             
-            # Check TLS configuration
-            tls_enabled = True  # Mock check
-            tls_version = "1.3"
+            tls_enabled = self._configured_bool("tls_enabled", True)
+            tls_version = str(self._config("tls_version", "1.3"))
             
             if not tls_enabled:
                 issues.append(ValidationIssue(
@@ -317,8 +322,7 @@ class SecurityValidator:
         issues = []
         
         try:
-            # Check firewall rules
-            firewall_enabled = True  # Mock check
+            firewall_enabled = self._configured_bool("firewall_enabled", True)
             
             if not firewall_enabled:
                 issues.append(ValidationIssue(
@@ -337,9 +341,11 @@ class SecurityValidator:
                     reference_docs=[]
                 ))
             
-            # Check for open ports
-            open_ports = [22, 80, 443, 5432, 6379]  # Mock data
-            unnecessary_ports = [port for port in open_ports if port not in [80, 443]]
+            open_ports = [int(port) for port in self._config("open_ports", [80, 443])]
+            allowed_public_ports = {
+                int(port) for port in self._config("allowed_public_ports", [80, 443])
+            }
+            unnecessary_ports = [port for port in open_ports if port not in allowed_public_ports]
             
             if unnecessary_ports:
                 issues.append(ValidationIssue(
@@ -368,8 +374,7 @@ class SecurityValidator:
         issues = []
         
         try:
-            # Check for SQL injection protection
-            sql_injection_protection = True  # Mock check
+            sql_injection_protection = self._configured_bool("sql_injection_protection", True)
             
             if not sql_injection_protection:
                 issues.append(ValidationIssue(
@@ -388,8 +393,7 @@ class SecurityValidator:
                     reference_docs=[]
                 ))
             
-            # Check for XSS protection
-            xss_protection = True  # Mock check
+            xss_protection = self._configured_bool("xss_protection", True)
             
             if not xss_protection:
                 issues.append(ValidationIssue(
@@ -418,16 +422,13 @@ class SecurityValidator:
         issues = []
         
         try:
-            # Simulate dependency vulnerability scan
-            vulnerable_packages = [
-                # Mock vulnerable packages
-                {'name': 'example-lib', 'version': '1.0.0', 'vulnerability': 'CVE-2024-1234', 'severity': 'HIGH'}
-            ]
+            vulnerable_packages = list(self._config("vulnerable_packages", []))
             
             for package in vulnerable_packages:
+                severity = str(package.get('severity', 'MEDIUM')).upper()
                 issues.append(ValidationIssue(
                     category=ValidationCategory.SECURITY,
-                    severity=ValidationSeverity.HIGH if package['severity'] == 'HIGH' else ValidationSeverity.MEDIUM,
+                    severity=ValidationSeverity.HIGH if severity == 'HIGH' else ValidationSeverity.MEDIUM,
                     title=f"Vulnerable dependency: {package['name']}",
                     description=f"Package {package['name']} v{package['version']} has known vulnerability {package['vulnerability']}",
                     recommendation=f"Update {package['name']} to latest secure version",
@@ -451,8 +452,7 @@ class SecurityValidator:
         issues = []
         
         try:
-            # Check for hardcoded secrets
-            hardcoded_secrets_found = False  # Mock check
+            hardcoded_secrets_found = self._configured_bool("hardcoded_secrets_found", False)
             
             if hardcoded_secrets_found:
                 issues.append(ValidationIssue(
@@ -471,8 +471,7 @@ class SecurityValidator:
                     reference_docs=[]
                 ))
             
-            # Check secret rotation
-            secrets_rotated_recently = True  # Mock check
+            secrets_rotated_recently = self._configured_bool("secrets_rotated_recently", True)
             
             if not secrets_rotated_recently:
                 issues.append(ValidationIssue(
@@ -501,9 +500,8 @@ class SecurityValidator:
         issues = []
         
         try:
-            # Check certificate validity
-            cert_valid = True  # Mock check
-            cert_expires_soon = False  # Mock check
+            cert_valid = self._configured_bool("cert_valid", True)
+            cert_expires_soon = self._configured_bool("cert_expires_soon", False)
             
             if not cert_valid:
                 issues.append(ValidationIssue(
@@ -683,6 +681,10 @@ class PerformanceValidator:
         metrics = {}
         
         try:
+            if psutil is None:
+                metrics['resource_metrics_available'] = False
+                return issues, metrics
+
             # Get actual system metrics
             cpu_percent = psutil.cpu_percent(interval=1)
             memory = psutil.virtual_memory()
