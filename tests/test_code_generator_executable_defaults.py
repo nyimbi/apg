@@ -1,5 +1,6 @@
 """Regression coverage for executable Python code-generation defaults."""
 
+import inspect
 import re
 
 from compiler.ast_builder import (
@@ -145,16 +146,44 @@ def test_hybrid_template_mode_uses_python_entity_catalog(monkeypatch):
 def test_legacy_framework_generation_helpers_are_removed():
     removed_helpers = {
         "_generate_legacy_flask_app",
+        "_generate_module",
+        "_add_module_docstring",
+        "_add_standard_imports",
+        "_generate_entity",
+        "_generate_agent",
+        "_generate_database",
+        "_generate_database_models",
         "_generate_requirements",
         "_generate_flask_app",
         "_generate_views",
         "_generate_config",
         "_generate_model_views",
         "_generate_table_model_view",
+        "_generate_table_model",
+        "_generate_column_definition",
         "_generate_templates",
         "_generate_base_template",
         "_generate_agent_dashboard_template",
+        "_generate_agent_api_method",
     }
 
     for helper_name in removed_helpers:
         assert not hasattr(PythonCodeGenerator, helper_name)
+
+
+def test_python_code_generator_source_is_framework_neutral():
+    source = inspect.getsource(PythonCodeGenerator)
+
+    for forbidden in (
+        "Flask",
+        "flask",
+        "AppBuilder",
+        "appbuilder",
+        "SQLAlchemy",
+        "sqlalchemy",
+        "Pydantic",
+        "pydantic",
+        "ModelView",
+        "BaseView",
+    ):
+        assert forbidden not in source

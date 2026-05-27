@@ -2967,7 +2967,7 @@ Completed checkpoint:
 
 Verification:
 
-- `python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
 - `rg -n "_generate_legacy_flask_app|Legacy Flask-AppBuilder generation method" compiler/code_generator.py tests/test_code_generator_executable_defaults.py` -> only the absence-regression assertion remains
 - `git diff --check -- compiler/code_generator.py tests/test_code_generator_executable_defaults.py docs/progress_log.md` -> no issues
 - Deferred pytest at the user's request to conserve battery.
@@ -2982,9 +2982,25 @@ Completed checkpoint:
 
 Verification:
 
-- `python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
 - `rg -n "_generate_(requirements|flask_app|views|config|model_views|templates|table_model_view|base_template|agent_dashboard_template)\(" compiler/code_generator.py tests/test_code_generator_executable_defaults.py` -> no matches
 - `git diff --check -- compiler/code_generator.py tests/test_code_generator_executable_defaults.py docs/progress_log.md` -> no issues
+- Deferred pytest at the user's request to conserve battery.
+
+### 2026-05-27 07:57 EAT
+
+Completed checkpoint:
+
+- Removed the uncalled private `_generate_module()` legacy module pipeline and its stale entity/view/model helper chain.
+- Updated the generator feature description to reflect the Python-first manifest, AI agent composition metadata, capability contracts, and composable template fallback behavior.
+- Added source-level regression coverage that keeps framework scaffold terms out of `PythonCodeGenerator`.
+
+Verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
+- `rg -n "Flask|flask|AppBuilder|appbuilder|SQLAlchemy|sqlalchemy|Pydantic|pydantic|ModelView|BaseView|_generate_module\(|_add_standard_imports\(|_generate_agent_api_method\(|_generate_database_models\(" compiler/code_generator.py` -> no matches
+- `.venv/bin/python -c "import inspect; from compiler.code_generator import PythonCodeGenerator; ..."` -> source has no framework scaffold terms and removed helpers are absent
+- `git diff --check -- compiler/code_generator.py tests/test_code_generator_executable_defaults.py` -> no issues
 - Deferred pytest at the user's request to conserve battery.
 
 ### 2026-05-27 02:07 EAT
