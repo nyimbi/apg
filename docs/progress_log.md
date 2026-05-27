@@ -3482,3 +3482,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_config_security_audit_sink.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed, 10 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:42 EAT
+
+Completed checkpoint:
+
+- Replaced Composition Registry mobile offline `create_composition` action sync's "mark as synced" placeholder with an actual online registry service call.
+- Successful offline composition sync now forwards name, description, capability IDs, composition type, and configuration to the online service, then marks the local composition with sync metadata and any online composition ID.
+- Failed online composition sync responses now preserve the pending action and increment retry state instead of falsely completing the action.
+- Added focused successful and failed offline action sync regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/mobile_service.py tests/test_composition_registry_mobile_sync.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_registry_mobile_sync.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed, 2 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

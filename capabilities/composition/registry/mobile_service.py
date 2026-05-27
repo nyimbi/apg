@@ -510,25 +510,113 @@ class MobileOfflineService:
 	async def _sync_create_composition(self, action: OfflineAction):
 		"""Sync create composition action."""
 		payload = action.payload
+		if not self.cr_service or not hasattr(self.cr_service, "create_composition"):
+			raise RuntimeError("Online registry service does not support composition creation")
 
-		# Create composition through online service
-		composition_data = {
-			"name": payload["name"],
-			"description": payload["description"],
-			"composition_type": payload["composition_type"],
-			"capability_ids": payload["capability_ids"]
-		}
+		create_composition = self.cr_service.create_composition
+		try:
+			result = await create_composition(
+				name=payload["name"],
+				description=payload["description"],
+				capability_ids=payload["capability_ids"],
+				composition_type=payload.get("composition_type", "mobile"),
+				configuration=payload.get("configuration")
+			)
+		except TypeError:
+			result = await create_composition({
+				"name": payload["name"],
+				"description": payload["description"],
+				"composition_type": payload.get("composition_type", "mobile"),
+				"capability_ids": payload["capability_ids"],
+				"configuration": payload.get("configuration")
+			})
 
-		# This would call the actual online service
-		# result = await self.cr_service.create_composition(composition_data)
-
-		# For now, just mark as synced
-		pass
+		self._raise_on_sync_failure(result, "create_composition")
+		online_composition_id = self._extract_result_id(result, "composition_id")
+		await self._mark_offline_composition_synced(action.resource_id, online_composition_id)
 
 	async def _sync_update_capability(self, action: OfflineAction):
 		"""Sync update capability action."""
-		# Implementation for syncing capability updates
-		pass
+		if not self.cr_service or not hasattr(self.cr_service, "update_capability"):
+			raise RuntimeError("Online registry service does not support capability updates")
+
+		updates = action.payload.get("updates", action.payload)
+		result = await self.cr_service.update_capability(action.resource_id, updates)
+		self._raise_on_sync_failure(result, "update_capability")
+		await self._mark_offline_capability_synced(action.resource_id, updates)
+
+	def _raise_on_sync_failure(self, result: Any, operation: str) -> None:
+		"""Raise when an online sync operation returns an unsuccessful response."""
+		if isinstance(result, dict) and result.get("success") is False:
+			message = result.get("message") or f"{operation} failed"
+			errors = result.get("errors") or []
+			raise RuntimeError(f"{message}: {errors}" if errors else message)
+
+	def _extract_result_id(self, result: Any, field_name: str) -> Optional[str]:
+		"""Extract an ID from common service response shapes."""
+		if isinstance(result, dict):
+			if result.get(field_name):
+				return result[field_name]
+			data = result.get("data")
+			if isinstance(data, dict):
+				return data.get(field_name)
+		return None
+
+	async def _mark_offline_composition_synced(
+		self,
+		local_composition_id: str,
+		online_composition_id: Optional[str]
+	) -> None:
+		"""Mark a locally-created composition as synced to the online registry."""
+		synced_at = datetime.utcnow().isoformat()
+		conn = sqlite3.connect(self.offline_db_path)
+		cursor = conn.cursor()
+		cursor.execute(
+			"SELECT data_json FROM offline_compositions WHERE composition_id = ?",
+			(local_composition_id,)
+		)
+		row = cursor.fetchone()
+		data = json.loads(row[0]) if row and row[0] else {}
+		data.update({
+			"created_offline": False,
+			"synced": True,
+			"synced_at": synced_at
+		})
+		if online_composition_id:
+			data["online_composition_id"] = online_composition_id
+
+		cursor.execute("""
+			UPDATE offline_compositions
+			SET data_json = ?, last_sync = ?
+			WHERE composition_id = ?
+		""", (json.dumps(data), synced_at, local_composition_id))
+		conn.commit()
+		conn.close()
+
+	async def _mark_offline_capability_synced(
+		self,
+		capability_id: str,
+		updates: Dict[str, Any]
+	) -> None:
+		"""Mark an offline capability update as synced locally."""
+		synced_at = datetime.utcnow().isoformat()
+		conn = sqlite3.connect(self.offline_db_path)
+		cursor = conn.cursor()
+		cursor.execute(
+			"SELECT data_json FROM offline_capabilities WHERE capability_id = ?",
+			(capability_id,)
+		)
+		row = cursor.fetchone()
+		data = json.loads(row[0]) if row and row[0] else {}
+		data.update(updates)
+		data.update({"synced": True, "synced_at": synced_at})
+		cursor.execute("""
+			UPDATE offline_capabilities
+			SET data_json = ?, last_sync = ?
+			WHERE capability_id = ?
+		""", (json.dumps(data, default=str), synced_at, capability_id))
+		conn.commit()
+		conn.close()
 
 	# =========================================================================
 	# Data Synchronization

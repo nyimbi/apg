@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import sqlite3
 from datetime import datetime, timedelta
 
 import pytest
@@ -56,6 +58,21 @@ class _RegistryFeed:
 	async def search_compositions(self, query):
 		assert query["limit"] == 1000
 		return {"compositions": self.compositions}
+
+
+class _CompositionWriter:
+	def __init__(self, *, fail: bool = False) -> None:
+		self.fail = fail
+		self.created: list[dict] = []
+
+	async def create_composition(self, **kwargs):
+		self.created.append(kwargs)
+		if self.fail:
+			return {"success": False, "message": "composition rejected", "errors": ["invalid capability"]}
+		return {
+			"success": True,
+			"data": {"composition_id": "online-agent-stack"},
+		}
 
 
 @pytest.mark.asyncio
@@ -134,3 +151,78 @@ async def test_mobile_incremental_sync_upserts_only_changed_online_records(tmp_p
 	assert by_id["cap-ai-agent"].name == "AI Agent Runtime"
 	assert by_id["cap-ai-agent"].version == "1.1.0"
 	assert by_id["cap-nlpc"].name == "Natural Language Processing Core"
+
+
+@pytest.mark.asyncio
+async def test_mobile_offline_composition_action_calls_online_registry_and_completes(tmp_path):
+	registry = _CompositionWriter()
+	service = MobileOfflineService(
+		tenant_id="tenant-a",
+		offline_db_path=str(tmp_path / "offline.db"),
+	)
+	service.is_online = False
+	await service.set_online_service(registry)
+
+	local_id = await service.create_mobile_composition(
+		name="Agent Stack",
+		description="Offline-created agent stack",
+		capability_ids=["cap-ai-agent", "cap-nlpc"],
+		composition_type="agent_composition",
+	)
+	assert len(await service.get_pending_offline_actions()) == 1
+
+	service.is_online = True
+	result = await service.sync_offline_actions()
+
+	assert result["synced"] == 1
+	assert result["failed"] == 0
+	assert await service.get_pending_offline_actions() == []
+	assert registry.created == [{
+		"name": "Agent Stack",
+		"description": "Offline-created agent stack",
+		"capability_ids": ["cap-ai-agent", "cap-nlpc"],
+		"composition_type": "agent_composition",
+		"configuration": None,
+	}]
+
+	compositions = await service.get_mobile_compositions(limit=10)
+	assert compositions[0].composition_id == local_id
+	detail = compositions[0]
+	assert detail.is_offline_ready is True
+
+	conn = sqlite3.connect(service.offline_db_path)
+	cursor = conn.cursor()
+	cursor.execute("SELECT status FROM offline_actions")
+	assert cursor.fetchone()[0] == "completed"
+	cursor.execute("SELECT data_json FROM offline_compositions WHERE composition_id = ?", (local_id,))
+	data = json.loads(cursor.fetchone()[0])
+	conn.close()
+	assert data["synced"] is True
+	assert data["created_offline"] is False
+	assert data["online_composition_id"] == "online-agent-stack"
+
+
+@pytest.mark.asyncio
+async def test_mobile_offline_action_retry_state_preserves_failed_online_sync(tmp_path):
+	registry = _CompositionWriter(fail=True)
+	service = MobileOfflineService(
+		tenant_id="tenant-a",
+		offline_db_path=str(tmp_path / "offline.db"),
+	)
+	service.is_online = False
+	await service.set_online_service(registry)
+	await service.create_mobile_composition(
+		name="Bad Stack",
+		description="Rejected composition",
+		capability_ids=["missing-capability"],
+		composition_type="agent_composition",
+	)
+
+	service.is_online = True
+	result = await service.sync_offline_actions()
+
+	assert result["synced"] == 0
+	assert result["failed"] == 1
+	pending = await service.get_pending_offline_actions()
+	assert len(pending) == 1
+	assert pending[0].retry_count == 1
