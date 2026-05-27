@@ -2972,6 +2972,21 @@ Verification:
 - `git diff --check -- compiler/code_generator.py tests/test_code_generator_executable_defaults.py docs/progress_log.md` -> no issues
 - Deferred pytest at the user's request to conserve battery.
 
+### 2026-05-27 07:51 EAT
+
+Completed checkpoint:
+
+- Removed the now-unreferenced framework scaffold helpers for generated requirements, Flask app wiring, view files, config files, ModelViews, and HTML templates.
+- Expanded the compiler regression to keep those dead framework helper entry points from returning.
+- Preserved still-referenced entity generation methods for a later, behavior-aware conversion pass.
+
+Verification:
+
+- `python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
+- `rg -n "_generate_(requirements|flask_app|views|config|model_views|templates|table_model_view|base_template|agent_dashboard_template)\(" compiler/code_generator.py tests/test_code_generator_executable_defaults.py` -> no matches
+- `git diff --check -- compiler/code_generator.py tests/test_code_generator_executable_defaults.py docs/progress_log.md` -> no issues
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 02:07 EAT
 
 Completed checkpoint:

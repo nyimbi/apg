@@ -142,5 +142,19 @@ def test_hybrid_template_mode_uses_python_entity_catalog(monkeypatch):
     compile(files["entities.py"], "entities.py", "exec")
 
 
-def test_legacy_flask_app_escape_hatch_is_removed():
-    assert not hasattr(PythonCodeGenerator, "_generate_legacy_flask_app")
+def test_legacy_framework_generation_helpers_are_removed():
+    removed_helpers = {
+        "_generate_legacy_flask_app",
+        "_generate_requirements",
+        "_generate_flask_app",
+        "_generate_views",
+        "_generate_config",
+        "_generate_model_views",
+        "_generate_table_model_view",
+        "_generate_templates",
+        "_generate_base_template",
+        "_generate_agent_dashboard_template",
+    }
+
+    for helper_name in removed_helpers:
+        assert not hasattr(PythonCodeGenerator, helper_name)
