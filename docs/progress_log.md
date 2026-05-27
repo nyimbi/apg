@@ -234,6 +234,30 @@ Verification result:
 - Recursive spec-to-contract inventory check returned no missing executable contracts outside docs/work scratch paths.
 - `git diff --check` for the finance/HCM contract slice passed.
 
+Commit result:
+
+- Pushed commit `7e94f75` (`Cover nested finance and HCM contracts`).
+
+### 2026-05-27 17:19 EAT
+
+Completed checkpoint:
+
+- Updated `docs/capability_contracts.md` to match the current recursive contract coverage and 109-contract registry count.
+- Fixed the registry API example to import `validate_contract_registry`.
+- Replaced stale focused-test paths that pointed at removed root/capability test locations with current `tests/` paths.
+
+Verification planned before commit:
+
+- Check the contract documentation for stale test paths.
+- Verify the current registry count.
+- Check the documentation diff for whitespace issues.
+
+Verification result:
+
+- Current `validate_contract_registry()` report is valid with 109 contracts.
+- Stale contract-doc path/count scan found no removed `capabilities/test_*` paths or `Validated 101` text.
+- `git diff --check` for the contract-doc slice passed.
+
 ### 2026-05-26 02:25 EAT
 
 In progress:

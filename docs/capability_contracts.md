@@ -21,6 +21,7 @@ from capabilities import (
     evaluate_capability_contract_rules,
     get_capability_contract,
     load_contract_registry,
+    validate_contract_registry,
 )
 
 registry = load_contract_registry()
@@ -58,7 +59,7 @@ python cli.py capabilities validate-contracts
 Expected success output:
 
 ```text
-✓ Validated 101 capability contracts
+✓ Validated 109 capability contracts
 ```
 
 List contracts for inspection:
@@ -122,8 +123,9 @@ optional because the registry can evaluate standard deterministic rules itself.
 Run these checks after changing contracts:
 
 ```bash
-python -m pytest -q capabilities/test_capability_contract_registry.py \
-  capabilities/test_spec_capability_contracts.py \
+python -m pytest -q tests/test_capability_contract_registry.py \
+  tests/test_spec_capability_contracts.py \
+  tests/test_capability_contract_public_api.py \
   capabilities/common/test_capability_contracts.py \
   tests/test_cli_capability_contracts.py \
   tests/test_composition_capability_contracts.py
