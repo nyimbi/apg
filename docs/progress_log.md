@@ -3003,6 +3003,20 @@ Verification:
 - `git diff --check -- compiler/code_generator.py tests/test_code_generator_executable_defaults.py` -> no issues
 - Deferred pytest at the user's request to conserve battery.
 
+### 2026-05-27 08:00 EAT
+
+Completed checkpoint:
+
+- Removed imports and constructor state fields that were only needed by the deleted legacy module pipeline.
+- Kept the live generator imports focused on module declarations, expression lowering, AI agent declarations, agent teams, and capability declarations.
+
+Verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
+- `rg -n "\b(ASTNode|EntityDeclaration|PropertyDeclaration|MethodDeclaration|Parameter|TypeAnnotation|Statement|AssignmentStatement|ReturnStatement|BlockStatement|ExpressionStatement|EntityType|DatabaseDeclaration|DatabaseSchema|TableDeclaration|TextIO|Set|self\.output|self\.imports|self\.indent_level|self\.current_entity|self\.generated_classes)\b" compiler/code_generator.py` -> no matches
+- `git diff --check -- compiler/code_generator.py docs/progress_log.md` -> no issues
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 02:07 EAT
 
 Completed checkpoint:

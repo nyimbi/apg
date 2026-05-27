@@ -7,21 +7,17 @@ Transforms APG entities, workflows, and other constructs into executable Python 
 with proper imports, type hints, and runtime support.
 """
 
-from typing import Any, Dict, List, Optional, Set, TextIO
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from pathlib import Path
-import re
 import sys
 
 # Import AST nodes
 from .ast_builder import (
-	ASTNode, ModuleDeclaration, EntityDeclaration, PropertyDeclaration,
-	MethodDeclaration, Parameter, TypeAnnotation, Expression, Statement,
+	ModuleDeclaration, Expression,
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
 	UnaryExpression, MemberExpression, IndexExpression, ListExpression,
 	DictExpression,
-	AssignmentStatement, ReturnStatement, BlockStatement, ExpressionStatement, EntityType,
-	DatabaseDeclaration, DatabaseSchema, TableDeclaration,
 	AIAgentDeclaration, AgentTeamDeclaration, CapabilityDeclaration
 )
 
@@ -82,14 +78,9 @@ class PythonCodeGenerator:
 	
 	def __init__(self, config: CodeGenConfig = None):
 		self.config = config or CodeGenConfig()
-		self.output: List[str] = []
-		self.imports: Set[str] = set()
-		self.indent_level = 0
 		
 		# Code generation state
 		self.current_module: Optional[ModuleDeclaration] = None
-		self.current_entity: Optional[EntityDeclaration] = None
-		self.generated_classes: Set[str] = set()
 	
 	def generate(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""
