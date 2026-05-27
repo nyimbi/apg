@@ -3252,3 +3252,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_encr_runtime_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 2 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:24 EAT
+
+Completed checkpoint:
+
+- Replaced ENCR core service fallback sessions' fixed `mock_user` and `mock_device` values with user/device values from runtime user context.
+- Replaced zero-knowledge proof generation's fixed `mock_tenant` with tenant context carried by a quantum-safe session or explicit proof context.
+- Extended focused ENCR service context coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/service.py tests/test_common_encr_runtime_tenant_context.py`
+- `.venv/bin/python -m pytest -q tests/test_common_encr_runtime_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

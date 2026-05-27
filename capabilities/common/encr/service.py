@@ -43,6 +43,15 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
+def _context_value(source: Any, name: str) -> Any:
+	"""Read a context value from dict-like or object sources."""
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
 class APGEncryptionService:
 	"""
 	Revolutionary APG Encryption Service
@@ -240,7 +249,7 @@ class APGEncryptionService:
 		
 		try:
 			# Retrieve session and validate access
-			session = await self._get_quantum_safe_session(session_id, tenant_id)
+			session = await self._get_quantum_safe_session(session_id, tenant_id, user_context)
 			
 			# Verify user authorization through APG auth
 			if self.auth_service:
@@ -317,8 +326,9 @@ class APGEncryptionService:
 			)
 			
 			# Generate zero-knowledge access proof
+			proof_context = {**user_context, "tenant_id": tenant_id, "session_id": operation_id}
 			access_proof = await self.zero_knowledge_engine.generate_access_proof(
-				user_context, encrypted_data, threshold_shares
+				proof_context, encrypted_data, {"threshold_shares": len(threshold_shares)}
 			)
 			
 			# Record operation
@@ -554,15 +564,19 @@ class APGEncryptionService:
 		
 		return session
 	
-	async def _get_quantum_safe_session(self, session_id: str, tenant_id: str) -> QuantumSafeSession:
+	async def _get_quantum_safe_session(
+		self,
+		session_id: str,
+		tenant_id: str,
+		user_context: Dict[str, Any] | None = None
+	) -> QuantumSafeSession:
 		"""Retrieve and validate quantum-safe session"""
 		# In production, this would query the database
-		# For now, create a mock session
 		return QuantumSafeSession(
 			id=session_id,
 			tenant_id=tenant_id,
-			user_id='mock_user',
-			device_id='mock_device',
+			user_id=_context_value(user_context, 'user_id') or 'anonymous',
+			device_id=_context_value(user_context, 'device_id') or 'unknown',
 			session_key=secrets.token_bytes(32),
 			key_pair_id=uuid7str(),
 			encryption_mode=EncryptionMode.QUANTUM_SAFE,
@@ -790,9 +804,21 @@ class ZeroKnowledgeEncryptionEngine:
 		additional_context: Any = None
 	) -> ZeroKnowledgeProof:
 		"""Generate zero-knowledge access proof"""
+		tenant_id = (
+			_context_value(user_context, 'tenant_id')
+			or _context_value(additional_context, 'tenant_id')
+		)
+		session_id = (
+			_context_value(user_context, 'session_id')
+			or _context_value(user_context, 'id')
+			or _context_value(additional_context, 'session_id')
+			or uuid7str()
+		)
+		assert tenant_id, "Tenant context required for zero-knowledge proof"
+
 		return ZeroKnowledgeProof(
-			tenant_id='mock_tenant',
-			session_id=uuid7str(),
+			tenant_id=tenant_id,
+			session_id=session_id,
 			proof_data=secrets.token_bytes(256),
 			verification_key=secrets.token_bytes(32),
 			commitment=secrets.token_bytes(32),
