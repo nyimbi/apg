@@ -4637,3 +4637,7 @@ Battery-conscious verification:
 - `rg -n "from \\.ai_insights import CRMAIInsights$|self\\.ai_insights = CRMAIInsights\\(" capabilities/crm/adv/service.py tests/test_crm_adv_core_records.py` -> no stale shadowed construction
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pushed commit `488a672` (`Use executable CRM AI insights engine`) to `origin/main`.
