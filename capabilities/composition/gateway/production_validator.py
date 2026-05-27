@@ -966,7 +966,8 @@ class PerformanceValidator:
 class ReliabilityValidator:
     """Comprehensive reliability validation."""
     
-    def __init__(self):
+    def __init__(self, reliability_config: Optional[Dict[str, Any]] = None):
+        self.reliability_config = reliability_config or {}
         self.reliability_checks = [
             self._check_error_rates,
             self._check_circuit_breakers,
@@ -975,6 +976,13 @@ class ReliabilityValidator:
             self._check_backup_systems,
             self._check_monitoring_alerting
         ]
+
+    def _config(self, key: str, default: Any = None) -> Any:
+        """Read configured reliability posture instead of using canned checks."""
+        return self.reliability_config.get(key, default)
+
+    def _configured_services(self) -> List[str]:
+        return list(self._config("all_services", []))
     
     async def validate_reliability(self) -> Tuple[List[ValidationIssue], float]:
         """Run comprehensive reliability validation."""
@@ -1016,14 +1024,10 @@ class ReliabilityValidator:
         issues = []
         
         try:
-            # Simulate error rate metrics
-            services_error_rates = {
-                'user-service': 0.5,  # 0.5%
-                'payment-service': 2.1,  # 2.1%
-                'notification-service': 0.2  # 0.2%
-            }
+            services_error_rates = dict(self._config("services_error_rates", {}))
             
             for service, error_rate in services_error_rates.items():
+                error_rate = float(error_rate)
                 if error_rate > 2.0:  # 2% threshold
                     issues.append(ValidationIssue(
                         category=ValidationCategory.RELIABILITY,
@@ -1067,11 +1071,10 @@ class ReliabilityValidator:
         issues = []
         
         try:
-            # Check circuit breaker configuration
-            services_with_circuit_breakers = ['user-service', 'payment-service']
-            all_services = ['user-service', 'payment-service', 'notification-service']
+            services_with_circuit_breakers = set(self._config("services_with_circuit_breakers", []))
+            all_services = set(self._configured_services())
             
-            missing_circuit_breakers = set(all_services) - set(services_with_circuit_breakers)
+            missing_circuit_breakers = all_services - services_with_circuit_breakers
             
             if missing_circuit_breakers:
                 issues.append(ValidationIssue(
@@ -1100,11 +1103,10 @@ class ReliabilityValidator:
         issues = []
         
         try:
-            # Check retry configuration
-            services_with_retries = ['payment-service']
-            critical_services = ['user-service', 'payment-service']
+            services_with_retries = set(self._config("services_with_retries", []))
+            critical_services = set(self._config("critical_services", []))
             
-            missing_retries = set(critical_services) - set(services_with_retries)
+            missing_retries = critical_services - services_with_retries
             
             if missing_retries:
                 issues.append(ValidationIssue(
@@ -1133,11 +1135,10 @@ class ReliabilityValidator:
         issues = []
         
         try:
-            # Check health check endpoints
-            services_with_health_checks = ['user-service', 'payment-service', 'notification-service']
-            all_services = ['user-service', 'payment-service', 'notification-service']
+            services_with_health_checks = set(self._config("services_with_health_checks", []))
+            all_services = set(self._configured_services())
             
-            missing_health_checks = set(all_services) - set(services_with_health_checks)
+            missing_health_checks = all_services - services_with_health_checks
             
             if missing_health_checks:
                 issues.append(ValidationIssue(
@@ -1157,7 +1158,7 @@ class ReliabilityValidator:
                 ))
             
             # Check health check frequency
-            health_check_interval = 30  # seconds
+            health_check_interval = int(self._config("health_check_interval_seconds", 30))
             if health_check_interval > 60:
                 issues.append(ValidationIssue(
                     category=ValidationCategory.RELIABILITY,
@@ -1185,10 +1186,8 @@ class ReliabilityValidator:
         issues = []
         
         try:
-            # Check backup configuration
-            database_backup_enabled = True
-            backup_frequency = 24  # hours
-            backup_retention = 30  # days
+            database_backup_enabled = bool(self._config("database_backup_enabled", True))
+            backup_frequency = int(self._config("backup_frequency_hours", 24))
             
             if not database_backup_enabled:
                 issues.append(ValidationIssue(
@@ -1234,11 +1233,16 @@ class ReliabilityValidator:
         issues = []
         
         try:
-            # Check monitoring coverage
-            monitored_metrics = ['cpu', 'memory', 'disk', 'response_time']
-            critical_metrics = ['cpu', 'memory', 'disk', 'response_time', 'error_rate', 'throughput']
+            monitored_metrics = set(self._config(
+                "monitored_metrics",
+                ['cpu', 'memory', 'disk', 'response_time', 'error_rate', 'throughput']
+            ))
+            critical_metrics = set(self._config(
+                "critical_metrics",
+                ['cpu', 'memory', 'disk', 'response_time', 'error_rate', 'throughput']
+            ))
             
-            missing_metrics = set(critical_metrics) - set(monitored_metrics)
+            missing_metrics = critical_metrics - monitored_metrics
             
             if missing_metrics:
                 issues.append(ValidationIssue(
@@ -1257,9 +1261,7 @@ class ReliabilityValidator:
                     reference_docs=[]
                 ))
             
-            # Check alerting configuration
-            alert_channels = ['email']  # Mock data
-            recommended_channels = ['email', 'slack', 'pagerduty']
+            alert_channels = list(self._config("alert_channels", ["email", "pagerduty"]))
             
             if len(alert_channels) < 2:
                 issues.append(ValidationIssue(

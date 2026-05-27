@@ -3547,3 +3547,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_gateway_production_validator_security_config.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 4 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 05:10 EAT
+
+Completed checkpoint:
+
+- Replaced API Service Mesh production reliability validator canned service, error-rate, circuit-breaker, retry, health-check, backup, monitoring, and alert-channel assumptions with explicit configuration-backed validation.
+- Reliability validation now emits findings only from configured or observed reliability posture instead of hard-coded `payment-service`, `notification-service`, or single-email alert assumptions.
+- Secure local defaults no longer emit canned reliability warnings when no posture evidence has been supplied.
+- Added focused reliability validator regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/production_validator.py tests/test_gateway_production_validator_reliability_config.py`
+- `.venv/bin/python -m pytest -q tests/test_gateway_production_validator_reliability_config.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 4 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
