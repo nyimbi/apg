@@ -9,6 +9,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 import asyncio
+import inspect
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -36,15 +37,61 @@ logger = logging.getLogger(__name__)
 # APG Platform Integration Layer
 # =============================================================================
 
+WORKFLOW_PERMISSION_ALIASES: Dict[str, List[str]] = {
+    "create_process": ["wbpm:process:create", "wbpm:process:write", "workflow_design"],
+    "view_process": ["wbpm:process:read", "workflow_view", "workflow_design"],
+    "start_process": ["wbpm:process:execute", "workflow_execute"],
+    "create_task": ["wbpm:task:create", "wbpm:task:write", "workflow_execute"],
+    "complete_any_task": ["wbpm:task:complete", "wbpm:task:admin"],
+    "view_any_task": ["wbpm:task:read", "wbpm:task:admin"],
+    "manage_instance": ["wbpm:instance:manage", "wbpm:process:manage", "workflow_manage"],
+}
+
+
+def _clean_permission(value: Any) -> Optional[str]:
+    """Normalize a permission token."""
+    if value is None:
+        return None
+    permission = str(value).strip()
+    return permission or None
+
+
+def _permission_candidates(required_permission: str) -> List[str]:
+    """Return all permission tokens that satisfy an internal workflow permission."""
+    required = _clean_permission(required_permission)
+    if not required:
+        return []
+    return [required, *WORKFLOW_PERMISSION_ALIASES.get(required, [])]
+
+
+def _permission_matches(granted_permission: str, required_permission: str) -> bool:
+    """Return whether a granted APG permission covers a required workflow permission."""
+    granted = _clean_permission(granted_permission)
+    if not granted:
+        return False
+    if granted in {"*", "admin", "wbpm:*", "workflow_admin"}:
+        return True
+    for candidate in _permission_candidates(required_permission):
+        if granted == candidate:
+            return True
+        for suffix, separator in ((":*", ":"), (".*", ".")):
+            if granted.endswith(suffix):
+                prefix = granted[: -len(suffix)]
+                if candidate == prefix or candidate.startswith(f"{prefix}{separator}"):
+                    return True
+    return False
+
+
 class APGPlatformIntegration:
     """Integration layer for APG platform services."""
     
-    def __init__(self, config: WBPMServiceConfig):
+    def __init__(self, config: WBPMServiceConfig, auth_service: Any | None = None):
         self.config = config
         self.auth_service_url = config.apg_auth_service_url
         self.audit_service_url = config.apg_audit_service_url
         self.collaboration_service_url = config.apg_collaboration_service_url
         self.ai_service_url = config.apg_ai_service_url
+        self.auth_service = auth_service
     
     async def validate_user_permissions(
         self,
@@ -53,23 +100,149 @@ class APGPlatformIntegration:
     ) -> bool:
         """Validate user permissions through APG auth service."""
         try:
-            # In production, this would make actual HTTP calls to APG auth service
-            # For now, simulate permission validation
-            
-            # Check if user has required permissions
-            user_permissions = set(context.permissions)
-            required_permissions_set = set(required_permissions)
-            
-            has_permissions = required_permissions_set.issubset(user_permissions)
+            required_permissions = [
+                permission for permission in
+                (_clean_permission(permission) for permission in required_permissions)
+                if permission
+            ]
+            if not required_permissions:
+                return True
+
+            auth_result = await self._validate_permissions_with_auth_service(context, required_permissions)
+            if auth_result is not None:
+                return auth_result
+
+            user_permissions = [
+                permission for permission in
+                (_clean_permission(permission) for permission in context.permissions)
+                if permission
+            ]
+            missing_permissions = [
+                permission for permission in required_permissions
+                if not any(_permission_matches(granted, permission) for granted in user_permissions)
+            ]
+            has_permissions = not missing_permissions
             
             if not has_permissions:
-                logger.warning(f"User {context.user_id} missing permissions: {required_permissions_set - user_permissions}")
+                logger.warning(f"User {context.user_id} missing permissions: {missing_permissions}")
             
             return has_permissions
             
         except Exception as e:
             logger.error(f"Error validating permissions: {e}")
             return False
+
+    async def _validate_permissions_with_auth_service(
+        self,
+        context: APGTenantContext,
+        required_permissions: List[str]
+    ) -> Optional[bool]:
+        """Validate permissions through an injected APG auth service when configured."""
+        if not self.auth_service:
+            return await self._validate_permissions_over_http(context, required_permissions)
+
+        plural_methods = ("has_permissions", "validate_permissions", "check_permissions")
+        for method_name in plural_methods:
+            method = getattr(self.auth_service, method_name, None)
+            if callable(method):
+                result = await self._call_auth_method(
+                    method,
+                    context=context,
+                    permissions=required_permissions
+                )
+                if result is not None:
+                    return result
+
+        singular_methods = ("has_permission", "check_permission", "user_has_permission")
+        for permission in required_permissions:
+            permission_result: Optional[bool] = None
+            for method_name in singular_methods:
+                method = getattr(self.auth_service, method_name, None)
+                if callable(method):
+                    permission_result = await self._call_auth_method(
+                        method,
+                        context=context,
+                        permissions=[permission]
+                    )
+                    if permission_result is not None:
+                        break
+            if permission_result is False:
+                return False
+            if permission_result is None:
+                return None
+        return True
+
+    async def _call_auth_method(
+        self,
+        method: Any,
+        context: APGTenantContext,
+        permissions: List[str]
+    ) -> Optional[bool]:
+        """Call common APG auth service method signatures."""
+        calls = (
+            lambda: method(context=context, required_permissions=permissions),
+            lambda: method(context=context, permissions=permissions),
+            lambda: method(
+                user_id=context.user_id,
+                tenant_id=context.tenant_id,
+                permissions=permissions
+            ),
+            lambda: method(
+                user_id=context.user_id,
+                permission=permissions[0],
+                tenant_id=context.tenant_id
+            ),
+            lambda: method(context.user_id, permissions, context.tenant_id),
+            lambda: method(context.user_id, permissions[0], context.tenant_id),
+        )
+        for call in calls:
+            try:
+                return await self._coerce_auth_result(call())
+            except TypeError:
+                continue
+        return None
+
+    async def _coerce_auth_result(self, result: Any) -> bool:
+        """Normalize APG auth service responses to a boolean."""
+        if inspect.isawaitable(result):
+            result = await result
+        if isinstance(result, dict):
+            for key in ("allowed", "authorized", "has_permission", "success"):
+                if key in result:
+                    return bool(result[key])
+        return bool(result)
+
+    async def _validate_permissions_over_http(
+        self,
+        context: APGTenantContext,
+        required_permissions: List[str]
+    ) -> Optional[bool]:
+        """Validate permissions through APG auth_rbac HTTP endpoint when an auth token is present."""
+        auth_token = context.metadata.get("auth_token") or context.metadata.get("access_token")
+        if not self.auth_service_url or not auth_token:
+            return None
+
+        try:
+            import httpx
+        except ImportError:
+            logger.warning("httpx is unavailable; falling back to context permissions")
+            return None
+
+        endpoint = f"{self.auth_service_url.rstrip('/')}/permissions/validate"
+        payload = {
+            "tenant_id": context.tenant_id,
+            "user_id": context.user_id,
+            "permissions": required_permissions,
+        }
+        headers = {"Authorization": f"Bearer {auth_token}"}
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(endpoint, json=payload, headers=headers)
+                response.raise_for_status()
+                return await self._coerce_auth_result(response.json())
+        except Exception as e:
+            logger.warning(f"APG auth service permission validation failed: {e}")
+            return None
     
     async def log_audit_event(
         self,

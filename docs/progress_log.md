@@ -3312,3 +3312,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_pde_pim_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 6 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:42 EAT
+
+Completed checkpoint:
+
+- Replaced CKM WFA service permission simulation with an APG auth service boundary that supports injected auth providers and token-backed HTTP validation.
+- Added explicit fallback permission evaluation from `APGTenantContext.permissions` with aliases between internal workflow permissions and public `wbpm:*` permission names.
+- Added focused executable permission regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/ckm/wfa/service.py tests/test_ckm_wfa_service_permissions.py`
+- `.venv/bin/python -m pytest -q tests/test_ckm_wfa_service_permissions.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
