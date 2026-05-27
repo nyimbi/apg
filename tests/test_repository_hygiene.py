@@ -44,7 +44,9 @@ PYTHON_FIRST_PUBLIC_DOCS = {
 	"README.md",
 	"docs/README.md",
 	"docs/architecture.md",
+	"docs/capabilities/README.md",
 	"docs/language_reference.md",
+	"docs/proposed_capability_architecture.md",
 }
 
 

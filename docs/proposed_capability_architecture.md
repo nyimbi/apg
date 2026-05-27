@@ -78,11 +78,12 @@ Each sub-capability follows a consistent structure:
 ```python
 # Example: core_financials/general_ledger/
 __init__.py          # Package initialization and metadata
-models.py           # Database models specific to GL
-views.py            # Flask-AppBuilder views for GL
+models.py           # Domain models and data contracts specific to GL
+views.py            # UI manifest and view adapters for GL
 service.py          # Business logic and API services
-api.py              # REST API endpoints
-blueprint.py        # Flask blueprint registration
+api.py              # API endpoints or adapter surface
+blueprint.py        # Composition registration
+capability_contract.py # Configuration, rules, UI, and theme contract
 config.py           # Sub-capability specific configuration
 requirements.txt    # Sub-capability dependencies
 README.md           # Documentation

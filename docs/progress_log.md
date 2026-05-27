@@ -3858,6 +3858,20 @@ Battery-conscious verification:
 - `git diff --check` -> no issues.
 - Deferred pytest at the user's request to conserve battery.
 
+### 2026-05-27 07:19 EAT
+
+Completed checkpoint:
+
+- Aligned capability-architecture documentation with first-class capability contracts.
+- Replaced framework-specific capability structure examples with domain models, UI manifests, API adapters, composition registration, and `capability_contract.py`.
+- Extended public-doc hygiene coverage to include `docs/capabilities/README.md` and `docs/proposed_capability_architecture.md`.
+
+Battery-conscious verification:
+
+- `rg -n "Flask-AppBuilder|flask_appbuilder|FastAPI|fastapi|Django|django|SQLAlchemy|python app.py|http://localhost:8080" docs/capabilities/README.md docs/proposed_capability_architecture.md tests/test_repository_hygiene.py` -> only hygiene guard constants remain.
+- `git diff --check` -> no issues.
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 07:02 EAT
 
 Completed checkpoint:

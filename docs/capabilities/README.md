@@ -6,7 +6,7 @@ The APG platform provides a comprehensive suite of production-ready capabilities
 
 ### Composable Design
 Each capability is:
-- **Self-contained**: Complete with models, services, views, and APIs
+- **Self-contained**: Complete with models, services, UI manifests, APIs, and contracts
 - **Plug-and-play**: Can be easily added or removed from applications
 - **Standards-compliant**: Follows consistent patterns and interfaces
 - **Production-ready**: Fully implemented with real functionality
@@ -15,11 +15,12 @@ Each capability is:
 ```
 capability/
 ├── __init__.py           # Capability registration
-├── models.py             # SQLAlchemy data models
+├── models.py             # Domain models and data contracts
 ├── service.py            # Core business logic
-├── views.py              # Flask-AppBuilder views
-├── api.py                # REST API endpoints
-├── blueprint.py          # Flask blueprint configuration
+├── views.py              # UI manifest and view adapters
+├── api.py                # API endpoints or adapter surface
+├── blueprint.py          # Composition registration
+├── capability_contract.py # Configuration, rules, UI, and theme contract
 ├── cap_spec.md           # Technical specification
 ├── desired_outcome.md    # Requirements document
 └── tests/                # Comprehensive test suite
