@@ -197,6 +197,7 @@ class APIGateway:
 		# Service discovery
 		self.services: Dict[str, Dict[str, Any]] = {}
 		self.service_instances: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+		self.service_handlers: Dict[str, Dict[str, Callable[..., Any]]] = defaultdict(dict)
 		
 		# Request tracking and analytics
 		self.active_requests: Dict[str, APIRequest] = {}
@@ -361,8 +362,29 @@ class APIGateway:
 		# Register service instances
 		instances = service_config.get("instances", [])
 		self.service_instances[service_name] = instances
+
+		handlers = service_config.get("handlers", {})
+		for handler_name, handler in handlers.items():
+			self.register_service_handler(service_name, handler_name, handler)
+
+		default_handler = service_config.get("handler")
+		if default_handler:
+			self.register_service_handler(service_name, "*", default_handler)
 		
 		logger.info(f"Registered service: {service_name} with {len(instances)} instances")
+
+	def register_service_handler(
+		self,
+		service_name: str,
+		handler_function: str,
+		handler: Callable[..., Any]
+	) -> None:
+		"""Register an executable handler for a gateway service route"""
+		if not callable(handler):
+			raise TypeError("Service handler must be callable")
+		self.services.setdefault(service_name, {})
+		self.service_handlers[service_name][handler_function] = handler
+		logger.info(f"Registered service handler: {service_name}.{handler_function}")
 	
 	async def process_request(self, method: str, path: str, version: APIVersion = APIVersion.V1,
 							 headers: Dict[str, str] = None, query_params: Dict[str, str] = None,
@@ -754,9 +776,14 @@ class APIGateway:
 			return await self._handle_nlp_service(request, endpoint)
 		elif endpoint.service_name == "analytics":
 			return await self._handle_analytics_service(request, endpoint)
-		else:
-			# External service call would go here
-			return self._create_error_response(request.request_id, 501, "Service handler not implemented")
+		elif self._has_registered_handler(endpoint.service_name, endpoint.handler_function):
+			return await self._handle_registered_service(request, endpoint, service_instance)
+
+		return self._create_error_response(
+			request.request_id,
+			501,
+			f"No executable handler registered for service '{endpoint.service_name}'"
+		)
 	
 	def _get_service_instance(self, service_name: str) -> Optional[Dict[str, Any]]:
 		"""Get service instance using load balancing"""
@@ -765,11 +792,87 @@ class APIGateway:
 			# For built-in services, return a default instance
 			if service_name in ["gateway", "nlp_core", "analytics"]:
 				return {"host": "localhost", "port": 8000, "health": "healthy"}
+			if service_name in self.services:
+				return {
+					"host": "local",
+					"port": None,
+					"health": self.services[service_name].get("health", "healthy"),
+					"config": self.services[service_name]
+				}
 			return None
 		
 		# Simple round-robin load balancing
 		# In production would use more sophisticated algorithms
 		return instances[0]
+
+	def _has_registered_handler(self, service_name: str, handler_function: str) -> bool:
+		"""Check whether a service route has an executable handler"""
+		handlers = self.service_handlers.get(service_name, {})
+		return handler_function in handlers or "*" in handlers
+
+	async def _handle_registered_service(
+		self,
+		request: APIRequest,
+		endpoint: APIEndpoint,
+		service_instance: Dict[str, Any]
+	) -> APIResponse:
+		"""Execute a registered service handler and normalize its response"""
+		handler = self.service_handlers[endpoint.service_name].get(endpoint.handler_function)
+		if handler is None:
+			handler = self.service_handlers[endpoint.service_name]["*"]
+
+		result = handler(request, endpoint, service_instance)
+		if asyncio.iscoroutine(result):
+			result = await result
+
+		response = self._normalize_handler_response(request, endpoint, result)
+		if not response.service_used:
+			response.service_used = endpoint.service_name
+		return response
+
+	def _normalize_handler_response(
+		self,
+		request: APIRequest,
+		endpoint: APIEndpoint,
+		result: Any
+	) -> APIResponse:
+		"""Convert handler return values into a gateway response"""
+		if isinstance(result, APIResponse):
+			return result
+
+		if isinstance(result, tuple):
+			if len(result) == 2:
+				status_code, body = result
+				headers = {}
+			elif len(result) == 3:
+				status_code, body, headers = result
+			else:
+				raise ValueError("Service handler tuple responses must be (status, body) or (status, body, headers)")
+
+			return APIResponse(
+				request_id=request.request_id,
+				status_code=int(status_code),
+				headers=dict(headers or {}),
+				body=self._coerce_response_body(body),
+				service_used=endpoint.service_name
+			)
+
+		return APIResponse(
+			request_id=request.request_id,
+			status_code=200,
+			body=self._coerce_response_body(result),
+			service_used=endpoint.service_name
+		)
+
+	def _coerce_response_body(self, body: Any) -> Dict[str, Any]:
+		"""Coerce service handler bodies into JSON-object response bodies"""
+		if body is None:
+			return {}
+		if isinstance(body, dict):
+			return body
+		if isinstance(body, list):
+			return {"items": body}
+		return {"result": body}
 	
 	async def _handle_gateway_service(self, request: APIRequest, endpoint: APIEndpoint) -> APIResponse:
 		"""Handle gateway service requests"""

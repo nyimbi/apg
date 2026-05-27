@@ -3404,3 +3404,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_gateway_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 6 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:14 EAT
+
+Completed checkpoint:
+
+- Replaced the NLPC API gateway's custom-service 501 placeholder with an executable registered handler boundary.
+- Gateway services can now bind named or default wildcard handlers, including async handlers, and have dict/list/scalar/tuple/APIResponse returns normalized into API responses.
+- Added focused custom service handler regression coverage using an AI-agent composition-style route while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/nlpc/api_gateway.py tests/test_common_nlpc_gateway_handlers.py`
+- `.venv/bin/python -m pytest -q tests/test_common_nlpc_gateway_handlers.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed, 4 existing Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
