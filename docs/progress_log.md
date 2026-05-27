@@ -4535,3 +4535,7 @@ Battery-conscious verification:
 - `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 5 passed, 9 existing deprecation warnings
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pushed commit `15ff339` (`Make CRM listing APIs executable`) to `origin/main`.
