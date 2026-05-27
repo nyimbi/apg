@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-CAPABILITIES_ROOT = Path(__file__).resolve().parent
+CAPABILITIES_ROOT = Path(__file__).resolve().parents[1] / "capabilities"
 SPEC_FILES = sorted(CAPABILITIES_ROOT.glob("*/*/cap_spec.md"))
 
 

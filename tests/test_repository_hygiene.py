@@ -66,6 +66,18 @@ def test_root_tests_and_docs_stay_in_expected_directories():
 	assert misplaced == []
 
 
+def test_top_level_generated_and_capability_tests_stay_out_of_source_roots():
+	forbidden_prefixes = ("capabilities/", "gen/")
+	misplaced = [
+		path for path in _tracked_files()
+		if path.startswith(forbidden_prefixes)
+		and Path(path).parent.as_posix() in {"capabilities", "gen"}
+		and (Path(path).name.startswith("test_") or Path(path).name.endswith("_test.py"))
+	]
+
+	assert misplaced == []
+
+
 def test_apg_streaming_runtime_stays_bytewax_native():
 	violations: list[str] = []
 

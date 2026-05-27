@@ -33,6 +33,6 @@ generator = FABModelGenerator()
 tree = parser.model()
 generator.visit(tree)
 
-# Generate the Flask-AppBuilder model.py file
+# Generate the legacy model.py file
 output_code = generator.generate_models()
 print(output_code)

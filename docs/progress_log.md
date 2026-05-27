@@ -3804,3 +3804,21 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_code_generator_executable_defaults.py tests/test_apg_language_contract.py tests/test_capability_composition_runtime.py tests/test_ai_agent_composition.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 26 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 06:53 EAT
+
+Completed checkpoint:
+
+- Moved top-level capability contract tests from `capabilities/` into the main `tests/` suite.
+- Updated spec-backed capability contract discovery to resolve `capabilities/` from the repository root after the move.
+- Renamed `gen/test_MG.py` to `gen/model_generation_smoke.py` so legacy generator smoke code is no longer collected as a misplaced pytest module.
+- Added repository hygiene coverage that prevents top-level `capabilities/test_*.py` and `gen/test_*.py` files from returning.
+- Preserved existing contract coverage for registry validation, structured validation reports, tenant-aware contract retrieval, rule evaluation, and spec-backed executable contracts.
+
+Verification:
+
+- `.venv/bin/python -m py_compile tests/test_capability_contract_registry.py tests/test_spec_capability_contracts.py tests/test_repository_hygiene.py gen/model_generation_smoke.py`
+- `.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py tests/test_spec_capability_contracts.py` -> 5 passed
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories tests/test_repository_hygiene.py::test_top_level_generated_and_capability_tests_stay_out_of_source_roots tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
