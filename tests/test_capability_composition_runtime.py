@@ -235,12 +235,33 @@ def test_capability_declaration_generates_runtime_manifest():
     ]
     assert namespace["ui_route_index"]()["/finance/gl/journals"]["component"] == "JournalScreen"
 
+    assert namespace["capability_components"]("GeneralLedger") == {
+        "posting": {"capability": "journal_entries", "permissions": ["post", "reverse"]}
+    }
+    assert namespace["component_catalog"]() == {
+        "GeneralLedger.posting": {
+            "id": "GeneralLedger.posting",
+            "capability": "GeneralLedger",
+            "name": "posting",
+            "service": "journal_entries",
+            "permissions": ["post", "reverse"],
+            "spec": {"capability": "journal_entries", "permissions": ["post", "reverse"]},
+        }
+    }
+    assert namespace["component_permissions"]("GeneralLedger", "posting") == ["post", "reverse"]
+    assert namespace["component_service_bindings"]() == {
+        "journal_entries": ["GeneralLedger.posting"]
+    }
+    assert namespace["validate_component_contracts"]() == {"errors": [], "warnings": []}
+
     graph = namespace["composition_graph"]()
     graph_edges = {(edge["source"], edge["relation"], edge["target"]) for edge in graph["edges"]}
     assert ("capability:GeneralLedger", "has_screen", "screen:GeneralLedger.Journals") in graph_edges
     assert ("screen:GeneralLedger.Journals", "renders", "component:JournalScreen") in graph_edges
     assert ("capability:GeneralLedger", "belongs_to", "erp_module:general_ledger") in graph_edges
     assert ("component:posting", "binds_to", "service:journal_entries") in graph_edges
+    assert ("component:posting", "requires_permission", "permission:post") in graph_edges
+    assert ("component:posting", "requires_permission", "permission:reverse") in graph_edges
     assert ("capability:GeneralLedger", "streams_with", "stream_processor:bytewax") in graph_edges
     assert ("capability:GeneralLedger", "stores_stream_state", "stream_state:ledger_posting_state") in graph_edges
 

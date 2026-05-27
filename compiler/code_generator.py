@@ -430,6 +430,77 @@ def validate_capability_contracts() -> Dict[str, Any]:
     return {{"errors": errors, "warnings": warnings}}
 
 
+def capability_components(capability_name: str) -> Dict[str, Dict[str, Any]]:
+    components = get_capability(capability_name).components
+    if not isinstance(components, dict):
+        return {{}}
+    normalized: Dict[str, Dict[str, Any]] = {{}}
+    for component_name, component_spec in components.items():
+        if isinstance(component_spec, dict):
+            normalized[str(component_name)] = dict(component_spec)
+        else:
+            normalized[str(component_name)] = {{"value": component_spec}}
+    return normalized
+
+
+def component_catalog() -> Dict[str, Dict[str, Any]]:
+    catalog: Dict[str, Dict[str, Any]] = {{}}
+    for capability in CAPABILITIES.values():
+        for component_name, component_spec in capability_components(capability.name).items():
+            component_id = f"{{capability.name}}.{{component_name}}"
+            permissions = component_spec.get("permissions", [])
+            if isinstance(permissions, list):
+                normalized_permissions = list(permissions)
+            elif permissions:
+                normalized_permissions = [str(permissions)]
+            else:
+                normalized_permissions = []
+            catalog[component_id] = {{
+                "id": component_id,
+                "capability": capability.name,
+                "name": component_name,
+                "service": component_spec.get("capability"),
+                "permissions": normalized_permissions,
+                "spec": component_spec,
+            }}
+    return catalog
+
+
+def component_permissions(capability_name: str, component_name: str) -> List[str]:
+    component = component_catalog().get(f"{{capability_name}}.{{component_name}}")
+    if component is None:
+        return []
+    return list(component["permissions"])
+
+
+def component_service_bindings() -> Dict[str, List[str]]:
+    bindings: Dict[str, List[str]] = {{}}
+    for component_id, component in component_catalog().items():
+        service = component.get("service")
+        if service:
+            bindings.setdefault(str(service), []).append(component_id)
+    return {{
+        service: sorted(component_ids)
+        for service, component_ids in sorted(bindings.items())
+    }}
+
+
+def validate_component_contracts() -> Dict[str, List[str]]:
+    provided = provided_services()
+    errors: List[str] = []
+    warnings: List[str] = []
+    for component_id, component in component_catalog().items():
+        service = component.get("service")
+        if not service:
+            warnings.append(f"{{component_id}} does not declare a service binding")
+        elif service not in provided and service not in CAPABILITIES:
+            warnings.append(f"{{component_id}} binds to external service {{service}}")
+        for permission in component.get("permissions", []):
+            if not permission:
+                errors.append(f"{{component_id}} declares an empty permission")
+    return {{"errors": errors, "warnings": warnings}}
+
+
 def capability_configuration(capability_name: str, overrides: Dict[str, Any] | None = None) -> Dict[str, Any]:
     config = dict(get_capability(capability_name).configuration or {{}})
     if overrides:
@@ -867,11 +938,15 @@ def composition_graph() -> Dict[str, List[Dict[str, Any]]]:
                 edge(screen_id, component_id, "renders")
 
         if isinstance(capability.components, dict):
-            for component_name, component_spec in capability.components.items():
+            for component_name, component_spec in capability_components(capability.name).items():
                 component_id = f"component:{{component_name}}"
                 node(component_id, "component", name=str(component_name), spec=component_spec)
                 edge(cap_id, component_id, "has_component")
-                if isinstance(component_spec, dict) and component_spec.get("capability"):
+                for permission in component_permissions(capability.name, component_name):
+                    permission_id = f"permission:{{permission}}"
+                    node(permission_id, "permission", name=str(permission))
+                    edge(component_id, permission_id, "requires_permission")
+                if component_spec.get("capability"):
                     service_id = f"service:{{component_spec['capability']}}"
                     node(service_id, "service", name=str(component_spec["capability"]))
                     edge(component_id, service_id, "binds_to")
