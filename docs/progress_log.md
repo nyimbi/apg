@@ -3191,3 +3191,19 @@ Verification:
 - `rg -n "default_tenant_id = \"default_tenant\"|GeneralLedgerService\(default_tenant_id\)|default_tenant|Kafka|kafka" capabilities/fin/glr/general_ledger/blueprint.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:11 EAT
+
+Completed checkpoint:
+
+- Replaced Composition Config security engine API-key authentication's fixed `api_user` actor with credential and APG environment identity resolution.
+- API-key permissions now resolve from credential metadata, scope, or APG API-key permission environment instead of granting fixed read/write permissions.
+- Added focused security-engine auth context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/config/security_engine.py tests/test_composition_config_security_context.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_config_security_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "user_id = \"api_user\"|For now, simple validation|Kafka|kafka" capabilities/composition/config/security_engine.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

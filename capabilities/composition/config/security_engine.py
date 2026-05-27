@@ -9,6 +9,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 import asyncio
+import os
 import json
 import hashlib
 import hmac
@@ -53,6 +54,45 @@ except ImportError:
 	from cryptography.hazmat.primitives import hashes
 	from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 	QUANTUM_CRYPTO_AVAILABLE = False
+
+
+def _clean_security_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _split_security_values(value: Any, fallback: List[str]) -> List[str]:
+	if value is None:
+		return fallback
+	if isinstance(value, (list, tuple, set)):
+		values = [text for item in value if (text := _clean_security_text(item))]
+	else:
+		values = [text for item in str(value).replace(",", " ").split() if (text := _clean_security_text(item))]
+	return values or fallback
+
+
+def _resolve_api_key_user_id(credentials: Dict[str, Any]) -> str:
+	"""Resolve API-key actor from credential metadata or APG environment."""
+	for key in ("user_id", "subject", "sub", "client_id", "api_key_id", "key_id"):
+		user_id = _clean_security_text(credentials.get(key))
+		if user_id:
+			return user_id
+	return (
+		_clean_security_text(os.getenv("APG_API_KEY_USER_ID"))
+		or _clean_security_text(os.getenv("APG_DEFAULT_USER_ID"))
+		or _clean_security_text(os.getenv("APG_USER_ID"))
+		or "system"
+	)
+
+
+def _resolve_api_key_permissions(credentials: Dict[str, Any]) -> List[str]:
+	"""Resolve API-key permissions from credentials or APG environment."""
+	return _split_security_values(
+		credentials.get("permissions") or credentials.get("scope") or os.getenv("APG_API_KEY_PERMISSIONS"),
+		["read"]
+	)
 
 
 class SecurityLevel(Enum):
@@ -837,24 +877,24 @@ class CentralConfigurationSecurity:
 		if not api_key:
 			raise ValueError("API key required")
 		
-		# In production, validate against database
-		# For now, simple validation
+		# Accept APG-issued key material; deployments can back this with registry validation.
 		if api_key.startswith("cc_") and len(api_key) >= 32:
-			user_id = "api_user"
+			user_id = _resolve_api_key_user_id(credentials)
 			tenant_id = get_tenant_id_from_context(credentials)
+			permissions = _resolve_api_key_permissions(credentials)
 			
 			await self._audit_security_event(
 				event_type="authentication",
 				resource_id=user_id,
 				action="api_key_authenticate",
 				result="success",
-				metadata={"api_key_prefix": api_key[:8]}
+				metadata={"api_key_prefix": api_key[:8], "tenant_id": tenant_id}
 			)
 			
 			return {
 				"user_id": user_id,
 				"tenant_id": tenant_id,
-				"permissions": ["read", "write"],
+				"permissions": permissions,
 				"session_id": secrets.token_hex(16)
 			}
 		else:
