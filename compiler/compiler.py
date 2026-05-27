@@ -3,7 +3,7 @@ APG Compiler Main Module
 ========================
 
 High-level compiler interface that orchestrates parsing, semantic analysis, and code generation.
-Provides a unified API for compiling APG source code to target languages and frameworks.
+Provides a unified API for compiling APG source code to executable Python artifacts.
 """
 
 from typing import Any, Dict, List, Optional, Union
@@ -34,6 +34,7 @@ class CompilationResult:
 		self.compilation_time: float = 0.0
 		self.target_language: str = "python"
 		self.output_directory: Optional[Path] = None
+		self.phase_info: Dict[str, Dict[str, Any]] = {}
 	
 	def has_errors(self) -> bool:
 		"""Check if compilation had any errors"""
@@ -84,7 +85,7 @@ class APGCompiler:
 	5. File Output
 	
 	Features:
-	- Multi-target code generation (Python/Flask-AppBuilder, etc.)
+	- Python code generation with composable application templates
 	- Comprehensive error reporting and recovery
 	- Incremental compilation support
 	- Plugin architecture for extensions
@@ -112,7 +113,7 @@ class APGCompiler:
 		Args:
 			source_file: Path to APG source file
 			output_dir: Output directory for generated files
-			target_language: Target language/framework
+			target_language: Target language
 			
 		Returns:
 			CompilationResult with success status and generated files
@@ -183,7 +184,7 @@ class APGCompiler:
 		Args:
 			source_code: APG source code
 			module_name: Name for the module
-			target_language: Target language/framework
+			target_language: Target language
 			
 		Returns:
 			CompilationResult with generated code
@@ -248,7 +249,7 @@ class APGCompiler:
 		Args:
 			project_dir: Directory containing APG source files
 			output_dir: Output directory for generated files
-			target_language: Target language/framework
+			target_language: Target language
 			
 		Returns:
 			List of CompilationResults, one per source file
@@ -347,8 +348,8 @@ class APGCompiler:
 	# ========================================
 	
 	def get_supported_targets(self) -> List[str]:
-		"""Get list of supported target languages/frameworks"""
-		return ['python', 'flask-appbuilder']
+		"""Get list of supported target languages."""
+		return list(CodeGenerator.SUPPORTED_TARGETS)
 	
 	def validate_source(self, source_code: str) -> List[Union[APGSyntaxError, SemanticError]]:
 		"""Validate APG source code without generating output"""
@@ -385,38 +386,38 @@ class APGCompiler:
 
 def compile_apg_file(source_file: Union[str, Path], 
 					output_dir: Optional[Union[str, Path]] = None,
-					target: str = "flask-appbuilder") -> CompilationResult:
+					target: str = "python") -> CompilationResult:
 	"""
 	Convenience function to compile a single APG file.
 	
 	Args:
 		source_file: Path to APG source file
 		output_dir: Output directory (optional)
-		target: Target framework
+		target: Target language
 		
 	Returns:
 		CompilationResult
 	"""
-	config = CodeGenConfig(target_language=target)
+	config = CodeGenConfig(target_language=CodeGenerator.normalize_target(target))
 	compiler = APGCompiler(config)
-	return compiler.compile_file(source_file, output_dir, target)
+	return compiler.compile_file(source_file, output_dir, CodeGenerator.normalize_target(target))
 
 
 def compile_apg_string(source_code: str, 
-					  target: str = "flask-appbuilder") -> CompilationResult:
+					  target: str = "python") -> CompilationResult:
 	"""
 	Convenience function to compile APG source code from string.
 	
 	Args:
 		source_code: APG source code
-		target: Target framework
+		target: Target language
 		
 	Returns:
 		CompilationResult
 	"""
-	config = CodeGenConfig(target_language=target)
+	config = CodeGenConfig(target_language=CodeGenerator.normalize_target(target))
 	compiler = APGCompiler(config)
-	return compiler.compile_string(source_code, "main", target)
+	return compiler.compile_string(source_code, "main", CodeGenerator.normalize_target(target))
 
 
 def validate_apg_syntax(source_code: str) -> List[Union[APGSyntaxError, SemanticError]]:

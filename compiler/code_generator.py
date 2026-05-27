@@ -1939,6 +1939,8 @@ class CodeGenerator:
 	Main code generator that orchestrates different target language generators.
 	Currently supports Python, with extensibility for other languages.
 	"""
+
+	SUPPORTED_TARGETS = ("python",)
 	
 	def __init__(self, config: CodeGenConfig = None):
 		self.config = config or CodeGenConfig()
@@ -1957,13 +1959,20 @@ class CodeGenerator:
 		Returns:
 			Dictionary mapping file names to generated code
 		"""
-		target = target_language or self.config.target_language
+		requested_target = target_language or self.config.target_language
+		target = self.normalize_target(requested_target)
 		
 		if target not in self.generators:
-			raise ValueError(f"Unsupported target language: {target}")
+			supported = ", ".join(self.SUPPORTED_TARGETS)
+			raise ValueError(f"Unsupported target language: {requested_target}. Supported targets: {supported}")
 		
 		generator = self.generators[target]
 		return generator.generate(ast)
+
+	@classmethod
+	def normalize_target(cls, target_language: str) -> str:
+		"""Normalize a user-provided APG code-generation target."""
+		return (target_language or "python").lower()
 	
 	def write_files(self, generated_files: Dict[str, str], output_dir: Path):
 		"""Write generated files to disk"""

@@ -52,7 +52,7 @@ class ProjectConfig:
 	
 	# Template Configuration
 	template_type: TemplateType = TemplateType.BASIC_AGENT
-	target_framework: str = "flask-appbuilder"
+	target_framework: str = "python"
 	database_type: str = "sqlite"
 	
 	# Feature Flags
@@ -117,7 +117,7 @@ class ProjectConfig:
 			version=data.get('version', '1.0.0'),
 			license=data.get('license', 'MIT'),
 			template_type=template_type,
-			target_framework=data.get('target_framework', 'flask-appbuilder'),
+			target_framework=data.get('target_framework', 'python'),
 			database_type=data.get('database_type', 'sqlite'),
 			enable_authentication=data.get('enable_authentication', True),
 			enable_api=data.get('enable_api', True),

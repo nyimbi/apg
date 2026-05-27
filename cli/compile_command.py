@@ -9,6 +9,7 @@ Command-line interface for compiling APG source files.
 import sys
 import os
 import json
+import shutil
 import time
 from pathlib import Path
 from typing import Optional, List
@@ -23,6 +24,7 @@ from rich.panel import Panel
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from compiler.compiler import APGCompiler, CodeGenConfig
+from compiler.code_generator import CodeGenerator
 from compiler.parser import APGParser
 
 console = Console()
@@ -31,9 +33,9 @@ console = Console()
 @click.command()
 @click.argument('source_file', required=False)
 @click.option('--output', '-o', help='Output directory')
-@click.option('--target', '-t', default='flask-appbuilder', 
-			 type=click.Choice(['flask-appbuilder', 'django', 'fastapi']),
-			 help='Target framework')
+@click.option('--target', '-t', default='python',
+			 type=click.Choice(['python']),
+			 help='Target language')
 @click.option('--generate-parser', is_flag=True, help='Generate ANTLR parser from grammar')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.option('--watch', '-w', is_flag=True, help='Watch for file changes')
@@ -43,7 +45,7 @@ console = Console()
 def compile_cmd(source_file: Optional[str], output: Optional[str], target: str,
 			   generate_parser: bool, verbose: bool, watch: bool, 
 			   no_runtime: bool, tests: bool, docs: bool):
-	"""Compile APG source files to target framework"""
+	"""Compile APG source files to Python artifacts."""
 	
 	if generate_parser:
 		_generate_parser()
@@ -90,7 +92,7 @@ def compile_cmd(source_file: Optional[str], output: Optional[str], target: str,
 	
 	# Create compiler configuration
 	config = CodeGenConfig(
-		target_language=target,
+		target_language=CodeGenerator.normalize_target(target),
 		output_directory=str(output_dir),
 		generate_tests=tests,
 		include_runtime=not no_runtime,
@@ -113,17 +115,18 @@ def _generate_parser():
 		console.print(f"[red]Grammar file not found: {grammar_file}[/red]")
 		return
 	
-	output_dir = Path(__file__).parent.parent / 'compiler' / 'generated'
-	output_dir.mkdir(exist_ok=True)
+	output_dir = grammar_file.parent
 	
 	try:
 		import subprocess
+		antlr_command = shutil.which('antlr4') or shutil.which('antlr')
+		if not antlr_command:
+			raise FileNotFoundError("antlr4")
 		
 		# Run ANTLR
 		cmd = [
-			'antlr4',
+			antlr_command,
 			'-Dlanguage=Python3',
-			'-o', str(output_dir),
 			'-visitor',
 			'-listener',
 			str(grammar_file)
@@ -136,14 +139,15 @@ def _generate_parser():
 		) as progress:
 			task = progress.add_task("Generating parser...", total=None)
 			
-			result = subprocess.run(cmd, capture_output=True, text=True)
+			result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path(__file__).parent.parent)
 			
 			if result.returncode == 0:
+				_strip_generated_parser_whitespace(output_dir)
 				progress.update(task, description="✅ Parser generated successfully")
 				console.print(f"[green]✅ ANTLR parser generated in {output_dir}[/green]")
 				
 				# List generated files
-				generated_files = list(output_dir.glob('APG*.py'))
+				generated_files = list(output_dir.glob('apg*.py'))
 				if generated_files:
 					console.print(f"[cyan]Generated files:[/cyan]")
 					for file in generated_files:
@@ -157,6 +161,14 @@ def _generate_parser():
 		console.print("[red]ANTLR4 not found. Install with: pip install antlr4-tools[/red]")
 	except Exception as e:
 		console.print(f"[red]Error generating parser: {e}[/red]")
+
+
+def _strip_generated_parser_whitespace(output_dir: Path):
+	"""Keep generated parser artifacts compatible with repository diff checks."""
+	for file_path in output_dir.glob("apg*.py"):
+		text = file_path.read_text(encoding="utf-8")
+		cleaned = "\n".join(line.rstrip() for line in text.splitlines()) + "\n"
+		file_path.write_text(cleaned, encoding="utf-8")
 
 
 def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool):
@@ -244,7 +256,7 @@ def _show_compilation_details(result, config: CodeGenConfig):
 	phases_table.add_column("Status", style="green")
 	phases_table.add_column("Time", style="yellow")
 	
-	for phase, info in result.phase_info.items():
+	for phase, info in getattr(result, "phase_info", {}).items():
 		status = "✅ Success" if info.get('success', True) else "❌ Failed"
 		time_str = f"{info.get('time', 0):.3f}s"
 		phases_table.add_row(phase, status, time_str)
@@ -269,13 +281,14 @@ def _show_compilation_details(result, config: CodeGenConfig):
 		console.print(files_table)
 	
 	# Show statistics
-	if result.statistics:
+	statistics = getattr(result, "statistics", {})
+	if statistics:
 		console.print(f"\n[bold]Statistics:[/bold]")
 		stats_table = Table(show_header=False, box=None)
 		stats_table.add_column("Metric", style="cyan")
 		stats_table.add_column("Count", style="white")
 		
-		for metric, count in result.statistics.items():
+		for metric, count in statistics.items():
 			stats_table.add_row(metric.replace('_', ' ').title(), str(count))
 		
 		console.print(stats_table)

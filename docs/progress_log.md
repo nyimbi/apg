@@ -3597,3 +3597,21 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_apg_language_contract.py tests/test_ai_agent_composition.py tests/test_parser.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 25 passed, 1 existing SQLAlchemy deprecation warning
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --cached --check` -> no issues
+
+### 2026-05-27 05:51 EAT
+
+Completed checkpoint:
+
+- Reviewed the compiler target surface for practicality and made `python` the only advertised APG compile target.
+- Removed the user-facing `flask-appbuilder`, `django`, and `fastapi` compile target choices from the CLI/API contract so framework names are not silently treated as supported compiler backends.
+- Updated project init, auto-compile, project scaffolding, demo, and functional compiler examples to use `python` as the target language.
+- Added focused compiler baseline regressions for default Python generation, CLI target help, framework-target rejection, doctor parser-artifact detection, and node-less compiler error rendering.
+- Fixed verbose compile details to tolerate missing phase/statistics metadata while the compiler baseline matures.
+
+Verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py compiler/compiler.py compiler/semantic_analyzer.py cli/compile_command.py cli/main.py cli/run_command.py cli/create_project.py templates/template_types.py templates/project_scaffolder.py tests/test_compiler_baseline.py tests/test_functional_generation.py examples/complete_demo.py`
+- `.venv/bin/python -m cli.main compile --help` -> target help shows `-t, --target [python]`
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 11 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

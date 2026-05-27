@@ -79,7 +79,7 @@ def doctor():
 	
 	# Check required packages
 	required_packages = [
-		'antlr4-python3-runtime',
+		'antlr4',
 		'flask',
 		'flask-appbuilder',
 		'sqlalchemy',
@@ -119,8 +119,8 @@ def doctor():
 		console.print("✅ Grammar file found")
 		
 		# Check if generated parser exists
-		generated_dir = apg_root / 'compiler' / 'generated'
-		if generated_dir.exists() and any(generated_dir.glob('APG*.py')):
+		generated_dir = apg_root / 'spec'
+		if all((generated_dir / name).exists() for name in ["apgLexer.py", "apgParser.py", "apgVisitor.py"]):
 			console.print("✅ Generated parser found")
 		else:
 			console.print("⚠️  Generated parser not found (run 'apg compile --generate-parser')")
@@ -167,7 +167,7 @@ def init():
 		'author': 'APG Developer',
 		'license': 'MIT',
 		'template': 'custom',
-		'target_framework': 'flask-appbuilder',
+		'target_language': 'python',
 		'python_version': f'{sys.version_info.major}.{sys.version_info.minor}',
 		'features': {
 			'authentication': True,
@@ -178,6 +178,7 @@ def init():
 		'build': {
 			'source_file': 'main.apg',
 			'output_directory': 'generated',
+			'target_language': 'python',
 			'include_runtime': True
 		}
 	}

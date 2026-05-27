@@ -115,7 +115,7 @@ def _auto_compile() -> bool:
 			output_dir = config_data.get('build', {}).get('output_directory', 'generated')
 		
 		config = CodeGenConfig(
-			target_language='flask-appbuilder',
+			target_language='python',
 			output_directory=output_dir,
 			include_runtime=True,
 			verbose=False

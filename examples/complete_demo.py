@@ -283,7 +283,7 @@ agent DemoAgent {
 		from compiler.compiler import APGCompiler, CodeGenConfig
 		
 		config = CodeGenConfig(
-			target_language="flask-appbuilder",
+			target_language="python",
 			output_directory="demo_test_output",
 			include_runtime=True
 		)

@@ -126,7 +126,10 @@ class SemanticError:
 	error_type: str = "semantic"
 	
 	def __str__(self) -> str:
-		location = f"{self.node.source_file or 'unknown'}:{self.node.line}:{self.node.column}"
+		if self.node is None:
+			location = "unknown:0:0"
+		else:
+			location = f"{self.node.source_file or 'unknown'}:{self.node.line}:{self.node.column}"
 		return f"{location}: {self.error_type} error: {self.message}"
 
 

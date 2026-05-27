@@ -258,10 +258,10 @@ def _configure_advanced_options(config: ProjectConfig) -> ProjectConfig:
 	
 	console.print("\n[bold]Advanced Configuration:[/bold]")
 	
-	# Target framework
-	framework = Prompt.ask("[cyan]Target framework[/cyan]", 
+	# Target language
+	framework = Prompt.ask("[cyan]Target language[/cyan]",
 						 default=config.target_framework,
-						 choices=['flask-appbuilder', 'django', 'fastapi'])
+						 choices=['python'])
 	config.target_framework = framework
 	
 	# Database type
@@ -325,7 +325,7 @@ def _show_config_summary(config: ProjectConfig):
 	table.add_row("Description", config.description)
 	table.add_row("Author", config.author)
 	table.add_row("Template", config.template_type.value)
-	table.add_row("Framework", config.target_framework)
+	table.add_row("Target", config.target_framework)
 	table.add_row("Database", config.database_type)
 	table.add_row("Python", config.python_version)
 	table.add_row("Output", str(config.output_directory))

@@ -154,7 +154,7 @@ db TaskDatabase {
     
     # Initialize compiler
     config = CodeGenConfig(
-        target_language="flask-appbuilder",
+        target_language="python",
         output_directory="test_output",
         generate_tests=True,
         include_runtime=True
