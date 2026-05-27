@@ -9,6 +9,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 import asyncio
+import inspect
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set, Callable, Union
@@ -167,10 +168,12 @@ class TimingAlert(APGBaseModel):
 class WorkflowScheduler:
 	"""Comprehensive workflow scheduling and timing engine."""
 	
-	def __init__(self, tenant_context: APGTenantContext):
+	def __init__(self, tenant_context: APGTenantContext, workflow_runtime: Any | None = None):
 		self.tenant_context = tenant_context
+		self.workflow_runtime = workflow_runtime
 		self.active_schedules: Dict[str, WorkflowSchedule] = {}
 		self.active_timers: Dict[str, ProcessTimer] = {}
+		self.scheduled_executions: Dict[str, Dict[str, Any]] = {}
 		self.alert_handlers: Dict[AlertType, List[Callable]] = {}
 		self.is_running = False
 		
@@ -596,9 +599,8 @@ class WorkflowScheduler:
 			schedule.last_execution = datetime.now(timezone.utc)
 			self.execution_stats['total_scheduled_executions'] += 1
 			
-			# In production, would start actual process instance
-			# For now, simulate execution
-			await asyncio.sleep(0.1)
+			execution_record = await self._start_scheduled_process(schedule)
+			schedule.notification_settings["last_execution_record"] = execution_record
 			
 			self.execution_stats['successful_executions'] += 1
 			
@@ -625,6 +627,87 @@ class WorkflowScheduler:
 				recipients=schedule.notification_settings.get('failure_recipients', [])
 			)
 			await self.create_alert(alert)
+
+	async def _start_scheduled_process(self, schedule: WorkflowSchedule) -> Dict[str, Any]:
+		"""Start the scheduled workflow through a runtime boundary or local execution store."""
+		if self.workflow_runtime:
+			for method_name in ("start_process", "start_process_instance", "create_process_instance"):
+				method = getattr(self.workflow_runtime, method_name, None)
+				if callable(method):
+					result = await self._call_workflow_runtime(method, schedule)
+					return self._normalize_execution_record(schedule, result)
+
+		execution_record = {
+			"execution_id": uuid7str(),
+			"schedule_id": schedule.schedule_id,
+			"process_definition_id": schedule.process_definition_id,
+			"tenant_id": schedule.tenant_id,
+			"started_by": self.tenant_context.user_id,
+			"input_variables": dict(schedule.input_variables),
+			"started_at": datetime.now(timezone.utc).isoformat(),
+			"status": "started",
+			"runtime": "local_scheduler",
+		}
+		self.scheduled_executions[execution_record["execution_id"]] = execution_record
+		return execution_record
+
+	async def _call_workflow_runtime(self, method: Callable[..., Any], schedule: WorkflowSchedule) -> Any:
+		"""Call common workflow runtime method signatures."""
+		calls = (
+			lambda: method(
+				process_definition_id=schedule.process_definition_id,
+				input_variables=schedule.input_variables,
+				context=self.tenant_context,
+				schedule_id=schedule.schedule_id,
+			),
+			lambda: method(
+				schedule.process_definition_id,
+				schedule.input_variables,
+				self.tenant_context,
+			),
+			lambda: method(
+				schedule.process_definition_id,
+				self.tenant_context,
+			),
+		)
+		last_type_error: Optional[TypeError] = None
+		for call in calls:
+			try:
+				result = call()
+				if inspect.isawaitable(result):
+					result = await result
+				return result
+			except TypeError as e:
+				last_type_error = e
+				continue
+		if last_type_error:
+			raise last_type_error
+		raise RuntimeError("Workflow runtime method could not be called")
+
+	def _normalize_execution_record(self, schedule: WorkflowSchedule, result: Any) -> Dict[str, Any]:
+		"""Normalize runtime start responses into a scheduler execution record."""
+		if hasattr(result, "success") and not getattr(result, "success"):
+			message = getattr(result, "message", "Workflow runtime rejected scheduled execution")
+			raise RuntimeError(message)
+
+		if hasattr(result, "data") and isinstance(result.data, dict):
+			record = dict(result.data)
+		elif isinstance(result, dict):
+			record = dict(result)
+		else:
+			record = {"runtime_result": result}
+
+		record.setdefault("execution_id", record.get("process_instance_id") or record.get("instance_id") or uuid7str())
+		record.setdefault("schedule_id", schedule.schedule_id)
+		record.setdefault("process_definition_id", schedule.process_definition_id)
+		record.setdefault("tenant_id", schedule.tenant_id)
+		record.setdefault("started_by", self.tenant_context.user_id)
+		record.setdefault("input_variables", dict(schedule.input_variables))
+		record.setdefault("started_at", datetime.now(timezone.utc).isoformat())
+		record.setdefault("status", "started")
+		record.setdefault("runtime", "workflow_runtime")
+		self.scheduled_executions[record["execution_id"]] = record
+		return record
 	
 	
 	async def _check_timer_thresholds(self, timer: ProcessTimer, elapsed_time: timedelta) -> None:
@@ -957,14 +1040,16 @@ class SchedulerFactory:
 	_instances: Dict[str, WorkflowScheduler] = {}
 	
 	@classmethod
-	async def get_scheduler(cls, tenant_context: APGTenantContext) -> WorkflowScheduler:
+	async def get_scheduler(cls, tenant_context: APGTenantContext, workflow_runtime: Any | None = None) -> WorkflowScheduler:
 		"""Get or create scheduler instance for tenant."""
 		tenant_id = tenant_context.tenant_id
 		
 		if tenant_id not in cls._instances:
-			scheduler = WorkflowScheduler(tenant_context)
+			scheduler = WorkflowScheduler(tenant_context, workflow_runtime=workflow_runtime)
 			await scheduler.start()
 			cls._instances[tenant_id] = scheduler
+		elif workflow_runtime is not None:
+			cls._instances[tenant_id].workflow_runtime = workflow_runtime
 		
 		return cls._instances[tenant_id]
 	
