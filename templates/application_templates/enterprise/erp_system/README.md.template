@@ -34,7 +34,7 @@ Complete ERP system for enterprise resource management
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

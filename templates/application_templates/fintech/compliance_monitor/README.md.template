@@ -34,7 +34,7 @@ Regulatory compliance monitoring and reporting
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

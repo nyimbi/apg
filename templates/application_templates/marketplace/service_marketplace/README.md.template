@@ -34,7 +34,7 @@ Platform for service providers and consumers
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

@@ -31,7 +31,7 @@ Intelligent knowledge management with semantic search
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

@@ -4,10 +4,10 @@ APG Application Templates
 ========================
 
 Complete application templates for generating world-class, domain-specific
-Flask-AppBuilder applications from APG source code.
+Python application artifacts from APG source code.
 
-Each template is a complete, working Flask-AppBuilder application that embodies
-best practices for its specific domain.
+Each template is a complete, working Python artifact set that embodies best
+practices for its specific domain without imposing a web framework dependency.
 """
 
 from pathlib import Path

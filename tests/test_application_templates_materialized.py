@@ -50,6 +50,8 @@ def test_application_templates_are_materialized_and_registered():
 
 	for template_dir in _template_dirs():
 		metadata = json.loads((template_dir / "template.json").read_text())
+		assert metadata["target"] == "python"
+		assert metadata["requirements"] == []
 		registered = set(metadata["files"])
 		discovered = {
 			str(path.relative_to(template_dir))
@@ -106,6 +108,8 @@ def test_template_structure_generator_emits_executable_starters(tmp_path, monkey
 	generator.create_template_files(template_dir, metadata)
 
 	metadata_file = json.loads((template_dir / "template.json").read_text())
+	assert metadata_file["target"] == "python"
+	assert metadata_file["requirements"] == []
 	assert set(metadata_file["files"]) == {
 		str(path.relative_to(template_dir))
 		for path in template_dir.rglob("*.template")

@@ -32,7 +32,7 @@ Complete AI platform with multiple AI agents and services
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

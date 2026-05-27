@@ -34,7 +34,7 @@ Complete HR management system with employee lifecycle
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

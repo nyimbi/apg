@@ -32,7 +32,7 @@ Monitor and manage IoT devices with real-time data
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

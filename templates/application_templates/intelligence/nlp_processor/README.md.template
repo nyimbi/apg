@@ -31,7 +31,7 @@ Complete natural language processing pipeline
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

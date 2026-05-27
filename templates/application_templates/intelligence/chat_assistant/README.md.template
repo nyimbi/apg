@@ -31,7 +31,7 @@ Advanced chatbot with context awareness and learning
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

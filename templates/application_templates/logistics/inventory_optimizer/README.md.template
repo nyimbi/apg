@@ -34,7 +34,7 @@ AI-powered inventory optimization and demand planning
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

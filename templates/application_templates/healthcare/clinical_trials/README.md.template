@@ -34,7 +34,7 @@ Clinical research and trial management system
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

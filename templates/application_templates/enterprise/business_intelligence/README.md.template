@@ -34,7 +34,7 @@ Enterprise BI platform with advanced analytics
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

@@ -34,7 +34,7 @@ Business-to-business marketplace with advanced trading features
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

@@ -3805,6 +3805,26 @@ Verification:
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
 
+### 2026-05-27 07:13 EAT
+
+Completed checkpoint:
+
+- Aligned the full `templates/application_templates/*/*` catalog with the Python artifact flow instead of leaving non-basic templates on framework web-app instructions.
+- Replaced application-template framework requirements with the standard-library-only Python target note and added `target: python` to all 31 application-template metadata files.
+- Updated generated application-template README run instructions to use `python generated/app.py`.
+- Updated `scripts/template_generation/create_template_structure.py` so future regenerated application templates keep the same Python-first target, empty dependency requirements, and run guidance.
+- Extended repository hygiene coverage from basic application templates to the full application-template catalog, the application-template manager, and the template generator.
+- Added materialization-test assertions that checked-in and regenerated application-template metadata remain `target: python` with no framework requirements.
+
+Battery-conscious verification:
+
+- `python -m py_compile tests/test_repository_hygiene.py tests/test_application_templates_materialized.py templates/application_templates/__init__.py templates/application_template_manager.py scripts/template_generation/create_template_structure.py`
+- `python -m json.tool templates/application_templates/logistics/shipping_tracker/template.json`
+- Metadata validation script confirmed 31 application-template `template.json` files have `target: python` and `requirements: []`.
+- `rg -n "Flask-AppBuilder|flask_appbuilder|FastAPI|fastapi|Django|django|python app.py|http://localhost:8080|Flask>=2.3.0|SQLAlchemy>=2.0.0" templates/application_templates templates/application_template_manager.py scripts/template_generation/create_template_structure.py tests/test_repository_hygiene.py` -> only hygiene guard constants remain.
+- `git diff --check` -> no issues.
+- Deferred pytest and full template materialization at the user's request to conserve battery.
+
 ### 2026-05-27 07:02 EAT
 
 Completed checkpoint:

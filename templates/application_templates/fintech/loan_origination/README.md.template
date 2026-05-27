@@ -34,7 +34,7 @@ Automated loan processing and underwriting
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

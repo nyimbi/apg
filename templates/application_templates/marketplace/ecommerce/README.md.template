@@ -34,7 +34,7 @@ Complete online marketplace with products, orders, and payments
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

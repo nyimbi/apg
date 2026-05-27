@@ -363,11 +363,8 @@ def create_template_json(template_path: Path, template_id: str, metadata: Dict):
         "digital_twins": metadata.get('digital_twins', []),
         "features": metadata['features'],
         "databases": metadata.get('databases', []),
-        "requirements": [
-            "Flask-AppBuilder>=4.3.0",
-            "Flask>=2.3.0",
-            "SQLAlchemy>=2.0.0"
-        ],
+        "requirements": [],
+        "target": "python",
         "variables": {
             "project_name": "{{project_name}}",
             "project_description": "{{project_description}}",
@@ -699,7 +696,7 @@ Generated from the APG **{metadata['name']}** template.
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test
@@ -718,9 +715,8 @@ def template_content(file_path: str, metadata: Dict) -> str:
         return _config_template(metadata)
     if file_path == 'requirements.txt.template':
         return '\n'.join([
-            "Flask-AppBuilder>=4.3.0",
-            "Flask>=2.3.0",
-            "SQLAlchemy>=2.0.0",
+            "# APG Generated Application Requirements",
+            "# The default Python compiler target uses only the Python standard library.",
         ]) + '\n'
     if file_path == 'README.md.template':
         return _readme_template(metadata)

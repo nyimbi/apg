@@ -4,7 +4,7 @@ APG Application Template Manager
 ================================
 
 Manages complete application templates for generating world-class, domain-specific
-Flask-AppBuilder applications from APG source code.
+Python application artifacts from APG source code.
 """
 
 import os

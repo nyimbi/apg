@@ -34,7 +34,7 @@ Complete electronic health records and patient management
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

@@ -1,3 +1,2 @@
-Flask-AppBuilder>=4.3.0
-Flask>=2.3.0
-SQLAlchemy>=2.0.0
+# APG Generated Application Requirements
+# The default Python compiler target uses only the Python standard library.

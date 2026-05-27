@@ -34,7 +34,7 @@ Real-time package tracking and delivery management
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

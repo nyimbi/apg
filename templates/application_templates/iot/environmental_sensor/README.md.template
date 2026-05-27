@@ -31,7 +31,7 @@ Environmental sensor network with data analysis
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

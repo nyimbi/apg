@@ -34,7 +34,7 @@ Financial trading platform with real-time market data
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

@@ -31,8 +31,14 @@ STREAMING_TERM_EXCLUDED_PATHS = {
 PYTHON_TEMPLATE_FORBIDDEN_TERMS = (
 	"Flask-AppBuilder",
 	"flask_appbuilder",
+	"FastAPI",
+	"fastapi",
+	"Django",
+	"django",
 	"python app.py",
 	"http://localhost:8080",
+	"Flask>=2.3.0",
+	"SQLAlchemy>=2.0.0",
 )
 
 
@@ -89,10 +95,12 @@ def test_project_templates_describe_python_artifact_flow():
 	for path in _tracked_files():
 		if not (
 			path.startswith("templates/templates/")
-			or path.startswith("templates/application_templates/basic/")
+			or path.startswith("templates/application_templates/")
+			or path == "templates/application_template_manager.py"
+			or path == "scripts/template_generation/create_template_structure.py"
 		):
 			continue
-		if not path.endswith((".md.template", ".txt.template", ".py.template", ".json")):
+		if not path.endswith((".md.template", ".txt.template", ".py.template", ".json", ".py")):
 			continue
 		content = (REPO_ROOT / path).read_text(encoding="utf-8", errors="ignore")
 		for term in PYTHON_TEMPLATE_FORBIDDEN_TERMS:

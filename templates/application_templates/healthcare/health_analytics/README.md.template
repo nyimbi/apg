@@ -34,7 +34,7 @@ Healthcare data analytics and insights
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

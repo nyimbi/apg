@@ -25,11 +25,7 @@
     "settlements",
     "reconciliation"
   ],
-  "requirements": [
-    "Flask-AppBuilder>=4.3.0",
-    "Flask>=2.3.0",
-    "SQLAlchemy>=2.0.0"
-  ],
+  "requirements": [],
   "variables": {
     "project_name": "{{project_name}}",
     "project_description": "{{project_description}}",
@@ -47,5 +43,6 @@
     "tests/__init__.py.template",
     "tests/__main__.py.template",
     "views/__init__.py.template"
-  ]
+  ],
+  "target": "python"
 }
