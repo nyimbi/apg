@@ -807,7 +807,7 @@ async def get_pipeline_analytics(
 ):
 	"""Get pipeline analytics"""
 	try:
-		pipeline_data = await service.get_pipeline_analytics(tenant_id, user_id)
+		pipeline_data = await service.get_pipeline_summary(tenant_id, user_id)
 		
 		return APIResponse(
 			message="Pipeline analytics retrieved successfully",

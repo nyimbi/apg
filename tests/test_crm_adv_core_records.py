@@ -238,6 +238,16 @@ def test_crm_api_lists_core_records_without_placeholders():
 			tenant_id="tenant-api",
 		)
 		health = await crm_api.health_check(service=service)
+		dashboard = await crm_api.get_dashboard(
+			service=service,
+			tenant_id="tenant-api",
+			user_id="seller-1",
+		)
+		pipeline = await crm_api.get_pipeline_analytics(
+			service=service,
+			tenant_id="tenant-api",
+			user_id="seller-1",
+		)
 		clock_in = await crm_api.clock_in(
 			clock_in_data=crm_api.ClockInRequest(
 				location={"latitude": -1.286389, "longitude": 36.817223},
@@ -259,6 +269,13 @@ def test_crm_api_lists_core_records_without_placeholders():
 		assert opportunities.data["items"][0]["expected_revenue"] == "45000.000"
 		assert [item["id"] for item in activities.data["items"]] == [activity.id]
 		assert health.uptime_seconds >= 0
+		assert dashboard.data["record_counts"]["opportunities"] == 1
+		assert dashboard.data["pipeline_value"] == "75000.00"
+		assert dashboard.data["weighted_pipeline_value"] == "45000.000"
+		assert dashboard.data["opportunity_stage_breakdown"] == {"prospecting": 1}
+		assert pipeline.data["opportunity_count"] == 1
+		assert pipeline.data["stage_breakdown"] == {"prospecting": 1}
+		assert pipeline.data["weighted_pipeline_value"] == "45000.000"
 		assert clock_in.data["status"] == "clocked_in"
 		assert clock_in.data["tenant_id"] == "tenant-api"
 		assert clock_in.data["user_id"] == "seller-1"

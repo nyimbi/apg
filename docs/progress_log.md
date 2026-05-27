@@ -4579,3 +4579,21 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `81e9006` (`Make CRM clock-in executable`) to `origin/main`.
+
+### 2026-05-27 18:47 EAT
+
+Completed checkpoint:
+
+- Repaired recent CRM progress-log ordering so listing, health metrics, and clock-in checkpoints are chronological with the correct commit IDs.
+- Replaced the active CRM analytics fallback's dashboard and pipeline placeholder payloads with deterministic record-store analytics.
+- Wired top-level CRM pipeline analytics API to the tenant-level summary path instead of the pipeline-manager method that requires a concrete pipeline ID.
+- Dashboard and pipeline responses now report record counts, lead status distribution, opportunity stage distribution, pipeline value, weighted pipeline value, win-rate inputs, and activity type distribution from executable CRM records.
+- Extended focused CRM API coverage to assert dashboard and pipeline analytics values.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/adv/service.py capabilities/crm/adv/api.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 5 passed, 9 existing deprecation warnings
+- `rg -n "placeholder.*dashboard|placeholder.*pipeline|dashboard_data|pipeline_data|get_pipeline_analytics\\(tenant_id, user_id\\)|service\\.get_pipeline_analytics\\(tenant_id" capabilities/crm/adv/service.py capabilities/crm/adv/api.py tests/test_crm_adv_core_records.py` -> no stale placeholder payloads or stale API call
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

@@ -250,7 +250,7 @@ class CRMService:
 		self.db_manager = db_manager or CRMDatabaseManager()
 		self.config_manager = config_manager
 		self.ai_insights = CRMAIInsights()
-		self.analytics = CRMAnalytics()
+		self.analytics = CRMAnalytics(self.db_manager)
 		self.relationship_manager = ContactRelationshipManager(self.db_manager)
 		self.activity_tracker = ContactActivityTracker(self.db_manager)
 		self.hierarchy_manager = AccountHierarchyManager(self.db_manager)
@@ -1089,6 +1089,14 @@ class CRMService:
 		except Exception as e:
 			logger.error(f"Failed to get pipeline analytics: {str(e)}", exc_info=True)
 			raise CRMServiceError(f"Pipeline analytics failed: {str(e)}")
+
+	async def get_pipeline_summary(self, tenant_id: str, user_id: str = None) -> Dict[str, Any]:
+		"""Get tenant-level sales pipeline summary metrics for API dashboards."""
+		try:
+			return await self.analytics.get_pipeline_analytics(tenant_id, user_id)
+		except Exception as e:
+			logger.error(f"Failed to get pipeline summary: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Pipeline summary failed: {str(e)}")
 	
 	# ================================
 	# Private Helper Methods
@@ -6518,22 +6526,158 @@ class CRMAIInsights:
 
 
 class CRMAnalytics:
-	"""Placeholder analytics class"""
-	
+	"""Deterministic CRM analytics over the core record store."""
+
+	def __init__(self, db_manager: CRMDatabaseManager = None):
+		self.db_manager = db_manager
+		self._initialized = False
+		self._updated_contacts: Dict[str, str] = {}
+
 	async def initialize(self):
-		pass
-	
+		self._initialized = True
+
 	async def health_check(self):
-		return {"status": "healthy"}
-	
+		return {
+			"status": "healthy",
+			"mode": "record_store",
+			"initialized": self._initialized
+		}
+
+	async def _tenant_records(self, tenant_id: str) -> Dict[str, Any]:
+		if not self.db_manager:
+			return {
+				"contacts": [],
+				"accounts": [],
+				"leads": [],
+				"opportunities": [],
+				"activities": [],
+				"counts": {name: 0 for name in ("contacts", "accounts", "leads", "opportunities", "activities")}
+			}
+
+		contacts, contact_count = await self.db_manager.search_contacts(
+			tenant_id=tenant_id,
+			limit=1000,
+			offset=0
+		)
+		accounts, account_count = await self.db_manager.list_accounts(
+			tenant_id=tenant_id,
+			limit=1000,
+			offset=0
+		)
+		leads, lead_count = await self.db_manager.list_leads(
+			tenant_id=tenant_id,
+			limit=1000,
+			offset=0
+		)
+		opportunities, opportunity_count = await self.db_manager.list_opportunities(
+			tenant_id=tenant_id,
+			limit=1000,
+			offset=0
+		)
+		activities, activity_count = await self.db_manager.list_activities(
+			tenant_id=tenant_id,
+			limit=1000,
+			offset=0
+		)
+		return {
+			"contacts": contacts,
+			"accounts": accounts,
+			"leads": leads,
+			"opportunities": opportunities,
+			"activities": activities,
+			"counts": {
+				"contacts": contact_count,
+				"accounts": account_count,
+				"leads": lead_count,
+				"opportunities": opportunity_count,
+				"activities": activity_count
+			}
+		}
+
+	def _enum_value(self, value: Any) -> str:
+		return value.value if hasattr(value, "value") else str(value)
+
+	def _distribution(self, records: List[Any], field: str) -> Dict[str, int]:
+		distribution: Dict[str, int] = {}
+		for record in records:
+			value = getattr(record, field, None)
+			if value is None:
+				continue
+			key = self._enum_value(value)
+			distribution[key] = distribution.get(key, 0) + 1
+		return distribution
+
 	async def get_sales_dashboard(self, tenant_id: str, user_id: str = None) -> Dict[str, Any]:
-		return {"placeholder": "dashboard_data"}
-	
+		records = await self._tenant_records(tenant_id)
+		opportunities = records["opportunities"]
+		open_opportunities = [
+			opportunity for opportunity in opportunities
+			if not getattr(opportunity, "is_closed", False)
+		]
+		won_opportunities = [
+			opportunity for opportunity in opportunities
+			if getattr(opportunity, "is_won", False) is True
+		]
+		pipeline_value = sum(
+			(getattr(opportunity, "amount", Decimal("0")) or Decimal("0"))
+			for opportunity in open_opportunities
+		)
+		weighted_value = sum(
+			(getattr(opportunity, "expected_revenue", Decimal("0")) or Decimal("0"))
+			for opportunity in open_opportunities
+		)
+
+		return {
+			"tenant_id": tenant_id,
+			"user_id": user_id,
+			"generated_at": datetime.utcnow().isoformat(),
+			"record_counts": records["counts"],
+			"pipeline_value": str(pipeline_value),
+			"weighted_pipeline_value": str(weighted_value),
+			"open_opportunities": len(open_opportunities),
+			"won_opportunities": len(won_opportunities),
+			"lead_status_breakdown": self._distribution(records["leads"], "lead_status"),
+			"opportunity_stage_breakdown": self._distribution(opportunities, "stage"),
+			"activity_type_breakdown": self._distribution(records["activities"], "activity_type")
+		}
+
 	async def get_pipeline_analytics(self, tenant_id: str, user_id: str = None) -> Dict[str, Any]:
-		return {"placeholder": "pipeline_data"}
-	
+		records = await self._tenant_records(tenant_id)
+		opportunities = records["opportunities"]
+		stage_breakdown = self._distribution(opportunities, "stage")
+		closed_won = [
+			opportunity for opportunity in opportunities
+			if getattr(opportunity, "is_won", False) is True
+		]
+		closed = [
+			opportunity for opportunity in opportunities
+			if getattr(opportunity, "is_closed", False)
+		]
+		total_value = sum(
+			(getattr(opportunity, "amount", Decimal("0")) or Decimal("0"))
+			for opportunity in opportunities
+		)
+		weighted_value = sum(
+			(getattr(opportunity, "expected_revenue", Decimal("0")) or Decimal("0"))
+			for opportunity in opportunities
+		)
+		win_rate = (len(closed_won) / len(closed)) if closed else 0.0
+
+		return {
+			"tenant_id": tenant_id,
+			"user_id": user_id,
+			"generated_at": datetime.utcnow().isoformat(),
+			"opportunity_count": records["counts"]["opportunities"],
+			"stage_breakdown": stage_breakdown,
+			"total_pipeline_value": str(total_value),
+			"weighted_pipeline_value": str(weighted_value),
+			"closed_opportunities": len(closed),
+			"won_opportunities": len(closed_won),
+			"win_rate": win_rate
+		}
+
 	async def update_contact_analytics(self, contact_id: str, tenant_id: str):
-		pass
-	
+		self._updated_contacts[contact_id] = tenant_id
+
 	async def shutdown(self):
-		pass
+		self._initialized = False
