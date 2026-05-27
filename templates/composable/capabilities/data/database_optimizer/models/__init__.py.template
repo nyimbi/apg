@@ -1,87 +1,66 @@
 """
-Database Optimizer Models
-=========================
+Database Optimizer Model Contracts
+==================================
 
-Database models for Database Optimizer capability.
+Framework-neutral APG model contracts for Database Optimizer.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class PerformanceBaseModel(AuditMixin, Model):
-	"""Base model for performance entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['QueryAnalysis', 'IndexRecommendation', 'SlowQuery', 'OptimizationReport']
 
 
-# Add performance-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class QueryAnalysis(PerformanceBaseModel):
-	"""Database query analysis results"""
-	__tablename__ = 'query_analyses'
-	
-	id = Column(Integer, primary_key=True)
-	query_hash = Column(String(128), nullable=False)
-	query_text = Column(Text, nullable=False)
-	execution_time = Column(Float)
-	rows_examined = Column(Integer)
-	rows_returned = Column(Integer)
-	index_usage = Column(JSON)
-	query_plan = Column(JSON)
-	optimization_score = Column(Float)
-	analyzed_at = Column(DateTime, default=datetime.utcnow)
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class IndexRecommendation(PerformanceBaseModel):
-	"""Database index recommendations"""
-	__tablename__ = 'index_recommendations'
-	
-	id = Column(Integer, primary_key=True)
-	table_name = Column(String(128), nullable=False)
-	column_names = Column(JSON, nullable=False)
-	index_type = Column(String(32))  # btree, hash, gin, gist
-	estimated_improvement = Column(Float)
-	creation_cost = Column(Float)
-	maintenance_cost = Column(Float)
-	priority = Column(String(32))
-	status = Column(String(32), default='pending')
-	created_at = Column(DateTime, default=datetime.utcnow)
-	applied_at = Column(DateTime)
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class SlowQuery(PerformanceBaseModel):
-	"""Slow query tracking"""
-	__tablename__ = 'slow_queries'
-	
-	id = Column(Integer, primary_key=True)
-	query_hash = Column(String(128), nullable=False)
-	query_text = Column(Text, nullable=False)
-	execution_time = Column(Float, nullable=False)
-	database_name = Column(String(128))
-	user_name = Column(String(128))
-	timestamp = Column(DateTime, default=datetime.utcnow)
-	frequency = Column(Integer, default=1)
-	last_seen = Column(DateTime, default=datetime.utcnow)
+@dataclass(slots=True)
+class DatabaseOptimizerModelCatalog:
+    """Model catalog emitted by the Database Optimizer capability."""
+
+    capability: str = 'Database Optimizer'
+    category: str = 'data'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Database Optimizer model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
 
 
-class OptimizationReport(PerformanceBaseModel):
-	"""Database optimization reports"""
-	__tablename__ = 'optimization_reports'
-	
-	id = Column(Integer, primary_key=True)
-	report_name = Column(String(256), nullable=False)
-	database_name = Column(String(128))
-	analysis_period = Column(String(32))
-	total_queries = Column(Integer)
-	slow_queries = Column(Integer)
-	recommendations = Column(JSON)
-	estimated_improvement = Column(Float)
-	generated_at = Column(DateTime, default=datetime.utcnow)
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
 
+
+def describe_models() -> dict[str, Any]:
+    return DatabaseOptimizerModelCatalog().to_manifest()

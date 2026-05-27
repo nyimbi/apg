@@ -1,71 +1,66 @@
 """
-OAuth2 & SSO Models
-===================
+OAuth2 & SSO Model Contracts
+============================
 
-Database models for OAuth2 & SSO capability.
+Framework-neutral APG model contracts for OAuth2 & SSO.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class SecurityBaseModel(AuditMixin, Model):
-	"""Base model for security entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['OAuthProvider', 'UserToken', 'SSOSession', 'TenantConfig']
 
 
-# Add security-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class OAuthProvider(SecurityBaseModel):
-	"""OAuth2 provider configuration"""
-	__tablename__ = 'oauth_providers'
-	
-	id = Column(Integer, primary_key=True)
-	name = Column(String(128), unique=True, nullable=False)
-	provider_type = Column(String(32))  # google, microsoft, saml
-	client_id = Column(String(256))
-	client_secret = Column(Text)
-	authorization_url = Column(String(512))
-	token_url = Column(String(512))
-	user_info_url = Column(String(512))
-	scopes = Column(JSON)
-	enabled = Column(Boolean, default=True)
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class UserToken(SecurityBaseModel):
-	"""User OAuth tokens"""
-	__tablename__ = 'user_tokens'
-	
-	id = Column(Integer, primary_key=True)
-	user_id = Column(Integer, nullable=False)
-	provider_id = Column(Integer, ForeignKey('oauth_providers.id'))
-	access_token = Column(Text)
-	refresh_token = Column(Text)
-	token_type = Column(String(32), default='Bearer')
-	expires_at = Column(DateTime)
-	
-	provider = relationship("OAuthProvider")
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class SSOSession(SecurityBaseModel):
-	"""SSO session tracking"""
-	__tablename__ = 'sso_sessions'
-	
-	id = Column(Integer, primary_key=True)
-	session_id = Column(String(256), unique=True, nullable=False)
-	user_id = Column(Integer, nullable=False)
-	provider_id = Column(Integer, ForeignKey('oauth_providers.id'))
-	login_time = Column(DateTime, default=datetime.utcnow)
-	last_activity = Column(DateTime, default=datetime.utcnow)
-	ip_address = Column(String(45))
-	user_agent = Column(Text)
-	
-	provider = relationship("OAuthProvider")
+@dataclass(slots=True)
+class Oauth2AndSsoModelCatalog:
+    """Model catalog emitted by the OAuth2 & SSO capability."""
 
+    capability: str = 'OAuth2 & SSO'
+    category: str = 'auth'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown OAuth2 & SSO model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return Oauth2AndSsoModelCatalog().to_manifest()

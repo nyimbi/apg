@@ -1,65 +1,66 @@
 """
-AWS Integration Models
-======================
+AWS Integration Model Contracts
+===============================
 
-Database models for AWS Integration capability.
+Framework-neutral APG model contracts for AWS Integration.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class CloudBaseModel(AuditMixin, Model):
-	"""Base model for cloud entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['AWSResource', 'S3Bucket', 'LambdaFunction', 'SQSQueue']
 
 
-# Add cloud-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class AWSResource(CloudBaseModel):
-	"""AWS resource model"""
-	__tablename__ = 'aws_resources'
-	
-	id = Column(Integer, primary_key=True)
-	resource_id = Column(String(256), unique=True, nullable=False)
-	resource_type = Column(String(64), nullable=False)
-	name = Column(String(256))
-	region = Column(String(32))
-	status = Column(String(32), default='pending')
-	configuration = Column(JSON)
-	cost_estimate = Column(Float)
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class S3Bucket(CloudBaseModel):
-	"""S3 bucket model"""
-	__tablename__ = 'aws_s3_buckets'
-	
-	id = Column(Integer, primary_key=True)
-	bucket_name = Column(String(256), unique=True, nullable=False)
-	region = Column(String(32))
-	versioning_enabled = Column(Boolean, default=False)
-	encryption_enabled = Column(Boolean, default=True)
-	public_access = Column(Boolean, default=False)
-	storage_class = Column(String(32), default='STANDARD')
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class LambdaFunction(CloudBaseModel):
-	"""Lambda function model"""
-	__tablename__ = 'aws_lambda_functions'
-	
-	id = Column(Integer, primary_key=True)
-	function_name = Column(String(256), nullable=False)
-	runtime = Column(String(32))
-	handler = Column(String(128))
-	memory_size = Column(Integer, default=128)
-	timeout = Column(Integer, default=3)
-	environment_vars = Column(JSON)
-	last_deployment = Column(DateTime)
+@dataclass(slots=True)
+class AwsIntegrationModelCatalog:
+    """Model catalog emitted by the AWS Integration capability."""
 
+    capability: str = 'AWS Integration'
+    category: str = 'data'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown AWS Integration model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return AwsIntegrationModelCatalog().to_manifest()

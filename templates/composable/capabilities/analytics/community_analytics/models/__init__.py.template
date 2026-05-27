@@ -1,62 +1,66 @@
 """
-Community Analytics Models
-==========================
+Community Analytics Model Contracts
+===================================
 
-Database models for Community Analytics capability.
+Framework-neutral APG model contracts for Community Analytics.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class CommunityBaseModel(AuditMixin, Model):
-	"""Base model for community entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['UsageMetric', 'TrendAnalysis', 'CommunityStats', 'EcosystemHealth']
 
 
-# Add community-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class UsageMetric(CommunityBaseModel):
-	"""Community usage metrics"""
-	__tablename__ = 'usage_metrics'
-	
-	id = Column(Integer, primary_key=True)
-	metric_type = Column(String(64), nullable=False)
-	capability_id = Column(String(256))
-	value = Column(Float, nullable=False)
-	timestamp = Column(DateTime, default=datetime.utcnow)
-	metadata = Column(JSON)
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class TrendAnalysis(CommunityBaseModel):
-	"""Trend analysis results"""
-	__tablename__ = 'trend_analysis'
-	
-	id = Column(Integer, primary_key=True)
-	analysis_type = Column(String(64))  # popularity, growth, adoption
-	time_period = Column(String(32))  # daily, weekly, monthly
-	trends = Column(JSON)
-	insights = Column(JSON)
-	generated_at = Column(DateTime, default=datetime.utcnow)
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class CommunityStats(CommunityBaseModel):
-	"""Community statistics"""
-	__tablename__ = 'community_stats'
-	
-	id = Column(Integer, primary_key=True)
-	stat_date = Column(DateTime, default=datetime.utcnow)
-	total_capabilities = Column(Integer)
-	active_authors = Column(Integer)
-	total_downloads = Column(Integer)
-	new_capabilities = Column(Integer)
-	avg_rating = Column(Float)
-	growth_rate = Column(Float)
+@dataclass(slots=True)
+class CommunityAnalyticsModelCatalog:
+    """Model catalog emitted by the Community Analytics capability."""
 
+    capability: str = 'Community Analytics'
+    category: str = 'analytics'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Community Analytics model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return CommunityAnalyticsModelCatalog().to_manifest()

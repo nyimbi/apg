@@ -1,54 +1,66 @@
 """
-ML Model Training Models
-========================
+ML Model Training Model Contracts
+=================================
 
-Database models for ML Model Training capability.
+Framework-neutral APG model contracts for ML Model Training.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class AIBaseModel(AuditMixin, Model):
-    """Base model for AI entities"""
-    __abstract__ = True
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+MODEL_CONTRACTS: list[str] = ['MLModel', 'TrainingJob', 'Dataset', 'Experiment', 'ModelVersion']
 
 
-# Add AI-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class MLModel(AIBaseModel):
-    """Machine learning model"""
-    __tablename__ = 'ml_models'
-    
-    id = Column(Integer, primary_key=True)
-    name = Column(String(256), nullable=False)
-    model_type = Column(String(64))
-    algorithm = Column(String(128))
-    version = Column(String(32))
-    file_path = Column(String(512))
-    status = Column(String(32), default='training')
-    
-    training_jobs = relationship("TrainingJob", back_populates="model")
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class TrainingJob(AIBaseModel):
-    """ML model training job"""
-    __tablename__ = 'ml_training_jobs'
-    
-    id = Column(Integer, primary_key=True)
-    model_id = Column(Integer, ForeignKey('ml_models.id'))
-    dataset_path = Column(String(512))
-    hyperparameters = Column(JSON)
-    metrics = Column(JSON)
-    status = Column(String(32), default='pending')
-    started_at = Column(DateTime)
-    completed_at = Column(DateTime)
-    
-    model = relationship("MLModel", back_populates="training_jobs")
+@dataclass(slots=True)
+class MlModelTrainingModelCatalog:
+    """Model catalog emitted by the ML Model Training capability."""
 
+    capability: str = 'ML Model Training'
+    category: str = 'ai'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown ML Model Training model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return MlModelTrainingModelCatalog().to_manifest()

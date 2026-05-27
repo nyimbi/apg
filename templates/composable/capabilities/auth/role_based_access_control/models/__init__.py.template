@@ -1,73 +1,66 @@
 """
-Role-Based Access Control Models
-================================
+Role-Based Access Control Model Contracts
+=========================================
 
-Database models for Role-Based Access Control capability.
+Framework-neutral APG model contracts for Role-Based Access Control.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class SecurityBaseModel(AuditMixin, Model):
-	"""Base model for security entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['Role', 'Permission', 'Policy', 'RoleAssignment', 'PermissionGroup']
 
 
-# Add security-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class Role(SecurityBaseModel):
-	"""Role definition"""
-	__tablename__ = 'rbac_roles'
-	
-	id = Column(Integer, primary_key=True)
-	name = Column(String(128), unique=True, nullable=False)
-	description = Column(Text)
-	parent_role_id = Column(Integer, ForeignKey('rbac_roles.id'))
-	level = Column(Integer, default=0)
-	
-	parent = relationship("Role", remote_side=[id])
-	permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class Permission(SecurityBaseModel):
-	"""Permission definition"""
-	__tablename__ = 'rbac_permissions'
-	
-	id = Column(Integer, primary_key=True)
-	name = Column(String(128), unique=True, nullable=False)
-	resource = Column(String(128))
-	action = Column(String(64))
-	description = Column(Text)
-	
-	roles = relationship("Role", secondary="role_permissions", back_populates="permissions")
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class RolePermission(SecurityBaseModel):
-	"""Role-Permission association"""
-	__tablename__ = 'role_permissions'
-	
-	role_id = Column(Integer, ForeignKey('rbac_roles.id'), primary_key=True)
-	permission_id = Column(Integer, ForeignKey('rbac_permissions.id'), primary_key=True)
+@dataclass(slots=True)
+class RoleBasedAccessControlModelCatalog:
+    """Model catalog emitted by the Role-Based Access Control capability."""
+
+    capability: str = 'Role-Based Access Control'
+    category: str = 'auth'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Role-Based Access Control model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
 
 
-class RoleAssignment(SecurityBaseModel):
-	"""User role assignments"""
-	__tablename__ = 'rbac_role_assignments'
-	
-	id = Column(Integer, primary_key=True)
-	user_id = Column(Integer, nullable=False)
-	role_id = Column(Integer, ForeignKey('rbac_roles.id'))
-	assigned_by = Column(Integer)
-	assigned_at = Column(DateTime, default=datetime.utcnow)
-	expires_at = Column(DateTime)
-	
-	role = relationship("Role")
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
 
+
+def describe_models() -> dict[str, Any]:
+    return RoleBasedAccessControlModelCatalog().to_manifest()

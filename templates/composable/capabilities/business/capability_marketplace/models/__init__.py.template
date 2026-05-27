@@ -1,86 +1,66 @@
 """
-Capability Marketplace Models
-=============================
+Capability Marketplace Model Contracts
+======================================
 
-Database models for Capability Marketplace capability.
+Framework-neutral APG model contracts for Capability Marketplace.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class CommunityBaseModel(AuditMixin, Model):
-	"""Base model for community entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['MarketplaceCapability', 'CapabilityRating', 'Author', 'DownloadStats']
 
 
-# Add community-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class MarketplaceCapability(CommunityBaseModel):
-	"""Capability in marketplace"""
-	__tablename__ = 'marketplace_capabilities'
-	
-	id = Column(Integer, primary_key=True)
-	capability_id = Column(String(256), unique=True, nullable=False)
-	name = Column(String(256), nullable=False)
-	description = Column(Text)
-	category = Column(String(64))
-	version = Column(String(32))
-	author_id = Column(Integer, ForeignKey('authors.id'))
-	downloads = Column(Integer, default=0)
-	rating = Column(Float, default=0.0)
-	status = Column(String(32), default='pending')  # pending, approved, rejected
-	
-	author = relationship("Author", back_populates="capabilities")
-	ratings = relationship("CapabilityRating", back_populates="capability")
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class CapabilityRating(CommunityBaseModel):
-	"""User ratings for capabilities"""
-	__tablename__ = 'capability_ratings'
-	
-	id = Column(Integer, primary_key=True)
-	capability_id = Column(Integer, ForeignKey('marketplace_capabilities.id'))
-	user_id = Column(Integer, nullable=False)
-	rating = Column(Integer, nullable=False)  # 1-5 stars
-	review = Column(Text)
-	helpful_votes = Column(Integer, default=0)
-	
-	capability = relationship("MarketplaceCapability", back_populates="ratings")
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class Author(CommunityBaseModel):
-	"""Capability author profile"""
-	__tablename__ = 'authors'
-	
-	id = Column(Integer, primary_key=True)
-	username = Column(String(128), unique=True, nullable=False)
-	email = Column(String(256))
-	name = Column(String(256))
-	bio = Column(Text)
-	website = Column(String(512))
-	github_username = Column(String(128))
-	reputation_score = Column(Integer, default=0)
-	
-	capabilities = relationship("MarketplaceCapability", back_populates="author")
+@dataclass(slots=True)
+class CapabilityMarketplaceModelCatalog:
+    """Model catalog emitted by the Capability Marketplace capability."""
+
+    capability: str = 'Capability Marketplace'
+    category: str = 'business'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Capability Marketplace model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
 
 
-class DownloadStats(CommunityBaseModel):
-	"""Download statistics"""
-	__tablename__ = 'download_stats'
-	
-	id = Column(Integer, primary_key=True)
-	capability_id = Column(Integer, ForeignKey('marketplace_capabilities.id'))
-	download_date = Column(DateTime, default=datetime.utcnow)
-	user_id = Column(Integer)
-	version = Column(String(32))
-	ip_address = Column(String(45))
-	user_agent = Column(Text)
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
 
+
+def describe_models() -> dict[str, Any]:
+    return CapabilityMarketplaceModelCatalog().to_manifest()

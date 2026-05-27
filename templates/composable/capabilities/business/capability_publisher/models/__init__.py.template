@@ -1,67 +1,66 @@
 """
-Capability Publisher Models
-===========================
+Capability Publisher Model Contracts
+====================================
 
-Database models for Capability Publisher capability.
+Framework-neutral APG model contracts for Capability Publisher.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class CommunityBaseModel(AuditMixin, Model):
-	"""Base model for community entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['PublishingJob', 'CapabilityPackage', 'ReleaseHistory', 'PublisherProfile']
 
 
-# Add community-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class PublishingJob(CommunityBaseModel):
-	"""Capability publishing job"""
-	__tablename__ = 'publishing_jobs'
-	
-	id = Column(Integer, primary_key=True)
-	job_id = Column(String(128), unique=True, nullable=False)
-	capability_id = Column(String(256), nullable=False)
-	author_id = Column(Integer, ForeignKey('authors.id'))
-	status = Column(String(32), default='pending')
-	build_log = Column(Text)
-	error_message = Column(Text)
-	started_at = Column(DateTime, default=datetime.utcnow)
-	completed_at = Column(DateTime)
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class CapabilityPackage(CommunityBaseModel):
-	"""Packaged capability metadata"""
-	__tablename__ = 'capability_packages'
-	
-	id = Column(Integer, primary_key=True)
-	package_id = Column(String(256), unique=True, nullable=False)
-	capability_id = Column(String(256), nullable=False)
-	version = Column(String(32), nullable=False)
-	package_size = Column(Integer)
-	checksum = Column(String(128))
-	dependencies = Column(JSON)
-	assets = Column(JSON)
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class ReleaseHistory(CommunityBaseModel):
-	"""Release history tracking"""
-	__tablename__ = 'release_history'
-	
-	id = Column(Integer, primary_key=True)
-	capability_id = Column(String(256), nullable=False)
-	version = Column(String(32), nullable=False)
-	release_notes = Column(Text)
-	breaking_changes = Column(Boolean, default=False)
-	migration_guide = Column(Text)
-	released_at = Column(DateTime, default=datetime.utcnow)
-	downloads = Column(Integer, default=0)
+@dataclass(slots=True)
+class CapabilityPublisherModelCatalog:
+    """Model catalog emitted by the Capability Publisher capability."""
 
+    capability: str = 'Capability Publisher'
+    category: str = 'business'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Capability Publisher model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return CapabilityPublisherModelCatalog().to_manifest()

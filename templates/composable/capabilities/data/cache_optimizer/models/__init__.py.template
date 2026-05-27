@@ -1,79 +1,66 @@
 """
-Cache Optimizer Models
-======================
+Cache Optimizer Model Contracts
+===============================
 
-Database models for Cache Optimizer capability.
+Framework-neutral APG model contracts for Cache Optimizer.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class PerformanceBaseModel(AuditMixin, Model):
-	"""Base model for performance entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['CacheInstance', 'CacheMetrics', 'CachePolicy', 'CacheInvalidation']
 
 
-# Add performance-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class CacheInstance(PerformanceBaseModel):
-	"""Cache instance configuration"""
-	__tablename__ = 'cache_instances'
-	
-	id = Column(Integer, primary_key=True)
-	instance_name = Column(String(128), nullable=False)
-	cache_type = Column(String(32))  # redis, memcached, in-memory
-	host = Column(String(256))
-	port = Column(Integer)
-	max_memory = Column(Integer)
-	eviction_policy = Column(String(32))
-	status = Column(String(32), default='active')
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class CacheMetrics(PerformanceBaseModel):
-	"""Cache performance metrics"""
-	__tablename__ = 'cache_metrics'
-	
-	id = Column(Integer, primary_key=True)
-	instance_id = Column(Integer, ForeignKey('cache_instances.id'))
-	hit_rate = Column(Float)
-	miss_rate = Column(Float)
-	eviction_rate = Column(Float)
-	memory_usage = Column(Float)
-	total_operations = Column(Integer)
-	timestamp = Column(DateTime, default=datetime.utcnow)
-	
-	instance = relationship("CacheInstance")
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class CachePolicy(PerformanceBaseModel):
-	"""Cache policies and configurations"""
-	__tablename__ = 'cache_policies'
-	
-	id = Column(Integer, primary_key=True)
-	policy_name = Column(String(128), nullable=False)
-	cache_pattern = Column(String(256))  # key pattern
-	ttl = Column(Integer)  # time to live in seconds
-	max_size = Column(Integer)
-	compression = Column(Boolean, default=False)
-	enabled = Column(Boolean, default=True)
+@dataclass(slots=True)
+class CacheOptimizerModelCatalog:
+    """Model catalog emitted by the Cache Optimizer capability."""
+
+    capability: str = 'Cache Optimizer'
+    category: str = 'data'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Cache Optimizer model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
 
 
-class CacheInvalidation(PerformanceBaseModel):
-	"""Cache invalidation tracking"""
-	__tablename__ = 'cache_invalidations'
-	
-	id = Column(Integer, primary_key=True)
-	cache_key = Column(String(512), nullable=False)
-	invalidation_reason = Column(String(128))
-	invalidated_at = Column(DateTime, default=datetime.utcnow)
-	invalidated_by = Column(String(128))
-	affected_operations = Column(Integer)
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
 
+
+def describe_models() -> dict[str, Any]:
+    return CacheOptimizerModelCatalog().to_manifest()

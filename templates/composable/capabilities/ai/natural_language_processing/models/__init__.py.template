@@ -1,49 +1,66 @@
 """
-Natural Language Processing Models
-==================================
+Natural Language Processing Model Contracts
+===========================================
 
-Database models for Natural Language Processing capability.
+Framework-neutral APG model contracts for Natural Language Processing.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class AIBaseModel(AuditMixin, Model):
-    """Base model for AI entities"""
-    __abstract__ = True
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+MODEL_CONTRACTS: list[str] = ['TextDocument', 'NLPResult', 'Entity', 'Sentiment']
 
 
-# Add AI-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class TextDocument(AIBaseModel):
-    """Text document model"""
-    __tablename__ = 'nlp_documents'
-    
-    id = Column(Integer, primary_key=True)
-    title = Column(String(256))
-    content = Column(Text, nullable=False)
-    language = Column(String(32))
-    word_count = Column(Integer)
-    
-    results = relationship("NLPResult", back_populates="document")
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class NLPResult(AIBaseModel):
-    """NLP analysis result"""
-    __tablename__ = 'nlp_results'
-    
-    id = Column(Integer, primary_key=True)
-    document_id = Column(Integer, ForeignKey('nlp_documents.id'))
-    analysis_type = Column(String(64))
-    result_data = Column(JSON)
-    confidence = Column(Float)
-    
-    document = relationship("TextDocument", back_populates="results")
+@dataclass(slots=True)
+class NaturalLanguageProcessingModelCatalog:
+    """Model catalog emitted by the Natural Language Processing capability."""
 
+    capability: str = 'Natural Language Processing'
+    category: str = 'ai'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Natural Language Processing model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return NaturalLanguageProcessingModelCatalog().to_manifest()

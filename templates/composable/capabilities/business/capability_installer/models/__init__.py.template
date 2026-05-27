@@ -1,41 +1,66 @@
 """
-Capability Installer Models
-===========================
+Capability Installer Model Contracts
+====================================
 
-Database models for Capability Installer capability.
+Framework-neutral APG model contracts for Capability Installer.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class CommunityBaseModel(AuditMixin, Model):
-	"""Base model for community entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['InstalledCapability', 'InstallationLog', 'DependencyGraph', 'UpdateHistory']
 
 
-# Add community-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-# Generic community model
-class CommunityContribution(CommunityBaseModel):
-	"""Generic community contribution"""
-	__tablename__ = 'community_contributions'
-	
-	id = Column(Integer, primary_key=True)
-	contribution_type = Column(String(64), nullable=False)
-	contributor_id = Column(Integer, nullable=False)
-	title = Column(String(256))
-	description = Column(Text)
-	status = Column(String(32), default='pending')
-	metadata = Column(JSON)
-	submitted_at = Column(DateTime, default=datetime.utcnow)
-	reviewed_at = Column(DateTime)
-	reviewer_id = Column(Integer)
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+@dataclass(slots=True)
+class CapabilityInstallerModelCatalog:
+    """Model catalog emitted by the Capability Installer capability."""
+
+    capability: str = 'Capability Installer'
+    category: str = 'business'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Capability Installer model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return CapabilityInstallerModelCatalog().to_manifest()

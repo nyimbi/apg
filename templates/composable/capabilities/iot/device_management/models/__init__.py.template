@@ -1,37 +1,66 @@
 """
-Device Management Models
-========================
+Device Management Model Contracts
+=================================
 
-Database models for Device Management capability.
+Framework-neutral APG model contracts for Device Management.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class IoTBaseModel(AuditMixin, Model):
-    """Base model for IoT entities"""
-    __abstract__ = True
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['IoTDevice', 'DeviceType', 'DeviceGroup', 'FirmwareVersion', 'DeviceConfig']
 
 
-# Add IoT-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-# Generic IoT device model
-class GenericIoTDevice(IoTBaseModel):
-    """Generic IoT device model"""
-    __tablename__ = 'iot_devices'
-    
-    id = Column(Integer, primary_key=True)
-    device_id = Column(String(128), unique=True, nullable=False)
-    name = Column(String(256), nullable=False)
-    device_type = Column(String(64))
-    status = Column(String(32), default='active')
-    metadata = Column(Text)  # JSON metadata
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+@dataclass(slots=True)
+class DeviceManagementModelCatalog:
+    """Model catalog emitted by the Device Management capability."""
+
+    capability: str = 'Device Management'
+    category: str = 'iot'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Device Management model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return DeviceManagementModelCatalog().to_manifest()

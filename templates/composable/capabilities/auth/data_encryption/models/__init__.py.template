@@ -1,70 +1,66 @@
 """
-Data Encryption Models
-======================
+Data Encryption Model Contracts
+===============================
 
-Database models for Data Encryption capability.
+Framework-neutral APG model contracts for Data Encryption.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class SecurityBaseModel(AuditMixin, Model):
-	"""Base model for security entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['EncryptionKey', 'CertificateStore', 'EncryptedField', 'KeyRotationLog']
 
 
-# Add security-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class EncryptionKey(SecurityBaseModel):
-	"""Encryption key management"""
-	__tablename__ = 'encryption_keys'
-	
-	id = Column(Integer, primary_key=True)
-	key_id = Column(String(128), unique=True, nullable=False)
-	key_type = Column(String(32))  # AES, RSA, etc.
-	key_size = Column(Integer)
-	purpose = Column(String(64))  # database, file, transport
-	algorithm = Column(String(32))
-	created_at = Column(DateTime, default=datetime.utcnow)
-	expires_at = Column(DateTime)
-	rotated_at = Column(DateTime)
-	status = Column(String(32), default='active')
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class CertificateStore(SecurityBaseModel):
-	"""Certificate storage"""
-	__tablename__ = 'certificate_store'
-	
-	id = Column(Integer, primary_key=True)
-	certificate_id = Column(String(128), unique=True, nullable=False)
-	subject = Column(String(256))
-	issuer = Column(String(256))
-	serial_number = Column(String(64))
-	not_before = Column(DateTime)
-	not_after = Column(DateTime)
-	certificate_pem = Column(Text)
-	private_key_pem = Column(Text)
-	certificate_type = Column(String(32))  # SSL, code_signing, etc.
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class EncryptedField(SecurityBaseModel):
-	"""Encrypted field tracking"""
-	__tablename__ = 'encrypted_fields'
-	
-	id = Column(Integer, primary_key=True)
-	table_name = Column(String(128), nullable=False)
-	field_name = Column(String(128), nullable=False)
-	key_id = Column(String(128), ForeignKey('encryption_keys.key_id'))
-	encryption_algorithm = Column(String(32))
-	encrypted_at = Column(DateTime, default=datetime.utcnow)
-	
-	key = relationship("EncryptionKey")
+@dataclass(slots=True)
+class DataEncryptionModelCatalog:
+    """Model catalog emitted by the Data Encryption capability."""
 
+    capability: str = 'Data Encryption'
+    category: str = 'auth'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Data Encryption model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return DataEncryptionModelCatalog().to_manifest()

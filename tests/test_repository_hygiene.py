@@ -206,6 +206,35 @@ def test_composable_integration_templates_are_framework_neutral():
 	assert violations == []
 
 
+def test_composable_model_and_view_templates_are_framework_neutral():
+	violations: list[str] = []
+	for path in _tracked_files():
+		if not (
+			path.startswith("templates/composable/capabilities/")
+			and (
+				path.endswith("/models/__init__.py.template")
+				or path.endswith("/views/__init__.py.template")
+			)
+		):
+			continue
+		content = (REPO_ROOT / path).read_text(encoding="utf-8", errors="ignore")
+		for term in (
+			"flask_appbuilder",
+			"Flask-AppBuilder",
+			"SQLAInterface",
+			"AuditMixin",
+			"from sqlalchemy",
+			"sqlalchemy",
+			"Column(",
+			"relationship(",
+			"has_access",
+		):
+			if term in content:
+				violations.append(f"{path}: {term}")
+
+	assert violations == []
+
+
 def test_apg_streaming_runtime_stays_bytewax_native():
 	violations: list[str] = []
 

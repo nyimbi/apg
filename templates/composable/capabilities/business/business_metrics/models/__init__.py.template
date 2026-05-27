@@ -1,38 +1,66 @@
 """
-Business Metrics Models
-=======================
+Business Metrics Model Contracts
+================================
 
-Database models for Business Metrics capability.
+Framework-neutral APG model contracts for Business Metrics.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class BIBaseModel(AuditMixin, Model):
-    """Base model for BI entities"""
-    __abstract__ = True
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+MODEL_CONTRACTS: list[str] = ['Customer', 'Sale', 'Revenue', 'Metric', 'Funnel']
 
 
-# Add BI-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-# Generic BI analytics model
-class AnalyticsJob(BIBaseModel):
-    """Generic analytics job"""
-    __tablename__ = 'bi_analytics_jobs'
-    
-    id = Column(Integer, primary_key=True)
-    job_name = Column(String(256), nullable=False)
-    job_type = Column(String(64))
-    parameters = Column(JSON)
-    results = Column(JSON)
-    status = Column(String(32), default='pending')
-    started_at = Column(DateTime)
-    completed_at = Column(DateTime)
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+@dataclass(slots=True)
+class BusinessMetricsModelCatalog:
+    """Model catalog emitted by the Business Metrics capability."""
+
+    capability: str = 'Business Metrics'
+    category: str = 'business'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Business Metrics model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return BusinessMetricsModelCatalog().to_manifest()

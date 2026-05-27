@@ -1,65 +1,66 @@
 """
-Sensor Data Processing Models
-=============================
+Sensor Data Processing Model Contracts
+======================================
 
-Database models for Sensor Data Processing capability.
+Framework-neutral APG model contracts for Sensor Data Processing.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class IoTBaseModel(AuditMixin, Model):
-    """Base model for IoT entities"""
-    __abstract__ = True
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['Sensor', 'SensorReading', 'SensorType', 'Alert', 'DataStream']
 
 
-# Add IoT-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class Sensor(IoTBaseModel):
-    """IoT sensor model"""
-    __tablename__ = 'sensors'
-    
-    id = Column(Integer, primary_key=True)
-    sensor_id = Column(String(128), unique=True, nullable=False)
-    name = Column(String(256), nullable=False)
-    sensor_type = Column(String(64))
-    location = Column(String(256))
-    unit = Column(String(32))
-    min_value = Column(Float)
-    max_value = Column(Float)
-    
-    readings = relationship("SensorReading", back_populates="sensor")
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class SensorReading(IoTBaseModel):
-    """Sensor data reading"""
-    __tablename__ = 'sensor_readings'
-    
-    id = Column(Integer, primary_key=True)
-    sensor_id = Column(Integer, ForeignKey('sensors.id'))
-    value = Column(Float, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    quality = Column(String(32), default='good')
-    
-    sensor = relationship("Sensor", back_populates="readings")
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class Alert(IoTBaseModel):
-    """Sensor alert model"""
-    __tablename__ = 'sensor_alerts'
-    
-    id = Column(Integer, primary_key=True)
-    sensor_id = Column(Integer, ForeignKey('sensors.id'))
-    alert_type = Column(String(64))
-    message = Column(Text)
-    severity = Column(String(32))
-    acknowledged = Column(Boolean, default=False)
+@dataclass(slots=True)
+class SensorDataProcessingModelCatalog:
+    """Model catalog emitted by the Sensor Data Processing capability."""
 
+    capability: str = 'Sensor Data Processing'
+    category: str = 'iot'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Sensor Data Processing model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return SensorDataProcessingModelCatalog().to_manifest()

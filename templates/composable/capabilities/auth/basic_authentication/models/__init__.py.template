@@ -1,86 +1,66 @@
 """
-Basic Authentication Models
-===========================
+Basic Authentication Model Contracts
+====================================
 
-Flask-AppBuilder models for basic authentication capability.
+Framework-neutral APG model contracts for Basic Authentication.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class User(AuditMixin, Model):
-    """Extended User model with additional fields"""
-    
-    __tablename__ = 'ab_user'
-    
-    id = Column(Integer, primary_key=True)
-    first_name = Column(String(64), nullable=False)
-    last_name = Column(String(64), nullable=False) 
-    username = Column(String(64), unique=True, nullable=False)
-    password = Column(String(256))
-    active = Column(Boolean, default=True)
-    email = Column(String(120), unique=True, nullable=False)
-    last_login = Column(DateTime)
-    login_count = Column(Integer, default=0)
-    fail_login_count = Column(Integer, default=0)
-    
-    # Relationships
-    roles = relationship("Role", secondary="ab_user_role", back_populates="users")
-    
-    def __repr__(self):
-        return f'<User {self.username}>'
+MODEL_CONTRACTS: list[str] = ['User', 'Role', 'Permission']
 
 
-class Role(AuditMixin, Model):
-    """User role model"""
-    
-    __tablename__ = 'ab_role'
-    
-    id = Column(Integer, primary_key=True)
-    name = Column(String(64), unique=True, nullable=False)
-    
-    # Relationships
-    users = relationship("User", secondary="ab_user_role", back_populates="roles")
-    permissions = relationship("Permission", secondary="ab_permission_role", back_populates="roles")
-    
-    def __repr__(self):
-        return f'<Role {self.name}>'
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
+
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class Permission(AuditMixin, Model):
-    """Permission model"""
-    
-    __tablename__ = 'ab_permission'
-    
-    id = Column(Integer, primary_key=True)
-    name = Column(String(100), unique=True, nullable=False)
-    
-    # Relationships
-    roles = relationship("Role", secondary="ab_permission_role", back_populates="permissions")
-    
-    def __repr__(self):
-        return f'<Permission {self.name}>'
+@dataclass(slots=True)
+class BasicAuthenticationModelCatalog:
+    """Model catalog emitted by the Basic Authentication capability."""
+
+    capability: str = 'Basic Authentication'
+    category: str = 'auth'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Basic Authentication model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
 
 
-# Association tables
-from sqlalchemy import Table
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
 
-ab_user_role = Table(
-    'ab_user_role',
-    Model.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('user_id', Integer, ForeignKey('ab_user.id')),
-    Column('role_id', Integer, ForeignKey('ab_role.id'))
-)
 
-ab_permission_role = Table(
-    'ab_permission_role', 
-    Model.metadata,
-    Column('id', Integer, primary_key=True),
-    Column('permission_id', Integer, ForeignKey('ab_permission.id')),
-    Column('role_id', Integer, ForeignKey('ab_role.id'))
-)
+def describe_models() -> dict[str, Any]:
+    return BasicAuthenticationModelCatalog().to_manifest()

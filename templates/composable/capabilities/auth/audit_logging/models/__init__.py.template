@@ -1,73 +1,66 @@
 """
-Audit Logging Models
-====================
+Audit Logging Model Contracts
+=============================
 
-Database models for Audit Logging capability.
+Framework-neutral APG model contracts for Audit Logging.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class SecurityBaseModel(AuditMixin, Model):
-	"""Base model for security entities"""
-	__abstract__ = True
-	
-	created_at = Column(DateTime, default=datetime.utcnow)
-	updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-	active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['AuditLog', 'UserActivity', 'SystemEvent', 'ComplianceReport']
 
 
-# Add security-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class AuditLog(SecurityBaseModel):
-	"""Comprehensive audit log"""
-	__tablename__ = 'audit_logs'
-	
-	id = Column(Integer, primary_key=True)
-	event_id = Column(String(128), unique=True, nullable=False)
-	user_id = Column(Integer)
-	session_id = Column(String(256))
-	event_type = Column(String(64))  # login, logout, data_access, etc.
-	resource = Column(String(256))
-	action = Column(String(64))
-	result = Column(String(32))  # success, failure, error
-	timestamp = Column(DateTime, default=datetime.utcnow)
-	ip_address = Column(String(45))
-	user_agent = Column(Text)
-	details = Column(JSON)
-	risk_score = Column(Integer)
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class UserActivity(SecurityBaseModel):
-	"""User activity tracking"""
-	__tablename__ = 'user_activities'
-	
-	id = Column(Integer, primary_key=True)
-	user_id = Column(Integer, nullable=False)
-	activity_type = Column(String(64))
-	description = Column(Text)
-	timestamp = Column(DateTime, default=datetime.utcnow)
-	ip_address = Column(String(45))
-	session_duration = Column(Integer)
-	pages_visited = Column(Integer)
-	actions_performed = Column(Integer)
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class ComplianceReport(SecurityBaseModel):
-	"""Compliance reporting"""
-	__tablename__ = 'compliance_reports'
-	
-	id = Column(Integer, primary_key=True)
-	report_id = Column(String(128), unique=True, nullable=False)
-	report_type = Column(String(64))  # GDPR, HIPAA, SOX, etc.
-	generated_at = Column(DateTime, default=datetime.utcnow)
-	period_start = Column(DateTime)
-	period_end = Column(DateTime)
-	findings = Column(JSON)
-	compliance_score = Column(Float)
-	recommendations = Column(JSON)
+@dataclass(slots=True)
+class AuditLoggingModelCatalog:
+    """Model catalog emitted by the Audit Logging capability."""
 
+    capability: str = 'Audit Logging'
+    category: str = 'auth'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown Audit Logging model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return AuditLoggingModelCatalog().to_manifest()

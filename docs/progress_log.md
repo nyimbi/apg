@@ -4190,3 +4190,20 @@ Battery-conscious verification:
 - `rg -n "from flask import Blueprint|flask_appbuilder|Flask-AppBuilder|SQLAlchemy>=2.0.0|SQLALCHEMY_DATABASE_URI|Flask-SocketIO|eventlet|\\bappbuilder\\b" templates/composable/capabilities --glob 'integration.py.template' --glob 'README.md' --glob 'requirements.txt' --glob 'capability.json'` -> no matches
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+### 2026-05-27 12:27 EAT
+
+Completed checkpoint:
+
+- Rewrote all composable capability `models/__init__.py.template` files as dependency-free APG model contract catalogs.
+- Replaced ORM-bound model classes with portable dataclass records, model listing helpers, and manifest helpers.
+- Rewrote the basic-authentication `views/__init__.py.template` as framework-neutral UI view contracts with actions, fields, and theme-token extension points.
+- Added repository hygiene coverage to prevent composable model/view templates from reintroducing Flask-AppBuilder or SQLAlchemy stubs.
+
+Battery-conscious verification:
+
+- `find templates/composable/capabilities -path '*/models/__init__.py.template' -print0 -o -path '*/views/__init__.py.template' -print0 | xargs -0 .venv/bin/python -m py_compile`
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 10 passed
+- `rg -n "Flask-AppBuilder|flask_appbuilder|from flask_appbuilder|SQLAInterface|AuditMixin|from sqlalchemy|sqlalchemy|Column\\(|relationship\\(|has_access" templates/composable/capabilities --glob 'models/__init__.py.template' --glob 'views/__init__.py.template'` -> no matches
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

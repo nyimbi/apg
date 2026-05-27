@@ -1,120 +1,79 @@
 """
-Basic Authentication Views
-===========================
+Basic Authentication View Contracts
+===================================
 
-Flask-AppBuilder views for user and role management.
+Framework-neutral APG UI view contracts for user, role, and permission
+management. UI adapters map these contracts to web, desktop, CLI, or API
+surfaces at composition time.
 """
 
-from flask_appbuilder import ModelView
-from flask_appbuilder.models.sqla.interface import SQLAInterface
-from flask_appbuilder.security.decorators import has_access
-from flask import flash, redirect, url_for
-from ..models import User, Role, Permission
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
 
 
-class UserView(ModelView):
-    """User management view"""
-    
-    datamodel = SQLAInterface(User)
-    
-    # List view configuration
-    list_columns = ['username', 'first_name', 'last_name', 'email', 'active', 'last_login', 'login_count']
-    search_columns = ['username', 'first_name', 'last_name', 'email']
-    
-    # Add/Edit form configuration
-    add_columns = ['first_name', 'last_name', 'username', 'email', 'active', 'roles']
-    edit_columns = ['first_name', 'last_name', 'username', 'email', 'active', 'roles']
-    show_columns = ['username', 'first_name', 'last_name', 'email', 'active', 'last_login', 'login_count', 'roles']
-    
-    # Security
-    base_permissions = ['can_add', 'can_edit', 'can_delete', 'can_list', 'can_show']
-    
-    # Custom labels
-    label_columns = {
-        'first_name': 'First Name',
-        'last_name': 'Last Name', 
-        'username': 'Username',
-        'email': 'Email',
-        'active': 'Active',
-        'last_login': 'Last Login',
-        'login_count': 'Login Count',
-        'roles': 'Roles'
-    }
-    
-    # Ordering
-    base_order = ('username', 'asc')
-    
-    @has_access
-    def deactivate_user(self, item_id):
-        """Deactivate a user account"""
-        user = self.datamodel.get(item_id)
-        if user:
-            user.active = False
-            self.datamodel.edit(user)
-            flash(f"User {user.username} has been deactivated", "success")
-        return redirect(url_for(f'{self.__class__.__name__}.list'))
-    
-    @has_access  
-    def activate_user(self, item_id):
-        """Activate a user account"""
-        user = self.datamodel.get(item_id)
-        if user:
-            user.active = True
-            self.datamodel.edit(user)
-            flash(f"User {user.username} has been activated", "success")
-        return redirect(url_for(f'{self.__class__.__name__}.list'))
+@dataclass(slots=True)
+class ViewAction:
+    name: str
+    label: str
+    requires_confirmation: bool = False
 
 
-class RoleView(ModelView):
-    """Role management view"""
-    
-    datamodel = SQLAInterface(Role)
-    
-    # List view configuration
-    list_columns = ['name']
-    search_columns = ['name']
-    
-    # Add/Edit form configuration
-    add_columns = ['name', 'permissions']
-    edit_columns = ['name', 'permissions'] 
-    show_columns = ['name', 'permissions', 'users']
-    
-    # Security
-    base_permissions = ['can_add', 'can_edit', 'can_delete', 'can_list', 'can_show']
-    
-    # Custom labels
-    label_columns = {
-        'name': 'Role Name',
-        'permissions': 'Permissions',
-        'users': 'Users'
-    }
-    
-    # Ordering
-    base_order = ('name', 'asc')
+@dataclass(slots=True)
+class ViewContract:
+    name: str
+    model: str
+    list_fields: list[str] = field(default_factory=list)
+    search_fields: list[str] = field(default_factory=list)
+    edit_fields: list[str] = field(default_factory=list)
+    actions: list[ViewAction] = field(default_factory=list)
+    theme_tokens: dict[str, Any] = field(default_factory=dict)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "model": self.model,
+            "list_fields": list(self.list_fields),
+            "search_fields": list(self.search_fields),
+            "edit_fields": list(self.edit_fields),
+            "actions": [action.__dict__.copy() for action in self.actions],
+            "theme_tokens": dict(self.theme_tokens),
+        }
 
 
-class PermissionView(ModelView):
-    """Permission management view"""
-    
-    datamodel = SQLAInterface(Permission)
-    
-    # List view configuration  
-    list_columns = ['name']
-    search_columns = ['name']
-    
-    # Add/Edit form configuration
-    add_columns = ['name']
-    edit_columns = ['name']
-    show_columns = ['name', 'roles']
-    
-    # Security
-    base_permissions = ['can_add', 'can_edit', 'can_delete', 'can_list', 'can_show']
-    
-    # Custom labels
-    label_columns = {
-        'name': 'Permission Name',
-        'roles': 'Roles'
-    }
-    
-    # Ordering
-    base_order = ('name', 'asc')
+VIEW_CONTRACTS = [
+    ViewContract(
+        name="UserView",
+        model="User",
+        list_fields=["username", "first_name", "last_name", "email", "active", "last_login", "login_count"],
+        search_fields=["username", "first_name", "last_name", "email"],
+        edit_fields=["first_name", "last_name", "username", "email", "active", "roles"],
+        actions=[
+            ViewAction("activate_user", "Activate user", requires_confirmation=True),
+            ViewAction("deactivate_user", "Deactivate user", requires_confirmation=True),
+        ],
+    ),
+    ViewContract(
+        name="RoleView",
+        model="Role",
+        list_fields=["name"],
+        search_fields=["name"],
+        edit_fields=["name", "permissions"],
+    ),
+    ViewContract(
+        name="PermissionView",
+        model="Permission",
+        list_fields=["name"],
+        search_fields=["name"],
+        edit_fields=["name"],
+    ),
+]
+
+
+def list_views() -> list[str]:
+    return [view.name for view in VIEW_CONTRACTS]
+
+
+def describe_views() -> list[dict[str, Any]]:
+    return [view.to_manifest() for view in VIEW_CONTRACTS]

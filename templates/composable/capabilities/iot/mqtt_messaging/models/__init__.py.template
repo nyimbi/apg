@@ -1,63 +1,66 @@
 """
-MQTT Messaging Models
-=====================
+MQTT Messaging Model Contracts
+==============================
 
-Database models for MQTT Messaging capability.
+Framework-neutral APG model contracts for MQTT Messaging.
+Persistence adapters map these contracts to an ORM, document store, graph store,
+or event log at composition time.
 """
 
-from flask_appbuilder import Model
-from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
-class IoTBaseModel(AuditMixin, Model):
-    """Base model for IoT entities"""
-    __abstract__ = True
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    active = Column(Boolean, default=True)
+MODEL_CONTRACTS: list[str] = ['MQTTDevice', 'MQTTTopic', 'MQTTMessage']
 
 
-# Add IoT-specific models based on capability
+@dataclass(slots=True)
+class APGModelRecord:
+    """Portable APG model record."""
 
-class MQTTDevice(IoTBaseModel):
-    """MQTT IoT device model"""
-    __tablename__ = 'mqtt_devices'
-    
-    id = Column(Integer, primary_key=True)
-    device_id = Column(String(128), unique=True, nullable=False)
-    name = Column(String(256), nullable=False)
-    device_type = Column(String(64))
-    last_seen = Column(DateTime)
-    status = Column(String(32), default='offline')
-    
-    # MQTT specific fields
-    client_id = Column(String(128))
-    topics = relationship("MQTTTopic", back_populates="device")
+    model: str
+    data: dict[str, Any] = field(default_factory=dict)
+    record_id: str | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
 
-
-class MQTTTopic(IoTBaseModel):
-    """MQTT topic subscription model"""
-    __tablename__ = 'mqtt_topics'
-    
-    id = Column(Integer, primary_key=True)
-    topic_name = Column(String(256), nullable=False)
-    qos_level = Column(Integer, default=0)
-    device_id = Column(Integer, ForeignKey('mqtt_devices.id'))
-    
-    device = relationship("MQTTDevice", back_populates="topics")
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "record_id": self.record_id,
+            "data": dict(self.data),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
-class MQTTMessage(IoTBaseModel):
-    """MQTT message history"""
-    __tablename__ = 'mqtt_messages'
-    
-    id = Column(Integer, primary_key=True)
-    topic = Column(String(256), nullable=False)
-    payload = Column(Text)
-    qos = Column(Integer)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+@dataclass(slots=True)
+class MqttMessagingModelCatalog:
+    """Model catalog emitted by the MQTT Messaging capability."""
 
+    capability: str = 'MQTT Messaging'
+    category: str = 'iot'
+    models: list[str] = field(default_factory=lambda: list(MODEL_CONTRACTS))
+
+    def create_record(self, model: str, data: dict[str, Any] | None = None, record_id: str | None = None) -> APGModelRecord:
+        if model not in self.models:
+            raise ValueError(f"Unknown MQTT Messaging model: {model}")
+        return APGModelRecord(model=model, data=data or {}, record_id=record_id)
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "capability": self.capability,
+            "category": self.category,
+            "models": list(self.models),
+        }
+
+
+def list_models() -> list[str]:
+    return list(MODEL_CONTRACTS)
+
+
+def describe_models() -> dict[str, Any]:
+    return MqttMessagingModelCatalog().to_manifest()
