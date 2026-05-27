@@ -30,8 +30,15 @@ from cryptography.fernet import Fernet
 from cryptography.x509 import load_pem_x509_certificate
 import bcrypt
 import jwt
-from jose import jwe, jwk
+try:
+	from jose import jwe, jwk
+	JOSE_AVAILABLE = True
+except ModuleNotFoundError:
+	jwe = None
+	jwk = None
+	JOSE_AVAILABLE = False
 import httpx
+from pathlib import Path
 import urllib.parse
 from urllib.parse import urlencode, parse_qs
 from ...common.request_context import get_tenant_id_from_context
@@ -223,12 +230,28 @@ class SecurityAuditEvent:
 class CentralConfigurationSecurity:
 	"""Revolutionary zero-trust security engine for configuration management."""
 	
-	def __init__(self, security_policy: Optional[SecurityPolicy] = None):
+	def __init__(
+		self,
+		security_policy: Optional[SecurityPolicy] = None,
+		audit_store_path: Optional[Union[str, Path]] = None,
+		siem_endpoint: Optional[str] = None,
+		siem_client: Optional[Any] = None
+	):
 		"""Initialize security engine."""
 		self.security_policy = security_policy or self._default_security_policy()
 		self.encryption_keys: Dict[str, bytes] = {}
 		self.key_versions: Dict[str, int] = {}
 		self.audit_events: List[SecurityAuditEvent] = []
+		self.audit_log_path = Path(
+			audit_store_path
+			or os.getenv("APG_CONFIG_SECURITY_AUDIT_LOG")
+			or "/tmp/apg_config_security_audit.jsonl"
+		)
+		self.siem_endpoint = _clean_security_text(
+			siem_endpoint or os.getenv("APG_CONFIG_SECURITY_SIEM_URL")
+		)
+		self.siem_client = siem_client
+		self.siem_delivery_failures: List[Dict[str, Any]] = []
 		self.active_sessions: Dict[str, Dict[str, Any]] = {}
 		self.threat_intelligence: Dict[str, Any] = {}
 		self.oauth2_configurations: Dict[str, OAuth2Configuration] = {}
@@ -1945,14 +1968,50 @@ class CentralConfigurationSecurity:
 		return max(0.0, min(1.0, score))
 	
 	async def _store_audit_event(self, event: SecurityAuditEvent):
-		"""Store audit event to database (placeholder implementation)."""
-		# In production, this would store to a secure audit database
-		pass
+		"""Store audit event to durable local audit storage."""
+		payload = self._serialize_audit_event(event)
+		await asyncio.to_thread(self._append_audit_event, payload)
 	
 	async def _send_to_siem(self, event: SecurityAuditEvent):
-		"""Send event to SIEM system (placeholder implementation)."""
-		# In production, this would send to SIEM systems like Splunk, ELK, etc.
-		pass
+		"""Forward event to configured SIEM endpoint or injected SIEM client."""
+		payload = self._serialize_audit_event(event)
+		try:
+			if self.siem_client:
+				result = self.siem_client(payload)
+				if asyncio.iscoroutine(result):
+					await result
+			elif self.siem_endpoint:
+				async with httpx.AsyncClient(timeout=5.0) as client:
+					response = await client.post(self.siem_endpoint, json=payload)
+					response.raise_for_status()
+		except Exception as exc:
+			self.siem_delivery_failures.append({
+				"event_id": event.event_id,
+				"error": str(exc),
+				"failed_at": datetime.now(timezone.utc).isoformat()
+			})
+
+	def _append_audit_event(self, payload: Dict[str, Any]) -> None:
+		"""Append a serialized audit event as JSON Lines."""
+		self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+		with self.audit_log_path.open("a", encoding="utf-8") as audit_log:
+			audit_log.write(json.dumps(payload, sort_keys=True) + "\n")
+
+	def _serialize_audit_event(self, event: SecurityAuditEvent) -> Dict[str, Any]:
+		"""Serialize audit events for durable storage and SIEM forwarding."""
+		return {
+			"event_id": event.event_id,
+			"event_type": event.event_type,
+			"user_id": event.user_id,
+			"resource_id": event.resource_id,
+			"action": event.action,
+			"result": event.result,
+			"risk_score": event.risk_score,
+			"ip_address": event.ip_address,
+			"user_agent": event.user_agent,
+			"timestamp": event.timestamp.isoformat(),
+			"metadata": event.metadata
+		}
 	
 	async def _trigger_high_risk_alert(self, event: SecurityAuditEvent):
 		"""Trigger high-risk security alert."""

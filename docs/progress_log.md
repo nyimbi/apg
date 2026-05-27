@@ -3466,3 +3466,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_registry_mobile_sync.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 2 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:38 EAT
+
+Completed checkpoint:
+
+- Replaced Central Configuration security audit and SIEM no-op placeholders with executable JSONL audit persistence and SIEM forwarding.
+- Security audit events now serialize deterministic payloads, append to a configurable durable audit path, and forward through either an injected SIEM client or configured HTTP endpoint.
+- SIEM delivery failures are recorded without losing the audit event, and optional `python-jose` imports no longer prevent the security engine from importing in the uv environment.
+- Added focused audit sink, SIEM delivery, SIEM failure, and import regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/config/security_engine.py tests/test_composition_config_security_audit_sink.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_config_security_audit_sink.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed, 10 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
