@@ -477,6 +477,67 @@ class CRMService:
 			updated_by or "system"
 		)
 		return updated.model_copy(deep=True)
+
+	async def import_contacts(
+		self,
+		file_data: Union[str, bytes],
+		file_format: str,
+		tenant_id: str,
+		created_by: str,
+		mapping_config: Optional[Dict[str, str]] = None,
+		deduplicate: bool = True,
+		validate_data: bool = True
+	) -> Dict[str, Any]:
+		"""Import contacts through the executable import/export manager."""
+		try:
+			manager = ContactImportExportManager(self.db_manager, tenant_id)
+			return await manager.import_contacts(
+				file_data=file_data,
+				file_format=file_format,
+				mapping_config=mapping_config,
+				deduplicate=deduplicate,
+				validate_data=validate_data,
+				created_by=created_by
+			)
+		except Exception as e:
+			logger.error(f"Contact import failed: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Contact import failed: {str(e)}")
+
+	async def export_contacts(
+		self,
+		export_format: str,
+		tenant_id: str,
+		contact_ids: Optional[List[str]] = None,
+		filters: Optional[Dict[str, Any]] = None,
+		include_fields: Optional[List[str]] = None,
+		exclude_fields: Optional[List[str]] = None
+	) -> Tuple[Union[str, bytes], str]:
+		"""Export contacts through the executable import/export manager."""
+		try:
+			manager = ContactImportExportManager(self.db_manager, tenant_id)
+			return await manager.export_contacts(
+				export_format=export_format,
+				contact_ids=contact_ids,
+				filters=filters,
+				include_fields=include_fields,
+				exclude_fields=exclude_fields
+			)
+		except Exception as e:
+			logger.error(f"Contact export failed: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Contact export failed: {str(e)}")
+
+	async def get_import_template(
+		self,
+		file_format: str,
+		mapping_type: Optional[str] = None
+	) -> Tuple[Union[str, bytes], str]:
+		"""Generate a contact import template."""
+		try:
+			manager = ContactImportExportManager(self.db_manager, "template")
+			return await manager.get_import_template(file_format, mapping_type)
+		except Exception as e:
+			logger.error(f"Import template generation failed: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Import template generation failed: {str(e)}")
 	
 	# ================================
 	# Contact Management

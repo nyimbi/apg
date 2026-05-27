@@ -4641,3 +4641,20 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `488a672` (`Use executable CRM AI insights engine`) to `origin/main`.
+
+### 2026-05-28 02:50 EAT
+
+Completed checkpoint:
+
+- Made CRM contact import/export executable through `CRMService` instead of relying on methods accidentally nested under a placeholder database class.
+- Added service-backed contact import, export, and import-template methods that delegate to `ContactImportExportManager`.
+- Updated the CRM database manager with `list_contacts()`, model-compatible `bulk_create_contacts()`, and memory-backed duplicate lookup for import/export flows.
+- Aligned contact import normalization with the current `CRMContact` model so standalone imports no longer emit stale fields such as mobile, department, website, or LinkedIn profile.
+- Extended focused CRM API coverage to execute CSV contact import, JSON contact export, and CSV import-template generation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/adv/database.py capabilities/crm/adv/service.py capabilities/crm/adv/import_export.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 7 passed, 9 existing deprecation warnings
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

@@ -979,6 +979,27 @@ class DatabaseManager:
 		except Exception as e:
 			logger.error(f"Contact search failed: {str(e)}", exc_info=True)
 			raise DatabaseError(f"Contact search failed: {str(e)}")
+
+	async def list_contacts(
+		self,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Dict[str, Any]:
+		"""List contacts in the shape expected by import/export helpers."""
+		contacts, total_count = await self.search_contacts(
+			tenant_id=tenant_id,
+			filters=filters,
+			limit=limit,
+			offset=offset
+		)
+		return {
+			"items": contacts,
+			"total_count": total_count,
+			"limit": limit,
+			"offset": offset
+		}
 	
 	def _row_to_contact(self, row) -> CRMContact:
 		"""Convert database row to CRMContact model"""
@@ -1512,48 +1533,19 @@ class DatabaseManager:
 			success_count = 0
 			error_count = 0
 			errors = []
-			
-			async with self.get_connection() as conn:
-				async with conn.transaction():
-					for i, contact_data in enumerate(contacts_data):
-						try:
-							# Create CRMContact object
-							contact = CRMContact(**contact_data)
-							
-							# Insert contact
-							await conn.execute("""
-								INSERT INTO crm_contacts (
-									id, tenant_id, first_name, last_name, email, phone, mobile,
-									company, job_title, department, website, linkedin_profile,
-									contact_type, lead_source, lead_score, customer_health_score,
-									description, notes, address, city, state, postal_code, country,
-									created_by, updated_by, created_at, updated_at, version
-								) VALUES (
-									$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 
-									$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
-								)
-							""",
-								contact.id, contact.tenant_id, contact.first_name, contact.last_name,
-								contact.email, contact.phone, contact.mobile, contact.company,
-								contact.job_title, contact.department, contact.website, 
-								contact.linkedin_profile, contact.contact_type.value,
-								contact.lead_source.value if contact.lead_source else None,
-								contact.lead_score, contact.customer_health_score,
-								contact.description, contact.notes, contact.address,
-								contact.city, contact.state, contact.postal_code, contact.country,
-								contact.created_by, contact.updated_by, contact.created_at,
-								contact.updated_at, contact.version
-							)
-							
-							success_count += 1
-							
-						except Exception as e:
-							error_count += 1
-							errors.append({
-								"row": i + 1,
-								"error": str(e),
-								"data": contact_data
-							})
+
+			for index, contact_data in enumerate(contacts_data):
+				try:
+					contact = CRMContact(**contact_data)
+					await self.create_contact(contact)
+					success_count += 1
+				except Exception as e:
+					error_count += 1
+					errors.append({
+						"row": index + 1,
+						"error": str(e),
+						"data": contact_data
+					})
 			
 			logger.info(f"Bulk contact creation completed - Success: {success_count}, Errors: {error_count}")
 			
@@ -1581,6 +1573,17 @@ class DatabaseManager:
 		try:
 			if not emails:
 				return []
+
+			if self._using_memory_store():
+				email_set = {email.lower() for email in emails if email}
+				return [
+					self._clone_record(contact)
+					for contact in self._memory_records["crm_contacts"].values()
+					if contact.tenant_id == tenant_id
+					and contact.email
+					and str(contact.email).lower() in email_set
+					and contact.status != RecordStatus.DELETED
+				]
 			
 			async with self.get_connection() as conn:
 				# Use ANY operator for efficient email lookup

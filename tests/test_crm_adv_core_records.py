@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import importlib
 from datetime import date, datetime
 from decimal import Decimal
@@ -160,6 +161,46 @@ def test_crm_service_uses_executable_ai_insights_engine():
 		assert "account_account-ai" in service.ai_insights.insights_cache
 		assert lead_score == 50.0
 		assert win_probability == 0.5
+
+	asyncio.run(exercise())
+
+
+def test_crm_contact_import_export_endpoints_execute_standalone():
+	async def exercise():
+		service = CRMService()
+		csv_data = "first_name,last_name,email,company\nAmina,Buyer,amina@example.com,Acme\n"
+
+		imported = await crm_api.import_contacts(
+			import_request=crm_api.ImportRequest(
+				file_format="csv",
+				file_data=csv_data,
+			),
+			service=service,
+			tenant_id="tenant-imex",
+			user_id="seller-1",
+		)
+		export_response = await crm_api.export_contacts(
+			export_request=crm_api.ExportRequest(
+				export_format="json",
+				include_fields=["first_name", "last_name", "email", "company"],
+			),
+			service=service,
+			tenant_id="tenant-imex",
+		)
+		template_response = await crm_api.get_import_template(
+			file_format="csv",
+			mapping_type=None,
+			service=service,
+		)
+
+		export_payload = json.loads(export_response.body.decode("utf-8"))
+		template_text = template_response.body.decode("utf-8")
+
+		assert imported.data["imported_records"] == 1
+		assert imported.data["failed_records"] == 0
+		assert export_payload["contacts"][0]["email"] == "amina@example.com"
+		assert export_payload["contacts"][0]["company"] == "Acme"
+		assert "first_name,last_name,email" in template_text
 
 	asyncio.run(exercise())
 
