@@ -42,20 +42,20 @@ from .models import (
 	SMRoute,
 	SMLoadBalancer,
 	SMPolicy,
-	
+
 	# Monitoring models
 	SMMetrics,
 	SMTrace,
 	SMHealthCheck,
 	SMAlert,
 	SMTopology,
-	
+
 	# Configuration models
 	SMConfiguration,
 	SMCertificate,
 	SMSecurityPolicy,
 	SMRateLimiter,
-	
+
 	# Enums
 	ServiceStatus,
 	EndpointProtocol,
@@ -75,30 +75,46 @@ from .service import (
 	MetricsCollectionService
 )
 
-from .api import api_app, router as api_router
 from .apg_integration import APGServiceMeshIntegration
 
-# Flask-AppBuilder components
-from .blueprint import create_blueprint
-from .views import (
-	ASMServiceView,
-	ASMEndpointView,
-	ASMRouteView,
-	ASMLoadBalancerView,
-	ASMPolicyView,
-	ASMMetricsView,
-	ASMTopologyView
-)
+try:
+	from .api import api_app, router as api_router
+except ImportError:
+	api_app = None
+	api_router = None
+
+try:
+	from .blueprint import create_blueprint
+	from .views import (
+		ASMServiceView,
+		ASMEndpointView,
+		ASMRouteView,
+		ASMLoadBalancerView,
+		ASMPolicyView,
+		ASMMetricsView,
+		ASMTopologyView
+	)
+except ImportError:
+	def create_blueprint(*args, **kwargs):
+		raise RuntimeError("Flask-AppBuilder gateway UI dependencies are not installed")
+
+	ASMServiceView = None
+	ASMEndpointView = None
+	ASMRouteView = None
+	ASMLoadBalancerView = None
+	ASMPolicyView = None
+	ASMMetricsView = None
+	ASMTopologyView = None
 
 # Export main classes for external use
 __all__ = [
 	# Metadata
 	"CAPABILITY_INFO",
 	"__version__",
-	
+
 	# Models
 	"SMService",
-	"SMEndpoint", 
+	"SMEndpoint",
 	"SMRoute",
 	"SMLoadBalancer",
 	"SMPolicy",
@@ -111,7 +127,7 @@ __all__ = [
 	"SMCertificate",
 	"SMSecurityPolicy",
 	"SMRateLimiter",
-	
+
 	# Enums
 	"ServiceStatus",
 	"EndpointProtocol",
@@ -119,7 +135,7 @@ __all__ = [
 	"HealthStatus",
 	"PolicyType",
 	"RouteMatchType",
-	
+
 	# Services
 	"ASMService",
 	"ServiceDiscoveryService",
@@ -128,12 +144,12 @@ __all__ = [
 	"PolicyEngineService",
 	"HealthMonitoringService",
 	"MetricsCollectionService",
-	
+
 	# API and Integration
 	"api_app",
 	"api_router",
 	"APGServiceMeshIntegration",
-	
+
 	# UI Components
 	"create_blueprint",
 	"ASMServiceView",
@@ -152,7 +168,7 @@ import sys
 def setup_logging():
 	"""Setup logging configuration for the service mesh."""
 	logger = logging.getLogger(__name__)
-	
+
 	if not logger.handlers:
 		handler = logging.StreamHandler(sys.stdout)
 		formatter = logging.Formatter(
@@ -161,7 +177,7 @@ def setup_logging():
 		handler.setFormatter(formatter)
 		logger.addHandler(handler)
 		logger.setLevel(logging.INFO)
-	
+
 	return logger
 
 # Initialize logger
@@ -177,7 +193,7 @@ def health_check() -> dict[str, str]:
 		"version": __version__,
 		"components": [
 			"service_discovery",
-			"traffic_management", 
+			"traffic_management",
 			"load_balancing",
 			"health_monitoring",
 			"metrics_collection"
@@ -192,7 +208,7 @@ def get_capability_info() -> dict[str, any]:
 		"health_check": health_check,
 		"api_endpoints": [
 			"/api/services",
-			"/api/routes", 
+			"/api/routes",
 			"/api/load-balancers",
 			"/api/policies",
 			"/api/metrics",

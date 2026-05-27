@@ -3514,3 +3514,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_registry_marketplace_transport.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 2 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:59 EAT
+
+Completed checkpoint:
+
+- Replaced API Service Mesh composition health monitoring's no-op placeholder with executable service-health evaluation.
+- Composition health checks now resolve live mesh service health from the ASM service, update composition status, record current unhealthy services, append first-detected failures, persist the cached composition, and publish a composition health event.
+- Restored gateway package importability in the local uv environment by moving reserved SQLAlchemy `metadata` mapped attributes to `metadata_json` columns with legacy instance accessors, updating gateway Pydantic regex constraints to v2-compatible `pattern`, making Redis optional for injected/fake runtimes, and deferring optional API/UI imports when their runtime dependencies are absent.
+- Added focused gateway composition health regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/__init__.py capabilities/composition/gateway/models.py capabilities/composition/gateway/service.py capabilities/composition/gateway/apg_integration.py tests/test_composition_gateway_composition_health.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_gateway_composition_health.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 4 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

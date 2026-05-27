@@ -19,7 +19,13 @@ from dataclasses import dataclass
 from enum import Enum
 
 import httpx
-import redis.asyncio as redis
+try:
+	import redis.asyncio as redis
+except ModuleNotFoundError:
+	class _RedisModule:
+		class Redis:
+			pass
+	redis = _RedisModule()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select, update, delete, func, and_, or_

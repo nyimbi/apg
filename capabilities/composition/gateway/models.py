@@ -120,7 +120,7 @@ class SMService(Base):
 	# Service metadata
 	description = Column(Text)
 	tags = Column(JSONB, default=list)
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Status and health
 	status = Column(String(50), nullable=False, default=ServiceStatus.REGISTERING.value)
@@ -171,7 +171,7 @@ class SMEndpoint(Base):
 	# Configuration
 	weight = Column(Integer, default=100)
 	enabled = Column(Boolean, default=True)
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Health check configuration
 	health_check_path = Column(String(500), default="/health")
@@ -341,7 +341,7 @@ class SMPolicy(Base):
 	
 	# Description and metadata
 	description = Column(Text)
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Relationships
 	route = relationship("SMRoute", back_populates="policies")
@@ -391,7 +391,7 @@ class SMMetrics(Base):
 	status_code = Column(Integer)
 	
 	# Additional metadata
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Relationships
 	service = relationship("SMService", back_populates="metrics")
@@ -526,7 +526,7 @@ class SMAlert(Base):
 	
 	# Description and metadata
 	description = Column(Text)
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Multi-tenancy and audit
 	tenant_id = Column(String(50), nullable=False)
@@ -572,7 +572,7 @@ class SMTopology(Base):
 	last_communication_at = Column(DateTime(timezone=True))
 	
 	# Metadata
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Multi-tenancy and audit
 	tenant_id = Column(String(50), nullable=False)
@@ -613,7 +613,7 @@ class SMConfiguration(Base):
 	
 	# Description and metadata
 	description = Column(Text)
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Multi-tenancy and audit
 	tenant_id = Column(String(50), nullable=False)
@@ -659,7 +659,7 @@ class SMCertificate(Base):
 	renewal_days_before = Column(Integer, default=30)
 	
 	# Metadata
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Multi-tenancy and audit
 	tenant_id = Column(String(50), nullable=False)
@@ -706,7 +706,7 @@ class SMSecurityPolicy(Base):
 	
 	# Description and metadata
 	description = Column(Text)
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Multi-tenancy and audit
 	tenant_id = Column(String(50), nullable=False)
@@ -752,7 +752,7 @@ class SMRateLimiter(Base):
 	enforcement_mode = Column(String(50), default="enforce")  # enforce, monitor
 	
 	# Metadata and configuration
-	metadata = Column(JSONB, default=dict)
+	metadata_json = Column("metadata", JSONB, default=dict)
 	
 	# Multi-tenancy and audit
 	tenant_id = Column(String(50), nullable=False)
@@ -1091,9 +1091,9 @@ class NaturalLanguagePolicyRequest(BaseModel):
 	
 	policy_name: str = Field(..., min_length=1, max_length=255)
 	natural_language_intent: str = Field(..., min_length=10, max_length=5000)
-	deployment_strategy: Optional[str] = Field(None, regex=r'^(canary|blue_green|rolling|immediate)$')
+	deployment_strategy: Optional[str] = Field(None, pattern=r'^(canary|blue_green|rolling|immediate)$')
 	compliance_requirements: List[str] = Field(default_factory=list)
-	risk_tolerance: str = Field("medium", regex=r'^(low|medium|high)$')
+	risk_tolerance: str = Field("medium", pattern=r'^(low|medium|high)$')
 
 class IntelligentTopologyRequest(BaseModel):
 	"""Pydantic model for intelligent topology requests."""
@@ -1103,7 +1103,7 @@ class IntelligentTopologyRequest(BaseModel):
 	include_predictions: bool = True
 	prediction_horizon_hours: int = Field(24, gt=0, le=168)  # Max 1 week
 	collaboration_enabled: bool = False
-	analysis_depth: str = Field("standard", regex=r'^(basic|standard|deep)$')
+	analysis_depth: str = Field("standard", pattern=r'^(basic|standard|deep)$')
 
 class CollaborativeSessionRequest(BaseModel):
 	"""Pydantic model for collaborative troubleshooting sessions."""
@@ -1112,9 +1112,9 @@ class CollaborativeSessionRequest(BaseModel):
 	session_name: str = Field(..., min_length=1, max_length=255)
 	problem_description: str = Field(..., min_length=10, max_length=5000)
 	affected_services: List[str] = Field(..., min_items=1)
-	session_type: str = Field("troubleshooting", regex=r'^(troubleshooting|optimization|planning)$')
+	session_type: str = Field("troubleshooting", pattern=r'^(troubleshooting|optimization|planning)$')
 	invite_participants: List[str] = Field(default_factory=list)
-	ai_assistance_level: str = Field("standard", regex=r'^(minimal|standard|advanced)$')
+	ai_assistance_level: str = Field("standard", pattern=r'^(minimal|standard|advanced)$')
 
 class AutoRemediationConfig(BaseModel):
 	"""Pydantic model for autonomous remediation configuration."""
@@ -1132,10 +1132,31 @@ class FederatedLearningConfig(BaseModel):
 	model_config = ConfigDict(extra='forbid', validate_assignment=True)
 	
 	participation_enabled: bool = True
-	privacy_level: str = Field("high", regex=r'^(standard|high|maximum)$')
-	data_sharing_scope: str = Field("performance_only", regex=r'^(performance_only|topology_patterns|full_insights)$')
+	privacy_level: str = Field("high", pattern=r'^(standard|high|maximum)$')
+	data_sharing_scope: str = Field("performance_only", pattern=r'^(performance_only|topology_patterns|full_insights)$')
 	contribution_weight: float = Field(1.0, ge=0.1, le=10.0)
 	update_frequency_hours: int = Field(24, gt=0, le=168)
+
+def _get_model_metadata(instance: Any) -> Dict[str, Any]:
+	"""Expose legacy instance.metadata access without using a reserved mapped name."""
+	return instance.metadata_json or {}
+
+def _set_model_metadata(instance: Any, value: Optional[Dict[str, Any]]) -> None:
+	instance.metadata_json = value or {}
+
+for _metadata_model in (
+	SMService,
+	SMEndpoint,
+	SMPolicy,
+	SMMetrics,
+	SMAlert,
+	SMTopology,
+	SMConfiguration,
+	SMCertificate,
+	SMSecurityPolicy,
+	SMRateLimiter,
+):
+	_metadata_model.metadata = property(_get_model_metadata, _set_model_metadata)
 
 # Create all database tables
 def create_tables(engine):
