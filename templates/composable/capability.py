@@ -486,34 +486,39 @@ This module handles integrating the capability into the base application.
 
 import logging
 from importlib import import_module
-from flask import Blueprint
-from flask_appbuilder import BaseView
 
 # Configure logging
 log = logging.getLogger(__name__)
 
-# Create capability blueprint
-{capability.name.lower().replace(' ', '_')}_bp = Blueprint(
-    '{capability.name.lower().replace(' ', '_')}',
-    __name__,
-    url_prefix='/{capability.category.value}/{capability.name.lower().replace(' ', '_')}',
-    template_folder='templates',
-    static_folder='static'
-)
+CAPABILITY_CONTRACT = {{
+    'name': '{capability.name}',
+    'category': '{capability.category.value}',
+    'version': '{capability.version}',
+    'features': {capability.features},
+    'models': {capability.integration.models},
+    'views': {capability.integration.views},
+    'apis': {capability.integration.apis},
+    'templates': {capability.integration.templates},
+    'static_files': {capability.integration.static_files},
+    'configuration': {capability.integration.config_additions}
+}}
 
 
-def integrate_{capability.name.lower().replace(' ', '_')}(app, appbuilder, db):
+def integrate_{capability.name.lower().replace(' ', '_')}(application=None, registry=None, configuration=None):
     """
-    Integrate {capability.name} capability into the application.
+    Register {capability.name} capability metadata with an APG application.
 
     Args:
-        app: Flask application instance
-        appbuilder: Flask-AppBuilder instance
-        db: SQLAlchemy database instance
+        application: Optional APG application object.
+        registry: Optional capability registry or dict.
+        configuration: Optional capability configuration overrides.
     """
     try:
-        # Register blueprint
-        app.register_blueprint({capability.name.lower().replace(' ', '_')}_bp)
+        contract = dict(CAPABILITY_CONTRACT)
+        contract['configuration'] = {{
+            **contract.get('configuration', {{}}),
+            **(configuration or {{}})
+        }}
 
         # Import optional capability modules without invalid function-local star imports.
         package_prefix = f"{{__package__}}." if __package__ else ""
@@ -523,15 +528,17 @@ def integrate_{capability.name.lower().replace(' ', '_')}(app, appbuilder, db):
             except ImportError as import_error:
                 log.debug(f"Optional {capability.name} module {{module_name}} not loaded: {{import_error}}")
 
-        # Register views with AppBuilder
-        # appbuilder.add_view(YourView, "Your View", category="{capability.name}")
+        if registry is not None:
+            if hasattr(registry, "register_capability"):
+                registry.register_capability(contract)
+            elif isinstance(registry, dict):
+                registry[contract['name']] = contract
 
-        # Apply configuration
-        config_additions = {capability.integration.config_additions}
-        for key, value in config_additions.items():
-            app.config[key] = value
+        if application is not None and hasattr(application, "capabilities"):
+            application.capabilities[contract['name']] = contract
 
         log.info(f"Successfully integrated {capability.name} capability")
+        return contract
 
     except Exception as e:
         log.error(f"Failed to integrate {capability.name} capability: {{e}}")
@@ -545,26 +552,31 @@ class {capability.name.replace(' ', '')}Capability:
     This class provides the core functionality of the {capability.name} capability.
     """
 
-    def __init__(self, app=None, appbuilder=None, db=None):
-        self.app = app
-        self.appbuilder = appbuilder
-        self.db = db
+    def __init__(self, application=None, registry=None, configuration=None):
+        self.application = application
+        self.registry = registry
+        self.config = configuration or {{}}
 
-        if app is not None:
-            self.init_app(app, appbuilder, db)
+        if application is not None or registry is not None:
+            self.init_app(application, registry, configuration)
 
-    def init_app(self, app, appbuilder, db):
+    def init_app(self, application=None, registry=None, configuration=None):
         """Initialize the capability with the application"""
-        self.app = app
-        self.appbuilder = appbuilder
-        self.db = db
+        self.application = application
+        self.registry = registry
+        self.config = configuration or self.config
 
         # Capability-specific initialization
         self._initialize_capability()
+        self.contract = integrate_{capability.name.lower().replace(' ', '_')}(application, registry, self.config)
+        return self.contract
 
     def _initialize_capability(self):
         """Initialize capability-specific components"""
-        self.config = dict({capability.integration.config_additions})
+        self.config = {{
+            **dict({capability.integration.config_additions}),
+            **getattr(self, 'config', {{}})
+        }}
         self.metadata = {{
             'name': '{capability.name}',
             'category': '{capability.category.value}',
@@ -827,14 +839,14 @@ CORE_CAPABILITIES = [
     Capability(
         name="PostgreSQL Database",
         category=CapabilityCategory.DATA,
-        description="PostgreSQL database with SQLAlchemy integration",
+        description="PostgreSQL database adapter with Python-first configuration",
         version="1.0.0",
-        python_requirements=["psycopg2-binary>=2.9.0", "SQLAlchemy>=2.0.0"],
+        python_requirements=["psycopg2-binary>=2.9.0"],
         system_requirements=["PostgreSQL 12+"],
         features=["Database Connectivity", "Migrations", "Connection Pooling"],
         compatible_bases=["flask_webapp", "microservice", "dashboard"],
         integration=CapabilityIntegration(
-            config_additions={"SQLALCHEMY_DATABASE_URI": "postgresql://user:pass@localhost/db"}
+            config_additions={"DATABASE_URL": "postgresql://user:pass@localhost/db"}
         )
     ),
 
@@ -906,7 +918,7 @@ CORE_CAPABILITIES = [
         category=CapabilityCategory.COMMUNICATION,
         description="Real-time WebSocket communication",
         version="1.0.0",
-        python_requirements=["Flask-SocketIO>=5.3.0", "eventlet>=0.33.0"],
+        python_requirements=[],
         features=["Real-time Messaging", "Room Management", "Event Broadcasting"],
         compatible_bases=["real_time", "flask_webapp"],
         integration=CapabilityIntegration(

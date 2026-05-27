@@ -4,7 +4,7 @@ Vision & IoT Integration Tests
 ==============================
 
 Comprehensive integration tests for computer vision and IoT capabilities,
-including Flask-AppBuilder blueprint integration and end-to-end workflows.
+including Python-first integration contracts and end-to-end workflows.
 """
 
 import asyncio

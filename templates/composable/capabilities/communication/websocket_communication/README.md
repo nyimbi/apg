@@ -18,8 +18,7 @@ Real-time WebSocket communication
 
 ### Python Packages
 
-- Flask-SocketIO>=5.3.0
-- eventlet>=0.33.0
+No default package dependencies. Configure a concrete WebSocket transport adapter at application composition time.
 
 ### System Requirements
 

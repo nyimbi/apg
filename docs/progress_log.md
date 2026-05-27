@@ -4151,3 +4151,23 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_code_generator_executable_defaults.py tests/test_apg_language_contract.py tests/test_capability_composition_runtime.py tests/test_ai_agent_composition.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 26 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 08:29 EAT
+
+Completed checkpoint:
+
+- Aligned the legacy `templates/template_manager.py` scaffold with the Python artifact flow.
+- Removed Flask-AppBuilder, Flask, SQLAlchemy, localhost web-app, and `python app.py` guidance from the generated template README/config/requirements content.
+- Converted the WebSocket composable capability and generator from framework blueprint stubs to dependency-light APG capability contract registration.
+- Removed default `Flask-SocketIO`/`eventlet` requirements from the WebSocket capability and kept transport selection as an explicit composition-time adapter decision.
+- Updated stale integration-test wording so tests describe Python-first API and integration contracts.
+- Extended repository hygiene coverage to include `templates/template_manager.py`.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile templates/composable/capability.py templates/composable/capabilities/communication/websocket_communication/integration.py.template templates/template_manager.py tests/test_repository_hygiene.py`
+- `python -m json.tool templates/composable/capabilities/communication/websocket_communication/capability.json`
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py tests/test_composable_template_executable_defaults.py` -> 12 passed
+- `rg -n "flask_appbuilder|Flask-AppBuilder|SQLAlchemy>=2.0.0|Flask-SocketIO|eventlet|from flask import Blueprint" templates/composable/capability.py templates/composable/capabilities/communication/websocket_communication templates/template_manager.py tests/test_system_integration_simple.py tests/test_vision_iot_integration.py` -> no matches
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

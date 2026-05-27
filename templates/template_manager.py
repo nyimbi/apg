@@ -879,11 +879,13 @@ db AssistantDatabase {
 
 4. Run the application:
    ```bash
-   python app.py
+   python generated/app.py
    ```
 
-5. Access the application:
-   Open http://localhost:8080
+5. Inspect the generated manifest:
+   ```bash
+   python -m json.tool generated/app_manifest.json
+   ```
 
 ## Usage
 
@@ -914,12 +916,7 @@ Generated with APG (Application Programming Generation) language.
 		
 		# Requirements template
 		files["requirements.txt.template"] = '''# APG Generated Application Requirements
-Flask-AppBuilder>=4.3.0
-Flask>=2.3.0
-Flask-SQLAlchemy>=3.0.0
-SQLAlchemy>=2.0.0
-WTForms>=3.0.0
-Werkzeug>=2.3.0
+# Python-first templates are standard-library only by default.
 
 # Template-specific requirements
 ''' + self._get_template_requirements(template_type)
@@ -929,11 +926,10 @@ Werkzeug>=2.3.0
 Application Configuration
 ========================
 
-Configuration for {{project_name}} Flask-AppBuilder application.
+Configuration for {{project_name}} Python application artifact flow.
 """
 
 import os
-from flask_appbuilder.security.manager import AUTH_DB
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -941,11 +937,10 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
 
 # Database
-SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(basedir, 'app.db')
+DATABASE_URL = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(basedir, 'app.db')
 
-# Flask-AppBuilder
+# APG application metadata
 APP_NAME = "{{project_name}}"
-AUTH_TYPE = AUTH_DB
 
 # Template-specific configuration
 ''' + self._get_template_config_extra(template_type)
@@ -1031,7 +1026,7 @@ celery>=5.0.0
 '''
 		else:
 			return '''
-# Basic web application requirements
+# Basic Python application requirements
 requests>=2.28.0
 '''
 	
