@@ -4,6 +4,8 @@ Customer Relationship Management (CRM) Capabilities
 Complete customer lifecycle and relationship management
 """
 
+from importlib import import_module
+
 __version__ = "1.0.0"
 
 from .cdp import *
@@ -18,7 +20,11 @@ from .ord import *  # Order Entry
 from .pro import *  # Order Processing
 from .pri import *  # Pricing & Discounts
 from .quo import *  # Quotations
-from .for import *  # Sales Forecasting
+_sales_forecasting = import_module(".for", __name__)
+for _name in getattr(_sales_forecasting, "__all__", ()):
+    globals()[_name] = getattr(_sales_forecasting, _name)
+globals().pop("_name", None)
+del _sales_forecasting
 
 __all__ = [
     "cdp",  # Customer Data Platform

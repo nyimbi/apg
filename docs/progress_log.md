@@ -4423,3 +4423,29 @@ Battery-conscious verification:
 - `rg -n "Flask-AppBuilder|flask_appbuilder|Flask Web Application|FastAPI Integration|Dynamic Flask integration|Flask, SQLAlchemy|python app.py|http://localhost:8080|SQLAlchemy integration" docs/reports/system_capabilities_report.md docs/reports/final_system_report.md docs/reports/final_system_summary.md docs/reports/marketplace_completion_report.md templates/composable/__init__.py templates/composable/bases/python_web/__init__.py.template templates/composable/capabilities/data/postgresql_database/__init__.py.template tests/test_complete_app_generation.py tests/test_final_verification.py` -> no matches
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+### 2026-05-27 17:35 EAT
+
+Commit result:
+
+- Pushed commit `5debe71` (`Refresh capability contract documentation`) to `origin/main`.
+
+Completed checkpoint:
+
+- Replaced CRM advanced account, lead, opportunity, and activity database placeholders with concrete create/get/update behavior.
+- Added uninitialized in-memory CRM storage for focused capability execution without requiring a local PostgreSQL pool.
+- Kept PostgreSQL-backed paths for the same CRM records through shared insert/get/update helpers.
+- Fixed CRM package import syntax for the reserved `for` sales-forecasting subpackage.
+- Added standalone fallbacks for missing APG core AI/event imports in CRM AI insights.
+- Fixed opportunity expected-revenue calculation to preserve `Decimal` arithmetic.
+- Added an `ActivityStatus` enum required by CRM activity-tracking imports.
+- Wired CRM service lead/opportunity get/update methods through the database manager and prevented default service construction from using the old local database stub.
+- Added focused root tests for CRM package import, memory-backed record CRUD, tenant isolation, stage/status updates, and expected revenue.
+
+Battery-conscious verification:
+
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 2 passed, 1 existing Pydantic V1-validator deprecation warning
+- `.venv/bin/python -m py_compile capabilities/crm/__init__.py capabilities/crm/adv/models.py capabilities/crm/adv/database.py capabilities/crm/adv/ai_insights.py capabilities/crm/adv/service.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/python - <<'PY' ... import capabilities.crm; from capabilities.crm.adv.database import DatabaseManager ... PY` -> CRM package and advanced database/models imported
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

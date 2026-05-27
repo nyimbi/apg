@@ -128,6 +128,16 @@ class ActivityType(str, Enum):
 	OTHER = "other"
 
 
+class ActivityStatus(str, Enum):
+	"""Activity workflow statuses"""
+	PLANNED = "planned"
+	SCHEDULED = "scheduled"
+	IN_PROGRESS = "in_progress"
+	COMPLETED = "completed"
+	CANCELLED = "cancelled"
+	OVERDUE = "overdue"
+
+
 class Priority(str, Enum):
 	"""Priority levels"""
 	LOW = "low"
@@ -340,7 +350,7 @@ class CRMOpportunity(BaseAuditModel):
 	def calculate_expected_revenue(cls, v, values):
 		"""Calculate expected revenue if not provided"""
 		if v is None and 'amount' in values and 'probability' in values:
-			return values['amount'] * (values['probability'] / 100)
+			return values['amount'] * (Decimal(str(values['probability'])) / Decimal("100"))
 		return v
 
 
@@ -417,7 +427,7 @@ __all__ = [
 	
 	# Enums
 	"RecordStatus", "ContactType", "AccountType", "LeadSource", "LeadStatus",
-	"OpportunityStage", "ActivityType", "Priority",
+	"OpportunityStage", "ActivityType", "ActivityStatus", "Priority",
 	
 	# Base Models
 	"BaseAuditModel", "Address", "PhoneNumber",

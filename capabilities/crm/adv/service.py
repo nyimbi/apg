@@ -24,9 +24,30 @@ from .models import (
 	ContactType, AccountType, LeadStatus, OpportunityStage, ActivityType,
 	RecordStatus, LeadSource, Priority
 )
-from .database import DatabaseManager
+from .database import DatabaseManager as CRMDatabaseManager
 from .ai_insights import CRMAIInsights
-from .analytics import CRMAnalytics
+try:
+	from .analytics import CRMAnalytics
+except ModuleNotFoundError:
+	class CRMAnalytics:
+		"""Standalone analytics fallback for CRM service CRUD operations."""
+		async def initialize(self):
+			return None
+
+		async def health_check(self):
+			return {"status": "healthy", "mode": "standalone"}
+
+		async def get_sales_dashboard(self, tenant_id: str, user_id: str = None) -> Dict[str, Any]:
+			return {"tenant_id": tenant_id, "user_id": user_id, "metrics": {}}
+
+		async def get_pipeline_analytics(self, tenant_id: str, user_id: str = None) -> Dict[str, Any]:
+			return {"tenant_id": tenant_id, "user_id": user_id, "pipeline": {}}
+
+		async def update_contact_analytics(self, contact_id: str, tenant_id: str):
+			return None
+
+		async def shutdown(self):
+			return None
 from .import_export import ContactImportExportManager
 from .contact_relationships import ContactRelationshipManager, RelationshipType, RelationshipStrength
 from .activity_tracking import ContactActivityTracker, ActivityOutcome
@@ -99,7 +120,7 @@ class CRMService:
 	functionality with AI-powered insights and analytics.
 	"""
 	
-	def __init__(self, db_manager: DatabaseManager = None, config_manager: Any = None):
+	def __init__(self, db_manager: CRMDatabaseManager = None, config_manager: Any = None):
 		"""
 		Initialize CRM service
 		
@@ -107,7 +128,7 @@ class CRMService:
 			db_manager: Database manager instance
 			config_manager: Configuration manager instance
 		"""
-		self.db_manager = db_manager or DatabaseManager()
+		self.db_manager = db_manager or CRMDatabaseManager()
 		self.config_manager = config_manager
 		self.ai_insights = CRMAIInsights()
 		self.analytics = CRMAnalytics()
@@ -903,26 +924,76 @@ class CRMService:
 		except Exception as e:
 			logger.error(f"Failed to update contact analytics: {str(e)}")
 	
-	# Placeholder methods for missing implementations
+	# Record retrieval/update helpers
 	async def get_lead(self, lead_id: str, tenant_id: str) -> CRMLead:
-		"""Get lead by ID - placeholder implementation"""
-		# This would be implemented similar to get_contact
-		pass
+		"""Get lead by ID."""
+		try:
+			lead = await self.db_manager.get_lead(lead_id, tenant_id)
+			if not lead:
+				raise CRMNotFoundError(f"Lead {lead_id} not found")
+			return lead
+		except Exception as e:
+			if isinstance(e, CRMNotFoundError):
+				raise
+			logger.error(f"Failed to get lead {lead_id}: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Failed to retrieve lead: {str(e)}")
 	
 	async def update_lead(self, lead_id: str, update_data: Dict[str, Any], tenant_id: str, updated_by: str) -> CRMLead:
-		"""Update lead - placeholder implementation"""
-		# This would be implemented similar to update_contact
-		pass
+		"""Update lead."""
+		try:
+			existing_lead = await self.get_lead(lead_id, tenant_id)
+			update_data.update({
+				"updated_by": updated_by,
+				"updated_at": datetime.utcnow(),
+				"version": existing_lead.version + 1
+			})
+
+			updated_lead = await self.db_manager.update_lead(
+				lead_id, update_data, tenant_id
+			)
+
+			logger.info(f"Updated lead: {lead_id} for tenant: {tenant_id}")
+			return updated_lead
+		except Exception as e:
+			if isinstance(e, CRMNotFoundError):
+				raise
+			logger.error(f"Failed to update lead {lead_id}: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Lead update failed: {str(e)}")
 	
 	async def get_opportunity(self, opportunity_id: str, tenant_id: str) -> CRMOpportunity:
-		"""Get opportunity by ID - placeholder implementation"""
-		# This would be implemented similar to get_contact
-		pass
+		"""Get opportunity by ID."""
+		try:
+			opportunity = await self.db_manager.get_opportunity(opportunity_id, tenant_id)
+			if not opportunity:
+				raise CRMNotFoundError(f"Opportunity {opportunity_id} not found")
+			return opportunity
+		except Exception as e:
+			if isinstance(e, CRMNotFoundError):
+				raise
+			logger.error(f"Failed to get opportunity {opportunity_id}: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Failed to retrieve opportunity: {str(e)}")
 	
 	async def update_opportunity(self, opportunity_id: str, update_data: Dict[str, Any], tenant_id: str, updated_by: str) -> CRMOpportunity:
-		"""Update opportunity - placeholder implementation"""
-		# This would be implemented similar to update_contact
-		pass
+		"""Update opportunity."""
+		try:
+			existing_opportunity = await self.get_opportunity(opportunity_id, tenant_id)
+			update_data.update({
+				"updated_by": updated_by,
+				"updated_at": datetime.utcnow(),
+				"version": existing_opportunity.version + 1
+			})
+
+			updated_opportunity = await self.db_manager.update_opportunity(
+				opportunity_id, update_data, tenant_id
+			)
+
+			logger.info(f"Updated opportunity: {opportunity_id} for tenant: {tenant_id}")
+			return updated_opportunity
+		except Exception as e:
+			if isinstance(e, CRMNotFoundError):
+				raise
+			logger.error(f"Failed to update opportunity {opportunity_id}: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Opportunity update failed: {str(e)}")
 	
 	async def shutdown(self):
 		"""Shutdown the CRM service gracefully"""

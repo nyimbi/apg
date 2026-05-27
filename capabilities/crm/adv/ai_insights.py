@@ -22,12 +22,36 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
 
-# APG Core imports (these would be actual APG framework imports)
-from apg.core.ai import AIOrchestrator, MLModel, PredictionResult
-from apg.core.events import EventBus
+# APG Core imports. Local fallbacks keep this capability executable when the
+# standalone repository is used without an installed APG runtime package.
+try:
+	from apg.core.ai import AIOrchestrator, MLModel, PredictionResult
+except ModuleNotFoundError:
+	class AIOrchestrator:
+		"""Minimal local AI orchestrator used by standalone CRM tests."""
+		pass
+
+	class MLModel:
+		"""Minimal local ML model marker used by standalone CRM tests."""
+		pass
+
+	@dataclass
+	class PredictionResult:
+		"""Minimal prediction result used by standalone CRM tests."""
+		prediction: Any = None
+		confidence: float = 0.0
+		metadata: Optional[Dict[str, Any]] = None
+
+try:
+	from apg.core.events import EventBus
+except ModuleNotFoundError:
+	class EventBus:
+		"""Minimal local event bus used by standalone CRM tests."""
+		async def publish(self, *_args, **_kwargs) -> None:
+			return None
 
 # Local imports
-from .models import CRMContact, CRMLead, CRMOpportunity, ContactType, LeadStatus, OpportunityStage
+from .models import CRMContact, CRMAccount, CRMLead, CRMOpportunity, ContactType, LeadStatus, OpportunityStage
 
 
 logger = logging.getLogger(__name__)

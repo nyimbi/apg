@@ -14,13 +14,18 @@ import asyncio
 import logging
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Dict, List, Any, Optional, Union, Tuple
+from typing import Dict, List, Any, Optional, Union, Tuple, Type
 from contextlib import asynccontextmanager
 import json
 
-import asyncpg
-from asyncpg import Pool, Connection
-from pydantic import ValidationError
+try:
+	import asyncpg
+	from asyncpg import Pool, Connection
+except ModuleNotFoundError:  # pragma: no cover - exercised when CRM runs in memory-only mode
+	asyncpg = None
+	Pool = Any
+	Connection = Any
+from pydantic import BaseModel, ValidationError
 
 # Local imports
 from .models import (
@@ -74,6 +79,13 @@ class DatabaseManager:
 		# Performance settings
 		self.query_timeout = self.config.get("query_timeout", 30)
 		self.statement_cache_size = self.config.get("statement_cache_size", 1024)
+		self._memory_records: Dict[str, Dict[str, BaseModel]] = {
+			"crm_contacts": {},
+			"crm_accounts": {},
+			"crm_leads": {},
+			"crm_opportunities": {},
+			"crm_activities": {}
+		}
 		
 		logger.info("🗄️ DatabaseManager initialized with advanced PostgreSQL configuration")
 	
@@ -102,6 +114,10 @@ class DatabaseManager:
 		"""
 		try:
 			logger.info("🔧 Initializing database connections...")
+			if asyncpg is None:
+				raise DatabaseConnectionError(
+					"asyncpg is required to initialize PostgreSQL CRM storage"
+				)
 			
 			# Create connection pool
 			self.pool = await asyncpg.create_pool(
@@ -426,11 +442,217 @@ class DatabaseManager:
 		async with self.pool.acquire() as conn:
 			yield conn
 	
+	def get_connection_pool(self) -> Optional[Pool]:
+		"""Return the active connection pool when the database is initialized."""
+		return self.pool
+
 	def _ensure_tenant_isolation(self, tenant_id: str):
 		"""Ensure tenant ID is provided for isolation"""
 		if not tenant_id:
 			raise TenantIsolationError("Tenant ID is required for all operations")
 	
+	def _using_memory_store(self) -> bool:
+		"""Use local storage when the database pool has not been initialized."""
+		return not self._initialized or self.pool is None
+
+	def _clone_record(self, record: BaseModel) -> BaseModel:
+		"""Return a detached copy so callers cannot mutate stored state."""
+		return record.model_copy(deep=True)
+
+	def _store_memory_record(self, table_name: str, record: BaseModel) -> BaseModel:
+		self._memory_records[table_name][record.id] = self._clone_record(record)
+		return self._clone_record(record)
+
+	def _get_memory_record(self, table_name: str, record_id: str, tenant_id: str) -> Optional[BaseModel]:
+		record = self._memory_records[table_name].get(record_id)
+		if not record or record.tenant_id != tenant_id:
+			return None
+		status = getattr(record, "status", None)
+		if status == RecordStatus.DELETED:
+			return None
+		return self._clone_record(record)
+
+	def _update_memory_record(
+		self,
+		table_name: str,
+		record_id: str,
+		update_data: Dict[str, Any],
+		tenant_id: str
+	) -> BaseModel:
+		record = self._memory_records[table_name].get(record_id)
+		if not record or record.tenant_id != tenant_id:
+			raise DatabaseError(f"Record {record_id} not found or not accessible")
+
+		mutable_updates = {
+			key: value for key, value in update_data.items()
+			if key not in {"id", "tenant_id", "created_at", "created_by"}
+		}
+		mutable_updates["updated_at"] = mutable_updates.get("updated_at", datetime.utcnow())
+		record_data = record.model_dump()
+		record_data.update(mutable_updates)
+		updated = record.__class__(**record_data)
+		self._memory_records[table_name][record_id] = updated
+		return self._clone_record(updated)
+
+	def _json_dump(self, value: Any) -> str:
+		"""Serialize model/list/dict values for JSONB columns."""
+		if isinstance(value, BaseModel):
+			value = value.model_dump(mode="json")
+		elif isinstance(value, list):
+			value = [
+				item.model_dump(mode="json") if isinstance(item, BaseModel) else item
+				for item in value
+			]
+		elif isinstance(value, dict):
+			value = {
+				key: item.model_dump(mode="json") if isinstance(item, BaseModel) else item
+				for key, item in value.items()
+			}
+		return json.dumps(value)
+
+	def _db_value(self, value: Any, json_field: bool = False) -> Any:
+		if json_field:
+			return self._json_dump(value or [])
+		if hasattr(value, "value"):
+			return value.value
+		return value
+
+	def _row_to_model(
+		self,
+		row: Any,
+		model_cls: Type[BaseModel],
+		json_fields: set[str] = None,
+		enum_fields: Dict[str, Type] = None,
+		field_map: Dict[str, str] = None
+	) -> Optional[BaseModel]:
+		"""Convert a database row to a Pydantic model."""
+		if not row:
+			return None
+
+		json_fields = json_fields or set()
+		enum_fields = enum_fields or {}
+		field_map = field_map or {}
+		data = dict(row)
+
+		for db_field, model_field in field_map.items():
+			if db_field in data:
+				data[model_field] = data.pop(db_field)
+
+		for field in json_fields:
+			if field in data:
+				value = data[field]
+				data[field] = json.loads(value) if value else []
+
+		for field, enum_cls in enum_fields.items():
+			if data.get(field) is not None:
+				data[field] = enum_cls(data[field])
+
+		return model_cls(**{
+			field: value for field, value in data.items()
+			if field in model_cls.model_fields
+		})
+
+	async def _insert_model(
+		self,
+		table_name: str,
+		record: BaseModel,
+		columns: List[str],
+		model_cls: Type[BaseModel],
+		json_fields: set[str] = None,
+		enum_fields: Dict[str, Type] = None,
+		field_map: Dict[str, str] = None,
+		column_map: Dict[str, str] = None
+	) -> BaseModel:
+		json_fields = json_fields or set()
+		field_map = field_map or {}
+		column_map = column_map or {}
+		model_data = record.model_dump()
+
+		values = []
+		for column in columns:
+			field = column_map.get(column, column)
+			values.append(self._db_value(model_data.get(field), field in json_fields))
+
+		placeholders = ", ".join(f"${index}" for index in range(1, len(columns) + 1))
+		query = f"""
+			INSERT INTO {table_name} ({", ".join(columns)})
+			VALUES ({placeholders})
+			RETURNING *
+		"""
+
+		async with self.get_connection() as conn:
+			row = await conn.fetchrow(query, *values)
+
+		return self._row_to_model(row, model_cls, json_fields, enum_fields, field_map)
+
+	async def _get_model(
+		self,
+		table_name: str,
+		record_id: str,
+		tenant_id: str,
+		model_cls: Type[BaseModel],
+		json_fields: set[str] = None,
+		enum_fields: Dict[str, Type] = None,
+		field_map: Dict[str, str] = None
+	) -> Optional[BaseModel]:
+		async with self.get_connection() as conn:
+			row = await conn.fetchrow(
+				f"SELECT * FROM {table_name} WHERE id = $1 AND tenant_id = $2 AND status != 'deleted'",
+				record_id,
+				tenant_id
+			)
+		return self._row_to_model(row, model_cls, json_fields, enum_fields, field_map)
+
+	async def _update_model(
+		self,
+		table_name: str,
+		record_id: str,
+		update_data: Dict[str, Any],
+		tenant_id: str,
+		model_cls: Type[BaseModel],
+		json_fields: set[str] = None,
+		enum_fields: Dict[str, Type] = None,
+		field_map: Dict[str, str] = None,
+		column_map: Dict[str, str] = None
+	) -> BaseModel:
+		json_fields = json_fields or set()
+		field_map = field_map or {}
+		column_map = column_map or {}
+		update_columns = {field: column for column, field in column_map.items()}
+		set_clauses = []
+		params = []
+		param_count = 1
+
+		for field, value in update_data.items():
+			if field in {"id", "tenant_id", "created_at", "created_by"}:
+				continue
+			column = update_columns.get(field, field)
+			set_clauses.append(f"{column} = ${param_count}")
+			params.append(self._db_value(value, column in json_fields))
+			param_count += 1
+
+		if not set_clauses:
+			raise ValueError("No valid fields to update")
+
+		set_clauses.append(f"updated_at = ${param_count}")
+		params.append(datetime.utcnow())
+		param_count += 1
+		params.extend([record_id, tenant_id])
+
+		query = f"""
+			UPDATE {table_name}
+			SET {', '.join(set_clauses)}
+			WHERE id = ${param_count} AND tenant_id = ${param_count + 1} AND status != 'deleted'
+			RETURNING *
+		"""
+
+		async with self.get_connection() as conn:
+			row = await conn.fetchrow(query, *params)
+
+		if not row:
+			raise DatabaseError(f"Record {record_id} not found or not accessible")
+		return self._row_to_model(row, model_cls, json_fields, enum_fields, field_map)
+
 	# ================================
 	# Contact Management
 	# ================================
@@ -438,6 +660,8 @@ class DatabaseManager:
 	async def create_contact(self, contact: CRMContact) -> CRMContact:
 		"""Create a new contact"""
 		self._ensure_tenant_isolation(contact.tenant_id)
+		if self._using_memory_store():
+			return self._store_memory_record("crm_contacts", contact)
 		
 		try:
 			async with self.get_connection() as conn:
@@ -481,6 +705,8 @@ class DatabaseManager:
 	async def get_contact(self, contact_id: str, tenant_id: str) -> Optional[CRMContact]:
 		"""Get contact by ID"""
 		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._get_memory_record("crm_contacts", contact_id, tenant_id)
 		
 		try:
 			async with self.get_connection() as conn:
@@ -504,6 +730,8 @@ class DatabaseManager:
 	) -> CRMContact:
 		"""Update contact"""
 		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._update_memory_record("crm_contacts", contact_id, update_data, tenant_id)
 		
 		try:
 			async with self.get_connection() as conn:
@@ -516,11 +744,13 @@ class DatabaseManager:
 				json_fields = {"addresses", "phone_numbers", "tags"}
 				
 				for field, value in update_data.items():
-					if field in {"id", "tenant_id", "created_at", "created_by"}:
+					if field in {"id", "tenant_id", "created_at", "created_by", "updated_at"}:
 						continue  # Skip immutable fields
 					
 					if field in json_fields and isinstance(value, (list, dict)):
 						value = json.dumps(value)
+					elif hasattr(value, "value"):
+						value = value.value
 					
 					set_clauses.append(f"{field} = ${param_count}")
 					params.append(value)
@@ -563,6 +793,35 @@ class DatabaseManager:
 	) -> Tuple[List[CRMContact], int]:
 		"""Search contacts with filters"""
 		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			records = [
+				self._clone_record(record)
+				for record in self._memory_records["crm_contacts"].values()
+				if record.tenant_id == tenant_id and record.status != RecordStatus.DELETED
+			]
+
+			if filters:
+				for field, value in filters.items():
+					expected = value.value if hasattr(value, "value") else value
+					records = [
+						record for record in records
+						if getattr(record, field, None) is not None
+						and str(getattr(record, field).value if hasattr(getattr(record, field), "value") else getattr(record, field)).lower() == str(expected).lower()
+					]
+
+			if search_term:
+				needle = search_term.lower()
+				records = [
+					record for record in records
+					if needle in " ".join(
+						str(getattr(record, field, "") or "")
+						for field in ("first_name", "last_name", "email", "company")
+					).lower()
+				]
+
+			records.sort(key=lambda record: record.created_at, reverse=True)
+			total_count = len(records)
+			return records[offset:offset + limit], total_count
 		
 		try:
 			async with self.get_connection() as conn:
@@ -645,41 +904,258 @@ class DatabaseManager:
 			raise DatabaseError(f"Data conversion failed: {str(e)}")
 	
 	# ================================
-	# Account Management (Placeholder implementations)
+	# Account Management
 	# ================================
 	
 	async def create_account(self, account: CRMAccount) -> CRMAccount:
-		"""Create account - placeholder implementation"""
-		# Similar implementation to create_contact
-		return account
+		"""Create a new account."""
+		self._ensure_tenant_isolation(account.tenant_id)
+		if self._using_memory_store():
+			return self._store_memory_record("crm_accounts", account)
+
+		try:
+			return await self._insert_model(
+				"crm_accounts",
+				account,
+				[
+					"id", "tenant_id", "account_name", "account_type", "industry",
+					"annual_revenue", "employee_count", "website", "main_phone",
+					"addresses", "parent_account_id", "account_owner_id",
+					"account_health_score", "description", "tags", "created_at",
+					"updated_at", "created_by", "updated_by", "version", "status"
+				],
+				CRMAccount,
+				json_fields={"addresses", "tags"},
+				enum_fields={"account_type": AccountType, "status": RecordStatus}
+			)
+		except Exception as e:
+			logger.error(f"Failed to create account: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Account creation failed: {str(e)}")
 	
 	async def get_account(self, account_id: str, tenant_id: str) -> Optional[CRMAccount]:
-		"""Get account - placeholder implementation"""
-		return None
+		"""Get account by ID."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._get_memory_record("crm_accounts", account_id, tenant_id)
+
+		try:
+			return await self._get_model(
+				"crm_accounts",
+				account_id,
+				tenant_id,
+				CRMAccount,
+				json_fields={"addresses", "tags"},
+				enum_fields={"account_type": AccountType, "status": RecordStatus}
+			)
+		except Exception as e:
+			logger.error(f"Failed to get account {account_id}: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Account retrieval failed: {str(e)}")
+
+	async def update_account(self, account_id: str, update_data: Dict[str, Any], tenant_id: str) -> CRMAccount:
+		"""Update account."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._update_memory_record("crm_accounts", account_id, update_data, tenant_id)
+
+		try:
+			return await self._update_model(
+				"crm_accounts",
+				account_id,
+				update_data,
+				tenant_id,
+				CRMAccount,
+				json_fields={"addresses", "tags"},
+				enum_fields={"account_type": AccountType, "status": RecordStatus}
+			)
+		except Exception as e:
+			logger.error(f"Failed to update account {account_id}: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Account update failed: {str(e)}")
 	
 	# ================================
-	# Lead Management (Placeholder implementations)
+	# Lead Management
 	# ================================
 	
 	async def create_lead(self, lead: CRMLead) -> CRMLead:
-		"""Create lead - placeholder implementation"""
-		return lead
+		"""Create a new lead."""
+		self._ensure_tenant_isolation(lead.tenant_id)
+		if self._using_memory_store():
+			return self._store_memory_record("crm_leads", lead)
+
+		try:
+			return await self._insert_model(
+				"crm_leads",
+				lead,
+				[
+					"id", "tenant_id", "first_name", "last_name", "company",
+					"email", "phone", "lead_source", "lead_status", "lead_score",
+					"budget", "timeline", "owner_id", "is_converted",
+					"converted_date", "converted_contact_id", "converted_account_id",
+					"converted_opportunity_id", "description", "tags", "created_at",
+					"updated_at", "created_by", "updated_by", "version", "status"
+				],
+				CRMLead,
+				json_fields={"tags"},
+				enum_fields={
+					"lead_source": LeadSource,
+					"lead_status": LeadStatus,
+					"status": RecordStatus
+				}
+			)
+		except Exception as e:
+			logger.error(f"Failed to create lead: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Lead creation failed: {str(e)}")
+
+	async def get_lead(self, lead_id: str, tenant_id: str) -> Optional[CRMLead]:
+		"""Get lead by ID."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._get_memory_record("crm_leads", lead_id, tenant_id)
+
+		try:
+			return await self._get_model(
+				"crm_leads",
+				lead_id,
+				tenant_id,
+				CRMLead,
+				json_fields={"tags"},
+				enum_fields={
+					"lead_source": LeadSource,
+					"lead_status": LeadStatus,
+					"status": RecordStatus
+				}
+			)
+		except Exception as e:
+			logger.error(f"Failed to get lead {lead_id}: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Lead retrieval failed: {str(e)}")
+
+	async def update_lead(self, lead_id: str, update_data: Dict[str, Any], tenant_id: str) -> CRMLead:
+		"""Update lead."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._update_memory_record("crm_leads", lead_id, update_data, tenant_id)
+
+		try:
+			return await self._update_model(
+				"crm_leads",
+				lead_id,
+				update_data,
+				tenant_id,
+				CRMLead,
+				json_fields={"tags"},
+				enum_fields={
+					"lead_source": LeadSource,
+					"lead_status": LeadStatus,
+					"status": RecordStatus
+				}
+			)
+		except Exception as e:
+			logger.error(f"Failed to update lead {lead_id}: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Lead update failed: {str(e)}")
 	
 	# ================================
-	# Opportunity Management (Placeholder implementations)
+	# Opportunity Management
 	# ================================
 	
 	async def create_opportunity(self, opportunity: CRMOpportunity) -> CRMOpportunity:
-		"""Create opportunity - placeholder implementation"""
-		return opportunity
+		"""Create a new opportunity."""
+		self._ensure_tenant_isolation(opportunity.tenant_id)
+		if self._using_memory_store():
+			return self._store_memory_record("crm_opportunities", opportunity)
+
+		try:
+			return await self._insert_model(
+				"crm_opportunities",
+				opportunity,
+				[
+					"id", "tenant_id", "opportunity_name", "description", "amount",
+					"probability", "expected_revenue", "close_date", "stage",
+					"is_closed", "is_won", "account_id", "primary_contact_id",
+					"owner_id", "win_probability_ai", "notes", "tags",
+					"created_at", "updated_at", "created_by", "updated_by",
+					"version", "status"
+				],
+				CRMOpportunity,
+				json_fields={"tags"},
+				enum_fields={"stage": OpportunityStage, "status": RecordStatus}
+			)
+		except Exception as e:
+			logger.error(f"Failed to create opportunity: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Opportunity creation failed: {str(e)}")
+
+	async def get_opportunity(self, opportunity_id: str, tenant_id: str) -> Optional[CRMOpportunity]:
+		"""Get opportunity by ID."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._get_memory_record("crm_opportunities", opportunity_id, tenant_id)
+
+		try:
+			return await self._get_model(
+				"crm_opportunities",
+				opportunity_id,
+				tenant_id,
+				CRMOpportunity,
+				json_fields={"tags"},
+				enum_fields={"stage": OpportunityStage, "status": RecordStatus}
+			)
+		except Exception as e:
+			logger.error(f"Failed to get opportunity {opportunity_id}: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Opportunity retrieval failed: {str(e)}")
+
+	async def update_opportunity(
+		self,
+		opportunity_id: str,
+		update_data: Dict[str, Any],
+		tenant_id: str
+	) -> CRMOpportunity:
+		"""Update opportunity."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._update_memory_record("crm_opportunities", opportunity_id, update_data, tenant_id)
+
+		try:
+			return await self._update_model(
+				"crm_opportunities",
+				opportunity_id,
+				update_data,
+				tenant_id,
+				CRMOpportunity,
+				json_fields={"tags"},
+				enum_fields={"stage": OpportunityStage, "status": RecordStatus}
+			)
+		except Exception as e:
+			logger.error(f"Failed to update opportunity {opportunity_id}: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Opportunity update failed: {str(e)}")
 	
 	# ================================
-	# Activity Management (Placeholder implementations)
+	# Activity Management
 	# ================================
 	
 	async def create_activity(self, activity: CRMActivity) -> CRMActivity:
-		"""Create activity - placeholder implementation"""
-		return activity
+		"""Create a new activity."""
+		self._ensure_tenant_isolation(activity.tenant_id)
+		if self._using_memory_store():
+			return self._store_memory_record("crm_activities", activity)
+
+		try:
+			return await self._insert_model(
+				"crm_activities",
+				activity,
+				[
+					"id", "tenant_id", "subject", "activity_type", "description",
+					"start_datetime", "end_datetime", "activity_status", "priority",
+					"is_completed", "related_to_type", "related_to_id",
+					"assigned_to_id", "notes", "tags", "created_at", "updated_at",
+					"created_by", "updated_by", "version", "status"
+				],
+				CRMActivity,
+				json_fields={"tags"},
+				enum_fields={"activity_type": ActivityType, "priority": Priority},
+				field_map={"activity_status": "status"},
+				column_map={"activity_status": "status", "status": "status"}
+			)
+		except Exception as e:
+			logger.error(f"Failed to create activity: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Activity creation failed: {str(e)}")
 	
 	# ================================
 	# Migration Management
