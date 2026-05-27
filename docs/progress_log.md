@@ -4519,3 +4519,19 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `4dd5750` (`Make advanced CRM package importable`) to `origin/main`.
+
+### 2026-05-27 18:32 EAT
+
+Completed checkpoint:
+
+- Replaced CRM account, lead, opportunity, and activity listing placeholder API endpoints with tenant-scoped service-backed list/search behavior.
+- Added in-memory and PostgreSQL-capable CRM list primitives for accounts, leads, opportunities, and activities with exact filters, search terms, pagination, and tenant isolation.
+- Exposed matching `CRMService` list methods so the API layer no longer reaches around the service boundary.
+- Extended the focused CRM executable test to verify direct API responses for core CRM record listings and to ensure cross-tenant records are excluded.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/adv/database.py capabilities/crm/adv/service.py capabilities/crm/adv/api.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 5 passed, 9 existing deprecation warnings
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

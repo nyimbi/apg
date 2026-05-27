@@ -6,9 +6,11 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
+from capabilities.crm.adv import api as crm_api
 from capabilities.crm.adv.database import DatabaseManager
 from capabilities.crm.adv.models import (
 	ActivityType,
+	AccountType,
 	CRMAccount,
 	CRMActivity,
 	CRMLead,
@@ -131,6 +133,119 @@ def test_crm_service_imports_with_optional_integrations_absent():
 
 		assert updated.lead_status == LeadStatus.QUALIFIED
 		assert updated.version == 2
+
+	asyncio.run(exercise())
+
+
+def test_crm_api_lists_core_records_without_placeholders():
+	async def exercise():
+		service = CRMService()
+
+		account = await service.create_account(
+			{
+				"account_name": "Acme Manufacturing",
+				"account_type": AccountType.CUSTOMER,
+				"industry": "industrial",
+				"account_owner_id": "seller-1",
+			},
+			"tenant-api",
+			"seller-1",
+		)
+		await service.create_account(
+			{
+				"account_name": "Other Tenant Account",
+				"account_type": AccountType.CUSTOMER,
+				"account_owner_id": "seller-2",
+			},
+			"tenant-other",
+			"seller-2",
+		)
+		lead = await service.create_lead(
+			{
+				"first_name": "Priya",
+				"last_name": "Buyer",
+				"company": "Acme Manufacturing",
+				"email": "priya@example.com",
+				"lead_source": LeadSource.WEBSITE,
+				"owner_id": "seller-1",
+			},
+			"tenant-api",
+			"seller-1",
+		)
+		opportunity = await service.create_opportunity(
+			{
+				"opportunity_name": "Acme ERP Expansion",
+				"amount": Decimal("75000.00"),
+				"probability": 60,
+				"close_date": date.today(),
+				"account_id": account.id,
+				"owner_id": "seller-1",
+			},
+			"tenant-api",
+			"seller-1",
+		)
+		activity = await service.db_manager.create_activity(
+			CRMActivity(
+				tenant_id="tenant-api",
+				created_by="seller-1",
+				subject="Acme expansion call",
+				activity_type=ActivityType.CALL,
+				start_datetime=datetime.utcnow(),
+				related_to_type="opportunity",
+				related_to_id=opportunity.id,
+				assigned_to_id="seller-1",
+			)
+		)
+
+		accounts = await crm_api.get_accounts(
+			search_term="acme",
+			account_type=AccountType.CUSTOMER,
+			owner_id=None,
+			page=1,
+			page_size=10,
+			service=service,
+			tenant_id="tenant-api",
+		)
+		leads = await crm_api.get_leads(
+			search_term="priya",
+			lead_source=None,
+			lead_status=LeadStatus.NEW,
+			owner_id="seller-1",
+			page=1,
+			page_size=10,
+			service=service,
+			tenant_id="tenant-api",
+		)
+		opportunities = await crm_api.get_opportunities(
+			search_term="expansion",
+			stage=OpportunityStage.PROSPECTING,
+			account_id=account.id,
+			owner_id=None,
+			page=1,
+			page_size=10,
+			service=service,
+			tenant_id="tenant-api",
+		)
+		activities = await crm_api.get_activities(
+			search_term="call",
+			activity_type=ActivityType.CALL,
+			related_to_type="opportunity",
+			related_to_id=opportunity.id,
+			assigned_to_id="seller-1",
+			page=1,
+			page_size=10,
+			service=service,
+			tenant_id="tenant-api",
+		)
+
+		assert [item["id"] for item in accounts.data["items"]] == [account.id]
+		assert accounts.data["total_count"] == 1
+		assert accounts.data["items"][0]["account_name"] == "Acme Manufacturing"
+		assert [item["id"] for item in leads.data["items"]] == [lead.id]
+		assert leads.data["items"][0]["lead_status"] == LeadStatus.NEW
+		assert [item["id"] for item in opportunities.data["items"]] == [opportunity.id]
+		assert opportunities.data["items"][0]["expected_revenue"] == "45000.000"
+		assert [item["id"] for item in activities.data["items"]] == [activity.id]
 
 	asyncio.run(exercise())
 

@@ -639,6 +639,27 @@ class CRMService:
 				raise
 			logger.error(f"Failed to get account {account_id}: {str(e)}", exc_info=True)
 			raise CRMServiceError(f"Failed to retrieve account: {str(e)}")
+
+	async def list_accounts(
+		self,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Tuple[List[CRMAccount], int]:
+		"""List accounts for a tenant."""
+		try:
+			return await self.db_manager.list_accounts(
+				tenant_id=tenant_id,
+				filters=filters,
+				search_term=search_term,
+				limit=limit,
+				offset=offset
+			)
+		except Exception as e:
+			logger.error(f"Account listing failed: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Account listing failed: {str(e)}")
 	
 	# ================================
 	# Lead Management
@@ -947,6 +968,27 @@ class CRMService:
 		except Exception as e:
 			logger.error(f"Failed to create activity: {str(e)}", exc_info=True)
 			raise CRMServiceError(f"Activity creation failed: {str(e)}")
+
+	async def list_activities(
+		self,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Tuple[List[CRMActivity], int]:
+		"""List activities for a tenant from the core CRM record store."""
+		try:
+			return await self.db_manager.list_activities(
+				tenant_id=tenant_id,
+				filters=filters,
+				search_term=search_term,
+				limit=limit,
+				offset=offset
+			)
+		except Exception as e:
+			logger.error(f"Activity listing failed: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Activity listing failed: {str(e)}")
 	
 	# ================================
 	# Analytics and Insights
@@ -1055,6 +1097,27 @@ class CRMService:
 				raise
 			logger.error(f"Failed to get lead {lead_id}: {str(e)}", exc_info=True)
 			raise CRMServiceError(f"Failed to retrieve lead: {str(e)}")
+
+	async def list_leads(
+		self,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Tuple[List[CRMLead], int]:
+		"""List leads for a tenant."""
+		try:
+			return await self.db_manager.list_leads(
+				tenant_id=tenant_id,
+				filters=filters,
+				search_term=search_term,
+				limit=limit,
+				offset=offset
+			)
+		except Exception as e:
+			logger.error(f"Lead listing failed: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Lead listing failed: {str(e)}")
 	
 	async def update_lead(self, lead_id: str, update_data: Dict[str, Any], tenant_id: str, updated_by: str) -> CRMLead:
 		"""Update lead."""
@@ -1090,6 +1153,27 @@ class CRMService:
 				raise
 			logger.error(f"Failed to get opportunity {opportunity_id}: {str(e)}", exc_info=True)
 			raise CRMServiceError(f"Failed to retrieve opportunity: {str(e)}")
+
+	async def list_opportunities(
+		self,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Tuple[List[CRMOpportunity], int]:
+		"""List opportunities for a tenant."""
+		try:
+			return await self.db_manager.list_opportunities(
+				tenant_id=tenant_id,
+				filters=filters,
+				search_term=search_term,
+				limit=limit,
+				offset=offset
+			)
+		except Exception as e:
+			logger.error(f"Opportunity listing failed: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Opportunity listing failed: {str(e)}")
 	
 	async def update_opportunity(self, opportunity_id: str, update_data: Dict[str, Any], tenant_id: str, updated_by: str) -> CRMOpportunity:
 		"""Update opportunity."""
@@ -3311,7 +3395,7 @@ class DatabaseManager:
 		except Exception as e:
 			logger.error(f"Get activity failed: {str(e)}", exc_info=True)
 			raise CRMServiceError(f"Get activity failed: {str(e)}")
-	
+
 	async def get_contact_activities(
 		self,
 		contact_id: str,

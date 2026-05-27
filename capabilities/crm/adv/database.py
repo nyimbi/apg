@@ -653,6 +653,108 @@ class DatabaseManager:
 			raise DatabaseError(f"Record {record_id} not found or not accessible")
 		return self._row_to_model(row, model_cls, json_fields, enum_fields, field_map)
 
+	def _record_matches_filters(self, record: BaseModel, filters: Dict[str, Any] = None) -> bool:
+		"""Return True when a memory-backed record matches exact filters."""
+		for field, expected in (filters or {}).items():
+			actual = getattr(record, field, None)
+			if hasattr(actual, "value"):
+				actual = actual.value
+			if hasattr(expected, "value"):
+				expected = expected.value
+			if actual is None or str(actual).lower() != str(expected).lower():
+				return False
+		return True
+
+	def _record_matches_search(self, record: BaseModel, search_fields: List[str], search_term: str = None) -> bool:
+		"""Return True when a memory-backed record contains the search term."""
+		if not search_term:
+			return True
+		needle = search_term.lower()
+		haystack = " ".join(str(getattr(record, field, "") or "") for field in search_fields)
+		return needle in haystack.lower()
+
+	def _list_memory_records(
+		self,
+		table_name: str,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		search_fields: List[str] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Tuple[List[BaseModel], int]:
+		search_fields = search_fields or []
+		records = []
+		for record in self._memory_records[table_name].values():
+			if record.tenant_id != tenant_id:
+				continue
+			if getattr(record, "status", None) == RecordStatus.DELETED:
+				continue
+			if not self._record_matches_filters(record, filters):
+				continue
+			if not self._record_matches_search(record, search_fields, search_term):
+				continue
+			records.append(self._clone_record(record))
+
+		records.sort(key=lambda record: record.created_at, reverse=True)
+		total_count = len(records)
+		return records[offset:offset + limit], total_count
+
+	async def _list_model(
+		self,
+		table_name: str,
+		tenant_id: str,
+		model_cls: Type[BaseModel],
+		filters: Dict[str, Any] = None,
+		search_fields: List[str] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0,
+		json_fields: set[str] = None,
+		enum_fields: Dict[str, Type] = None,
+		field_map: Dict[str, str] = None
+	) -> Tuple[List[BaseModel], int]:
+		"""List tenant-scoped records with simple exact filters and text search."""
+		filters = filters or {}
+		search_fields = search_fields or []
+		where_clauses = ["tenant_id = $1", "status != 'deleted'"]
+		params: List[Any] = [tenant_id]
+		param_count = 2
+
+		for field, value in filters.items():
+			where_clauses.append(f"{field} = ${param_count}")
+			params.append(value.value if hasattr(value, "value") else value)
+			param_count += 1
+
+		if search_term and search_fields:
+			search_clauses = [f"{field} ILIKE ${param_count}" for field in search_fields]
+			where_clauses.append(f"({' OR '.join(search_clauses)})")
+			params.append(f"%{search_term}%")
+			param_count += 1
+
+		where_clause = " AND ".join(where_clauses)
+		async with self.get_connection() as conn:
+			total_count = await conn.fetchval(
+				f"SELECT COUNT(*) FROM {table_name} WHERE {where_clause}",
+				*params
+			)
+			rows = await conn.fetch(
+				f"""
+					SELECT * FROM {table_name}
+					WHERE {where_clause}
+					ORDER BY created_at DESC
+					LIMIT ${param_count} OFFSET ${param_count + 1}
+				""",
+				*params,
+				limit,
+				offset
+			)
+
+		return [
+			self._row_to_model(row, model_cls, json_fields, enum_fields, field_map)
+			for row in rows
+		], total_count
+
 	# ================================
 	# Contact Management
 	# ================================
@@ -970,6 +1072,44 @@ class DatabaseManager:
 		except Exception as e:
 			logger.error(f"Failed to update account {account_id}: {str(e)}", exc_info=True)
 			raise DatabaseError(f"Account update failed: {str(e)}")
+
+	async def list_accounts(
+		self,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Tuple[List[CRMAccount], int]:
+		"""List tenant accounts with optional exact filters and name search."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._list_memory_records(
+				"crm_accounts",
+				tenant_id,
+				filters=filters,
+				search_fields=["account_name", "industry", "website", "description"],
+				search_term=search_term,
+				limit=limit,
+				offset=offset
+			)
+
+		try:
+			return await self._list_model(
+				"crm_accounts",
+				tenant_id,
+				CRMAccount,
+				filters=filters,
+				search_fields=["account_name", "industry", "website", "description"],
+				search_term=search_term,
+				limit=limit,
+				offset=offset,
+				json_fields={"addresses", "tags"},
+				enum_fields={"account_type": AccountType, "status": RecordStatus}
+			)
+		except Exception as e:
+			logger.error(f"Failed to list accounts: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Account listing failed: {str(e)}")
 	
 	# ================================
 	# Lead Management
@@ -1051,6 +1191,48 @@ class DatabaseManager:
 		except Exception as e:
 			logger.error(f"Failed to update lead {lead_id}: {str(e)}", exc_info=True)
 			raise DatabaseError(f"Lead update failed: {str(e)}")
+
+	async def list_leads(
+		self,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Tuple[List[CRMLead], int]:
+		"""List tenant leads with optional exact filters and contact search."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._list_memory_records(
+				"crm_leads",
+				tenant_id,
+				filters=filters,
+				search_fields=["first_name", "last_name", "company", "email", "phone"],
+				search_term=search_term,
+				limit=limit,
+				offset=offset
+			)
+
+		try:
+			return await self._list_model(
+				"crm_leads",
+				tenant_id,
+				CRMLead,
+				filters=filters,
+				search_fields=["first_name", "last_name", "company", "email", "phone"],
+				search_term=search_term,
+				limit=limit,
+				offset=offset,
+				json_fields={"tags"},
+				enum_fields={
+					"lead_source": LeadSource,
+					"lead_status": LeadStatus,
+					"status": RecordStatus
+				}
+			)
+		except Exception as e:
+			logger.error(f"Failed to list leads: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Lead listing failed: {str(e)}")
 	
 	# ================================
 	# Opportunity Management
@@ -1125,6 +1307,44 @@ class DatabaseManager:
 		except Exception as e:
 			logger.error(f"Failed to update opportunity {opportunity_id}: {str(e)}", exc_info=True)
 			raise DatabaseError(f"Opportunity update failed: {str(e)}")
+
+	async def list_opportunities(
+		self,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Tuple[List[CRMOpportunity], int]:
+		"""List tenant opportunities with optional exact filters and name search."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._list_memory_records(
+				"crm_opportunities",
+				tenant_id,
+				filters=filters,
+				search_fields=["opportunity_name", "description", "notes"],
+				search_term=search_term,
+				limit=limit,
+				offset=offset
+			)
+
+		try:
+			return await self._list_model(
+				"crm_opportunities",
+				tenant_id,
+				CRMOpportunity,
+				filters=filters,
+				search_fields=["opportunity_name", "description", "notes"],
+				search_term=search_term,
+				limit=limit,
+				offset=offset,
+				json_fields={"tags"},
+				enum_fields={"stage": OpportunityStage, "status": RecordStatus}
+			)
+		except Exception as e:
+			logger.error(f"Failed to list opportunities: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Opportunity listing failed: {str(e)}")
 	
 	# ================================
 	# Activity Management
@@ -1156,6 +1376,45 @@ class DatabaseManager:
 		except Exception as e:
 			logger.error(f"Failed to create activity: {str(e)}", exc_info=True)
 			raise DatabaseError(f"Activity creation failed: {str(e)}")
+
+	async def list_activities(
+		self,
+		tenant_id: str,
+		filters: Dict[str, Any] = None,
+		search_term: str = None,
+		limit: int = 100,
+		offset: int = 0
+	) -> Tuple[List[CRMActivity], int]:
+		"""List tenant activities with optional exact filters and subject search."""
+		self._ensure_tenant_isolation(tenant_id)
+		if self._using_memory_store():
+			return self._list_memory_records(
+				"crm_activities",
+				tenant_id,
+				filters=filters,
+				search_fields=["subject", "description", "related_to_type", "notes"],
+				search_term=search_term,
+				limit=limit,
+				offset=offset
+			)
+
+		try:
+			return await self._list_model(
+				"crm_activities",
+				tenant_id,
+				CRMActivity,
+				filters=filters,
+				search_fields=["subject", "description", "related_to_type", "notes"],
+				search_term=search_term,
+				limit=limit,
+				offset=offset,
+				json_fields={"tags"},
+				enum_fields={"activity_type": ActivityType, "priority": Priority},
+				field_map={"activity_status": "status"}
+			)
+		except Exception as e:
+			logger.error(f"Failed to list activities: {str(e)}", exc_info=True)
+			raise DatabaseError(f"Activity listing failed: {str(e)}")
 	
 	# ================================
 	# Migration Management

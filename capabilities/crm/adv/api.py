@@ -204,6 +204,23 @@ async def get_crm_service() -> CRMService:
 get_service = get_crm_service
 
 
+def _model_data(record: Any) -> Dict[str, Any]:
+	if hasattr(record, "model_dump"):
+		return record.model_dump(mode="json")
+	return dict(record)
+
+
+def _paginated_data(records: List[Any], total_count: int, page: int, page_size: int) -> Dict[str, Any]:
+	total_pages = (total_count + page_size - 1) // page_size
+	return PaginatedResponse(
+		items=[_model_data(record) for record in records],
+		total_count=total_count,
+		page=page,
+		page_size=page_size,
+		total_pages=total_pages
+	).model_dump()
+
+
 def _clean_text(value: Any) -> Optional[str]:
 	if value is None:
 		return None
@@ -574,63 +591,171 @@ async def delete_contact(
 
 
 # ================================
-# Account Management Endpoints (Placeholder)
+# Account, Lead, Opportunity, and Activity Listing Endpoints
 # ================================
 
 @app.get("/accounts", response_model=APIResponse)
 async def get_accounts(
+	search_term: Optional[str] = Query(None, description="Search account name, industry, website, or description"),
+	account_type: Optional[AccountType] = Query(None, description="Filter by account type"),
+	owner_id: Optional[str] = Query(None, description="Filter by account owner"),
+	page: int = Query(1, ge=1, description="Page number"),
+	page_size: int = Query(50, ge=1, le=200, description="Page size"),
+	service: CRMService = Depends(get_crm_service),
 	tenant_id: str = Depends(get_tenant_id)
 ):
-	"""Get accounts - placeholder endpoint"""
-	return APIResponse(
-		message="Accounts endpoint placeholder",
-		data={"accounts": [], "message": "Account management endpoints coming soon"}
-	)
+	"""List accounts with tenant isolation, filters, search, and pagination."""
+	try:
+		filters = {}
+		if account_type:
+			filters["account_type"] = account_type
+		if owner_id:
+			filters["account_owner_id"] = owner_id
 
+		accounts, total_count = await service.list_accounts(
+			tenant_id=tenant_id,
+			filters=filters,
+			search_term=search_term,
+			limit=page_size,
+			offset=(page - 1) * page_size
+		)
 
-# ================================
-# Lead Management Endpoints (Placeholder)
-# ================================
+		return APIResponse(
+			message=f"Found {len(accounts)} accounts",
+			data=_paginated_data(accounts, total_count, page, page_size)
+		)
+	except Exception as e:
+		logger.error(f"Account listing failed: {str(e)}", exc_info=True)
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail="Account listing failed"
+		)
+
 
 @app.get("/leads", response_model=APIResponse)
 async def get_leads(
+	search_term: Optional[str] = Query(None, description="Search lead name, company, email, or phone"),
+	lead_source: Optional[LeadSource] = Query(None, description="Filter by lead source"),
+	lead_status: Optional[LeadStatus] = Query(None, description="Filter by lead status"),
+	owner_id: Optional[str] = Query(None, description="Filter by lead owner"),
+	page: int = Query(1, ge=1, description="Page number"),
+	page_size: int = Query(50, ge=1, le=200, description="Page size"),
+	service: CRMService = Depends(get_crm_service),
 	tenant_id: str = Depends(get_tenant_id)
 ):
-	"""Get leads - placeholder endpoint"""
-	return APIResponse(
-		message="Leads endpoint placeholder",
-		data={"leads": [], "message": "Lead management endpoints coming soon"}
-	)
+	"""List leads with tenant isolation, filters, search, and pagination."""
+	try:
+		filters = {}
+		if lead_source:
+			filters["lead_source"] = lead_source
+		if lead_status:
+			filters["lead_status"] = lead_status
+		if owner_id:
+			filters["owner_id"] = owner_id
 
+		leads, total_count = await service.list_leads(
+			tenant_id=tenant_id,
+			filters=filters,
+			search_term=search_term,
+			limit=page_size,
+			offset=(page - 1) * page_size
+		)
 
-# ================================
-# Opportunity Management Endpoints (Placeholder)
-# ================================
+		return APIResponse(
+			message=f"Found {len(leads)} leads",
+			data=_paginated_data(leads, total_count, page, page_size)
+		)
+	except Exception as e:
+		logger.error(f"Lead listing failed: {str(e)}", exc_info=True)
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail="Lead listing failed"
+		)
+
 
 @app.get("/opportunities", response_model=APIResponse)
 async def get_opportunities(
+	search_term: Optional[str] = Query(None, description="Search opportunity name, description, or notes"),
+	stage: Optional[OpportunityStage] = Query(None, description="Filter by sales stage"),
+	account_id: Optional[str] = Query(None, description="Filter by account"),
+	owner_id: Optional[str] = Query(None, description="Filter by owner"),
+	page: int = Query(1, ge=1, description="Page number"),
+	page_size: int = Query(50, ge=1, le=200, description="Page size"),
+	service: CRMService = Depends(get_crm_service),
 	tenant_id: str = Depends(get_tenant_id)
 ):
-	"""Get opportunities - placeholder endpoint"""
-	return APIResponse(
-		message="Opportunities endpoint placeholder",
-		data={"opportunities": [], "message": "Opportunity management endpoints coming soon"}
-	)
+	"""List opportunities with tenant isolation, filters, search, and pagination."""
+	try:
+		filters = {}
+		if stage:
+			filters["stage"] = stage
+		if account_id:
+			filters["account_id"] = account_id
+		if owner_id:
+			filters["owner_id"] = owner_id
 
+		opportunities, total_count = await service.list_opportunities(
+			tenant_id=tenant_id,
+			filters=filters,
+			search_term=search_term,
+			limit=page_size,
+			offset=(page - 1) * page_size
+		)
 
-# ================================
-# Activity Management Endpoints (Placeholder)
-# ================================
+		return APIResponse(
+			message=f"Found {len(opportunities)} opportunities",
+			data=_paginated_data(opportunities, total_count, page, page_size)
+		)
+	except Exception as e:
+		logger.error(f"Opportunity listing failed: {str(e)}", exc_info=True)
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail="Opportunity listing failed"
+		)
+
 
 @app.get("/activities", response_model=APIResponse)
 async def get_activities(
+	search_term: Optional[str] = Query(None, description="Search activity subject, description, relation, or notes"),
+	activity_type: Optional[ActivityType] = Query(None, description="Filter by activity type"),
+	related_to_type: Optional[str] = Query(None, description="Filter by related record type"),
+	related_to_id: Optional[str] = Query(None, description="Filter by related record ID"),
+	assigned_to_id: Optional[str] = Query(None, description="Filter by assignee"),
+	page: int = Query(1, ge=1, description="Page number"),
+	page_size: int = Query(50, ge=1, le=200, description="Page size"),
+	service: CRMService = Depends(get_crm_service),
 	tenant_id: str = Depends(get_tenant_id)
 ):
-	"""Get activities - placeholder endpoint"""
-	return APIResponse(
-		message="Activities endpoint placeholder",
-		data={"activities": [], "message": "Activity management endpoints coming soon"}
-	)
+	"""List activities with tenant isolation, filters, search, and pagination."""
+	try:
+		filters = {}
+		if activity_type:
+			filters["activity_type"] = activity_type
+		if related_to_type:
+			filters["related_to_type"] = related_to_type
+		if related_to_id:
+			filters["related_to_id"] = related_to_id
+		if assigned_to_id:
+			filters["assigned_to_id"] = assigned_to_id
+
+		activities, total_count = await service.list_activities(
+			tenant_id=tenant_id,
+			filters=filters,
+			search_term=search_term,
+			limit=page_size,
+			offset=(page - 1) * page_size
+		)
+
+		return APIResponse(
+			message=f"Found {len(activities)} activities",
+			data=_paginated_data(activities, total_count, page, page_size)
+		)
+	except Exception as e:
+		logger.error(f"Activity listing failed: {str(e)}", exc_info=True)
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail="Activity listing failed"
+		)
 
 
 # ================================
