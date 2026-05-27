@@ -37,6 +37,30 @@ capability GeneralLedger {
 """
 
 
+DEPENDENCY_SOURCE = """
+capability AuditLog {
+    contract: {
+        id: audit_log,
+        provides: [audit_log],
+        configuration: {retention_days: 365}
+    };
+    master_data: {entities: [audit_event]};
+    streaming: {processor: bytewax, state: audit_log_state};
+}
+
+capability GeneralLedger {
+    contract: {
+        id: general_ledger,
+        provides: [journal_entries],
+        requires: [audit_log],
+        configuration: {currency: "KES"}
+    };
+    master_data: {entities: [account]};
+    streaming: {processor: bytewax, state: ledger_state};
+}
+"""
+
+
 def test_capability_declaration_parses_to_first_class_ast():
     parse_result = APGParser().parse_string(CAPABILITY_SOURCE, "erp_ops.apg")
     assert parse_result["success"] is True, parse_result["errors"]
@@ -223,3 +247,29 @@ def test_capability_declaration_generates_runtime_manifest():
     validation = namespace["validate_capability_contracts"]()
     assert validation["errors"] == []
     assert validation["warnings"] == ["GeneralLedger requires external service audit_log"]
+
+
+def test_capability_dependency_planning_uses_provides_requires_contracts():
+    result = APGCompiler().compile_string(DEPENDENCY_SOURCE, "dependencies.apg")
+
+    assert result.success is True
+    namespace = {}
+    exec(compile(result.generated_files["apg_capabilities.py"], "apg_capabilities.py", "exec"), namespace)
+
+    assert namespace["provided_services"]() == {
+        "audit_log": ["AuditLog"],
+        "journal_entries": ["GeneralLedger"],
+    }
+    assert namespace["service_providers"]("audit_log") == ["AuditLog"]
+    assert namespace["required_services"]("GeneralLedger") == ["audit_log"]
+    assert namespace["capability_dependency_graph"]() == {
+        "AuditLog": [],
+        "GeneralLedger": ["AuditLog"],
+    }
+    assert namespace["unresolved_required_services"]() == {}
+    assert namespace["capability_load_order"]() == {
+        "order": ["AuditLog", "GeneralLedger"],
+        "cycles": [],
+        "unresolved": {},
+    }
+    assert namespace["validate_capability_dependencies"]() == {"errors": [], "warnings": []}

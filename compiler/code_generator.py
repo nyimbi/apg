@@ -334,6 +334,83 @@ def provided_services() -> Dict[str, List[str]]:
     return services
 
 
+def service_providers(service_name: str) -> List[str]:
+    return sorted(provided_services().get(service_name, []))
+
+
+def required_services(capability_name: str) -> List[str]:
+    return list(get_capability(capability_name).requires)
+
+
+def capability_dependency_graph() -> Dict[str, List[str]]:
+    providers = provided_services()
+    graph: Dict[str, List[str]] = {{}}
+    for capability in CAPABILITIES.values():
+        dependencies: List[str] = []
+        for service in capability.requires:
+            for provider in providers.get(service, []):
+                if provider != capability.name and provider not in dependencies:
+                    dependencies.append(provider)
+        graph[capability.name] = sorted(dependencies)
+    return graph
+
+
+def unresolved_required_services() -> Dict[str, List[str]]:
+    providers = provided_services()
+    unresolved: Dict[str, List[str]] = {{}}
+    for capability in CAPABILITIES.values():
+        missing = [
+            service for service in capability.requires
+            if service not in providers and service not in CAPABILITIES
+        ]
+        if missing:
+            unresolved[capability.name] = sorted(missing)
+    return unresolved
+
+
+def capability_load_order() -> Dict[str, Any]:
+    graph = capability_dependency_graph()
+    visited: set[str] = set()
+    visiting: set[str] = set()
+    order: List[str] = []
+    cycles: List[List[str]] = []
+
+    def visit(name: str, stack: List[str]) -> None:
+        if name in visited:
+            return
+        if name in visiting:
+            cycle_start = stack.index(name) if name in stack else 0
+            cycles.append([*stack[cycle_start:], name])
+            return
+        visiting.add(name)
+        for dependency in graph.get(name, []):
+            visit(dependency, [*stack, name])
+        visiting.remove(name)
+        visited.add(name)
+        order.append(name)
+
+    for capability_name in sorted(CAPABILITIES):
+        visit(capability_name, [])
+
+    return {{
+        "order": order,
+        "cycles": cycles,
+        "unresolved": unresolved_required_services(),
+    }}
+
+
+def validate_capability_dependencies() -> Dict[str, List[str]]:
+    plan = capability_load_order()
+    errors: List[str] = []
+    warnings: List[str] = []
+    for cycle in plan["cycles"]:
+        errors.append("Capability dependency cycle: " + " -> ".join(cycle))
+    for capability_name, services in plan["unresolved"].items():
+        for service in services:
+            warnings.append(f"{{capability_name}} requires external service {{service}}")
+    return {{"errors": errors, "warnings": warnings}}
+
+
 def validate_capability_contracts() -> Dict[str, Any]:
     providers = provided_services()
     errors: List[str] = []
