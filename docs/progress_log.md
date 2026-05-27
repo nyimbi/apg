@@ -3207,3 +3207,18 @@ Verification:
 - `rg -n "user_id = \"api_user\"|For now, simple validation|Kafka|kafka" capabilities/composition/config/security_engine.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:15 EAT
+
+Completed checkpoint:
+
+- Replaced MDM Flask blueprint's fixed `current_user` and `current_tenant` operation context with APG request-context resolution.
+- Replaced Pose Estimation session and real-time tracking tenant placeholders with APG request-context resolution for tenant and actor assignment.
+- Added focused MDM/Pose blueprint context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mdm/blueprint.py capabilities/common/pose/blueprint.py tests/test_common_mdm_pose_blueprint_context.py`
+- `.venv/bin/python -m pytest -q tests/test_common_mdm_pose_blueprint_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

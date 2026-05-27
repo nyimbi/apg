@@ -9,11 +9,12 @@ Copyright © 2025 Datacraft (nyimbi@gmail.com)
 """
 
 import asyncio
+import os
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Dict, List
 from uuid_extensions import uuid7str
 
-from flask import Blueprint, request, jsonify, render_template, current_app
+from flask import Blueprint, request, jsonify, render_template, current_app, g, has_request_context, session
 from flask_appbuilder import BaseView, expose, has_access
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.views import ModelView
@@ -35,6 +36,94 @@ def _log_blueprint_error(operation: str, error: Exception, **kwargs) -> None:
 	"""APG error logging for blueprint operations"""
 	print(f"[POSE_BLUEPRINT_ERROR] {operation}: {str(error)}")
 	print(f"[POSE_BLUEPRINT_ERROR] Context: {kwargs}")
+
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+def _appbuilder_user(view: Any = None) -> Any:
+	appbuilder = getattr(view, "appbuilder", None)
+	security_manager = getattr(appbuilder, "sm", None)
+	get_user = getattr(security_manager, "get_user", None)
+	if callable(get_user):
+		try:
+			return get_user()
+		except Exception:
+			return None
+	return getattr(security_manager, "user", None)
+
+def _resolve_pose_request_context(payload: Optional[Dict[str, Any]] = None, view: Any = None) -> Dict[str, str]:
+	"""Resolve pose tenant and actor context from APG runtime request sources."""
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
+	default_user = os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
+
+	if not has_request_context():
+		return {"tenant_id": default_tenant, "user_id": default_user}
+
+	request_user = getattr(request, "current_user", None)
+	g_user = (
+		getattr(g, "current_user", None)
+		or getattr(g, "user", None)
+		or getattr(g, "auth_user", None)
+	)
+	app_user = _appbuilder_user(view)
+	payload_values = payload or {}
+
+	tenant_id = _first_text([
+		getattr(g, "tenant_id", None),
+		_object_value(request_user, "tenant_id"),
+		_object_value(g_user, "tenant_id"),
+		_object_value(app_user, "tenant_id"),
+		session.get("tenant_id"),
+		request.headers.get("X-Tenant-ID"),
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Organization-ID"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+		payload_values.get("tenant_id"),
+		payload_values.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], default_tenant)
+
+	user_id = _first_text([
+		getattr(g, "user_id", None),
+		getattr(request, "current_user_id", None),
+		_object_value(request_user, "user_id"),
+		_object_value(request_user, "id"),
+		_object_value(request_user, "username"),
+		_object_value(g_user, "user_id"),
+		_object_value(g_user, "id"),
+		_object_value(g_user, "username"),
+		_object_value(app_user, "user_id"),
+		_object_value(app_user, "id"),
+		_object_value(app_user, "username"),
+		session.get("user_id"),
+		session.get("username"),
+		request.headers.get("X-User-ID"),
+		request.headers.get("X-APG-User-ID"),
+		request.args.get("user_id"),
+		payload_values.get("user_id"),
+		payload_values.get("created_by"),
+		os.getenv("APG_USER_ID"),
+	], default_user)
+
+	return {"tenant_id": tenant_id, "user_id": user_id}
 
 # APG Blueprint Registration
 pose_bp = Blueprint(
@@ -261,11 +350,12 @@ class PoseSessionModelView(ModelView):
 				asyncio.set_event_loop(loop)
 				
 				try:
+					context = _resolve_pose_request_context(session_data, self)
 					result = loop.run_until_complete(
 						capability.service.create_pose_session({
 							**session_request.model_dump(),
-							'tenant_id': 'default',  # Would get from APG auth
-							'created_by': 'current_user'  # Would get from APG auth
+							'tenant_id': context['tenant_id'],
+							'created_by': context['user_id']
 						})
 					)
 					
@@ -336,10 +426,11 @@ class RealTimeTrackingView(BaseView):
 			asyncio.set_event_loop(loop)
 			
 			try:
+				context = _resolve_pose_request_context(tracking_data, self)
 				result = loop.run_until_complete(
 					capability.service.start_real_time_tracking({
 						**tracking_data,
-						'tenant_id': 'default'
+						'tenant_id': context['tenant_id']
 					})
 				)
 				
