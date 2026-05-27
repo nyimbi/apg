@@ -20,6 +20,8 @@ from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from ..request_context import get_tenant_id_from_context
+
 # Developer Tool Types
 class ToolType(str, Enum):
 	CLI = "cli"
@@ -2945,4 +2947,4 @@ See language-specific documentation:
 			return package_path.read_text() if package_path.suffix == ".txt" else "Binary package created"
 
 # Initialize developer tools manager for immediate use
-developer_tools_manager = DeveloperToolsManager("default_tenant")
+developer_tools_manager = DeveloperToolsManager(get_tenant_id_from_context())

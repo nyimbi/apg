@@ -22,6 +22,8 @@ from uuid_extensions import uuid7str
 from pydantic import BaseModel, Field, ConfigDict, validator
 from pydantic.types import constr
 
+from ..request_context import get_tenant_id_from_context
+
 # Mobile Platform Definitions
 class MobilePlatform(str, Enum):
 	IOS = "ios"
@@ -2347,4 +2349,4 @@ const styles = StyleSheet.create({{
 		}
 
 # Initialize mobile app manager for immediate use
-mobile_app_manager = MobileAppManager("default_tenant")
+mobile_app_manager = MobileAppManager(get_tenant_id_from_context())

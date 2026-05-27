@@ -34,6 +34,8 @@ from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from ..request_context import get_tenant_id_from_context
+
 # Production Feature Enums
 class HealthCheckStatus(str, Enum):
 	HEALTHY = "healthy"
@@ -1167,5 +1169,5 @@ class ProductionMonitoringSystem:
 
 # Initialize production systems
 health_check_system = HealthCheckSystem("apg-encryption")
-backup_recovery_system = BackupRecoverySystem("default_tenant")
+backup_recovery_system = BackupRecoverySystem(get_tenant_id_from_context())
 monitoring_system = ProductionMonitoringSystem("apg-encryption", MonitoringLevel.ENTERPRISE)

@@ -20,6 +20,8 @@ from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict, validator
 
+from ..request_context import get_tenant_id_from_context
+
 # Quality Assurance Enums
 class SecurityAuditType(str, Enum):
 	CRYPTOGRAPHIC_IMPLEMENTATION = "cryptographic_implementation"
@@ -1514,6 +1516,6 @@ class QualityMetricsEngine:
 		}
 
 # Initialize quality assurance components
-security_audit_engine = SecurityAuditEngine("default_tenant")
-compliance_certification_manager = ComplianceCertificationManager("default_tenant")
-quality_metrics_engine = QualityMetricsEngine("default_tenant")
+security_audit_engine = SecurityAuditEngine(get_tenant_id_from_context())
+compliance_certification_manager = ComplianceCertificationManager(get_tenant_id_from_context())
+quality_metrics_engine = QualityMetricsEngine(get_tenant_id_from_context())

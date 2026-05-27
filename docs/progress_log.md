@@ -3237,3 +3237,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_orchestration_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed, 1 SQLAlchemy deprecation warning from `common/base.py`
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:21 EAT
+
+Completed checkpoint:
+
+- Replaced ENCR support modules' fixed `default_tenant` global manager construction with the shared APG runtime tenant resolver.
+- Quality assurance, mobile apps, production backup/recovery, and developer tools managers now initialize from `get_tenant_id_from_context()`.
+- Added focused ENCR tenant-context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/quality_assurance.py capabilities/common/encr/mobile_apps.py capabilities/common/encr/production_features.py capabilities/common/encr/developer_tools.py tests/test_common_encr_runtime_tenant_context.py`
+- `.venv/bin/python -m pytest -q tests/test_common_encr_runtime_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 2 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
