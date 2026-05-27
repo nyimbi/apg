@@ -12,6 +12,7 @@ import asyncio
 import logging
 import json
 import importlib
+import os
 from typing import Dict, Any, List, Optional, Type, Union, Callable
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
@@ -30,6 +31,43 @@ from .models import WorkflowStatus, TaskStatus
 
 
 logger = logging.getLogger(__name__)
+
+
+def _clean_component_context_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _component_context_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _first_component_context_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_component_context_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def resolve_component_library_tenant_id(definition: Optional[Dict[str, Any]] = None, service: Any = None) -> str:
+	"""Resolve the tenant used to persist custom workflow components."""
+	default_tenant = os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
+	definition_values = definition or {}
+
+	return _first_component_context_text([
+		_component_context_value(service, "tenant_id"),
+		definition_values.get("tenant_id"),
+		definition_values.get("tenant"),
+		definition_values.get("organization_id"),
+		os.getenv("APG_TENANT_ID"),
+	], default_tenant)
 
 
 class ComponentType(str, Enum):
@@ -1967,11 +2005,12 @@ component_library = ComponentLibrary()
 class ComponentLibraryService(APGBaseService):
 	"""Service for managing workflow component library."""
 	
-	def __init__(self):
+	def __init__(self, tenant_id: Optional[str] = None):
 		super().__init__()
 		self.library = component_library
 		self.database = APGDatabase()
 		self.audit = APGAuditLogger()
+		self.tenant_id = _clean_component_context_text(tenant_id)
 		self.custom_components: Dict[str, Dict[str, Any]] = {}
 	
 	async def start(self):
@@ -2157,7 +2196,7 @@ class ComponentLibraryService(APGBaseService):
 					'active',
 					datetime.utcnow(),
 					datetime.utcnow(),
-					getattr(self, 'tenant_id', 'default_tenant')
+					resolve_component_library_tenant_id(definition, self)
 				)
 				
 				await session.execute(insert_query, values)

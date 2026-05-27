@@ -3222,3 +3222,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_mdm_pose_blueprint_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:18 EAT
+
+Completed checkpoint:
+
+- Replaced Composition Orchestration custom component persistence's fixed `default_tenant` fallback with a component-library tenant resolver.
+- Component persistence now resolves tenant from the tenant-bound service instance, component definition, organization ID, or APG environment fallback.
+- Extended orchestration context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/orchestration/component_library.py tests/test_composition_orchestration_context.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_orchestration_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed, 1 SQLAlchemy deprecation warning from `common/base.py`
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

@@ -18,6 +18,7 @@ from starlette.requests import Request
 REPO_ROOT = Path(__file__).resolve().parents[1]
 API_PATH = REPO_ROOT / "capabilities" / "composition" / "orchestration" / "api.py"
 ADVANCED_API_PATH = REPO_ROOT / "capabilities" / "composition" / "orchestration" / "advanced_api.py"
+COMPONENT_LIBRARY_PATH = REPO_ROOT / "capabilities" / "composition" / "orchestration" / "component_library.py"
 
 
 def _request(path: str = "/workflows", headers: dict[str, str] | None = None) -> Request:
@@ -82,15 +83,33 @@ def _advanced_helpers() -> dict[str, Any]:
 	return namespace
 
 
+def _component_library_helpers() -> dict[str, Any]:
+	source = COMPONENT_LIBRARY_PATH.read_text(encoding="utf-8")
+	start = source.index("def _clean_component_context_text")
+	end = source.index("\n\nclass ComponentType")
+	namespace: dict[str, Any] = {
+		"Any": Any,
+		"Dict": Dict,
+		"List": List,
+		"Optional": Optional,
+		"os": os,
+	}
+	exec(compile(source[start:end], str(COMPONENT_LIBRARY_PATH), "exec"), namespace)
+	return namespace
+
+
 def test_orchestration_context_sources_no_longer_use_fixed_placeholders():
 	api_source = API_PATH.read_text(encoding="utf-8")
 	advanced_source = ADVANCED_API_PATH.read_text(encoding="utf-8")
+	component_library_source = COMPONENT_LIBRARY_PATH.read_text(encoding="utf-8")
 
 	assert '"default_tenant"' not in api_source
 	assert "'default_tenant'" not in advanced_source
+	assert "'default_tenant'" not in component_library_source
 	assert "payload.get(\"tenant_id\", \"default_tenant\")" not in api_source
 	assert "getattr(info.context, 'tenant_id', 'default_tenant')" not in advanced_source
 	assert "'created_by': 'current_user'" not in advanced_source
+	assert "getattr(self, 'tenant_id', 'default_tenant')" not in component_library_source
 
 
 def test_orchestration_rest_auth_resolves_claims_headers_query_and_env(monkeypatch):
@@ -146,3 +165,16 @@ def test_orchestration_graphql_context_helpers_resolve_tenant_and_actor(monkeypa
 	monkeypatch.setenv("APG_DEFAULT_USER_ID", "env-user")
 	assert resolve_tenant(SimpleNamespace(context=SimpleNamespace())) == "env-tenant"
 	assert resolve_user(SimpleNamespace(context=SimpleNamespace())) == "env-user"
+
+
+def test_component_library_resolves_custom_component_tenant(monkeypatch):
+	resolve_tenant = _component_library_helpers()["resolve_component_library_tenant_id"]
+
+	monkeypatch.setenv("APG_DEFAULT_TENANT_ID", "env-tenant")
+	assert resolve_tenant() == "env-tenant"
+
+	assert resolve_tenant({"tenant_id": "definition-tenant"}) == "definition-tenant"
+	assert resolve_tenant({"organization_id": "org-tenant"}) == "org-tenant"
+
+	service = SimpleNamespace(tenant_id="service-tenant")
+	assert resolve_tenant({"tenant_id": "definition-tenant"}, service) == "service-tenant"
