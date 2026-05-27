@@ -439,7 +439,7 @@ PLATFORM_INFO = {
 	"total_deployment_templates": len(DeploymentTemplate),
 	"architecture_version": "2.0",
 	"python_requirement": "3.12+",
-	"primary_frameworks": ["Flask-AppBuilder", "SQLAlchemy", "Pydantic v2"],
+	"primary_frameworks": ["APG Python contracts", "Optional persistence adapters", "Pydantic v2"],
 	"deployment_targets": ["On-premises", "Cloud", "Hybrid", "Edge"],
 	"compliance_ready": ["GDPR", "HIPAA", "SOX", "ISO 27001", "SOC 2"],
 	"ai_ml_integration": True,

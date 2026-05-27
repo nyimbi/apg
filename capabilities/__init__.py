@@ -32,7 +32,7 @@ Key Features:
 - Workflow automation and approval processes
 - REST APIs for external system integration
 - Modern Python 3.12+ with type safety
-- Flask-AppBuilder for automatic UI generation
+- APG Python UI contracts with optional adapter integration
 - Comprehensive audit trails and security
 
 Usage Example:
@@ -49,8 +49,8 @@ result = compose_application(
 )
 
 if result.success:
-    app = result.flask_app
-    app.run(debug=True)
+    contract = result.application_contract
+    print(contract["name"])
 ```
 
 Industry Templates:
@@ -67,15 +67,15 @@ Integration:
 Each capability provides:
 - Database models with proper relationships
 - Business logic services with validation
-- Flask-AppBuilder views for web UI
+- UI contracts with routes, permissions, and theme tokens
 - REST APIs for external integration
 - Comprehensive permissions and security
 
 Dependencies:
 ------------
 - Python 3.12+
-- Flask-AppBuilder 4.x
-- SQLAlchemy 2.x
+- APG capability contracts
+- Optional persistence adapters
 - Pydantic 2.x
 - UUID Extensions
 - Modern web stack

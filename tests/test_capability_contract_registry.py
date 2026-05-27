@@ -7,6 +7,7 @@ from capabilities.capability_contract_registry import (
 	evaluate_rules,
 	get_contract,
 	load_contract_registry,
+	normalize_contract,
 	validate_contract_registry,
 	validate_contract_shape,
 )
@@ -24,6 +25,47 @@ def test_registry_discovers_and_validates_all_capability_contracts():
 
 	for record in registry.values():
 		validate_contract_shape(record.contract, record.path)
+
+
+def test_registry_normalizes_legacy_framework_shells_to_apg_python():
+	contract = normalize_contract({
+		"capability": "legacy_demo",
+		"configuration": {"tenant_id": "tenant", "ui": {}, "theme": {}},
+		"configuration_schema": {"required": ["tenant_id", "ui", "theme"]},
+		"rule_engine": {
+			"type": "deterministic",
+			"rules": [{"name": "ok", "condition": {}, "effect": {"decision": "allow"}}],
+		},
+		"ui": {
+			"shell": "flask_appbuilder",
+			"template_roots": ["templates/"],
+			"routes": [{"name": "dashboard", "path": "/dashboard", "component": "Dashboard", "permission": "demo:view"}],
+			"requires_theme": True,
+		},
+		"theme": {"name": "demo", "tokens": {"border.radius": "8px"}, "components": {"dashboard": {}}},
+	})
+
+	assert contract["ui"]["shell"] == "apg_python"
+	assert contract["ui"]["legacy_shell"] == "flask_appbuilder"
+
+
+def test_loaded_contracts_expose_python_first_ui_shells():
+	registry = load_contract_registry()
+	legacy_shells = {
+		"flask_appbuilder",
+		"fastapi_flask_appbuilder",
+		"flask",
+		"fastapi",
+		"django",
+	}
+
+	violations = [
+		f"{record.path}: {record.contract['ui']['shell']}"
+		for record in registry.values()
+		if record.contract["ui"]["shell"] in legacy_shells
+	]
+
+	assert violations == []
 
 
 def test_registry_returns_structured_validation_report():

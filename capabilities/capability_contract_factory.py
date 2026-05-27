@@ -70,7 +70,7 @@ def build_spec_capability_contract(
 			"rules": _default_rules(metadata["display_name"]),
 		},
 		"ui": {
-			"shell": "flask_appbuilder",
+			"shell": "apg_python",
 			"view_module": "views.py",
 			"api_prefix": f"{route_prefix}/api/v1",
 			"routes": [

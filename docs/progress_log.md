@@ -92,6 +92,32 @@ Verification planned before commit:
 - Check the staged diff and whitespace.
 - Stage only the submodule removal, hygiene test, and progress-log update.
 
+Verification result:
+
+- Pushed commit `6c6a910` (`Remove obsolete framework submodule`).
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` passed with 13 tests.
+- `git diff --cached --check` passed.
+
+### 2026-05-27 13:03 EAT
+
+In progress:
+
+- Normalized capability contract UI shells at registry load time so legacy framework shell names become `apg_python`.
+- Updated the shared spec-backed contract factory to emit `apg_python` directly.
+- Updated top-level capability metadata/docs away from framework-specific defaults.
+
+Verification planned before commit:
+
+- Run the focused capability contract registry tests.
+- Compile the changed registry/factory/package modules.
+- Check staged diff whitespace before committing.
+
+Verification result:
+
+- `.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py tests/test_capability_contract_public_api.py` passed with 8 tests.
+- `.venv/bin/python -m py_compile capabilities/capability_contract_registry.py capabilities/capability_contract_factory.py capabilities/__init__.py capabilities/__init___NEW.py tests/test_capability_contract_registry.py` passed.
+- `git diff --check` passed.
+
 ### 2026-05-26 02:25 EAT
 
 In progress:

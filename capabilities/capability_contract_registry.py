@@ -16,6 +16,14 @@ REQUIRED_SCHEMA_KEYS = {"tenant_id", "ui", "theme"}
 REQUIRED_RULE_KEYS = {"name", "condition", "effect"}
 REQUIRED_ROUTE_KEYS = {"name", "path", "component", "permission"}
 REQUIRED_THEME_TOKENS = {"border.radius"}
+PYTHON_UI_SHELL = "apg_python"
+LEGACY_UI_SHELL_ALIASES = {
+	"flask_appbuilder",
+	"fastapi_flask_appbuilder",
+	"flask",
+	"fastapi",
+	"django",
+}
 
 
 @dataclass(frozen=True)
@@ -49,7 +57,7 @@ def load_contract_registry(
 		module = _load_contract_module(path)
 		if not hasattr(module, "get_capability_contract"):
 			raise ValueError(f"{path} does not expose get_capability_contract")
-		contract = module.get_capability_contract(tenant_id)
+		contract = normalize_contract(module.get_capability_contract(tenant_id))
 		validate_contract_shape(contract, path)
 		capability_id = str(contract["capability"])
 		records[capability_id] = CapabilityContractRecord(
@@ -75,7 +83,7 @@ def validate_contract_registry(
 			module = _load_contract_module(path)
 			if not hasattr(module, "get_capability_contract"):
 				raise ValueError(f"{path} does not expose get_capability_contract")
-			contract = module.get_capability_contract(tenant_id)
+			contract = normalize_contract(module.get_capability_contract(tenant_id))
 			validate_contract_shape(contract, path)
 			capability_id = str(contract["capability"])
 			records[capability_id] = CapabilityContractRecord(
@@ -137,6 +145,17 @@ def validate_contract_shape(contract: dict[str, Any], source: Path | str = "<con
 	_validate_rule_engine(contract["rule_engine"], source)
 	_validate_ui(contract["ui"], source)
 	_validate_theme(contract["theme"], source)
+
+
+def normalize_contract(contract: dict[str, Any]) -> dict[str, Any]:
+	"""Return a runtime-normalized APG contract without mutating module globals."""
+	normalized = _copy_contract(contract)
+	ui = normalized.setdefault("ui", {})
+	shell = ui.get("shell")
+	if isinstance(shell, str) and shell.lower() in LEGACY_UI_SHELL_ALIASES:
+		ui["legacy_shell"] = shell
+		ui["shell"] = PYTHON_UI_SHELL
+	return normalized
 
 
 def _validate_configuration(configuration: Any, schema: Any, source: Path | str) -> None:
@@ -248,3 +267,16 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 		elif context.get(key) != expected:
 			return False
 	return True
+
+
+def _copy_contract(contract: dict[str, Any]) -> dict[str, Any]:
+	"""Copy plain contract data while keeping dependency surface minimal."""
+	copied: dict[str, Any] = {}
+	for key, value in contract.items():
+		if isinstance(value, dict):
+			copied[key] = _copy_contract(value)
+		elif isinstance(value, list):
+			copied[key] = [_copy_contract(item) if isinstance(item, dict) else item for item in value]
+		else:
+			copied[key] = value
+	return copied
