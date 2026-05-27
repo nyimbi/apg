@@ -4470,3 +4470,7 @@ Battery-conscious verification:
 - `.venv/bin/python - <<'PY' ... from capabilities.crm.adv.service import CRMService; CRMService() ... PY` -> constructed service with standalone optional managers
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pushed commit `e50b8d3` (`Keep CRM service importable standalone`) to `origin/main`.
