@@ -44,6 +44,7 @@ security = HTTPBearer()
 
 # Global service instance
 _service_instance: Optional[CRMService] = None
+_api_started_at = datetime.utcnow()
 
 
 # ================================
@@ -379,7 +380,7 @@ async def health_check(service: CRMService = Depends(get_crm_service)):
 			timestamp=datetime.utcnow(),
 			version="1.0.0",
 			components=health_data["components"],
-			uptime_seconds=0.0  # TODO: Calculate actual uptime
+			uptime_seconds=(datetime.utcnow() - _api_started_at).total_seconds()
 		)
 		
 	except Exception as e:
@@ -390,11 +391,24 @@ async def health_check(service: CRMService = Depends(get_crm_service)):
 		)
 
 
-@app.get("/metrics")
-async def get_metrics():
-	"""Get service metrics (Prometheus format)"""
-	# TODO: Implement Prometheus metrics
-	return {"status": "metrics endpoint placeholder"}
+@app.get("/metrics", response_model=APIResponse)
+async def get_metrics(
+	service: CRMService = Depends(get_crm_service),
+	tenant_id: str = Depends(get_tenant_id)
+):
+	"""Get tenant-scoped CRM operational metrics."""
+	try:
+		metrics = await service.get_operational_metrics(tenant_id)
+		return APIResponse(
+			message="CRM metrics retrieved successfully",
+			data=metrics
+		)
+	except Exception as e:
+		logger.error(f"Metrics retrieval failed: {str(e)}", exc_info=True)
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail="Metrics retrieval failed"
+		)
 
 
 # ================================

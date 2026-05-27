@@ -386,6 +386,38 @@ class CRMService:
 			health_status["error"] = str(e)
 		
 		return health_status
+
+	async def get_operational_metrics(self, tenant_id: str) -> Dict[str, Any]:
+		"""Return tenant-scoped operational counts and component health."""
+		try:
+			_, account_count = await self.list_accounts(tenant_id=tenant_id, limit=1, offset=0)
+			_, lead_count = await self.list_leads(tenant_id=tenant_id, limit=1, offset=0)
+			_, opportunity_count = await self.list_opportunities(tenant_id=tenant_id, limit=1, offset=0)
+			_, activity_count = await self.list_activities(tenant_id=tenant_id, limit=1, offset=0)
+			contact_count = 0
+			if self.db_manager:
+				_, contact_count = await self.search_contacts(
+					tenant_id=tenant_id,
+					limit=1,
+					offset=0
+				)
+			health = await self.health_check()
+			return {
+				"tenant_id": tenant_id,
+				"generated_at": datetime.utcnow().isoformat(),
+				"service": health.get("service", "unknown"),
+				"record_counts": {
+					"contacts": contact_count,
+					"accounts": account_count,
+					"leads": lead_count,
+					"opportunities": opportunity_count,
+					"activities": activity_count
+				},
+				"components": health.get("components", {})
+			}
+		except Exception as e:
+			logger.error(f"Operational metrics failed: {str(e)}", exc_info=True)
+			raise CRMServiceError(f"Operational metrics failed: {str(e)}")
 	
 	# ================================
 	# Contact Management

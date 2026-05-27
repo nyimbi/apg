@@ -4539,3 +4539,19 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `15ff339` (`Make CRM listing APIs executable`) to `origin/main`.
+
+### 2026-05-27 18:36 EAT
+
+Completed checkpoint:
+
+- Replaced the CRM API health endpoint's fixed uptime value with runtime uptime derived from API process start time.
+- Replaced the top-level CRM metrics placeholder with tenant-scoped operational metrics from the service layer.
+- Added `CRMService.get_operational_metrics()` to report core CRM record counts and component health without requiring a live PostgreSQL pool.
+- Extended focused CRM API coverage to assert runtime health and deterministic tenant record counts.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/adv/database.py capabilities/crm/adv/service.py capabilities/crm/adv/api.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 5 passed, 9 existing deprecation warnings
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

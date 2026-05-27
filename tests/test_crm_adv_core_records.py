@@ -237,6 +237,8 @@ def test_crm_api_lists_core_records_without_placeholders():
 			service=service,
 			tenant_id="tenant-api",
 		)
+		health = await crm_api.health_check(service=service)
+		metrics = await crm_api.get_metrics(service=service, tenant_id="tenant-api")
 
 		assert [item["id"] for item in accounts.data["items"]] == [account.id]
 		assert accounts.data["total_count"] == 1
@@ -246,6 +248,14 @@ def test_crm_api_lists_core_records_without_placeholders():
 		assert [item["id"] for item in opportunities.data["items"]] == [opportunity.id]
 		assert opportunities.data["items"][0]["expected_revenue"] == "45000.000"
 		assert [item["id"] for item in activities.data["items"]] == [activity.id]
+		assert health.uptime_seconds >= 0
+		assert metrics.data["record_counts"] == {
+			"contacts": 0,
+			"accounts": 1,
+			"leads": 1,
+			"opportunities": 1,
+			"activities": 1,
+		}
 
 	asyncio.run(exercise())
 
