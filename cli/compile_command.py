@@ -223,9 +223,9 @@ def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool):
 			_write_generated_files(result.generated_files, Path(config.output_directory))
 			
 			console.print(f"\n[green]Next steps:[/green]")
-			console.print(f"  1. Inspect generated files in {config.output_directory}")
-			console.print(f"  2. pip install -r {config.output_directory}/requirements.txt")
-			console.print(f"  3. python {config.output_directory}/app.py")
+			console.print(f"  1. Inspect generated files in {config.output_directory}", soft_wrap=True)
+			console.print(f"  2. pip install -r {config.output_directory}/requirements.txt", soft_wrap=True)
+			console.print(f"  3. python {config.output_directory}/app.py", soft_wrap=True)
 			console.print("\n[green]The generated Python manifest prints application metadata as JSON.[/green]")
 			
 		else:

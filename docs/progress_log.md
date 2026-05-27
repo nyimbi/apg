@@ -118,6 +118,31 @@ Verification result:
 - `.venv/bin/python -m py_compile capabilities/capability_contract_registry.py capabilities/capability_contract_factory.py capabilities/__init__.py capabilities/__init___NEW.py tests/test_capability_contract_registry.py` passed.
 - `git diff --check` passed.
 
+Commit result:
+
+- Pushed commit `740c5c4` (`Make capability contracts Python-first at runtime`).
+
+### 2026-05-27 13:07 EAT
+
+In progress:
+
+- Regenerated ANTLR parser artifacts from `spec/apg.g4` so generated lexer/parser files no longer advertise removed framework UI target tokens.
+- Fixed compile-command next-step output so long absolute paths remain a copyable `python .../app.py` command in CLI output.
+
+Verification planned before commit:
+
+- Run focused grammar and compiler baseline tests.
+- Compile the changed CLI command.
+- Check generated spec artifacts for stale framework tokens.
+- Check staged diff whitespace before committing.
+
+Verification result:
+
+- `.venv/bin/python -m pytest -q tests/test_apg_language_contract.py tests/test_compiler_baseline.py` passed with 15 tests.
+- `.venv/bin/python -m py_compile cli/compile_command.py spec/apgLexer.py spec/apgParser.py spec/apgListener.py spec/apgVisitor.py` passed.
+- Stale generated parser token scan for `'flask_appbuilder'`, `'fastapi'`, and `'django'` returned no matches.
+- `git diff --check` passed after trimming regenerated parser EOF blanks.
+
 ### 2026-05-26 02:25 EAT
 
 In progress:
