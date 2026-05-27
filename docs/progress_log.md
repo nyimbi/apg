@@ -3358,3 +3358,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_notification_service_executable_state.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:57 EAT
+
+Completed checkpoint:
+
+- Replaced Composition Events' unconditional tenant capability access with explicit tenant access policy evaluation.
+- Capability stream discovery now respects public/shared, restricted/private, allow-list, and deny-list policies.
+- Event routing now skips target capabilities that are not accessible to the event tenant.
+- Added focused tenant access regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/events/apg_integration.py tests/test_composition_events_tenant_access.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_events_tenant_access.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed, 3 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

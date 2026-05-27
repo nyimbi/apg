@@ -38,6 +38,7 @@ class APGCapabilityInfo:
 	endpoints: Dict[str, str]
 	event_patterns: List[str]
 	dependencies: List[str]
+	tenant_access_policy: Dict[str, Any] = field(default_factory=dict)
 	status: str = "active"
 	last_heartbeat: Optional[datetime] = None
 
@@ -267,6 +268,7 @@ class APGEventStreamingIntegration:
 	async def route_event(self, event: ESEvent) -> List[str]:
 		"""Route an event to target capabilities based on routing rules."""
 		routed_to = []
+		event_tenant_id = getattr(event, "tenant_id", None)
 		
 		try:
 			for rule in self.routing_rules.values():
@@ -278,6 +280,9 @@ class APGEventStreamingIntegration:
 					# Route to target capabilities
 					for target_capability in rule.target_capabilities:
 						if target_capability in self.registered_capabilities:
+							capability = self.registered_capabilities[target_capability]
+							if event_tenant_id and not self._capability_accessible_to_tenant(capability, event_tenant_id):
+								continue
 							await self._route_event_to_capability(event, target_capability, rule)
 							routed_to.append(target_capability)
 			
@@ -469,7 +474,6 @@ class APGEventStreamingIntegration:
 	
 	async def get_tenant_streams(self, tenant_id: str) -> List[str]:
 		"""Get all streams accessible to a tenant."""
-		# In production, this would query the database with tenant filters
 		tenant_streams = []
 		for capability in self.registered_capabilities.values():
 			if self._capability_accessible_to_tenant(capability, tenant_id):
@@ -477,6 +481,30 @@ class APGEventStreamingIntegration:
 				tenant_streams.append(stream_id)
 		
 		return tenant_streams
+
+	def grant_capability_access(self, capability_id: str, tenant_ids: List[str]) -> bool:
+		"""Grant tenant access to a registered capability."""
+		capability = self.registered_capabilities.get(capability_id)
+		if not capability:
+			return False
+		policy = capability.tenant_access_policy
+		allowed = set(policy.get("allowed_tenants", []))
+		allowed.update(tenant_id for tenant_id in tenant_ids if tenant_id)
+		policy["allowed_tenants"] = sorted(allowed)
+		if policy.get("visibility") in {None, "private", "restricted"}:
+			policy["visibility"] = "restricted"
+		return True
+
+	def revoke_capability_access(self, capability_id: str, tenant_ids: List[str]) -> bool:
+		"""Revoke tenant access to a registered capability."""
+		capability = self.registered_capabilities.get(capability_id)
+		if not capability:
+			return False
+		policy = capability.tenant_access_policy
+		denied = set(policy.get("denied_tenants", []))
+		denied.update(tenant_id for tenant_id in tenant_ids if tenant_id)
+		policy["denied_tenants"] = sorted(denied)
+		return True
 	
 	# =========================================================================
 	# Private Helper Methods
@@ -846,8 +874,27 @@ class APGEventStreamingIntegration:
 	
 	def _capability_accessible_to_tenant(self, capability: APGCapabilityInfo, tenant_id: str) -> bool:
 		"""Check if a capability is accessible to a tenant."""
-		# In production, implement proper tenant access control
-		return True  # For now, all capabilities are accessible to all tenants
+		if not tenant_id:
+			return False
+		if tenant_id in {"platform", "system"}:
+			return True
+
+		policy = capability.tenant_access_policy or {}
+		denied_tenants = set(policy.get("denied_tenants", []))
+		if "*" in denied_tenants or tenant_id in denied_tenants:
+			return False
+
+		allowed_tenants = set(policy.get("allowed_tenants", []))
+		if "*" in allowed_tenants or tenant_id in allowed_tenants:
+			return True
+
+		visibility = policy.get("visibility", policy.get("access", "public"))
+		if visibility in {"public", "shared"}:
+			return True
+		if visibility in {"private", "restricted", "tenant_restricted"}:
+			return False
+
+		return False
 	
 	async def _event_matches_rule(self, event: ESEvent, rule: EventRoutingRule) -> bool:
 		"""Check if an event matches a routing rule."""
