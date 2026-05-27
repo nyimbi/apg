@@ -199,6 +199,22 @@ Commit result:
 
 - Pushed commit `74264c0` (`Run generated Python artifacts directly`).
 
+### 2026-05-27 17:11 EAT
+
+Completed checkpoint:
+
+- Aligned composable master integration generation with framework-neutral APG capability registration.
+- Removed the Flask-only `flask-principal` dependency from the composable RBAC capability metadata.
+- Updated stale final summary examples from `result.flask_app` and `app.run(...)` to application contract inspection.
+- Added repository hygiene coverage for composable glue and RBAC metadata so `appbuilder`, `flask-principal`, and framework shell terms do not return.
+
+Verification result:
+
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py tests/test_composition_engine.py tests/test_cli_composable_only.py` passed with 20 tests.
+- `.venv/bin/python -m py_compile templates/composable/composition_engine.py tests/test_repository_hygiene.py` passed.
+- `python -m json.tool templates/composable/capabilities/auth/role_based_access_control/capability.json` passed.
+- Focused stale-term scan over the changed report/template/RBAC metadata returned no matches.
+
 ### 2026-05-26 02:25 EAT
 
 In progress:

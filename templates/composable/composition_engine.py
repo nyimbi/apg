@@ -480,21 +480,28 @@ except ImportError as e:
     integrate_{{capability}} = None
 {% endfor %}
 
-def integrate_all_capabilities(app, appbuilder=None, db=None) -> Dict[str, Any]:
+def integrate_all_capabilities(application=None, registry=None, configuration=None) -> Dict[str, Any]:
     """
-    Integrate all capabilities into the application.
+    Register all capability contracts with the composed APG application.
     
     Returns:
         Dict with integration status for each capability
     """
     integration_status = {}
+    capability_config = configuration or {}
     
     {% for capability in capabilities %}
     # Integrate {{capability}}
     try:
         if integrate_{{capability}}:
-            integrate_{{capability}}(app, appbuilder, db)
+            contract = integrate_{{capability}}(
+                application,
+                registry,
+                capability_config.get('{{capability}}', {})
+            )
             integration_status['{{capability}}'] = {'status': 'success', 'error': None}
+            if isinstance(contract, dict):
+                integration_status['{{capability}}']['contract'] = contract.get('name', '{{capability}}')
             log.info("Successfully integrated {{capability}}")
         else:
             integration_status['{{capability}}'] = {'status': 'skipped', 'error': 'Integration function not available'}

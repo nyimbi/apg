@@ -235,6 +235,27 @@ def test_composable_integration_templates_are_framework_neutral():
 	assert violations == []
 
 
+def test_composable_engine_glue_is_framework_neutral():
+	violations: list[str] = []
+	paths = [
+		"templates/composable/composition_engine.py",
+		"templates/composable/capabilities/auth/role_based_access_control/capability.json",
+	]
+
+	for path in paths:
+		content = (REPO_ROOT / path).read_text(encoding="utf-8", errors="ignore")
+		for term in (
+			"appbuilder",
+			"flask-principal",
+			"Flask-AppBuilder",
+			"flask_appbuilder",
+		):
+			if term in content:
+				violations.append(f"{path}: {term}")
+
+	assert violations == []
+
+
 def test_composable_model_and_view_templates_are_framework_neutral():
 	violations: list[str] = []
 	for path in _tracked_files():

@@ -267,8 +267,8 @@ from capabilities import create_manufacturing_erp
 # Create a complete manufacturing ERP
 result = create_manufacturing_erp(tenant_id="acme_manufacturing")
 if result.success:
-    app = result.flask_app
-    app.run(debug=True)
+    contract = result.application_contract
+    print(contract["name"])
 ```
 
 ### **Advanced Composition**
@@ -301,8 +301,8 @@ result = compose_application(
 
 if result.success:
     print(f"Pharmaceutical ERP created with {len(result.registered_capabilities)} capabilities")
-    app = result.flask_app
-    app.run(debug=True)
+    contract = result.application_contract
+    print(contract["name"])
 ```
 
 ### **Discovery and Validation**
