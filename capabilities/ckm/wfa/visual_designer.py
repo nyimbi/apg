@@ -9,6 +9,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 import asyncio
+import copy
 import logging
 import json
 import xml.etree.ElementTree as ET
@@ -575,8 +576,11 @@ class BPMNValidator:
 class VisualDesignerService:
 	"""Core visual designer service with collaboration and validation."""
 	
-	def __init__(self):
+	def __init__(self, process_service: Any | None = None):
 		self.active_sessions: Dict[str, DesignSession] = {}
+		self.process_service = process_service
+		self.process_definitions: Dict[Tuple[str, str], WBPMProcessDefinition] = {}
+		self.process_diagrams: Dict[Tuple[str, str], ProcessDiagram] = {}
 		self.validator = BPMNValidator()
 		self.auto_save_interval = 30  # seconds
 		self.session_timeout = 3600  # 1 hour
@@ -923,14 +927,18 @@ class VisualDesignerService:
 				updated_by=context.user_id
 			)
 			
-			# In production, save to database via process service
-			# For now, simulate successful save
-			process_id = process_definition.id
+			# Persist through the configured process service or the local repository.
+			save_result = await self._store_process_definition(process_definition, process_data, context)
+			if not save_result.success:
+				return save_result
+			process_id = save_result.data.get("process_id", process_definition.id)
 			
 			# Update session
 			session.process_diagram.process_id = process_id
+			session.process_diagram.diagram_name = process_definition.process_name
 			session.process_diagram.updated_by = context.user_id
 			session.process_diagram.updated_at = datetime.utcnow()
+			self.process_diagrams[self._process_storage_key(context.tenant_id, process_id)] = copy.deepcopy(session.process_diagram)
 			
 			logger.info(f"Process definition saved: {process_id}")
 			
@@ -959,16 +967,100 @@ class VisualDesignerService:
 	
 	async def _load_process_diagram(self, process_id: str, context: APGTenantContext) -> ProcessDiagram:
 		"""Load existing process as diagram."""
-		# In production, load from database
-		# For now, create a sample diagram
+		storage_key = self._process_storage_key(context.tenant_id, process_id)
+		if storage_key in self.process_diagrams:
+			diagram = copy.deepcopy(self.process_diagrams[storage_key])
+			diagram.updated_by = context.user_id
+			diagram.updated_at = datetime.utcnow()
+			return diagram
+
+		process_definition = await self._load_process_definition(process_id, context)
+		if process_definition:
+			return ProcessDiagram(
+				diagram_id=f"diagram_{uuid.uuid4().hex}",
+				process_id=process_definition.id,
+				tenant_id=context.tenant_id,
+				diagram_name=process_definition.process_name,
+				canvas_properties={
+					"process_key": process_definition.process_key,
+					"process_version": process_definition.process_version,
+					"category": process_definition.category,
+					"tags": process_definition.tags,
+					"bpmn_xml": process_definition.bpmn_xml,
+				},
+				created_by=process_definition.created_by,
+				updated_by=context.user_id
+			)
+
 		return ProcessDiagram(
 			diagram_id=f"diagram_{uuid.uuid4().hex}",
 			process_id=process_id,
 			tenant_id=context.tenant_id,
-			diagram_name="Loaded Process",
+			diagram_name=f"Process {process_id}",
 			created_by=context.user_id,
 			updated_by=context.user_id
 		)
+
+	def _process_storage_key(self, tenant_id: str, process_id: str) -> Tuple[str, str]:
+		"""Build a tenant-scoped process storage key."""
+		return (tenant_id, process_id)
+
+	async def _store_process_definition(
+		self,
+		process_definition: WBPMProcessDefinition,
+		process_data: Dict[str, Any],
+		context: APGTenantContext
+	) -> WBPMServiceResponse:
+		"""Persist process definitions through APG service boundaries or local repository."""
+		persist_payload = {
+			**process_data,
+			"bpmn_xml": process_definition.bpmn_xml,
+			"category": process_definition.category,
+			"tags": process_definition.tags,
+		}
+
+		if self.process_service:
+			create_process = getattr(self.process_service, "create_process", None)
+			if callable(create_process):
+				return await create_process(persist_payload, context)
+
+			create_definition = getattr(self.process_service, "create_process_definition", None)
+			if callable(create_definition):
+				return await create_definition(persist_payload, context)
+
+		storage_key = self._process_storage_key(context.tenant_id, process_definition.id)
+		self.process_definitions[storage_key] = process_definition
+		return WBPMServiceResponse(
+			success=True,
+			message="Process definition saved successfully",
+			data={
+				"process_id": process_definition.id,
+				"process_key": process_definition.process_key,
+				"process_name": process_definition.process_name,
+				"status": process_definition.process_status
+			}
+		)
+
+	async def _load_process_definition(
+		self,
+		process_id: str,
+		context: APGTenantContext
+	) -> Optional[WBPMProcessDefinition]:
+		"""Load a process definition from APG service boundaries or local repository."""
+		if self.process_service:
+			get_process = getattr(self.process_service, "get_process", None)
+			if callable(get_process):
+				response = await get_process(process_id, context)
+				if response.success and response.data:
+					return WBPMProcessDefinition(**response.data)
+
+			get_definition = getattr(self.process_service, "get_process_definition", None)
+			if callable(get_definition):
+				response = await get_definition(process_id, context)
+				if response.success and response.data:
+					return WBPMProcessDefinition(**response.data)
+
+		return self.process_definitions.get(self._process_storage_key(context.tenant_id, process_id))
 	
 	async def _create_from_template(self, template_id: str, context: APGTenantContext) -> ProcessDiagram:
 		"""Create diagram from template."""
