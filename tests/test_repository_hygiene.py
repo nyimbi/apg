@@ -104,6 +104,7 @@ def test_project_templates_describe_python_artifact_flow():
 			or path.startswith("templates/application_templates/")
 			or path == "templates/application_template_manager.py"
 			or path == "scripts/template_generation/create_template_structure.py"
+			or path == "cli/compile_command.py"
 			or path in PYTHON_FIRST_PUBLIC_DOCS
 		):
 			continue

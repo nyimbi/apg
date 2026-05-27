@@ -3843,6 +3843,21 @@ Battery-conscious verification:
 - `git diff --check` -> no issues.
 - Deferred pytest at the user's request to conserve battery.
 
+### 2026-05-27 07:18 EAT
+
+Completed checkpoint:
+
+- Aligned `apg compile` next-step guidance with the Python artifact path used by the rest of the CLI and documentation.
+- Replaced the stale `cd generated` plus `python app.py` flow with direct project-root commands for inspecting the output directory, installing generated requirements, and running `{output}/app.py`.
+- Updated compiler baseline expectations to lock the generated output-directory command.
+- Extended repository hygiene coverage to include `cli/compile_command.py` so stale framework or `python app.py` guidance cannot return there.
+
+Battery-conscious verification:
+
+- `rg -n "python app.py|http://localhost:8080|Flask-AppBuilder|flask_appbuilder|FastAPI|fastapi|Django|django" cli/compile_command.py tests/test_compiler_baseline.py tests/test_repository_hygiene.py` -> only hygiene constants and negative assertions remain.
+- `git diff --check` -> no issues.
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 07:02 EAT
 
 Completed checkpoint:
