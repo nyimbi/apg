@@ -4494,3 +4494,7 @@ Battery-conscious verification:
 - `.venv/bin/python - <<'PY' ... CRMService() ... PY` -> constructed with real repaired optional modules where available
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pushed commit `d8ac9fe` (`Make CRM optional adapters import standalone`) to `origin/main`.
