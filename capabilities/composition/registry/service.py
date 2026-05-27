@@ -149,7 +149,7 @@ class CapabilityRegistryService:
 			max_dependency_depth=10,
 			created_at=datetime.utcnow(),
 			created_by=self.user_id,
-			metadata={"source": "auto_created", "version": "1.0.0"}
+			metadata_json={"source": "auto_created", "version": "1.0.0"}
 		)
 		
 		self.db_session.add(registry)
@@ -1517,6 +1517,8 @@ class CapabilityRegistryService:
 				"data": None,
 				"errors": [str(e)]
 			}
+
+CRService = CapabilityRegistryService
 
 # Service Factory
 _registry_service_instance: Optional[CapabilityRegistryService] = None

@@ -3434,3 +3434,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_auth_abac_policy_applicability.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed, 10 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:26 EAT
+
+Completed checkpoint:
+
+- Repaired the Composition Registry import boundary by replacing reserved SQLAlchemy declarative `metadata` mapped attributes with `metadata_json` attributes backed by the same database column name.
+- Preserved legacy instance-level `metadata` access for registry models and restored the expected `CRService` alias used by registry API, integration, and mobile modules.
+- Fixed the capability search index to reference the actual `capability_name` column so registry models map cleanly.
+- Added focused registry import and metadata mapping regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/models.py capabilities/composition/registry/service.py capabilities/composition/registry/version_manager.py tests/test_composition_registry_import_contract.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_registry_import_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 2 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

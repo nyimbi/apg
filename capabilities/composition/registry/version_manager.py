@@ -341,7 +341,7 @@ class VersionManager:
 				support_level="full",
 				created_at=datetime.utcnow(),
 				created_by=self.user_id,
-				metadata={"source": "version_manager", "analysis": compatibility_analysis}
+				metadata_json={"source": "version_manager", "analysis": compatibility_analysis}
 			)
 			
 			self.db_session.add(version_record)

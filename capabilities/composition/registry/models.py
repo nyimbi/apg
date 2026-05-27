@@ -82,7 +82,7 @@ class CRCapability(Base):
 		Index('idx_cr_capability_code', 'capability_code'),
 		Index('idx_cr_capability_status', 'status'),
 		Index('idx_cr_capability_category', 'category'),
-		Index('idx_cr_capability_search', 'name', 'description'),
+		Index('idx_cr_capability_search', 'capability_name', 'description'),
 		UniqueConstraint('tenant_id', 'capability_code', name='uq_tenant_capability'),
 	)
 	
@@ -138,7 +138,7 @@ class CRCapability(Base):
 	updated_by = Column(String(36))
 	
 	# Additional metadata
-	metadata = Column(JSON, default=dict)
+	metadata_json = Column("metadata", JSON, default=dict)
 	
 	# Relationships
 	dependencies = relationship("CRDependency", foreign_keys="CRDependency.capability_id", back_populates="capability")
@@ -184,7 +184,7 @@ class CRDependency(Base):
 	created_by = Column(String(36), nullable=False)
 	
 	# Additional metadata
-	metadata = Column(JSON, default=dict)
+	metadata_json = Column("metadata", JSON, default=dict)
 	
 	# Relationships
 	capability = relationship("CRCapability", foreign_keys=[capability_id], back_populates="dependencies")
@@ -246,7 +246,7 @@ class CRComposition(Base):
 	updated_by = Column(String(36))
 	
 	# Additional metadata
-	metadata = Column(JSON, default=dict)
+	metadata_json = Column("metadata", JSON, default=dict)
 	
 	# Relationships
 	capabilities = relationship("CRCompositionCapability", back_populates="composition", cascade="all, delete-orphan")
@@ -335,7 +335,7 @@ class CRVersion(Base):
 	created_by = Column(String(36), nullable=False)
 	
 	# Additional metadata
-	metadata = Column(JSON, default=dict)
+	metadata_json = Column("metadata", JSON, default=dict)
 	
 	# Relationships
 	capability = relationship("CRCapability", back_populates="versions")
@@ -411,7 +411,7 @@ class CRRegistry(Base):
 	updated_by = Column(String(36))
 	
 	# Additional metadata
-	metadata = Column(JSON, default=dict)
+	metadata_json = Column("metadata", JSON, default=dict)
 
 # =============================================================================
 # Analytics and Monitoring Models
@@ -449,7 +449,7 @@ class CRUsageAnalytics(Base):
 	avg_session_duration = Column(Float, default=0.0)
 	
 	# Additional metadata
-	metadata = Column(JSON, default=dict)
+	metadata_json = Column("metadata", JSON, default=dict)
 
 class CRHealthMetrics(Base):
 	"""Capability health and performance metrics."""
@@ -482,7 +482,25 @@ class CRHealthMetrics(Base):
 	security_score = Column(Float, default=0.0)
 	
 	# Additional metadata
-	metadata = Column(JSON, default=dict)
+	metadata_json = Column("metadata", JSON, default=dict)
+
+def _get_model_metadata(instance: Any) -> Dict[str, Any]:
+	"""Expose legacy instance.metadata access without using a reserved mapped name."""
+	return instance.metadata_json or {}
+
+def _set_model_metadata(instance: Any, value: Optional[Dict[str, Any]]) -> None:
+	instance.metadata_json = value or {}
+
+for _metadata_model in (
+	CRCapability,
+	CRDependency,
+	CRComposition,
+	CRVersion,
+	CRRegistry,
+	CRUsageAnalytics,
+	CRHealthMetrics,
+):
+	_metadata_model.metadata = property(_get_model_metadata, _set_model_metadata)
 
 # =============================================================================
 # Model Exports
