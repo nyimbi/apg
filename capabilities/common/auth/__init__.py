@@ -575,34 +575,71 @@ class ABACEngine:
 	def _policy_applies(self, policy: Policy, request: AccessRequest, 
 						subject_attrs: Dict[str, Any]) -> bool:
 		"""Check if policy applies to the request"""
-		# Basic checks - could be more sophisticated
-		return True  # For now, assume all policies are potentially applicable
+		return (
+			self._conditions_match(policy.subject_conditions, self._subject_attributes(request, subject_attrs))
+			and self._conditions_match(policy.resource_conditions, self._resource_attributes(request))
+			and self._conditions_match(policy.action_conditions, self._action_attributes(request))
+			and self._conditions_match(policy.environment_conditions, self._environment_attributes(request))
+		)
 
 	def _evaluate_policy_conditions(self, policy: Policy, request: AccessRequest,
 									subject_attrs: Dict[str, Any]) -> bool:
 		"""Evaluate policy conditions"""
 		# Evaluate subject conditions
 		if policy.subject_conditions:
-			if not self._evaluate_conditions(policy.subject_conditions, subject_attrs):
+			if not self._evaluate_conditions(policy.subject_conditions, self._subject_attributes(request, subject_attrs)):
 				return False
 		
 		# Evaluate resource conditions  
 		if policy.resource_conditions:
-			if not self._evaluate_conditions(policy.resource_conditions, request.resource_attributes):
+			if not self._evaluate_conditions(policy.resource_conditions, self._resource_attributes(request)):
 				return False
 				
 		# Evaluate action conditions
 		if policy.action_conditions:
-			action_attrs = {"action": request.action}
-			if not self._evaluate_conditions(policy.action_conditions, action_attrs):
+			if not self._evaluate_conditions(policy.action_conditions, self._action_attributes(request)):
 				return False
 				
 		# Evaluate environment conditions
 		if policy.environment_conditions:
-			if not self._evaluate_conditions(policy.environment_conditions, request.environment_attributes):
+			if not self._evaluate_conditions(policy.environment_conditions, self._environment_attributes(request)):
 				return False
 		
 		return True
+
+	def _conditions_match(self, conditions: List[Dict[str, Any]], attributes: Dict[str, Any]) -> bool:
+		"""Return whether a condition group matches, treating an empty group as global"""
+		return True if not conditions else self._evaluate_conditions(conditions, attributes)
+
+	def _subject_attributes(self, request: AccessRequest, subject_attrs: Dict[str, Any]) -> Dict[str, Any]:
+		"""Build canonical subject attributes for ABAC evaluation"""
+		return {
+			"subject_id": request.subject_id,
+			"tenant_id": request.tenant_id,
+			**subject_attrs
+		}
+
+	def _resource_attributes(self, request: AccessRequest) -> Dict[str, Any]:
+		"""Build canonical resource attributes for ABAC evaluation"""
+		return {
+			"resource": request.resource,
+			"tenant_id": request.tenant_id,
+			**request.resource_attributes
+		}
+
+	def _action_attributes(self, request: AccessRequest) -> Dict[str, Any]:
+		"""Build canonical action attributes for ABAC evaluation"""
+		return {"action": request.action}
+
+	def _environment_attributes(self, request: AccessRequest) -> Dict[str, Any]:
+		"""Build canonical environment attributes for ABAC evaluation"""
+		return {
+			"timestamp": request.timestamp,
+			"current_time": request.timestamp.strftime("%H:%M:%S"),
+			"ip_address": request.ip_address,
+			"user_agent": request.user_agent,
+			**request.environment_attributes
+		}
 
 	def _evaluate_conditions(self, conditions: List[Dict[str, Any]], 
 							 attributes: Dict[str, Any]) -> bool:
@@ -630,13 +667,13 @@ class ABACEngine:
 		elif operator == "not_in":
 			return actual not in expected if isinstance(expected, (list, set)) else True
 		elif operator == "greater_than":
-			return actual > expected
+			return actual is not None and actual > expected
 		elif operator == "less_than":
-			return actual < expected
+			return actual is not None and actual < expected
 		elif operator == "greater_equal":
-			return actual >= expected
+			return actual is not None and actual >= expected
 		elif operator == "less_equal":
-			return actual <= expected
+			return actual is not None and actual <= expected
 		elif operator == "contains":
 			return expected in str(actual)
 		elif operator == "starts_with":

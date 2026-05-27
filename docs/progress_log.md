@@ -3419,3 +3419,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_nlpc_gateway_handlers.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed, 4 existing Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:19 EAT
+
+Completed checkpoint:
+
+- Replaced AUTH ABAC policy applicability's unconditional `True` placeholder with concrete subject, resource, action, and environment condition matching.
+- Canonical request attributes now include `subject_id`, `resource`, `action`, tenant, timestamp/current time, IP address, and user-agent so policies can match request context without callers duplicating fields into attribute maps.
+- Added focused ABAC applicability regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/auth/__init__.py tests/test_common_auth_abac_policy_applicability.py`
+- `.venv/bin/python -m pytest -q tests/test_common_auth_abac_policy_applicability.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed, 10 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
