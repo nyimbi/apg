@@ -351,6 +351,99 @@ def validate_capability_contracts() -> Dict[str, Any]:
         if len(set(capability.requires)) != len(capability.requires):
             errors.append(f"{{capability.name}} declares duplicate required services")
     return {{"errors": errors, "warnings": warnings}}
+
+
+def capability_screens(capability_name: str) -> List[Dict[str, Any]]:
+    capability = get_capability(capability_name)
+    routes = capability.ui.get("routes", [])
+    if not isinstance(routes, list):
+        return []
+    screens: List[Dict[str, Any]] = []
+    for index, route in enumerate(routes):
+        if not isinstance(route, dict):
+            continue
+        name = str(route.get("name") or route.get("component") or f"screen_{{index + 1}}")
+        component = route.get("component", name)
+        screens.append({{
+            "id": f"{{capability.name}}.{{name}}",
+            "capability": capability.name,
+            "name": name,
+            "path": route.get("path", ""),
+            "component": component,
+            "permission": route.get("permission"),
+            "nav_group": route.get("nav_group"),
+            "shell": capability.ui.get("shell"),
+            "theme": capability.theme.get("name"),
+        }})
+    return screens
+
+
+def ui_route_index() -> Dict[str, Dict[str, Any]]:
+    routes: Dict[str, Dict[str, Any]] = {{}}
+    for capability in CAPABILITIES.values():
+        for screen in capability_screens(capability.name):
+            path = screen.get("path")
+            if path:
+                routes[str(path)] = screen
+    return routes
+
+
+def composition_graph() -> Dict[str, List[Dict[str, Any]]]:
+    nodes: Dict[str, Dict[str, Any]] = {{}}
+    edges: List[Dict[str, Any]] = []
+
+    def node(node_id: str, kind: str, **attrs: Any) -> None:
+        nodes[node_id] = {{"id": node_id, "kind": kind, **attrs}}
+
+    def edge(source: str, target: str, relation: str) -> None:
+        edges.append({{"source": source, "target": target, "relation": relation}})
+
+    for capability in CAPABILITIES.values():
+        cap_id = f"capability:{{capability.name}}"
+        node(cap_id, "capability", name=capability.name)
+
+        for service in capability.provides:
+            service_id = f"service:{{service}}"
+            node(service_id, "service", name=service)
+            edge(cap_id, service_id, "provides")
+
+        for service in capability.requires:
+            service_id = f"service:{{service}}"
+            node(service_id, "service", name=service)
+            edge(cap_id, service_id, "requires")
+
+        for module_name in capability.erp_modules:
+            module_id = f"erp_module:{{module_name}}"
+            node(module_id, "erp_module", name=module_name)
+            edge(cap_id, module_id, "belongs_to")
+
+        theme_name = capability.theme.get("name")
+        if theme_name:
+            theme_id = f"theme:{{theme_name}}"
+            node(theme_id, "theme", name=theme_name)
+            edge(cap_id, theme_id, "uses_theme")
+
+        for screen in capability_screens(capability.name):
+            screen_id = f"screen:{{screen['id']}}"
+            node(screen_id, "screen", **screen)
+            edge(cap_id, screen_id, "has_screen")
+            component = screen.get("component")
+            if component:
+                component_id = f"component:{{component}}"
+                node(component_id, "component", name=str(component))
+                edge(screen_id, component_id, "renders")
+
+        if isinstance(capability.components, dict):
+            for component_name, component_spec in capability.components.items():
+                component_id = f"component:{{component_name}}"
+                node(component_id, "component", name=str(component_name), spec=component_spec)
+                edge(cap_id, component_id, "has_component")
+                if isinstance(component_spec, dict) and component_spec.get("capability"):
+                    service_id = f"service:{{component_spec['capability']}}"
+                    node(service_id, "service", name=str(component_spec["capability"]))
+                    edge(component_id, service_id, "binds_to")
+
+    return {{"nodes": sorted(nodes.values(), key=lambda item: item["id"]), "edges": edges}}
 '''
 
 	def _generate_ai_agents_runtime(

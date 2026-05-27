@@ -99,6 +99,28 @@ def test_capability_declaration_generates_runtime_manifest():
     assert capability.provides == ["journal_entries", "chart_of_accounts", "financial_periods"]
     assert namespace["capabilities_by_erp_module"]()["general_ledger"][0].name == "GeneralLedger"
     assert namespace["provided_services"]()["journal_entries"] == ["GeneralLedger"]
+    assert namespace["capability_screens"]("GeneralLedger") == [
+        {
+            "id": "GeneralLedger.Journals",
+            "capability": "GeneralLedger",
+            "name": "Journals",
+            "path": "/finance/gl/journals",
+            "component": "JournalScreen",
+            "permission": None,
+            "nav_group": None,
+            "shell": "react",
+            "theme": "finance_ops",
+        }
+    ]
+    assert namespace["ui_route_index"]()["/finance/gl/journals"]["component"] == "JournalScreen"
+
+    graph = namespace["composition_graph"]()
+    graph_edges = {(edge["source"], edge["relation"], edge["target"]) for edge in graph["edges"]}
+    assert ("capability:GeneralLedger", "has_screen", "screen:GeneralLedger.Journals") in graph_edges
+    assert ("screen:GeneralLedger.Journals", "renders", "component:JournalScreen") in graph_edges
+    assert ("capability:GeneralLedger", "belongs_to", "erp_module:general_ledger") in graph_edges
+    assert ("component:posting", "binds_to", "service:journal_entries") in graph_edges
+
     validation = namespace["validate_capability_contracts"]()
     assert validation["errors"] == []
     assert validation["warnings"] == ["GeneralLedger requires external service audit_log"]

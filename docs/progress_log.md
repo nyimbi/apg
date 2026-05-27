@@ -3632,3 +3632,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_apg_language_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 19 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 06:03 EAT
+
+Completed checkpoint:
+
+- Made compiled APG capability UI contracts queryable as executable screen and composition metadata.
+- Extended generated `apg_capabilities.py` with `capability_screens()`, `ui_route_index()`, and `composition_graph()` helpers.
+- The generated composition graph now exposes capability-to-service, capability-to-ERP-module, capability-to-screen, screen-to-component, capability-to-theme, and declared component binding relationships.
+- Extended capability composition regressions to execute those helpers and verify the ERP general-ledger screen, route, component, and service binding graph.
+
+Verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_apg_language_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 19 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
