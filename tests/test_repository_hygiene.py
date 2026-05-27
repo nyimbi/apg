@@ -95,6 +95,16 @@ def test_root_tests_and_docs_stay_in_expected_directories():
 	assert misplaced == []
 
 
+def test_root_dependency_files_stay_python_first():
+	forbidden = {
+		"requirements_flask_appbuilder.txt",
+		"requirements_django.txt",
+		"requirements_fastapi.txt",
+	}
+
+	assert sorted(forbidden.intersection(_tracked_files())) == []
+
+
 def test_top_level_generated_and_capability_tests_stay_out_of_source_roots():
 	forbidden_prefixes = ("capabilities/", "gen/")
 	misplaced = [

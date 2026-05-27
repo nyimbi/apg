@@ -3017,6 +3017,22 @@ Verification:
 - `git diff --check -- compiler/code_generator.py docs/progress_log.md` -> no issues
 - Deferred pytest at the user's request to conserve battery.
 
+### 2026-05-27 08:05 EAT
+
+Completed checkpoint:
+
+- Removed the stale root `requirements_flask_appbuilder.txt` dependency bundle now that the default compiler target is Python-first and standard-library-only.
+- Rewrote `tests/test_functional_generation.py` from a Flask-AppBuilder web-app script into a functional smoke test for executable Python manifest generation.
+- Added repository hygiene coverage that prevents root framework-specific requirements files from returning.
+
+Verification:
+
+- `.venv/bin/python -m py_compile tests/test_functional_generation.py tests/test_repository_hygiene.py`
+- `.venv/bin/python -c "from compiler.compiler import compile_apg_string; ..."` -> generated `app.py`, `__init__.py`, `requirements.txt`, and `ai_agents.py`; executed `describe_application()`
+- `.venv/bin/python -m pytest -q tests/test_functional_generation.py tests/test_repository_hygiene.py::test_root_dependency_files_stay_python_first` -> 2 passed
+- `git diff --check -- requirements_flask_appbuilder.txt tests/test_functional_generation.py tests/test_repository_hygiene.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
 ### 2026-05-27 02:07 EAT
 
 Completed checkpoint:
