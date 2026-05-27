@@ -51,21 +51,24 @@ API endpoints are rate limited to prevent abuse:
 
 ```bash
 # Health check
-curl -X GET http://localhost:8080/auth/jwt_authentication/health
+curl -X GET "${APG_RUNTIME_URL}/auth/jwt_authentication/health"
 
-curl -X GET http://localhost:8080/auth/jwt_authentication/status
+curl -X GET "${APG_RUNTIME_URL}/auth/jwt_authentication/status"
 ```
 
 ### Python Examples
 
 ```python
+import os
 import requests
 
+base_url = os.environ.get('APG_RUNTIME_URL', '').rstrip('/')
+
 # Health check
-response = requests.get('http://localhost:8080/auth/jwt_authentication/health')
+response = requests.get(f'{base_url}/auth/jwt_authentication/health')
 print(response.json())
 
-status = requests.get('http://localhost:8080/auth/jwt_authentication/status')
+status = requests.get(f'{base_url}/auth/jwt_authentication/status')
 status.raise_for_status()
 print(status.json())
 ```

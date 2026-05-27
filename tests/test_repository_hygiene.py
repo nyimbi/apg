@@ -40,6 +40,12 @@ PYTHON_TEMPLATE_FORBIDDEN_TERMS = (
 	"Flask>=2.3.0",
 	"SQLAlchemy>=2.0.0",
 )
+COMPOSABLE_CAPABILITY_DOC_FORBIDDEN_TERMS = (
+	"Flask-AppBuilder",
+	"flask_appbuilder",
+	"http://localhost:8080",
+	"python app.py",
+)
 PYTHON_FIRST_PUBLIC_DOCS = {
 	"README.md",
 	"docs/README.md",
@@ -114,6 +120,21 @@ def test_project_templates_describe_python_artifact_flow():
 			continue
 		content = (REPO_ROOT / path).read_text(encoding="utf-8", errors="ignore")
 		for term in PYTHON_TEMPLATE_FORBIDDEN_TERMS:
+			if term in content:
+				violations.append(f"{path}: {term}")
+
+	assert violations == []
+
+
+def test_composable_capability_docs_do_not_advertise_framework_runtime():
+	violations: list[str] = []
+	for path in _tracked_files():
+		if not path.startswith("templates/composable/capabilities/"):
+			continue
+		if not path.endswith(("README.md", "API.md", "requirements.txt", "capability.json", ".py")):
+			continue
+		content = (REPO_ROOT / path).read_text(encoding="utf-8", errors="ignore")
+		for term in COMPOSABLE_CAPABILITY_DOC_FORBIDDEN_TERMS:
 			if term in content:
 				violations.append(f"{path}: {term}")
 

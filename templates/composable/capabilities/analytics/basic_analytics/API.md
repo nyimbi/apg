@@ -51,21 +51,24 @@ API endpoints are rate limited to prevent abuse:
 
 ```bash
 # Health check
-curl -X GET http://localhost:8080/analytics/basic_analytics/health
+curl -X GET "${APG_RUNTIME_URL}/analytics/basic_analytics/health"
 
-curl -X GET http://localhost:8080/analytics/basic_analytics/status
+curl -X GET "${APG_RUNTIME_URL}/analytics/basic_analytics/status"
 ```
 
 ### Python Examples
 
 ```python
+import os
 import requests
 
+base_url = os.environ.get('APG_RUNTIME_URL', '').rstrip('/')
+
 # Health check
-response = requests.get('http://localhost:8080/analytics/basic_analytics/health')
+response = requests.get(f'{base_url}/analytics/basic_analytics/health')
 print(response.json())
 
-status = requests.get('http://localhost:8080/analytics/basic_analytics/status')
+status = requests.get(f'{base_url}/analytics/basic_analytics/status')
 status.raise_for_status()
 print(status.json())
 ```

@@ -43,6 +43,8 @@ def test_generated_capability_structure_has_executable_defaults(tmp_path):
     assert "get_status" in integration
     assert "RiskSignalsCapability" in readme
     assert "/analytics/risk_signals/status" in api
+    assert "APG_RUNTIME_URL" in api
+    assert "http://localhost:8080" not in api
     assert "Executable Risk Signals support for rule evaluation." in features
     compile(integration, "integration.py.template", "exec")
 

@@ -1,11 +1,10 @@
 {
   "name": "Basic Authentication",
   "category": "auth",
-  "description": "Username/password authentication with Flask-AppBuilder",
+  "description": "Username/password authentication with APG capability contracts",
   "version": "1.0.0",
   "author": "APG Team",
   "python_requirements": [
-    "Flask-AppBuilder>=4.3.0",
     "WTForms>=3.0.0"
   ],
   "system_requirements": [],

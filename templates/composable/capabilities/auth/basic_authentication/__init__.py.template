@@ -2,7 +2,7 @@
 Basic Authentication Capability
 ========================================
 
-Username/password authentication with Flask-AppBuilder
+Username/password authentication with APG capability contracts
 
 Category: auth
 Version: 1.0.0

@@ -750,22 +750,25 @@ API endpoints are rate limited to prevent abuse:
 
 ```bash
 # Health check
-curl -X GET http://localhost:8080/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/health
+curl -X GET "${{APG_RUNTIME_URL}}/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/health"
 
 # Capability status
-curl -X GET http://localhost:8080/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/status
+curl -X GET "${{APG_RUNTIME_URL}}/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/status"
 ```
 
 ### Python Examples
 
 ```python
+import os
 import requests
 
+base_url = os.environ.get('APG_RUNTIME_URL', '').rstrip('/')
+
 # Health check
-response = requests.get('http://localhost:8080/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/health')
+response = requests.get(f'{{base_url}}/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/health')
 print(response.json())
 
-status = requests.get('http://localhost:8080/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/status')
+status = requests.get(f'{{base_url}}/{capability.category.value}/{capability.name.lower().replace(' ', '_')}/status')
 status.raise_for_status()
 print(status.json())
 ```
@@ -778,9 +781,9 @@ CORE_CAPABILITIES = [
     Capability(
         name="Basic Authentication",
         category=CapabilityCategory.AUTH,
-        description="Username/password authentication with Flask-AppBuilder",
+        description="Username/password authentication with APG capability contracts",
         version="1.0.0",
-        python_requirements=["Flask-AppBuilder>=4.3.0", "WTForms>=3.0.0"],
+        python_requirements=["WTForms>=3.0.0"],
         features=["User Registration", "Login/Logout", "Password Reset", "User Management"],
         compatible_bases=["flask_webapp", "dashboard", "real_time"],
         integration=CapabilityIntegration(

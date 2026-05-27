@@ -3872,6 +3872,26 @@ Battery-conscious verification:
 - `git diff --check` -> no issues.
 - Deferred pytest at the user's request to conserve battery.
 
+### 2026-05-27 07:26 EAT
+
+Completed checkpoint:
+
+- Removed localhost runtime URLs from checked-in composable capability API examples.
+- Updated composable capability API examples to use `APG_RUNTIME_URL` and path-stable health/status calls.
+- Updated the composable capability generator so newly generated capability API docs use the same environment-based runtime URL pattern.
+- Replaced the Basic Authentication composable capability's Flask-AppBuilder description and requirement with APG capability-contract language and its actual WTForms requirement.
+- Added repository hygiene coverage for composable capability README/API/requirements/metadata files so framework runtime and localhost API examples do not return.
+- Added generated-capability regression expectations that API docs include `APG_RUNTIME_URL` and omit localhost URLs.
+
+Battery-conscious verification:
+
+- `python -m py_compile templates/composable/capability.py tests/test_repository_hygiene.py tests/test_composable_template_executable_defaults.py`
+- `python -m json.tool templates/composable/capabilities/auth/basic_authentication/capability.json`
+- `rg -n "Flask-AppBuilder|flask_appbuilder|http://localhost:8080|python app.py" templates/composable/capabilities --glob 'README.md' --glob 'API.md' --glob 'requirements.txt' --glob 'capability.json' tests/test_repository_hygiene.py tests/test_composable_template_executable_defaults.py` -> only hygiene constants and negative assertions remain.
+- `rg -n "http://localhost:8080|Username/password authentication with Flask-AppBuilder|Flask-AppBuilder>=4.3.0" templates/composable/capability.py templates/composable/capabilities/auth/basic_authentication` -> no stale generator/basic-auth matches.
+- `git diff --check` -> no issues.
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 07:02 EAT
 
 Completed checkpoint:

@@ -1,6 +1,6 @@
 # Basic Authentication Capability
 
-Username/password authentication with Flask-AppBuilder
+Username/password authentication with APG capability contracts
 
 ## Overview
 
@@ -19,7 +19,6 @@ Username/password authentication with Flask-AppBuilder
 
 ### Python Packages
 
-- Flask-AppBuilder>=4.3.0
 - WTForms>=3.0.0
 
 ### System Requirements
