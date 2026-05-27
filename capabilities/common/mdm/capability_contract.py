@@ -262,7 +262,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("settings", "/mdm/settings", "MDMSettings", "mdm:admin", "Administration")
 	]
 	return {
-		"shell": "flask_appbuilder",
+		"shell": "apg_python",
 		"view_module": "views.py",
 		"api_prefix": "/mdm/api/v1",
 		"routes": [route.__dict__ for route in routes],

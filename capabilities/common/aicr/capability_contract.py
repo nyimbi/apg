@@ -139,7 +139,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
 		"ui": {
-			"shell": "flask_appbuilder",
+			"shell": "apg_python",
 			"view_module": "dashboard.py",
 			"api_prefix": "/aicr/api/v1",
 			"routes": deepcopy(UI_ROUTES),

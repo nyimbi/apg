@@ -186,7 +186,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("gateway_sync", "/regy/gateway-sync", "GatewaySyncView", "regy:sync_gateway", "Integration"),
 		CapabilityUIRoute("settings", "/regy/settings", "RegistrySettings", "regy:admin", "Administration")
 	]
-	return {"shell": "flask_appbuilder", "view_module": "views.py", "api_prefix": "/regy/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
+	return {"shell": "apg_python", "view_module": "views.py", "api_prefix": "/regy/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:

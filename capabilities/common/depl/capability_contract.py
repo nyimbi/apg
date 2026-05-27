@@ -45,7 +45,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	config["tenant_id"] = tenant_id
 	if overrides:
 		_deep_merge(config, overrides)
-	return {"capability": "depl", "display_name": "Deployment Management", "configuration": config, "configuration_schema": CONFIGURATION_SCHEMA, "rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)}, "ui": {"shell": "flask_appbuilder", "view_module": "views.py", "api_prefix": "/depl/api/v1", "routes": deepcopy(UI_ROUTES), "template_roots": ["templates/", "static/"], "requires_theme": True}, "theme": deepcopy(THEME)}
+	return {"capability": "depl", "display_name": "Deployment Management", "configuration": config, "configuration_schema": CONFIGURATION_SCHEMA, "rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)}, "ui": {"shell": "apg_python", "view_module": "views.py", "api_prefix": "/depl/api/v1", "routes": deepcopy(UI_ROUTES), "template_roots": ["templates/", "static/"], "requires_theme": True}, "theme": deepcopy(THEME)}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

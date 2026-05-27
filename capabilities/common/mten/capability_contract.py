@@ -261,7 +261,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("settings", "/mten/settings", "TenantGovernanceSettings", "mten:admin", "Administration")
 	]
 	return {
-		"shell": "flask_appbuilder",
+		"shell": "apg_python",
 		"view_module": "blueprint.py",
 		"api_prefix": "/mten/api/v1",
 		"routes": [route.__dict__ for route in routes],

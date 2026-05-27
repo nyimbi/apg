@@ -279,7 +279,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("metrics", "/auth/metrics/overview", "AuthenticationMetricsOverview", "auth:admin", "Operations")
 	]
 	return {
-		"shell": "flask_appbuilder",
+		"shell": "apg_python",
 		"view_module": "views.py",
 		"api_prefix": "/api",
 		"routes": [route.__dict__ for route in routes],

@@ -143,6 +143,31 @@ Verification result:
 - Stale generated parser token scan for `'flask_appbuilder'`, `'fastapi'`, and `'django'` returned no matches.
 - `git diff --check` passed after trimming regenerated parser EOF blanks.
 
+Commit result:
+
+- Pushed commit `a8dae99` (`Regenerate parser for Python target grammar`).
+
+### 2026-05-27 13:12 EAT
+
+In progress:
+
+- Replaced legacy framework UI shell literals in common capability contract sources with `apg_python`.
+- Added contract-registry coverage to prevent source `capability_contract.py` files from emitting legacy framework shells.
+
+Verification planned before commit:
+
+- Run focused capability contract registry tests.
+- Compile the changed capability contract modules.
+- Scan capability contract sources for legacy shell literals.
+- Check staged diff whitespace before committing.
+
+Verification result:
+
+- `.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py tests/test_capability_contract_public_api.py` passed with 9 tests.
+- `.venv/bin/python -m py_compile $(git diff --name-only -- 'capabilities/**/capability_contract.py') tests/test_capability_contract_registry.py` passed.
+- Legacy shell scan over `capabilities/**/capability_contract.py` returned no matches.
+- `git diff --check` for the capability-contract slice passed.
+
 ### 2026-05-26 02:25 EAT
 
 In progress:

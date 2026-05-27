@@ -252,7 +252,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("settings", "/cvsn/settings", "VisionSettings", "cv:admin", "Administration")
 	]
 	return {
-		"shell": "fastapi_flask_appbuilder",
+		"shell": "apg_python",
 		"frontend_bundle": "views.py",
 		"routes": [route.__dict__ for route in routes],
 		"template_roots": ["templates/", "views.py"],

@@ -262,7 +262,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("settings", "/encr/settings", "EncryptionSettings", "encr:admin", "Administration")
 	]
 	return {
-		"shell": "flask_appbuilder",
+		"shell": "apg_python",
 		"view_module": "web_ui.py",
 		"api_prefix": "/encr/api/v1",
 		"routes": [route.__dict__ for route in routes],

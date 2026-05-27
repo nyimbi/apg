@@ -269,7 +269,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("settings", "/moni/settings", "MonitoringSettings", "moni:admin", "Administration")
 	]
 	return {
-		"shell": "flask_appbuilder",
+		"shell": "apg_python",
 		"view_module": "views.py",
 		"api_prefix": "/moni/api/v1",
 		"routes": [route.__dict__ for route in routes],

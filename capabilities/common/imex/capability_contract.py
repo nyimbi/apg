@@ -186,7 +186,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("workflows", "/imex/workflows", "MigrationWorkflows", "imex.manage", "Orchestration"),
 		CapabilityUIRoute("settings", "/imex/settings", "IMEXSettings", "imex.admin", "Administration")
 	]
-	return {"shell": "flask_appbuilder", "view_module": "views.py", "api_prefix": "/imex/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
+	return {"shell": "apg_python", "view_module": "views.py", "api_prefix": "/imex/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:

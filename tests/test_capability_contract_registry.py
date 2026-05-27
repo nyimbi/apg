@@ -68,6 +68,25 @@ def test_loaded_contracts_expose_python_first_ui_shells():
 	assert violations == []
 
 
+def test_capability_contract_sources_emit_python_first_ui_shells():
+	legacy_shells = (
+		'"shell": "flask_appbuilder"',
+		'"shell": "fastapi_flask_appbuilder"',
+		'"shell": "fastapi"',
+		'"shell": "django"',
+		'"shell": "flask"',
+	)
+	violations: list[str] = []
+
+	for path in discover_contract_paths():
+		content = path.read_text(encoding="utf-8")
+		for shell in legacy_shells:
+			if shell in content:
+				violations.append(f"{path}: {shell}")
+
+	assert violations == []
+
+
 def test_registry_returns_structured_validation_report():
 	report = validate_contract_registry()
 

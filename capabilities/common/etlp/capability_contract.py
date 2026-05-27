@@ -177,7 +177,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("datasources", "/etlp/datasources", "DatasourceManager", "etlp:datasource:read", "Sources"),
 		CapabilityUIRoute("settings", "/etlp/settings", "ETLPSettings", "etlp:pipeline:write", "Administration")
 	]
-	return {"shell": "flask_appbuilder", "view_module": "views.py", "api_prefix": "/etlp/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
+	return {"shell": "apg_python", "view_module": "views.py", "api_prefix": "/etlp/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:

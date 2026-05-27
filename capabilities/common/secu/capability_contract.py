@@ -236,7 +236,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("settings", "/secu/settings", "SecuritySettings", "secu:admin", "Administration")
 	]
 	return {
-		"shell": "flask_appbuilder",
+		"shell": "apg_python",
 		"frontend_bundle": "views.py",
 		"routes": [route.__dict__ for route in routes],
 		"template_roots": ["templates/"],

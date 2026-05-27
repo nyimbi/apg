@@ -268,7 +268,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("settings", "/cach/settings", "CacheSettings", "cach:admin", "Administration")
 	]
 	return {
-		"shell": "flask_appbuilder",
+		"shell": "apg_python",
 		"view_module": "dashboard.py",
 		"api_prefix": "/cach/api/v1",
 		"routes": [route.__dict__ for route in routes],

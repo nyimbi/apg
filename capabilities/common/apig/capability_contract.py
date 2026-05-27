@@ -187,7 +187,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("analytics", "/apig/analytics", "GatewayAnalytics", "apig:view_metrics", "Operations"),
 		CapabilityUIRoute("settings", "/apig/settings", "APIGSettings", "apig:admin", "Administration")
 	]
-	return {"shell": "flask_appbuilder", "view_module": "control_plane.py", "api_prefix": "/apig/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
+	return {"shell": "apg_python", "view_module": "control_plane.py", "api_prefix": "/apig/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
