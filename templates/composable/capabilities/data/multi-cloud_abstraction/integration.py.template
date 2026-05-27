@@ -2,135 +2,83 @@
 Multi-Cloud Abstraction Integration
 ===================================
 
-Integration logic for the Multi-Cloud Abstraction capability.
-Handles cloud-specific setup and configuration.
+APG capability-contract integration for Multi-Cloud Abstraction.
+This template is framework-neutral; transport, UI, and persistence adapters
+are selected by the composing application.
 """
 
 import logging
 from importlib import import_module
-from flask import Blueprint
-from flask_appbuilder import BaseView
+from typing import Any
 
-# Configure logging
+
 log = logging.getLogger(__name__)
 
-# Create capability blueprint
-multi_cloud_abstraction_bp = Blueprint(
-    'multi_cloud_abstraction',
-    __name__,
-    url_prefix='/cloud/multi_cloud_abstraction',
-    template_folder='templates',
-    static_folder='static'
-)
+CAPABILITY_CONTRACT: dict[str, Any] = {
+    'name': 'Multi-Cloud Abstraction',
+    'category': 'data',
+    'version': '1.0.0',
+    'features': ['Cloud-agnostic Storage API', 'Universal Database Interface', 'Cross-cloud Resource Management', 'Cost Optimization', 'Migration Tools', 'Disaster Recovery', 'Performance Comparison', 'Vendor Lock-in Prevention'],
+    'models': ['CloudProvider', 'CloudResource', 'CloudOperation', 'MigrationJob'],
+    'views': ['MultiCloudView', 'ProviderComparisonView', 'MigrationView'],
+    'apis': ['multicloud/storage', 'multicloud/compute', 'multicloud/migrate'],
+    'templates': ['multicloud_dashboard.html', 'provider_comparison.html'],
+    'static_files': [],
+    'configuration': {},
+}
 
 
-def integrate_multi_cloud_abstraction(app, appbuilder, db):
-    """
-    Integrate Multi-Cloud Abstraction capability into the application.
+def integrate_multi_cloud_abstraction(application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Register Multi-Cloud Abstraction metadata with an APG application or registry."""
+    contract = dict(CAPABILITY_CONTRACT)
+    contract['configuration'] = {
+        **contract.get('configuration', {}),
+        **(configuration or {}),
+    }
 
-    Args:
-        app: Flask application instance
-        appbuilder: Flask-AppBuilder instance
-        db: SQLAlchemy database instance
-    """
-    try:
-        # Register blueprint
-        app.register_blueprint(multi_cloud_abstraction_bp)
-
-        # Import optional capability modules without invalid function-local star imports
-        package_prefix = f"{__package__}." if __package__ else ""
-        for module_name in ("models", "views"):
-            try:
-                import_module(f"{package_prefix}{module_name}")
-            except ImportError as import_error:
-                log.debug(f"Optional module {module_name} not loaded: {import_error}")
-
-        # Apply cloud-specific configuration
-        config_additions = {}
-        for key, value in config_additions.items():
-            if key not in app.config or not app.config[key]:
-                app.config[key] = value
-
-        # Initialize cloud service
-        cloud_service = MultiCloudAbstractionService(app, appbuilder, db)
-        app.extensions['multi_cloud_abstraction_service'] = cloud_service
-
-        # Register views with AppBuilder
-        appbuilder.add_view(
-            MultiCloudAbstractionView,
-            "Multi-Cloud Abstraction",
-            icon="fa-cloud",
-            category="Cloud Services",
-            category_icon="fa-cloud"
-        )
-
-        log.info(f"Successfully integrated Multi-Cloud Abstraction capability")
-
-    except Exception as e:
-        log.error(f"Failed to integrate Multi-Cloud Abstraction capability: {e}")
-        raise
-
-
-class MultiCloudAbstractionService:
-    """
-    Main service class for Multi-Cloud Abstraction.
-
-    Handles cloud-specific operations and resource management.
-    """
-
-    def __init__(self, app, appbuilder, db):
-        self.app = app
-        self.appbuilder = appbuilder
-        self.db = db
-        self.client = None
-        self.initialize_service()
-
-    def initialize_service(self):
-        """Initialize cloud service client"""
-        log.info(f"Initializing Multi-Cloud Abstraction service")
-
+    package_prefix = f"{__package__}." if __package__ else ""
+    for module_name in ("models", "views"):
         try:
-            # Initialize cloud client based on capability type
-            self.setup_cloud_client()
+            import_module(f"{package_prefix}{module_name}")
+        except ImportError as import_error:
+            log.debug("Optional %s module %s not loaded: %s", 'Multi-Cloud Abstraction', module_name, import_error)
 
-            # Validate credentials and connectivity
-            self.validate_connection()
+    if registry is not None:
+        if hasattr(registry, "register_capability"):
+            registry.register_capability(contract)
+        elif isinstance(registry, dict):
+            registry[contract['name']] = contract
 
-        except Exception as e:
-            log.error(f"Error initializing cloud service: {e}")
+    if application is not None and hasattr(application, "capabilities"):
+        application.capabilities[contract['name']] = contract
 
-    def setup_cloud_client(self):
-        """Setup cloud provider client"""
-        # Cloud client setup logic specific to provider
-        return True
-    def validate_connection(self):
-        """Validate cloud provider connection"""
-        # Connection validation logic
-        return True
-    def deploy_resource(self, resource_config):
-        """Deploy cloud resource"""
-        # Resource deployment logic
-        return {"status": "deployed", "resource_id": None}
-
-    def monitor_resources(self):
-        """Monitor cloud resources"""
-        # Resource monitoring logic
-        return {"status": "healthy", "resources": []}
+    log.info("Registered APG capability: %s", contract['name'])
+    return contract
 
 
-class MultiCloudAbstractionView(BaseView):
-    """
-    Main view for Multi-Cloud Abstraction capability.
-    """
+class MultiCloudAbstractionCapability:
+    """Executable capability wrapper for Multi-Cloud Abstraction."""
 
-    route_base = "/multi_cloud_abstraction"
+    def __init__(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None):
+        self.application = application
+        self.registry = registry
+        self.config = configuration or {}
+        self.initialized = False
+        self.contract: dict[str, Any] | None = None
+        if application is not None or registry is not None:
+            self.init_app(application, registry, configuration)
 
-    @expose("/")
-    def index(self):
-        """Main cloud dashboard view"""
-        return self.render_template("multi_cloud_abstraction_dashboard.html")
+    def init_app(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.application = application
+        self.registry = registry
+        self.config = configuration or self.config
+        self.contract = integrate_multi_cloud_abstraction(application, registry, self.config)
+        self.initialized = True
+        return self.contract
 
-    @expose("/resources")
-    def resources(self):
-        """Cloud resources view"""
-        return self.render_template("multi_cloud_abstraction_resources.html")
+    def get_status(self) -> dict[str, Any]:
+        return {
+            'initialized': self.initialized,
+            'capability': 'Multi-Cloud Abstraction',
+            'configuration_keys': sorted(self.config),
+        }

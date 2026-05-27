@@ -2,150 +2,83 @@
 Auto Scaler Integration
 =======================
 
-Integration logic for the Auto Scaler capability.
-Handles performance monitoring and optimization functionality.
+APG capability-contract integration for Auto Scaler.
+This template is framework-neutral; transport, UI, and persistence adapters
+are selected by the composing application.
 """
 
 import logging
 from importlib import import_module
-from flask import Blueprint
-from flask_appbuilder import BaseView
+from typing import Any
 
-# Configure logging
+
 log = logging.getLogger(__name__)
 
-# Create capability blueprint
-auto_scaler_bp = Blueprint(
-    'auto_scaler',
-    __name__,
-    url_prefix='/performance/auto_scaler',
-    template_folder='templates',
-    static_folder='static'
-)
+CAPABILITY_CONTRACT: dict[str, Any] = {
+    'name': 'Auto Scaler',
+    'category': 'data',
+    'version': '1.0.0',
+    'features': ['Horizontal Pod Autoscaling', 'Vertical Pod Autoscaling', 'Custom Metrics Scaling', 'Predictive Scaling', 'Cost-aware Scaling', 'Multi-cloud Scaling', 'Scaling History', 'Performance-based Triggers'],
+    'models': ['ScalingPolicy', 'ScalingEvent', 'MetricTarget', 'ScalingHistory'],
+    'views': ['ScalerView', 'PolicyView', 'EventView'],
+    'apis': ['scaler/policy', 'scaler/scale', 'scaler/history'],
+    'templates': ['auto_scaler_dashboard.html', 'scaling_history.html'],
+    'static_files': [],
+    'configuration': {'SCALING_ENABLED': True, 'MIN_REPLICAS': 1, 'MAX_REPLICAS': 10, 'TARGET_CPU_UTILIZATION': 70},
+}
 
 
-def integrate_auto_scaler(app, appbuilder, db):
-    """
-    Integrate Auto Scaler capability into the application.
+def integrate_auto_scaler(application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Register Auto Scaler metadata with an APG application or registry."""
+    contract = dict(CAPABILITY_CONTRACT)
+    contract['configuration'] = {
+        **contract.get('configuration', {}),
+        **(configuration or {}),
+    }
 
-    Args:
-        app: Flask application instance
-        appbuilder: Flask-AppBuilder instance
-        db: SQLAlchemy database instance
-    """
-    try:
-        # Register blueprint
-        app.register_blueprint(auto_scaler_bp)
-
-        # Import optional capability modules without invalid function-local star imports
-        package_prefix = f"{__package__}." if __package__ else ""
-        for module_name in ("models", "views"):
-            try:
-                import_module(f"{package_prefix}{module_name}")
-            except ImportError as import_error:
-                log.debug(f"Optional module {module_name} not loaded: {import_error}")
-
-        # Apply performance-specific configuration
-        config_additions = {'SCALING_ENABLED': True, 'MIN_REPLICAS': 1, 'MAX_REPLICAS': 10, 'TARGET_CPU_UTILIZATION': 70}
-        for key, value in config_additions.items():
-            if key not in app.config or not app.config[key]:
-                app.config[key] = value
-
-        # Initialize performance service
-        performance_service = AutoScalerService(app, appbuilder, db)
-        app.extensions['auto_scaler_service'] = performance_service
-
-        # Register views with AppBuilder
-        appbuilder.add_view(
-            AutoScalerView,
-            "Auto Scaler",
-            icon="fa-tachometer-alt",
-            category="Performance",
-            category_icon="fa-chart-line"
-        )
-
-        log.info(f"Successfully integrated Auto Scaler capability")
-
-    except Exception as e:
-        log.error(f"Failed to integrate Auto Scaler capability: {e}")
-        raise
-
-
-class AutoScalerService:
-    """
-    Main service class for Auto Scaler.
-
-    Handles performance monitoring and optimization operations.
-    """
-
-    def __init__(self, app, appbuilder, db):
-        self.app = app
-        self.appbuilder = appbuilder
-        self.db = db
-        self.monitoring_active = False
-        self.initialize_service()
-
-    def initialize_service(self):
-        """Initialize performance service"""
-        log.info(f"Initializing Auto Scaler service")
-
+    package_prefix = f"{__package__}." if __package__ else ""
+    for module_name in ("models", "views"):
         try:
-            # Setup performance monitoring
-            self.setup_monitoring()
+            import_module(f"{package_prefix}{module_name}")
+        except ImportError as import_error:
+            log.debug("Optional %s module %s not loaded: %s", 'Auto Scaler', module_name, import_error)
 
-            # Initialize optimization components
-            self.setup_optimization()
+    if registry is not None:
+        if hasattr(registry, "register_capability"):
+            registry.register_capability(contract)
+        elif isinstance(registry, dict):
+            registry[contract['name']] = contract
 
-        except Exception as e:
-            log.error(f"Error initializing performance service: {e}")
+    if application is not None and hasattr(application, "capabilities"):
+        application.capabilities[contract['name']] = contract
 
-    def setup_monitoring(self):
-        """Setup performance monitoring"""
-        # Executable default monitoring setup logic specific to capability
-        return True
-    def setup_optimization(self):
-        """Setup optimization components"""
-        # Optimization setup logic
-        return True
-    def start_monitoring(self):
-        """Start performance monitoring"""
-        self.monitoring_active = True
-        return {"status": "monitoring_started"}
-
-    def stop_monitoring(self):
-        """Stop performance monitoring"""
-        self.monitoring_active = False
-        return {"status": "monitoring_stopped"}
-
-    def get_metrics(self):
-        """Get current performance metrics"""
-        # Metrics collection logic
-        return {"cpu_usage": 0.0, "memory_usage": 0.0, "response_time": 0.0}
-
-    def optimize(self):
-        """Perform optimization"""
-        # Optimization logic
-        return {"status": "optimized", "improvements": []}
+    log.info("Registered APG capability: %s", contract['name'])
+    return contract
 
 
-class AutoScalerView(BaseView):
-    """
-    Main view for Auto Scaler capability.
-    """
+class AutoScalerCapability:
+    """Executable capability wrapper for Auto Scaler."""
 
-    route_base = "/auto_scaler"
+    def __init__(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None):
+        self.application = application
+        self.registry = registry
+        self.config = configuration or {}
+        self.initialized = False
+        self.contract: dict[str, Any] | None = None
+        if application is not None or registry is not None:
+            self.init_app(application, registry, configuration)
 
-    @expose("/")
-    def index(self):
-        """Main performance dashboard view"""
-        return self.render_template("auto_scaler_dashboard.html")
+    def init_app(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.application = application
+        self.registry = registry
+        self.config = configuration or self.config
+        self.contract = integrate_auto_scaler(application, registry, self.config)
+        self.initialized = True
+        return self.contract
 
-    @expose("/metrics")
-    def metrics(self):
-        """Performance metrics view"""
-        return self.render_template("auto_scaler_metrics.html")
-
-    @expose("/optimize")
-    def optimize(self):
-        """Optimization control view"""
-        return self.render_template("auto_scaler_optimize.html")
+    def get_status(self) -> dict[str, Any]:
+        return {
+            'initialized': self.initialized,
+            'capability': 'Auto Scaler',
+            'configuration_keys': sorted(self.config),
+        }

@@ -2,123 +2,83 @@
 Capability Publisher Integration
 ================================
 
-Integration logic for the Capability Publisher capability.
-Handles community contribution system functionality.
+APG capability-contract integration for Capability Publisher.
+This template is framework-neutral; transport, UI, and persistence adapters
+are selected by the composing application.
 """
 
 import logging
 from importlib import import_module
-from flask import Blueprint
-from flask_appbuilder import BaseView
+from typing import Any
 
-# Configure logging
+
 log = logging.getLogger(__name__)
 
-# Create capability blueprint
-capability_publisher_bp = Blueprint(
-    'capability_publisher',
-    __name__,
-    url_prefix='/community/capability_publisher',
-    template_folder='templates',
-    static_folder='static'
-)
+CAPABILITY_CONTRACT: dict[str, Any] = {
+    'name': 'Capability Publisher',
+    'category': 'business',
+    'version': '1.0.0',
+    'features': ['Capability Packaging', 'Automated Publishing', 'Version Management', 'Documentation Generation', 'Test Automation', 'CI/CD Integration', 'Distribution Management', 'Update Notifications'],
+    'models': ['PublishingJob', 'CapabilityPackage', 'ReleaseHistory', 'PublisherProfile'],
+    'views': ['PublisherView', 'PackageView', 'ReleaseView'],
+    'apis': ['publish/package', 'publish/release', 'publish/update'],
+    'templates': ['publisher_dashboard.html', 'package_editor.html', 'release_manager.html'],
+    'static_files': [],
+    'configuration': {},
+}
 
 
-def integrate_capability_publisher(app, appbuilder, db):
-    """
-    Integrate Capability Publisher capability into the application.
+def integrate_capability_publisher(application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Register Capability Publisher metadata with an APG application or registry."""
+    contract = dict(CAPABILITY_CONTRACT)
+    contract['configuration'] = {
+        **contract.get('configuration', {}),
+        **(configuration or {}),
+    }
 
-    Args:
-        app: Flask application instance
-        appbuilder: Flask-AppBuilder instance
-        db: SQLAlchemy database instance
-    """
-    try:
-        # Register blueprint
-        app.register_blueprint(capability_publisher_bp)
-
-        # Import optional capability modules without invalid function-local star imports
-        package_prefix = f"{__package__}." if __package__ else ""
-        for module_name in ("models", "views"):
-            try:
-                import_module(f"{package_prefix}{module_name}")
-            except ImportError as import_error:
-                log.debug(f"Optional module {module_name} not loaded: {import_error}")
-
-        # Initialize community service
-        community_service = CapabilityPublisherService(app, appbuilder, db)
-        app.extensions['capability_publisher_service'] = community_service
-
-        # Register views with AppBuilder
-        appbuilder.add_view(
-            CapabilityPublisherView,
-            "Capability Publisher",
-            icon="fa-users",
-            category="Community",
-            category_icon="fa-heart"
-        )
-
-        log.info(f"Successfully integrated Capability Publisher capability")
-
-    except Exception as e:
-        log.error(f"Failed to integrate Capability Publisher capability: {e}")
-        raise
-
-
-class CapabilityPublisherService:
-    """
-    Main service class for Capability Publisher.
-
-    Handles community contribution system operations.
-    """
-
-    def __init__(self, app, appbuilder, db):
-        self.app = app
-        self.appbuilder = appbuilder
-        self.db = db
-        self.initialize_service()
-
-    def initialize_service(self):
-        """Initialize community service"""
-        log.info(f"Initializing Capability Publisher service")
-
+    package_prefix = f"{__package__}." if __package__ else ""
+    for module_name in ("models", "views"):
         try:
-            # Setup community components
-            self.setup_community_features()
+            import_module(f"{package_prefix}{module_name}")
+        except ImportError as import_error:
+            log.debug("Optional %s module %s not loaded: %s", 'Capability Publisher', module_name, import_error)
 
-            # Initialize monitoring
-            self.setup_monitoring()
+    if registry is not None:
+        if hasattr(registry, "register_capability"):
+            registry.register_capability(contract)
+        elif isinstance(registry, dict):
+            registry[contract['name']] = contract
 
-        except Exception as e:
-            log.error(f"Error initializing community service: {e}")
+    if application is not None and hasattr(application, "capabilities"):
+        application.capabilities[contract['name']] = contract
 
-    def setup_community_features(self):
-        """Setup community-specific features"""
-        # Executable default community feature setup logic
-        return True
-    def setup_monitoring(self):
-        """Setup community monitoring"""
-        # Executable default monitoring setup logic
-        return True
-    def process_contribution(self, contribution_data):
-        """Process community contribution"""
-        # Contribution processing logic
-        return {"status": "processed", "contribution_id": None}
+    log.info("Registered APG capability: %s", contract['name'])
+    return contract
 
 
-class CapabilityPublisherView(BaseView):
-    """
-    Main view for Capability Publisher capability.
-    """
+class CapabilityPublisherCapability:
+    """Executable capability wrapper for Capability Publisher."""
 
-    route_base = "/capability_publisher"
+    def __init__(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None):
+        self.application = application
+        self.registry = registry
+        self.config = configuration or {}
+        self.initialized = False
+        self.contract: dict[str, Any] | None = None
+        if application is not None or registry is not None:
+            self.init_app(application, registry, configuration)
 
-    @expose("/")
-    def index(self):
-        """Main community dashboard view"""
-        return self.render_template("capability_publisher_dashboard.html")
+    def init_app(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.application = application
+        self.registry = registry
+        self.config = configuration or self.config
+        self.contract = integrate_capability_publisher(application, registry, self.config)
+        self.initialized = True
+        return self.contract
 
-    @expose("/contribute")
-    def contribute(self):
-        """Community contribution view"""
-        return self.render_template("capability_publisher_contribute.html")
+    def get_status(self) -> dict[str, Any]:
+        return {
+            'initialized': self.initialized,
+            'capability': 'Capability Publisher',
+            'configuration_keys': sorted(self.config),
+        }

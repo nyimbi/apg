@@ -1,12 +1,11 @@
 {
   "name": "PostgreSQL Database",
   "category": "data",
-  "description": "PostgreSQL database with SQLAlchemy integration",
+  "description": "PostgreSQL database adapter with Python-first configuration",
   "version": "1.0.0",
   "author": "APG Team",
   "python_requirements": [
-    "psycopg2-binary>=2.9.0",
-    "SQLAlchemy>=2.0.0"
+    "psycopg2-binary>=2.9.0"
   ],
   "system_requirements": [
     "PostgreSQL 12+"
@@ -19,7 +18,7 @@
     "templates": [],
     "static_files": [],
     "config_additions": {
-      "SQLALCHEMY_DATABASE_URI": "postgresql://user:pass@localhost/db"
+      "DATABASE_URL": "postgresql://user:pass@localhost/db"
     },
     "database_migrations": []
   },

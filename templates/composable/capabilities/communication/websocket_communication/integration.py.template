@@ -1,18 +1,20 @@
 """
 WebSocket Communication Integration
-===========================================
+===================================
 
-Integration logic for the WebSocket Communication capability.
-This module handles integrating the capability into the base application.
+APG capability-contract integration for WebSocket Communication.
+This template is framework-neutral; transport, UI, and persistence adapters
+are selected by the composing application.
 """
 
 import logging
 from importlib import import_module
+from typing import Any
 
-# Configure logging
+
 log = logging.getLogger(__name__)
 
-CAPABILITY_CONTRACT = {
+CAPABILITY_CONTRACT: dict[str, Any] = {
     'name': 'WebSocket Communication',
     'category': 'communication',
     'version': '1.0.0',
@@ -22,83 +24,61 @@ CAPABILITY_CONTRACT = {
     'apis': [],
     'templates': ['websocket_client.html'],
     'static_files': ['js/websocket.js'],
-    'configuration': {}
+    'configuration': {},
 }
 
 
-def integrate_websocket_communication(application=None, registry=None, configuration=None):
-    """
-    Register WebSocket Communication capability metadata with an APG application.
+def integrate_websocket_communication(application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Register WebSocket Communication metadata with an APG application or registry."""
+    contract = dict(CAPABILITY_CONTRACT)
+    contract['configuration'] = {
+        **contract.get('configuration', {}),
+        **(configuration or {}),
+    }
 
-    Args:
-        application: Optional APG application object.
-        registry: Optional capability registry or dict.
-        configuration: Optional capability configuration overrides.
-    """
-    try:
-        contract = dict(CAPABILITY_CONTRACT)
-        contract['configuration'] = {
-            **contract.get('configuration', {}),
-            **(configuration or {})
-        }
+    package_prefix = f"{__package__}." if __package__ else ""
+    for module_name in ("models", "views"):
+        try:
+            import_module(f"{package_prefix}{module_name}")
+        except ImportError as import_error:
+            log.debug("Optional %s module %s not loaded: %s", 'WebSocket Communication', module_name, import_error)
 
-        # Import optional capability modules without invalid function-local star imports
-        package_prefix = f"{__package__}." if __package__ else ""
-        for module_name in ("models", "views"):
-            try:
-                import_module(f"{package_prefix}{module_name}")
-            except ImportError as import_error:
-                log.debug(f"Optional module {module_name} not loaded: {import_error}")
+    if registry is not None:
+        if hasattr(registry, "register_capability"):
+            registry.register_capability(contract)
+        elif isinstance(registry, dict):
+            registry[contract['name']] = contract
 
-        if registry is not None:
-            if hasattr(registry, "register_capability"):
-                registry.register_capability(contract)
-            elif isinstance(registry, dict):
-                registry[contract['name']] = contract
+    if application is not None and hasattr(application, "capabilities"):
+        application.capabilities[contract['name']] = contract
 
-        if application is not None and hasattr(application, "capabilities"):
-            application.capabilities[contract['name']] = contract
-
-        log.info(f"Successfully integrated WebSocket Communication capability")
-        return contract
-
-    except Exception as e:
-        log.error(f"Failed to integrate WebSocket Communication capability: {e}")
-        raise
+    log.info("Registered APG capability: %s", contract['name'])
+    return contract
 
 
-class WebSocketCommunicationCapability:
-    """
-    Main capability class for WebSocket Communication.
+class WebsocketCommunicationCapability:
+    """Executable capability wrapper for WebSocket Communication."""
 
-    This class provides the core functionality of the WebSocket Communication capability.
-    """
-
-    def __init__(self, application=None, registry=None, configuration=None):
+    def __init__(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None):
         self.application = application
         self.registry = registry
         self.config = configuration or {}
-
+        self.initialized = False
+        self.contract: dict[str, Any] | None = None
         if application is not None or registry is not None:
             self.init_app(application, registry, configuration)
 
-    def init_app(self, application=None, registry=None, configuration=None):
-        """Initialize the capability with the application"""
+    def init_app(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
         self.application = application
         self.registry = registry
         self.config = configuration or self.config
-
-        # Capability-specific initialization
-        self._initialize_capability()
         self.contract = integrate_websocket_communication(application, registry, self.config)
+        self.initialized = True
         return self.contract
 
-    def _initialize_capability(self):
-        """Initialize capability-specific components"""
-        self.config = {
-            **dict({}),
-            **getattr(self, 'config', {})
+    def get_status(self) -> dict[str, Any]:
+        return {
+            'initialized': self.initialized,
+            'capability': 'WebSocket Communication',
+            'configuration_keys': sorted(self.config),
         }
-        self.initialized = True
-        self.health = {"status": "healthy", "capability": self.__class__.__name__}
-        return self.health

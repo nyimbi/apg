@@ -4171,3 +4171,22 @@ Battery-conscious verification:
 - `rg -n "flask_appbuilder|Flask-AppBuilder|SQLAlchemy>=2.0.0|Flask-SocketIO|eventlet|from flask import Blueprint" templates/composable/capability.py templates/composable/capabilities/communication/websocket_communication templates/template_manager.py tests/test_system_integration_simple.py tests/test_vision_iot_integration.py` -> no matches
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+### 2026-05-27 09:37 EAT
+
+Completed checkpoint:
+
+- Rewrote all composable capability `integration.py.template` files to framework-neutral APG capability-contract registration.
+- Preserved per-capability metadata from `capability.json` in generated contracts: category, version, features, models, views, APIs, templates, static files, and configuration.
+- Removed Flask blueprint/AppBuilder integration assumptions from composable integration templates.
+- Aligned the PostgreSQL composable capability metadata with Python-first `DATABASE_URL` configuration and removed default SQLAlchemy requirements.
+- Added repository hygiene coverage that prevents composable integration templates from reintroducing Flask/FAB/AppBuilder/SQLAlchemy URI defaults.
+
+Battery-conscious verification:
+
+- `find templates/composable/capabilities -name 'integration.py.template' -print0 | xargs -0 .venv/bin/python -m py_compile`
+- `python -m json.tool templates/composable/capabilities/data/postgresql_database/capability.json`
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 9 passed
+- `rg -n "from flask import Blueprint|flask_appbuilder|Flask-AppBuilder|SQLAlchemy>=2.0.0|SQLALCHEMY_DATABASE_URI|Flask-SocketIO|eventlet|\\bappbuilder\\b" templates/composable/capabilities --glob 'integration.py.template' --glob 'README.md' --glob 'requirements.txt' --glob 'capability.json'` -> no matches
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

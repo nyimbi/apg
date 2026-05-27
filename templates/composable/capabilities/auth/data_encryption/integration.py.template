@@ -2,132 +2,83 @@
 Data Encryption Integration
 ===========================
 
-Integration logic for the Data Encryption capability.
-Handles security-specific setup and configuration.
+APG capability-contract integration for Data Encryption.
+This template is framework-neutral; transport, UI, and persistence adapters
+are selected by the composing application.
 """
 
 import logging
 from importlib import import_module
-from flask import Blueprint
-from flask_appbuilder import BaseView
+from typing import Any
 
-# Configure logging
+
 log = logging.getLogger(__name__)
 
-# Create capability blueprint
-data_encryption_bp = Blueprint(
-    'data_encryption',
-    __name__,
-    url_prefix='/security/data_encryption',
-    template_folder='templates',
-    static_folder='static'
-)
+CAPABILITY_CONTRACT: dict[str, Any] = {
+    'name': 'Data Encryption',
+    'category': 'auth',
+    'version': '1.0.0',
+    'features': ['AES-256 Encryption', 'RSA Key Pair Generation', 'Database Field Encryption', 'File Encryption', 'Key Rotation', 'Hardware Security Module', 'Certificate Management', 'Digital Signatures'],
+    'models': ['EncryptionKey', 'CertificateStore', 'EncryptedField', 'KeyRotationLog'],
+    'views': ['EncryptionView', 'KeyManagementView', 'CertificateView'],
+    'apis': ['encryption/encrypt', 'encryption/decrypt', 'encryption/keys', 'encryption/rotate'],
+    'templates': ['encryption_dashboard.html', 'key_management.html'],
+    'static_files': [],
+    'configuration': {'ENCRYPTION_KEY_SIZE': 256, 'KEY_ROTATION_DAYS': 90, 'HSM_ENABLED': False},
+}
 
 
-def integrate_data_encryption(app, appbuilder, db):
-    """
-    Integrate Data Encryption capability into the application.
+def integrate_data_encryption(application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Register Data Encryption metadata with an APG application or registry."""
+    contract = dict(CAPABILITY_CONTRACT)
+    contract['configuration'] = {
+        **contract.get('configuration', {}),
+        **(configuration or {}),
+    }
 
-    Args:
-        app: Flask application instance
-        appbuilder: Flask-AppBuilder instance
-        db: SQLAlchemy database instance
-    """
-    try:
-        # Register blueprint
-        app.register_blueprint(data_encryption_bp)
-
-        # Import optional capability modules without invalid function-local star imports
-        package_prefix = f"{__package__}." if __package__ else ""
-        for module_name in ("models", "views"):
-            try:
-                import_module(f"{package_prefix}{module_name}")
-            except ImportError as import_error:
-                log.debug(f"Optional module {module_name} not loaded: {import_error}")
-
-        # Apply security-specific configuration
-        config_additions = {'ENCRYPTION_KEY_SIZE': 256, 'KEY_ROTATION_DAYS': 90, 'HSM_ENABLED': False}
-        for key, value in config_additions.items():
-            if key not in app.config or not app.config[key]:
-                app.config[key] = value
-
-        # Initialize security service
-        security_service = DataEncryptionService(app, appbuilder, db)
-        app.extensions['data_encryption_service'] = security_service
-
-        # Register views with AppBuilder
-        appbuilder.add_view(
-            DataEncryptionView,
-            "Data Encryption",
-            icon="fa-shield-alt",
-            category="Security",
-            category_icon="fa-lock"
-        )
-
-        log.info(f"Successfully integrated Data Encryption capability")
-
-    except Exception as e:
-        log.error(f"Failed to integrate Data Encryption capability: {e}")
-        raise
-
-
-class DataEncryptionService:
-    """
-    Main service class for Data Encryption.
-
-    Handles security-specific operations and compliance management.
-    """
-
-    def __init__(self, app, appbuilder, db):
-        self.app = app
-        self.appbuilder = appbuilder
-        self.db = db
-        self.initialize_service()
-
-    def initialize_service(self):
-        """Initialize security service"""
-        log.info(f"Initializing Data Encryption service")
-
+    package_prefix = f"{__package__}." if __package__ else ""
+    for module_name in ("models", "views"):
         try:
-            # Setup security components
-            self.setup_security_context()
+            import_module(f"{package_prefix}{module_name}")
+        except ImportError as import_error:
+            log.debug("Optional %s module %s not loaded: %s", 'Data Encryption', module_name, import_error)
 
-            # Initialize compliance checks
-            self.initialize_compliance()
+    if registry is not None:
+        if hasattr(registry, "register_capability"):
+            registry.register_capability(contract)
+        elif isinstance(registry, dict):
+            registry[contract['name']] = contract
 
-        except Exception as e:
-            log.error(f"Error initializing security service: {e}")
+    if application is not None and hasattr(application, "capabilities"):
+        application.capabilities[contract['name']] = contract
 
-    def setup_security_context(self):
-        """Setup security context and policies"""
-        # Executable default security context setup logic
-        return True
-    def initialize_compliance(self):
-        """Initialize compliance monitoring"""
-        # Executable default compliance setup logic
-        return True
-    def check_permissions(self, user, resource, action):
-        """Check user permissions for resource access"""
-        # Permission checking logic
-        return False
+    log.info("Registered APG capability: %s", contract['name'])
+    return contract
 
-    def audit_access(self, user, resource, action, result):
-        """Log access attempt for audit purposes"""
-        # Executable default audit logging logic
-        return True
-class DataEncryptionView(BaseView):
-    """
-    Main view for Data Encryption capability.
-    """
 
-    route_base = "/data_encryption"
+class DataEncryptionCapability:
+    """Executable capability wrapper for Data Encryption."""
 
-    @expose("/")
-    def index(self):
-        """Main security dashboard view"""
-        return self.render_template("data_encryption_dashboard.html")
+    def __init__(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None):
+        self.application = application
+        self.registry = registry
+        self.config = configuration or {}
+        self.initialized = False
+        self.contract: dict[str, Any] | None = None
+        if application is not None or registry is not None:
+            self.init_app(application, registry, configuration)
 
-    @expose("/settings")
-    def settings(self):
-        """Security settings view"""
-        return self.render_template("data_encryption_settings.html")
+    def init_app(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.application = application
+        self.registry = registry
+        self.config = configuration or self.config
+        self.contract = integrate_data_encryption(application, registry, self.config)
+        self.initialized = True
+        return self.contract
+
+    def get_status(self) -> dict[str, Any]:
+        return {
+            'initialized': self.initialized,
+            'capability': 'Data Encryption',
+            'configuration_keys': sorted(self.config),
+        }

@@ -2,102 +2,83 @@
 Computer Vision Integration
 ===========================
 
-Integration logic for the Computer Vision capability.
-Handles AI/ML-specific setup and model loading.
+APG capability-contract integration for Computer Vision.
+This template is framework-neutral; transport, UI, and persistence adapters
+are selected by the composing application.
 """
 
 import logging
 from importlib import import_module
-from flask import Blueprint
-from flask_appbuilder import BaseView
+from typing import Any
 
-# Configure logging
+
 log = logging.getLogger(__name__)
 
-# Create capability blueprint
-computer_vision_bp = Blueprint(
-    'computer_vision',
-    __name__,
-    url_prefix='/ai/computer_vision',
-    template_folder='templates',
-    static_folder='static'
-)
+CAPABILITY_CONTRACT: dict[str, Any] = {
+    'name': 'Computer Vision',
+    'category': 'ai',
+    'version': '1.0.0',
+    'features': ['Image Classification', 'Object Detection', 'Face Recognition', 'Image Segmentation', 'OCR Text Extraction', 'Video Processing', 'Real-time Analysis', 'Custom Model Training'],
+    'models': ['Image', 'DetectionResult', 'CVModel', 'ProcessingJob'],
+    'views': ['ImageView', 'DetectionView', 'ModelView'],
+    'apis': ['cv/upload', 'cv/detect', 'cv/classify', 'cv/ocr'],
+    'templates': ['cv_dashboard.html', 'image_gallery.html'],
+    'static_files': [],
+    'configuration': {'CV_UPLOAD_FOLDER': '/tmp/cv_uploads', 'CV_MAX_FILE_SIZE': 16777216, 'CV_ALLOWED_EXTENSIONS': ['jpg', 'jpeg', 'png', 'bmp', 'tiff']},
+}
 
 
-def integrate_computer_vision(app, appbuilder, db):
-    """
-    Integrate Computer Vision capability into the application.
+def integrate_computer_vision(application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Register Computer Vision metadata with an APG application or registry."""
+    contract = dict(CAPABILITY_CONTRACT)
+    contract['configuration'] = {
+        **contract.get('configuration', {}),
+        **(configuration or {}),
+    }
 
-    Args:
-        app: Flask application instance
-        appbuilder: Flask-AppBuilder instance
-        db: SQLAlchemy database instance
-    """
-    try:
-        # Register blueprint
-        app.register_blueprint(computer_vision_bp)
-
-        # Import optional capability modules without invalid function-local star imports
-        package_prefix = f"{__package__}." if __package__ else ""
-        for module_name in ("models", "views"):
-            try:
-                import_module(f"{package_prefix}{module_name}")
-            except ImportError as import_error:
-                log.debug(f"Optional module {module_name} not loaded: {import_error}")
-
-        # Apply AI-specific configuration
-        config_additions = {'CV_UPLOAD_FOLDER': '/tmp/cv_uploads', 'CV_MAX_FILE_SIZE': 16777216, 'CV_ALLOWED_EXTENSIONS': ['jpg', 'jpeg', 'png', 'bmp', 'tiff']}
-        for key, value in config_additions.items():
-            app.config[key] = value
-
-        # Initialize AI service
-        ai_service = ComputerVisionService(app, appbuilder, db)
-        app.extensions['computer_vision_service'] = ai_service
-
-        log.info(f"Successfully integrated Computer Vision capability")
-
-    except Exception as e:
-        log.error(f"Failed to integrate Computer Vision capability: {e}")
-        raise
-
-
-class ComputerVisionService:
-    """
-    Main service class for Computer Vision.
-
-    Handles AI/ML model loading and inference.
-    """
-
-    def __init__(self, app, appbuilder, db):
-        self.app = app
-        self.appbuilder = appbuilder
-        self.db = db
-        self.models = {}
-        self.initialize_service()
-
-    def initialize_service(self):
-        """Initialize AI service and load models"""
-        log.info(f"Initializing Computer Vision service")
-
+    package_prefix = f"{__package__}." if __package__ else ""
+    for module_name in ("models", "views"):
         try:
-            # Load pre-trained models
-            self.load_models()
+            import_module(f"{package_prefix}{module_name}")
+        except ImportError as import_error:
+            log.debug("Optional %s module %s not loaded: %s", 'Computer Vision', module_name, import_error)
 
-            # Setup processing pipeline
-            self.setup_pipeline()
+    if registry is not None:
+        if hasattr(registry, "register_capability"):
+            registry.register_capability(contract)
+        elif isinstance(registry, dict):
+            registry[contract['name']] = contract
 
-        except Exception as e:
-            log.error(f"Error initializing AI service: {e}")
+    if application is not None and hasattr(application, "capabilities"):
+        application.capabilities[contract['name']] = contract
 
-    def load_models(self):
-        """Load AI/ML models"""
-        # Executable default model loading logic specific to capability
-        return True
-    def setup_pipeline(self):
-        """Setup AI processing pipeline"""
-        # Executable default pipeline setup logic
-        return True
-    def process(self, input_data):
-        """Process input data through AI pipeline"""
-        # Main processing logic
-        return {"status": "processed", "result": None}
+    log.info("Registered APG capability: %s", contract['name'])
+    return contract
+
+
+class ComputerVisionCapability:
+    """Executable capability wrapper for Computer Vision."""
+
+    def __init__(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None):
+        self.application = application
+        self.registry = registry
+        self.config = configuration or {}
+        self.initialized = False
+        self.contract: dict[str, Any] | None = None
+        if application is not None or registry is not None:
+            self.init_app(application, registry, configuration)
+
+    def init_app(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.application = application
+        self.registry = registry
+        self.config = configuration or self.config
+        self.contract = integrate_computer_vision(application, registry, self.config)
+        self.initialized = True
+        return self.contract
+
+    def get_status(self) -> dict[str, Any]:
+        return {
+            'initialized': self.initialized,
+            'capability': 'Computer Vision',
+            'configuration_keys': sorted(self.config),
+        }

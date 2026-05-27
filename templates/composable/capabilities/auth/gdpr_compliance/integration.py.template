@@ -2,132 +2,83 @@
 GDPR Compliance Integration
 ===========================
 
-Integration logic for the GDPR Compliance capability.
-Handles security-specific setup and configuration.
+APG capability-contract integration for GDPR Compliance.
+This template is framework-neutral; transport, UI, and persistence adapters
+are selected by the composing application.
 """
 
 import logging
 from importlib import import_module
-from flask import Blueprint
-from flask_appbuilder import BaseView
+from typing import Any
 
-# Configure logging
+
 log = logging.getLogger(__name__)
 
-# Create capability blueprint
-gdpr_compliance_bp = Blueprint(
-    'gdpr_compliance',
-    __name__,
-    url_prefix='/security/gdpr_compliance',
-    template_folder='templates',
-    static_folder='static'
-)
+CAPABILITY_CONTRACT: dict[str, Any] = {
+    'name': 'GDPR Compliance',
+    'category': 'auth',
+    'version': '1.0.0',
+    'features': ['Data Subject Rights Management', 'Consent Management', 'Data Anonymization', 'Right to be Forgotten', 'Data Portability', 'Privacy Impact Assessment', 'Cookie Consent', 'Breach Notification'],
+    'models': ['ConsentRecord', 'DataSubject', 'PrivacyRequest', 'DataProcessingActivity'],
+    'views': ['GDPRView', 'ConsentView', 'PrivacyView', 'DataSubjectView'],
+    'apis': ['gdpr/consent', 'gdpr/request', 'gdpr/export', 'gdpr/delete'],
+    'templates': ['gdpr_dashboard.html', 'consent_form.html', 'privacy_request.html'],
+    'static_files': [],
+    'configuration': {'GDPR_RETENTION_PERIOD': 2555, 'ANONYMIZATION_ALGORITHM': 'k-anonymity', 'CONSENT_EXPIRY_DAYS': 365},
+}
 
 
-def integrate_gdpr_compliance(app, appbuilder, db):
-    """
-    Integrate GDPR Compliance capability into the application.
+def integrate_gdpr_compliance(application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Register GDPR Compliance metadata with an APG application or registry."""
+    contract = dict(CAPABILITY_CONTRACT)
+    contract['configuration'] = {
+        **contract.get('configuration', {}),
+        **(configuration or {}),
+    }
 
-    Args:
-        app: Flask application instance
-        appbuilder: Flask-AppBuilder instance
-        db: SQLAlchemy database instance
-    """
-    try:
-        # Register blueprint
-        app.register_blueprint(gdpr_compliance_bp)
-
-        # Import optional capability modules without invalid function-local star imports
-        package_prefix = f"{__package__}." if __package__ else ""
-        for module_name in ("models", "views"):
-            try:
-                import_module(f"{package_prefix}{module_name}")
-            except ImportError as import_error:
-                log.debug(f"Optional module {module_name} not loaded: {import_error}")
-
-        # Apply security-specific configuration
-        config_additions = {'GDPR_RETENTION_PERIOD': 2555, 'ANONYMIZATION_ALGORITHM': 'k-anonymity', 'CONSENT_EXPIRY_DAYS': 365}
-        for key, value in config_additions.items():
-            if key not in app.config or not app.config[key]:
-                app.config[key] = value
-
-        # Initialize security service
-        security_service = GDPRComplianceService(app, appbuilder, db)
-        app.extensions['gdpr_compliance_service'] = security_service
-
-        # Register views with AppBuilder
-        appbuilder.add_view(
-            GDPRComplianceView,
-            "GDPR Compliance",
-            icon="fa-shield-alt",
-            category="Security",
-            category_icon="fa-lock"
-        )
-
-        log.info(f"Successfully integrated GDPR Compliance capability")
-
-    except Exception as e:
-        log.error(f"Failed to integrate GDPR Compliance capability: {e}")
-        raise
-
-
-class GDPRComplianceService:
-    """
-    Main service class for GDPR Compliance.
-
-    Handles security-specific operations and compliance management.
-    """
-
-    def __init__(self, app, appbuilder, db):
-        self.app = app
-        self.appbuilder = appbuilder
-        self.db = db
-        self.initialize_service()
-
-    def initialize_service(self):
-        """Initialize security service"""
-        log.info(f"Initializing GDPR Compliance service")
-
+    package_prefix = f"{__package__}." if __package__ else ""
+    for module_name in ("models", "views"):
         try:
-            # Setup security components
-            self.setup_security_context()
+            import_module(f"{package_prefix}{module_name}")
+        except ImportError as import_error:
+            log.debug("Optional %s module %s not loaded: %s", 'GDPR Compliance', module_name, import_error)
 
-            # Initialize compliance checks
-            self.initialize_compliance()
+    if registry is not None:
+        if hasattr(registry, "register_capability"):
+            registry.register_capability(contract)
+        elif isinstance(registry, dict):
+            registry[contract['name']] = contract
 
-        except Exception as e:
-            log.error(f"Error initializing security service: {e}")
+    if application is not None and hasattr(application, "capabilities"):
+        application.capabilities[contract['name']] = contract
 
-    def setup_security_context(self):
-        """Setup security context and policies"""
-        # Executable default security context setup logic
-        return True
-    def initialize_compliance(self):
-        """Initialize compliance monitoring"""
-        # Executable default compliance setup logic
-        return True
-    def check_permissions(self, user, resource, action):
-        """Check user permissions for resource access"""
-        # Permission checking logic
-        return False
+    log.info("Registered APG capability: %s", contract['name'])
+    return contract
 
-    def audit_access(self, user, resource, action, result):
-        """Log access attempt for audit purposes"""
-        # Executable default audit logging logic
-        return True
-class GDPRComplianceView(BaseView):
-    """
-    Main view for GDPR Compliance capability.
-    """
 
-    route_base = "/gdpr_compliance"
+class GdprComplianceCapability:
+    """Executable capability wrapper for GDPR Compliance."""
 
-    @expose("/")
-    def index(self):
-        """Main security dashboard view"""
-        return self.render_template("gdpr_compliance_dashboard.html")
+    def __init__(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None):
+        self.application = application
+        self.registry = registry
+        self.config = configuration or {}
+        self.initialized = False
+        self.contract: dict[str, Any] | None = None
+        if application is not None or registry is not None:
+            self.init_app(application, registry, configuration)
 
-    @expose("/settings")
-    def settings(self):
-        """Security settings view"""
-        return self.render_template("gdpr_compliance_settings.html")
+    def init_app(self, application: Any = None, registry: Any = None, configuration: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.application = application
+        self.registry = registry
+        self.config = configuration or self.config
+        self.contract = integrate_gdpr_compliance(application, registry, self.config)
+        self.initialized = True
+        return self.contract
+
+    def get_status(self) -> dict[str, Any]:
+        return {
+            'initialized': self.initialized,
+            'capability': 'GDPR Compliance',
+            'configuration_keys': sorted(self.config),
+        }

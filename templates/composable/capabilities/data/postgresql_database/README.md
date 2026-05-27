@@ -1,6 +1,6 @@
 # PostgreSQL Database Capability
 
-PostgreSQL database with SQLAlchemy integration
+PostgreSQL database adapter with Python-first configuration
 
 ## Overview
 
@@ -19,7 +19,6 @@ PostgreSQL database with SQLAlchemy integration
 ### Python Packages
 
 - psycopg2-binary>=2.9.0
-- SQLAlchemy>=2.0.0
 
 ### System Requirements
 
