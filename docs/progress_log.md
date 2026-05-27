@@ -3048,6 +3048,21 @@ Verification:
 - `rg -n "legacy|Flask-AppBuilder|flask_appbuilder|views.py|model_views.py|localhost|python app.py|default Flask" tests/test_integrated_code_generation.py` -> only negative assertions and test naming remain
 - `git diff --check -- tests/test_integrated_code_generation.py` -> no issues
 
+### 2026-05-27 08:13 EAT
+
+Completed checkpoint:
+
+- Replaced the script-style enhanced CLI test with direct Click runner regressions for the supported Python-first command surface.
+- Removed obsolete expectations for non-existent template-management CLI commands and Flask-AppBuilder capability details.
+- Added CLI coverage for help, version, and `init` project scaffolding output/configuration.
+
+Verification:
+
+- `.venv/bin/python -m py_compile tests/test_enhanced_cli.py`
+- `.venv/bin/python -m pytest -q tests/test_enhanced_cli.py` -> 3 passed
+- `rg -n "Flask-AppBuilder|flask_appbuilder|legacy|capabilities list|Basic Authentication|localhost|python app.py|default Flask" tests/test_enhanced_cli.py` -> only negative assertions remain
+- `git diff --check -- tests/test_enhanced_cli.py` -> no issues
+
 ### 2026-05-27 02:07 EAT
 
 Completed checkpoint:
