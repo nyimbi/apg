@@ -16,7 +16,7 @@ The APG Capability Marketplace and Discovery System has been successfully implem
 - **Analytics**: Marketplace statistics and metrics tracking
 
 ### 2. Web API Interface (`marketplace/web_api.py`)
-- **FastAPI Integration**: Modern, async web API with automatic documentation
+- **Python API Contract**: Modern async API contract with generated documentation hooks
 - **RESTful Endpoints**: Complete API for capability management
 - **Request/Response Models**: Pydantic models for data validation
 - **Error Handling**: Comprehensive error handling and HTTP status codes
@@ -102,7 +102,7 @@ The APG Capability Marketplace and Discovery System has been successfully implem
 ### API Architecture
 - **RESTful Design**: Standard HTTP methods and status codes
 - **Async Processing**: High-performance async/await patterns
-- **Input Validation**: Pydantic-based request/response validation
+- **Input Validation**: Typed request/response contract validation
 - **Error Handling**: Comprehensive error handling and logging
 - **Documentation**: Auto-generated OpenAPI/Swagger documentation
 

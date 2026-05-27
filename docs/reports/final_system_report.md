@@ -170,7 +170,7 @@ The APG system can now generate **complete, production-ready applications** for:
 - **Modular Design**: Clean separation of concerns with composable capabilities
 - **Dependency Management**: Automatic resolution of capability dependencies
 - **Template Generation**: Dynamic code generation based on capability selection
-- **Integration Patterns**: Standardized integration for Flask-AppBuilder
+- **Integration Patterns**: Standardized APG capability-contract integration
 - **Scalable Framework**: Support for unlimited custom capabilities
 
 ### **🔧 Developer Experience**

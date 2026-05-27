@@ -2,7 +2,7 @@
 PostgreSQL Database Capability
 =======================================
 
-PostgreSQL database with SQLAlchemy integration
+PostgreSQL database adapter with Python-first configuration
 
 Category: data
 Version: 1.0.0

@@ -65,8 +65,8 @@ The APG (Application Programming Generation) composable template system has been
 ## 🏗️ Base Template System
 
 ### **6 Base Templates Available:**
-1. **Flask Web Application** - Full-featured web app with Flask-AppBuilder
-2. **Microservice** - Lightweight microservice with FastAPI
+1. **Python Web Artifact** - Full-featured Python web artifact with APG capability contracts
+2. **Microservice** - Lightweight Python service artifact
 3. **API Only** - Pure API service without UI
 4. **Dashboard** - Real-time dashboard with analytics
 5. **Real-time** - WebSocket-enabled applications
@@ -87,7 +87,7 @@ The APG (Application Programming Generation) composable template system has been
 - **Composable Design**: Modular capabilities with clean interfaces
 - **Dependency Resolution**: Automatic capability dependency management
 - **Template Generation**: Dynamic code generation based on capability selection
-- **Integration Templates**: Standardized integration patterns for Flask-AppBuilder
+- **Integration Templates**: Standardized APG capability-contract integration patterns
 
 ### **Enterprise-Grade Features**
 - **Security-First**: Comprehensive security and compliance capabilities
@@ -126,7 +126,7 @@ The expanded system can now generate:
 
 ### **Pending Implementations**
 1. **Community Contribution System**: Enable third-party capability development
-2. **Framework Integration Guides**: Django, FastAPI, React integration patterns
+2. **Adapter Integration Guides**: Python web, API, UI, and event adapter patterns
 3. **Additional Cloud Providers**: Alibaba Cloud, Oracle Cloud, IBM Cloud
 4. **Industry Verticals**: Healthcare (HIPAA), Finance (SOX), Manufacturing (IIoT)
 

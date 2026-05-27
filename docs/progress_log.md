@@ -4225,3 +4225,21 @@ Battery-conscious verification:
 - `find templates/composable/bases -maxdepth 1 -type d | sort` -> includes `templates/composable/bases/python_web` and no `flask_webapp` directory
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+### 2026-05-27 12:39 EAT
+
+Completed checkpoint:
+
+- Updated legacy report language that still described APG defaults as Flask-AppBuilder, FastAPI, Flask, or SQLAlchemy centered.
+- Reframed report claims around Python-first APG capability contracts, explicit adapters, and generated UI/API contracts.
+- Updated remaining composable package comments and PostgreSQL capability init template wording to match the Python-first adapter model.
+- Updated legacy generation-test print guidance from `python app.py` to `python generated/app.py`.
+- Added report hygiene coverage for the high-level status reports most likely to be read as current platform truth.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_repository_hygiene.py tests/test_complete_app_generation.py tests/test_final_verification.py`
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` -> 12 passed
+- `rg -n "Flask-AppBuilder|flask_appbuilder|Flask Web Application|FastAPI Integration|Dynamic Flask integration|Flask, SQLAlchemy|python app.py|http://localhost:8080|SQLAlchemy integration" docs/reports/system_capabilities_report.md docs/reports/final_system_report.md docs/reports/final_system_summary.md docs/reports/marketplace_completion_report.md templates/composable/__init__.py templates/composable/bases/python_web/__init__.py.template templates/composable/capabilities/data/postgresql_database/__init__.py.template tests/test_complete_app_generation.py tests/test_final_verification.py` -> no matches
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

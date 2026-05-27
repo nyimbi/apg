@@ -57,6 +57,12 @@ PYTHON_FIRST_PUBLIC_DOCS = {
 	"docs/language_reference.md",
 	"docs/proposed_capability_architecture.md",
 }
+PYTHON_FIRST_REPORTS = {
+	"docs/reports/system_capabilities_report.md",
+	"docs/reports/final_system_report.md",
+	"docs/reports/final_system_summary.md",
+	"docs/reports/marketplace_completion_report.md",
+}
 
 
 def _tracked_files() -> list[str]:
@@ -245,6 +251,24 @@ def test_composable_base_names_are_python_first():
 			continue
 		content = candidate.read_text(encoding="utf-8", errors="ignore")
 		for term in ("flask_webapp", "FLASK_WEBAPP"):
+			if term in content:
+				violations.append(f"{path}: {term}")
+
+	assert violations == []
+
+
+def test_status_reports_describe_python_first_platform_defaults():
+	violations: list[str] = []
+	for path in PYTHON_FIRST_REPORTS:
+		content = (REPO_ROOT / path).read_text(encoding="utf-8", errors="ignore")
+		for term in (
+			"Flask-AppBuilder",
+			"FastAPI Integration",
+			"Dynamic Flask integration",
+			"Flask, SQLAlchemy",
+			"Flask Web Application",
+			"python app.py",
+		):
 			if term in content:
 				violations.append(f"{path}: {term}")
 

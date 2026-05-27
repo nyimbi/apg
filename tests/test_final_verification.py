@@ -246,7 +246,7 @@ def main():
         print(f"   Ready for:")
         print(f"   • Automatic application generation from APG code")
         print(f"   • Intelligent capability detection and composition")
-        print(f"   • Production-ready Flask applications")
+        print(f"   • Production-ready Python applications")
         print(f"   • Community contribution of new capabilities")
         print(f"   • Integration with APG compiler pipeline")
         

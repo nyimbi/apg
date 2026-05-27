@@ -3,7 +3,7 @@
 Complete Application Generation Test
 ====================================
 
-Generate a complete Flask application using the composable template system
+Generate a complete Python application using the composable template system
 and verify it runs correctly.
 """
 
@@ -60,8 +60,8 @@ class MockMethod:
         self.name = name
 
 def generate_complete_application():
-    """Generate a complete Flask application"""
-    print("🚀 Generating Complete Flask Application")
+    """Generate a complete Python application"""
+    print("🚀 Generating Complete Python Application")
     print("=" * 60)
     
     # Initialize the composition engine
@@ -168,7 +168,7 @@ def main():
         print(f"📚 To explore the generated app:")
         print(f"   cd {app_dir}")
         print(f"   pip install -r requirements.txt")
-        print(f"   python app.py")
+        print(f"   python generated/app.py")
         
         # Ask if user wants to keep the generated app
         keep_app = input("\n🤔 Keep the generated application? (y/N): ").lower().strip()

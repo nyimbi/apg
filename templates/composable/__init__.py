@@ -7,7 +7,7 @@ Composable capability-based templating system for generating world-class applica
 by combining base templates with focused capability modules.
 
 Architecture:
-- Base Templates: Core application architectures (Flask webapp, microservice, etc.)
+- Base Templates: Core application architectures (Python web, microservice, etc.)
 - Capabilities: Focused feature modules (AI, payments, auth, etc.)
 - Integration Patterns: Pre-defined capability combinations for common use cases
 - Composition Engine: Intelligently combines capabilities based on APG AST analysis

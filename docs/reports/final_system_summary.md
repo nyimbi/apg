@@ -20,7 +20,7 @@ I have successfully built a **complete, enterprise-grade ERP system** with hiera
 - ✅ **Multi-tenant Architecture** - Complete data isolation
 - ✅ **UUID7 Identifiers** - Distributed-ready system
 - ✅ **Comprehensive Audit Trails** - Enterprise compliance ready
-- ✅ **Flask-AppBuilder Integration** - Automatic UI generation
+- ✅ **APG UI Contracts** - Automatic UI contract generation
 - ✅ **REST API Coverage** - 100% API coverage for integration
 
 ## 🏗️ **Complete Capability Breakdown**
@@ -240,7 +240,7 @@ The composition engine ties everything together, allowing APG programmers to cre
 - ✅ **Composition Engine** - Dynamic application creation
 - ✅ **Dependency Validator** - Conflict resolution and validation
 - ✅ **Industry Templates** - 13 pre-configured industry solutions
-- ✅ **Blueprint Manager** - Dynamic Flask integration
+- ✅ **Capability Contract Manager** - Dynamic APG integration
 - ✅ **Database Manager** - Schema composition and migrations
 
 ### **13 Industry Templates Ready**
@@ -375,8 +375,8 @@ This is the most comprehensive ERP system implementation ever created in a singl
 ### **2. Modern Architecture**
 Built with cutting-edge technology patterns:
 - Python 3.12+ with modern typing
-- Flask-AppBuilder for rapid UI development
-- SQLAlchemy 2.x for modern ORM
+- APG UI contracts for rapid interface generation
+- Explicit persistence adapters for storage and ORM choices
 - Pydantic 2.x for data validation
 - UUID7 for distributed systems
 
@@ -429,7 +429,7 @@ Every file includes:
 
 ### **For Developers**
 - **Modular Architecture** - Work on specific capabilities independently
-- **Modern Tech Stack** - Python 3.12+, Flask, SQLAlchemy, modern patterns
+- **Modern Tech Stack** - Python 3.12+, APG capability contracts, explicit adapters, modern patterns
 - **Extensibility** - Easy to add new capabilities and features
 - **Best Practices** - Learn from enterprise-grade code patterns
 - **Comprehensive Examples** - Real-world implementation patterns
