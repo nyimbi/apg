@@ -353,6 +353,75 @@ def validate_capability_contracts() -> Dict[str, Any]:
     return {{"errors": errors, "warnings": warnings}}
 
 
+def capability_theme(capability_name: str, tenant_overrides: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    capability = get_capability(capability_name)
+    theme = dict(capability.theme or {{}})
+    resolved = {{
+        "name": theme.get("name", f"{{capability.name}}_theme"),
+        "tokens": dict(theme.get("tokens") or {{}}),
+        "components": dict(theme.get("components") or {{}}),
+        "allow_tenant_overrides": bool(theme.get("allow_tenant_overrides", True)),
+    }}
+    if tenant_overrides and resolved["allow_tenant_overrides"]:
+        _deep_merge(resolved, tenant_overrides)
+    return resolved
+
+
+def theme_token(
+    capability_name: str,
+    token_name: str,
+    default: Any = None,
+    tenant_overrides: Dict[str, Any] | None = None,
+) -> Any:
+    return capability_theme(capability_name, tenant_overrides)["tokens"].get(token_name, default)
+
+
+def capability_languages(capability_name: str) -> List[str]:
+    languages = get_capability(capability_name).i18n.get("supported_languages", [])
+    if not isinstance(languages, list):
+        return []
+    return [str(language) for language in languages]
+
+
+def resolve_language(capability_name: str, requested_language: str | None = None) -> str:
+    capability = get_capability(capability_name)
+    supported = capability_languages(capability_name)
+    default_language = str(capability.i18n.get("default_language") or (supported[0] if supported else "en"))
+    fallback_language = str(capability.i18n.get("fallback_language") or default_language)
+    if requested_language and requested_language in supported:
+        return requested_language
+    if default_language in supported:
+        return default_language
+    if fallback_language in supported:
+        return fallback_language
+    return supported[0] if supported else fallback_language
+
+
+def validate_capability_i18n() -> Dict[str, List[str]]:
+    errors: List[str] = []
+    warnings: List[str] = []
+    for capability in CAPABILITIES.values():
+        supported = capability_languages(capability.name)
+        if not supported:
+            warnings.append(f"{{capability.name}} does not declare supported languages")
+            continue
+        default_language = capability.i18n.get("default_language")
+        fallback_language = capability.i18n.get("fallback_language")
+        if default_language and default_language not in supported:
+            errors.append(f"{{capability.name}} default language {{default_language}} is not supported")
+        if fallback_language and fallback_language not in supported:
+            errors.append(f"{{capability.name}} fallback language {{fallback_language}} is not supported")
+    return {{"errors": errors, "warnings": warnings}}
+
+
+def _deep_merge(target: Dict[str, Any], source: Dict[str, Any]) -> None:
+    for key, value in source.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _deep_merge(target[key], value)
+        else:
+            target[key] = value
+
+
 def capability_rules(capability_name: str) -> List[Dict[str, Any]]:
     capability = get_capability(capability_name)
     rules: List[Dict[str, Any]] = []

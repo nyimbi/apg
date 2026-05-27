@@ -99,6 +99,28 @@ def test_capability_declaration_generates_runtime_manifest():
     assert capability.provides == ["journal_entries", "chart_of_accounts", "financial_periods"]
     assert namespace["capabilities_by_erp_module"]()["general_ledger"][0].name == "GeneralLedger"
     assert namespace["provided_services"]()["journal_entries"] == ["GeneralLedger"]
+
+    assert namespace["capability_theme"]("GeneralLedger") == {
+        "name": "finance_ops",
+        "tokens": {"accent": "#126E82"},
+        "components": {},
+        "allow_tenant_overrides": True,
+    }
+    assert namespace["theme_token"]("GeneralLedger", "accent") == "#126E82"
+    assert namespace["theme_token"](
+        "GeneralLedger",
+        "accent",
+        tenant_overrides={"tokens": {"accent": "#0F766E", "danger": "#B91C1C"}},
+    ) == "#0F766E"
+    assert namespace["capability_theme"](
+        "GeneralLedger",
+        {"tokens": {"accent": "#0F766E", "danger": "#B91C1C"}},
+    )["tokens"] == {"accent": "#0F766E", "danger": "#B91C1C"}
+    assert namespace["capability_languages"]("GeneralLedger") == ["en", "sw", "ha", "yo", "zu"]
+    assert namespace["resolve_language"]("GeneralLedger", "sw") == "sw"
+    assert namespace["resolve_language"]("GeneralLedger", "fr") == "en"
+    assert namespace["validate_capability_i18n"]() == {"errors": [], "warnings": []}
+
     rule_names = [rule["name"] for rule in namespace["capability_rules"]("GeneralLedger")]
     assert rule_names == ["posting_period_open", "balanced_journal"]
 
