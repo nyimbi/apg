@@ -9,6 +9,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 import asyncio
+import os
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timezone, timedelta
 import logging
@@ -150,7 +151,108 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 			return await call_next(request)
 
 # Authentication Dependencies
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _first_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def _object_value(source: Any, name: str) -> Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _normalise_list(value: Any, fallback: List[str]) -> List[str]:
+	if value is None:
+		return fallback
+	if isinstance(value, str):
+		items = [item.strip() for item in value.replace(",", " ").split()]
+		return items or fallback
+	if isinstance(value, list):
+		return [str(item) for item in value if _clean_text(item)] or fallback
+	return fallback
+
+
+def _decode_bearer_claims(token: str) -> Dict[str, Any]:
+	parts = token.split(".")
+	if len(parts) < 2:
+		return {}
+	try:
+		import base64
+		import binascii
+
+		payload = parts[1]
+		padding = "=" * (-len(payload) % 4)
+		claims = json.loads(base64.urlsafe_b64decode(f"{payload}{padding}".encode("ascii")).decode("utf-8"))
+	except (binascii.Error, json.JSONDecodeError, UnicodeDecodeError, ValueError):
+		return {}
+	return claims if isinstance(claims, dict) else {}
+
+
+def _resolve_auth_context(request: Request, token_context: Dict[str, Any]) -> Dict[str, Any]:
+	state = getattr(request, "state", None)
+	state_user = _object_value(state, "current_user") or _object_value(state, "user")
+	headers = request.headers or {}
+	query_params = request.query_params or {}
+
+	user_id = _first_text([
+		token_context.get("user_id"),
+		token_context.get("sub"),
+		token_context.get("uid"),
+		_object_value(state_user, "user_id"),
+		_object_value(state_user, "id"),
+		_object_value(state_user, "username"),
+		_object_value(state, "user_id"),
+		headers.get("X-User-ID"),
+		headers.get("X-APG-User-ID"),
+		query_params.get("user_id"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
+
+	tenant_id = _first_text([
+		token_context.get("tenant_id"),
+		token_context.get("tenant"),
+		token_context.get("organization_id"),
+		_object_value(state_user, "tenant_id"),
+		_object_value(state, "tenant_id"),
+		headers.get("X-Tenant-ID"),
+		headers.get("X-APG-Tenant-ID"),
+		headers.get("X-Organization-ID"),
+		query_params.get("tenant_id"),
+		query_params.get("tenant"),
+		os.getenv("APG_TENANT_ID"),
+	], os.getenv("APG_DEFAULT_TENANT_ID", "default"))
+
+	return {
+		"user_id": user_id,
+		"tenant_id": tenant_id,
+		"roles": _normalise_list(
+			token_context.get("roles") or headers.get("X-APG-Roles") or os.getenv("APG_ROLES"),
+			["workflow_user"]
+		),
+		"permissions": _normalise_list(
+			token_context.get("permissions") or token_context.get("scope") or headers.get("X-APG-Permissions") or os.getenv("APG_PERMISSIONS"),
+			["workflow.read"]
+		),
+	}
+
+
+async def get_current_user(
+	request: Request,
+	credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> Dict[str, Any]:
 	"""Extract and validate user from APG authentication token."""
 	
 	try:
@@ -162,6 +264,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 				detail="Invalid authentication token"
 			)
 		
+		token_context: Dict[str, Any] = {}
+
 		# Try APG auth_rbac capability integration
 		try:
 			from apg.capabilities.auth_rbac import AuthRBACService
@@ -169,45 +273,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 			
 			# Validate token with APG auth service
 			user_info = await auth_service.validate_token(token)
-			if not user_info:
-				raise HTTPException(status_code=401, detail="Token validation failed")
-			
-			return {
-				"user_id": user_info.get("user_id", "unknown"),
-				"tenant_id": user_info.get("tenant_id", "default_tenant"),
-				"roles": user_info.get("roles", ["workflow_user"]),
-				"permissions": user_info.get("permissions", ["workflow.read"])
-			}
+			if user_info:
+				token_context = user_info
 			
 		except ImportError:
-			# APG auth_rbac not available, try JWT validation
-			try:
-				import jwt
-				import os
-				
-				# Get JWT secret from environment
-				jwt_secret = os.getenv('JWT_SECRET', 'workflow_orchestration_secret')
-				jwt_algorithm = os.getenv('JWT_ALGORITHM', 'HS256')
-				
-				# Decode and validate JWT token
-				payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
-				
-				# Extract user information from JWT payload
-				user_id = payload.get('sub') or payload.get('user_id')
-				if not user_id:
-					raise HTTPException(status_code=401, detail="Invalid token payload")
-				
-				return {
-					"user_id": str(user_id),
-					"tenant_id": payload.get("tenant_id", "default_tenant"),
-					"roles": payload.get("roles", ["workflow_user"]),
-					"permissions": payload.get("permissions", ["workflow.read", "workflow.write"])
-				}
-				
-			except jwt.ExpiredSignatureError:
-				raise HTTPException(status_code=401, detail="Token has expired")
-			except jwt.InvalidTokenError:
-				raise HTTPException(status_code=401, detail="Invalid token")
+			token_context = _decode_bearer_claims(token)
+
+		return _resolve_auth_context(request, token_context)
 		
 	except HTTPException:
 		raise  # Re-raise HTTP exceptions

@@ -11,6 +11,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 import asyncio
 import logging
 import json
+import os
 import hashlib
 import hmac
 from typing import Dict, Any, List, Optional, Set, Tuple, Union, Callable
@@ -33,6 +34,54 @@ from .models import WorkflowStatus, TaskStatus, WorkflowExecution
 
 
 logger = logging.getLogger(__name__)
+
+
+def _clean_context_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _context_value(context: Any, name: str) -> Any:
+	if context is None:
+		return None
+	if isinstance(context, dict):
+		return context.get(name)
+	return getattr(context, name, None)
+
+
+def _first_context_text(candidates: List[Any], fallback: str) -> str:
+	for candidate in candidates:
+		text = _clean_context_text(candidate)
+		if text:
+			return text
+	return fallback
+
+
+def resolve_graphql_tenant_id(info: Any) -> str:
+	"""Resolve tenant context for GraphQL resolvers without hardcoded tenant literals."""
+	context = getattr(info, "context", None)
+	user = _context_value(context, "current_user") or _context_value(context, "user")
+	return _first_context_text([
+		_context_value(context, "tenant_id"),
+		_context_value(user, "tenant_id"),
+		_context_value(context, "organization_id"),
+		os.getenv("APG_TENANT_ID"),
+	], os.getenv("APG_DEFAULT_TENANT_ID", "default"))
+
+
+def resolve_graphql_user_id(info: Any) -> str:
+	"""Resolve actor context for GraphQL mutations."""
+	context = getattr(info, "context", None)
+	user = _context_value(context, "current_user") or _context_value(context, "user")
+	return _first_context_text([
+		_context_value(context, "user_id"),
+		_context_value(user, "user_id"),
+		_context_value(user, "id"),
+		_context_value(user, "username"),
+		os.getenv("APG_USER_ID"),
+	], os.getenv("APG_DEFAULT_USER_ID", "system"))
 
 
 class APIVersion(str, Enum):
@@ -325,7 +374,7 @@ class Query(ObjectType):
 				"""
 				
 				# Get tenant ID from context
-				tenant_id = getattr(info.context, 'tenant_id', 'default_tenant')
+				tenant_id = resolve_graphql_tenant_id(info)
 				
 				result = await session.execute(query, [id, tenant_id])
 				row = result.fetchone()
@@ -366,7 +415,7 @@ class Query(ObjectType):
 			async with db_manager.get_session() as session:
 				# Build dynamic WHERE clause based on filters
 				where_conditions = ["w.tenant_id = %s"]
-				query_params = [getattr(info.context, 'tenant_id', 'default_tenant')]
+				query_params = [resolve_graphql_tenant_id(info)]
 				
 				category = kwargs.get('category')
 				status = kwargs.get('status')
@@ -459,7 +508,7 @@ class Query(ObjectType):
 				GROUP BY wi.id, w.name, w.description
 				"""
 				
-				tenant_id = getattr(info.context, 'tenant_id', 'default_tenant')
+				tenant_id = resolve_graphql_tenant_id(info)
 				
 				result = await session.execute(query, [id, tenant_id])
 				row = result.fetchone()
@@ -513,7 +562,7 @@ class Query(ObjectType):
 			async with db_manager.get_session() as session:
 				# Build dynamic WHERE clause based on filters
 				where_conditions = ["wi.tenant_id = %s"]
-				query_params = [getattr(info.context, 'tenant_id', 'default_tenant')]
+				query_params = [resolve_graphql_tenant_id(info)]
 				
 				workflow_id = kwargs.get('workflow_id')
 				status = kwargs.get('status')
@@ -611,7 +660,7 @@ class Query(ObjectType):
 				GROUP BY t.id
 				"""
 				
-				tenant_id = getattr(info.context, 'tenant_id', 'default_tenant')
+				tenant_id = resolve_graphql_tenant_id(info)
 				
 				result = await session.execute(query, [id, tenant_id])
 				row = result.fetchone()
@@ -653,7 +702,7 @@ class Query(ObjectType):
 			async with db_manager.get_session() as session:
 				# Build dynamic WHERE clause based on filters
 				where_conditions = ["t.tenant_id = %s"]
-				query_params = [getattr(info.context, 'tenant_id', 'default_tenant')]
+				query_params = [resolve_graphql_tenant_id(info)]
 				
 				category = kwargs.get('category')
 				complexity = kwargs.get('complexity')
@@ -729,6 +778,10 @@ class Query(ObjectType):
 		except Exception as e:
 			logger.error(f"Failed to resolve templates: {e}")
 			return []
+
+	def _get_tenant_context(self, info) -> str:
+		"""Resolve tenant context for metrics queries."""
+		return resolve_graphql_tenant_id(info)
 	
 	async def resolve_metrics(self, info, **kwargs):
 		"""Resolve metrics from monitoring database and real-time collection."""
@@ -1052,7 +1105,7 @@ class CreateWorkflowMutation(graphene.Mutation):
 				'tags': [],
 				'created_at': datetime.utcnow(),
 				'updated_at': datetime.utcnow(),
-				'created_by': 'current_user'  # From context
+				'created_by': resolve_graphql_user_id(info)
 			}
 			
 			return CreateWorkflowMutation(
@@ -1103,7 +1156,7 @@ class UpdateWorkflowMutation(graphene.Mutation):
 				'tags': [],
 				'created_at': datetime.utcnow() - timedelta(days=1),
 				'updated_at': datetime.utcnow(),
-				'created_by': 'current_user'
+				'created_by': resolve_graphql_user_id(info)
 			}
 			
 			return UpdateWorkflowMutation(

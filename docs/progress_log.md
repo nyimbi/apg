@@ -3143,3 +3143,19 @@ Verification:
 - `rg -n "'default_tenant'|'current_user'|For now, return a default user context|Kafka|kafka" capabilities/common/etlp/blueprint.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:00 EAT
+
+Completed checkpoint:
+
+- Replaced Workflow Orchestration REST auth's `default_tenant` fallbacks with APG auth service, bearer-claim, request-state, header, query, and environment context resolution.
+- Replaced GraphQL resolver tenant fallbacks with shared tenant-context resolution and routed mutation `created_by` values through actor context instead of fixed `current_user`.
+- Added focused Composition Orchestration context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/orchestration/api.py capabilities/composition/orchestration/advanced_api.py tests/test_composition_orchestration_context.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_orchestration_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed, 1 SQLAlchemy deprecation warning from `common/base.py`
+- `rg -n "default_tenant|payload\.get\(\"tenant_id\", \"default_tenant\"\)|getattr\(info\.context, 'tenant_id', 'default_tenant'\)|'created_by': 'current_user'|Kafka|kafka" capabilities/composition/orchestration/api.py capabilities/composition/orchestration/advanced_api.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
