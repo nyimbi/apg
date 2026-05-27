@@ -28,11 +28,10 @@
 
 4. Run the application:
    ```bash
-   python app.py
+   python generated/app.py
    ```
 
-5. Access the application:
-   Open http://localhost:8080
+5. Inspect the application metadata printed as JSON.
 
 ## Usage
 

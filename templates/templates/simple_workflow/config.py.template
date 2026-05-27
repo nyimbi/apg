@@ -2,11 +2,10 @@
 Application Configuration
 ========================
 
-Configuration for {{project_name}} Flask-AppBuilder application.
+Configuration for {{project_name}} APG Python application.
 """
 
 import os
-from flask_appbuilder.security.manager import AUTH_DB
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -16,9 +15,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-productio
 # Database
 SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(basedir, 'app.db')
 
-# Flask-AppBuilder
 APP_NAME = "{{project_name}}"
-AUTH_TYPE = AUTH_DB
 
 # Template-specific configuration
 

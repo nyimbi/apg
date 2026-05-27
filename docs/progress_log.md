@@ -3805,6 +3805,23 @@ Verification:
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
 
+### 2026-05-27 07:02 EAT
+
+Completed checkpoint:
+
+- Bulk-aligned the remaining `templates/templates/*` project templates with the Python artifact flow.
+- Replaced framework requirements with a standard-library-only Python target note.
+- Removed `flask_appbuilder` imports and `AUTH_DB` config from template config files.
+- Updated template README run instructions from `python app.py` plus localhost web-app guidance to `python generated/app.py` plus JSON manifest inspection.
+- Added repository hygiene coverage that prevents these project templates from reintroducing Flask-AppBuilder, `flask_appbuilder`, `python app.py`, or localhost web-app instructions.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_repository_hygiene.py`
+- `rg -n "Flask-AppBuilder|flask_appbuilder|python app.py|http://localhost:8080" templates/templates tests/test_repository_hygiene.py` -> only hygiene guard constants remain
+- `git diff --check` -> no issues
+- Deferred pytest and broader verification at the user's request to conserve battery.
+
 ### 2026-05-27 06:53 EAT
 
 Completed checkpoint:
