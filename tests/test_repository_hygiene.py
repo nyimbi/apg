@@ -105,6 +105,24 @@ def test_root_dependency_files_stay_python_first():
 	assert sorted(forbidden.intersection(_tracked_files())) == []
 
 
+def test_package_metadata_does_not_install_framework_targets_by_default():
+	setup_source = (REPO_ROOT / "setup.py").read_text(encoding="utf-8")
+	forbidden_terms = (
+		"Flask>=",
+		"Flask-AppBuilder",
+		"Flask-SQLAlchemy",
+		"fastapi>=",
+		"uvicorn>=",
+		"SQLAlchemy>=",
+		"flask-appbuilder",
+		"Web Environment",
+		"WWW/HTTP",
+	)
+
+	for term in forbidden_terms:
+		assert term not in setup_source
+
+
 def test_top_level_generated_and_capability_tests_stay_out_of_source_roots():
 	forbidden_prefixes = ("capabilities/", "gen/")
 	misplaced = [

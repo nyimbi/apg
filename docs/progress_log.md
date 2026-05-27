@@ -3063,6 +3063,21 @@ Verification:
 - `rg -n "Flask-AppBuilder|flask_appbuilder|legacy|capabilities list|Basic Authentication|localhost|python app.py|default Flask" tests/test_enhanced_cli.py` -> only negative assertions remain
 - `git diff --check -- tests/test_enhanced_cli.py` -> no issues
 
+### 2026-05-27 08:17 EAT
+
+Completed checkpoint:
+
+- Removed Flask, Flask-AppBuilder, Flask-SQLAlchemy, FastAPI, Uvicorn, and SQLAlchemy from the package's default install requirements.
+- Updated package classifiers and keywords so the package presents as a Python artifact compiler instead of a framework web runtime.
+- Added repository hygiene coverage that prevents setup metadata from reintroducing default framework-target dependencies.
+
+Verification:
+
+- `.venv/bin/python -m py_compile setup.py tests/test_repository_hygiene.py`
+- `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_package_metadata_does_not_install_framework_targets_by_default` -> 1 passed
+- `rg -n "Flask>=|Flask-AppBuilder|Flask-SQLAlchemy|fastapi>=|uvicorn>=|SQLAlchemy>=|flask-appbuilder|Web Environment|WWW/HTTP" setup.py tests/test_repository_hygiene.py` -> only hygiene guard terms remain
+- `git diff --check -- setup.py tests/test_repository_hygiene.py` -> no issues
+
 ### 2026-05-27 02:07 EAT
 
 Completed checkpoint:

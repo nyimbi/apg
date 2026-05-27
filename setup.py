@@ -19,13 +19,6 @@ version = "1.0.0"
 # Define package requirements
 install_requires = [
     "antlr4-python3-runtime>=4.13.0",
-	"Flask>=2.3.0",
-	"Flask-AppBuilder>=4.3.0",
-	"Flask-SQLAlchemy>=3.0.0",
-	"fastapi>=0.100.0",
-	"python-multipart>=0.0.6",
-	"uvicorn>=0.23.0",
-	"SQLAlchemy>=2.0.0",
     "click>=8.1.0",
     "rich>=13.0.0",
     "pydantic>=2.0.0",
@@ -132,8 +125,6 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Compilers",
         "Topic :: Software Development :: Code Generators", 
-        "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
-        "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.10",
@@ -141,13 +132,12 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Operating System :: OS Independent",
         "Environment :: Console",
-        "Environment :: Web Environment",
     ],
     
     # Keywords for discoverability
     keywords=[
         "apg", "application-generation", "code-generation", "dsl", 
-        "flask-appbuilder", "web-development", "automation", "agents",
+        "python-artifacts", "automation", "agents",
         "workflows", "digital-twins", "iot", "compiler", "language"
     ],
     
