@@ -1,8 +1,8 @@
 {
   "name": "Real-Time Application",
   "type": "real_time",
-  "description": "Real-time application with WebSocket support",
-  "framework": "Flask-SocketIO",
+  "description": "Real-time Python artifact with WebSocket-ready contracts",
+  "framework": "python",
   "capabilities_supported": [
     "communication",
     "auth",
@@ -24,8 +24,5 @@
     },
     "tests": {}
   },
-  "requirements": [
-    "Flask-SocketIO>=5.0.0",
-    "eventlet>=0.33.0"
-  ]
+  "requirements": []
 }

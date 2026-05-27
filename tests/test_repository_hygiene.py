@@ -43,6 +43,9 @@ PYTHON_TEMPLATE_FORBIDDEN_TERMS = (
 COMPOSABLE_CAPABILITY_DOC_FORBIDDEN_TERMS = (
 	"Flask-AppBuilder",
 	"flask_appbuilder",
+	"FastAPI",
+	"fastapi",
+	"Flask-SocketIO",
 	"http://localhost:8080",
 	"python app.py",
 )
@@ -129,9 +132,13 @@ def test_project_templates_describe_python_artifact_flow():
 def test_composable_capability_docs_do_not_advertise_framework_runtime():
 	violations: list[str] = []
 	for path in _tracked_files():
-		if not path.startswith("templates/composable/capabilities/"):
-			continue
-		if not path.endswith(("README.md", "API.md", "requirements.txt", "capability.json", ".py")):
+		if path.startswith("templates/composable/capabilities/"):
+			if not path.endswith(("README.md", "API.md", "requirements.txt", "capability.json", ".py")):
+				continue
+		elif path.startswith("templates/composable/bases/"):
+			if not path.endswith(("README.md.template", "requirements.txt.template", "__init__.py.template", "base.json")):
+				continue
+		else:
 			continue
 		content = (REPO_ROOT / path).read_text(encoding="utf-8", errors="ignore")
 		for term in COMPOSABLE_CAPABILITY_DOC_FORBIDDEN_TERMS:

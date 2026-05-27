@@ -1,8 +1,8 @@
 {
-  "name": "Flask Web Application",
+  "name": "Python Web Artifact",
   "type": "flask_webapp",
-  "description": "Full-featured web application with Flask-AppBuilder",
-  "framework": "Flask-AppBuilder",
+  "description": "Full-featured Python web artifact with APG capability contracts",
+  "framework": "python",
   "capabilities_supported": [
     "auth",
     "ai",
@@ -29,10 +29,5 @@
     "capabilities": {},
     "tests": {}
   },
-  "requirements": [
-    "Flask-AppBuilder>=4.3.0",
-    "Flask>=2.3.0",
-    "SQLAlchemy>=2.0.0",
-    "WTForms>=3.0.0"
-  ]
+  "requirements": []
 }

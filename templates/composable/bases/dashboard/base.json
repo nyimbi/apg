@@ -1,8 +1,8 @@
 {
   "name": "Analytics Dashboard",
   "type": "dashboard",
-  "description": "Real-time dashboard with analytics",
-  "framework": "Flask-AppBuilder",
+  "description": "Real-time dashboard artifact with APG capability contracts",
+  "framework": "python",
   "capabilities_supported": [
     "analytics",
     "data",
@@ -27,9 +27,5 @@
     },
     "tests": {}
   },
-  "requirements": [
-    "Flask-AppBuilder>=4.3.0",
-    "plotly>=5.0.0",
-    "pandas>=2.0.0"
-  ]
+  "requirements": []
 }

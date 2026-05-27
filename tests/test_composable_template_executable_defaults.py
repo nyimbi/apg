@@ -1,5 +1,6 @@
 """Executable-default checks for composable templates."""
 
+import json
 from pathlib import Path
 
 from jinja2 import Template
@@ -77,6 +78,18 @@ def test_base_template_fallback_renders_executable_health_descriptor(tmp_path):
     assert app["base_template"] == "cli_tool"
     assert app["capabilities"] == ["auth/basic_authentication"]
     assert health["status"] == "healthy"
+
+
+def test_checked_in_base_metadata_is_python_first():
+    offenders: list[str] = []
+    for path in sorted(COMPOSABLE_ROOT.glob("bases/*/base.json")):
+        metadata = json.loads(path.read_text())
+        if metadata.get("framework") != "python":
+            offenders.append(f"{path.relative_to(REPO_ROOT)}: framework")
+        if metadata.get("requirements") != []:
+            offenders.append(f"{path.relative_to(REPO_ROOT)}: requirements")
+
+    assert offenders == []
 
 
 def test_checked_in_composable_templates_do_not_emit_placeholder_bodies():

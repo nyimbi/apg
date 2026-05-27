@@ -33,29 +33,17 @@ This application provides:
 
 3. Set environment variables:
    ```bash
-   export FLASK_APP=app.py
-   export FLASK_ENV=development
    export SECRET_KEY="your-secret-key"
    export DATABASE_URL="{{database_url}}"
-   ```
-
-4. Initialize the database:
-   ```bash
-   flask fab create-admin
    ```
 
 ### Running the Application
 
 ```bash
-python app.py
+python ./app.py
 ```
 
-The application will be available at: http://localhost:8080
-
-### Default Login
-
-- Username: admin
-- Password: (set during `flask fab create-admin`)
+The generated base artifact prints a dependency-light health descriptor that can be composed with APG runtime adapters.
 
 ## Architecture
 

@@ -3805,6 +3805,27 @@ Verification:
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
 
+### 2026-05-27 07:33 EAT
+
+Completed checkpoint:
+
+- Aligned composable base-template metadata with the Python-first artifact target.
+- Set all five checked-in composable base `base.json` files to `framework: python` with empty default requirements.
+- Replaced composable base README instructions that assumed Flask environment variables, `flask fab create-admin`, `python app.py`, and localhost web-app serving.
+- Updated composable base requirements templates to state that the Python-first base uses only the standard library by default.
+- Updated base-template generator defaults so future composable base metadata and README/requirements output do not reintroduce framework defaults.
+- Added regression coverage that checked-in base metadata remains `framework: python` with empty requirements.
+- Extended repository hygiene coverage to include composable base README, requirements, init, and metadata files.
+
+Battery-conscious verification:
+
+- `python -m py_compile templates/composable/base_template.py tests/test_repository_hygiene.py tests/test_composable_template_executable_defaults.py`
+- Metadata validation script confirmed all 5 composable base `base.json` files have `framework: python` and `requirements: []`.
+- `python -m json.tool templates/composable/bases/flask_webapp/base.json`
+- `rg -n "Flask-AppBuilder|flask_appbuilder|FastAPI|fastapi|Flask-SocketIO|eventlet|uvicorn|python app.py|http://localhost:8080|Flask>=2.3.0|SQLAlchemy>=2.0.0" templates/composable/bases --glob 'base.json' --glob 'README.md.template' --glob 'requirements.txt.template' --glob '__init__.py.template' tests/test_repository_hygiene.py` -> only hygiene constants remain.
+- `git diff --check` -> no issues.
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 07:13 EAT
 
 Completed checkpoint:

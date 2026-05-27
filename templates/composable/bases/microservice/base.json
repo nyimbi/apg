@@ -1,8 +1,8 @@
 {
   "name": "Microservice",
   "type": "microservice",
-  "description": "Lightweight microservice with FastAPI",
-  "framework": "FastAPI",
+  "description": "Lightweight Python service artifact with APG capability contracts",
+  "framework": "python",
   "capabilities_supported": [
     "auth",
     "ai",
@@ -20,10 +20,5 @@
     "capabilities": {},
     "tests": {}
   },
-  "requirements": [
-    "fastapi>=0.104.0",
-    "uvicorn>=0.24.0",
-    "pydantic>=2.0.0",
-    "sqlalchemy>=2.0.0"
-  ]
+  "requirements": []
 }
