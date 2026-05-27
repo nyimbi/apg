@@ -4453,3 +4453,20 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `df2f9ac` (`Make CRM core records executable`) to `origin/main`.
+
+### 2026-05-27 17:50 EAT
+
+Completed checkpoint:
+
+- Made `CRMService` importable and constructible when optional integration modules or dependencies are absent.
+- Added standalone component manager/record fallbacks for optional CRM integrations that currently require `html2text`, Redis, AIOHTTP, legacy Flask-AppBuilder widgets, or broken predictive-analytics syntax.
+- Preserved the real integration imports when dependencies are available, while allowing core CRM account/lead/opportunity/activity behavior to execute in the standalone checkout.
+- Extended focused CRM tests to cover `CRMService` construction and service-level lead create/update through the memory-backed database manager.
+
+Battery-conscious verification:
+
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 3 passed, 8 existing deprecation warnings
+- `.venv/bin/python -m py_compile capabilities/crm/adv/service.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/python - <<'PY' ... from capabilities.crm.adv.service import CRMService; CRMService() ... PY` -> constructed service with standalone optional managers
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

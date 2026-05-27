@@ -15,6 +15,7 @@ from capabilities.crm.adv.models import (
 	LeadStatus,
 	OpportunityStage,
 )
+from capabilities.crm.adv.service import CRMService
 
 
 def test_crm_package_imports_reserved_sales_forecasting_module():
@@ -98,5 +99,35 @@ def test_crm_adv_records_work_without_postgres_pool():
 			)
 		)
 		assert activity.related_to_id == opportunity.id
+
+	asyncio.run(exercise())
+
+
+def test_crm_service_imports_with_optional_integrations_absent():
+	async def exercise():
+		service = CRMService()
+
+		assert type(service.email_integration_manager).__name__ == "EmailIntegrationManager"
+		assert type(service.realtime_sync).__name__ == "RealTimeSyncEngine"
+
+		lead = await service.create_lead(
+			{
+				"first_name": "Maya",
+				"last_name": "Buyer",
+				"email": "maya@example.com",
+				"lead_source": LeadSource.REFERRAL,
+			},
+			"tenant-service",
+			"seller-1",
+		)
+		updated = await service.update_lead(
+			lead.id,
+			{"lead_status": LeadStatus.QUALIFIED},
+			"tenant-service",
+			"seller-2",
+		)
+
+		assert updated.lead_status == LeadStatus.QUALIFIED
+		assert updated.version == 2
 
 	asyncio.run(exercise())
