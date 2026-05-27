@@ -136,7 +136,14 @@ def test_composable_capability_docs_do_not_advertise_framework_runtime():
 			if not path.endswith(("README.md", "API.md", "requirements.txt", "capability.json", ".py")):
 				continue
 		elif path.startswith("templates/composable/bases/"):
-			if not path.endswith(("README.md.template", "requirements.txt.template", "__init__.py.template", "base.json")):
+			if not path.endswith((
+				"README.md.template",
+				"requirements.txt.template",
+				"__init__.py.template",
+				"app.py.template",
+				"config.py.template",
+				"base.json",
+			)):
 				continue
 		else:
 			continue

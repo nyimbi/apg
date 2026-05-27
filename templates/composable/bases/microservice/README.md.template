@@ -102,9 +102,8 @@ docker run -p 8080:8080 {{project_name}}
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SECRET_KEY` | Flask secret key | Development key |
+| `SECRET_KEY` | APG secret key | Development key |
 | `DATABASE_URL` | Database connection URL | SQLite database |
-| `FLASK_ENV` | Flask environment | production |
 
 ## Support
 

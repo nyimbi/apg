@@ -3826,6 +3826,24 @@ Battery-conscious verification:
 - `git diff --check` -> no issues.
 - Deferred pytest at the user's request to conserve battery.
 
+### 2026-05-27 07:38 EAT
+
+Completed checkpoint:
+
+- Converted checked-in composable base `app.py.template` files to dependency-light Python application descriptors.
+- Converted checked-in composable base `config.py.template` files to standard-library configuration modules without framework auth/database imports.
+- Updated the composable base-template generator so newly generated base app/config templates use the same Python descriptor and config pattern.
+- Extended composable template regression coverage to render and compile checked-in base config templates as well as app templates.
+- Extended repository hygiene coverage to include composable base app/config templates.
+
+Battery-conscious verification:
+
+- `python -m py_compile templates/composable/base_template.py tests/test_repository_hygiene.py tests/test_composable_template_executable_defaults.py`
+- Render/compile script compiled all 5 checked-in composable base `app.py.template` files and all 5 `config.py.template` files.
+- `rg -n "Flask-AppBuilder|flask_appbuilder|FastAPI|fastapi|Flask-SocketIO|uvicorn|eventlet|from flask|python app.py|http://localhost:8080|FLASK_ENV|AUTH_DB|SQLALCHEMY" templates/composable/bases templates/composable/base_template.py --glob 'app.py.template' --glob 'config.py.template' --glob 'base.json' --glob 'README.md.template' --glob 'requirements.txt.template' --glob '__init__.py.template' tests/test_repository_hygiene.py` -> only enum identifiers and hygiene constants remain.
+- `git diff --check` -> no issues.
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 07:13 EAT
 
 Completed checkpoint:
