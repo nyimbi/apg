@@ -25,7 +25,6 @@ STREAMING_TERM_EXCLUDED_PREFIXES = (
 )
 STREAMING_TERM_EXCLUDED_PATHS = {
 	"docs/progress_log.md",
-	"fab/flask_appbuilder/static/appbuilder/js/swagger-ui-bundle.js",
 	"tests/test_repository_hygiene.py",
 }
 PYTHON_TEMPLATE_FORBIDDEN_TERMS = (
@@ -76,6 +75,17 @@ def _tracked_files() -> list[str]:
 	return result.stdout.splitlines()
 
 
+def _tracked_index_entries() -> list[str]:
+	result = subprocess.run(
+		["git", "ls-files", "--stage"],
+		cwd=REPO_ROOT,
+		check=True,
+		capture_output=True,
+		text=True,
+	)
+	return result.stdout.splitlines()
+
+
 def test_generated_cache_artifacts_are_not_tracked():
 	forbidden = [
 		path for path in _tracked_files()
@@ -109,6 +119,19 @@ def test_root_dependency_files_stay_python_first():
 	}
 
 	assert sorted(forbidden.intersection(_tracked_files())) == []
+
+
+def test_legacy_framework_submodules_are_not_tracked():
+	tracked = set(_tracked_files())
+	assert "fab" not in tracked
+	assert ".gitmodules" not in tracked
+
+	gitlinks = [
+		entry.rsplit("\t", 1)[-1] for entry in _tracked_index_entries()
+		if entry.startswith("160000 ")
+	]
+
+	assert "fab" not in gitlinks
 
 
 def test_package_metadata_does_not_install_framework_targets_by_default():

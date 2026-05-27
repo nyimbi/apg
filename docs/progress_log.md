@@ -78,6 +78,20 @@ Next concrete slice:
 - Resolve the moved-test collection blockers by routing or implementing the missing runtime surfaces: `uuid_extensions`, `numpy`, `agents`, and `capabilities.edge_computing`.
 - Audit the unrelated dirty capability worktree before staging any further capability changes.
 
+### 2026-05-27 12:58 EAT
+
+Completed checkpoint:
+
+- Removed the tracked root `fab` gitlink to the external Flask-AppBuilder checkout.
+- Removed `.gitmodules` because it only described the stale `fab` submodule.
+- Tightened repository hygiene coverage so legacy framework submodules and gitlinks are rejected.
+
+Verification planned before commit:
+
+- Run the focused repository hygiene test.
+- Check the staged diff and whitespace.
+- Stage only the submodule removal, hygiene test, and progress-log update.
+
 ### 2026-05-26 02:25 EAT
 
 In progress:
