@@ -99,6 +99,31 @@ def test_capability_declaration_generates_runtime_manifest():
     assert capability.provides == ["journal_entries", "chart_of_accounts", "financial_periods"]
     assert namespace["capabilities_by_erp_module"]()["general_ledger"][0].name == "GeneralLedger"
     assert namespace["provided_services"]()["journal_entries"] == ["GeneralLedger"]
+    rule_names = [rule["name"] for rule in namespace["capability_rules"]("GeneralLedger")]
+    assert rule_names == ["posting_period_open", "balanced_journal"]
+
+    denied_by_contract = namespace["evaluate_capability_rules"](
+        "GeneralLedger",
+        {"debits": 100, "credits": 90, "period": {"closed": False}},
+    )
+    assert denied_by_contract["decision"] == "deny"
+    assert denied_by_contract["matched_rules"] == ["balanced_journal"]
+    assert denied_by_contract["actions"][0]["action"] == "deny"
+
+    denied_by_business_rule = namespace["evaluate_capability_rules"](
+        "GeneralLedger",
+        {"debits": 100, "credits": 100, "period": {"closed": True}},
+    )
+    assert denied_by_business_rule["decision"] == "deny"
+    assert denied_by_business_rule["matched_rules"] == ["posting_period_open"]
+
+    allowed = namespace["evaluate_capability_rules"](
+        "GeneralLedger",
+        {"debits": 100, "credits": 100, "period": {"closed": False}},
+    )
+    assert allowed["decision"] == "allow"
+    assert allowed["matched_rules"] == []
+
     assert namespace["capability_screens"]("GeneralLedger") == [
         {
             "id": "GeneralLedger.Journals",

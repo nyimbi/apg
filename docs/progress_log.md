@@ -3648,3 +3648,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_apg_language_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 19 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 06:07 EAT
+
+Completed checkpoint:
+
+- Made compiled APG capability rules executable from the generated `apg_capabilities.py` manifest.
+- Added `capability_rules()` and `evaluate_capability_rules()` helpers that support both deterministic `condition`/`effect` rule shapes and terse APG `when`/`action` business rules.
+- Added a small dependency-free condition evaluator for equality, inequality, ordering comparisons, boolean path checks, negation, literals, and dotted context paths.
+- Extended capability composition regressions to execute balanced-journal and closed-period rules from the generated manifest and verify allow/deny outcomes.
+
+Verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_apg_language_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 19 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

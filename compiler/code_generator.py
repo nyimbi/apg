@@ -353,6 +353,134 @@ def validate_capability_contracts() -> Dict[str, Any]:
     return {{"errors": errors, "warnings": warnings}}
 
 
+def capability_rules(capability_name: str) -> List[Dict[str, Any]]:
+    capability = get_capability(capability_name)
+    rules: List[Dict[str, Any]] = []
+    for source, source_rules in (
+        ("contract", capability.rules),
+        ("business", capability.business_rules),
+        ("engine", capability.rule_engine.get("rules", [])),
+    ):
+        if not isinstance(source_rules, list):
+            continue
+        for index, rule in enumerate(source_rules):
+            if not isinstance(rule, dict):
+                continue
+            normalized = dict(rule)
+            normalized.setdefault("name", f"{{source}}_rule_{{index + 1}}")
+            normalized.setdefault("source", source)
+            normalized.setdefault("priority", 0)
+            if "condition" not in normalized and "when" in normalized:
+                normalized["condition"] = normalized["when"]
+            if "effect" not in normalized:
+                action = normalized.get("action", "allow")
+                normalized["effect"] = {{
+                    "decision": _decision_from_action(action),
+                    "action": action,
+                }}
+            rules.append(normalized)
+    return sorted(rules, key=lambda rule: int(rule.get("priority") or 0), reverse=True)
+
+
+def evaluate_capability_rules(capability_name: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    matched: List[str] = []
+    actions: List[Dict[str, Any]] = []
+    decision = "allow"
+    precedence = {{"allow": 0, "audit": 1, "warn": 1, "require_review": 2, "deny": 3}}
+    for rule in capability_rules(capability_name):
+        if not _matches_rule(rule, context):
+            continue
+        matched.append(str(rule["name"]))
+        effect = dict(rule.get("effect") or {{}})
+        effect.setdefault("decision", _decision_from_action(effect.get("action", rule.get("action", "allow"))))
+        effect.setdefault("rule", rule["name"])
+        actions.append(effect)
+        candidate = str(effect.get("decision") or "allow")
+        if precedence.get(candidate, 0) > precedence.get(decision, 0):
+            decision = candidate
+    return {{"decision": decision, "matched_rules": matched, "actions": actions, "context": context}}
+
+
+def _matches_rule(rule: Dict[str, Any], context: Dict[str, Any]) -> bool:
+    condition = rule.get("condition")
+    if condition is None:
+        return False
+    if isinstance(condition, dict):
+        for key, expected in condition.items():
+            if _resolve_value(str(key), context) != expected:
+                return False
+        return True
+    if isinstance(condition, bool):
+        return condition
+    return _evaluate_condition(str(condition), context)
+
+
+def _evaluate_condition(expression: str, context: Dict[str, Any]) -> bool:
+    expression = expression.strip()
+    if not expression:
+        return False
+    if expression.startswith("not "):
+        return not bool(_resolve_value(expression[4:].strip(), context))
+    for operator in ("!=", "==", ">=", "<=", ">", "<"):
+        marker = f" {{operator}} "
+        if marker not in expression:
+            continue
+        left_text, right_text = expression.split(marker, 1)
+        left = _resolve_value(left_text.strip(), context)
+        right = _resolve_value(right_text.strip(), context)
+        if operator == "!=":
+            return left != right
+        if operator == "==":
+            return left == right
+        if operator == ">=":
+            return left >= right
+        if operator == "<=":
+            return left <= right
+        if operator == ">":
+            return left > right
+        if operator == "<":
+            return left < right
+    return bool(_resolve_value(expression, context))
+
+
+def _resolve_value(value: str, context: Dict[str, Any]) -> Any:
+    value = value.strip()
+    if value in context:
+        return context[value]
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+    if value.lower() in {{"none", "null"}}:
+        return None
+    if (value.startswith("'") and value.endswith("'")) or (value.startswith('"') and value.endswith('"')):
+        return value[1:-1]
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    current: Any = context
+    for part in value.split("."):
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            return value
+    return current
+
+
+def _decision_from_action(action: Any) -> str:
+    if isinstance(action, dict):
+        return str(action.get("decision", "allow"))
+    action_text = str(action)
+    if action_text in {{"allow", "deny", "require_review", "warn", "audit"}}:
+        return action_text
+    return "allow"
+
+
 def capability_screens(capability_name: str) -> List[Dict[str, Any]]:
     capability = get_capability(capability_name)
     routes = capability.ui.get("routes", [])
