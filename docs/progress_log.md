@@ -4540,6 +4540,22 @@ Commit result:
 
 - Pushed commit `2995b2b` (`Make CRM health metrics executable`) to `origin/main`.
 
+### 2026-05-27 18:40 EAT
+
+Completed checkpoint:
+
+- Replaced the CRM time-tracking clock-in placeholder endpoint with a service-backed clock-in operation.
+- Added in-memory tenant-scoped time-entry storage for standalone CRM execution, including user, timestamp, work date, location, device, notes, and active status.
+- Extended CRM operational metrics to include tenant-scoped time-entry counts.
+- Extended focused CRM API coverage to assert clock-in output and metrics integration.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/adv/database.py capabilities/crm/adv/service.py capabilities/crm/adv/api.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 5 passed, 9 existing deprecation warnings
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.
+
 Commit result:
 
 - Pushed commit `15ff339` (`Make CRM listing APIs executable`) to `origin/main`.

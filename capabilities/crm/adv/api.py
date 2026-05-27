@@ -823,7 +823,7 @@ async def get_pipeline_analytics(
 
 
 # ================================
-# Time Tracking Integration (Placeholder)
+# Time Tracking Integration
 # ================================
 
 @app.post("/time-tracking/clock-in", response_model=APIResponse)
@@ -833,16 +833,25 @@ async def clock_in(
 	tenant_id: str = Depends(get_tenant_id),
 	user_id: str = Depends(get_user_id)
 ):
-	"""Clock in for time tracking - placeholder endpoint"""
-	return APIResponse(
-		message="Time tracking integration placeholder",
-		data={
-			"user_id": user_id,
-			"tenant_id": tenant_id,
-			"timestamp": datetime.utcnow().isoformat(),
-			"message": "Time tracking integration coming soon"
-		}
-	)
+	"""Clock in for time tracking."""
+	try:
+		entry = await service.clock_in(
+			tenant_id=tenant_id,
+			user_id=user_id,
+			location=clock_in_data.location,
+			device_info=clock_in_data.device_info,
+			notes=clock_in_data.notes
+		)
+		return APIResponse(
+			message="Clock-in recorded successfully",
+			data=entry
+		)
+	except Exception as e:
+		logger.error(f"Clock-in failed: {str(e)}", exc_info=True)
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail="Clock-in failed"
+		)
 
 
 # ================================

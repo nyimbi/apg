@@ -14,6 +14,7 @@ import logging
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import Dict, List, Any, Optional, Union, Tuple
+from uuid import uuid4
 import json
 
 from pydantic import ValidationError
@@ -280,6 +281,7 @@ class CRMService:
 		self.third_party_integration = ThirdPartyIntegrationManager(self.db_manager.get_connection_pool())
 		self.realtime_sync = RealTimeSyncEngine(self.db_manager.get_connection_pool())
 		self.api_versioning = APIVersioningManager(self.db_manager.get_connection_pool())
+		self._time_tracking_entries: Dict[str, Dict[str, Any]] = {}
 		self._initialized = False
 	
 	async def initialize(self):
@@ -411,13 +413,41 @@ class CRMService:
 					"accounts": account_count,
 					"leads": lead_count,
 					"opportunities": opportunity_count,
-					"activities": activity_count
+					"activities": activity_count,
+					"time_entries": len([
+						entry for entry in self._time_tracking_entries.values()
+						if entry["tenant_id"] == tenant_id
+					])
 				},
 				"components": health.get("components", {})
 			}
 		except Exception as e:
 			logger.error(f"Operational metrics failed: {str(e)}", exc_info=True)
 			raise CRMServiceError(f"Operational metrics failed: {str(e)}")
+
+	async def clock_in(
+		self,
+		tenant_id: str,
+		user_id: str,
+		location: Dict[str, float] = None,
+		device_info: Dict[str, Any] = None,
+		notes: str = None
+	) -> Dict[str, Any]:
+		"""Create a tenant-scoped active time-tracking entry."""
+		now = datetime.utcnow()
+		entry = {
+			"id": str(uuid4()),
+			"tenant_id": tenant_id,
+			"user_id": user_id,
+			"clock_in_at": now.isoformat(),
+			"work_date": now.date().isoformat(),
+			"status": "clocked_in",
+			"location": location or {},
+			"device_info": device_info or {},
+			"notes": notes,
+		}
+		self._time_tracking_entries[entry["id"]] = entry
+		return dict(entry)
 	
 	# ================================
 	# Contact Management

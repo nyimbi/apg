@@ -238,6 +238,16 @@ def test_crm_api_lists_core_records_without_placeholders():
 			tenant_id="tenant-api",
 		)
 		health = await crm_api.health_check(service=service)
+		clock_in = await crm_api.clock_in(
+			clock_in_data=crm_api.ClockInRequest(
+				location={"latitude": -1.286389, "longitude": 36.817223},
+				device_info={"device": "test-terminal"},
+				notes="Start field sales route",
+			),
+			service=service,
+			tenant_id="tenant-api",
+			user_id="seller-1",
+		)
 		metrics = await crm_api.get_metrics(service=service, tenant_id="tenant-api")
 
 		assert [item["id"] for item in accounts.data["items"]] == [account.id]
@@ -249,12 +259,16 @@ def test_crm_api_lists_core_records_without_placeholders():
 		assert opportunities.data["items"][0]["expected_revenue"] == "45000.000"
 		assert [item["id"] for item in activities.data["items"]] == [activity.id]
 		assert health.uptime_seconds >= 0
+		assert clock_in.data["status"] == "clocked_in"
+		assert clock_in.data["tenant_id"] == "tenant-api"
+		assert clock_in.data["user_id"] == "seller-1"
 		assert metrics.data["record_counts"] == {
 			"contacts": 0,
 			"accounts": 1,
 			"leads": 1,
 			"opportunities": 1,
 			"activities": 1,
+			"time_entries": 1,
 		}
 
 	asyncio.run(exercise())
