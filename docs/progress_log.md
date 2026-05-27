@@ -4658,3 +4658,7 @@ Battery-conscious verification:
 - `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 7 passed, 9 existing deprecation warnings
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pushed commit `7fd67f5` (`Make CRM contact import export executable`) to `origin/main`.
