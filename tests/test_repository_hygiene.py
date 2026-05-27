@@ -87,7 +87,10 @@ def test_top_level_generated_and_capability_tests_stay_out_of_source_roots():
 def test_project_templates_describe_python_artifact_flow():
 	violations: list[str] = []
 	for path in _tracked_files():
-		if not path.startswith("templates/templates/"):
+		if not (
+			path.startswith("templates/templates/")
+			or path.startswith("templates/application_templates/basic/")
+		):
 			continue
 		if not path.endswith((".md.template", ".txt.template", ".py.template", ".json")):
 			continue

@@ -3822,6 +3822,24 @@ Battery-conscious verification:
 - `git diff --check` -> no issues
 - Deferred pytest and broader verification at the user's request to conserve battery.
 
+### 2026-05-27 07:07 EAT
+
+Completed checkpoint:
+
+- Aligned the `templates/application_templates/basic/*` family with the Python artifact flow.
+- Replaced Flask-AppBuilder requirements in the basic application templates with the standard-library-only Python target note.
+- Updated basic template README run instructions to use `python generated/app.py`.
+- Replaced the simple-agent `Web Dashboard` feature labels with `Python Manifest` in template metadata, app/config/model/view payloads, and README copy.
+- Extended the repository hygiene guard to cover `templates/application_templates/basic/` alongside `templates/templates/`.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_repository_hygiene.py`
+- `python -m json.tool` on the three basic application-template `template.json` files
+- `rg -n "Flask-AppBuilder|flask_appbuilder|python app.py|http://localhost:8080|Web Dashboard" templates/application_templates/basic templates/templates tests/test_repository_hygiene.py` -> only hygiene guard constants remain
+- `git diff --check` -> no issues
+- Deferred pytest and full template materialization at the user's request to conserve battery.
+
 ### 2026-05-27 06:53 EAT
 
 Completed checkpoint:

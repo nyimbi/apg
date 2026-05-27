@@ -18,9 +18,9 @@ ROUTES = [
         "feature": "Basic Methods"
     },
     {
-        "name": "web_dashboard",
-        "path": "/web-dashboard",
-        "feature": "Web Dashboard"
+        "name": "python_manifest",
+        "path": "/python-manifest",
+        "feature": "Python Manifest"
     }
 ]
 
@@ -33,7 +33,7 @@ def build_dashboard_payload(records: list[Any], agents: dict[str, Any], config: 
 	runtime_config = config or {}
 	return {
 		"title": runtime_config.get("project_name", "{{project_name}}"),
-		"summary": "Basic agent with simple methods and web interface",
+		"summary": "Basic agent with simple methods and Python manifest",
 		"record_count": len(records),
 		"agent_count": len(agents),
 		"routes": list_routes(),

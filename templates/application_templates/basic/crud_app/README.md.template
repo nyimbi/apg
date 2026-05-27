@@ -27,7 +27,7 @@ Complete Create, Read, Update, Delete application
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

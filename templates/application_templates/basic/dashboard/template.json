@@ -20,11 +20,7 @@
     "analytics_data",
     "metrics"
   ],
-  "requirements": [
-    "Flask-AppBuilder>=4.3.0",
-    "Flask>=2.3.0",
-    "SQLAlchemy>=2.0.0"
-  ],
+  "requirements": [],
   "variables": {
     "project_name": "{{project_name}}",
     "project_description": "{{project_description}}",

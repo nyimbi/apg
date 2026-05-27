@@ -2,7 +2,7 @@
 
 Generated from the APG **Simple Agent** template.
 
-Basic agent with simple methods and web interface
+Basic agent with simple methods and Python manifest
 
 ## Template
 
@@ -14,7 +14,7 @@ Basic agent with simple methods and web interface
 
 - Agent Runtime
 - Basic Methods
-- Web Dashboard
+- Python Manifest
 
 ## Agents
 
@@ -27,7 +27,7 @@ Basic agent with simple methods and web interface
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

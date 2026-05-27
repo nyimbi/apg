@@ -12,11 +12,11 @@ from views import build_dashboard_payload, list_routes
 
 TEMPLATE_ID = "basic/simple_agent"
 TEMPLATE_NAME = "Simple Agent"
-DESCRIPTION = "Basic agent with simple methods and web interface"
+DESCRIPTION = "Basic agent with simple methods and Python manifest"
 FEATURES = [
     "Agent Runtime",
     "Basic Methods",
-    "Web Dashboard"
+    "Python Manifest"
 ]
 DATABASES = [
     "simple_data"

@@ -1,7 +1,7 @@
 {
   "template_id": "basic/simple_agent",
   "name": "Simple Agent",
-  "description": "Basic agent with simple methods and web interface",
+  "description": "Basic agent with simple methods and Python manifest",
   "complexity": "Beginner",
   "domain": "General",
   "version": "1.0.0",
@@ -13,16 +13,12 @@
   "features": [
     "Agent Runtime",
     "Basic Methods",
-    "Web Dashboard"
+    "Python Manifest"
   ],
   "databases": [
     "simple_data"
   ],
-  "requirements": [
-    "Flask-AppBuilder>=4.3.0",
-    "Flask>=2.3.0",
-    "SQLAlchemy>=2.0.0"
-  ],
+  "requirements": [],
   "variables": {
     "project_name": "{{project_name}}",
     "project_description": "{{project_description}}",

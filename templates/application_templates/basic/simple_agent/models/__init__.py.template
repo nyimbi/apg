@@ -20,8 +20,8 @@ SEED_ITEMS = [
         "Basic Methods"
     ],
     [
-        "web_dashboard",
-        "Web Dashboard"
+        "python_manifest",
+        "Python Manifest"
     ]
 ]
 

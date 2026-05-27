@@ -29,7 +29,7 @@ Real-time analytics dashboard with charts and metrics
 ## Run
 
 ```bash
-python app.py
+python generated/app.py
 ```
 
 ## Smoke Test

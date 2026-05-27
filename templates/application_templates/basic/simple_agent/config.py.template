@@ -18,7 +18,7 @@ class Config:
 	FEATURES = [
     "Agent Runtime",
     "Basic Methods",
-    "Web Dashboard"
+    "Python Manifest"
 ]
 	DATABASES = [
     "simple_data"
