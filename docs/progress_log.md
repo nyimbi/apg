@@ -4449,3 +4449,7 @@ Battery-conscious verification:
 - `.venv/bin/python - <<'PY' ... import capabilities.crm; from capabilities.crm.adv.database import DatabaseManager ... PY` -> CRM package and advanced database/models imported
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pushed commit `df2f9ac` (`Make CRM core records executable`) to `origin/main`.
