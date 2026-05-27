@@ -65,7 +65,7 @@ class APGProject:
 			"description": "APG Application",
 			"author": "",
 			"license": "MIT",
-			"target": "flask-appbuilder",
+			"target": "python",
 			"source_dir": "src",
 			"output_dir": "generated",
 			"main_file": "app.apg",
@@ -75,14 +75,13 @@ class APGProject:
 				"include_docs": True,
 				"optimize": False
 			},
-			"deployment": {
-				"host": "0.0.0.0",
-				"port": 8080,
-				"debug": True
+			"runtime": {
+				"command": "python generated/app.py",
+				"description": "Print generated application metadata as JSON"
 			},
 			"composable_templates": {
 				"enabled": True,
-				"base_template": "auto",  # "auto", "flask_webapp", "microservice", "api_only", "dashboard", "real_time"
+				"base_template": "auto",
 				"capabilities": {
 					"additional": [],  # Additional capabilities to include
 					"exclude": [],    # Capabilities to exclude
@@ -122,7 +121,7 @@ class APGCLICommands:
 		self.logger = logging.getLogger(__name__)
 		self.compiler = APGCompiler()
 	
-	def init_project(self, project_name: str, target: str = "flask-appbuilder", 
+	def init_project(self, project_name: str, target: str = "python",
 					template: Optional[str] = None) -> bool:
 		"""Initialize a new APG project"""
 		project_dir = Path.cwd() / project_name
@@ -165,7 +164,7 @@ class APGCLICommands:
 			print(f"\nNext steps:")
 			print(f"  cd {project_name}")
 			print(f"  apg build")
-			print(f"  apg serve")
+			print(f"  python generated/app.py")
 			
 			return True
 			
@@ -237,12 +236,8 @@ class APGCLICommands:
 				print(f"  Generated {total_files} files")
 				print(f"  Output: {output_dir}")
 				
-				# Show next steps
-				if project.config["target"] == "flask-appbuilder":
-					print(f"\nNext steps:")
-					print(f"  cd {output_dir}")
-					print(f"  pip install -r requirements.txt")
-					print(f"  python app.py")
+				print(f"\nNext steps:")
+				print(f"  python {output_dir / 'app.py'}")
 				
 				return True
 			else:
@@ -255,7 +250,7 @@ class APGCLICommands:
 	
 	def serve_project(self, project_dir: Path = None, host: str = None, 
 					 port: int = None, debug: bool = None) -> bool:
-		"""Serve the generated Flask-AppBuilder application"""
+		"""Run the generated Python artifact."""
 		project_dir = project_dir or Path.cwd()
 		project = APGProject(project_dir)
 		
@@ -270,34 +265,16 @@ class APGCLICommands:
 			print("✗ No generated application found. Run 'apg build' first.")
 			return False
 		
-		# Use project config or provided values
-		serve_host = host or project.config["deployment"]["host"]
-		serve_port = port or project.config["deployment"]["port"]
-		serve_debug = debug if debug is not None else project.config["deployment"]["debug"]
-		
 		try:
-			print(f"Starting APG application: {project.config['name']}")
-			print(f"  Host: {serve_host}")
-			print(f"  Port: {serve_port}")
-			print(f"  Debug: {serve_debug}")
-			print(f"  URL: http://{serve_host}:{serve_port}")
-			print("\nPress Ctrl+C to stop")
+			print(f"Running APG Python artifact: {project.config['name']}")
+			print(f"  File: {app_file}")
 			
 			# Change to output directory and run the app
 			original_cwd = os.getcwd()
 			os.chdir(output_dir)
 			
 			try:
-				# Set environment variables
-				env = os.environ.copy()
-				env.update({
-					"FLASK_HOST": serve_host,
-					"FLASK_PORT": str(serve_port),
-					"FLASK_DEBUG": "1" if serve_debug else "0"
-				})
-				
-				# Run the Flask app
-				subprocess.run([sys.executable, "app.py"], env=env, check=True)
+				subprocess.run([sys.executable, "app.py"], check=True)
 				return True
 				
 			finally:
@@ -307,10 +284,10 @@ class APGCLICommands:
 			print("\n✓ Application stopped")
 			return True
 		except subprocess.CalledProcessError as e:
-			print(f"✗ Application failed to start: {e}")
+			print(f"✗ Generated Python artifact failed: {e}")
 			return False
 		except Exception as e:
-			print(f"✗ Failed to serve application: {e}")
+			print(f"✗ Failed to run generated artifact: {e}")
 			return False
 	
 	def validate_project(self, project_dir: Path = None) -> bool:
@@ -447,8 +424,9 @@ class APGCLICommands:
 		print(f"Configuration:")
 		print(f"  Include tests: {config['build']['include_tests']}")
 		print(f"  Include docs:  {config['build']['include_docs']}")
-		print(f"  Host:         {config['deployment']['host']}")
-		print(f"  Port:         {config['deployment']['port']}")
+		runtime = config.get("runtime", {})
+		if runtime:
+			print(f"  Runtime:       {runtime.get('command', 'python generated/app.py')}")
 		
 		return True
 	
@@ -868,8 +846,8 @@ logs/
 *.sqlite
 *.sqlite3
 
-# Flask-AppBuilder
-app.db
+# Generated local data
+*.db
 '''
 		
 		gitignore_file = project_dir / ".gitignore"
@@ -897,16 +875,16 @@ APG (Application Programming Generation) project.
 
 3. **Run the application:**
    ```bash
-   apg serve
+   python generated/app.py
    ```
 
-4. **Access the application:**
-   Open http://localhost:8080 in your browser
+4. **Inspect the output:**
+   The generated artifact prints application metadata as JSON.
 
 ## Project Structure
 
 - `src/` - APG source files
-- `generated/` - Generated Flask-AppBuilder application
+- `generated/` - Generated Python application artifacts
 - `tests/` - Test files
 - `docs/` - Documentation
 - `apg.json` - Project configuration
@@ -914,19 +892,18 @@ APG (Application Programming Generation) project.
 ## APG Commands
 
 - `apg build` - Build the project
-- `apg serve` - Run the application
+- `apg serve` - Run the generated Python artifact
 - `apg validate` - Validate source code
 - `apg info` - Show project information
 
 ## Generated Application
 
-This project generates a Flask-AppBuilder web application with:
+This project generates dependency-light Python artifacts with:
 
-- Interactive dashboards for agents and workflows
-- RESTful API endpoints
-- Database management interfaces
-- User authentication and authorization
-- Responsive Bootstrap UI
+- Application metadata manifests
+- AI agent and team composition descriptors
+- Capability contract descriptors
+- Standard-library runtime entrypoints
 
 ## Development
 
@@ -954,7 +931,7 @@ def create_parser() -> argparse.ArgumentParser:
 Examples:
   apg init myapp                    # Create new APG project
   apg build                         # Build current project
-  apg serve                         # Run the generated application
+  apg serve                         # Run generated Python artifact
   apg validate                      # Validate source code
   apg info                          # Show project information
 
@@ -971,8 +948,8 @@ For more help on specific commands, use:
 	# Init command
 	init_parser = subparsers.add_parser('init', help='Initialize new APG project')
 	init_parser.add_argument('name', help='Project name')
-	init_parser.add_argument('--target', '-t', default='flask-appbuilder',
-							choices=['flask-appbuilder'], help='Target framework')
+	init_parser.add_argument('--target', '-t', default='python',
+							choices=['python'], help='Target language')
 	init_parser.add_argument('--template', help='Project template')
 	
 	# Build command
@@ -981,11 +958,11 @@ For more help on specific commands, use:
 	build_parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
 	
 	# Serve command
-	serve_parser = subparsers.add_parser('serve', help='Run generated application')
-	serve_parser.add_argument('--host', default=None, help='Host address')
-	serve_parser.add_argument('--port', '-p', type=int, default=None, help='Port number')
-	serve_parser.add_argument('--debug', action='store_true', help='Enable debug mode')
-	serve_parser.add_argument('--no-debug', dest='debug', action='store_false', help='Disable debug mode')
+	serve_parser = subparsers.add_parser('serve', help='Run generated Python artifact')
+	serve_parser.add_argument('--host', default=None, help=argparse.SUPPRESS)
+	serve_parser.add_argument('--port', '-p', type=int, default=None, help=argparse.SUPPRESS)
+	serve_parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
+	serve_parser.add_argument('--no-debug', dest='debug', action='store_false', help=argparse.SUPPRESS)
 	
 	# Validate command
 	validate_parser = subparsers.add_parser('validate', help='Validate APG source code')

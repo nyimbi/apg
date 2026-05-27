@@ -3078,6 +3078,21 @@ Verification:
 - `rg -n "Flask>=|Flask-AppBuilder|Flask-SQLAlchemy|fastapi>=|uvicorn>=|SQLAlchemy>=|flask-appbuilder|Web Environment|WWW/HTTP" setup.py tests/test_repository_hygiene.py` -> only hygiene guard terms remain
 - `git diff --check -- setup.py tests/test_repository_hygiene.py` -> no issues
 
+### 2026-05-27 08:22 EAT
+
+Completed checkpoint:
+
+- Updated the legacy root `cli.py` scaffold/build/run path to default to the Python target instead of `flask-appbuilder`.
+- Replaced generated-project README and `.gitignore` content that described Flask-AppBuilder web output with Python artifact guidance.
+- Preserved root CLI capability-contract commands while adding scaffold regression coverage for Python-first config and README output.
+
+Verification:
+
+- `.venv/bin/python -m py_compile cli.py tests/test_cli_project_scaffold.py`
+- `.venv/bin/python -m pytest -q tests/test_cli_project_scaffold.py tests/test_cli_capability_contracts.py` -> 5 passed
+- `rg -n "flask-appbuilder|Flask-AppBuilder|flask_appbuilder|python app.py|http://localhost:8080|generated Flask|web application|Target framework|FLASK_|flask_webapp" cli.py tests/test_cli_project_scaffold.py` -> only negative assertions remain
+- `git diff --check -- cli.py tests/test_cli_project_scaffold.py` -> no issues
+
 ### 2026-05-27 02:07 EAT
 
 Completed checkpoint:
