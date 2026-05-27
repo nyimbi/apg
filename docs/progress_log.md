@@ -3450,3 +3450,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_registry_import_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 2 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:31 EAT
+
+Completed checkpoint:
+
+- Replaced Composition Registry mobile/offline full sync's canned capability and composition rows with online registry service-backed fetch and upsert paths.
+- Mobile sync now reads capabilities from `search_capabilities`, `list_capabilities`, or service feeds, and reads compositions from service methods, service feeds, or registry database sessions.
+- Incremental sync now filters online records by update/create timestamps and upserts changed rows without deleting unchanged offline data.
+- Added focused mobile full and incremental sync regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/mobile_service.py tests/test_composition_registry_mobile_sync.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_registry_mobile_sync.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 2 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
