@@ -114,3 +114,29 @@ def test_unknown_expression_default_is_valid_python_literal():
     generator = PythonCodeGenerator(CodeGenConfig(use_composable_templates=False))
 
     assert generator._generate_expression(Expression()) == "None"
+
+
+def test_hybrid_template_mode_uses_python_entity_catalog(monkeypatch):
+    module = ModuleDeclaration(
+        name="hybrid_runtime",
+        entities=[
+            EntityDeclaration(
+                entity_type=EntityType.AGENT,
+                name="Planner",
+                properties=[PropertyDeclaration("role", TypeAnnotation("str"))],
+                methods=[MethodDeclaration("plan")],
+            )
+        ],
+    )
+    generator = PythonCodeGenerator(
+        CodeGenConfig(use_composable_templates=True, template_output_mode="hybrid")
+    )
+
+    files = generator.generate(module)
+
+    assert "entities.py" in files
+    assert "views.py" not in files
+    assert "model_views.py" not in files
+    assert "Flask-AppBuilder" not in files["entities.py"]
+    assert "flask_appbuilder" not in files["entities.py"]
+    compile(files["entities.py"], "entities.py", "exec")

@@ -3826,6 +3826,22 @@ Battery-conscious verification:
 - `git diff --check` -> no issues.
 - Deferred pytest at the user's request to conserve battery.
 
+### 2026-05-27 07:43 EAT
+
+Completed checkpoint:
+
+- Removed the reachable hybrid compiler dependency on legacy generated `views.py` and `model_views.py` framework artifacts.
+- Hybrid composable generation now emits a dependency-free `entities.py` catalog for APG entity metadata.
+- Added a focused regression proving hybrid mode emits `entities.py`, does not emit `views.py` or `model_views.py`, and compiles the entity catalog.
+
+Battery-conscious verification:
+
+- `python -m py_compile compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
+- `.venv/bin/python` hybrid smoke generated composable output, asserted `entities.py` exists, asserted `views.py`/`model_views.py` are absent, and compiled `entities.py`.
+- `rg -n "_generate_legacy_entities|template_output_mode == \"hybrid\"|entities.py|model_views.py|views.py" compiler/code_generator.py tests/test_code_generator_executable_defaults.py`
+- `git diff --check` -> no issues.
+- Deferred pytest at the user's request to conserve battery.
+
 ### 2026-05-27 07:38 EAT
 
 Completed checkpoint:

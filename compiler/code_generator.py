@@ -162,10 +162,9 @@ class PythonCodeGenerator:
 				# Return only model files for integration with existing apps
 				return {k: v for k, v in generated_files.items() if 'model' in k.lower()}
 			elif self.config.template_output_mode == "hybrid":
-				# Combine template system with legacy entity generation
+				# Combine template system with dependency-free entity metadata.
 				template_files = generated_files
-				legacy_files = self._generate_legacy_entities(ast)
-				template_files.update(legacy_files)
+				template_files.update(self._generate_python_entity_catalog_files(ast))
 				return template_files
 			else:
 				# Return complete application
@@ -261,15 +260,40 @@ if __name__ == "__main__":
 # The default compiler target uses only the Python standard library.
 """
 
-	def _generate_legacy_entities(self, ast: ModuleDeclaration) -> Dict[str, str]:
-		"""Generate the legacy entity files used by hybrid template mode."""
+	def _generate_python_entity_catalog_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Generate dependency-free entity metadata for hybrid template mode."""
+		return {"entities.py": self._generate_python_entity_catalog(ast)}
 
-		files = {"views.py": self._generate_views(ast)}
-		for entity in ast.entities:
-			if entity.entity_type == EntityType.DATABASE:
-				files["models.py"] = self._generate_database_models(entity)
-				files["model_views.py"] = self._generate_model_views(entity)
-		return files
+	def _generate_python_entity_catalog(self, module: ModuleDeclaration) -> str:
+		"""Generate a framework-neutral entity catalog module."""
+		entity_specs = [
+			{
+				"name": entity.name,
+				"type": entity.entity_type.value,
+				"properties": [property.name for property in entity.properties],
+				"methods": [method.name for method in entity.methods],
+			}
+			for entity in module.entities
+		]
+		return f'''"""
+{module.name} Entity Catalog
+{"=" * (len(module.name) + 15)}
+
+Generated APG entity metadata for composable hybrid output.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict
+
+
+ENTITIES = {entity_specs!r}
+
+
+def list_entities() -> list[Dict[str, Any]]:
+    """Return APG entity metadata for composition adapters."""
+    return [dict(entity) for entity in ENTITIES]
+'''
 	
 	def _generate_legacy_flask_app(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Legacy Flask-AppBuilder generation method"""
