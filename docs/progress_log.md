@@ -4474,3 +4474,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `e50b8d3` (`Keep CRM service importable standalone`) to `origin/main`.
+
+### 2026-05-27 18:00 EAT
+
+Completed checkpoint:
+
+- Added standalone CRM support shims for optional adapter modules that need response/error types, Redis-like clients, or AIOHTTP-like clients.
+- Made CRM optional modules importable in the standalone checkout: email integration, predictive analytics, performance benchmarking, API gateway, webhook management, third-party integration, real-time sync, and API versioning.
+- Fixed the predictive analytics non-default-argument syntax error.
+- Replaced direct legacy `views.py` imports with model/support fallbacks where optional modules only needed CRM response/error/model types.
+- Added missing Pipedrive, Zapier, and webhook third-party integration handlers that route through the generic REST adapter.
+- Extended focused CRM tests to assert all repaired optional modules import.
+
+Battery-conscious verification:
+
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 4 passed, 8 existing deprecation warnings
+- `.venv/bin/python -m py_compile capabilities/crm/adv/standalone_support.py capabilities/crm/adv/email_integration.py capabilities/crm/adv/predictive_analytics.py capabilities/crm/adv/performance_benchmarking.py capabilities/crm/adv/api_gateway.py capabilities/crm/adv/webhook_management.py capabilities/crm/adv/third_party_integration.py capabilities/crm/adv/realtime_sync.py capabilities/crm/adv/api_versioning.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/python - <<'PY' ... import optional CRM modules ... PY` -> all repaired optional modules imported
+- `.venv/bin/python - <<'PY' ... CRMService() ... PY` -> constructed with real repaired optional modules where available
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

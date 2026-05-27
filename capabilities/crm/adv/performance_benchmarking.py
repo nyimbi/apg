@@ -24,15 +24,19 @@ import pandas as pd
 from pydantic import BaseModel, Field, validator
 from uuid_extensions import uuid7str
 
-from .views import (
-	CRMResponse, 
-	PaginationParams, 
-	CRMError,
-	CRMContact,
-	CRMLead,
-	CRMOpportunity,
-	CRMAccount
-)
+try:
+	from .views import (
+		CRMResponse,
+		PaginationParams,
+		CRMError,
+		CRMContact,
+		CRMLead,
+		CRMOpportunity,
+		CRMAccount
+	)
+except Exception:
+	from .models import CRMAccount, CRMContact, CRMLead, CRMOpportunity
+	from .standalone_support import CRMError, CRMResponse, PaginationParams
 
 
 logger = logging.getLogger(__name__)

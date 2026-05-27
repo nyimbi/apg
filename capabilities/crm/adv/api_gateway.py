@@ -19,15 +19,21 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 from uuid import uuid4
 import hashlib
-import redis.asyncio as aioredis
+try:
+	import redis.asyncio as aioredis
+except ModuleNotFoundError:
+	from .standalone_support import NoOpRedisModule as aioredis
 
 from fastapi import FastAPI, Request, Response, HTTPException, Depends
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
 from uuid_extensions import uuid7str
 
-from .views import CRMResponse, CRMError
+try:
+	from .views import CRMResponse, CRMError
+except Exception:
+	from .standalone_support import CRMResponse, CRMError
 
 
 logger = logging.getLogger(__name__)

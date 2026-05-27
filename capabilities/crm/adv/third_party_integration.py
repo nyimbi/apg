@@ -19,14 +19,24 @@ import base64
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 from enum import Enum
-import aiohttp
-from aiohttp import ClientTimeout, BasicAuth
+try:
+	import aiohttp
+	from aiohttp import ClientTimeout, BasicAuth
+except ModuleNotFoundError:
+	from .standalone_support import (
+		NoOpAiohttpModule as aiohttp,
+		NoOpBasicAuth as BasicAuth,
+		NoOpClientTimeout as ClientTimeout,
+	)
 import jwt
 
 from pydantic import BaseModel, Field, validator, HttpUrl
 from uuid_extensions import uuid7str
 
-from .views import CRMResponse, CRMError
+try:
+	from .views import CRMResponse, CRMError
+except Exception:
+	from .standalone_support import CRMResponse, CRMError
 
 
 logger = logging.getLogger(__name__)
@@ -722,6 +732,36 @@ class ThirdPartyIntegrationManager:
 		except Exception as e:
 			logger.error(f"HubSpot integration error: {str(e)}")
 			raise CRMError(f"HubSpot integration failed: {str(e)}")
+
+	async def _handle_pipedrive_integration(
+		self,
+		connector: IntegrationConnector,
+		operation: DataOperation,
+		entity_type: str,
+		data: Dict[str, Any]
+	) -> Dict[str, Any]:
+		"""Handle Pipedrive integration through the generic REST adapter."""
+		return await self._handle_rest_api_integration(connector, operation, entity_type, data)
+
+	async def _handle_zapier_integration(
+		self,
+		connector: IntegrationConnector,
+		operation: DataOperation,
+		entity_type: str,
+		data: Dict[str, Any]
+	) -> Dict[str, Any]:
+		"""Handle Zapier integration through the generic REST adapter."""
+		return await self._handle_rest_api_integration(connector, operation, entity_type, data)
+
+	async def _handle_webhook_integration(
+		self,
+		connector: IntegrationConnector,
+		operation: DataOperation,
+		entity_type: str,
+		data: Dict[str, Any]
+	) -> Dict[str, Any]:
+		"""Handle webhook integration through the generic REST adapter."""
+		return await self._handle_rest_api_integration(connector, operation, entity_type, data)
 
 	async def _handle_rest_api_integration(
 		self,

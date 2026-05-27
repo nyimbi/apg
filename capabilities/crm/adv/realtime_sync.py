@@ -20,13 +20,19 @@ from typing import Any, Dict, List, Optional, Tuple, Union, Callable, Set
 from enum import Enum
 import weakref
 from collections import defaultdict, deque
-import aioredis
+try:
+	import aioredis
+except ModuleNotFoundError:
+	from .standalone_support import NoOpRedisModule as aioredis
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field, validator
 from uuid_extensions import uuid7str
 
-from .views import CRMResponse, CRMError
+try:
+	from .views import CRMResponse, CRMError
+except Exception:
+	from .standalone_support import CRMResponse, CRMError
 
 
 logger = logging.getLogger(__name__)

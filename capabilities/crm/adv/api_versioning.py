@@ -23,7 +23,10 @@ from packaging import version as pkg_version
 from pydantic import BaseModel, Field, validator
 from uuid_extensions import uuid7str
 
-from .views import CRMResponse, CRMError
+try:
+	from .views import CRMResponse, CRMError
+except Exception:
+	from .standalone_support import CRMResponse, CRMError
 
 
 logger = logging.getLogger(__name__)

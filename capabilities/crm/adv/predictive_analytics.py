@@ -31,15 +31,19 @@ from sklearn.cluster import KMeans
 from sklearn.tree import DecisionTreeClassifier
 from uuid_extensions import uuid7str
 
-from .views import (
-	CRMResponse, 
-	PaginationParams, 
-	CRMError,
-	CRMContact,
-	CRMLead,
-	CRMOpportunity,
-	CRMAccount
-)
+try:
+	from .views import (
+		CRMResponse,
+		PaginationParams,
+		CRMError,
+		CRMContact,
+		CRMLead,
+		CRMOpportunity,
+		CRMAccount
+	)
+except Exception:
+	from .models import CRMAccount, CRMContact, CRMLead, CRMOpportunity
+	from .standalone_support import CRMError, CRMResponse, PaginationParams
 
 
 logger = logging.getLogger(__name__)
@@ -172,13 +176,13 @@ class PredictiveAnalyticsEngine:
 		name: str,
 		model_type: str,
 		algorithm: str,
-		target_variable: str,
-		feature_columns: List[str],
-		data_sources: List[str],
-		training_data_query: str,
-		hyperparameters: Optional[Dict[str, Any]] = None,
-		created_by: str,
-		description: Optional[str] = None
+			target_variable: str,
+			feature_columns: List[str],
+			data_sources: List[str],
+			training_data_query: str,
+			created_by: str,
+			hyperparameters: Optional[Dict[str, Any]] = None,
+			description: Optional[str] = None
 	) -> PredictionModel:
 		"""Create a new predictive model configuration"""
 		try:

@@ -19,14 +19,20 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 from uuid import uuid4
-import aiohttp
-from aiohttp import ClientTimeout
+try:
+	import aiohttp
+	from aiohttp import ClientTimeout
+except ModuleNotFoundError:
+	from .standalone_support import NoOpAiohttpModule as aiohttp, NoOpClientTimeout as ClientTimeout
 import jinja2
 
 from pydantic import BaseModel, Field, validator, HttpUrl
 from uuid_extensions import uuid7str
 
-from .views import CRMResponse, CRMError
+try:
+	from .views import CRMResponse, CRMError
+except Exception:
+	from .standalone_support import CRMResponse, CRMError
 
 
 logger = logging.getLogger(__name__)

@@ -25,8 +25,20 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 import json
-import html2text
 import hashlib
+
+try:
+	import html2text
+except ModuleNotFoundError:
+	class _SimpleHTMLToText:
+		body_width = 0
+		ignore_links = False
+
+		def handle(self, html: str) -> str:
+			return re.sub(r"<[^>]+>", "", html or "")
+
+	class html2text:
+		HTML2Text = _SimpleHTMLToText
 
 from pydantic import BaseModel, Field, validator
 

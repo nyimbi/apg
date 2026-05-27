@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -131,3 +132,20 @@ def test_crm_service_imports_with_optional_integrations_absent():
 		assert updated.version == 2
 
 	asyncio.run(exercise())
+
+
+def test_optional_crm_integration_modules_import_standalone():
+	modules = [
+		"email_integration",
+		"predictive_analytics",
+		"performance_benchmarking",
+		"api_gateway",
+		"webhook_management",
+		"third_party_integration",
+		"realtime_sync",
+		"api_versioning",
+	]
+
+	for module_name in modules:
+		module = importlib.import_module(f"capabilities.crm.adv.{module_name}")
+		assert module is not None
