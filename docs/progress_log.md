@@ -3498,3 +3498,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_registry_mobile_sync.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 5 passed, 2 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:49 EAT
+
+Completed checkpoint:
+
+- Replaced Composition Registry marketplace API's generated success placeholder with a real transport boundary.
+- Marketplace calls now use an injected API client when present, otherwise perform HTTP requests against the configured marketplace URL and API version with optional bearer authentication.
+- Marketplace submission responses now include the actual marketplace response, and marketplace sync update fetches now use the same transport instead of returning empty placeholder updates.
+- Added focused marketplace submission and sync transport regressions while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/marketplace.py tests/test_composition_registry_marketplace_transport.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_registry_marketplace_transport.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 2 existing SQLAlchemy/Pydantic deprecation warnings
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

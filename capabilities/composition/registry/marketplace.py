@@ -8,13 +8,14 @@ and distribution across the APG ecosystem.
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
-import asyncio
 import json
+import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from uuid_extensions import uuid7str
 from dataclasses import dataclass
 from enum import Enum
+import httpx
 
 from sqlalchemy import select, and_, or_, func, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -145,7 +146,8 @@ class MarketplaceIntegration:
 		self.marketplace_api_client = marketplace_api_client
 		
 		# Configuration
-		self.marketplace_url = "https://marketplace.apg.platform"
+		self.marketplace_url = os.getenv("APG_MARKETPLACE_URL", "https://marketplace.apg.platform")
+		self.marketplace_api_key = os.getenv("APG_MARKETPLACE_API_KEY")
 		self.api_version = "v1"
 		self.submission_cache: Dict[str, MarketplaceSubmission] = {}
 	
@@ -666,6 +668,7 @@ This capability depends on:
 					"review_status": submission.review_status.value,
 					"estimated_review_time_hours": submission.estimated_review_time,
 					"marketplace_url": f"{self.marketplace_url}/submissions/{submission.submission_id}",
+					"marketplace_response": marketplace_response,
 					"submission_time_ms": duration_ms
 				},
 				"errors": []
@@ -705,17 +708,70 @@ This capability depends on:
 		self,
 		endpoint: str,
 		method: str,
-		data: Dict[str, Any]
+		data: Optional[Dict[str, Any]] = None
 	) -> Dict[str, Any]:
-		"""Call marketplace API (placeholder implementation)."""
-		# In real implementation, this would make HTTP calls to marketplace API
-		await asyncio.sleep(0.1)  # Simulate network delay
-		
-		return {
-			"status": "success",
-			"response_id": uuid7str(),
-			"timestamp": datetime.utcnow().isoformat()
-		}
+		"""Call the configured marketplace API transport."""
+		payload = data or {}
+		method = method.upper()
+
+		if self.marketplace_api_client:
+			return await self._call_injected_marketplace_client(endpoint, method, payload)
+
+		url = self._marketplace_endpoint_url(endpoint)
+		headers = {"Content-Type": "application/json"}
+		if self.marketplace_api_key:
+			headers["Authorization"] = f"Bearer {self.marketplace_api_key}"
+
+		async with httpx.AsyncClient(timeout=30.0) as client:
+			response = await client.request(
+				method,
+				url,
+				json=payload if method not in {"GET", "DELETE"} else None,
+				params=payload if method in {"GET", "DELETE"} else None,
+				headers=headers
+			)
+			response.raise_for_status()
+			if not response.content:
+				return {
+					"status": "success",
+					"response_id": uuid7str(),
+					"timestamp": datetime.utcnow().isoformat()
+				}
+			return response.json()
+
+	async def _call_injected_marketplace_client(
+		self,
+		endpoint: str,
+		method: str,
+		payload: Dict[str, Any]
+	) -> Dict[str, Any]:
+		"""Call an injected marketplace client and normalize the response."""
+		client = self.marketplace_api_client
+		if hasattr(client, "request"):
+			result = client.request(method, self._marketplace_endpoint_url(endpoint), json=payload)
+		elif callable(client):
+			try:
+				result = client(endpoint=endpoint, method=method, data=payload)
+			except TypeError:
+				result = client(endpoint, method, payload)
+		else:
+			raise RuntimeError("Marketplace API client must be callable or expose request()")
+
+		if hasattr(result, "__await__"):
+			result = await result
+
+		if hasattr(result, "raise_for_status"):
+			result.raise_for_status()
+		if hasattr(result, "json"):
+			result = result.json()
+
+		if not isinstance(result, dict):
+			raise RuntimeError("Marketplace API client returned a non-object response")
+		return result
+
+	def _marketplace_endpoint_url(self, endpoint: str) -> str:
+		"""Build a marketplace endpoint URL from the base URL and API version."""
+		return f"{self.marketplace_url.rstrip('/')}/api/{self.api_version}/{endpoint.lstrip('/')}"
 	
 	def _serialize_publication_package(self, package: PublicationPackage) -> Dict[str, Any]:
 		"""Serialize publication package for API transmission."""
@@ -799,11 +855,15 @@ This capability depends on:
 	
 	async def _fetch_marketplace_updates(self) -> Dict[str, Any]:
 		"""Fetch updates from marketplace."""
-		# Placeholder implementation
+		response = await self._call_marketplace_api(
+			"updates",
+			"GET",
+			{"tenant_id": self.tenant_id}
+		)
 		return {
-			"capabilities": [],
-			"templates": [],
-			"last_updated": datetime.utcnow().isoformat()
+			"capabilities": response.get("capabilities", []),
+			"templates": response.get("templates", []),
+			"last_updated": response.get("last_updated", datetime.utcnow().isoformat())
 		}
 	
 	async def _process_capability_update(self, update: Dict[str, Any]):
