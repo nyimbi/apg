@@ -26,7 +26,7 @@ def test_generated_capability_structure_has_executable_defaults(tmp_path):
         version="1.0.0",
         features=["Rule Evaluation", "Status Reporting"],
         configuration={"threshold": 0.7},
-        compatible_bases=["flask_webapp"],
+        compatible_bases=["python_web"],
         integration=CapabilityIntegration(config_additions={"RISK_THRESHOLD": 0.7}),
     )
     manager = CapabilityManager(tmp_path)

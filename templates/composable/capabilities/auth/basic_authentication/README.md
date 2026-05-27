@@ -46,7 +46,7 @@ This capability can be configured through the following settings:
 
 This capability integrates with the following base templates:
 
-- flask_webapp
+- python_web
 - dashboard
 - real_time
 

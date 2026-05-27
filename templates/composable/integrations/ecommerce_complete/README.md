@@ -4,7 +4,7 @@ Full e-commerce platform with payments and inventory
 
 ## Components
 
-- **Base Template**: flask_webapp
+- **Base Template**: python_web
 - **Capabilities**: 5 capabilities
 
 ### Capabilities Included

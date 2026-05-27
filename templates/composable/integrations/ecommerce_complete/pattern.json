@@ -1,7 +1,7 @@
 {
   "name": "Complete E-Commerce",
   "description": "Full e-commerce platform with payments and inventory",
-  "base_template": "flask_webapp",
+  "base_template": "python_web",
   "capabilities": [
     "auth/basic_authentication",
     "payments/stripe_payments",

@@ -62,7 +62,7 @@
   ],
   "configuration": {},
   "compatible_bases": [
-    "flask_webapp",
+    "python_web",
     "dashboard",
     "microservice"
   ],

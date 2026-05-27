@@ -253,10 +253,10 @@ class APGASTAnalyzer:
         """Infer best base template based on characteristics"""
         hints = []
         
-        # Web application indicators
+        # Python web artifact indicators
         if (characteristics['agents'] or 
             any('auth' in cap for cap in characteristics['required_capabilities'])):
-            hints.append('flask_webapp')
+            hints.append('python_web')
         
         # API service indicators
         if any('api' in str(entity).lower() for entity in characteristics['agents']):
@@ -271,9 +271,9 @@ class APGASTAnalyzer:
         if any('websocket' in cap or 'realtime' in cap for cap in characteristics['required_capabilities']):
             hints.append('real_time')
         
-        # Default to web application
+        # Default to the Python web artifact base
         if not hints:
-            hints.append('flask_webapp')
+            hints.append('python_web')
         
         return hints
 
@@ -338,8 +338,8 @@ class CompositionEngine:
             except ValueError:
                 continue
         
-        # Default to flask_webapp
-        return self.base_manager.get_base_template(BaseTemplateType.FLASK_WEBAPP)
+        # Default to python_web
+        return self.base_manager.get_base_template(BaseTemplateType.PYTHON_WEB)
     
     def _select_capabilities(self, required_caps: List[str], base_template: BaseTemplate) -> List[Capability]:
         """Select and validate capabilities"""
@@ -866,7 +866,7 @@ def _matches(condition: Dict[str, Any], context: Dict[str, Any]) -> bool:
                 ],
             },
             "ui": {
-                "shell": "flask_appbuilder",
+                "shell": "apg_python",
                 "api_prefix": f"{route_prefix}/api/v1",
                 "routes": [
                     {"name": "dashboard", "path": f"{route_prefix}/dashboard", "component": "CapabilityDashboard", "permission": f"{record['id']}:view", "nav_group": "Overview"},

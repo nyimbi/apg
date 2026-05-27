@@ -66,7 +66,7 @@
   ],
   "configuration": {},
   "compatible_bases": [
-    "flask_webapp",
+    "python_web",
     "microservice",
     "real_time"
   ],

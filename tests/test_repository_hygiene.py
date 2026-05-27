@@ -235,6 +235,22 @@ def test_composable_model_and_view_templates_are_framework_neutral():
 	assert violations == []
 
 
+def test_composable_base_names_are_python_first():
+	violations: list[str] = []
+	for path in _tracked_files():
+		if not path.startswith("templates/composable/"):
+			continue
+		candidate = REPO_ROOT / path
+		if not candidate.is_file():
+			continue
+		content = candidate.read_text(encoding="utf-8", errors="ignore")
+		for term in ("flask_webapp", "FLASK_WEBAPP"):
+			if term in content:
+				violations.append(f"{path}: {term}")
+
+	assert violations == []
+
+
 def test_apg_streaming_runtime_stays_bytewax_native():
 	violations: list[str] = []
 

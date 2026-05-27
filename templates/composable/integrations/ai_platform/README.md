@@ -4,7 +4,7 @@ Complete AI platform with LLM, vector database, and analytics
 
 ## Components
 
-- **Base Template**: flask_webapp
+- **Base Template**: python_web
 - **Capabilities**: 5 capabilities
 
 ### Capabilities Included

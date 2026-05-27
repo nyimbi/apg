@@ -62,7 +62,7 @@
       "items": {
         "type": "string",
         "enum": [
-          "flask_webapp",
+          "python_web",
           "microservice",
           "api_only",
           "dashboard",

@@ -11,7 +11,7 @@ APG Application = Base Template + Capability Modules + Integration Layer
 ### Components
 
 1. **Base Templates** (4 core architectures)
-   - `flask_webapp`: Full-featured web application
+   - `python_web`: Python web artifact with APG capability contracts
    - `microservice`: Lightweight microservice
    - `api_only`: Pure API service
    - `dashboard`: Analytics dashboard
@@ -46,7 +46,7 @@ apg compile my_app.apg
 
 ```bash
 # Create project with specific base and capabilities
-apg create project --base flask_webapp --capabilities auth/basic ai/llm data/postgresql
+apg create project --base python_web --capabilities auth/basic ai/llm data/postgresql
 ```
 
 ### Integration Patterns
@@ -69,7 +69,7 @@ apg create project --pattern ai_platform
 ```
 templates/composable/
 ├── bases/                  # Base template architectures
-│   ├── flask_webapp/
+│   ├── python_web/
 │   ├── microservice/
 │   ├── api_only/
 │   ├── dashboard/

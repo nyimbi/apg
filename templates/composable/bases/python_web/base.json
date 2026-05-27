@@ -1,6 +1,6 @@
 {
   "name": "Python Web Artifact",
-  "type": "flask_webapp",
+  "type": "python_web",
   "description": "Full-featured Python web artifact with APG capability contracts",
   "framework": "python",
   "capabilities_supported": [

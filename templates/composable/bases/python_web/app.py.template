@@ -18,7 +18,7 @@ def create_app(config: Dict[str, Any] | None = None) -> Dict[str, Any]:
         "project": "{{project_name}}",
         "description": "{{project_description}}",
         "version": "{{version}}",
-        "base_template": "flask_webapp",
+        "base_template": "python_web",
         "framework": "python",
         "capabilities": CAPABILITIES,
         "config": dict(config or {}),

@@ -1,7 +1,7 @@
 {
   "name": "AI Platform",
   "description": "Complete AI platform with LLM, vector database, and analytics",
-  "base_template": "flask_webapp",
+  "base_template": "python_web",
   "capabilities": [
     "auth/basic_authentication",
     "ai/llm_integration",

@@ -70,7 +70,7 @@
   ],
   "configuration": {},
   "compatible_bases": [
-    "flask_webapp",
+    "python_web",
     "microservice"
   ],
   "incompatible_capabilities": []

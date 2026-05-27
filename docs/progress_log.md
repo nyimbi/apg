@@ -4207,3 +4207,21 @@ Battery-conscious verification:
 - `rg -n "Flask-AppBuilder|flask_appbuilder|from flask_appbuilder|SQLAInterface|AuditMixin|from sqlalchemy|sqlalchemy|Column\\(|relationship\\(|has_access" templates/composable/capabilities --glob 'models/__init__.py.template' --glob 'views/__init__.py.template'` -> no matches
 - `git diff --check` -> no issues
 - Deferred broad pytest at the user's request to conserve battery.
+
+### 2026-05-27 12:34 EAT
+
+Completed checkpoint:
+
+- Renamed the composable web base from `flask_webapp` to `python_web` across base metadata, schema, composition inference, integration patterns, capability compatibility metadata, docs, and focused tests.
+- Moved `templates/composable/bases/flask_webapp/` to `templates/composable/bases/python_web/`.
+- Updated the default composable UI shell metadata from `flask_appbuilder` to `apg_python`.
+- Added repository hygiene coverage to prevent the stale composable `flask_webapp` base name from returning.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile templates/composable/base_template.py templates/composable/composition_engine.py templates/composable/capability.py tests/test_repository_hygiene.py tests/test_composable_template_executable_defaults.py`
+- `.venv/bin/python -m pytest -q tests/test_composable_template_executable_defaults.py tests/test_repository_hygiene.py` -> 15 passed
+- `rg -n "flask_webapp|FLASK_WEBAPP|Flask-AppBuilder|flask_appbuilder" templates/composable tests/test_composable_template_executable_defaults.py` -> no matches
+- `find templates/composable/bases -maxdepth 1 -type d | sort` -> includes `templates/composable/bases/python_web` and no `flask_webapp` directory
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

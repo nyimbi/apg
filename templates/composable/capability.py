@@ -797,7 +797,7 @@ CORE_CAPABILITIES = [
         version="1.0.0",
         python_requirements=["WTForms>=3.0.0"],
         features=["User Registration", "Login/Logout", "Password Reset", "User Management"],
-        compatible_bases=["flask_webapp", "dashboard", "real_time"],
+        compatible_bases=["python_web", "dashboard", "real_time"],
         integration=CapabilityIntegration(
             models=["User", "Role", "Permission"],
             views=["UserView", "RoleView"],
@@ -827,7 +827,7 @@ CORE_CAPABILITIES = [
         version="1.0.0",
         python_requirements=["openai>=1.0.0", "anthropic>=0.3.0", "transformers>=4.30.0"],
         features=["Text Generation", "Chat Completion", "Embeddings", "Model Management"],
-        compatible_bases=["flask_webapp", "microservice", "api_only"],
+        compatible_bases=["python_web", "microservice", "api_only"],
         integration=CapabilityIntegration(
             models=["LLMModel", "Conversation", "Message"],
             views=["ChatView", "ModelView"],
@@ -844,7 +844,7 @@ CORE_CAPABILITIES = [
         python_requirements=["psycopg2-binary>=2.9.0"],
         system_requirements=["PostgreSQL 12+"],
         features=["Database Connectivity", "Migrations", "Connection Pooling"],
-        compatible_bases=["flask_webapp", "microservice", "dashboard"],
+        compatible_bases=["python_web", "microservice", "dashboard"],
         integration=CapabilityIntegration(
             config_additions={"DATABASE_URL": "postgresql://user:pass@localhost/db"}
         )
@@ -860,7 +860,7 @@ CORE_CAPABILITIES = [
             CapabilityDependency("data/postgresql", reason="Requires PostgreSQL with pgvector extension")
         ],
         features=["Vector Storage", "Similarity Search", "Embeddings Management"],
-        compatible_bases=["flask_webapp", "microservice"],
+        compatible_bases=["python_web", "microservice"],
         integration=CapabilityIntegration(
             models=["VectorDocument", "Embedding"],
             apis=["vector/search", "vector/store", "vector/similarity"]
@@ -875,7 +875,7 @@ CORE_CAPABILITIES = [
         version="1.0.0",
         python_requirements=["stripe>=7.0.0"],
         features=["Payment Processing", "Subscription Management", "Webhook Handling", "Refunds"],
-        compatible_bases=["flask_webapp", "microservice"],
+        compatible_bases=["python_web", "microservice"],
         integration=CapabilityIntegration(
             models=["Payment", "Subscription", "Customer"],
             views=["PaymentView", "SubscriptionView"],
@@ -890,7 +890,7 @@ CORE_CAPABILITIES = [
         description="Inventory tracking and management system",
         version="1.0.0",
         features=["Stock Tracking", "Low Stock Alerts", "Inventory Reports", "Supplier Management"],
-        compatible_bases=["flask_webapp", "dashboard"],
+        compatible_bases=["python_web", "dashboard"],
         integration=CapabilityIntegration(
             models=["Product", "Inventory", "Supplier", "StockMovement"],
             views=["InventoryView", "ProductView", "SupplierView"]
@@ -905,7 +905,7 @@ CORE_CAPABILITIES = [
         version="1.0.0",
         python_requirements=["plotly>=5.0.0", "pandas>=2.0.0"],
         features=["Dashboard Charts", "Data Visualization", "Report Generation", "KPI Tracking"],
-        compatible_bases=["flask_webapp", "dashboard"],
+        compatible_bases=["python_web", "dashboard"],
         integration=CapabilityIntegration(
             views=["AnalyticsView", "ChartsView", "ReportsView"],
             templates=["analytics_dashboard.html", "charts.html"]
@@ -920,7 +920,7 @@ CORE_CAPABILITIES = [
         version="1.0.0",
         python_requirements=[],
         features=["Real-time Messaging", "Room Management", "Event Broadcasting"],
-        compatible_bases=["real_time", "flask_webapp"],
+        compatible_bases=["real_time", "python_web"],
         integration=CapabilityIntegration(
             templates=["websocket_client.html"],
             static_files=["js/websocket.js"]
