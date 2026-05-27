@@ -8,11 +8,14 @@ from pathlib import Path
 
 
 CAPABILITIES_ROOT = Path(__file__).resolve().parents[1] / "capabilities"
-SPEC_FILES = sorted(CAPABILITIES_ROOT.glob("*/*/cap_spec.md"))
+SPEC_FILES = sorted(
+	path for path in CAPABILITIES_ROOT.glob("**/cap_spec.md")
+	if not {"docs", "works"}.intersection(path.relative_to(CAPABILITIES_ROOT).parts)
+)
 
 
 def _load_contract(path: Path):
-	module_name = "apg_spec_contract_" + "_".join(path.parent.parts[-2:])
+	module_name = "apg_spec_contract_" + "_".join(path.parent.parts[-4:])
 	spec = importlib.util.spec_from_file_location(module_name, path)
 	assert spec is not None
 	assert spec.loader is not None
@@ -23,7 +26,7 @@ def _load_contract(path: Path):
 
 
 def test_all_spec_backed_capabilities_have_executable_contracts():
-	assert len(SPEC_FILES) >= 49
+	assert len(SPEC_FILES) >= 57
 
 	missing = [
 		str(spec_path.parent)

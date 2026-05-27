@@ -215,6 +215,25 @@ Verification result:
 - `python -m json.tool templates/composable/capabilities/auth/role_based_access_control/capability.json` passed.
 - Focused stale-term scan over the changed report/template/RBAC metadata returned no matches.
 
+Commit result:
+
+- Pushed commit `45bc842` (`Make composable glue contract-native`).
+
+### 2026-05-27 17:15 EAT
+
+Completed checkpoint:
+
+- Added executable capability contracts for nested finance and HCM spec-backed capabilities:
+  accounts payable, accounts receivable, budgeting/forecasting, cash management, general ledger, employee data management, payroll, and time/attendance.
+- Expanded spec-backed contract coverage from two-level `capabilities/*/*/cap_spec.md` to recursive capability specs, excluding documentation/work scratch directories.
+
+Verification result:
+
+- `.venv/bin/python -m pytest -q tests/test_spec_capability_contracts.py tests/test_capability_contract_registry.py tests/test_capability_contract_public_api.py` passed with 10 tests.
+- `.venv/bin/python -m py_compile` passed for the eight new contracts and `tests/test_spec_capability_contracts.py`.
+- Recursive spec-to-contract inventory check returned no missing executable contracts outside docs/work scratch paths.
+- `git diff --check` for the finance/HCM contract slice passed.
+
 ### 2026-05-26 02:25 EAT
 
 In progress:
