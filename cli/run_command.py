@@ -136,7 +136,7 @@ def _run_single(app_path: Path, host: str, port: int, debug: bool):
 	console.print(Panel(f"[bold blue]APG Application Runner[/bold blue]", 
 					   subtitle=f"Starting {app_path}"))
 	
-	# Check whether the generated file has an executable entrypoint.
+	# Check whether the generated file has an executable Python entrypoint.
 	with open(app_path, 'r') as f:
 		content = f.read()
 	app_kind = _detect_application_kind(content)
@@ -147,19 +147,19 @@ def _run_single(app_path: Path, host: str, port: int, debug: bool):
 	
 	# Set environment variables
 	env = os.environ.copy()
-	env['FLASK_HOST'] = host
-	env['FLASK_PORT'] = str(port)
-	env['FLASK_DEBUG'] = '1' if debug else '0'
 	env['HOST'] = host
 	env['PORT'] = str(port)
+	env['APG_HOST'] = host
+	env['APG_PORT'] = str(port)
+	env['APG_DEBUG'] = '1' if debug else '0'
 	
-	console.print(f"[green]Starting APG application...[/green]")
+	console.print(f"[green]Starting APG Python artifact...[/green]")
 	console.print(f"[cyan]Host:[/cyan] {host}")
 	console.print(f"[cyan]Port:[/cyan] {port}")
 	console.print(f"[cyan]Debug:[/cyan] {'enabled' if debug else 'disabled'}")
 	console.print(f"[cyan]Application:[/cyan] {app_path}")
 	console.print(f"[cyan]Detected runtime:[/cyan] {app_kind}")
-	console.print(f"\n[green]Access at:[/green] http://{host}:{port}")
+	console.print(f"\n[green]Executing generated Python manifest[/green]")
 	console.print(f"[yellow]Press Ctrl+C to stop[/yellow]")
 	console.print("-" * 50)
 	
@@ -181,10 +181,6 @@ def _run_single(app_path: Path, host: str, port: int, debug: bool):
 
 def _detect_application_kind(content: str) -> Optional[str]:
 	"""Detect whether generated Python content has a runnable entrypoint."""
-	if 'app.run' in content or 'Flask(' in content or 'AppBuilder(' in content:
-		return 'flask'
-	if 'uvicorn.run' in content or 'FastAPI(' in content:
-		return 'fastapi'
 	if 'if __name__' in content or 'def main(' in content or 'async def main(' in content:
 		return 'python'
 	return None
@@ -232,13 +228,13 @@ def _run_with_watch(app_path: Path, host: str, port: int, debug: bool):
 		nonlocal process
 		
 		env = os.environ.copy()
-		env['FLASK_HOST'] = host
-		env['FLASK_PORT'] = str(port)
-		env['FLASK_DEBUG'] = '1' if debug else '0'
 		env['HOST'] = host
 		env['PORT'] = str(port)
+		env['APG_HOST'] = host
+		env['APG_PORT'] = str(port)
+		env['APG_DEBUG'] = '1' if debug else '0'
 		
-		console.print(f"\n[green]🚀 Starting application at http://{host}:{port}[/green]")
+		console.print(f"\n[green]Starting APG Python artifact {app_path.name}[/green]")
 		
 		try:
 			process = subprocess.Popen(

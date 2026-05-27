@@ -168,6 +168,33 @@ Verification result:
 - Legacy shell scan over `capabilities/**/capability_contract.py` returned no matches.
 - `git diff --check` for the capability-contract slice passed.
 
+Commit result:
+
+- Pushed commit `90d3c00` (`Emit Python UI shells from common contracts`).
+
+### 2026-05-27 17:04 EAT
+
+In progress:
+
+- Converted the APG run command away from Flask/FastAPI runtime detection and toward generated Python artifact execution.
+- Replaced framework-specific `FLASK_*` runtime environment variables with generic `APG_*` variables.
+- Updated focused run-command tests to reject framework app detection and verify Python artifact execution.
+
+Verification planned before commit:
+
+- Run focused run-command and compiler baseline tests.
+- Compile the changed CLI/test modules.
+- Scan the run command and its focused tests for framework runtime assumptions.
+- Check staged diff whitespace before committing.
+
+Verification result:
+
+- `.venv/bin/python -m pytest -q tests/test_cli_run_command.py tests/test_compiler_baseline.py` passed with 13 tests.
+- `.venv/bin/python -m py_compile cli/run_command.py tests/test_cli_run_command.py` passed.
+- `cli/run_command.py` no longer contains Flask/FastAPI/Django/uvicorn detection or `FLASK_*` environment variables.
+- Remaining framework strings in `tests/test_cli_run_command.py` are negative assertions.
+- `git diff --check` for the CLI runner slice passed.
+
 ### 2026-05-26 02:25 EAT
 
 In progress:

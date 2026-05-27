@@ -13,15 +13,15 @@ from cli import run_command
 
 
 def test_detect_application_kind_accepts_generated_runtime_styles():
-	assert run_command._detect_application_kind("app = Flask(__name__)\napp.run()") == "flask"
-	assert run_command._detect_application_kind("app = FastAPI()\nuvicorn.run(app)") == "fastapi"
 	assert run_command._detect_application_kind("def main():\n\treturn 0\nif __name__ == '__main__':\n\tmain()") == "python"
+	assert run_command._detect_application_kind("app = Flask(__name__)\napp.run()") is None
+	assert run_command._detect_application_kind("app = FastAPI()\nuvicorn.run(app)") is None
 	assert run_command._detect_application_kind("VALUE = 1") is None
 
 
-def test_run_single_runs_fastapi_generated_app(tmp_path, monkeypatch):
+def test_run_single_runs_python_generated_artifact(tmp_path, monkeypatch):
 	app = tmp_path / "app.py"
-	app.write_text("from fastapi import FastAPI\nimport uvicorn\napp = FastAPI()\nuvicorn.run(app)\n")
+	app.write_text("def main():\n\treturn 0\n\nif __name__ == '__main__':\n\tmain()\n")
 	calls: list[dict[str, object]] = []
 
 	def fake_run(command, cwd, env, check):
@@ -36,8 +36,11 @@ def test_run_single_runs_fastapi_generated_app(tmp_path, monkeypatch):
 	assert calls[0]["cwd"] == tmp_path
 	assert calls[0]["env"]["HOST"] == "127.0.0.1"
 	assert calls[0]["env"]["PORT"] == "8123"
-	assert calls[0]["env"]["FLASK_PORT"] == "8123"
-	assert calls[0]["env"]["FLASK_DEBUG"] == "1"
+	assert calls[0]["env"]["APG_HOST"] == "127.0.0.1"
+	assert calls[0]["env"]["APG_PORT"] == "8123"
+	assert calls[0]["env"]["APG_DEBUG"] == "1"
+	assert "FLASK_PORT" not in calls[0]["env"]
+	assert "FLASK_DEBUG" not in calls[0]["env"]
 
 
 def test_run_single_rejects_non_executable_python(tmp_path, monkeypatch):
