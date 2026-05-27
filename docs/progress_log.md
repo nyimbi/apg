@@ -3175,3 +3175,19 @@ Verification:
 - `rg -n "getattr\(g, 'user', \{\}\)\.get\('tenant_id', 'default_tenant'\)|'default_tenant'|\"default_tenant\"|Kafka|kafka" capabilities/crm/adv/blueprint.py` -> no matches
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:07 EAT
+
+Completed checkpoint:
+
+- Replaced General Ledger default-data bootstrap's fixed `default_tenant` service construction with the existing APG tenant/user context helpers.
+- Made the bootstrap tenant setup execute the async `setup_tenant` coroutine explicitly during synchronous Flask startup instead of creating an un-awaited coroutine.
+- Extended focused GL context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/glr/general_ledger/blueprint.py tests/test_fin_glr_context_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_fin_glr_context_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n "default_tenant_id = \"default_tenant\"|GeneralLedgerService\(default_tenant_id\)|default_tenant|Kafka|kafka" capabilities/fin/glr/general_ledger/blueprint.py` -> no matches
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

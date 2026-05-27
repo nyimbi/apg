@@ -13,6 +13,8 @@ Comprehensive blueprint registration for enterprise general ledger including:
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
+import asyncio
+
 from flask import Blueprint
 from flask_appbuilder import AppBuilder, BaseView
 from flask_babel import lazy_gettext as _
@@ -21,6 +23,16 @@ from .views import (
 	GLAccountTypeView, GLAccountView, ChartOfAccountsView,
 	GLJournalEntryView, FinancialReportsView, GLDashboardView
 )
+from .context import get_current_user_id, get_tenant_id_from_request
+
+
+def _run_async_initialization(coro_factory):
+	"""Run sync bootstrap async setup where Flask startup has no active event loop."""
+	try:
+		asyncio.get_running_loop()
+	except RuntimeError:
+		return asyncio.run(coro_factory())
+	raise RuntimeError("General Ledger default data initialization requires a synchronous startup context")
 
 
 def register_views(appbuilder: AppBuilder):
@@ -278,29 +290,29 @@ def _init_default_data(appbuilder: AppBuilder):
 		from .models import GLAccountType, AccountTypeEnum, BalanceTypeEnum
 		from .service import GeneralLedgerService
 		
-		# Use default tenant for initialization
-		default_tenant_id = "default_tenant"
-		gl_service = GeneralLedgerService(default_tenant_id)
+		tenant_id = get_tenant_id_from_request()
+		user_id = get_current_user_id()
+		gl_service = GeneralLedgerService(tenant_id, user_id)
 		
 		# Check if account types already exist
 		session = gl_service.get_session()
 		existing_types = session.query(GLAccountType).filter_by(
-			tenant_id=default_tenant_id
+			tenant_id=tenant_id
 		).count()
 		
 		if existing_types == 0:
 			# Create default tenant setup
 			tenant_data = {
-				'tenant_code': 'DEFAULT',
-				'tenant_name': 'Default Tenant',
+				'tenant_code': tenant_id.upper().replace('-', '_')[:32],
+				'tenant_name': f'General Ledger Tenant {tenant_id}',
 				'base_currency': 'USD',
 				'reporting_framework': 'GAAP',
 				'country_code': 'US'
 			}
 			
 			# Setup tenant with default account types and periods
-			gl_service.setup_tenant(tenant_data)
-			print("✓ Default General Ledger tenant and data created")
+			_run_async_initialization(lambda: gl_service.setup_tenant(tenant_data))
+			print(f"✓ General Ledger tenant and data initialized for {tenant_id}")
 		else:
 			print("✓ General Ledger data already exists")
 			

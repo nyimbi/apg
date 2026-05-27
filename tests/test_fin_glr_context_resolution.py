@@ -11,6 +11,7 @@ from flask import Flask, g, has_request_context, request, session
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTEXT_PATH = REPO_ROOT / "capabilities" / "fin" / "glr" / "general_ledger" / "context.py"
 API_PATH = REPO_ROOT / "capabilities" / "fin" / "glr" / "general_ledger" / "api.py"
+BLUEPRINT_PATH = REPO_ROOT / "capabilities" / "fin" / "glr" / "general_ledger" / "blueprint.py"
 
 
 def _context_helpers() -> dict[str, Any]:
@@ -33,12 +34,18 @@ def _context_helpers() -> dict[str, Any]:
 
 def test_general_ledger_api_delegates_context_resolution():
 	source = API_PATH.read_text(encoding="utf-8")
+	blueprint_source = BLUEPRINT_PATH.read_text(encoding="utf-8")
 
 	assert "session.get('tenant_id', 'default_tenant')" not in source
 	assert "return session.get('user_id')" not in source
 	assert "from .context import get_current_user_id, get_tenant_id_from_request" in source
 	assert source.count("get_tenant_id_from_request(") >= 10
 	assert source.count("get_current_user_id(") >= 10
+	assert 'default_tenant_id = "default_tenant"' not in blueprint_source
+	assert 'GeneralLedgerService(default_tenant_id)' not in blueprint_source
+	assert "from .context import get_current_user_id, get_tenant_id_from_request" in blueprint_source
+	assert "GeneralLedgerService(tenant_id, user_id)" in blueprint_source
+	assert "_run_async_initialization(lambda: gl_service.setup_tenant(tenant_data))" in blueprint_source
 
 
 def test_general_ledger_context_resolves_tenant_and_user(monkeypatch):
