@@ -351,10 +351,6 @@ venv/
 env/
 ENV/
 
-# Flask
-instance/
-.webassets-cache
-
 # Database
 *.db
 *.sqlite
@@ -672,10 +668,10 @@ class TestAgents(BaseTestCase):
 		
 		result = self.compile_apg_source(apg_source)
 		
-		# Check that methods are in generated code
+		# Check that methods are present in the generated manifest
 		app_content = result.generated_files.get('app.py', '')
-		self.assertIn('def set_value_api(self)', app_content)
-		self.assertIn('def get_value_api(self)', app_content)
+		self.assertIn("'methods': ['set_value', 'get_value']", app_content)
+		self.assertIn('def describe_application()', app_content)
 
 
 if __name__ == '__main__':
@@ -736,6 +732,7 @@ if __name__ == '__main__':
 			'author': config.author,
 			'license': config.license,
 			'template': config.template_type.value,
+			'target_language': config.target_framework,
 			'target_framework': config.target_framework,
 			'python_version': config.python_version,
 			'features': {

@@ -1,11 +1,11 @@
 {
   "name": "Basic Agent",
-  "description": "Simple agent with basic functionality and Flask-AppBuilder interface",
+  "description": "Simple agent with dependency-free Python application artifacts",
   "complexity": "Beginner",
   "features": [
     "Agent Runtime",
     "Basic Methods",
-    "Web Dashboard"
+    "Python Manifest"
   ],
   "use_cases": [
     "Learning APG",

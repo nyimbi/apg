@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from click.testing import CliRunner
 
 from cli.main import cli
@@ -56,6 +58,55 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in requirements
 	assert "standard library" in requirements
+
+
+def test_cli_init_describes_python_artifact_flow():
+	runner = CliRunner()
+	with runner.isolated_filesystem():
+		result = runner.invoke(cli, ["init"])
+
+	assert result.exit_code == 0, result.output
+	assert "generate Python artifacts" in result.output
+	assert "python generated/app.py" in result.output
+	assert "Flask-AppBuilder" not in result.output
+
+
+def test_cli_create_basic_project_scaffolds_python_target(tmp_path):
+	output = tmp_path / "demo"
+	result = CliRunner().invoke(cli, [
+		"create",
+		"project",
+		"--name",
+		"demo",
+		"--description",
+		"Demo project",
+		"--template",
+		"basic_agent",
+		"--output",
+		str(output),
+		"--no-interactive",
+	])
+
+	assert result.exit_code == 0, result.output
+	assert "python generated/app.py" in result.output
+	assert "Flask-AppBuilder" not in result.output
+	assert "default Flask-AppBuilder credentials" not in result.output
+
+	readme = (output / "README.md").read_text(encoding="utf-8")
+	requirements = (output / "requirements.txt").read_text(encoding="utf-8")
+	config = (output / "config.py").read_text(encoding="utf-8")
+	agent_tests = (output / "tests" / "test_agents.py").read_text(encoding="utf-8")
+	apg_config = json.loads((output / "apg.json").read_text(encoding="utf-8"))
+
+	assert "python generated/app.py" in readme
+	assert "Python Manifest" in readme
+	assert "standard library" in requirements
+	assert "flask_appbuilder" not in config
+	assert "Flask-AppBuilder" not in readme
+	assert "def describe_application()" in agent_tests
+	assert "set_value_api" not in agent_tests
+	assert apg_config["target_language"] == "python"
+	assert apg_config["target_framework"] == "python"
 
 
 def test_cli_doctor_recognizes_spec_parser_artifacts():

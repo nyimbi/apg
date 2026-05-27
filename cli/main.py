@@ -237,8 +237,8 @@ agent BasicAgent {{
 	
 	console.print("\n[green]Next steps:[/green]")
 	console.print("  1. Edit main.apg to define your application")
-	console.print("  2. Run 'apg compile' to generate Flask-AppBuilder application")
-	console.print("  3. Run 'apg run' to start the application")
+	console.print("  2. Run 'apg compile' to generate Python artifacts")
+	console.print("  3. Run 'python generated/app.py' to inspect the application manifest")
 
 
 if __name__ == '__main__':

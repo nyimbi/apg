@@ -259,10 +259,10 @@ def _configure_advanced_options(config: ProjectConfig) -> ProjectConfig:
 	console.print("\n[bold]Advanced Configuration:[/bold]")
 	
 	# Target language
-	framework = Prompt.ask("[cyan]Target language[/cyan]",
-						 default=config.target_framework,
-						 choices=['python'])
-	config.target_framework = framework
+	target_language = Prompt.ask("[cyan]Target language[/cyan]",
+							 default=config.target_framework,
+							 choices=['python'])
+	config.target_framework = target_language
 	
 	# Database type
 	database = Prompt.ask("[cyan]Database type[/cyan]",
@@ -325,7 +325,7 @@ def _show_config_summary(config: ProjectConfig):
 	table.add_row("Description", config.description)
 	table.add_row("Author", config.author)
 	table.add_row("Template", config.template_type.value)
-	table.add_row("Target", config.target_framework)
+	table.add_row("Target Language", config.target_framework)
 	table.add_row("Database", config.database_type)
 	table.add_row("Python", config.python_version)
 	table.add_row("Output", str(config.output_directory))
@@ -393,14 +393,13 @@ def _show_next_steps(config: ProjectConfig, project_path: Path):
 		f"cd {project_path}",
 		"pip install -r requirements.txt",
 		"apg compile main.apg",
-		"python app.py"
+		"python generated/app.py"
 	]
 	
 	for i, step in enumerate(steps, 1):
 		console.print(f"{i}. [cyan]{step}[/cyan]")
 	
-	console.print(f"\n[green]Then open:[/green] http://localhost:8080")
-	console.print(f"[green]Login with:[/green] admin/admin (default Flask-AppBuilder credentials)")
+	console.print("\n[green]The generated Python manifest prints application metadata as JSON.[/green]")
 	
 	if config.template_type != TemplateType.BASIC_AGENT:
 		console.print(f"\n[yellow]📚 Check the README.md for template-specific usage instructions[/yellow]")

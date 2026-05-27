@@ -6,7 +6,7 @@
 
 - Agent Runtime
 - Basic Methods
-- Web Dashboard
+- Python Manifest
 
 ## Installation
 
@@ -27,20 +27,18 @@
 
 4. Run the application:
    ```bash
-   python app.py
+   python generated/app.py
    ```
 
-5. Access the application:
-   Open http://localhost:8080
+5. Inspect the application metadata printed as JSON.
 
 ## Usage
 
 ### Basic Usage
 
-1. **Agent Dashboard**: Monitor agent status and activity
-2. **Method Execution**: Execute agent methods via web interface
-3. **Real-time Updates**: View live status and logs
-4. **Configuration**: Customize agent behavior through settings
+1. **Application Manifest**: Inspect generated module, entity, agent, and capability metadata
+2. **Agent Runtime**: Use generated `ai_agents.py` helpers for agent composition
+3. **Configuration**: Customize agent behavior through settings
 
 
 ## Configuration

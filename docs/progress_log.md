@@ -3785,3 +3785,22 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_code_generator_executable_defaults.py tests/test_apg_language_contract.py tests/test_capability_composition_runtime.py tests/test_ai_agent_composition.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 24 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 06:47 EAT
+
+Completed checkpoint:
+
+- Updated `apg init` and `apg create project` next-step guidance to describe Python artifact generation and `python generated/app.py` manifest inspection instead of a web-server/login flow.
+- Converted the basic project template from Flask-AppBuilder-oriented copy, requirements, and config imports to dependency-free Python manifest copy.
+- Updated generated basic-project tests so they assert generated method metadata and `describe_application()` instead of framework API view methods.
+- Added `target_language: python` to scaffolded `apg.json` while retaining `target_framework: python` for compatibility.
+- Added CLI scaffold regressions proving init/create output and generated basic project files no longer advertise Flask-AppBuilder credentials or imports.
+
+Verification:
+
+- `.venv/bin/python -m py_compile cli/main.py cli/create_project.py templates/project_scaffolder.py templates/template_types.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py` -> 9 passed
+- Manual `apg create project --template basic_agent` smoke confirmed generated README, requirements, config, tests, and `apg.json` omit Flask-AppBuilder/`flask_appbuilder` and include `target_language: python`.
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_code_generator_executable_defaults.py tests/test_apg_language_contract.py tests/test_capability_composition_runtime.py tests/test_ai_agent_composition.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 26 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

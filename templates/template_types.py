@@ -140,9 +140,9 @@ class ProjectConfig:
 TEMPLATE_METADATA = {
 	TemplateType.BASIC_AGENT: {
 		'name': 'Basic Agent',
-		'description': 'Simple agent with basic functionality and Flask-AppBuilder interface',
+		'description': 'Simple agent with dependency-free Python application artifacts',
 		'complexity': 'Beginner',
-		'features': ['Agent Runtime', 'Basic Methods', 'Web Dashboard'],
+		'features': ['Agent Runtime', 'Basic Methods', 'Python Manifest'],
 		'use_cases': ['Learning APG', 'Simple Automation', 'Proof of Concept']
 	},
 	
