@@ -1,6 +1,4 @@
-"""
-Regression coverage for executable legacy code-generation defaults.
-"""
+"""Regression coverage for executable Python code-generation defaults."""
 
 import re
 
@@ -22,7 +20,7 @@ from compiler.ast_builder import (
 from compiler.code_generator import CodeGenConfig, PythonCodeGenerator
 
 
-def _generate_legacy_files() -> dict[str, str]:
+def _generate_python_files() -> dict[str, str]:
     module = ModuleDeclaration(
         name="runtime_defaults",
         entities=[
@@ -88,8 +86,8 @@ def _generate_legacy_files() -> dict[str, str]:
     return generator.generate(module)
 
 
-def test_legacy_generator_emits_executable_defaults_without_todos_or_passes():
-    files = _generate_legacy_files()
+def test_python_generator_emits_executable_defaults_without_framework_scaffolding():
+    files = _generate_python_files()
     generated_python = "\n\n".join(
         content for path, content in files.items() if path.endswith(".py")
     )
@@ -98,13 +96,14 @@ def test_legacy_generator_emits_executable_defaults_without_todos_or_passes():
     assert "placeholder implementation" not in generated_python
     assert "None  # TODO" not in generated_python
     assert not re.search(r"^\s*pass\s*$", generated_python, re.MULTILINE)
+    assert "Flask-AppBuilder" not in generated_python
+    assert "flask_appbuilder" not in generated_python
+    assert "django" not in generated_python.lower()
 
-    assert "await asyncio.sleep(0)" in generated_python
-    assert "return False" in generated_python
-    assert "return None" in generated_python
-    assert "setattr(self, key, value)" in generated_python
-    assert "self._step_results[str(step)]" in generated_python
-    assert "return {'status': 'executed', 'method': 'ping'}" in generated_python
+    assert "app.py" in files
+    assert "requirements.txt" in files
+    assert "APG Python Application" in files["app.py"]
+    assert "standard library" in files["requirements.txt"]
 
     for path, content in files.items():
         if path.endswith(".py"):

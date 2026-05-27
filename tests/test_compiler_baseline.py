@@ -31,6 +31,12 @@ def test_documented_python_target_generates_executable_application_files():
 	assert result.target_language == "python"
 	assert "app.py" in result.generated_files
 	assert "ai_agents.py" in result.generated_files
+	app = result.generated_files["app.py"]
+	assert "APG Python Application" in app
+	assert "Flask-AppBuilder" not in app
+	assert "flask_appbuilder" not in app
+	assert "django" not in app.lower()
+	compile(app, "app.py", "exec")
 
 
 def test_cli_compile_default_target_writes_generated_application(tmp_path):
@@ -44,6 +50,12 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "Compilation successful" in result.output
 	assert (output / "app.py").exists()
 	assert (output / "ai_agents.py").exists()
+	app = (output / "app.py").read_text(encoding="utf-8")
+	requirements = (output / "requirements.txt").read_text(encoding="utf-8")
+	assert "APG Python Application" in app
+	assert "Flask-AppBuilder" not in app
+	assert "flask_appbuilder" not in requirements
+	assert "standard library" in requirements
 
 
 def test_cli_doctor_recognizes_spec_parser_artifacts():

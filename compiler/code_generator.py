@@ -48,7 +48,7 @@ class CodeGenConfig:
 	include_runtime: bool = True
 	
 	# Composable template system configuration
-	use_composable_templates: bool = True
+	use_composable_templates: bool = False
 	preferred_base_template: Optional[str] = None
 	additional_capabilities: List[str] = None
 	exclude_capabilities: List[str] = None
@@ -93,7 +93,7 @@ class PythonCodeGenerator:
 	
 	def generate(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""
-		Generate application from APG AST using composable template system.
+		Generate executable Python artifacts from an APG AST.
 		
 		Args:
 			ast: Root AST node (ModuleDeclaration)
@@ -103,12 +103,9 @@ class PythonCodeGenerator:
 		"""
 		self.current_module = ast
 		
-		# Use composable template system if enabled
 		if self.config.use_composable_templates:
 			return self._generate_with_composable_templates(ast)
-		else:
-			# Fall back to legacy generation method
-			return self._generate_legacy_flask_app(ast)
+		return self._generate_python_application(ast)
 	
 	def _generate_with_composable_templates(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Generate application using the composable template system"""
@@ -176,8 +173,93 @@ class PythonCodeGenerator:
 				
 		except Exception as e:
 			print(f"Error in composable template generation: {e}")
-			print("Falling back to legacy generation...")
-			return self._generate_legacy_flask_app(ast)
+			print("Falling back to dependency-free Python generation...")
+			return self._generate_python_application(ast)
+
+	def _generate_python_application(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Generate a dependency-free Python application manifest."""
+		files = {
+			"app.py": self._generate_python_app(ast),
+			"__init__.py": self._generate_package_init(ast),
+			"requirements.txt": self._generate_python_requirements(),
+		}
+		files.update(self._generate_ai_agent_files(ast))
+		files.update(self._generate_capability_files(ast))
+		return files
+
+	def _generate_python_app(self, module: ModuleDeclaration) -> str:
+		"""Generate a framework-neutral Python app.py entrypoint."""
+		entity_specs = [
+			{
+				"name": entity.name,
+				"type": entity.entity_type.value,
+				"properties": [property.name for property in entity.properties],
+				"methods": [method.name for method in entity.methods],
+			}
+			for entity in module.entities
+		]
+		return f'''"""
+{module.name} - APG Python Application
+{"=" * (len(module.name) + 25)}
+
+Generated from APG source as dependency-free Python artifacts.
+"""
+
+from __future__ import annotations
+
+import importlib
+import json
+from typing import Any, Dict, Optional
+
+
+MODULE_NAME = {module.name!r}
+MODULE_VERSION = {module.version!r}
+MODULE_DESCRIPTION = {module.description!r}
+ENTITIES = {entity_specs!r}
+
+
+def _optional_module(name: str) -> Optional[Any]:
+    try:
+        return importlib.import_module(name)
+    except ImportError:
+        return None
+
+
+AI_AGENTS = _optional_module("ai_agents")
+APG_CAPABILITIES = _optional_module("apg_capabilities")
+
+
+def list_entities() -> list[Dict[str, Any]]:
+    return [dict(entity) for entity in ENTITIES]
+
+
+def describe_application() -> Dict[str, Any]:
+    description: Dict[str, Any] = {{
+        "name": MODULE_NAME,
+        "version": MODULE_VERSION,
+        "description": MODULE_DESCRIPTION,
+        "entities": list_entities(),
+    }}
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents"):
+        description["ai_agents"] = AI_AGENTS.list_agents()
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities"):
+        description["capabilities"] = APG_CAPABILITIES.list_capabilities()
+    return description
+
+
+def main() -> None:
+    print(json.dumps(describe_application(), indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+	def _generate_python_requirements(self) -> str:
+		"""Generate requirements for the dependency-free Python target."""
+		return """# APG generated Python application requirements
+# The default compiler target uses only the Python standard library.
+"""
 
 	def _generate_legacy_entities(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Generate the legacy entity files used by hybrid template mode."""

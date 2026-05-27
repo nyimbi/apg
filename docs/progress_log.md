@@ -3766,3 +3766,22 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_apg_language_contract.py tests/test_capability_composition_runtime.py tests/test_ai_agent_composition.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 22 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 06:40 EAT
+
+Completed checkpoint:
+
+- Replaced the compiler's default generated application path with dependency-free Python artifacts instead of composable Flask-AppBuilder scaffolding.
+- Added a plain `app.py` runtime manifest with `list_entities()`, `describe_application()`, optional generated AI-agent/capability module discovery, and a JSON-printing `main()`.
+- Replaced the default generated `requirements.txt` with a standard-library-only Python target note.
+- Changed composable-template failure fallback from legacy Flask-AppBuilder generation to the same dependency-free Python artifact path.
+- Updated compiler baseline and generator-default regressions to prove default generated output is executable Python and does not contain Flask-AppBuilder, `flask_appbuilder`, Django, or FastAPI framework scaffolding.
+
+Verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py tests/test_code_generator_executable_defaults.py`
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_code_generator_executable_defaults.py` -> 9 passed
+- Manual compile smoke: generated `app.py`/`requirements.txt`, executed `describe_application()`, and confirmed no Flask-AppBuilder, `flask_appbuilder`, Django, or FastAPI strings in `app.py`.
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_code_generator_executable_defaults.py tests/test_apg_language_contract.py tests/test_capability_composition_runtime.py tests/test_ai_agent_composition.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 24 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
