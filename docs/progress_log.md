@@ -3374,3 +3374,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_composition_events_tenant_access.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed, 3 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:02 EAT
+
+Completed checkpoint:
+
+- Replaced INT API gateway JWT and OAuth2 bearer "not implemented" authentication responses with executable token validation paths.
+- Gateway authentication now validates signed JWTs with configured secret/algorithm, propagates tenant IDs from token claims, and delegates JWT or opaque bearer token validation to runtime validators when available.
+- Added focused token-auth regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/int/api/gateway.py tests/test_int_api_gateway_token_auth.py`
+- `.venv/bin/python -m pytest -q tests/test_int_api_gateway_token_auth.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

@@ -10,6 +10,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 import asyncio
 import json
+import os
 import time
 import hashlib
 import secrets
@@ -21,6 +22,7 @@ from urllib.parse import urljoin, urlparse
 
 import aiohttp
 import aioredis
+import jwt
 from aiohttp import web, ClientSession, ClientTimeout, ClientError
 from aiohttp.web_middlewares import normalize_path_middleware
 from aiohttp_cors import setup as cors_setup, ResourceOptions
@@ -184,8 +186,17 @@ class RateLimitMiddleware:
 class AuthenticationMiddleware:
 	"""Authentication middleware supporting multiple auth types."""
 	
-	def __init__(self, consumer_service: ConsumerManagementService):
+	def __init__(
+		self,
+		consumer_service: ConsumerManagementService,
+		jwt_secret: Optional[str] = None,
+		jwt_algorithm: Optional[str] = None,
+		bearer_token_validator: Optional[Callable[[str], Any]] = None
+	):
 		self.consumer_service = consumer_service
+		self.jwt_secret = jwt_secret or os.getenv("APG_API_JWT_SECRET") or os.getenv("APG_JWT_SECRET_KEY") or os.getenv("APG_JWT_SECRET")
+		self.jwt_algorithm = jwt_algorithm or os.getenv("APG_API_JWT_ALGORITHM", "HS256")
+		self.bearer_token_validator = bearer_token_validator
 		
 	async def __call__(self, request: web.Request, handler: Callable) -> web.Response:
 		"""Authenticate request."""
@@ -214,6 +225,8 @@ class AuthenticationMiddleware:
 		# Set consumer info in request
 		gateway_request.consumer_id = auth_result.get('consumer_id')
 		gateway_request.api_key = auth_result.get('api_key')
+		if auth_result.get('tenant_id'):
+			gateway_request.tenant_id = auth_result['tenant_id']
 		
 		return await handler(request)
 	
@@ -255,12 +268,17 @@ class AuthenticationMiddleware:
 		"""Extract JWT token from Authorization header."""
 		auth_header = gateway_request.headers.get('Authorization', '')
 		if auth_header.startswith('Bearer '):
-			return auth_header[7:]
+			token = auth_header[7:]
+			if token.count('.') == 2:
+				return token
 		return None
 	
 	def _extract_bearer_token(self, gateway_request: GatewayRequest) -> Optional[str]:
 		"""Extract Bearer token from Authorization header."""
-		return self._extract_jwt_token(gateway_request)
+		auth_header = gateway_request.headers.get('Authorization', '')
+		if auth_header.startswith('Bearer '):
+			return auth_header[7:]
+		return None
 	
 	async def _validate_api_key(self, api_key: str, tenant_id: str) -> Dict[str, Any]:
 		"""Validate API key."""
@@ -289,13 +307,78 @@ class AuthenticationMiddleware:
 	
 	async def _validate_jwt_token(self, token: str) -> Dict[str, Any]:
 		"""Validate JWT token."""
-		# Implementation would validate JWT signature and claims
-		return {'success': False, 'message': 'JWT validation not implemented'}
+		delegated = await self._validate_with_consumer_service("validate_jwt_token", token)
+		if delegated is not None:
+			return delegated
+
+		if not self.jwt_secret:
+			return {'success': False, 'message': 'JWT validation secret not configured'}
+
+		try:
+			claims = jwt.decode(
+				token,
+				self.jwt_secret,
+				algorithms=[self.jwt_algorithm],
+				options={"require": ["exp"]}
+			)
+		except jwt.ExpiredSignatureError:
+			return {'success': False, 'message': 'JWT token expired'}
+		except jwt.InvalidTokenError as e:
+			return {'success': False, 'message': f'Invalid JWT token: {e}'}
+
+		consumer_id = claims.get('consumer_id') or claims.get('sub') or claims.get('client_id')
+		if not consumer_id:
+			return {'success': False, 'message': 'JWT token missing consumer identity'}
+
+		return {
+			'success': True,
+			'consumer_id': str(consumer_id),
+			'tenant_id': claims.get('tenant_id') or claims.get('tid'),
+			'auth_method': 'jwt',
+			'claims': claims
+		}
 	
 	async def _validate_bearer_token(self, token: str) -> Dict[str, Any]:
 		"""Validate OAuth2 Bearer token."""
-		# Implementation would validate with OAuth2 provider
-		return {'success': False, 'message': 'Bearer token validation not implemented'}
+		delegated = await self._validate_with_consumer_service("validate_bearer_token", token)
+		if delegated is not None:
+			return delegated
+
+		if self.bearer_token_validator:
+			result = self.bearer_token_validator(token)
+			if asyncio.iscoroutine(result):
+				result = await result
+			return self._normalize_token_validation_result(result, "bearer")
+
+		return {'success': False, 'message': 'Bearer token validator not configured'}
+
+	async def _validate_with_consumer_service(self, method_name: str, token: str) -> Optional[Dict[str, Any]]:
+		"""Delegate token validation to the consumer service when it exposes a validator."""
+		validator = getattr(self.consumer_service, method_name, None)
+		if not callable(validator):
+			return None
+		result = validator(token)
+		if asyncio.iscoroutine(result):
+			result = await result
+		return self._normalize_token_validation_result(result, method_name.replace("validate_", "").replace("_token", ""))
+
+	def _normalize_token_validation_result(self, result: Any, auth_method: str) -> Dict[str, Any]:
+		"""Normalize token validator responses into gateway authentication results."""
+		if not result:
+			return {'success': False, 'message': f'Invalid {auth_method} token'}
+		if isinstance(result, dict):
+			normalized = dict(result)
+			normalized.setdefault('success', bool(normalized.get('consumer_id') or normalized.get('sub') or normalized.get('client_id')))
+			normalized.setdefault('consumer_id', normalized.get('sub') or normalized.get('client_id'))
+			normalized.setdefault('auth_method', auth_method)
+			if not normalized.get('success'):
+				normalized.setdefault('message', f'Invalid {auth_method} token')
+			return normalized
+		return {
+			'success': True,
+			'consumer_id': str(result),
+			'auth_method': auth_method
+		}
 
 class PolicyEnforcementMiddleware:
 	"""Policy enforcement middleware."""
