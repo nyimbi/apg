@@ -414,6 +414,61 @@ def validate_capability_i18n() -> Dict[str, List[str]]:
     return {{"errors": errors, "warnings": warnings}}
 
 
+def capability_streaming(capability_name: str) -> Dict[str, Any]:
+    capability = get_capability(capability_name)
+    runtime_streaming = capability.runtime.get("streaming", {{}})
+    stream = dict(runtime_streaming) if isinstance(runtime_streaming, dict) else {{}}
+    if isinstance(capability.streaming, dict):
+        _deep_merge(stream, capability.streaming)
+    return {{
+        "capability": capability.name,
+        "processor": stream.get("processor", "bytewax"),
+        "input": stream.get("input"),
+        "output": stream.get("output"),
+        "state": stream.get("state"),
+        "window": stream.get("window"),
+        "config": stream,
+    }}
+
+
+def streaming_processor_index() -> Dict[str, List[str]]:
+    processors: Dict[str, List[str]] = {{}}
+    for capability in CAPABILITIES.values():
+        stream = capability_streaming(capability.name)
+        processor = str(stream.get("processor") or "bytewax")
+        processors.setdefault(processor, []).append(capability.name)
+    return {{
+        processor: sorted(capability_names)
+        for processor, capability_names in processors.items()
+    }}
+
+
+def streaming_state_index() -> Dict[str, List[str]]:
+    states: Dict[str, List[str]] = {{}}
+    for capability in CAPABILITIES.values():
+        state = capability_streaming(capability.name).get("state")
+        if state:
+            states.setdefault(str(state), []).append(capability.name)
+    return {{
+        state: sorted(capability_names)
+        for state, capability_names in states.items()
+    }}
+
+
+def validate_streaming_contracts() -> Dict[str, List[str]]:
+    errors: List[str] = []
+    warnings: List[str] = []
+    allowed_processors = {{"bytewax", "bytewax_streams"}}
+    for capability in CAPABILITIES.values():
+        stream = capability_streaming(capability.name)
+        processor = str(stream.get("processor") or "")
+        if processor not in allowed_processors:
+            errors.append(f"{{capability.name}} uses unsupported stream processor {{processor}}")
+        if not stream.get("state"):
+            warnings.append(f"{{capability.name}} does not declare streaming state")
+    return {{"errors": errors, "warnings": warnings}}
+
+
 def _deep_merge(target: Dict[str, Any], source: Dict[str, Any]) -> None:
     for key, value in source.items():
         if isinstance(value, dict) and isinstance(target.get(key), dict):
@@ -639,6 +694,18 @@ def composition_graph() -> Dict[str, List[Dict[str, Any]]]:
                     service_id = f"service:{{component_spec['capability']}}"
                     node(service_id, "service", name=str(component_spec["capability"]))
                     edge(component_id, service_id, "binds_to")
+
+        stream = capability_streaming(capability.name)
+        processor = stream.get("processor")
+        if processor:
+            processor_id = f"stream_processor:{{processor}}"
+            node(processor_id, "stream_processor", name=str(processor))
+            edge(cap_id, processor_id, "streams_with")
+        state = stream.get("state")
+        if state:
+            state_id = f"stream_state:{{state}}"
+            node(state_id, "stream_state", name=str(state))
+            edge(cap_id, state_id, "stores_stream_state")
 
     return {{"nodes": sorted(nodes.values(), key=lambda item: item["id"]), "edges": edges}}
 '''

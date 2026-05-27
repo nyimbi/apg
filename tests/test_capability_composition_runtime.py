@@ -120,6 +120,18 @@ def test_capability_declaration_generates_runtime_manifest():
     assert namespace["resolve_language"]("GeneralLedger", "sw") == "sw"
     assert namespace["resolve_language"]("GeneralLedger", "fr") == "en"
     assert namespace["validate_capability_i18n"]() == {"errors": [], "warnings": []}
+    assert namespace["capability_streaming"]("GeneralLedger") == {
+        "capability": "GeneralLedger",
+        "processor": "bytewax",
+        "input": None,
+        "output": None,
+        "state": "ledger_posting_state",
+        "window": None,
+        "config": {"processor": "bytewax", "state": "ledger_posting_state"},
+    }
+    assert namespace["streaming_processor_index"]() == {"bytewax": ["GeneralLedger"]}
+    assert namespace["streaming_state_index"]() == {"ledger_posting_state": ["GeneralLedger"]}
+    assert namespace["validate_streaming_contracts"]() == {"errors": [], "warnings": []}
 
     rule_names = [rule["name"] for rule in namespace["capability_rules"]("GeneralLedger")]
     assert rule_names == ["posting_period_open", "balanced_journal"]
@@ -167,6 +179,8 @@ def test_capability_declaration_generates_runtime_manifest():
     assert ("screen:GeneralLedger.Journals", "renders", "component:JournalScreen") in graph_edges
     assert ("capability:GeneralLedger", "belongs_to", "erp_module:general_ledger") in graph_edges
     assert ("component:posting", "binds_to", "service:journal_entries") in graph_edges
+    assert ("capability:GeneralLedger", "streams_with", "stream_processor:bytewax") in graph_edges
+    assert ("capability:GeneralLedger", "stores_stream_state", "stream_state:ledger_posting_state") in graph_edges
 
     validation = namespace["validate_capability_contracts"]()
     assert validation["errors"] == []

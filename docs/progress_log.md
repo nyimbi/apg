@@ -3680,3 +3680,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_apg_language_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 19 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 06:15 EAT
+
+Completed checkpoint:
+
+- Made compiled APG capability streaming contracts executable from the generated `apg_capabilities.py` manifest.
+- Added `capability_streaming()`, `streaming_processor_index()`, `streaming_state_index()`, and `validate_streaming_contracts()` helpers.
+- Streaming validation now accepts only Bytewax-native processors (`bytewax` and `bytewax_streams`) and warns when a capability omits stream state.
+- Extended the generated composition graph with capability-to-stream-processor and capability-to-stream-state relationships.
+- Extended capability composition regressions to execute Bytewax processor indexing, stream state indexing, streaming validation, and graph relationships.
+
+Verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_apg_language_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 19 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
