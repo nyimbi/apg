@@ -53,8 +53,20 @@ class NoOpRedis:
 	async def delete(self, *_args, **_kwargs):
 		return 0
 
+	async def keys(self, *_args, **_kwargs):
+		return []
+
+	async def eval(self, *_args, **_kwargs):
+		return 1
+
+	async def ping(self):
+		return True
+
 	async def lpush(self, *_args, **_kwargs):
 		return 1
+
+	async def ltrim(self, *_args, **_kwargs):
+		return True
 
 	async def lrange(self, *_args, **_kwargs):
 		return []
@@ -80,6 +92,25 @@ class NoOpRedisModule:
 	@staticmethod
 	def from_url(*_args, **_kwargs) -> NoOpRedis:
 		return NoOpRedis()
+
+
+class NoOpAsyncpgPool:
+	"""Asyncpg Pool-compatible placeholder used for import-time annotations."""
+
+
+class NoOpAsyncpgConnection:
+	"""Asyncpg Connection-compatible placeholder used for annotations."""
+
+
+class NoOpAsyncpgModule:
+	"""Asyncpg module-shaped object for standalone imports."""
+
+	Pool = NoOpAsyncpgPool
+	Connection = NoOpAsyncpgConnection
+
+	@staticmethod
+	async def create_pool(*_args, **_kwargs) -> NoOpAsyncpgPool:
+		return NoOpAsyncpgPool()
 
 
 class NoOpClientTimeout:
@@ -150,3 +181,115 @@ class NoOpAiohttpModule:
 	class TCPConnector:
 		def __init__(self, *_args, **_kwargs):
 			pass
+
+
+class StandaloneCoreObject:
+	"""Permissive APG-core fallback object."""
+
+	def __init__(self, *args, **kwargs):
+		self.args = args
+		self.kwargs = kwargs
+
+	def __getattr__(self, name: str):
+		async def _async_noop(*_args, **_kwargs):
+			return None
+
+		return _async_noop
+
+
+class StandaloneEvent(StandaloneCoreObject):
+	"""Minimal event fallback."""
+
+
+class StandaloneEventBus(StandaloneCoreObject):
+	"""Minimal event bus fallback."""
+
+	async def publish(self, *_args, **_kwargs):
+		return None
+
+	async def subscribe(self, *_args, **_kwargs):
+		return None
+
+
+class StandaloneCapability(StandaloneCoreObject):
+	"""Minimal APG capability fallback."""
+
+
+class StandaloneCapabilityInfo(StandaloneCoreObject):
+	"""Minimal APG capability info fallback."""
+
+
+class StandaloneCapabilityStatus:
+	INITIALIZING = "initializing"
+	READY = "ready"
+	STOPPING = "stopping"
+	STOPPED = "stopped"
+	ACTIVE = "active"
+	INACTIVE = "inactive"
+	HEALTHY = "healthy"
+	UNHEALTHY = "unhealthy"
+	ERROR = "error"
+	FAILED = "failed"
+
+
+class StandaloneRegistry(StandaloneCoreObject):
+	async def register(self, *_args, **_kwargs):
+		return True
+
+
+capability_registry = StandaloneRegistry()
+
+
+class StandaloneModel:
+	"""Permissive placeholder for legacy UI model classes."""
+
+	def __init__(self, **values):
+		self.__dict__.update(values)
+
+
+class StandaloneView:
+	"""Permissive placeholder for legacy Flask-AppBuilder view classes."""
+
+
+class StandaloneWidget:
+	"""Permissive placeholder for legacy Flask-AppBuilder widgets."""
+
+
+class StandaloneForm:
+	"""Permissive placeholder for legacy WTForms forms."""
+
+
+class StandaloneField:
+	"""Permissive placeholder for legacy WTForms fields and validators."""
+
+	def __init__(self, *args, **kwargs):
+		self.args = args
+		self.kwargs = kwargs
+
+
+def standalone_expose(*_args, **_kwargs):
+	def _decorator(func):
+		return func
+	return _decorator
+
+
+def standalone_has_access(func=None, *_args, **_kwargs):
+	if func is None:
+		return lambda wrapped: wrapped
+	return func
+
+
+standalone_protect = standalone_has_access
+
+
+class StandaloneSQLAInterface:
+	def __init__(self, model):
+		self.model = model
+
+
+class StandaloneSQLA:
+	"""Minimal SQLA placeholder for legacy blueprint annotations."""
+
+
+def standalone_lazy_gettext(value: str) -> str:
+	return value

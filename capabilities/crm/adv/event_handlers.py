@@ -18,9 +18,18 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 
-# APG Core imports (these would be actual APG framework imports)
-from apg.core.events import EventBus, Event, EventHandler, EventSubscriber
-from apg.core.auth import UserContext
+# APG Core imports. Standalone fallbacks keep this module importable without
+# an installed APG runtime package.
+try:
+	from apg.core.events import EventBus, Event, EventHandler, EventSubscriber
+	from apg.core.auth import UserContext
+except ModuleNotFoundError:
+	from .standalone_support import StandaloneCoreObject, StandaloneEvent, StandaloneEventBus
+	EventBus = StandaloneEventBus
+	Event = StandaloneEvent
+	EventHandler = StandaloneCoreObject
+	EventSubscriber = StandaloneCoreObject
+	UserContext = StandaloneCoreObject
 
 # Local imports
 from .models import CRMContact, CRMAccount, CRMLead, CRMOpportunity, CRMActivity

@@ -17,7 +17,7 @@ from datetime import datetime, date
 from typing import Dict, List, Any, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Query, Path, Body, Request, status
+from fastapi import FastAPI, HTTPException, Depends, Query, Path, Body, Request, Header, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -71,7 +71,7 @@ class ContactCreateRequest(BaseModel):
 	"""Contact creation request"""
 	first_name: str = Field(..., min_length=1, max_length=100)
 	last_name: str = Field(..., min_length=1, max_length=100)
-	email: Optional[str] = Field(None, regex=r'^[^@]+@[^@]+\.[^@]+$')
+	email: Optional[str] = Field(None, pattern=r'^[^@]+@[^@]+\.[^@]+$')
 	phone: Optional[str] = Field(None, max_length=50)
 	job_title: Optional[str] = Field(None, max_length=200)
 	company: Optional[str] = Field(None, max_length=200)
@@ -86,7 +86,7 @@ class ContactUpdateRequest(BaseModel):
 	"""Contact update request"""
 	first_name: Optional[str] = Field(None, min_length=1, max_length=100)
 	last_name: Optional[str] = Field(None, min_length=1, max_length=100)
-	email: Optional[str] = Field(None, regex=r'^[^@]+@[^@]+\.[^@]+$')
+	email: Optional[str] = Field(None, pattern=r'^[^@]+@[^@]+\.[^@]+$')
 	phone: Optional[str] = Field(None, max_length=50)
 	job_title: Optional[str] = Field(None, max_length=200)
 	company: Optional[str] = Field(None, max_length=200)
@@ -199,6 +199,9 @@ async def get_crm_service() -> CRMService:
 			detail="CRM service not available"
 		)
 	return _service_instance
+
+
+get_service = get_crm_service
 
 
 def _clean_text(value: Any) -> Optional[str]:

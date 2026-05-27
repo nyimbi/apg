@@ -26,13 +26,44 @@ from uuid_extensions import uuid7str
 from pydantic import BaseModel, Field, ConfigDict, field_validator, AfterValidator
 from annotated_types import Annotated
 
-import asyncpg
-import redis.asyncio as redis
+try:
+	import asyncpg
+except ModuleNotFoundError:
+	from .standalone_support import NoOpAsyncpgModule as asyncpg
+try:
+	import redis.asyncio as redis
+except ModuleNotFoundError:
+	from .standalone_support import NoOpRedisModule as redis
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-import pyotp
-import qrcode
+try:
+	import pyotp
+except ModuleNotFoundError:
+	class pyotp:
+		class TOTP:
+			def __init__(self, secret: str):
+				self.secret = secret
+
+			def verify(self, *_args, **_kwargs) -> bool:
+				return False
+
+			def provisioning_uri(self, *_args, **_kwargs) -> str:
+				return f"otpauth://totp/{self.secret}"
+
+		@staticmethod
+		def random_base32() -> str:
+			return "A" * 32
+try:
+	import qrcode
+except ModuleNotFoundError:
+	class qrcode:
+		@staticmethod
+		def make(*_args, **_kwargs):
+			class _QRCode:
+				def save(self, *_save_args, **_save_kwargs):
+					return None
+			return _QRCode()
 from io import BytesIO
 import base64
 

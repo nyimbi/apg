@@ -11,31 +11,82 @@ from datetime import datetime, date, timedelta
 from typing import Dict, List, Any, Optional
 from decimal import Decimal
 
-from flask import request, flash, redirect, url_for, jsonify, render_template, abort
-from flask_appbuilder import ModelView, BaseView, has_access, expose
-from flask_appbuilder.models.sqla.interface import SQLAInterface
-from flask_appbuilder.charts.views import GroupByChartView, TimeChartView
-from flask_appbuilder.widgets import ListWidget, ShowWidget, EditWidget
-from flask_appbuilder.forms import DynamicForm
-from flask_appbuilder.security.decorators import protect
-from flask_babel import lazy_gettext as _
-from wtforms import Form, StringField, SelectField, DecimalField, DateField, TextAreaField, BooleanField
-from wtforms.validators import DataRequired, Email, Optional as WTFOptional, Length, NumberRange
+try:
+	from flask import request, flash, redirect, url_for, jsonify, render_template, abort
+	from flask_appbuilder import ModelView, BaseView, has_access, expose
+	from flask_appbuilder.models.sqla.interface import SQLAInterface
+	from flask_appbuilder.charts.views import GroupByChartView, TimeChartView
+	from flask_appbuilder.widgets import ListWidget, ShowWidget, EditWidget
+	from flask_appbuilder.forms import DynamicForm
+	from flask_appbuilder.security.decorators import protect
+	from flask_babel import lazy_gettext as _
+	from wtforms import Form, StringField, SelectField, DecimalField, DateField, TextAreaField, BooleanField
+	from wtforms.validators import DataRequired, Email, Optional as WTFOptional, Length, NumberRange
+except Exception:
+	from .standalone_support import (
+		StandaloneField,
+		StandaloneForm,
+		StandaloneSQLAInterface,
+		StandaloneView,
+		StandaloneWidget,
+		standalone_expose,
+		standalone_has_access,
+		standalone_lazy_gettext,
+		standalone_protect,
+	)
+	request = None
+	flash = redirect = url_for = jsonify = render_template = abort = lambda *args, **kwargs: None
+	ModelView = BaseView = GroupByChartView = TimeChartView = StandaloneView
+	ListWidget = ShowWidget = EditWidget = StandaloneWidget
+	DynamicForm = Form = StandaloneForm
+	StringField = SelectField = DecimalField = DateField = TextAreaField = BooleanField = StandaloneField
+	DataRequired = Email = WTFOptional = Length = NumberRange = StandaloneField
+	SQLAInterface = StandaloneSQLAInterface
+	has_access = standalone_has_access
+	expose = standalone_expose
+	protect = standalone_protect
+	_ = standalone_lazy_gettext
 
-from .models import (
-	GCCRMAccount, GCCRMCustomer, GCCRMContact, GCCRMLead, GCCRMOpportunity,
-	GCCRMSalesStage, GCCRMActivity, GCCRMTask, GCCRMAppointment, GCCRMCampaign,
-	GCCRMCampaignMember, GCCRMMarketingList, GCCRMEmailTemplate, GCCRMCase,
-	GCCRMCaseComment, GCCRMProduct, GCCRMPriceList, GCCRMQuote, GCCRMQuoteLine,
-	GCCRMTerritory, GCCRMTeam, GCCRMForecast, GCCRMDashboardWidget, GCCRMReport,
-	GCCRMLeadSource, GCCRMCustomerSegment, GCCRMCustomerScore, GCCRMSocialProfile,
-	GCCRMCommunication, GCCRMWorkflowDefinition, GCCRMWorkflowExecution,
-	GCCRMNotification, GCCRMKnowledgeBase, GCCRMCustomField, GCCRMCustomFieldValue,
-	GCCRMDocumentAttachment, GCCRMEventLog, GCCRMSystemConfiguration,
-	GCCRMWebhookEndpoint, GCCRMWebhookDelivery, LeadStatus, LeadRating,
-	OpportunityStage, ActivityType, ActivityStatus, CaseStatus, CasePriority
-)
-from .service import CRMService, create_crm_service
+try:
+	from .models import (
+		GCCRMAccount, GCCRMCustomer, GCCRMContact, GCCRMLead, GCCRMOpportunity,
+		GCCRMSalesStage, GCCRMActivity, GCCRMTask, GCCRMAppointment, GCCRMCampaign,
+		GCCRMCampaignMember, GCCRMMarketingList, GCCRMEmailTemplate, GCCRMCase,
+		GCCRMCaseComment, GCCRMProduct, GCCRMPriceList, GCCRMQuote, GCCRMQuoteLine,
+		GCCRMTerritory, GCCRMTeam, GCCRMForecast, GCCRMDashboardWidget, GCCRMReport,
+		GCCRMLeadSource, GCCRMCustomerSegment, GCCRMCustomerScore, GCCRMSocialProfile,
+		GCCRMCommunication, GCCRMWorkflowDefinition, GCCRMWorkflowExecution,
+		GCCRMNotification, GCCRMKnowledgeBase, GCCRMCustomField, GCCRMCustomFieldValue,
+		GCCRMDocumentAttachment, GCCRMEventLog, GCCRMSystemConfiguration,
+		GCCRMWebhookEndpoint, GCCRMWebhookDelivery, LeadStatus, LeadRating,
+		OpportunityStage, ActivityType, ActivityStatus, CaseStatus, CasePriority
+	)
+except ImportError:
+	from .standalone_support import StandaloneModel
+	from .models import ActivityStatus, ActivityType, LeadStatus, OpportunityStage
+	LeadRating = CaseStatus = CasePriority = StandaloneModel
+	for _model_name in (
+		"GCCRMAccount", "GCCRMCustomer", "GCCRMContact", "GCCRMLead",
+		"GCCRMOpportunity", "GCCRMSalesStage", "GCCRMActivity", "GCCRMTask",
+		"GCCRMAppointment", "GCCRMCampaign", "GCCRMCampaignMember",
+		"GCCRMMarketingList", "GCCRMEmailTemplate", "GCCRMCase",
+		"GCCRMCaseComment", "GCCRMProduct", "GCCRMPriceList", "GCCRMQuote",
+		"GCCRMQuoteLine", "GCCRMTerritory", "GCCRMTeam", "GCCRMForecast",
+		"GCCRMDashboardWidget", "GCCRMReport", "GCCRMLeadSource",
+		"GCCRMCustomerSegment", "GCCRMCustomerScore", "GCCRMSocialProfile",
+		"GCCRMCommunication", "GCCRMWorkflowDefinition", "GCCRMWorkflowExecution",
+		"GCCRMNotification", "GCCRMKnowledgeBase", "GCCRMCustomField",
+		"GCCRMCustomFieldValue", "GCCRMDocumentAttachment", "GCCRMEventLog",
+		"GCCRMSystemConfiguration", "GCCRMWebhookEndpoint", "GCCRMWebhookDelivery",
+	):
+		globals()[_model_name] = type(_model_name, (StandaloneModel,), {})
+	globals().pop("_model_name", None)
+from .service import CRMService
+try:
+	from .service import create_crm_service
+except ImportError:
+	def create_crm_service(*args, **kwargs):
+		return CRMService(*args, **kwargs)
 
 # Configure logging
 logger = logging.getLogger(__name__)

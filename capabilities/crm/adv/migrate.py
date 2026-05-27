@@ -28,7 +28,10 @@ logger = logging.getLogger(__name__)
 # Add migrations directory to path
 sys.path.append(str(Path(__file__).parent))
 
-from migrations.migration_manager import MigrationManager, MigrationError
+try:
+	from .migrations.migration_manager import MigrationManager, MigrationError
+except ImportError:
+	from migrations.migration_manager import MigrationManager, MigrationError
 
 
 class MigrationRunner:

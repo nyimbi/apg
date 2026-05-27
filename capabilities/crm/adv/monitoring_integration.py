@@ -21,9 +21,18 @@ from enum import Enum
 import json
 from collections import defaultdict, deque
 
-# APG Core imports (these would be actual APG framework imports)
-from apg.core.monitoring import APGMonitoring, MetricCollector, AlertManager
-from apg.core.events import EventBus, Event
+# APG Core imports. Standalone fallbacks keep this module importable without
+# an installed APG runtime package.
+try:
+	from apg.core.monitoring import APGMonitoring, MetricCollector, AlertManager
+	from apg.core.events import EventBus, Event
+except ModuleNotFoundError:
+	from .standalone_support import StandaloneCoreObject, StandaloneEvent, StandaloneEventBus
+	APGMonitoring = StandaloneCoreObject
+	MetricCollector = StandaloneCoreObject
+	AlertManager = StandaloneCoreObject
+	EventBus = StandaloneEventBus
+	Event = StandaloneEvent
 
 # Local imports
 from .service import CRMService

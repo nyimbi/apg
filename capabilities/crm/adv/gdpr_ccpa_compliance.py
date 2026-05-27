@@ -21,8 +21,14 @@ from uuid_extensions import uuid7str
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import xml.etree.ElementTree as ET
 
-import asyncpg
-import redis.asyncio as redis
+try:
+	import asyncpg
+except ModuleNotFoundError:
+	from .standalone_support import NoOpAsyncpgModule as asyncpg
+try:
+	import redis.asyncio as redis
+except ModuleNotFoundError:
+	from .standalone_support import NoOpRedisModule as redis
 
 
 logger = logging.getLogger(__name__)

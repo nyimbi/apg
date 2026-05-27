@@ -4,6 +4,7 @@ import asyncio
 import importlib
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
 
 from capabilities.crm.adv.database import DatabaseManager
 from capabilities.crm.adv.models import (
@@ -136,14 +137,9 @@ def test_crm_service_imports_with_optional_integrations_absent():
 
 def test_optional_crm_integration_modules_import_standalone():
 	modules = [
-		"email_integration",
-		"predictive_analytics",
-		"performance_benchmarking",
-		"api_gateway",
-		"webhook_management",
-		"third_party_integration",
-		"realtime_sync",
-		"api_versioning",
+		path.stem
+		for path in sorted(Path("capabilities/crm/adv").glob("*.py"))
+		if not path.name.startswith("__")
 	]
 
 	for module_name in modules:

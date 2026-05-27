@@ -15,7 +15,10 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from enum import Enum
-import asyncpg
+try:
+	import asyncpg
+except ModuleNotFoundError:
+	from ..standalone_support import NoOpAsyncpgModule as asyncpg
 
 
 logger = logging.getLogger(__name__)

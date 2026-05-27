@@ -17,10 +17,24 @@ from typing import Dict, List, Any, Optional, Set
 from dataclasses import dataclass
 from enum import Enum
 
-# APG Core imports (these would be actual APG framework imports)
-from apg.core.discovery import ServiceDiscovery, ServiceInfo, ServiceStatus
-from apg.core.events import EventBus, Event
-from apg.core.monitoring import ServiceHealthMonitor
+# APG Core imports. Standalone fallbacks keep this module importable without
+# an installed APG runtime package.
+try:
+	from apg.core.discovery import ServiceDiscovery, ServiceInfo, ServiceStatus
+	from apg.core.events import EventBus, Event
+	from apg.core.monitoring import ServiceHealthMonitor
+except ModuleNotFoundError:
+	from .standalone_support import StandaloneCoreObject, StandaloneEvent, StandaloneEventBus
+	ServiceDiscovery = StandaloneCoreObject
+	ServiceInfo = StandaloneCoreObject
+	class ServiceStatus:
+		HEALTHY = "healthy"
+		UNHEALTHY = "unhealthy"
+		DEGRADED = "degraded"
+		UNKNOWN = "unknown"
+	ServiceHealthMonitor = StandaloneCoreObject
+	EventBus = StandaloneEventBus
+	Event = StandaloneEvent
 
 
 logger = logging.getLogger(__name__)

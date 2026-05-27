@@ -19,15 +19,31 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from fastapi import HTTPException
 
-# APG Core imports (these would be actual APG framework imports)
-from apg.core.capability import APGCapability, CapabilityInfo, CapabilityStatus
-from apg.core.registry import capability_registry
-from apg.core.discovery import ServiceDiscovery
-from apg.core.events import EventBus
-from apg.core.config import APGConfigManager
-from apg.core.monitoring import APGMonitoring
-from apg.core.auth import APGAuthProvider
-from apg.core.gateway import APGGateway
+# APG Core imports. Standalone fallbacks keep this module importable without
+# an installed APG runtime package.
+try:
+	from apg.core.capability import APGCapability, CapabilityInfo, CapabilityStatus
+	from apg.core.registry import capability_registry
+	from apg.core.discovery import ServiceDiscovery
+	from apg.core.events import EventBus
+	from apg.core.config import APGConfigManager
+	from apg.core.monitoring import APGMonitoring
+	from apg.core.auth import APGAuthProvider
+	from apg.core.gateway import APGGateway
+except ModuleNotFoundError:
+	from .standalone_support import (
+		StandaloneCapability as APGCapability,
+		StandaloneCapabilityInfo as CapabilityInfo,
+		StandaloneCapabilityStatus as CapabilityStatus,
+		StandaloneCoreObject,
+		StandaloneEventBus as EventBus,
+		capability_registry,
+	)
+	ServiceDiscovery = StandaloneCoreObject
+	APGConfigManager = StandaloneCoreObject
+	APGMonitoring = StandaloneCoreObject
+	APGAuthProvider = StandaloneCoreObject
+	APGGateway = StandaloneCoreObject
 
 # Local imports
 from .service import CRMService

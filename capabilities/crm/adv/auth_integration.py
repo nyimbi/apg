@@ -22,9 +22,19 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 import os
 
-# APG Core imports (these would be actual APG framework imports)
-from apg.core.auth import APGAuthProvider, UserContext, Permission, Role
-from apg.core.rbac import RBACManager, AccessPolicy
+# APG Core imports. Standalone fallbacks keep this module importable without
+# an installed APG runtime package.
+try:
+	from apg.core.auth import APGAuthProvider, UserContext, Permission, Role
+	from apg.core.rbac import RBACManager, AccessPolicy
+except ModuleNotFoundError:
+	from .standalone_support import StandaloneCoreObject
+	APGAuthProvider = StandaloneCoreObject
+	UserContext = StandaloneCoreObject
+	Permission = StandaloneCoreObject
+	Role = StandaloneCoreObject
+	RBACManager = StandaloneCoreObject
+	AccessPolicy = StandaloneCoreObject
 
 
 logger = logging.getLogger(__name__)

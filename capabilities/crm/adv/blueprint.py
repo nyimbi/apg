@@ -10,26 +10,74 @@ import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-from flask import Blueprint, current_app, g, request, jsonify, session, has_request_context
-from flask_appbuilder import AppBuilder, SQLA
-from flask_appbuilder.security.decorators import has_access
-from flask_babel import lazy_gettext as _
+try:
+	from flask import Blueprint, current_app, g, request, jsonify, session, has_request_context
+	from flask_appbuilder import AppBuilder, SQLA
+	from flask_appbuilder.security.decorators import has_access
+	from flask_babel import lazy_gettext as _
+except Exception:
+	from .standalone_support import (
+		StandaloneSQLA,
+		StandaloneView,
+		standalone_has_access,
+		standalone_lazy_gettext,
+	)
+	Blueprint = lambda *args, **kwargs: StandaloneView()
+	AppBuilder = StandaloneView
+	SQLA = StandaloneSQLA
+	current_app = g = request = session = None
+	jsonify = lambda *args, **kwargs: {}
+	has_request_context = lambda: False
+	has_access = standalone_has_access
+	_ = standalone_lazy_gettext
 
-from .models import (
-	GCCRMAccount, GCCRMCustomer, GCCRMContact, GCCRMLead, GCCRMOpportunity,
-	GCCRMSalesStage, GCCRMActivity, GCCRMTask, GCCRMAppointment, GCCRMCampaign,
-	GCCRMCampaignMember, GCCRMMarketingList, GCCRMEmailTemplate, GCCRMCase,
-	GCCRMCaseComment, GCCRMProduct, GCCRMPriceList, GCCRMQuote, GCCRMQuoteLine,
-	GCCRMTerritory, GCCRMTeam, GCCRMForecast, GCCRMDashboardWidget, GCCRMReport,
-	GCCRMLeadSource, GCCRMCustomerSegment, GCCRMCustomerScore, GCCRMSocialProfile,
-	GCCRMCommunication, GCCRMWorkflowDefinition, GCCRMWorkflowExecution,
-	GCCRMNotification, GCCRMKnowledgeBase, GCCRMCustomField, GCCRMCustomFieldValue,
-	GCCRMDocumentAttachment, GCCRMEventLog, GCCRMSystemConfiguration,
-	GCCRMWebhookEndpoint, GCCRMWebhookDelivery
-)
-from .views import register_crm_views
-from .api import init_crm_api
-from .service import CRMService, create_crm_service
+try:
+	from .models import (
+		GCCRMAccount, GCCRMCustomer, GCCRMContact, GCCRMLead, GCCRMOpportunity,
+		GCCRMSalesStage, GCCRMActivity, GCCRMTask, GCCRMAppointment, GCCRMCampaign,
+		GCCRMCampaignMember, GCCRMMarketingList, GCCRMEmailTemplate, GCCRMCase,
+		GCCRMCaseComment, GCCRMProduct, GCCRMPriceList, GCCRMQuote, GCCRMQuoteLine,
+		GCCRMTerritory, GCCRMTeam, GCCRMForecast, GCCRMDashboardWidget, GCCRMReport,
+		GCCRMLeadSource, GCCRMCustomerSegment, GCCRMCustomerScore, GCCRMSocialProfile,
+		GCCRMCommunication, GCCRMWorkflowDefinition, GCCRMWorkflowExecution,
+		GCCRMNotification, GCCRMKnowledgeBase, GCCRMCustomField, GCCRMCustomFieldValue,
+		GCCRMDocumentAttachment, GCCRMEventLog, GCCRMSystemConfiguration,
+		GCCRMWebhookEndpoint, GCCRMWebhookDelivery
+	)
+except ImportError:
+	from .standalone_support import StandaloneModel
+	for _model_name in (
+		"GCCRMAccount", "GCCRMCustomer", "GCCRMContact", "GCCRMLead",
+		"GCCRMOpportunity", "GCCRMSalesStage", "GCCRMActivity", "GCCRMTask",
+		"GCCRMAppointment", "GCCRMCampaign", "GCCRMCampaignMember",
+		"GCCRMMarketingList", "GCCRMEmailTemplate", "GCCRMCase",
+		"GCCRMCaseComment", "GCCRMProduct", "GCCRMPriceList", "GCCRMQuote",
+		"GCCRMQuoteLine", "GCCRMTerritory", "GCCRMTeam", "GCCRMForecast",
+		"GCCRMDashboardWidget", "GCCRMReport", "GCCRMLeadSource",
+		"GCCRMCustomerSegment", "GCCRMCustomerScore", "GCCRMSocialProfile",
+		"GCCRMCommunication", "GCCRMWorkflowDefinition", "GCCRMWorkflowExecution",
+		"GCCRMNotification", "GCCRMKnowledgeBase", "GCCRMCustomField",
+		"GCCRMCustomFieldValue", "GCCRMDocumentAttachment", "GCCRMEventLog",
+		"GCCRMSystemConfiguration", "GCCRMWebhookEndpoint", "GCCRMWebhookDelivery",
+	):
+		globals()[_model_name] = type(_model_name, (StandaloneModel,), {})
+	globals().pop("_model_name", None)
+try:
+	from .views import register_crm_views
+except Exception:
+	def register_crm_views(*_args, **_kwargs):
+		return None
+try:
+	from .api import init_crm_api
+except Exception:
+	def init_crm_api(*_args, **_kwargs):
+		return None
+from .service import CRMService
+try:
+	from .service import create_crm_service
+except ImportError:
+	def create_crm_service(*args, **kwargs):
+		return CRMService(*args, **kwargs)
 
 # Configure logging
 logger = logging.getLogger(__name__)

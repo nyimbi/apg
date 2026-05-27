@@ -4498,3 +4498,20 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `d8ac9fe` (`Make CRM optional adapters import standalone`) to `origin/main`.
+
+### 2026-05-27 18:22 EAT
+
+Completed checkpoint:
+
+- Made every top-level `capabilities/crm/adv/*.py` module import in the standalone checkout.
+- Added standalone asyncpg, APG-core, Flask-AppBuilder, WTForms, model, and UI placeholders needed for import-time compatibility.
+- Repaired remaining CRM import blockers: missing `pyotp`/`qrcode`, missing `Header`, Pydantic `regex` usage, migration asyncpg annotations, legacy `get_service` alias, legacy UI model imports, and APG-core integration imports.
+- Extended the focused CRM test to import every top-level advanced CRM module dynamically.
+
+Battery-conscious verification:
+
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 4 passed, 9 existing deprecation warnings
+- `.venv/bin/python -m py_compile` on the repaired CRM import-gate files and focused test
+- `.venv/bin/python - <<'PY' ... import every capabilities/crm/adv/*.py module ... PY` -> `FAILURES 0`
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.

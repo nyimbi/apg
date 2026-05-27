@@ -16,7 +16,10 @@ import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Type
 from pathlib import Path
-import asyncpg
+try:
+	import asyncpg
+except ModuleNotFoundError:
+	from ..standalone_support import NoOpAsyncpgModule as asyncpg
 from collections import defaultdict, deque
 
 from .base_migration import BaseMigration, MigrationDirection, MigrationStatus
