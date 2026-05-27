@@ -259,6 +259,24 @@ def test_crm_api_lists_core_records_without_placeholders():
 			user_id="seller-1",
 		)
 		metrics = await crm_api.get_metrics(service=service, tenant_id="tenant-api")
+		default_config = await crm_api.get_configuration(
+			service=service,
+			tenant_id="tenant-api",
+		)
+		updated_config = await crm_api.update_configuration(
+			update_data={
+				"default_lead_score_threshold": 82.5,
+				"max_records_per_page": 250,
+				"ai_recommendations_enabled": False,
+			},
+			service=service,
+			tenant_id="tenant-api",
+			user_id="admin-1",
+		)
+		other_tenant_config = await crm_api.get_configuration(
+			service=service,
+			tenant_id="tenant-other",
+		)
 
 		assert [item["id"] for item in accounts.data["items"]] == [account.id]
 		assert accounts.data["total_count"] == 1
@@ -287,6 +305,11 @@ def test_crm_api_lists_core_records_without_placeholders():
 			"activities": 1,
 			"time_entries": 1,
 		}
+		assert default_config.data["default_lead_score_threshold"] == 70.0
+		assert updated_config.data["default_lead_score_threshold"] == 82.5
+		assert updated_config.data["max_records_per_page"] == 250
+		assert updated_config.data["ai_recommendations_enabled"] is False
+		assert other_tenant_config.data["default_lead_score_threshold"] == 70.0
 
 	asyncio.run(exercise())
 

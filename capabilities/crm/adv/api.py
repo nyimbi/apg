@@ -2472,14 +2472,44 @@ async def get_account_communication_timeline(
 
 @app.get("/config", response_model=APIResponse)
 async def get_configuration(
+	service: CRMService = Depends(get_crm_service),
 	tenant_id: str = Depends(get_tenant_id)
 ):
 	"""Get CRM configuration"""
-	# TODO: Implement proper configuration management
-	config = CRMCapabilityConfig()
+	try:
+		config = await service.get_configuration(tenant_id)
+	except Exception as e:
+		logger.error(f"Configuration retrieval failed: {str(e)}", exc_info=True)
+		raise HTTPException(status_code=500, detail="Failed to retrieve configuration")
 	
 	return APIResponse(
 		message="Configuration retrieved successfully",
+		data=config.model_dump()
+	)
+
+
+@app.put("/config", response_model=APIResponse)
+async def update_configuration(
+	update_data: Dict[str, Any] = Body(...),
+	service: CRMService = Depends(get_crm_service),
+	tenant_id: str = Depends(get_tenant_id),
+	user_id: str = Depends(get_user_id)
+):
+	"""Update CRM configuration for a tenant"""
+	try:
+		config = await service.update_configuration(
+			tenant_id=tenant_id,
+			updates=update_data,
+			updated_by=user_id
+		)
+	except ValidationError as e:
+		raise HTTPException(status_code=422, detail=str(e))
+	except Exception as e:
+		logger.error(f"Configuration update failed: {str(e)}", exc_info=True)
+		raise HTTPException(status_code=500, detail="Failed to update configuration")
+
+	return APIResponse(
+		message="Configuration updated successfully",
 		data=config.model_dump()
 	)
 

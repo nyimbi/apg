@@ -69,7 +69,7 @@ def _fallback_record_class(name: str):
 from .models import (
 	CRMContact, CRMAccount, CRMLead, CRMOpportunity, CRMActivity, CRMCampaign,
 	ContactType, AccountType, LeadStatus, OpportunityStage, ActivityType,
-	RecordStatus, LeadSource, Priority
+	RecordStatus, LeadSource, Priority, CRMCapabilityConfig
 )
 from .database import DatabaseManager as CRMDatabaseManager
 from .ai_insights import CRMAIInsights
@@ -282,6 +282,7 @@ class CRMService:
 		self.realtime_sync = RealTimeSyncEngine(self.db_manager.get_connection_pool())
 		self.api_versioning = APIVersioningManager(self.db_manager.get_connection_pool())
 		self._time_tracking_entries: Dict[str, Dict[str, Any]] = {}
+		self._tenant_configurations: Dict[str, CRMCapabilityConfig] = {}
 		self._initialized = False
 	
 	async def initialize(self):
@@ -448,6 +449,34 @@ class CRMService:
 		}
 		self._time_tracking_entries[entry["id"]] = entry
 		return dict(entry)
+
+	async def get_configuration(self, tenant_id: str) -> CRMCapabilityConfig:
+		"""Return tenant-specific CRM configuration, creating defaults on first access."""
+		if tenant_id not in self._tenant_configurations:
+			self._tenant_configurations[tenant_id] = CRMCapabilityConfig()
+		return self._tenant_configurations[tenant_id].model_copy(deep=True)
+
+	async def update_configuration(
+		self,
+		tenant_id: str,
+		updates: Dict[str, Any],
+		updated_by: str = None
+	) -> CRMCapabilityConfig:
+		"""Validate and persist tenant-specific CRM configuration updates."""
+		current = await self.get_configuration(tenant_id)
+		next_data = current.model_dump()
+		next_data.update({
+			key: value for key, value in (updates or {}).items()
+			if value is not None
+		})
+		updated = CRMCapabilityConfig(**next_data)
+		self._tenant_configurations[tenant_id] = updated
+		logger.info(
+			"Updated CRM configuration for tenant %s by %s",
+			tenant_id,
+			updated_by or "system"
+		)
+		return updated.model_copy(deep=True)
 	
 	# ================================
 	# Contact Management

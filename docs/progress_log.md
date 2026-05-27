@@ -4601,3 +4601,20 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `ac9b476` (`Make CRM dashboard analytics executable`) to `origin/main`.
+
+### 2026-05-27 18:52 EAT
+
+Completed checkpoint:
+
+- Replaced the CRM `/config` endpoint's static default-response behavior with service-backed tenant configuration management.
+- Added `CRMService.get_configuration()` and `CRMService.update_configuration()` with tenant isolation and `CRMCapabilityConfig` validation.
+- Added `PUT /config` so callers can update capability configuration through the API instead of receiving immutable defaults.
+- Extended focused CRM API coverage to verify default configuration, tenant-specific updates, validation-backed values, and cross-tenant isolation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/adv/service.py capabilities/crm/adv/api.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 5 passed, 9 existing deprecation warnings
+- `rg -n "TODO: Implement proper configuration management" capabilities/crm/adv/api.py capabilities/crm/adv/service.py tests/test_crm_adv_core_records.py` -> no matches
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.
