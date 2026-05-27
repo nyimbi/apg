@@ -100,6 +100,44 @@ def test_capability_declaration_generates_runtime_manifest():
     assert namespace["capabilities_by_erp_module"]()["general_ledger"][0].name == "GeneralLedger"
     assert namespace["provided_services"]()["journal_entries"] == ["GeneralLedger"]
 
+    assert namespace["capability_configuration"]("GeneralLedger") == {
+        "currency": "KES",
+        "fiscal_calendar": "monthly",
+    }
+    assert namespace["capability_configuration"](
+        "GeneralLedger",
+        {"currency": "USD", "posting": {"batch_size": 250}},
+    ) == {
+        "currency": "USD",
+        "fiscal_calendar": "monthly",
+        "posting": {"batch_size": 250},
+    }
+    assert namespace["configuration_value"]("GeneralLedger", "currency") == "KES"
+    config_validation = namespace["validate_capability_configuration"]("GeneralLedger")
+    assert config_validation["errors"] == []
+    assert config_validation["warnings"] == []
+    assert namespace["approval_policy"]("GeneralLedger") == {
+        "levels": 2,
+        "approvers": ["controller", "cfo"],
+        "thresholds": {},
+        "segregation_of_duties": False,
+        "escalation": None,
+    }
+    assert namespace["approval_plan"]("GeneralLedger") == {
+        "capability": "GeneralLedger",
+        "required": True,
+        "levels": 2,
+        "approvers": ["controller", "cfo"],
+        "segregation_of_duties": False,
+        "escalation": None,
+    }
+    assert namespace["master_data_entities"]("GeneralLedger") == ["account", "cost_center"]
+    assert namespace["master_data_index"]() == {
+        "account": ["GeneralLedger"],
+        "cost_center": ["GeneralLedger"],
+    }
+    assert namespace["validate_master_data_contracts"]() == {"errors": [], "warnings": []}
+
     assert namespace["capability_theme"]("GeneralLedger") == {
         "name": "finance_ops",
         "tokens": {"accent": "#126E82"},

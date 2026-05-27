@@ -3697,3 +3697,20 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_apg_language_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 19 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 06:19 EAT
+
+Completed checkpoint:
+
+- Made compiled APG capability configuration, approval, and master-data contracts executable from the generated `apg_capabilities.py` manifest.
+- Added `capability_configuration()`, `configuration_value()`, and `validate_capability_configuration()` helpers for configuration resolution and required-key checks.
+- Added `approval_policy()` and `approval_plan()` helpers for declared approval levels, approvers, thresholds, segregation-of-duties, and escalation metadata.
+- Added `master_data_entities()`, `master_data_index()`, and `validate_master_data_contracts()` helpers for ERP master-data discovery and duplicate-entity validation.
+- Extended capability composition regressions to execute configuration overrides, approval planning, and master-data indexing from the generated manifest.
+
+Verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_apg_language_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 19 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

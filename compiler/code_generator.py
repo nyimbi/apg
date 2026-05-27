@@ -353,6 +353,110 @@ def validate_capability_contracts() -> Dict[str, Any]:
     return {{"errors": errors, "warnings": warnings}}
 
 
+def capability_configuration(capability_name: str, overrides: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    config = dict(get_capability(capability_name).configuration or {{}})
+    if overrides:
+        _deep_merge(config, overrides)
+    return config
+
+
+def configuration_value(
+    capability_name: str,
+    key: str,
+    default: Any = None,
+    overrides: Dict[str, Any] | None = None,
+) -> Any:
+    return capability_configuration(capability_name, overrides).get(key, default)
+
+
+def validate_capability_configuration(
+    capability_name: str,
+    configuration: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    capability = get_capability(capability_name)
+    config = capability_configuration(capability_name, configuration or {{}})
+    schema = capability.contract.get("configuration_schema", {{}})
+    required = schema.get("required", list(capability.configuration)) if isinstance(schema, dict) else list(capability.configuration)
+    errors: List[str] = []
+    warnings: List[str] = []
+    for key in required:
+        if key not in config:
+            errors.append(f"{{capability.name}} missing required configuration {{key}}")
+    for key in config:
+        if capability.configuration and key not in capability.configuration:
+            warnings.append(f"{{capability.name}} has undeclared configuration {{key}}")
+    return {{"errors": errors, "warnings": warnings, "configuration": config}}
+
+
+def approval_policy(capability_name: str) -> Dict[str, Any]:
+    approvals = get_capability(capability_name).approvals
+    if isinstance(approvals, dict):
+        return {{
+            "levels": int(approvals.get("levels") or 0),
+            "approvers": [str(approver) for approver in approvals.get("approvers", [])],
+            "thresholds": dict(approvals.get("thresholds") or {{}}),
+            "segregation_of_duties": bool(approvals.get("segregation_of_duties", False)),
+            "escalation": approvals.get("escalation"),
+        }}
+    if isinstance(approvals, list):
+        return {{"levels": len(approvals), "approvers": [str(item) for item in approvals], "thresholds": {{}}, "segregation_of_duties": False, "escalation": None}}
+    return {{"levels": 0, "approvers": [], "thresholds": {{}}, "segregation_of_duties": False, "escalation": None}}
+
+
+def approval_plan(capability_name: str, context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    policy = approval_policy(capability_name)
+    context = context or {{}}
+    amount = context.get("amount")
+    thresholds = policy.get("thresholds", {{}})
+    levels = policy["levels"]
+    if isinstance(amount, (int, float)):
+        for threshold_name, threshold_value in thresholds.items():
+            if isinstance(threshold_value, (int, float)) and amount >= threshold_value:
+                levels = max(levels, int(str(threshold_name).split("_")[-1]) if str(threshold_name).split("_")[-1].isdigit() else levels)
+    return {{
+        "capability": capability_name,
+        "required": levels > 0,
+        "levels": levels,
+        "approvers": policy["approvers"][:levels] if levels else [],
+        "segregation_of_duties": policy["segregation_of_duties"],
+        "escalation": policy["escalation"],
+    }}
+
+
+def master_data_entities(capability_name: str) -> List[str]:
+    master_data = get_capability(capability_name).master_data
+    if isinstance(master_data, dict):
+        entities = master_data.get("entities", [])
+        if isinstance(entities, list):
+            return [str(entity) for entity in entities]
+    if isinstance(master_data, list):
+        return [str(entity) for entity in master_data]
+    return []
+
+
+def master_data_index() -> Dict[str, List[str]]:
+    index: Dict[str, List[str]] = {{}}
+    for capability in CAPABILITIES.values():
+        for entity in master_data_entities(capability.name):
+            index.setdefault(entity, []).append(capability.name)
+    return {{
+        entity: sorted(capability_names)
+        for entity, capability_names in index.items()
+    }}
+
+
+def validate_master_data_contracts() -> Dict[str, List[str]]:
+    errors: List[str] = []
+    warnings: List[str] = []
+    for capability in CAPABILITIES.values():
+        entities = master_data_entities(capability.name)
+        if not entities:
+            warnings.append(f"{{capability.name}} does not declare master data entities")
+        if len(set(entities)) != len(entities):
+            errors.append(f"{{capability.name}} declares duplicate master data entities")
+    return {{"errors": errors, "warnings": warnings}}
+
+
 def capability_theme(capability_name: str, tenant_overrides: Dict[str, Any] | None = None) -> Dict[str, Any]:
     capability = get_capability(capability_name)
     theme = dict(capability.theme or {{}})
