@@ -111,6 +111,7 @@ def test_crm_service_imports_with_optional_integrations_absent():
 	async def exercise():
 		service = CRMService()
 
+		assert service.ai_insights.__class__.__module__ == "capabilities.crm.adv.ai_insights"
 		assert type(service.email_integration_manager).__name__ == "EmailIntegrationManager"
 		assert type(service.realtime_sync).__name__ == "RealTimeSyncEngine"
 
@@ -133,6 +134,32 @@ def test_crm_service_imports_with_optional_integrations_absent():
 
 		assert updated.lead_status == LeadStatus.QUALIFIED
 		assert updated.version == 2
+
+	asyncio.run(exercise())
+
+
+def test_crm_service_uses_executable_ai_insights_engine():
+	async def exercise():
+		service = CRMService()
+
+		account_insight = await service.ai_insights.generate_account_insights(
+			"account-ai",
+			"tenant-ai",
+		)
+		lead_score = await service.ai_insights.calculate_lead_score(
+			"lead-ai",
+			"tenant-ai",
+		)
+		win_probability = await service.ai_insights.calculate_win_probability(
+			"opportunity-ai",
+			"tenant-ai",
+		)
+
+		assert account_insight.entity_id == "account-ai"
+		assert account_insight.tenant_id == "tenant-ai"
+		assert "account_account-ai" in service.ai_insights.insights_cache
+		assert lead_score == 50.0
+		assert win_probability == 0.5
 
 	asyncio.run(exercise())
 

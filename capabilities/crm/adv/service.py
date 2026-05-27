@@ -72,7 +72,7 @@ from .models import (
 	RecordStatus, LeadSource, Priority, CRMCapabilityConfig
 )
 from .database import DatabaseManager as CRMDatabaseManager
-from .ai_insights import CRMAIInsights
+from .ai_insights import CRMAIInsights as CRMAIInsightsEngine
 try:
 	from .analytics import CRMAnalytics
 except ModuleNotFoundError:
@@ -249,7 +249,7 @@ class CRMService:
 		"""
 		self.db_manager = db_manager or CRMDatabaseManager()
 		self.config_manager = config_manager
-		self.ai_insights = CRMAIInsights()
+		self.ai_insights = CRMAIInsightsEngine()
 		self.analytics = CRMAnalytics(self.db_manager)
 		self.relationship_manager = ContactRelationshipManager(self.db_manager)
 		self.activity_tracker = ContactActivityTracker(self.db_manager)

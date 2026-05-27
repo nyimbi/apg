@@ -4622,3 +4622,18 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `df88f00` (`Make CRM configuration executable`) to `origin/main`.
+
+### 2026-05-27 18:57 EAT
+
+Completed checkpoint:
+
+- Fixed CRM service AI insights wiring so `CRMService` instantiates the executable `capabilities.crm.adv.ai_insights.CRMAIInsights` engine instead of the local placeholder class that was shadowing the import.
+- Added focused regression coverage that verifies the service uses the real AI insights module and that account insight generation, lead scoring fallback, win-probability fallback, and insight caching execute.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/adv/service.py tests/test_crm_adv_core_records.py`
+- `.venv/bin/pytest tests/test_crm_adv_core_records.py -q` -> 6 passed, 9 existing deprecation warnings
+- `rg -n "from \\.ai_insights import CRMAIInsights$|self\\.ai_insights = CRMAIInsights\\(" capabilities/crm/adv/service.py tests/test_crm_adv_core_records.py` -> no stale shadowed construction
+- `git diff --check` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.
