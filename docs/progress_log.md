@@ -3563,3 +3563,37 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_gateway_production_validator_reliability_config.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed, 4 existing SQLAlchemy/Pydantic deprecation warnings
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 05:26 EAT
+
+Completed checkpoint:
+
+- Promoted the APG language spec itself to the first compiler baseline before continuing compiler implementation work.
+- Converted `spec/` from an orphan gitlink with no `.gitmodules` mapping into tracked grammar and generated parser artifacts so `spec/apg.g4` is versioned and reproducible from this repository.
+- Extended `spec/apg.g4` with first-class composable capability, capability contract, rule engine, UI contract, visual theme contract, AI agent runtime/tool/memory/handoff, Bytewax-native streaming, and i18n contract language constructs.
+- Added explicit African language code coverage in the grammar with more than 40 supported codes.
+- Regenerated ANTLR parser artifacts from the updated grammar and added grammar-contract regressions.
+
+Verification:
+
+- `antlr -Dlanguage=Python3 -visitor -listener spec/apg.g4` -> generated successfully with existing grammar warnings about `HEX_DIGIT` and optional `module_declaration`
+- `.venv/bin/python -m pytest -q tests/test_apg_language_contract.py tests/test_ai_agent_composition.py tests/test_parser.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 24 passed, 1 existing SQLAlchemy deprecation warning
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --cached --check` -> no issues
+
+### 2026-05-27 05:42 EAT
+
+Completed checkpoint:
+
+- Tightened the APG grammar for rapid ERP composition before compiler implementation work continues.
+- Added first-class ERP entity kinds and domains for finance, general ledger, accounts payable/receivable, procurement, suppliers, inventory, warehouse, sales, CRM, manufacturing, HR, payroll, fixed assets, project accounting, budgeting, tax, compliance, supply chain, service management, and reporting.
+- Added explicit ERP component blocks for component data contracts, APIs, workflows, rules, approvals, permissions, audit, effective dates, master data, UI, theme, and i18n.
+- Extended rule contracts with priority, applies-to scope, effective-from/effective-to windows, exceptions, approvals, and audit metadata so ERP component rules can be declared tersely but precisely.
+- Regenerated ANTLR parser artifacts and extended grammar-contract tests to lock these ERP language capabilities.
+
+Verification:
+
+- `antlr -Dlanguage=Python3 -visitor -listener spec/apg.g4` -> generated successfully with existing grammar warnings about `HEX_DIGIT` and optional `module_declaration`
+- `.venv/bin/python -m pytest -q tests/test_apg_language_contract.py tests/test_ai_agent_composition.py tests/test_parser.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 25 passed, 1 existing SQLAlchemy deprecation warning
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --cached --check` -> no issues

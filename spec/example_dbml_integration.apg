@@ -1,0 +1,227 @@
+// ========================================
+// APG Language - DBML Integration Example
+// Comprehensive Database Schema Definition
+// ========================================
+
+module ecommerce.database version 1.0.0 {
+    description: "E-commerce database schema with comprehensive DBML integration";
+    author: "APG Language Team";
+    license: "MIT";
+}
+
+// Database entity with DBML schema definition
+db EcommerceDB {
+    // Database connection configuration
+    url: "postgresql://localhost:5432/ecommerce";
+    host: "localhost";
+    port: 5432;
+    database: "ecommerce";
+    username: "ecommerce_user";
+    pool_size: 20;
+
+    // DBML Schema Definition
+    schema ecommerce_schema {
+        // User management tables
+        table users [note: "Application users"] {
+            id serial [pk, increment]
+            email varchar(255) [unique, not null]
+            username varchar(50) [unique, not null]
+            password_hash varchar(255) [not null]
+            first_name varchar(100)
+            last_name varchar(100)
+            created_at timestamp [default: now()]
+            updated_at timestamp [default: now()]
+            is_active boolean [default: true]
+
+            indexes {
+                (email) [unique, name: "idx_users_email"]
+                (username) [unique, name: "idx_users_username"]
+                (created_at) [name: "idx_users_created_at"]
+            }
+        }
+
+        // Product catalog
+        table categories {
+            id serial [pk]
+            name varchar(100) [not null]
+            slug varchar(100) [unique, not null]
+            description text
+            parent_id int [ref: > categories.id]
+            created_at timestamp [default: now()]
+
+            indexes {
+                (slug) [unique]
+                (parent_id)
+            }
+        }
+
+        table products [note: "Product catalog with variants"] {
+            id serial [pk]
+            name varchar(200) [not null]
+            slug varchar(200) [unique, not null]
+            description text
+            price decimal(10,2) [not null]
+            category_id int [ref: > categories.id, note: "Product category"]
+            sku varchar(50) [unique]
+            stock_quantity int [default: 0]
+            is_active boolean [default: true]
+            created_at timestamp [default: now()]
+            updated_at timestamp [default: now()]
+
+            indexes {
+                (slug) [unique]
+                (category_id)
+                (sku) [unique]
+                (price)
+                (is_active, created_at)
+            }
+        }
+
+        // Order management
+        table orders {
+            id serial [pk]
+            user_id int [ref: > users.id, note: "Order owner"]
+            order_number varchar(50) [unique, not null]
+            status order_status [not null, default: 'pending']
+            total_amount decimal(10,2) [not null]
+            shipping_address jsonb
+            billing_address jsonb
+            created_at timestamp [default: now()]
+            updated_at timestamp [default: now()]
+
+            indexes {
+                (user_id)
+                (order_number) [unique]
+                (status)
+                (created_at)
+            }
+        }
+
+        table order_items {
+            id serial [pk]
+            order_id int [ref: > orders.id]
+            product_id int [ref: > products.id]
+            quantity int [not null]
+            unit_price decimal(10,2) [not null]
+            total_price decimal(10,2) [not null]
+
+            indexes {
+                (order_id)
+                (product_id)
+            }
+        }
+
+        // Enums for type safety
+        enum order_status {
+            pending [note: "Order created but not paid"]
+            paid [note: "Payment confirmed"]
+            processing [note: "Order being prepared"]
+            shipped [note: "Order dispatched"]
+            delivered [note: "Order received by customer"]
+            cancelled [note: "Order cancelled"]
+            refunded [note: "Order refunded"]
+        }
+
+        enum user_role {
+            customer
+            admin
+            moderator
+        }
+
+        // Complex relationships
+        ref: users.id < user_profiles.user_id
+        ref: products.id < product_images.product_id
+        ref: categories.id < product_categories.category_id
+
+        // Table groups for organization
+        tablegroup user_management {
+            users, user_profiles, user_roles
+        }
+
+        tablegroup catalog {
+            categories, products, product_images
+        }
+
+        tablegroup orders {
+            orders, order_items, payments
+        }
+
+        // Standalone notes for documentation
+        note database_info {
+            '''
+            E-commerce Database Schema
+            - Supports multi-tenant architecture
+            - Includes comprehensive indexing strategy
+            - Implements soft deletes where appropriate
+            - Uses JSONB for flexible address storage
+            '''
+        }
+    }
+}
+
+// Table entity for individual table management
+table UserProfiles {
+    // This shows how individual tables can be defined as entities
+    // while still leveraging the full DBML capabilities
+
+    schema user_profile_schema {
+        table user_profiles {
+            id serial [pk]
+            user_id int [ref: > users.id, unique]
+            avatar_url varchar(500)
+            bio text
+            phone varchar(20)
+            date_of_birth date
+            gender varchar(10)
+            preferences jsonb
+            created_at timestamp [default: now()]
+            updated_at timestamp [default: now()]
+
+            indexes {
+                (user_id) [unique]
+                (phone)
+            }
+        }
+    }
+}
+
+// Integration with other APG features
+agent DatabaseMigrator {
+    // Database migrations using DBML definitions
+    migrate_up: () -> bool = {
+        // Use the schema definitions to generate migrations
+        schema_def = EcommerceDB.schema.ecommerce_schema;
+        return apply_migrations(schema_def);
+    };
+
+    migrate_down: () -> bool = {
+        // Rollback migrations
+        return rollback_migrations();
+    };
+
+    validate_schema: () -> bool = {
+        // Validate current database against DBML schema
+        return validate_against_schema(EcommerceDB.schema);
+    };
+}
+
+// Business logic entity using database types
+biz UserService {
+    // Seamless integration of database types with business logic
+    create_user: (email: varchar(255), username: varchar(50), password: varchar(255)) -> int = {
+        // Direct use of database column types in function signatures
+        user_id = insert_user({
+            email: email,
+            username: username,
+            password_hash: hash_password(password),
+            created_at: now(),
+            is_active: true
+        });
+        return user_id;
+    };
+
+    get_user_orders: (user_id: int) -> list[orders] = {
+        // Return type references the database table structure
+        return query("SELECT * FROM orders WHERE user_id = ?", user_id);
+    };
+}

@@ -1,0 +1,402 @@
+// ========================================
+// APG Language - Extended DBML Integration
+// Triggers, Procedures, Functions, and Vector Storage for AI/ML
+// ========================================
+
+module ai_recommendation.database version 1.2.0 {
+    description: "AI-powered recommendation system with vector search and automated triggers";
+    author: "APG Language Team";
+    license: "MIT";
+}
+
+// Advanced database with AI/ML capabilities
+db RecommendationDB {
+    // Connection configuration
+    url: "postgresql://localhost:5432/recommendations";
+    host: "localhost";
+    port: 5432;
+    database: "recommendations";
+
+    // Comprehensive schema with triggers, procedures, and vector storage
+    schema ai_recommendation_schema {
+
+        // ========================================
+        // CORE TABLES WITH VECTOR EMBEDDINGS
+        // ========================================
+
+        table users {
+            id serial [pk]
+            email varchar(255) [unique, not null]
+            username varchar(50) [unique, not null]
+            preferences jsonb
+            created_at timestamp [default: now()]
+            updated_at timestamp [default: now()]
+
+            // Vector embedding for user preferences (1536 dimensions for OpenAI embeddings)
+            preference_embedding vector(1536) [dimensions: 1536, normalized]
+
+            indexes {
+                (email) [unique]
+                (username) [unique]
+                (created_at)
+            }
+
+            // Vector index for similarity search
+            vector_index idx_user_preferences on users (preference_embedding) [
+                method: hnsw,
+                distance: cosine,
+                ef_construction: 64,
+                ef_search: 40,
+                m: 16
+            ]
+        }
+
+        table products {
+            id serial [pk]
+            name varchar(200) [not null]
+            description text
+            category_id int [ref: > categories.id]
+            price decimal(10,2) [not null]
+
+            // Multiple vector representations for different ML models
+            content_embedding vector(1536) [dimensions: 1536, normalized, note: "Product content embedding"]
+            image_embedding vector(512) [dimensions: 512, normalized, note: "Product image embedding"]
+            feature_vector halfvec(128) [dimensions: 128, note: "Compact feature representation"]
+
+            // Sparse vector for categorical features
+            category_sparse sparsevec(1000) [sparse, note: "Category one-hot encoding"]
+
+            created_at timestamp [default: now()]
+            updated_at timestamp [default: now()]
+
+            indexes {
+                (category_id)
+                (price)
+                (created_at)
+            }
+
+            // Multiple vector indexes for different search types
+            vector_index idx_content_similarity on products (content_embedding) [
+                method: ivfflat,
+                distance: cosine,
+                dimensions: 1536
+            ]
+
+            vector_index idx_visual_similarity on products (image_embedding) [
+                method: hnsw,
+                distance: euclidean,
+                dimensions: 512
+            ]
+        }
+
+        table interactions {
+            id serial [pk]
+            user_id int [ref: > users.id]
+            product_id int [ref: > products.id]
+            interaction_type interaction_enum [not null]
+            rating float [check: (rating >= 1.0 AND rating <= 5.0)]
+            timestamp timestamp [default: now()]
+
+            // Context vector for interaction circumstances
+            context_vector vector(256) [dimensions: 256, note: "Interaction context embedding"]
+
+            indexes {
+                (user_id, timestamp)
+                (product_id, timestamp)
+                (interaction_type)
+            }
+
+            vector_index idx_interaction_context on interactions (context_vector) [
+                method: hnsw,
+                distance: dot_product,
+                dimensions: 256
+            ]
+        }
+
+        // ========================================
+        // ENUMS FOR TYPE SAFETY
+        // ========================================
+
+        enum interaction_enum {
+            view [note: "User viewed product"]
+            like [note: "User liked product"]
+            purchase [note: "User purchased product"]
+            review [note: "User reviewed product"]
+            share [note: "User shared product"]
+        }
+
+        enum recommendation_status {
+            pending [note: "Recommendation generated but not shown"]
+            shown [note: "Recommendation displayed to user"]
+            clicked [note: "User clicked on recommendation"]
+            dismissed [note: "User dismissed recommendation"]
+        }
+
+        // ========================================
+        // AUTOMATED TRIGGERS FOR REAL-TIME ML
+        // ========================================
+
+        // Trigger to update user preference embeddings when interactions change
+        trigger update_user_embeddings after insert or update on interactions {
+            begin
+                // Call stored procedure to recalculate user embeddings
+                execute procedure refresh_user_embedding(NEW.user_id);
+
+                // Update recommendation cache
+                execute procedure invalidate_user_recommendations(NEW.user_id);
+            end
+        }
+
+        // Trigger to maintain interaction statistics
+        trigger maintain_interaction_stats after insert on interactions {
+            begin
+                // Update product popularity metrics
+                update products
+                set popularity_score = (
+                    select count(*) * 1.0 / extract(days from now() - created_at)
+                    from interactions
+                    where product_id = NEW.product_id
+                )
+                where id = NEW.product_id;
+
+                // Log for analytics
+                insert into interaction_logs (user_id, product_id, interaction_type, timestamp)
+                values (NEW.user_id, NEW.product_id, NEW.interaction_type, NEW.timestamp);
+            end
+        }
+
+        // ========================================
+        // STORED PROCEDURES FOR ML OPERATIONS
+        // ========================================
+
+        // Procedure to refresh user embedding based on recent interactions
+        procedure refresh_user_embedding(in user_id int) [language: plpgsql, cost: 100] {
+            declare
+                user_vector vector(1536);
+                interaction_weights float[];
+            begin
+                // Calculate weighted average of interacted product embeddings
+                select
+                    avg(p.content_embedding *
+                        case i.interaction_type
+                            when 'purchase' then 3.0
+                            when 'like' then 2.0
+                            when 'view' then 1.0
+                            else 0.5
+                        end
+                    )
+                into user_vector
+                from interactions i
+                join products p on i.product_id = p.id
+                where i.user_id = user_id
+                and i.timestamp > now() - interval '30 days';
+
+                // Update user preference embedding
+                update users
+                set preference_embedding = user_vector,
+                    updated_at = now()
+                where id = user_id;
+
+                // Log the update
+                insert into embedding_updates (user_id, update_type, timestamp)
+                values (user_id, 'preference_refresh', now());
+            end
+        }
+
+        // Function to find similar products using vector similarity
+        function find_similar_products(in target_product_id int, in limit_count int default 10)
+        returns table(product_id int, similarity_score float) [language: sql, stable] {
+            return query
+            select
+                p.id as product_id,
+                1 - (target.content_embedding <=> p.content_embedding) as similarity_score
+            from products p
+            cross join (
+                select content_embedding
+                from products
+                where id = target_product_id
+            ) as target
+            where p.id != target_product_id
+            order by target.content_embedding <=> p.content_embedding
+            limit limit_count;
+        }
+
+        // Function to generate personalized recommendations
+        function generate_recommendations(in user_id int, in recommendation_count int default 20)
+        returns table(product_id int, score float, reason varchar) [language: plpgsql, cost: 200] {
+            declare
+                user_embedding vector(1536);
+                rec record;
+            begin
+                // Get user preference embedding
+                select preference_embedding into user_embedding
+                from users where id = user_id;
+
+                // Return personalized recommendations based on vector similarity
+                for rec in
+                    select
+                        p.id,
+                        (1 - (user_embedding <=> p.content_embedding)) *
+                        (1 + log(coalesce(p.popularity_score, 1))) as recommendation_score,
+                        'Content similarity + popularity boost' as recommendation_reason
+                    from products p
+                    where p.id not in (
+                        select product_id
+                        from interactions
+                        where user_id = user_id
+                        and interaction_type in ('purchase', 'like')
+                    )
+                    order by recommendation_score desc
+                    limit recommendation_count
+                loop
+                    product_id := rec.id;
+                    score := rec.recommendation_score;
+                    reason := rec.recommendation_reason;
+                    return next;
+                end loop;
+            end
+        }
+
+        // ========================================
+        // MATERIALIZED VIEWS FOR ANALYTICS
+        // ========================================
+
+        view user_interaction_summary [materialized, with_data] as {
+            select
+                u.id as user_id,
+                u.username,
+                count(i.id) as total_interactions,
+                count(distinct i.product_id) as unique_products,
+                avg(case when i.rating is not null then i.rating end) as avg_rating,
+                max(i.timestamp) as last_interaction
+            from users u
+            left join interactions i on u.id = i.user_id
+            group by u.id, u.username
+        }
+
+        view product_recommendation_metrics [materialized] as {
+            select
+                p.id as product_id,
+                p.name,
+                count(i.id) as interaction_count,
+                count(distinct i.user_id) as unique_users,
+                avg(case when i.rating is not null then i.rating end) as avg_rating,
+                count(case when i.interaction_type = 'purchase' then 1 end) as purchase_count
+            from products p
+            left join interactions i on p.id = i.product_id
+            group by p.id, p.name
+        }
+
+        // ========================================
+        // VECTOR CONSTRAINTS AND VALIDATION
+        // ========================================
+
+        // Ensure vector dimensions are consistent
+        check vector_dims(users.preference_embedding) = 1536;
+        check vector_dims(products.content_embedding) = 1536;
+        check vector_dims(products.image_embedding) = 512;
+
+        // Ensure embeddings are normalized for cosine similarity
+        check vector_norm(users.preference_embedding) <= 1.01 AND vector_norm(users.preference_embedding) >= 0.99;
+        check vector_norm(products.content_embedding) <= 1.01 AND vector_norm(products.content_embedding) >= 0.99;
+
+        // Table groups for organization
+        tablegroup core_entities {
+            users, products, categories, interactions
+        }
+
+        tablegroup ml_infrastructure {
+            embedding_updates, recommendation_logs, interaction_logs
+        }
+
+        // Documentation
+        note recommendation_system {
+            '''
+            AI-Powered Recommendation System Database Schema
+
+            Features:
+            - Vector embeddings for content-based filtering
+            - Automated triggers for real-time ML updates
+            - Stored procedures for recommendation generation
+            - Multiple vector indexes for efficient similarity search
+            - Support for both dense and sparse vector representations
+            - Comprehensive analytics views
+
+            Vector Storage Types:
+            - vector(n): Dense vectors for embeddings
+            - halfvec(n): Half-precision vectors for memory efficiency
+            - sparsevec(n): Sparse vectors for categorical data
+
+            Index Methods:
+            - HNSW: Hierarchical Navigable Small World (best for high recall)
+            - IVFFlat: Inverted File with Flat Compression (faster build time)
+            - Flat: Exact search (100% recall, slower for large datasets)
+            '''
+        }
+    }
+}
+
+// Business logic entity that uses the advanced database features
+agent RecommendationEngine {
+    // Configuration for AI model integration
+    model_config: {
+        embedding_model: "text-embedding-3-large",
+        embedding_dimensions: 1536,
+        similarity_threshold: 0.75,
+        recommendation_batch_size: 50
+    };
+
+    // Generate recommendations using database functions
+    get_recommendations: (user_id: int, count: int = 20) -> list[dict] = {
+        // Use the database function directly
+        recommendations = query(
+            "SELECT * FROM generate_recommendations($1, $2)",
+            user_id, count
+        );
+
+        return recommendations;
+    };
+
+    // Update user preferences with new embedding
+    update_user_preferences: (user_id: int, preferences: dict) -> bool = {
+        // Generate embedding for preferences
+        embedding = generate_embedding(preferences);
+
+        // Update in database (triggers will handle downstream updates)
+        result = query(
+            "UPDATE users SET preferences = $1, preference_embedding = $2 WHERE id = $3",
+            preferences, embedding, user_id
+        );
+
+        return result.success;
+    };
+
+    // Find products similar to a given product
+    find_similar: (product_id: int, limit: int = 10) -> list[dict] = {
+        // Use the database function for vector similarity search
+        similar_products = query(
+            "SELECT * FROM find_similar_products($1, $2)",
+            product_id, limit
+        );
+
+        return similar_products;
+    };
+}
+
+// Analytics entity for monitoring ML performance
+agent MLAnalytics {
+    // Monitor embedding quality and drift
+    analyze_embedding_drift: () -> dict = {
+        drift_metrics = query("""
+            SELECT
+                avg(vector_norm(preference_embedding)) as avg_user_embedding_norm,
+                stddev(vector_norm(preference_embedding)) as user_embedding_std,
+                avg(vector_norm(content_embedding)) as avg_product_embedding_norm,
+                count(*) filter (where preference_embedding is null) as users_without_embeddings
+            FROM users u
+            CROSS JOIN products p
+        """);
+
+        return drift_metrics[0];
+    };
+}
