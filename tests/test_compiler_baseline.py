@@ -50,6 +50,9 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 
 	assert result.exit_code == 0, result.output
 	assert "Compilation successful" in result.output
+	assert "python app.py" in result.output
+	assert "application metadata as JSON" in result.output
+	assert "http://localhost:8080" not in result.output
 	assert (output / "app.py").exists()
 	assert (output / "ai_agents.py").exists()
 	app = (output / "app.py").read_text(encoding="utf-8")

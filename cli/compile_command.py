@@ -226,7 +226,7 @@ def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool):
 			console.print(f"  1. cd {config.output_directory}")
 			console.print(f"  2. pip install -r requirements.txt")
 			console.print(f"  3. python app.py")
-			console.print(f"\n[green]Then open:[/green] http://localhost:8080")
+			console.print("\n[green]The generated Python manifest prints application metadata as JSON.[/green]")
 			
 		else:
 			progress.update(task, description="❌ Compilation failed")

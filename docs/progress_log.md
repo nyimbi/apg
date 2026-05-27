@@ -3822,3 +3822,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories tests/test_repository_hygiene.py::test_top_level_generated_and_capability_tests_stay_out_of_source_roots tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 06:57 EAT
+
+Completed checkpoint:
+
+- Updated `apg compile` success guidance so it no longer tells users to open a localhost web application after compilation.
+- The compile command now describes the generated Python manifest as JSON metadata, matching the Python-first compiler output.
+- Extended compiler baseline coverage to assert the compile output includes `python app.py`, describes JSON metadata, and omits the stale localhost URL.
+
+Verification:
+
+- `.venv/bin/python -m py_compile cli/compile_command.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py` -> 9 passed
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_code_generator_executable_defaults.py tests/test_apg_language_contract.py tests/test_capability_composition_runtime.py tests/test_ai_agent_composition.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 26 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
