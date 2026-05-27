@@ -138,6 +138,16 @@ def test_grammar_keeps_streaming_runtime_bytewax_native():
 	assert "'bytewax_streams'" in processor
 
 
+def test_grammar_advertises_python_not_framework_targets():
+	ui_shell = _rule_body("ui_shell")
+	runtime_backend = _rule_body("runtime_backend")
+
+	assert "'python'" in ui_shell
+	assert "'python'" in runtime_backend
+	for framework in ["'flask_appbuilder'", "'fastapi'", "'django'"]:
+		assert framework not in ui_shell
+
+
 def test_grammar_includes_broad_african_language_codes():
 	language_code = _rule_body("language_code")
 	codes = set(re.findall(r"'([a-z]{2,3})'", language_code))

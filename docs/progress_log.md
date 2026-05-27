@@ -3748,3 +3748,21 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_apg_language_contract.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 20 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 06:34 EAT
+
+Completed checkpoint:
+
+- Reviewed the practical target surface and tightened it around generated Python artifacts.
+- Updated the CLI version output from a Flask-AppBuilder framework target to a Python target.
+- Removed Flask, Flask-AppBuilder, and SQLAlchemy from the compiler doctor's required package list so the compiler baseline reflects the Python target instead of a framework stack.
+- Updated `spec/apg.g4` so `runtime_backend` explicitly accepts `python` and `ui_shell` no longer reserves Flask-AppBuilder, FastAPI, or Django as built-in practical shells.
+- Added compiler and grammar contract regressions that prevent framework targets from being re-advertised.
+
+Verification:
+
+- `.venv/bin/python -m py_compile cli/main.py tests/test_compiler_baseline.py tests/test_apg_language_contract.py`
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_apg_language_contract.py` -> 13 passed
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_apg_language_contract.py tests/test_capability_composition_runtime.py tests/test_ai_agent_composition.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 22 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

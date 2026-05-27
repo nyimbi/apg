@@ -51,6 +51,18 @@ def test_cli_doctor_recognizes_spec_parser_artifacts():
 
 	assert result.exit_code == 0, result.output
 	assert "Generated parser found" in result.output
+	assert "flask-appbuilder" not in result.output
+	assert "django" not in result.output
+
+
+def test_cli_version_advertises_python_target_not_framework_target():
+	result = CliRunner().invoke(cli, ["version"])
+
+	assert result.exit_code == 0, result.output
+	assert "Target Language: Python" in result.output
+	assert "Executable Python application artifacts" in result.output
+	assert "Flask-AppBuilder" not in result.output
+	assert "Django" not in result.output
 
 
 def test_compiler_error_rendering_handles_internal_node_less_errors():

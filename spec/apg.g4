@@ -603,7 +603,7 @@ ui_contract_member
     ;
 
 ui_shell
-    : 'flask_appbuilder' | 'fastapi' | 'django' | 'react' | 'mobile' | 'cli'
+    : 'python' | 'react' | 'mobile' | 'cli'
     | IDENTIFIER | STRING
     ;
 
@@ -663,7 +663,8 @@ runtime_contract_member
     ;
 
 runtime_backend
-    : agent_runtime_ref
+    : 'python'
+    | agent_runtime_ref
     | 'bytewax'
     ;
 

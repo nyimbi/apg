@@ -50,7 +50,7 @@ def version():
 	console.print("[bold blue]APG (Application Programming Generation)[/bold blue]")
 	console.print("Version: 1.0.0")
 	console.print("Language Specification: v11")
-	console.print("Target Framework: Flask-AppBuilder")
+	console.print("Target Language: Python")
 	console.print()
 	console.print("Features:")
 	console.print("  • Complete grammar with ANTLR 4.13+ support")
@@ -59,7 +59,7 @@ def version():
 	console.print("  • Database schema with DBML integration")
 	console.print("  • Vector storage for AI/ML applications")
 	console.print("  • Real-time web dashboards")
-	console.print("  • Professional Flask-AppBuilder output")
+	console.print("  • Executable Python application artifacts")
 	console.print("  • VS Code extension with Language Server")
 	console.print("  • Comprehensive project templates")
 
@@ -80,9 +80,6 @@ def doctor():
 	# Check required packages
 	required_packages = [
 		'antlr4',
-		'flask',
-		'flask-appbuilder',
-		'sqlalchemy',
 		'click',
 		'rich'
 	]
