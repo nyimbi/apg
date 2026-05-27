@@ -3389,3 +3389,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_int_api_gateway_token_auth.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 4 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 04:08 EAT
+
+Completed checkpoint:
+
+- Replaced API Service Mesh dependency placeholders with FastAPI app-state backed database/session and ASM service resolution.
+- Missing database or ASM service providers now fail fast with explicit 503 responses instead of injecting `None` into request handlers.
+- Extended focused composition gateway dependency regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/api.py tests/test_composition_gateway_tenant_resolution.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_gateway_tenant_resolution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 6 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

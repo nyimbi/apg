@@ -241,16 +241,50 @@ api_app.add_middleware(
 # Dependency Injection
 # =============================================================================
 
-async def get_db_session() -> AsyncSession:
-	"""Get database session dependency."""
-	# This would be implemented with your actual database session factory
-	# For now, return None as placeholder
-	return None
+async def get_db_session(request: Request) -> AsyncSession:
+	"""Resolve database session from FastAPI application state."""
+	session = await _resolve_app_state_dependency(
+		request,
+		("db_session", "database_session"),
+		("db_session_factory", "async_session_factory", "database_session_factory")
+	)
+	if session is None:
+		raise HTTPException(status_code=503, detail="Database session provider is not configured")
+	return session
 
-async def get_asm_service() -> ASMService:
+async def get_asm_service(request: Request) -> ASMService:
 	"""Get ASM service dependency."""
-	# This would be implemented with your actual service factory
-	# For now, return None as placeholder
+	service = await _resolve_app_state_dependency(
+		request,
+		("asm_service", "service_mesh"),
+		("asm_service_factory", "service_mesh_factory")
+	)
+	if service is None:
+		raise HTTPException(status_code=503, detail="ASM service provider is not configured")
+	return service
+
+async def _resolve_app_state_dependency(
+	request: Request,
+	instance_names: tuple[str, ...],
+	factory_names: tuple[str, ...]
+) -> Any:
+	"""Resolve a dependency instance or factory from FastAPI application state."""
+	app_state = getattr(request.app, "state", None)
+	if app_state is None:
+		return None
+
+	for name in instance_names:
+		instance = getattr(app_state, name, None)
+		if instance is not None:
+			return instance
+
+	for name in factory_names:
+		factory = getattr(app_state, name, None)
+		if callable(factory):
+			result = factory()
+			if asyncio.iscoroutine(result):
+				result = await result
+			return result
 	return None
 
 async def get_tenant_id(request: Request) -> str:
