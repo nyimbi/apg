@@ -3267,3 +3267,18 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_common_encr_runtime_tenant_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:27 EAT
+
+Completed checkpoint:
+
+- Replaced Composition Orchestration UX workflow search's fixed tenant filter with the shared APG runtime tenant resolver.
+- Tenant-scoped search now queries the active request/APG/environment tenant instead of a static `default` tenant.
+- Extended orchestration context regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/orchestration/user_experience.py tests/test_composition_orchestration_context.py`
+- `.venv/bin/python -m pytest -q tests/test_composition_orchestration_context.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 6 passed, 1 SQLAlchemy deprecation warning from `common/base.py`
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues

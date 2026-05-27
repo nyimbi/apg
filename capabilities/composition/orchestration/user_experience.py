@@ -25,6 +25,7 @@ from apg.framework.base_service import APGBaseService
 from apg.framework.database import APGDatabase
 from apg.framework.audit_compliance import APGAuditLogger
 
+from ...common.request_context import get_tenant_id_from_context
 from .config import get_config
 from .models import WorkflowStatus, TaskStatus
 
@@ -265,7 +266,7 @@ class AdvancedSearchEngine:
 		# Add tenant scope
 		if query.tenant_scope:
 			conditions.append("tenant_id = %(tenant_id)s")
-			params['tenant_id'] = 'default'  # Get from context
+			params['tenant_id'] = get_tenant_id_from_context()
 		
 		# Combine conditions
 		if conditions:

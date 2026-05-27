@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 API_PATH = REPO_ROOT / "capabilities" / "composition" / "orchestration" / "api.py"
 ADVANCED_API_PATH = REPO_ROOT / "capabilities" / "composition" / "orchestration" / "advanced_api.py"
 COMPONENT_LIBRARY_PATH = REPO_ROOT / "capabilities" / "composition" / "orchestration" / "component_library.py"
+USER_EXPERIENCE_PATH = REPO_ROOT / "capabilities" / "composition" / "orchestration" / "user_experience.py"
 
 
 def _request(path: str = "/workflows", headers: dict[str, str] | None = None) -> Request:
@@ -110,6 +111,15 @@ def test_orchestration_context_sources_no_longer_use_fixed_placeholders():
 	assert "getattr(info.context, 'tenant_id', 'default_tenant')" not in advanced_source
 	assert "'created_by': 'current_user'" not in advanced_source
 	assert "getattr(self, 'tenant_id', 'default_tenant')" not in component_library_source
+
+
+def test_orchestration_user_experience_search_uses_request_tenant_context():
+	source = USER_EXPERIENCE_PATH.read_text(encoding="utf-8")
+
+	assert "from ...common.request_context import get_tenant_id_from_context" in source
+	assert "params['tenant_id'] = 'default'" not in source
+	assert "Get from context" not in source
+	assert "params['tenant_id'] = get_tenant_id_from_context()" in source
 
 
 def test_orchestration_rest_auth_resolves_claims_headers_query_and_env(monkeypatch):
