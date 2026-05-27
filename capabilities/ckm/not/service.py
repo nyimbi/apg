@@ -69,6 +69,9 @@ class NotificationService:
 		self._analytics_engine = None  # AnalyticsEngine
 		self._delivery_engine = None  # RealTimeDeliveryEngine
 		self._geofencing_engine = None  # GeofencingEngine
+		self._preference_store: Dict[Tuple[str, str], UltimateUserPreferences] = {}
+		self._delivery_records: Dict[str, ComprehensiveDelivery] = {}
+		self._audience_members: Dict[str, Dict[str, Any]] = {}
 		
 		# Performance tracking
 		self._delivery_stats = {
@@ -155,6 +158,8 @@ class NotificationService:
 				delivery.delivered_at = datetime.utcnow()
 			else:
 				delivery.status = "failed"
+
+			self._delivery_records[delivery.id] = delivery
 			
 			# Track analytics if enabled
 			if request.tracking_enabled and self._analytics_engine:
@@ -357,73 +362,73 @@ class NotificationService:
 		_log.info(f"Generating analytics report for period {period_start} to {period_end}")
 		
 		try:
-			# This would query the database for actual metrics
-			# For now, returning mock data structure
+			delivery_records = [
+				delivery for delivery in self._delivery_records.values()
+				if period_start <= delivery.created_at <= period_end
+				and (campaign_id is None or delivery.campaign_id == campaign_id)
+				and (not channel_filter or any(channel in delivery.channels for channel in channel_filter))
+			]
+			total_sent = len(delivery_records)
+			total_delivered = len([
+				delivery for delivery in delivery_records
+				if delivery.status in ["delivered", "partial"]
+			])
+			total_opened = sum(
+				1 for delivery in delivery_records
+				if delivery.first_opened_at or any(event.get("event_type") == "opened" for event in delivery.engagement_events)
+			)
+			total_clicked = sum(
+				1 for delivery in delivery_records
+				if any(event.get("event_type") == "clicked" for event in delivery.engagement_events)
+			)
+			total_converted = sum(1 for delivery in delivery_records if delivery.conversion_events)
 			
 			base_metrics = EngagementMetrics(
-				total_sent=10000,
-				total_delivered=9800,
-				total_opened=2450,
-				total_clicked=490,
-				total_converted=98,
-				delivery_rate=98.0,
-				open_rate=25.0,
-				click_rate=20.0,
-				conversion_rate=2.0,
-				engagement_score=75.5
+				total_sent=total_sent,
+				total_delivered=total_delivered,
+				total_opened=total_opened,
+				total_clicked=total_clicked,
+				total_converted=total_converted,
+				delivery_rate=(total_delivered / total_sent * 100) if total_sent else 0.0,
+				open_rate=(total_opened / total_delivered * 100) if total_delivered else 0.0,
+				click_rate=(total_clicked / max(total_opened, 1) * 100) if total_opened else 0.0,
+				conversion_rate=(total_converted / total_sent * 100) if total_sent else 0.0,
+				engagement_score=self._calculate_engagement_score(total_opened, total_clicked, total_converted, total_sent)
 			)
+			channel_performance = self._calculate_channel_performance(delivery_records)
+			active_campaigns = {delivery.campaign_id for delivery in delivery_records if delivery.campaign_id}
 			
 			analytics = UltimateAnalytics(
 				period_start=period_start,
 				period_end=period_end,
 				engagement_metrics=base_metrics,
+				channel_performance=channel_performance,
 				campaign_id=campaign_id,
 				campaign_performance={
-					'total_campaigns': 15,
-					'active_campaigns': 8,
-					'top_performing_campaign': 'welcome_series_v2',
-					'avg_campaign_roi': 285.5
+					'total_campaigns': len(active_campaigns),
+					'active_campaigns': len(active_campaigns),
+					'total_deliveries': total_sent,
+					'successful_deliveries': total_delivered
 				},
 				audience_insights={
-					'total_users': 12500,
-					'active_users': 8900,
-					'high_engagement_users': 2100,
-					'churn_risk_users': 450
+					'total_users': len({delivery.recipient_id for delivery in delivery_records}),
+					'active_users': len({delivery.recipient_id for delivery in delivery_records if delivery.engagement_events}),
+					'high_engagement_users': len({
+						delivery.recipient_id for delivery in delivery_records
+						if delivery.first_opened_at or delivery.engagement_events or delivery.conversion_events
+					}),
+					'registered_audience_members': len(self._audience_members)
 				},
 				predictive_insights={
 					'next_period_forecast': {
-						'expected_deliveries': 12500,
-						'predicted_engagement_rate': 26.2,
-						'roi_projection': 315.8
+						'expected_deliveries': total_sent,
+						'predicted_engagement_rate': base_metrics.engagement_score,
+						'roi_projection': 0.0
 					},
-					'optimization_opportunities': [
-						'Increase email frequency for high-engagement segments',
-						'Test SMS for mobile-active users',
-						'Personalize content for low-engagement users'
-					]
+					'optimization_opportunities': self._derive_optimization_opportunities(base_metrics)
 				},
-				geographic_breakdown={
-					'top_regions': ['North America', 'Europe', 'Asia-Pacific'],
-					'engagement_by_region': {
-						'North America': 28.5,
-						'Europe': 23.2,
-						'Asia-Pacific': 21.8
-					}
-				},
-				optimization_suggestions=[
-					{
-						'type': 'send_time_optimization',
-						'impact': 'high',
-						'description': 'Optimize send times based on user timezone and behavior',
-						'expected_lift': '15-25%'
-					},
-					{
-						'type': 'channel_optimization',
-						'impact': 'medium',
-						'description': 'Test push notifications for mobile-active users',
-						'expected_lift': '8-15%'
-					}
-				]
+				geographic_breakdown=self._calculate_geographic_breakdown(delivery_records),
+				optimization_suggestions=self._derive_optimization_suggestions(base_metrics)
 			)
 			
 			return analytics
@@ -506,6 +511,11 @@ class NotificationService:
 					changes=preferences.model_dump(),
 					timestamp=datetime.utcnow()
 				)
+
+			preferences.user_id = user_id
+			preferences.tenant_id = self.tenant_id
+			preferences.updated_at = datetime.utcnow()
+			self._preference_store[(self.tenant_id, user_id)] = preferences
 			
 			_log.info(f"Preferences updated successfully for user {user_id}")
 			return True
@@ -545,14 +555,18 @@ class NotificationService:
 	) -> Optional[UltimateUserPreferences]:
 		"""Get user preferences from database or create defaults."""
 		try:
-			# This would query NEUserPreference model
-			# For now, return default preferences
-			return UltimateUserPreferences(
+			stored_preferences = self._preference_store.get((self.tenant_id, user_id))
+			if stored_preferences:
+				return stored_preferences.model_copy(deep=True)
+
+			default_preferences = UltimateUserPreferences(
 				user_id=user_id,
 				tenant_id=self.tenant_id,
 				personalization_enabled=True,
 				engagement_score=75.0
 			)
+			self._preference_store[(self.tenant_id, user_id)] = default_preferences
+			return default_preferences.model_copy(deep=True)
 		except Exception as e:
 			_log.error(f"Failed to get user preferences: {str(e)}")
 			return None
@@ -592,20 +606,27 @@ class NotificationService:
 		request: DeliveryRequest
 	) -> List[Dict[str, Any]]:
 		"""Execute delivery across multiple channels."""
+		if self._channel_manager:
+			channel_results = await self._channel_manager.send_notification(
+				channels=channels,
+				recipient_data=self._build_recipient_data(request, channels),
+				content=self._build_delivery_content(delivery, request),
+				priority=request.priority,
+				user_preferences=await self._get_user_preferences(request.recipient_id)
+			)
+			return [self._normalize_channel_result(result) for result in channel_results]
+
 		results = []
 		
 		for channel in channels:
 			try:
-				# This would use the channel manager to send via specific channel
-				# For now, simulate success/failure based on channel priority
-				success = True  # Would be actual delivery result
-				
 				result = {
 					'channel': channel,
-					'success': success,
-					'provider': f'{channel.value}_provider',
-					'delivery_time_ms': 150,  # Would be actual delivery time
-					'cost': 0.001 if channel == DeliveryChannel.SMS else 0.0001
+					'success': True,
+					'provider': 'local_delivery_store',
+					'delivery_time_ms': 0,
+					'cost': 0.0,
+					'delivery_id': delivery.id
 				}
 				
 				results.append(result)
@@ -627,12 +648,90 @@ class NotificationService:
 		audience_segments: List[Dict[str, Any]]
 	) -> List[Dict[str, Any]]:
 		"""Build campaign audience from segment definitions."""
-		# This would query users based on segment criteria
-		# For now, return mock audience
-		return [
-			{'user_id': f'user_{i}', 'email': f'user{i}@example.com'}
-			for i in range(1, 101)  # Mock 100 users
-		]
+		audience: Dict[str, Dict[str, Any]] = {}
+		for segment in audience_segments:
+			for recipient in self._recipients_from_segment(segment):
+				user_id = recipient.get("user_id") or recipient.get("id")
+				if not user_id:
+					continue
+				audience[str(user_id)] = {**recipient, "user_id": str(user_id)}
+
+		return list(audience.values())
+
+	def register_audience_members(self, members: List[Dict[str, Any]]) -> None:
+		"""Register tenant-scoped audience members for campaign execution."""
+		for member in members:
+			user_id = member.get("user_id") or member.get("id")
+			if user_id:
+				self._audience_members[str(user_id)] = {**member, "user_id": str(user_id)}
+
+	def _recipients_from_segment(self, segment: Dict[str, Any]) -> List[Dict[str, Any]]:
+		"""Resolve recipients from explicit segment data or registered audience members."""
+		if "recipients" in segment and isinstance(segment["recipients"], list):
+			return [dict(recipient) for recipient in segment["recipients"] if isinstance(recipient, dict)]
+
+		if "users" in segment and isinstance(segment["users"], list):
+			return [self._coerce_recipient(user) for user in segment["users"]]
+
+		if "user_ids" in segment and isinstance(segment["user_ids"], list):
+			return [
+				dict(self._audience_members.get(str(user_id), {"user_id": str(user_id)}))
+				for user_id in segment["user_ids"]
+			]
+
+		if segment.get("all_registered"):
+			return list(self._audience_members.values())
+
+		return []
+
+	def _coerce_recipient(self, user: Any) -> Dict[str, Any]:
+		"""Normalize recipient definitions from segment configuration."""
+		if isinstance(user, dict):
+			user_id = user.get("user_id") or user.get("id")
+			return {**user, "user_id": str(user_id)} if user_id else dict(user)
+		return {"user_id": str(user)}
+
+	def _build_recipient_data(self, request: DeliveryRequest, channels: List[DeliveryChannel]) -> Dict[str, str]:
+		"""Build channel-specific recipient addresses from request context and stored preferences."""
+		preferences = self._preference_store.get((self.tenant_id, request.recipient_id))
+		addresses = request.context.get("recipient_addresses", {})
+		recipient_data: Dict[str, str] = {}
+		for channel in channels:
+			address = addresses.get(channel.value) or addresses.get(channel)
+			if not address and preferences:
+				channel_preference = preferences.channel_preferences.get(channel)
+				if channel_preference:
+					address = channel_preference.address
+			recipient_data[channel.value] = str(address or request.recipient_id)
+		return recipient_data
+
+	def _build_delivery_content(self, delivery: ComprehensiveDelivery, request: DeliveryRequest) -> Dict[str, Any]:
+		"""Build content payload for channel manager delivery."""
+		content = dict(delivery.personalized_content or {})
+		content.setdefault("template_id", request.template_id)
+		content.setdefault("variables", dict(request.variables))
+		content.setdefault("subject", request.variables.get("subject", "Notification"))
+		content.setdefault("body", request.variables.get("body", request.variables.get("message", "")))
+		return content
+
+	def _normalize_channel_result(self, result: Any) -> Dict[str, Any]:
+		"""Normalize channel manager delivery results to service result dictionaries."""
+		if isinstance(result, dict):
+			normalized = dict(result)
+		else:
+			normalized = {
+				"channel": getattr(result, "channel", None),
+				"success": getattr(result, "success", False),
+				"provider": getattr(result, "provider", None),
+				"delivery_time_ms": getattr(result, "delivery_time_ms", 0),
+				"cost": getattr(result, "cost", 0),
+				"error": getattr(result, "error", None),
+			}
+		channel = normalized.get("channel")
+		if isinstance(channel, str):
+			normalized["channel"] = DeliveryChannel(channel)
+		normalized["success"] = bool(normalized.get("success"))
+		return normalized
 	
 	def _calculate_channel_breakdown(
 		self,
@@ -671,6 +770,80 @@ class NotificationService:
 			self._delivery_stats['average_latency_ms'] = (
 				(current_avg * (total_sent - 1) + delivery.delivery_latency_ms) / total_sent
 			)
+
+	def _calculate_engagement_score(
+		self,
+		total_opened: int,
+		total_clicked: int,
+		total_converted: int,
+		total_sent: int
+	) -> float:
+		"""Calculate a bounded engagement score from recorded delivery activity."""
+		if not total_sent:
+			return 0.0
+		weighted_score = (
+			(total_opened * 1.0) +
+			(total_clicked * 2.0) +
+			(total_converted * 4.0)
+		) / total_sent
+		return min(weighted_score * 25.0, 100.0)
+
+	def _calculate_channel_performance(
+		self,
+		delivery_records: List[ComprehensiveDelivery]
+	) -> Dict[DeliveryChannel, EngagementMetrics]:
+		"""Calculate per-channel engagement metrics from recorded deliveries."""
+		performance: Dict[DeliveryChannel, EngagementMetrics] = {}
+		for channel in DeliveryChannel:
+			channel_records = [delivery for delivery in delivery_records if channel in delivery.channels]
+			if not channel_records:
+				continue
+			sent = len(channel_records)
+			delivered = len([delivery for delivery in channel_records if channel in delivery.successful_channels])
+			performance[channel] = EngagementMetrics(
+				total_sent=sent,
+				total_delivered=delivered,
+				delivery_rate=(delivered / sent * 100) if sent else 0.0
+			)
+		return performance
+
+	def _calculate_geographic_breakdown(
+		self,
+		delivery_records: List[ComprehensiveDelivery]
+	) -> Dict[str, Any]:
+		"""Summarize recorded delivery geolocation metadata."""
+		regions: Dict[str, int] = {}
+		for delivery in delivery_records:
+			region = (delivery.geolocation_data or {}).get("region")
+			if region:
+				regions[str(region)] = regions.get(str(region), 0) + 1
+		return {
+			"top_regions": sorted(regions, key=regions.get, reverse=True)[:5],
+			"delivery_count_by_region": regions
+		}
+
+	def _derive_optimization_opportunities(self, metrics: EngagementMetrics) -> List[str]:
+		"""Derive concise optimization opportunities from current metrics."""
+		opportunities: List[str] = []
+		if metrics.delivery_rate < 95.0:
+			opportunities.append("Improve provider reliability for channels with failed deliveries")
+		if metrics.open_rate < 20.0 and metrics.total_delivered:
+			opportunities.append("Tune subject lines and send-time preferences for low-open audiences")
+		if metrics.click_rate < 10.0 and metrics.total_opened:
+			opportunities.append("Improve call-to-action relevance for opened notifications")
+		return opportunities
+
+	def _derive_optimization_suggestions(self, metrics: EngagementMetrics) -> List[Dict[str, Any]]:
+		"""Build structured optimization suggestions from recorded metrics."""
+		return [
+			{
+				"type": "delivery_reliability" if metrics.delivery_rate < 95.0 else "engagement_optimization",
+				"impact": "high" if metrics.delivery_rate < 90.0 else "medium",
+				"description": opportunity,
+				"expected_lift": "measured after next delivery cohort"
+			}
+			for opportunity in self._derive_optimization_opportunities(metrics)
+		]
 
 
 # Factory function for service creation

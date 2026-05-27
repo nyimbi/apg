@@ -3342,3 +3342,19 @@ Verification:
 - `.venv/bin/python -m pytest -q tests/test_ckm_wfa_scheduler_execution.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
 - `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
 - `git diff --check` -> no issues
+
+### 2026-05-27 03:52 EAT
+
+Completed checkpoint:
+
+- Replaced common NTFY and CKM NOT notification-service mock preference, delivery, audience, and analytics paths with executable tenant-local state.
+- Notification delivery now records delivery artifacts, uses an injected channel manager when available, and falls back to deterministic local delivery records.
+- Campaign audience resolution now uses explicit segment recipients, segment user IDs, or registered tenant audience members instead of canned mock users.
+- Added focused notification service state regression coverage while preserving the Bytewax-native streaming guard.
+
+Verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/ntfy/service.py capabilities/ckm/not/service.py tests/test_notification_service_executable_state.py`
+- `.venv/bin/python -m pytest -q tests/test_notification_service_executable_state.py tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native` -> 3 passed
+- `rg -n -i "\bkafka\b|confluent|redpanda|bootstrap\.servers|bootstrap_servers|bytewax_brokers|broker connection string" . -g '!**/.git/**' -g '!**/.venv/**' -g '!**/node_modules/**' -g '!uploads/**' -g '!**/swagger-ui-bundle.js' -g '!docs/progress_log.md' -g '!tests/test_repository_hygiene.py'` -> no matches
+- `git diff --check` -> no issues
