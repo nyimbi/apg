@@ -12,8 +12,14 @@ import json
 import logging
 import hashlib
 import gzip
-import lz4.frame
-import zstandard
+try:
+	import lz4.frame as lz4_frame
+except ImportError:
+	lz4_frame = None
+try:
+	import zstandard
+except ImportError:
+	zstandard = None
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple, Set, AsyncGenerator, Union
 from dataclasses import dataclass, field
@@ -90,15 +96,19 @@ class CacheService:
 		# Compression handlers
 		self._compression_handlers = {
 			CompressionAlgorithm.GZIP: self._compress_gzip,
-			CompressionAlgorithm.LZ4: self._compress_lz4,
-			CompressionAlgorithm.ZSTD: self._compress_zstd,
 		}
+		if lz4_frame is not None:
+			self._compression_handlers[CompressionAlgorithm.LZ4] = self._compress_lz4
+		if zstandard is not None:
+			self._compression_handlers[CompressionAlgorithm.ZSTD] = self._compress_zstd
 		
 		self._decompression_handlers = {
 			CompressionAlgorithm.GZIP: self._decompress_gzip,
-			CompressionAlgorithm.LZ4: self._decompress_lz4,
-			CompressionAlgorithm.ZSTD: self._decompress_zstd,
 		}
+		if lz4_frame is not None:
+			self._decompression_handlers[CompressionAlgorithm.LZ4] = self._decompress_lz4
+		if zstandard is not None:
+			self._decompression_handlers[CompressionAlgorithm.ZSTD] = self._decompress_zstd
 	
 	async def initialize(self, additional_config: Dict[str, Any] | None = None) -> None:
 		"""Initialize cache service with APG integration"""
@@ -183,7 +193,7 @@ class CacheService:
 		"""Initialize AI optimization engines"""
 		if not self.config.ai_optimization_enabled:
 			return
-		
+
 		try:
 			self.logger.info("Initializing AI optimization engines...")
 			
@@ -721,7 +731,7 @@ class CacheService:
 		
 		if not self.config.predictive_prefetching:
 			return
-		
+
 		try:
 			# Analyze key patterns to identify potential prefetch candidates
 			candidates = await self._generate_prefetch_candidates(key, namespace, tenant_id)
@@ -787,21 +797,35 @@ class CacheService:
 		"""Apply compression to data"""
 		
 		if compression is None:
-			compression = CompressionAlgorithm.LZ4
+			compression = self._default_compression_algorithm()
 		
 		if compression == CompressionAlgorithm.NONE or len(data) < 100:
 			return data, CompressionAlgorithm.NONE, 1.0
 		
+		if compression not in self._compression_handlers:
+			self.logger.warning(
+				"Compression backend %s is not available; storing uncompressed data",
+				compression.value,
+			)
+			return data, CompressionAlgorithm.NONE, 1.0
+
 		try:
-			if compression in self._compression_handlers:
-				compressed_data = await self._compression_handlers[compression](data)
-				ratio = len(compressed_data) / len(data)
-				return compressed_data, compression, ratio
+			compressed_data = await self._compression_handlers[compression](data)
+			ratio = len(compressed_data) / len(data)
+			return compressed_data, compression, ratio
 		except Exception as e:
 			self.logger.warning(f"Compression failed: {e}, using uncompressed data")
 		
 		return data, CompressionAlgorithm.NONE, 1.0
 	
+	def _default_compression_algorithm(self) -> CompressionAlgorithm:
+		"""Choose the best available compression backend for this environment."""
+		if CompressionAlgorithm.LZ4 in self._compression_handlers:
+			return CompressionAlgorithm.LZ4
+		if CompressionAlgorithm.GZIP in self._compression_handlers:
+			return CompressionAlgorithm.GZIP
+		return CompressionAlgorithm.NONE
+
 	async def _apply_decompression(self, data: bytes, compression: CompressionAlgorithm) -> bytes:
 		"""Apply decompression to data"""
 		
@@ -811,6 +835,7 @@ class CacheService:
 		try:
 			if compression in self._decompression_handlers:
 				return await self._decompression_handlers[compression](data)
+			raise RuntimeError(f"Compression backend {compression.value} is not available")
 		except Exception as e:
 			self.logger.error(f"Decompression failed: {e}")
 			raise
@@ -827,19 +852,27 @@ class CacheService:
 	
 	async def _compress_lz4(self, data: bytes) -> bytes:
 		"""Compress data using LZ4"""
-		return lz4.frame.compress(data)
+		if lz4_frame is None:
+			raise RuntimeError("LZ4 compression backend is not available")
+		return lz4_frame.compress(data)
 	
 	async def _decompress_lz4(self, data: bytes) -> bytes:
 		"""Decompress LZ4 data"""
-		return lz4.frame.decompress(data)
+		if lz4_frame is None:
+			raise RuntimeError("LZ4 compression backend is not available")
+		return lz4_frame.decompress(data)
 	
 	async def _compress_zstd(self, data: bytes) -> bytes:
 		"""Compress data using Zstandard"""
+		if zstandard is None:
+			raise RuntimeError("Zstandard compression backend is not available")
 		compressor = zstandard.ZstdCompressor()
 		return compressor.compress(data)
 	
 	async def _decompress_zstd(self, data: bytes) -> bytes:
 		"""Decompress Zstandard data"""
+		if zstandard is None:
+			raise RuntimeError("Zstandard compression backend is not available")
 		decompressor = zstandard.ZstdDecompressor()
 		return decompressor.decompress(data)
 	

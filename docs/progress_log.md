@@ -8496,3 +8496,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q tests/test_common_cach_dashboard_metrics.py` passed with 4 tests.
 - `rg -n "This would integrate with the actual cache service|For now, return mock data|125000|user:12345:profile|api:products:list|missing:key|CacheManagementService|pandas as pd" capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py` found no stale CACH dashboard demo metrics.
 - `git diff --check -- capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py docs/progress_log.md` passed.
+
+### 2026-05-29 02:03 EAT
+
+Executable CACH optional compression slice:
+
+- Made the CACH service importable when optional LZ4 and Zstandard packages are absent.
+- Registered compression/decompression handlers only for available backends and selected the best available default backend at runtime.
+- Explicit requests for an unavailable compression backend now store data uncompressed with an honest warning instead of making the cache service unusable.
+- Added focused coverage for service import/default compression selection, LZ4 fallback round-trip behavior, and explicit Zstandard availability behavior.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/cach/service.py tests/test_common_cach_service_optional_compression.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_common_cach_service_optional_compression.py tests/test_common_cach_dashboard_metrics.py` passed with 7 tests.
+- `.venv/bin/python - <<'PY' ... CacheService(...)._default_compression_algorithm() ... PY` printed `gzip` in this environment.
+- `git diff --check -- capabilities/common/cach/service.py tests/test_common_cach_service_optional_compression.py docs/progress_log.md` passed.
