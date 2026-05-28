@@ -5352,3 +5352,26 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `1b25dd8` (`Persist generated app records to JSON`) to `origin/main`.
+
+### 2026-05-28 06:34 EAT
+
+Completed checkpoint:
+
+- Added a generated API contract endpoint at `GET /openapi.json`.
+- The generated contract advertises:
+  - health, manifest, validation, storage, records, and UI routes.
+  - per-entity record CRUD routes.
+  - per-entity record schemas under `components.schemas`.
+  - capability operation routes when generated capability runtime support is present.
+- Linked the API contract from the generated `/ui` index.
+- Added focused subprocess regression coverage for the generated OpenAPI version, app title, `Customer` record collection path, `Customer` record item path, and `CustomerRecord` schema.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 13 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated API contract slice.

@@ -59,6 +59,7 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "django" not in app.lower()
 	assert "HTTPServer" in app
 	assert "run_server" in app
+	assert "openapi_document" in app
 	compile(app, "app.py", "exec")
 
 
@@ -205,6 +206,9 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 			ui_index = response.read().decode("utf-8")
 		with urllib.request.urlopen(f"{base_url}/ui/entities/Customer", timeout=1) as response:
 			entity_ui = response.read().decode("utf-8")
+		with urllib.request.urlopen(f"{base_url}/openapi.json", timeout=1) as response:
+			openapi_content_type = response.headers["Content-Type"]
+			openapi = json.loads(response.read().decode("utf-8"))
 		update_request = urllib.request.Request(
 			f"{base_url}/entities/Customer/records/1",
 			data=json.dumps({"record": {"email": "asha@new.example", "status": "active"}}).encode("utf-8"),
@@ -252,9 +256,16 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert all_records["records"]["Customer"] == [created["record"]]
 	assert ui_content_type.startswith("text/html")
 	assert "/ui/entities/Customer" in ui_index
+	assert "/openapi.json" in ui_index
 	assert 'action="/entities/Customer/records"' in entity_ui
 	assert "<pre>" in entity_ui
 	assert "asha@example.com" in entity_ui
+	assert openapi_content_type.startswith("application/json")
+	assert openapi["openapi"] == "3.1.0"
+	assert openapi["info"]["title"] == "customer_ops"
+	assert "/entities/Customer/records" in openapi["paths"]
+	assert "/entities/Customer/records/{id}" in openapi["paths"]
+	assert "CustomerRecord" in openapi["components"]["schemas"]
 	assert updated["record"] == {"id": 1, "name": "Asha", "email": "asha@new.example", "status": "active"}
 	assert deleted["deleted"] == updated["record"]
 	assert deleted["count"] == 0

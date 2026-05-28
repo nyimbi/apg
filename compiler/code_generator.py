@@ -329,6 +329,80 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
     return status
 
 
+def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
+    properties = entity.get("properties") or []
+    if not properties:
+        return {{"type": "object", "additionalProperties": True}}
+    schema_properties: Dict[str, Any] = {{
+        "id": {{"oneOf": [{{"type": "integer"}}, {{"type": "string"}}]}},
+    }}
+    for property_name in properties:
+        schema_properties[str(property_name)] = {{"type": "string"}}
+    return {{
+        "type": "object",
+        "additionalProperties": True,
+        "properties": schema_properties,
+    }}
+
+
+def _api_operation(
+    summary: str,
+    description: str,
+    status: str = "200",
+    request_body: bool = False,
+) -> Dict[str, Any]:
+    operation: Dict[str, Any] = {{
+        "summary": summary,
+        "responses": {{status: {{"description": description}}}},
+    }}
+    if request_body:
+        operation["requestBody"] = {{"required": True}}
+    return operation
+
+
+def openapi_document() -> Dict[str, Any]:
+    paths: Dict[str, Any] = {{
+        "/health": {{"get": _api_operation("Application health", "Health report")}},
+        "/manifest": {{"get": _api_operation("Application manifest", "APG manifest")}},
+        "/validate": {{"get": _api_operation("Application validation", "Validation report")}},
+        "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
+        "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
+        "/ui": {{"get": _api_operation("Generated application UI", "HTML application index")}},
+    }}
+    schemas: Dict[str, Any] = {{}}
+    for entity in ENTITIES:
+        entity_name = str(entity["name"])
+        schema_name = f"{{entity_name}}Record"
+        schemas[schema_name] = _record_schema(entity)
+        paths[f"/entities/{{entity_name}}/records"] = {{
+            "get": _api_operation(f"List {{entity_name}} records", "Record list"),
+            "post": _api_operation(f"Create {{entity_name}} record", "Created record", status="201", request_body=True),
+        }}
+        paths[f"/entities/{{entity_name}}/records/{{{{id}}}}"] = {{
+            "get": _api_operation(f"Fetch {{entity_name}} record", "Record"),
+            "put": _api_operation(f"Update {{entity_name}} record", "Updated record", request_body=True),
+            "delete": _api_operation(f"Delete {{entity_name}} record", "Deleted record"),
+        }}
+        paths[f"/ui/entities/{{entity_name}}"] = {{
+            "get": _api_operation(f"Generated {{entity_name}} UI", "HTML entity screen"),
+        }}
+    if APG_CAPABILITIES is not None:
+        paths["/rules/evaluate"] = {{"post": _api_operation("Evaluate capability rules", "Rule decision", request_body=True)}}
+        paths["/configuration/resolve"] = {{"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True)}}
+        paths["/configuration/validate"] = {{"post": _api_operation("Validate capability configuration", "Configuration validation", request_body=True)}}
+        paths["/approval/plan"] = {{"post": _api_operation("Plan capability approvals", "Approval plan", request_body=True)}}
+    return {{
+        "openapi": "3.1.0",
+        "info": {{
+            "title": MODULE_NAME,
+            "version": MODULE_VERSION,
+            "description": MODULE_DESCRIPTION,
+        }},
+        "paths": paths,
+        "components": {{"schemas": schemas}},
+    }}
+
+
 def describe_application() -> Dict[str, Any]:
     description: Dict[str, Any] = {{
         "name": MODULE_NAME,
@@ -446,7 +520,8 @@ def _ui_index_html() -> str:
         f"<h1>{{html.escape(MODULE_NAME)}}</h1>"
         f"<p>{{html.escape(MODULE_DESCRIPTION or 'Generated APG application')}}</p>"
         '<nav><a href="/manifest">Manifest JSON</a> | '
-        '<a href="/records">Record JSON</a></nav>'
+        '<a href="/records">Record JSON</a> | '
+        '<a href="/openapi.json">API Contract</a></nav>'
         "<h2>Entities</h2>"
         f"<ul>{{links}}</ul>"
     )
@@ -549,6 +624,8 @@ def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
     if path == "/validate":
         validation = validate_application()
         return (200 if validation["valid"] else 422), validation
+    if path == "/openapi.json":
+        return 200, openapi_document()
     if path == "/entities":
         return 200, {{"entities": list_entities()}}
     if path == "/records" or path.startswith("/records/") or (
