@@ -44,6 +44,18 @@ table Customer {
 }
 """
 
+TYPED_DATA_APP_SOURCE = """
+module inventory_ops version 1.0.0 {
+	description: "Inventory operations";
+}
+
+table InventoryItem {
+	name: str;
+	quantity: int;
+	active: bool;
+}
+"""
+
 
 def test_documented_python_target_generates_executable_application_files():
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
@@ -88,14 +100,20 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 
 	assert module.__version__ == "1.0.0"
 	assert module.list_entities() == [
-		{"name": "Planner", "type": "ai_agent", "properties": [], "methods": []}
+		{"name": "Planner", "type": "ai_agent", "properties": [], "fields": [], "methods": []}
 	]
 	assert module.list_records("Planner") == []
 	assert module.list_agents() == ["Planner"]
 	assert manifest["ai_agents"] == ["Planner"]
+	assert module.openapi_document()["openapi"] == "3.1.0"
+	assert module.storage_status()["mode"] == "memory"
+	assert module.validate_record("Planner", {})["valid"] is True
 	assert module.validate_application()["valid"] is True
 	assert "describe_application" in module.__all__
+	assert "openapi_document" in module.__all__
+	assert "storage_status" in module.__all__
 	assert "validate_application" in module.__all__
+	assert "validate_record" in module.__all__
 	assert "list_records" in module.__all__
 	assert "list_agents" in module.__all__
 
@@ -265,7 +283,9 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert openapi["info"]["title"] == "customer_ops"
 	assert "/entities/Customer/records" in openapi["paths"]
 	assert "/entities/Customer/records/{id}" in openapi["paths"]
-	assert "CustomerRecord" in openapi["components"]["schemas"]
+	customer_schema = openapi["components"]["schemas"]["CustomerRecord"]
+	assert customer_schema["required"] == ["name", "email"]
+	assert customer_schema["properties"]["name"]["type"] == "string"
 	assert updated["record"] == {"id": 1, "name": "Asha", "email": "asha@new.example", "status": "active"}
 	assert deleted["deleted"] == updated["record"]
 	assert deleted["count"] == 0
@@ -273,6 +293,59 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert missing_payload["error"] == "record_not_found"
 	assert empty_list["records"] == []
 	assert form_created["record"] == {"id": 2, "name": "Kofi", "email": "kofi@example.com"}
+
+
+def test_generated_python_app_validates_records_from_entity_fields():
+	result = compile_apg_string(TYPED_DATA_APP_SOURCE)
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	entity = namespace["list_entities"]()[0]
+	assert entity["fields"] == [
+		{"name": "name", "type": "str", "required": True},
+		{"name": "quantity", "type": "int", "required": True},
+		{"name": "active", "type": "bool", "required": True},
+	]
+	assert namespace["openapi_document"]()["components"]["schemas"]["InventoryItemRecord"] == {
+		"type": "object",
+		"additionalProperties": True,
+		"properties": {
+			"id": {"oneOf": [{"type": "integer"}, {"type": "string"}]},
+			"name": {"type": "string"},
+			"quantity": {"type": "integer"},
+			"active": {"type": "boolean"},
+		},
+		"required": ["name", "quantity", "active"],
+	}
+
+	status, invalid = namespace["_post_payload"](
+		"/entities/InventoryItem/records",
+		{"record": {"name": "Widget", "quantity": "many", "active": True}},
+	)
+	assert status == 422
+	assert invalid["error"] == "record_validation_failed"
+	assert invalid["errors"] == ["quantity must be integer"]
+
+	status, missing = namespace["_post_payload"](
+		"/entities/InventoryItem/records",
+		{"record": {"name": "Widget", "quantity": 3}},
+	)
+	assert status == 422
+	assert missing["errors"] == ["active is required"]
+
+	status, created = namespace["_post_payload"](
+		"/entities/InventoryItem/records",
+		{"record": {"name": "Widget", "quantity": 3, "active": True}},
+	)
+	assert status == 201
+	assert created["record"] == {"id": 1, "name": "Widget", "quantity": 3, "active": True}
+
+	status, invalid_update = namespace["_put_payload"](
+		"/entities/InventoryItem/records/1",
+		{"record": {"active": "yes"}},
+	)
+	assert status == 422
+	assert invalid_update["errors"] == ["active must be boolean"]
 
 
 def test_generated_python_app_persists_records_with_data_file(tmp_path):

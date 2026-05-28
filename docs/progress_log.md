@@ -5375,3 +5375,27 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `92b8c16` (`Expose generated app API contracts`) to `origin/main`.
+
+### 2026-05-28 06:42 EAT
+
+Completed checkpoint:
+
+- Added generated entity field metadata beside the existing compatibility `properties` list.
+- Generated field metadata includes field name, APG type, and required flag.
+- Generated apps now validate record creation and update payloads against declared entity fields:
+  - missing required fields return `422 record_validation_failed`.
+  - type mismatches return `422 record_validation_failed`.
+  - partial updates validate only supplied fields.
+- Generated OpenAPI schemas now include per-field JSON schema types and required fields.
+- Generated packages now reexport `openapi_document()`, `storage_status()`, and `validate_record()` for Python consumers.
+- Added focused typed-record regression coverage for field metadata, OpenAPI schema generation, missing required field errors, type errors, valid typed creation, and invalid typed updates.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 14 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated record validation slice.

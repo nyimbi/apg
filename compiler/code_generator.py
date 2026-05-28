@@ -184,6 +184,14 @@ class PythonCodeGenerator:
 				"name": entity.name,
 				"type": entity.entity_type.value,
 				"properties": [property.name for property in entity.properties],
+				"fields": [
+					{
+						"name": property.name,
+						"type": property.type_annotation.type_name if property.type_annotation else "any",
+						"required": property.is_required,
+					}
+					for property in entity.properties
+				],
 				"methods": [method.name for method in entity.methods],
 			}
 			for entity in module.entities
@@ -330,19 +338,26 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
 
 
 def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
-    properties = entity.get("properties") or []
-    if not properties:
+    fields = _field_specs(str(entity["name"]))
+    if not fields:
         return {{"type": "object", "additionalProperties": True}}
     schema_properties: Dict[str, Any] = {{
         "id": {{"oneOf": [{{"type": "integer"}}, {{"type": "string"}}]}},
     }}
-    for property_name in properties:
-        schema_properties[str(property_name)] = {{"type": "string"}}
-    return {{
+    required_fields: list[str] = []
+    for field in fields:
+        field_name = str(field["name"])
+        schema_properties[field_name] = {{"type": _json_schema_type(str(field.get("type", "any")))}}
+        if field.get("required", True):
+            required_fields.append(field_name)
+    schema: Dict[str, Any] = {{
         "type": "object",
         "additionalProperties": True,
         "properties": schema_properties,
     }}
+    if required_fields:
+        schema["required"] = required_fields
+    return schema
 
 
 def _api_operation(
@@ -507,6 +522,72 @@ def _entity_spec(entity_name: str) -> Dict[str, Any] | None:
     return None
 
 
+def _field_specs(entity_name: str) -> list[Dict[str, Any]]:
+    entity = _entity_spec(entity_name)
+    if entity is None:
+        return []
+    fields = entity.get("fields") or []
+    if fields:
+        return [dict(field) for field in fields if isinstance(field, dict)]
+    return [
+        {{"name": property_name, "type": "any", "required": True}}
+        for property_name in entity.get("properties", [])
+    ]
+
+
+def _json_schema_type(apg_type: str) -> str:
+    normalized = apg_type.lower()
+    if normalized in {{"str", "string", "text", "varchar", "char", "email", "uuid", "date", "datetime", "timestamp"}}:
+        return "string"
+    if normalized in {{"int", "integer", "serial", "bigint", "smallint"}}:
+        return "integer"
+    if normalized in {{"float", "double", "decimal", "number", "numeric", "money"}}:
+        return "number"
+    if normalized in {{"bool", "boolean"}}:
+        return "boolean"
+    if normalized in {{"list", "array", "set"}}:
+        return "array"
+    if normalized in {{"dict", "map", "object", "json", "jsonb"}}:
+        return "object"
+    return "string"
+
+
+def _value_matches_type(value: Any, apg_type: str) -> bool:
+    expected = _json_schema_type(apg_type)
+    if value is None:
+        return True
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return (isinstance(value, int) or isinstance(value, float)) and not isinstance(value, bool)
+    if expected == "boolean":
+        return isinstance(value, bool)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "object":
+        return isinstance(value, dict)
+    return True
+
+
+def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = False) -> Dict[str, Any]:
+    errors: list[str] = []
+    fields = _field_specs(entity_name)
+    for field in fields:
+        field_name = str(field["name"])
+        if not partial and field.get("required", True) and field_name not in record:
+            errors.append(f"{{field_name}} is required")
+            continue
+        if field_name in record and not _value_matches_type(record[field_name], str(field.get("type", "any"))):
+            errors.append(f"{{field_name}} must be {{_json_schema_type(str(field.get('type', 'any')))}}")
+    return {{
+        "valid": not errors,
+        "entity": entity_name,
+        "errors": errors,
+    }}
+
+
 def _ui_index_html() -> str:
     links = "".join(
         f'<li><a href="/ui/entities/{{html.escape(entity["name"], quote=True)}}">'
@@ -533,11 +614,11 @@ def _ui_entity_html(entity_name: str) -> tuple[int, str]:
     if entity is None:
         return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
     safe_entity = html.escape(entity_name, quote=True)
-    properties = entity.get("properties") or ["value"]
+    fields = _field_specs(entity_name) or [{{"name": "value", "type": "string", "required": True}}]
     inputs = "".join(
-        f'<label>{{html.escape(str(property_name))}} '
-        f'<input name="{{html.escape(str(property_name), quote=True)}}"></label><br>'
-        for property_name in properties
+        f'<label>{{html.escape(str(field["name"]))}} '
+        f'<input name="{{html.escape(str(field["name"]), quote=True)}}"></label><br>'
+        for field in fields
     )
     records_json = html.escape(json.dumps(list_records(entity_name), indent=2, sort_keys=True))
     body = (
@@ -736,6 +817,9 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     if not isinstance(raw_record, dict):
         return 400, {{"error": "record_must_be_object"}}
     record = dict(raw_record)
+    validation = validate_record(entity_name, record)
+    if not validation["valid"]:
+        return 422, {{"error": "record_validation_failed", **validation}}
     if record.get("id") in (None, ""):
         record["id"] = NEXT_RECORD_IDS[entity_name]
         NEXT_RECORD_IDS[entity_name] += 1
@@ -763,6 +847,9 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     raw_record = payload.get("record", payload)
     if not isinstance(raw_record, dict):
         return 400, {{"error": "record_must_be_object"}}
+    validation = validate_record(entity_name, dict(raw_record), partial=True)
+    if not validation["valid"]:
+        return 422, {{"error": "record_validation_failed", **validation}}
     for index, existing in enumerate(RECORD_STORE[entity_name]):
         if str(existing.get("id")) == str(record_id):
             updated = dict(existing)
@@ -2264,7 +2351,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import describe_application, list_entities, list_records, main, validate_application',
+			'from .app import describe_application, list_entities, list_records, main, openapi_document, storage_status, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
@@ -2272,7 +2359,10 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    "list_entities",',
 			'    "list_records",',
 			'    "main",',
+			'    "openapi_document",',
+			'    "storage_status",',
 			'    "validate_application",',
+			'    "validate_record",',
 			']',
 			'',
 			'try:',
