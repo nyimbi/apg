@@ -160,6 +160,8 @@ def doctor():
 @click.option('--port', '-p', default=2087, help='Language server port')
 @click.option('--host', '-h', default='127.0.0.1', help='Language server host')
 @click.option("--check", is_flag=True, help="Run a dependency-light language-service check for one APG file")
+@click.option("--code-actions", is_flag=True, help="Plan language-server code actions for one APG file")
+@click.option("--apply-action", "action_id", help="Apply one code action id; requires --code-actions")
 @click.option("--rename", "rename_symbol", help="Plan a semantic rename for the given symbol")
 @click.option("--to", "rename_target", help="New symbol name for --rename")
 @click.option("--kind", "rename_kind", help="Optional symbol kind discriminator for --rename")
@@ -170,6 +172,8 @@ def language_server(
 	port: int,
 	host: str,
 	check: bool,
+	code_actions: bool,
+	action_id: str | None,
 	rename_symbol: str | None,
 	rename_target: str | None,
 	rename_kind: str | None,
@@ -177,10 +181,13 @@ def language_server(
 	as_json: bool,
 ):
 	"""Start APG Language Server for IDE integration or check one APG file."""
-	if check and rename_symbol:
-		raise click.ClickException("--check and --rename cannot be combined")
-	if write_rename and not rename_symbol:
-		raise click.ClickException("--write is only valid with --rename")
+	selected_modes = sum(bool(value) for value in [check, code_actions, rename_symbol])
+	if selected_modes > 1:
+		raise click.ClickException("--check, --code-actions, and --rename cannot be combined")
+	if action_id and not code_actions:
+		raise click.ClickException("--apply-action requires --code-actions")
+	if write_rename and not (rename_symbol or action_id):
+		raise click.ClickException("--write is only valid with --rename or --code-actions --apply-action")
 
 	if check:
 		if source_file is None:
@@ -201,6 +208,36 @@ def language_server(
 				f"{report['completion_count']} completion(s), "
 				f"{report['document_symbol_count']} document symbol(s)"
 			)
+		if not report["ok"]:
+			raise click.exceptions.Exit(1)
+		return
+
+	if code_actions:
+		if source_file is None:
+			raise click.ClickException("--code-actions requires SOURCE_FILE")
+		if not source_file.exists():
+			raise click.ClickException(f"APG source file not found: {source_file}")
+		if not source_file.is_file():
+			raise click.ClickException(f"APG language-server --code-actions expects a file: {source_file}")
+		from language_server.semantic_service import build_language_server_code_actions
+		report = build_language_server_code_actions(
+			source_file,
+			action_id=action_id,
+			write=write_rename,
+		)
+		if as_json:
+			click.echo(json.dumps(report, indent=2, sort_keys=True))
+		else:
+			status = "OK" if report["ok"] else "FAILED"
+			click.echo(
+				f"APG language-server code-actions {status}: {source_file}, "
+				f"{report['action_count']} action(s)"
+			)
+			for action in report["actions"]:
+				click.echo(f"  - {action['id']}: {action['title']}")
+			if report.get("errors"):
+				for error in report["errors"]:
+					click.echo(f"  - {error}")
 		if not report["ok"]:
 			raise click.exceptions.Exit(1)
 		return
@@ -239,7 +276,7 @@ def language_server(
 		return
 
 	if source_file is not None:
-		raise click.ClickException("SOURCE_FILE is only accepted with --check or --rename")
+		raise click.ClickException("SOURCE_FILE is only accepted with --check, --code-actions, or --rename")
 
 	console.print(f"[blue]Starting APG Language Server on {host}:{port}[/blue]")
 	

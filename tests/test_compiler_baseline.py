@@ -22,6 +22,7 @@ from compiler.code_generator import CodeGenerator
 from compiler.compiler import APGCompiler, compile_apg_string
 from compiler.semantic_analyzer import SemanticError
 from language_server.semantic_service import (
+	build_code_action_report,
 	build_rename_plan,
 	build_language_service_snapshot,
 	code_actions,
@@ -2136,6 +2137,91 @@ def test_cli_language_server_rename_json_dry_runs_without_writing(tmp_path):
 	assert report["replacement_count"] == 2
 	assert "new_source" not in report
 	assert source.read_text(encoding="utf-8") == RELATIONSHIP_APP_SOURCE
+
+
+def test_language_service_code_actions_create_missing_table_patch(tmp_path):
+	source = tmp_path / "missing_table.apg"
+	source.write_text(
+		"""
+module missing_table version 1.0.0 {
+	description: "Missing table";
+}
+
+table SalesOrder {
+	customer: Customer;
+}
+""",
+		encoding="utf-8",
+	)
+
+	report = build_code_action_report(source.read_text(encoding="utf-8"), source)
+	action = next(item for item in report["actions"] if item["id"] == "create-table-Customer")
+
+	assert report["format"] == "apg.language-server-code-actions.v1"
+	assert report["ok"] is True
+	assert action["title"] == "Create missing table Customer"
+	assert action["requires_review"] is True
+	assert action["metadata"]["created_symbol"] == "table.Customer"
+	assert "table Customer" in action["new_source"]
+	assert "new table Customer affects schema and migrations" in action["review_reasons"]
+
+
+def test_cli_language_server_code_actions_json_dry_runs_without_writing(tmp_path):
+	source = tmp_path / "missing_table.apg"
+	source.write_text(
+		"""
+module missing_table version 1.0.0 {
+	description: "Missing table";
+}
+
+table SalesOrder {
+	customer: Customer;
+}
+""",
+		encoding="utf-8",
+	)
+
+	result = CliRunner().invoke(cli, ["language-server", str(source), "--code-actions", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.language-server-code-actions.v1"
+	assert report["action_count"] >= 1
+	assert "create-table-Customer" in {action["id"] for action in report["actions"]}
+	assert all("new_source" not in action for action in report["actions"])
+	assert "table Customer" not in source.read_text(encoding="utf-8")
+
+
+def test_cli_language_server_apply_code_action_writes_explicitly(tmp_path):
+	source = tmp_path / "missing_table.apg"
+	source.write_text(
+		"""
+module missing_table version 1.0.0 {
+	description: "Missing table";
+}
+
+table SalesOrder {
+	customer: Customer;
+}
+""",
+		encoding="utf-8",
+	)
+
+	result = CliRunner().invoke(cli, [
+		"language-server",
+		str(source),
+		"--code-actions",
+		"--apply-action",
+		"create-table-Customer",
+		"--write",
+		"--json",
+	])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["written"] is True
+	assert report["selected_action"]["id"] == "create-table-Customer"
+	assert "table Customer" in source.read_text(encoding="utf-8")
 
 
 def test_framework_names_are_not_silent_compiler_target_aliases():

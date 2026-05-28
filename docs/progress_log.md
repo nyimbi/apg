@@ -7693,3 +7693,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile language_server/semantic_service.py cli/main.py tests/test_compiler_baseline.py`
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_language_service_rename_plan_updates_symbol_references_without_writing tests/test_compiler_baseline.py::test_language_service_rename_blocks_ambiguous_field_symbols tests/test_compiler_baseline.py::test_cli_language_server_rename_json_dry_runs_without_writing -q` -> 3 passed
 - `.venv/bin/apg language-server examples/02_customer_orders_relationship/main.apg --rename Customer --to Account --json` -> emitted `apg.language-server-rename.v1`, skipped the quoted description, planned 1 source replacement, and did not write the file
+
+### 2026-05-28 20:35 EAT
+
+Completed checkpoint:
+
+- Extended `language_server.semantic_service` with concrete code-action planning over the shared semantic model.
+- Added `apg language-server <file> --code-actions --json`, emitting `apg.language-server-code-actions.v1`.
+- Code actions now produce reviewable APG DSL diffs for supported diagnostics, including missing table declarations from unknown field types, missing agent declarations from unresolved agent/team references, missing capability contract skeletons, and minimal module recovery for non-APG source.
+- Added explicit application through `apg language-server <file> --code-actions --apply-action <id> --write`; dry-run mode omits `new_source` from emitted action payloads and does not mutate the file.
+- Updated the tooling specification so Phase 4 code actions are documented as an executable current contract.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile language_server/semantic_service.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_language_service_code_actions_create_missing_table_patch tests/test_compiler_baseline.py::test_cli_language_server_code_actions_json_dry_runs_without_writing tests/test_compiler_baseline.py::test_cli_language_server_apply_code_action_writes_explicitly -q` -> 3 passed
+- `.venv/bin/apg language-server /private/tmp/apg_missing_type.apg --code-actions --json` -> emitted `apg.language-server-code-actions.v1` with `create-table-Customer` and no file write

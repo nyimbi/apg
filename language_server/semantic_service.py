@@ -155,6 +155,31 @@ def build_language_server_rename(
 	return report
 
 
+def build_language_server_code_actions(
+	path: Path,
+	action_id: str | None = None,
+	write: bool = False,
+) -> dict[str, Any]:
+	"""Build and optionally apply APG language-server code actions."""
+	source = path.read_text(encoding="utf-8")
+	report = build_code_action_report(source, path)
+	report["written"] = False
+	if action_id:
+		selected = next((action for action in report["actions"] if action["id"] == action_id), None)
+		if selected is None:
+			report["ok"] = False
+			report["errors"].append(f"Code action not found: {action_id}")
+		else:
+			report["selected_action"] = selected
+			if write:
+				path.write_text(str(selected["new_source"]), encoding="utf-8")
+				report["written"] = True
+	if not action_id or not write:
+		for action in report["actions"]:
+			action.pop("new_source", None)
+	return report
+
+
 def completion_items(
 	model: dict[str, Any],
 	source: str = "",
@@ -365,6 +390,22 @@ def code_actions(diagnostics: list[dict[str, Any]]) -> list[dict[str, Any]]:
 	return actions
 
 
+def build_code_action_report(source: str, source_name: str | Path = "<memory>") -> dict[str, Any]:
+	"""Return concrete APG code-action plans for one source document."""
+	snapshot = build_language_service_snapshot(source, source_name)
+	model = snapshot["semantic_model"]
+	actions = _planned_code_actions(source, source_name, snapshot["diagnostics"], model)
+	return {
+		"format": "apg.language-server-code-actions.v1",
+		"ok": True,
+		"file": str(source_name),
+		"diagnostic_count": len(snapshot["diagnostics"]),
+		"action_count": len(actions),
+		"actions": actions,
+		"errors": [],
+	}
+
+
 def formatting(source: str) -> dict[str, Any]:
 	"""Return formatted text using the shared APG formatter."""
 	return format_apg_source(source).to_dict(include_text=True)
@@ -531,6 +572,203 @@ def _rename_review_reasons(selected: dict[str, Any] | None) -> list[str]:
 	if kind == "app":
 		return ["application renames can affect package metadata and release evidence"]
 	return []
+
+
+def _planned_code_actions(
+	source: str,
+	source_name: str | Path,
+	diagnostics: list[dict[str, Any]],
+	model: dict[str, Any],
+) -> list[dict[str, Any]]:
+	actions: list[dict[str, Any]] = []
+	for diagnostic in diagnostics:
+		message = str(diagnostic.get("message", ""))
+		code = str(diagnostic.get("code", ""))
+		if code == "APG0001" and "No APG declarations found" in message:
+			new_source = _minimal_module_source(source_name)
+			actions.append(_code_action(
+				"create-minimal-module",
+				"Create minimal APG module",
+				"quickfix",
+				diagnostic,
+				source,
+				new_source,
+				source_name,
+				requires_review=True,
+				review_reasons=["replaces non-APG source with a minimal module shell"],
+			))
+			continue
+
+		type_match = re.search(r"Unknown type '([^']+)' for property '([^']+)'", message)
+		if type_match:
+			table_name = type_match.group(1)
+			property_name = type_match.group(2)
+			if table_name not in model.get("tables", {}):
+				new_source = _append_block(source, _table_stub(table_name))
+				actions.append(_code_action(
+					f"create-table-{table_name}",
+					f"Create missing table {table_name}",
+					"quickfix",
+					diagnostic,
+					source,
+					new_source,
+					source_name,
+					requires_review=True,
+					review_reasons=[f"new table {table_name} affects schema and migrations"],
+					metadata={"created_symbol": f"table.{table_name}", "referenced_by": property_name},
+				))
+			continue
+
+		agent_match = re.search(r"references unknown agent '([^']+)'", message)
+		if agent_match:
+			agent_name = agent_match.group(1)
+			if agent_name not in model.get("agents", {}):
+				new_source = _append_block(source, _agent_stub(agent_name))
+				actions.append(_code_action(
+					f"create-agent-{agent_name}",
+					f"Create missing agent {agent_name}",
+					"quickfix",
+					diagnostic,
+					source,
+					new_source,
+					source_name,
+					requires_review=True,
+					review_reasons=[f"new agent {agent_name} requires model, runtime, permission, and release review"],
+					metadata={"created_symbol": f"agent.{agent_name}"},
+				))
+			continue
+
+		if "must declare a contract" in message:
+			capability = _extract_quoted_name(message)
+			if capability:
+				new_source = _insert_capability_contract(source, capability)
+				if new_source != source:
+					actions.append(_code_action(
+						f"add-contract-{capability}",
+						f"Add contract skeleton to capability {capability}",
+						"quickfix",
+						diagnostic,
+						source,
+						new_source,
+						source_name,
+						requires_review=True,
+						review_reasons=[f"capability contract for {capability} controls composition boundaries"],
+						metadata={"updated_symbol": f"capability.{capability}"},
+					))
+				continue
+
+		actions.append({
+			"id": f"explain-{code.lower()}-{len(actions) + 1}",
+			"title": "Explain APG diagnostic",
+			"kind": "quickfix",
+			"diagnostic": diagnostic,
+			"command": "apg.explainDiagnostic",
+			"safe_to_apply": False,
+			"requires_review": False,
+			"review_reasons": [],
+			"edits": [],
+			"diff": "",
+			"metadata": {},
+		})
+
+	return _dedupe_actions(actions)
+
+
+def _code_action(
+	action_id: str,
+	title: str,
+	kind: str,
+	diagnostic: dict[str, Any],
+	source: str,
+	new_source: str,
+	source_name: str | Path,
+	requires_review: bool,
+	review_reasons: list[str],
+	metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+	return {
+		"id": action_id,
+		"title": title,
+		"kind": kind,
+		"diagnostic": diagnostic,
+		"command": "apg.applyCodeAction",
+		"safe_to_apply": not requires_review,
+		"requires_review": requires_review,
+		"review_reasons": review_reasons,
+		"edits": [{
+			"file": str(source_name),
+			"operation": "replace_document",
+		}],
+		"diff": _unified_source_diff(source, new_source, str(source_name)),
+		"new_source": new_source,
+		"metadata": metadata or {},
+	}
+
+
+def _dedupe_actions(actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	seen: set[str] = set()
+	unique: list[dict[str, Any]] = []
+	for action in actions:
+		action_id = action["id"]
+		if action_id in seen:
+			continue
+		seen.add(action_id)
+		unique.append(action)
+	return unique
+
+
+def _minimal_module_source(source_name: str | Path) -> str:
+	name = re.sub(r"\W+", "_", Path(source_name).stem).strip("_") or "apg_app"
+	if name[0].isdigit():
+		name = f"app_{name}"
+	return (
+		f"module {name} version 1.0.0 {{\n"
+		"  description: \"Recovered APG module\";\n"
+		"}\n"
+	)
+
+
+def _table_stub(table_name: str) -> str:
+	return (
+		f"table {table_name} {{\n"
+		"  id: int;\n"
+		"}\n"
+	)
+
+
+def _agent_stub(agent_name: str) -> str:
+	role = re.sub(r"(?<!^)([A-Z])", r" \1", agent_name).strip().lower() or "agent"
+	return (
+		f"agent {agent_name} {{\n"
+		f"  role: \"{role}\";\n"
+		"  model: \"openai:gpt-4.1-mini\";\n"
+		"  runtime: codex;\n"
+		"}\n"
+	)
+
+
+def _append_block(source: str, block: str) -> str:
+	return source.rstrip() + "\n\n" + block
+
+
+def _extract_quoted_name(message: str) -> str | None:
+	match = re.search(r"'([^']+)'", message)
+	return match.group(1) if match else None
+
+
+def _insert_capability_contract(source: str, capability: str) -> str:
+	pattern = re.compile(rf"(capability\s+{re.escape(capability)}\s*\{{)")
+	match = pattern.search(source)
+	if not match:
+		return source
+	insert_at = match.end()
+	contract = (
+		"\n  contract: {\n"
+		f"    id: {capability.lower()},\n"
+		f"    provides: [{capability.lower()}]\n"
+		"  };\n"
+	)
+	return source[:insert_at] + contract + source[insert_at:]
 
 
 def _identifier_occurrences(source: str, word: str) -> list[tuple[int, int, int]]:
