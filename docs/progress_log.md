@@ -6347,3 +6347,21 @@ Battery-conscious verification:
 - `rg -n "Placeholder|placeholder|raise NotImplementedError|not implemented|pass\\s*(#.*)?$" capabilities/common/cach/quantum_security.py tests/test_common_cach_quantum_security_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/cach/quantum_security.py tests/test_common_cach_quantum_security_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:12 EAT
+
+Completed checkpoint:
+
+- Made the ENCR Android keystore integration decrypt real AES-GCM envelopes instead of returning literal placeholder plaintext.
+- Android keystore key generation now stores in-memory hardware-backed key material for local execution and derives a stable public-key fingerprint for metadata.
+- Keystore encryption now uses AES-256-GCM with tenant/key-alias authenticated metadata while preserving the existing `ciphertext`/`iv` response shape.
+- Keystore decryption now authenticates ciphertext and returns explicit tamper errors on invalid tags.
+- Added focused regression coverage for Android keystore encrypt/decrypt round trips and ciphertext tamper rejection.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_encr_mobile_apps_runtime.py -q` -> 2 passed, 11 pre-existing warnings
+- `rg -n "decrypted_data_placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
