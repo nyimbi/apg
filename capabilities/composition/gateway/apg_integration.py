@@ -33,9 +33,93 @@ from sqlalchemy.ext.asyncio import AsyncSession
 try:
 	import redis.asyncio as redis
 except ModuleNotFoundError:
+	class _InMemoryPubSub:
+		def __init__(self, client: "_InMemoryRedis"):
+			self.client = client
+			self.channels: set[str] = set()
+			self.closed = False
+			self._cursor = 0
+
+		async def subscribe(self, *channels: str) -> None:
+			self.channels.update(channels)
+
+		async def get_message(self, timeout: float = 0.0) -> Optional[Dict[str, Any]]:
+			_ = timeout
+			if self.closed:
+				return None
+			for index, message in enumerate(self.client._published[self._cursor:], start=self._cursor):
+				if message["channel"] in self.channels:
+					self._cursor = index + 1
+					return {
+						"type": "message",
+						"channel": message["channel"],
+						"data": message["message"]
+					}
+			return None
+
+		async def close(self) -> None:
+			self.closed = True
+
+	class _InMemoryRedis:
+		def __init__(self, *args, **kwargs):
+			self._values: Dict[str, Any] = {}
+			self._hashes: Dict[str, Dict[str, Any]] = {}
+			self._streams: Dict[str, List[Dict[str, Any]]] = {}
+			self._published: List[Dict[str, Any]] = []
+			self._expirations: Dict[str, int] = {}
+
+		async def setex(self, key: str, seconds: int, value: Any) -> bool:
+			self._values[key] = value
+			self._expirations[key] = seconds
+			return True
+
+		async def get(self, key: str) -> Any:
+			return self._values.get(key)
+
+		async def delete(self, key: str) -> int:
+			deleted = 0
+			for store in (self._values, self._hashes, self._streams):
+				if key in store:
+					del store[key]
+					deleted = 1
+			self._expirations.pop(key, None)
+			return deleted
+
+		async def hset(self, key: str, field: str, value: Any) -> int:
+			existed = field in self._hashes.setdefault(key, {})
+			self._hashes[key][field] = value
+			return 0 if existed else 1
+
+		async def hgetall(self, key: str) -> Dict[str, Any]:
+			return dict(self._hashes.get(key, {}))
+
+		async def expire(self, key: str, seconds: int) -> bool:
+			self._expirations[key] = seconds
+			return True
+
+		async def xadd(self, key: str, fields: Dict[str, Any]) -> str:
+			stream = self._streams.setdefault(key, [])
+			entry_id = f"{len(stream)}-0"
+			stream.append({"id": entry_id, "fields": dict(fields)})
+			return entry_id
+
+		async def publish(self, channel: str, message: Any) -> int:
+			self._published.append({"channel": channel, "message": message})
+			return 1
+
+		def pubsub(self) -> _InMemoryPubSub:
+			return _InMemoryPubSub(self)
+
+		async def close(self) -> None:
+			return None
+
 	class _RedisModule:
-		class Redis:
-			pass
+		Redis = _InMemoryRedis
+
+		@staticmethod
+		def from_url(url: str, *args, **kwargs) -> _InMemoryRedis:
+			_ = url
+			return _InMemoryRedis()
 	redis = _RedisModule()
 from uuid_extensions import uuid7str
 

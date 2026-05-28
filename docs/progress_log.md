@@ -6179,3 +6179,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `b5e8a60` (`Make ENCR public interface executable`).
+
+### 2026-05-28 10:48 EAT
+
+Completed checkpoint:
+
+- Made the API Service Mesh APG integration runnable without the external Redis package or a Redis server.
+- Replaced the previous no-op Redis fallback with an in-memory implementation covering `from_url`, `setex`, `get`, `delete`, hashes, expirations, streams, publish, and pubsub.
+- Proved gateway capability registration, service catalog updates, event stream publishing, composition-engine registration, and composition-engine deregistration work in the minimal runtime.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/apg_integration.py tests/test_composition_gateway_apg_integration_minimal.py`
+- `.venv/bin/pytest tests/test_composition_gateway_apg_integration_minimal.py tests/test_composition_gateway_composition_health.py -q` -> 5 passed
+- `.venv/bin/python -c 'from capabilities.composition.gateway.apg_integration import create_apg_integration, redis; assert hasattr(redis, "from_url")'`
+- `git diff --check capabilities/composition/gateway/apg_integration.py tests/test_composition_gateway_apg_integration_minimal.py`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push.
