@@ -7,6 +7,8 @@ from pathlib import Path
 
 from compiler.compiler import compile_apg_file
 from compiler.parser import APGParser
+from compiler.release import build_release_report
+from compiler.semantic_model import build_semantic_model
 
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
@@ -93,5 +95,52 @@ def test_numbered_apg_example_outputs_match_current_compiler():
 			actual_content = output_file.read_text(encoding="utf-8")
 			if actual_content != expected_content:
 				failures.append(f"{source}: stale generated output {filename}")
+
+	assert failures == []
+
+
+def test_numbered_apg_examples_cover_compiler_bed_down_domains():
+	models = [build_semantic_model(source) for source in numbered_example_sources()]
+	capabilities = [
+		capability
+		for model in models
+		for capability in model.get("capabilities", {}).values()
+	]
+	composition = [model.get("composition", {}) for model in models]
+
+	assert any(model.get("tables") for model in models)
+	assert any(model.get("flows") for model in models)
+	assert any(model.get("agents") for model in models)
+	assert any(capabilities)
+	assert any(
+		model.get("views") or capability.get("screens")
+		for model in models
+		for capability in model.get("capabilities", {}).values()
+	)
+	assert any(item.get("applications") for item in composition)
+	assert any(capability.get("theme") for capability in capabilities)
+	assert any(capability.get("i18n") for capability in capabilities)
+	assert any(
+		capability.get("streaming", {}).get("processor") == "bytewax"
+		for capability in capabilities
+	)
+
+
+def test_numbered_apg_examples_release_evidence_passes():
+	failures: list[str] = []
+
+	for source in numbered_example_sources():
+		report = build_release_report(source)
+		evidence = report.get("evidence", {})
+		if not report.get("ok"):
+			failures.append(f"{source}: release failed: {report.get('errors', [])}")
+			continue
+		if not evidence.get("self_test", {}).get("passed"):
+			failures.append(f"{source}: generated self-test did not pass")
+		if evidence.get("semantic_model", {}).get("format") != "apg.semantic-model.v1":
+			failures.append(f"{source}: generated semantic model format mismatch")
+		for name, contract in evidence.get("contracts", {}).items():
+			if contract.get("errors"):
+				failures.append(f"{source}: {name} contract errors {contract['errors']}")
 
 	assert failures == []

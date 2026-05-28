@@ -33,3 +33,13 @@ capability ProcurementWorkbench {
         }
     };
 }
+
+workflow ProcurementApproval {
+    // Workflow properties make the approval path visible to the semantic model
+    // without introducing framework-specific process-engine code.
+    steps: str = "draft -> budget_review -> procurement_review -> finance_approval -> approved";
+    stages: str = "draft, review, approval, complete";
+    process: () -> bool = {
+        return true;
+    };
+}

@@ -7764,3 +7764,23 @@ Verification result:
 - `.venv/bin/python -m py_compile tests/test_repository_hygiene.py` passed.
 - `.venv/bin/python -m pytest tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories tests/test_repository_hygiene.py::test_operational_markdown_lives_under_docs_archive -q` passed with 2 tests.
 - `git diff --check -- tests/test_repository_hygiene.py docs/progress_log.md docs/archive/source-root-notes/capabilities/COMMON_ERP_REORGANIZATION_COMPLETE.md docs/archive/source-root-notes/capabilities/COMMON_REORGANIZATION_PLAN.md docs/archive/source-root-notes/capabilities/REORGANIZATION_COMPLETE.md docs/archive/source-root-notes/mobile_apps/IMPLEMENTATION_COMPLETE.md` passed.
+
+Commit result:
+
+- Pushed commit `429d9b4` (`Move source-root status notes into docs archive`).
+
+### 2026-05-28 21:19 EAT
+
+In progress:
+
+- Tightened the compiler bed-down gate around the numbered examples instead of relying on ad hoc release checks.
+- Added an explicit `workflow ProcurementApproval` declaration to the procurement example so the curated examples cover records, screens, workflows, agents, capabilities, application composition, visual theming, i18n, and ByteWax streaming metadata.
+- Regenerated `examples/13_procurement_approval_workbench/output/` with `apg compile --verify`.
+- Added examples regression coverage that proves the numbered examples cover the compiler bed-down domains and that all 20 emit passing release evidence.
+
+Battery-conscious verification:
+
+- `.venv/bin/apg compile examples/13_procurement_approval_workbench/main.apg --output examples/13_procurement_approval_workbench/output --verify` passed, including generated self-test and generated smoke test.
+- `.venv/bin/python -m py_compile tests/test_examples_parseable.py` passed.
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` passed with 6 tests.
+- `git diff --check -- examples/13_procurement_approval_workbench/main.apg examples/13_procurement_approval_workbench/output tests/test_examples_parseable.py` passed.

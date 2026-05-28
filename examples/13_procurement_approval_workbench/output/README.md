@@ -66,6 +66,10 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `ProcurementApproval`
+
 ## Capabilities
 
 - `ProcurementWorkbench` - provides purchase_requests, supplier_quotes, approval_plans
