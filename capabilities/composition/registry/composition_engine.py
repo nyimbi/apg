@@ -23,7 +23,7 @@ from sqlalchemy.orm import selectinload
 from .models import (
 	CRCapability, CRDependency, CRComposition, CRCompositionCapability,
 	CRVersion, CRRegistry, CRUsageAnalytics, CRHealthMetrics,
-	CRCapabilityStatus, CRDependencyType, CRCompositionType, 
+	CRCapabilityStatus, CRDependencyType, CRCompositionType,
 	CRVersionConstraint, CRValidationStatus
 )
 
@@ -112,11 +112,11 @@ class CompositionValidationResult:
 class IntelligentCompositionEngine:
 	"""
 	AI-powered composition engine for APG capability orchestration.
-	
+
 	Provides dependency resolution, conflict detection, performance optimization,
 	and intelligent recommendations for capability compositions.
 	"""
-	
+
 	def __init__(
 		self,
 		db_session: AsyncSession,
@@ -128,44 +128,44 @@ class IntelligentCompositionEngine:
 		self.tenant_id = tenant_id
 		self.user_id = user_id
 		self.redis_client = redis_client
-		
+
 		# AI Integration (placeholder for APG AI service)
 		self._ai_service = None
 		self._analytics_service = None
 		self._performance_service = None
-		
+
 		# Caching
 		self._dependency_cache: Dict[str, DependencyNode] = {}
 		self._validation_cache: Dict[str, CompositionValidationResult] = {}
-		
+
 	def _log_composition_operation(self, operation: str, details: str) -> str:
 		"""Log composition engine operations."""
 		return f"CE-{self.tenant_id}: {operation} - {details}"
-	
+
 	def _log_performance_metric(self, operation: str, duration_ms: float) -> str:
 		"""Log composition engine performance metrics."""
 		return f"CE-Performance: {operation} completed in {duration_ms:.2f}ms"
-	
+
 	# =================================================================
 	# Dependency Graph Management
 	# =================================================================
-	
+
 	async def build_dependency_graph(
 		self,
 		capability_ids: List[str]
 	) -> Dict[str, DependencyNode]:
 		"""
 		Build complete dependency graph for given capabilities.
-		
+
 		Args:
 			capability_ids: List of capability IDs to include
-			
+
 		Returns:
 			Dictionary mapping capability_id to DependencyNode
 		"""
 		start_time = datetime.utcnow()
 		dependency_graph = {}
-		
+
 		try:
 			# Get all capabilities with their dependencies
 			capabilities_query = select(CRCapability).options(
@@ -178,10 +178,10 @@ class IntelligentCompositionEngine:
 					CRCapability.capability_id.in_(capability_ids)
 				)
 			)
-			
+
 			result = await self.db_session.execute(capabilities_query)
 			capabilities = result.scalars().all()
-			
+
 			# Build nodes
 			for cap in capabilities:
 				node = DependencyNode(
@@ -201,22 +201,22 @@ class IntelligentCompositionEngine:
 					}
 				)
 				dependency_graph[cap.capability_id] = node
-			
+
 			# Resolve transitive dependencies
 			await self._resolve_transitive_dependencies(dependency_graph)
-			
+
 			# Calculate load order
 			await self._calculate_load_order(dependency_graph)
-			
+
 			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 			print(self._log_performance_metric("build_dependency_graph", duration_ms))
-			
+
 			return dependency_graph
-			
+
 		except Exception as e:
 			print(self._log_composition_operation("build_dependency_graph", f"Error: {e}"))
 			return {}
-	
+
 	async def _resolve_transitive_dependencies(
 		self,
 		dependency_graph: Dict[str, DependencyNode]
@@ -225,21 +225,21 @@ class IntelligentCompositionEngine:
 		for node_id, node in dependency_graph.items():
 			visited = set()
 			transitive_deps = set()
-			
+
 			async def _collect_dependencies(cap_id: str, depth: int = 0):
 				if cap_id in visited or depth > 10:  # Prevent infinite loops
 					return
-				
+
 				visited.add(cap_id)
-				
+
 				if cap_id in dependency_graph:
 					for dep_id in dependency_graph[cap_id].dependencies:
 						transitive_deps.add(dep_id)
 						await _collect_dependencies(dep_id, depth + 1)
-			
+
 			await _collect_dependencies(node_id)
 			node.dependencies = list(transitive_deps)
-	
+
 	async def _calculate_load_order(
 		self,
 		dependency_graph: Dict[str, DependencyNode]
@@ -247,78 +247,78 @@ class IntelligentCompositionEngine:
 		"""Calculate optimal load order using topological sorting."""
 		# Simplified topological sort
 		in_degree = {node_id: 0 for node_id in dependency_graph}
-		
+
 		# Calculate in-degrees
 		for node in dependency_graph.values():
 			for dep_id in node.dependencies:
 				if dep_id in in_degree:
 					in_degree[dep_id] += 1
-		
+
 		# Assign load order
 		queue = [node_id for node_id, degree in in_degree.items() if degree == 0]
 		order = 1
-		
+
 		while queue:
 			current = queue.pop(0)
 			if current in dependency_graph:
 				dependency_graph[current].initialization_order = order
 				order += 1
-				
+
 				# Update dependents
 				for dependent_id in dependency_graph[current].dependents:
 					if dependent_id in in_degree:
 						in_degree[dependent_id] -= 1
 						if in_degree[dependent_id] == 0:
 							queue.append(dependent_id)
-	
+
 	# =================================================================
 	# Conflict Detection and Resolution
 	# =================================================================
-	
+
 	async def detect_conflicts(
 		self,
 		capability_ids: List[str]
 	) -> List[ConflictReport]:
 		"""
 		Detect conflicts in capability composition.
-		
+
 		Args:
 			capability_ids: List of capability IDs to validate
-			
+
 		Returns:
 			List of conflict reports
 		"""
 		start_time = datetime.utcnow()
 		conflicts = []
-		
+
 		try:
 			dependency_graph = await self.build_dependency_graph(capability_ids)
-			
+
 			# Check for circular dependencies
 			circular_conflicts = await self._detect_circular_dependencies(dependency_graph)
 			conflicts.extend(circular_conflicts)
-			
+
 			# Check for version conflicts
 			version_conflicts = await self._detect_version_conflicts(capability_ids)
 			conflicts.extend(version_conflicts)
-			
+
 			# Check for resource conflicts
 			resource_conflicts = await self._detect_resource_conflicts(capability_ids)
 			conflicts.extend(resource_conflicts)
-			
+
 			# Check for configuration conflicts
 			config_conflicts = await self._detect_configuration_conflicts(capability_ids)
 			conflicts.extend(config_conflicts)
-			
+
 			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 			print(self._log_performance_metric("detect_conflicts", duration_ms))
-			
+
 			return conflicts
-			
+
 		except Exception as e:
 			print(self._log_composition_operation("detect_conflicts", f"Error: {e}"))
 			return []
-	
+
 	async def _detect_circular_dependencies(
 		self,
 		dependency_graph: Dict[str, DependencyNode]
@@ -327,29 +327,29 @@ class IntelligentCompositionEngine:
 		conflicts = []
 		visited = set()
 		rec_stack = set()
-		
+
 		def _has_cycle(node_id: str, path: List[str]) -> Optional[List[str]]:
 			if node_id in rec_stack:
 				# Found cycle - return the cycle path
 				cycle_start = path.index(node_id)
 				return path[cycle_start:]
-			
+
 			if node_id in visited:
 				return None
-			
+
 			visited.add(node_id)
 			rec_stack.add(node_id)
 			path.append(node_id)
-			
+
 			if node_id in dependency_graph:
 				for dep_id in dependency_graph[node_id].dependencies:
 					cycle = _has_cycle(dep_id, path.copy())
 					if cycle:
 						return cycle
-			
+
 			rec_stack.remove(node_id)
 			return None
-		
+
 		for node_id in dependency_graph:
 			if node_id not in visited:
 				cycle = _has_cycle(node_id, [])
@@ -370,16 +370,16 @@ class IntelligentCompositionEngine:
 						auto_resolvable=False
 					)
 					conflicts.append(conflict)
-		
+
 		return conflicts
-	
+
 	async def _detect_version_conflicts(
 		self,
 		capability_ids: List[str]
 	) -> List[ConflictReport]:
 		"""Detect version compatibility conflicts."""
 		conflicts = []
-		
+
 		try:
 			# Get all dependencies with version constraints
 			dependencies_query = select(CRDependency).where(
@@ -387,7 +387,7 @@ class IntelligentCompositionEngine:
 			)
 			result = await self.db_session.execute(dependencies_query)
 			dependencies = result.scalars().all()
-			
+
 			# Group by dependency target
 			dependency_groups = {}
 			for dep in dependencies:
@@ -395,7 +395,7 @@ class IntelligentCompositionEngine:
 				if target_id not in dependency_groups:
 					dependency_groups[target_id] = []
 				dependency_groups[target_id].append(dep)
-			
+
 			# Check for conflicting version requirements
 			for target_id, deps in dependency_groups.items():
 				if len(deps) > 1:
@@ -407,12 +407,12 @@ class IntelligentCompositionEngine:
 								"constraint": dep.version_constraint,
 								"version": dep.version_exact or dep.version_min or dep.version_max
 							})
-					
+
 					if len(version_requirements) > 1:
 						# Simplified conflict detection - check for exact version mismatches
-						exact_versions = [req for req in version_requirements 
+						exact_versions = [req for req in version_requirements
 										if req["constraint"] == CRVersionConstraint.EXACT]
-						
+
 						if len(set(req["version"] for req in exact_versions)) > 1:
 							conflict = ConflictReport(
 								conflict_id=uuid7str(),
@@ -430,40 +430,218 @@ class IntelligentCompositionEngine:
 								auto_resolvable=True
 							)
 							conflicts.append(conflict)
-			
+
 		except Exception as e:
 			print(self._log_composition_operation("detect_version_conflicts", f"Error: {e}"))
-		
+
 		return conflicts
-	
+
 	async def _detect_resource_conflicts(
 		self,
 		capability_ids: List[str]
 	) -> List[ConflictReport]:
 		"""Detect resource usage conflicts."""
 		conflicts = []
-		
-		# Placeholder for resource conflict detection
-		# This would analyze CPU, memory, network, and storage requirements
-		
+		capabilities = await self._load_capability_records(capability_ids)
+		endpoint_owners: Dict[Tuple[str, str], str] = {}
+		service_owners: Dict[str, str] = {}
+		port_owners: Dict[int, str] = {}
+		data_model_owners: Dict[str, str] = {}
+
+		for capability in capabilities:
+			capability_id = capability.capability_id
+			capability_name = getattr(capability, "capability_name", capability_id)
+			for endpoint in self._normalize_endpoints(getattr(capability, "api_endpoints", []) or []):
+				owner = endpoint_owners.get(endpoint)
+				if owner and owner != capability_id:
+					conflicts.append(self._build_conflict(
+						ConflictSeverity.HIGH,
+						[owner, capability_id],
+						"api_endpoint_conflict",
+						f"Capabilities define the same API endpoint {endpoint[0]} {endpoint[1]}",
+						"rename_or_namespace_endpoint",
+						"Move one endpoint under a capability-specific route namespace",
+						auto_resolvable=True
+					))
+				else:
+					endpoint_owners[endpoint] = capability_id
+
+			for service in self._string_items(getattr(capability, "provides_services", []) or []):
+				owner = service_owners.get(service)
+				if owner and owner != capability_id:
+					conflicts.append(self._build_conflict(
+						ConflictSeverity.MEDIUM,
+						[owner, capability_id],
+						"service_name_conflict",
+						f"Capabilities both provide service '{service}'",
+						"rename_service",
+						"Use unique service aliases in the composition manifest",
+						auto_resolvable=True
+					))
+				else:
+					service_owners[service] = capability_id
+
+			for model in self._string_items(getattr(capability, "data_models", []) or []):
+				owner = data_model_owners.get(model)
+				if owner and owner != capability_id:
+					conflicts.append(self._build_conflict(
+						ConflictSeverity.MEDIUM,
+						[owner, capability_id],
+						"data_model_ownership_conflict",
+						f"Capabilities both declare ownership of data model '{model}'",
+						"choose_model_owner",
+						"Declare one source of truth and make the other capability consume it",
+						auto_resolvable=False
+					))
+				else:
+					data_model_owners[model] = capability_id
+
+			for port in self._declared_ports(capability):
+				owner = port_owners.get(port)
+				if owner and owner != capability_id:
+					conflicts.append(self._build_conflict(
+						ConflictSeverity.HIGH,
+						[owner, capability_id],
+						"port_conflict",
+						f"Capabilities both declare network port {port}",
+						"remap_port",
+						"Assign a distinct port or route one capability through the gateway",
+						auto_resolvable=True
+					))
+				else:
+					port_owners[port] = capability_id
+
 		return conflicts
-	
+
 	async def _detect_configuration_conflicts(
 		self,
 		capability_ids: List[str]
 	) -> List[ConflictReport]:
 		"""Detect configuration conflicts between capabilities."""
 		conflicts = []
-		
-		# Placeholder for configuration conflict detection
-		# This would analyze environment variables, port usage, and configuration overlaps
-		
+		capabilities = await self._load_capability_records(capability_ids)
+		config_owners: Dict[str, Tuple[str, Any]] = {}
+
+		for capability in capabilities:
+			metadata = self._metadata(capability)
+			configuration = metadata.get("configuration", {})
+			if not isinstance(configuration, dict):
+				continue
+			for key, value in self._flatten_config(configuration):
+				existing = config_owners.get(key)
+				if existing and existing[0] != capability.capability_id and existing[1] != value:
+					conflicts.append(self._build_conflict(
+						ConflictSeverity.MEDIUM,
+						[existing[0], capability.capability_id],
+						"configuration_value_conflict",
+						f"Capabilities set configuration '{key}' to incompatible values",
+						"namespace_configuration",
+						"Move the setting under capability-specific configuration keys or align values",
+						auto_resolvable=False
+					))
+				else:
+					config_owners[key] = (capability.capability_id, value)
+
 		return conflicts
-	
+
+	async def _load_capability_records(self, capability_ids: List[str]) -> List[CRCapability]:
+		"""Load capability records for conflict analysis."""
+		if not capability_ids:
+			return []
+		query = select(CRCapability).where(
+			and_(
+				CRCapability.tenant_id == self.tenant_id,
+				CRCapability.capability_id.in_(capability_ids)
+			)
+		)
+		result = await self.db_session.execute(query)
+		return list(result.scalars().all())
+
+	def _build_conflict(
+		self,
+		severity: ConflictSeverity,
+		capability_ids: List[str],
+		conflict_type: str,
+		description: str,
+		option: str,
+		resolution_description: str,
+		auto_resolvable: bool
+	) -> ConflictReport:
+		"""Build a standard composition conflict report."""
+		return ConflictReport(
+			conflict_id=uuid7str(),
+			severity=severity,
+			conflicting_capabilities=capability_ids,
+			conflict_type=conflict_type,
+			description=description,
+			resolution_options=[{
+				"option": option,
+				"description": resolution_description,
+				"impact": "Composition manifest or capability metadata update required"
+			}],
+			auto_resolvable=auto_resolvable
+		)
+
+	def _metadata(self, capability: CRCapability) -> Dict[str, Any]:
+		metadata = getattr(capability, "metadata_json", None) or {}
+		return metadata if isinstance(metadata, dict) else {}
+
+	def _normalize_endpoints(self, endpoints: List[Any]) -> List[Tuple[str, str]]:
+		normalized = []
+		for endpoint in endpoints:
+			if isinstance(endpoint, str):
+				normalized.append(("ANY", endpoint.strip()))
+				continue
+			if isinstance(endpoint, dict):
+				method = str(endpoint.get("method", endpoint.get("verb", "ANY"))).upper()
+				path = str(endpoint.get("path", endpoint.get("route", ""))).strip()
+				if path:
+					normalized.append((method, path))
+		return normalized
+
+	def _string_items(self, values: List[Any]) -> List[str]:
+		items = []
+		for value in values:
+			if isinstance(value, str):
+				items.append(value)
+			elif isinstance(value, dict):
+				name = value.get("name") or value.get("code") or value.get("service")
+				if name:
+					items.append(str(name))
+		return items
+
+	def _declared_ports(self, capability: CRCapability) -> List[int]:
+		metadata = self._metadata(capability)
+		ports = metadata.get("ports", [])
+		if isinstance(ports, int):
+			ports = [ports]
+		if not isinstance(ports, list):
+			ports = []
+		for endpoint in getattr(capability, "api_endpoints", []) or []:
+			if isinstance(endpoint, dict) and endpoint.get("port") is not None:
+				ports.append(endpoint["port"])
+		declared_ports = []
+		for port in ports:
+			try:
+				declared_ports.append(int(port))
+			except (TypeError, ValueError):
+				continue
+		return declared_ports
+
+	def _flatten_config(self, configuration: Dict[str, Any], prefix: str = "") -> List[Tuple[str, Any]]:
+		items = []
+		for key, value in configuration.items():
+			path = f"{prefix}.{key}" if prefix else str(key)
+			if isinstance(value, dict):
+				items.extend(self._flatten_config(value, path))
+			else:
+				items.append((path, value))
+		return items
+
 	# =================================================================
 	# AI-Powered Recommendations
 	# =================================================================
-	
+
 	async def generate_composition_recommendations(
 		self,
 		capability_ids: List[str],
@@ -472,66 +650,66 @@ class IntelligentCompositionEngine:
 	) -> List[CompositionRecommendation]:
 		"""
 		Generate AI-powered composition recommendations.
-		
+
 		Args:
 			capability_ids: Current capabilities in composition
 			composition_type: Type of composition being created
 			industry_focus: Industry-specific requirements
-			
+
 		Returns:
 			List of composition recommendations
 		"""
 		start_time = datetime.utcnow()
 		recommendations = []
-		
+
 		try:
 			# Get capability analytics
 			analytics = await self._get_capability_analytics(capability_ids)
-			
+
 			# Generate optimization recommendations
 			optimization_recs = await self._generate_optimization_recommendations(
 				capability_ids, analytics
 			)
 			recommendations.extend(optimization_recs)
-			
+
 			# Generate security recommendations
 			security_recs = await self._generate_security_recommendations(
 				capability_ids, analytics
 			)
 			recommendations.extend(security_recs)
-			
+
 			# Generate performance recommendations
 			performance_recs = await self._generate_performance_recommendations(
 				capability_ids, analytics
 			)
 			recommendations.extend(performance_recs)
-			
+
 			# Generate industry-specific recommendations
 			if industry_focus:
 				industry_recs = await self._generate_industry_recommendations(
 					capability_ids, industry_focus
 				)
 				recommendations.extend(industry_recs)
-			
+
 			# Sort by confidence score and priority
 			recommendations.sort(key=lambda x: (x.confidence_score, x.priority), reverse=True)
-			
+
 			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 			print(self._log_performance_metric("generate_recommendations", duration_ms))
-			
+
 			return recommendations[:10]  # Return top 10 recommendations
-			
+
 		except Exception as e:
 			print(self._log_composition_operation("generate_recommendations", f"Error: {e}"))
 			return []
-	
+
 	async def _get_capability_analytics(
 		self,
 		capability_ids: List[str]
 	) -> Dict[str, Any]:
 		"""Get analytics data for capabilities."""
 		analytics = {}
-		
+
 		try:
 			# Get usage analytics
 			usage_query = select(CRUsageAnalytics).where(
@@ -539,14 +717,14 @@ class IntelligentCompositionEngine:
 			)
 			result = await self.db_session.execute(usage_query)
 			usage_data = result.scalars().all()
-			
+
 			# Get health metrics
 			health_query = select(CRHealthMetrics).where(
 				CRHealthMetrics.capability_id.in_(capability_ids)
 			)
 			result = await self.db_session.execute(health_query)
 			health_data = result.scalars().all()
-			
+
 			analytics = {
 				"usage_data": [
 					{
@@ -567,12 +745,12 @@ class IntelligentCompositionEngine:
 					for health in health_data
 				]
 			}
-			
+
 		except Exception as e:
 			print(self._log_composition_operation("get_analytics", f"Error: {e}"))
-		
+
 		return analytics
-	
+
 	async def _generate_optimization_recommendations(
 		self,
 		capability_ids: List[str],
@@ -580,7 +758,7 @@ class IntelligentCompositionEngine:
 	) -> List[CompositionRecommendation]:
 		"""Generate optimization recommendations."""
 		recommendations = []
-		
+
 		# Analyze for redundant capabilities
 		recommendation = CompositionRecommendation(
 			recommendation_id=uuid7str(),
@@ -602,9 +780,9 @@ class IntelligentCompositionEngine:
 			priority=2
 		)
 		recommendations.append(recommendation)
-		
+
 		return recommendations
-	
+
 	async def _generate_security_recommendations(
 		self,
 		capability_ids: List[str],
@@ -612,7 +790,7 @@ class IntelligentCompositionEngine:
 	) -> List[CompositionRecommendation]:
 		"""Generate security recommendations."""
 		recommendations = []
-		
+
 		# Check for auth_rbac integration
 		recommendation = CompositionRecommendation(
 			recommendation_id=uuid7str(),
@@ -633,9 +811,9 @@ class IntelligentCompositionEngine:
 			priority=1
 		)
 		recommendations.append(recommendation)
-		
+
 		return recommendations
-	
+
 	async def _generate_performance_recommendations(
 		self,
 		capability_ids: List[str],
@@ -643,13 +821,13 @@ class IntelligentCompositionEngine:
 	) -> List[CompositionRecommendation]:
 		"""Generate performance recommendations."""
 		recommendations = []
-		
+
 		# Analyze response times
 		high_latency_caps = []
 		for usage in analytics.get("usage_data", []):
 			if usage.get("avg_response_time", 0) > 500:  # >500ms
 				high_latency_caps.append(usage["capability_id"])
-		
+
 		if high_latency_caps:
 			recommendation = CompositionRecommendation(
 				recommendation_id=uuid7str(),
@@ -670,9 +848,9 @@ class IntelligentCompositionEngine:
 				priority=2
 			)
 			recommendations.append(recommendation)
-		
+
 		return recommendations
-	
+
 	async def _generate_industry_recommendations(
 		self,
 		capability_ids: List[str],
@@ -680,7 +858,7 @@ class IntelligentCompositionEngine:
 	) -> List[CompositionRecommendation]:
 		"""Generate industry-specific recommendations."""
 		recommendations = []
-		
+
 		# Industry-specific capability suggestions
 		if "healthcare" in industry_focus:
 			recommendation = CompositionRecommendation(
@@ -702,23 +880,23 @@ class IntelligentCompositionEngine:
 				priority=1
 			)
 			recommendations.append(recommendation)
-		
+
 		return recommendations
-	
+
 	# =================================================================
 	# Performance Impact Analysis
 	# =================================================================
-	
+
 	async def analyze_performance_impact(
 		self,
 		capability_ids: List[str]
 	) -> PerformanceImpact:
 		"""
 		Analyze performance impact of capability composition.
-		
+
 		Args:
 			capability_ids: List of capability IDs
-			
+
 		Returns:
 			PerformanceImpact analysis
 		"""
@@ -732,19 +910,19 @@ class IntelligentCompositionEngine:
 			)
 			result = await self.db_session.execute(capabilities_query)
 			capabilities = result.scalars().all()
-			
+
 			# Calculate estimated performance impact
 			total_complexity = sum(cap.complexity_score for cap in capabilities)
 			capability_count = len(capabilities)
-			
+
 			# Simplified performance calculations
 			estimated_memory = capability_count * 50 + total_complexity * 25  # MB
 			estimated_cpu = min(capability_count * 5 + total_complexity * 10, 100)  # %
 			estimated_startup = capability_count * 100 + total_complexity * 50  # ms
 			estimated_response = capability_count * 10 + total_complexity * 20  # ms
-			
+
 			scalability_score = max(0, 1.0 - (total_complexity / 100))
-			
+
 			return PerformanceImpact(
 				memory_usage_mb=estimated_memory,
 				cpu_usage_pct=estimated_cpu,
@@ -754,7 +932,7 @@ class IntelligentCompositionEngine:
 				response_time_ms=estimated_response,
 				scalability_score=scalability_score
 			)
-			
+
 		except Exception as e:
 			print(self._log_composition_operation("analyze_performance", f"Error: {e}"))
 			return PerformanceImpact(
@@ -766,11 +944,11 @@ class IntelligentCompositionEngine:
 				response_time_ms=0.0,
 				scalability_score=1.0
 			)
-	
+
 	# =================================================================
 	# Complete Composition Validation
 	# =================================================================
-	
+
 	async def validate_composition(
 		self,
 		capability_ids: List[str],
@@ -779,49 +957,49 @@ class IntelligentCompositionEngine:
 	) -> CompositionValidationResult:
 		"""
 		Perform complete composition validation.
-		
+
 		Args:
 			capability_ids: List of capability IDs to validate
 			composition_type: Type of composition
 			industry_focus: Industry requirements
-			
+
 		Returns:
 			Complete validation results
 		"""
 		start_time = datetime.utcnow()
-		
+
 		try:
-			print(self._log_composition_operation("validate_composition", 
+			print(self._log_composition_operation("validate_composition",
 				f"Validating {len(capability_ids)} capabilities"))
-			
+
 			# Detect conflicts
 			conflicts = await self.detect_conflicts(capability_ids)
-			
+
 			# Generate recommendations
 			recommendations = await self.generate_composition_recommendations(
 				capability_ids, composition_type, industry_focus
 			)
-			
+
 			# Analyze performance impact
 			performance_impact = await self.analyze_performance_impact(capability_ids)
-			
+
 			# Calculate validation score
 			validation_score = await self._calculate_validation_score(
 				conflicts, performance_impact, len(capability_ids)
 			)
-			
+
 			# Determine if composition is valid
 			is_valid = len([c for c in conflicts if c.severity in [ConflictSeverity.HIGH, ConflictSeverity.CRITICAL]]) == 0
-			
+
 			# Generate cost analysis (placeholder)
 			cost_analysis = await self._generate_cost_analysis(capability_ids, performance_impact)
-			
+
 			# Generate deployment strategy
 			deployment_strategy = await self._generate_deployment_strategy(capability_ids, conflicts)
-			
+
 			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 			print(self._log_performance_metric("validate_composition", duration_ms))
-			
+
 			return CompositionValidationResult(
 				is_valid=is_valid,
 				validation_score=validation_score,
@@ -831,7 +1009,7 @@ class IntelligentCompositionEngine:
 				cost_analysis=cost_analysis,
 				deployment_strategy=deployment_strategy
 			)
-			
+
 		except Exception as e:
 			print(self._log_composition_operation("validate_composition", f"Error: {e}"))
 			return CompositionValidationResult(
@@ -843,7 +1021,7 @@ class IntelligentCompositionEngine:
 				cost_analysis={},
 				deployment_strategy={}
 			)
-	
+
 	async def _calculate_validation_score(
 		self,
 		conflicts: List[ConflictReport],
@@ -852,7 +1030,7 @@ class IntelligentCompositionEngine:
 	) -> float:
 		"""Calculate overall validation score."""
 		base_score = 1.0
-		
+
 		# Deduct for conflicts
 		for conflict in conflicts:
 			if conflict.severity == ConflictSeverity.CRITICAL:
@@ -863,18 +1041,18 @@ class IntelligentCompositionEngine:
 				base_score -= 0.10
 			else:
 				base_score -= 0.05
-		
+
 		# Adjust for performance
 		if performance_impact.response_time_ms > 1000:
 			base_score -= 0.10
 		if performance_impact.memory_usage_mb > 1000:
 			base_score -= 0.05
-		
+
 		# Adjust for scalability
 		base_score *= performance_impact.scalability_score
-		
+
 		return max(0.0, min(1.0, base_score))
-	
+
 	async def _generate_cost_analysis(
 		self,
 		capability_ids: List[str],
@@ -885,13 +1063,13 @@ class IntelligentCompositionEngine:
 		base_cost_per_capability = 10.0  # USD per month
 		memory_cost_per_gb = 5.0
 		cpu_cost_factor = 0.1
-		
+
 		base_cost = len(capability_ids) * base_cost_per_capability
 		memory_cost = (performance_impact.memory_usage_mb / 1024) * memory_cost_per_gb
 		cpu_cost = performance_impact.cpu_usage_pct * cpu_cost_factor
-		
+
 		total_monthly_cost = base_cost + memory_cost + cpu_cost
-		
+
 		return {
 			"monthly_cost_usd": round(total_monthly_cost, 2),
 			"cost_breakdown": {
@@ -902,7 +1080,7 @@ class IntelligentCompositionEngine:
 			"cost_per_capability": round(total_monthly_cost / len(capability_ids), 2),
 			"optimization_potential": 0.15  # 15% potential savings
 		}
-	
+
 	async def _generate_deployment_strategy(
 		self,
 		capability_ids: List[str],
@@ -919,7 +1097,7 @@ class IntelligentCompositionEngine:
 					"estimated_time_minutes": 15
 				},
 				{
-					"phase": 2, 
+					"phase": 2,
 					"name": "Business Logic",
 					"capabilities": capability_ids[len(capability_ids)//3:2*len(capability_ids)//3],
 					"estimated_time_minutes": 20
@@ -935,7 +1113,7 @@ class IntelligentCompositionEngine:
 			"health_checks_enabled": True,
 			"conflicts_to_resolve": len([c for c in conflicts if not c.auto_resolvable])
 		}
-		
+
 		return strategy
 
 

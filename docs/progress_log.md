@@ -6594,3 +6594,20 @@ Battery-conscious verification:
 - `rg -n "pass\\s*# Implementation for (device clustering discovery|device monitoring setup|geographic optimization|cluster networking|cluster monitoring|target validation|bandwidth optimization|cluster expansion|blue-green deployment|canary deployment|geographic deployment|deployment health checks|resource optimization|network optimization|storage optimization)" capabilities/common/conf/edge_computing_integration.py tests/test_common_conf_edge_computing_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/conf/edge_computing_integration.py tests/test_common_conf_edge_computing_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 13:49 EAT
+
+Completed checkpoint:
+
+- Replaced composition registry placeholder resource and configuration conflict detection with executable checks.
+- Added conflict detection for duplicate API endpoints, service names, data model ownership, declared ports, and conflicting flattened configuration values.
+- Added standard conflict reports with severity, affected capability IDs, resolution options, and auto-resolution flags.
+- Added focused runtime coverage using a fake async registry session so the behavior is verified without a database service.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/composition_engine.py tests/test_composition_registry_conflict_detection.py`
+- `.venv/bin/python -m pytest tests/test_composition_registry_conflict_detection.py -q` -> 2 passed, 2 pre-existing warnings
+- `rg -n "Placeholder for resource conflict detection|Placeholder for configuration conflict detection" capabilities/composition/registry/composition_engine.py tests/test_composition_registry_conflict_detection.py -S` -> no matches
+- `git diff --check capabilities/composition/registry/composition_engine.py tests/test_composition_registry_conflict_detection.py`
+- Deferred broader pytest at the user's request to conserve battery.
