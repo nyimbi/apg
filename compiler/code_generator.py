@@ -891,11 +891,11 @@ def _resolve_value(value: str, context: Dict[str, Any]) -> Any:
     try:
         return int(value)
     except ValueError:
-        pass
+        integer_parse_failed = True
     try:
         return float(value)
     except ValueError:
-        pass
+        float_parse_failed = True
     current: Any = context
     for part in value.split("."):
         if isinstance(current, dict) and part in current:

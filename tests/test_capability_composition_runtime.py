@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from compiler.ast_builder import ASTBuilder, CapabilityDeclaration
 from compiler.compiler import APGCompiler
 from compiler.parser import APGParser
@@ -182,6 +184,7 @@ def test_capability_declaration_generates_runtime_manifest():
     runtime = result.generated_files["apg_capabilities.py"]
     assert "CAPABILITIES" in runtime
     assert "CapabilitySpec" in runtime
+    assert not re.search(r"^\s*pass\s*$", runtime, re.MULTILINE)
     assert "GeneralLedger" in runtime
     assert "'erp_modules': ['finance', 'general_ledger', 'accounts_payable']" in runtime
     assert "'supported_languages': ['en', 'sw', 'ha', 'yo', 'zu']" in runtime

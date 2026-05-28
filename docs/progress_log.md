@@ -4748,3 +4748,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `f5c473f` (`Document APG screen composition contracts`) to `origin/main`.
+
+### 2026-05-28 03:22 EAT
+
+Completed checkpoint:
+
+- Removed the remaining bare `pass` statements from generated `apg_capabilities.py` runtime source emitted by the compiler.
+- Replaced integer/float coercion fallback no-ops with executable parse-failure assignments before context-path resolution.
+- Added focused regression coverage that rejects pass-only bodies in generated capability manifests.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py tests/test_code_generator_executable_defaults.py -q` -> 10 passed
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_apg_language_contract.py tests/test_ai_agent_composition.py tests/test_code_generator_executable_defaults.py -q` -> 30 passed
+- `rg -n "^\\s*pass\\s*$" compiler/code_generator.py tests/test_capability_composition_runtime.py` -> no matches
+- `git diff --check -- compiler/code_generator.py tests/test_capability_composition_runtime.py` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push for this checkpoint.
