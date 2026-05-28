@@ -10,6 +10,7 @@ with proper imports, type hints, and runtime support.
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from pathlib import Path
+import json
 import sys
 
 # Import AST nodes
@@ -21,6 +22,7 @@ from .ast_builder import (
 	AIAgentDeclaration, AgentTeamDeclaration, ApplicationDeclaration, CapabilityDeclaration,
 	DatabaseDeclaration
 )
+from .semantic_model import build_semantic_model_from_module
 
 # Import composable template system
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -146,6 +148,7 @@ class PythonCodeGenerator:
 			
 			# Generate application files
 			generated_files = engine.generate_application_files(context)
+			generated_files.update(self._generate_semantic_model_files(ast))
 			generated_files.update(self._generate_ai_agent_files(ast))
 			generated_files.update(self._generate_application_files(ast))
 			generated_files.update(self._generate_capability_files(ast))
@@ -173,6 +176,7 @@ class PythonCodeGenerator:
 		files = {
 			"app.py": self._generate_python_app(ast),
 			"__init__.py": self._generate_package_init(ast),
+			"semantic_model.json": self._generate_semantic_model_json(ast),
 			".dockerignore": self._generate_python_dockerignore(),
 			".env.example": self._generate_python_env_example(ast),
 			"Dockerfile": self._generate_python_dockerfile(ast),
@@ -184,6 +188,15 @@ class PythonCodeGenerator:
 		files.update(self._generate_application_files(ast))
 		files.update(self._generate_capability_files(ast))
 		return files
+
+	def _generate_semantic_model_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Generate the compiler semantic model artifact shipped with apps."""
+		return {"semantic_model.json": self._generate_semantic_model_json(ast)}
+
+	def _generate_semantic_model_json(self, ast: ModuleDeclaration) -> str:
+		"""Generate deterministic apg.semantic-model.v1 JSON."""
+		model = build_semantic_model_from_module(ast, f"{ast.name}.apg")
+		return json.dumps(model, indent=2, sort_keys=True) + "\n"
 
 	def _entity_spec(self, entity: Any) -> Dict[str, Any]:
 		"""Convert an APG entity AST node into generated runtime metadata."""
@@ -241,6 +254,7 @@ class PythonCodeGenerator:
 	def _generate_python_app(self, module: ModuleDeclaration) -> str:
 		"""Generate a framework-neutral Python app.py entrypoint."""
 		entity_specs = [self._entity_spec(entity) for entity in module.entities]
+		semantic_model = build_semantic_model_from_module(module, f"{module.name}.apg")
 		return f'''"""
 {module.name} - APG Python Application
 {"=" * (len(module.name) + 25)}
@@ -270,6 +284,7 @@ RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {{entity["name"]: [] for entity 
 NEXT_RECORD_IDS: Dict[str, int] = {{entity["name"]: 1 for entity in ENTITIES}}
 EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
+SEMANTIC_MODEL: Dict[str, Any] = {semantic_model!r}
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -349,6 +364,10 @@ def list_entities() -> list[Dict[str, Any]]:
 
 def list_databases() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+
+
+def semantic_model() -> Dict[str, Any]:
+    return json.loads(json.dumps(SEMANTIC_MODEL))
 
 
 def database_status() -> Dict[str, Any]:
@@ -653,6 +672,7 @@ def component_manifest() -> Dict[str, Any]:
                     "relationship_graph",
                     "runtime_adapter_environment_keys",
                     "self_test",
+                    "semantic_model",
                     "storage_status",
                     "update_record",
                     "capability_health",
@@ -667,6 +687,7 @@ def component_manifest() -> Dict[str, Any]:
             }},
             "records": sorted(ENTITY_NAMES),
             "theme": "/theme.css",
+            "semantic_model": "/semantic-model.json",
         }},
         "entities": list_entities(),
         "databases": list_databases(),
@@ -683,6 +704,7 @@ def component_manifest() -> Dict[str, Any]:
                 "app.py",
                 "__init__.py",
                 "README.md",
+                "semantic_model.json",
                 "requirements.txt",
                 "Dockerfile",
                 ".dockerignore",
@@ -692,6 +714,7 @@ def component_manifest() -> Dict[str, Any]:
             "commands": {{
                 "run": "python app.py",
                 "describe": "python app.py --describe",
+                "semantic_model": "python app.py --semantic-model",
                 "validate": "python app.py --validate",
                 "self_test": "python app.py --self-test",
                 "smoke_test": "python smoke_test.py",
@@ -913,6 +936,7 @@ def _database_openapi_schemas() -> Dict[str, Any]:
     generic_object = {{"type": "object", "additionalProperties": True}}
     return {{
         "ApplicationDescription": generic_object,
+        "SemanticModel": generic_object,
         "ComponentManifest": {{
             "type": "object",
             "additionalProperties": True,
@@ -1415,6 +1439,7 @@ def openapi_document() -> Dict[str, Any]:
         "/health": {{"get": _api_operation("Application health", "Health report", response_schema=_schema_ref("HealthReport"))}},
         "/component.json": {{"get": _api_operation("Composable component manifest", "APG component manifest", response_schema=_schema_ref("ComponentManifest"))}},
         "/manifest": {{"get": _api_operation("Application manifest", "APG manifest", response_schema=_schema_ref("ApplicationDescription"))}},
+        "/semantic-model.json": {{"get": _api_operation("Semantic model", "APG semantic model", response_schema=_schema_ref("SemanticModel"))}},
         "/openapi.json": {{"get": _api_operation("OpenAPI contract", "OpenAPI 3.1 contract", response_schema={{"type": "object", "additionalProperties": True}})}},
         "/validate": {{"get": _api_operation("Application validation", "Validation report", response_schema=_schema_ref("ValidationReport"))}},
         "/events": {{"get": _api_operation("Record mutation events", "Event log", response_schema=_schema_ref("EventLog"))}},
@@ -1607,8 +1632,10 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
         errors.append("component manifest record interface does not match generated entities")
     if interfaces.get("theme") != "/theme.css":
         errors.append("component manifest theme interface must point to /theme.css")
+    if interfaces.get("semantic_model") != "/semantic-model.json":
+        errors.append("component manifest semantic model interface must point to /semantic-model.json")
     deployment = manifest.get("deployment", {{}})
-    expected_artifacts = ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
+    expected_artifacts = ["app.py", "__init__.py", "README.md", "semantic_model.json", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
     raw_artifacts = deployment.get("artifacts", []) if isinstance(deployment, dict) else []
     artifacts: set[str] = set()
     if not isinstance(raw_artifacts, list):
@@ -1633,6 +1660,7 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
     expected_commands = {{
         "run": "python app.py",
         "describe": "python app.py --describe",
+        "semantic_model": "python app.py --semantic-model",
         "validate": "python app.py --validate",
         "self_test": "python app.py --self-test",
         "smoke_test": "python smoke_test.py",
@@ -1756,6 +1784,7 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             "/manifest",
             "/application",
             "/component.json",
+            "/semantic-model.json",
             "/health",
             "/validate",
             "/openapi.json",
@@ -2998,6 +3027,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, describe_application()
     if path == "/component.json":
         return 200, component_manifest()
+    if path == "/semantic-model.json":
+        return 200, semantic_model()
     if path == "/health":
         validation = validate_application()
         return 200, {{
@@ -3540,6 +3571,9 @@ def main(argv: list[str] | None = None) -> None:
     if "--describe" in args:
         print(json.dumps(describe_application(), indent=2, sort_keys=True))
         return
+    if "--semantic-model" in args:
+        print(json.dumps(semantic_model(), indent=2, sort_keys=True))
+        return
     if "--validate" in args:
         report = validate_application()
         print(json.dumps(report, indent=2, sort_keys=True))
@@ -3638,7 +3672,7 @@ def main() -> int:
         print(json.dumps({"capability_health": capability_health}, indent=2, sort_keys=True))
         return 1
     component = app.component_manifest()
-    required_routes = {"/health", "/self-test", "/component.json", "/openapi.json"}
+    required_routes = {"/health", "/self-test", "/component.json", "/semantic-model.json", "/openapi.json"}
     missing_routes = sorted(required_routes.difference(component["interfaces"]["http"]["paths"]))
     if missing_routes:
         print(json.dumps({"missing_routes": missing_routes}, indent=2, sort_keys=True))
@@ -3678,6 +3712,7 @@ if __name__ == "__main__":
 			"python app.py --self-test",
 			"python smoke_test.py",
 			"python app.py --describe",
+			"python app.py --semantic-model",
 			"python app.py --validate",
 			"```",
 			"",
@@ -3685,6 +3720,7 @@ if __name__ == "__main__":
 			"",
 			"- `GET /health` - runtime health and validation summary",
 			"- `GET /component.json` - composable application component manifest",
+			"- `GET /semantic-model.json` - normalized APG semantic model",
 			"- `GET /self-test` - generated app smoke contract",
 			"- `GET /manifest` - application manifest",
 			"- `GET /openapi.json` - OpenAPI 3.1 contract",
@@ -3725,6 +3761,7 @@ if __name__ == "__main__":
 			"- `Dockerfile` - standard-library Python container entrypoint",
 			"- `.dockerignore` - container build exclusions",
 			"- `.env.example` - documented runtime environment variables",
+			"- `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks",
 			"- `smoke_test.py` - standalone generated app smoke test",
 		]
 
@@ -5753,7 +5790,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import auth_status, capability_health, capability_health_report, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, invoke_agent, invoke_team, list_agent_teams, list_agents, list_capabilities, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, runtime_adapter_environment_keys, self_test, storage_status, update_record, validate_agent_runtimes, validate_application, validate_component_manifest_contract, validate_openapi_contract, validate_route_dispatch_contract, validate_record',
+			'from .app import auth_status, capability_health, capability_health_report, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, invoke_agent, invoke_team, list_agent_teams, list_agents, list_capabilities, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, runtime_adapter_environment_keys, self_test, semantic_model, storage_status, update_record, validate_agent_runtimes, validate_application, validate_component_manifest_contract, validate_openapi_contract, validate_route_dispatch_contract, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
@@ -5783,6 +5820,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    "relationship_graph",',
 			'    "runtime_adapter_environment_keys",',
 			'    "self_test",',
+			'    "semantic_model",',
 			'    "storage_status",',
 			'    "update_record",',
 			'    "validate_agent_runtimes",',

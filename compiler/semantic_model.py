@@ -56,6 +56,22 @@ def build_semantic_model(path: Path) -> dict[str, Any]:
 	return model
 
 
+def build_semantic_model_from_module(module: ModuleDeclaration, source: str | Path) -> dict[str, Any]:
+	"""Build an ``apg.semantic-model.v1`` report from an existing AST module."""
+	path = Path(source)
+	analyzer = SemanticAnalyzer()
+	analysis = analyzer.analyze(module)
+	diagnostics: list[dict[str, Any]] = []
+	for error in analysis.get("errors", []):
+		diagnostics.append(_diagnostic_from_error(error, path, "error"))
+	for warning in analysis.get("warnings", []):
+		diagnostics.append(_diagnostic_from_error(warning, path, "warning"))
+	model = _model_from_module(module, path)
+	model["diagnostics"] = diagnostics
+	model["ok"] = not any(diagnostic["severity"] == "error" for diagnostic in diagnostics)
+	return model
+
+
 def _empty_model(path: Path, diagnostics: list[dict[str, Any]]) -> dict[str, Any]:
 	return {
 		"format": "apg.semantic-model.v1",

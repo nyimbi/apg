@@ -33,10 +33,10 @@ APG currently has an executable compiler path:
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
-  optional `ai_agents.py`, `apg_capabilities.py`, and `apg_application.py`
-  sidecars;
+  `semantic_model.json`, plus optional `ai_agents.py`, `apg_capabilities.py`,
+  and `apg_application.py` sidecars;
 - generated apps expose `--self-test`, `--describe`, `--validate`, HTTP
-  routes, OpenAPI JSON, and component manifest JSON;
+  routes, OpenAPI JSON, component manifest JSON, and semantic-model JSON;
 - capability contracts can be inspected with
   `python cli.py capabilities contracts --json` and validated with
   `python cli.py capabilities validate-contracts`.

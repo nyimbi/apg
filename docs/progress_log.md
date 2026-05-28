@@ -7439,3 +7439,22 @@ Battery-conscious verification:
 - `.venv/bin/apg model examples/05_single_support_agent/main.apg` -> exited 0 and summarized one AI agent
 - `.venv/bin/apg model examples/08_basic_capability_contract/main.apg --json` -> exited 0 and emitted capability, contract, composition dependency, and graph summary metadata
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 18:55 EAT
+
+Completed checkpoint:
+
+- Made generated Python applications ship `semantic_model.json` as a first-class deployment artifact.
+- Embedded the same `apg.semantic-model.v1` data in generated `app.py` through `semantic_model()`.
+- Added `GET /semantic-model.json` and `python app.py --semantic-model` so compiled applications can serve and print their normalized APG model.
+- Extended component manifest and route-dispatch validation so generated self-tests catch semantic-model artifact and endpoint drift.
+- Updated the tooling baseline to describe semantic-model JSON as part of generated application reality.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py compiler/semantic_model.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_documented_python_target_generates_executable_application_files tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_compiler_baseline.py::test_generated_python_app_serves_http_endpoints -q` -> 3 passed
+- `.venv/bin/apg compile examples/05_single_support_agent/main.apg --output /private/tmp/apg_semantic_model_smoke` -> exited 0 and generated 10 files including `semantic_model.json`
+- `.venv/bin/python /private/tmp/apg_semantic_model_smoke/app.py --semantic-model` -> exited 0 and printed `apg.semantic-model.v1`
+- `/Users/nyimbiodero/src/pjs/apg/.venv/bin/python smoke_test.py` from `/private/tmp/apg_semantic_model_smoke` -> passed with `/semantic-model.json` in route-dispatch validation
+- Deferred broader pytest at the user's request to conserve battery.

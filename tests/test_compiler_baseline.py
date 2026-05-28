@@ -82,6 +82,7 @@ def test_documented_python_target_generates_executable_application_files():
 	assert result.target_language == "python"
 	assert "app.py" in result.generated_files
 	assert "ai_agents.py" in result.generated_files
+	assert "semantic_model.json" in result.generated_files
 	assert ".dockerignore" in result.generated_files
 	assert ".env.example" in result.generated_files
 	assert "Dockerfile" in result.generated_files
@@ -92,6 +93,7 @@ def test_documented_python_target_generates_executable_application_files():
 	env_example = result.generated_files[".env.example"]
 	readme = result.generated_files["README.md"]
 	smoke_test = result.generated_files["smoke_test.py"]
+	semantic_artifact = json.loads(result.generated_files["semantic_model.json"])
 	assert "APG Python Application" in app
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in app
@@ -105,6 +107,7 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "python app.py --self-test" in readme
 	assert "python smoke_test.py" in readme
 	assert "GET /component.json" in readme
+	assert "GET /semantic-model.json" in readme
 	assert "## Browser UI" in readme
 	assert "create, edit, delete, and validation-error flows" in readme
 	assert "_revision` checks" in readme
@@ -114,6 +117,8 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "openapi_contract" in smoke_test
 	assert "route_dispatch" in smoke_test
 	assert "capability_health" in smoke_test
+	assert semantic_artifact["format"] == "apg.semantic-model.v1"
+	assert semantic_artifact["agents"]["Planner"]["runtime"] == "codex"
 	compile(app, "app.py", "exec")
 	compile(smoke_test, "smoke_test.py", "exec")
 
@@ -136,6 +141,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 		spec.loader.exec_module(module)
 		manifest = module.describe_application()
 		component = module.component_manifest()
+		semantic_model = module.semantic_model()
 		invocation = module.invoke_agent("Planner", {"input": {"task": "plan"}})
 		self_test = module.self_test()
 		openapi_contract = module.validate_openapi_contract()
@@ -158,7 +164,10 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert component["kind"] == "apg.application"
 	assert component["composable"] is True
 	assert "/component.json" in component["interfaces"]["http"]["paths"]
+	assert "/semantic-model.json" in component["interfaces"]["http"]["paths"]
+	assert component["interfaces"]["semantic_model"] == "/semantic-model.json"
 	assert "component_manifest" in component["interfaces"]["python"]["exports"]
+	assert "semantic_model" in component["interfaces"]["python"]["exports"]
 	assert "auth_status" in component["interfaces"]["python"]["exports"]
 	assert "create_record" in component["interfaces"]["python"]["exports"]
 	assert "database_status" in component["interfaces"]["python"]["exports"]
@@ -182,12 +191,16 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert self_test["checks"]["validation"]["checks"]["openapi_contract"]["errors"] == []
 	assert self_test["checks"]["validation"]["checks"]["component_manifest"]["errors"] == []
 	assert self_test["checks"]["validation"]["checks"]["route_dispatch"]["errors"] == []
+	assert semantic_model["format"] == "apg.semantic-model.v1"
+	assert semantic_model["agents"]["Planner"]["runtime"] == "codex"
 	assert openapi_contract["errors"] == []
 	assert "AgentInvocationRequest" in openapi_contract["referenced_schemas"]
 	assert component_contract["errors"] == []
-	assert component_contract["artifact_count"] >= 8
+	assert component_contract["artifact_count"] >= 9
 	assert "validate_component_manifest_contract" in component_contract["python_exports"]
+	assert "semantic_model" in component_contract["python_exports"]
 	assert route_contract["errors"] == []
+	assert route_contract["routes"]["/semantic-model.json"][0]["target"] == "_route_payload"
 	assert route_contract["routes"]["/agents/Planner/invoke"][0]["target"] == "_agent_invocation_payload"
 	assert {"method": "GET", "target": "_records_payload_with_query"} in route_contract["routes"]["/entities/Planner/records/{id}"]
 	assert {"method": "PUT", "target": "_update_record_payload"} in route_contract["routes"]["/entities/Planner/records/{id}"]
@@ -196,6 +209,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.metrics_snapshot()["entity_count"] == 1
 	openapi = module.openapi_document()
 	assert openapi["openapi"] == "3.1.0"
+	assert "SemanticModel" in openapi["components"]["schemas"]
 	assert openapi["components"]["schemas"]["SelfTestReport"]["properties"]["checks"] == {
 		"$ref": "#/components/schemas/SelfTestChecks"
 	}
@@ -227,6 +241,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "query_records" in module.__all__
 	assert "relationship_graph" in module.__all__
 	assert "self_test" in module.__all__
+	assert "semantic_model" in module.__all__
 	assert "storage_status" in module.__all__
 	assert "update_record" in module.__all__
 	assert "validate_application" in module.__all__
@@ -359,6 +374,8 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 			manifest = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/component.json", timeout=1) as response:
 			component = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/semantic-model.json", timeout=1) as response:
+			semantic_model = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/agents", timeout=1) as response:
 			agents = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/validate", timeout=1) as response:
@@ -388,14 +405,19 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	assert manifest["name"] == "baseline"
 	assert component["kind"] == "apg.application"
 	assert component["deployment"]["commands"]["self_test"] == "python app.py --self-test"
+	assert component["deployment"]["commands"]["semantic_model"] == "python app.py --semantic-model"
 	assert "/agents/Planner/invoke" in component["interfaces"]["http"]["paths"]
+	assert "/semantic-model.json" in component["interfaces"]["http"]["paths"]
 	assert "/openapi.json" in component["interfaces"]["http"]["paths"]
+	assert semantic_model["format"] == "apg.semantic-model.v1"
+	assert semantic_model["agents"]["Planner"]["runtime"] == "codex"
 	assert agents["agents"]["Planner"]["runtime"] == "codex"
 	assert invocation["agent"] == "Planner"
 	assert invocation["status"] == "adapter_required"
 	assert invocation["input"] == {"ticket": "reset password"}
 	assert "/agents/Planner/invoke" in openapi["paths"]
 	assert "/component.json" in openapi["paths"]
+	assert "/semantic-model.json" in openapi["paths"]
 	assert "/self-test" in openapi["paths"]
 	assert self_test["passed"] is True
 	assert self_test["checks"]["validation"]["checks"]["openapi_contract"]["errors"] == []
