@@ -103,6 +103,10 @@ APG currently has an executable compiler path:
 - `apg language-server <file> --code-actions --json` emits
   `apg.language-server-code-actions.v1`, offering concrete APG DSL patches for
   supported diagnostics, including missing table and missing agent declarations;
+- `apg language-server --audit-fixtures --json` emits
+  `apg.language-server-fixture-audit.v1` by checking editor fixtures for
+  semantic checks, completions, document symbols, formatting, dry-run rename,
+  diagnostics, code actions, and source immutability;
 - `apg ide audit --json` emits `apg.ide-audit.v1`, proving the checked-in
   VS Code extension is aligned with current APG CLI commands, python-only
   compiler targeting, activation, contributed files, icons, and themes;
@@ -762,6 +766,7 @@ apg language-server
 apg language-server app.apg --check --json
 apg language-server app.apg --rename Customer --to Account --json
 apg language-server app.apg --code-actions --json
+apg language-server --audit-fixtures --json
 apg ide audit --json
 apg studio snapshot app.apg --json
 apg studio plan-edit app.apg --edit-json '{"operation":"add_field","table":"Customer","name":"phone","type":"str"}' --json
@@ -1082,6 +1087,13 @@ and missing agents, and can apply a selected action only when
 `--apply-action <id> --write` is explicit. The long-running TCP/stdio LSP
 server should remain a thin transport adapter over that service.
 
+`apg language-server --audit-fixtures --json` loads
+`tests/fixtures/language_server/catalog.json` and emits
+`apg.language-server-fixture-audit.v1`. The audit fails when semantic check,
+completion, document-symbol, formatting, dry-run rename, diagnostic, or
+code-action behavior drifts, or when a supposedly side-effect-free editor
+operation mutates a source fixture.
+
 ### Capabilities
 
 | LSP Feature | Required Behavior |
@@ -1374,7 +1386,7 @@ Tooling tests must be fixture-driven and deterministic.
 | Diagnostic golden tests | Every diagnostic code has at least one fixture and expected JSON output. |
 | Formatter tests | Idempotency, comment preservation, modifier ordering, stable output. |
 | CLI contract tests | Exit codes, JSON schemas, text summaries, bad arguments. |
-| LSP tests | Completion, hover, definition, references, rename, code actions, formatting. |
+| LSP tests | Completion, hover, definition, references, rename, code actions, formatting, and source immutability, enforced by `apg language-server --audit-fixtures --json` and the `apg.language-server-fixture-audit.v1` report. |
 | Graph tests | ER, lookup, workflow, handler, capability, security, agent, package, deployment graph output, enforced by `apg graph-suite --audit-fixtures --json` and the `apg.graph-fixture-audit.v1` report. |
 | Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios, enforced by `apg migrate-plan --audit-fixtures --json` and the `apg.migration-fixture-audit.v1` report. |
 | Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, migration previews, source immutability, and rejected unsafe plans, enforced by `apg nl-plan --audit-fixtures --json` and the `apg.nl-plan-fixture-audit.v1` report. |
@@ -1418,6 +1430,7 @@ Exit criteria:
   `apg diagnostics --audit-fixtures --json`,
   `apg format --audit-fixtures --json`,
   `apg graph-suite --audit-fixtures --json`,
+  `apg language-server --audit-fixtures --json`,
   `apg nl-plan --audit-fixtures --json`,
   `apg migrate-plan --audit-fixtures --json`,
   `apg evidence --audit-fixtures --json`, and `apg drift <file> --json`.

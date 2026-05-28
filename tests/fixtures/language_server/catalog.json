@@ -1,0 +1,68 @@
+{
+  "format": "apg.language-server-fixture-catalog.v1",
+  "tags_required": [
+    "check",
+    "completion",
+    "document_symbols",
+    "formatting",
+    "rename",
+    "code_actions",
+    "diagnostics",
+    "source_immutability"
+  ],
+  "fixtures": [
+    {
+      "id": "sales_check",
+      "source": "sales.apg",
+      "operation": "check",
+      "expected_ok": true,
+      "min_completions": 10,
+      "min_document_symbols": 3,
+      "expected_capabilities": [
+        "textDocument/completion",
+        "textDocument/definition",
+        "textDocument/rename",
+        "textDocument/codeAction",
+        "textDocument/formatting"
+      ],
+      "expected_document_symbols": ["Customer", "SalesOrder"],
+      "expect_formatting_idempotent": true,
+      "tags": ["check", "completion", "document_symbols", "formatting", "source_immutability"]
+    },
+    {
+      "id": "sales_rename_customer",
+      "source": "sales.apg",
+      "operation": "rename",
+      "symbol": "Customer",
+      "to": "Account",
+      "expected_ok": true,
+      "expected_replacement_count": 2,
+      "expected_requires_review": true,
+      "expect_changed": true,
+      "expect_written": false,
+      "tags": ["rename", "source_immutability"]
+    },
+    {
+      "id": "missing_table_code_actions",
+      "source": "missing_table.apg",
+      "operation": "code_actions",
+      "expected_ok": true,
+      "min_actions": 1,
+      "expected_action_ids": ["create-table-Customer"],
+      "tags": ["code_actions", "diagnostics", "source_immutability"]
+    },
+    {
+      "id": "ambiguous_field_rename",
+      "source": "ambiguous.apg",
+      "operation": "rename",
+      "symbol": "name",
+      "to": "label",
+      "expected_ok": false,
+      "expected_replacement_count": 0,
+      "expect_changed": false,
+      "expect_written": false,
+      "expected_error_contains": ["ambiguous"],
+      "tags": ["rename", "diagnostics", "source_immutability"]
+    }
+  ]
+}

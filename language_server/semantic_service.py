@@ -7,6 +7,7 @@ server can all consume the same semantic snapshot.
 
 from __future__ import annotations
 
+import json
 import re
 from difflib import unified_diff
 from pathlib import Path
@@ -58,6 +59,8 @@ AGENT_COMPLETIONS = [
 ]
 
 IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+LANGUAGE_SERVER_FIXTURE_AUDIT_FORMAT = "apg.language-server-fixture-audit.v1"
+DEFAULT_LANGUAGE_SERVER_FIXTURE_CATALOG = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "language_server" / "catalog.json"
 
 
 def build_language_service_snapshot(source: str, source_name: str | Path = "<memory>") -> dict[str, Any]:
@@ -178,6 +181,162 @@ def build_language_server_code_actions(
 		for action in report["actions"]:
 			action.pop("new_source", None)
 	return report
+
+
+def audit_language_server_fixtures(catalog_path: Path | None = None) -> dict[str, Any]:
+	"""Run the checked-in language-server fixture catalog."""
+	catalog_file = Path(catalog_path or DEFAULT_LANGUAGE_SERVER_FIXTURE_CATALOG)
+	catalog_root = catalog_file.parent
+	catalog = json.loads(catalog_file.read_text(encoding="utf-8"))
+	required_tags = sorted(str(tag) for tag in catalog.get("tags_required", []))
+	fixture_reports: list[dict[str, Any]] = []
+	blocking_gaps: list[dict[str, Any]] = []
+	covered_tags: set[str] = set()
+
+	for fixture in catalog.get("fixtures", []):
+		report = _audit_language_server_fixture(catalog_root, fixture)
+		fixture_reports.append(report)
+		if report["ok"]:
+			covered_tags.update(report["tags"])
+		else:
+			blocking_gaps.append({
+				"id": report["id"],
+				"source": report["source"],
+				"operation": report["operation"],
+				"errors": report["errors"],
+			})
+
+	missing_tags = sorted(set(required_tags).difference(covered_tags))
+	for tag in missing_tags:
+		blocking_gaps.append({
+			"id": f"missing_tag:{tag}",
+			"source": str(catalog_file),
+			"operation": "",
+			"errors": [f"required language-server fixture tag {tag!r} is not covered by a passing fixture"],
+		})
+
+	return {
+		"format": LANGUAGE_SERVER_FIXTURE_AUDIT_FORMAT,
+		"ok": not blocking_gaps,
+		"fixture_catalog": str(catalog_file),
+		"tags_required": required_tags,
+		"tags_covered": sorted(covered_tags),
+		"missing_tags": missing_tags,
+		"fixtures": fixture_reports,
+		"summary": {
+			"fixture_count": len(fixture_reports),
+			"passing_fixture_count": sum(1 for report in fixture_reports if report["ok"]),
+			"failing_fixture_count": sum(1 for report in fixture_reports if not report["ok"]),
+			"blocking_gap_count": len(blocking_gaps),
+		},
+		"blocking_gaps": blocking_gaps,
+	}
+
+
+def _audit_language_server_fixture(catalog_root: Path, fixture: dict[str, Any]) -> dict[str, Any]:
+	fixture_id = str(fixture["id"])
+	source = (catalog_root / str(fixture["source"])).resolve()
+	operation = str(fixture["operation"])
+	tags = sorted(str(tag) for tag in fixture.get("tags", []))
+	before_text = source.read_text(encoding="utf-8") if source.exists() else ""
+	errors: list[str] = []
+	report: dict[str, Any] | None = None
+
+	try:
+		if operation == "check":
+			report = build_language_server_check(source)
+			_check_language_server_check_expectations(report, fixture, errors)
+		elif operation == "rename":
+			report = build_language_server_rename(
+				source,
+				str(fixture["symbol"]),
+				str(fixture["to"]),
+				kind=fixture.get("kind"),
+				write=False,
+			)
+			_check_language_server_rename_expectations(report, fixture, errors)
+		elif operation == "code_actions":
+			report = build_language_server_code_actions(source)
+			_check_language_server_code_action_expectations(report, fixture, errors)
+		else:
+			errors.append(f"unsupported language-server fixture operation: {operation}")
+	except Exception as error:
+		errors.append(str(error))
+
+	if source.exists() and source.read_text(encoding="utf-8") != before_text:
+		errors.append("language-server fixture audit mutated source")
+
+	return {
+		"id": fixture_id,
+		"source": str(source),
+		"operation": operation,
+		"tags": tags,
+		"format": report.get("format") if report else "",
+		"ok": not errors,
+		"errors": errors,
+	}
+
+
+def _check_language_server_check_expectations(report: dict[str, Any], fixture: dict[str, Any], errors: list[str]) -> None:
+	_expected_bool(fixture, report, "ok", errors)
+	if report.get("format") != "apg.language-server-check.v1":
+		errors.append("check report format mismatch")
+	if report.get("semantic_model_format") != "apg.semantic-model.v1":
+		errors.append("semantic model format mismatch")
+	if int(report.get("completion_count", 0)) < int(fixture.get("min_completions", 0)):
+		errors.append(f"expected at least {fixture.get('min_completions')} completions")
+	if int(report.get("document_symbol_count", 0)) < int(fixture.get("min_document_symbols", 0)):
+		errors.append(f"expected at least {fixture.get('min_document_symbols')} document symbols")
+	for capability in fixture.get("expected_capabilities", []):
+		if str(capability) not in report.get("capabilities", []):
+			errors.append(f"missing language-server capability {capability}")
+	for symbol in fixture.get("expected_document_symbols", []):
+		if str(symbol) not in {str(item.get("name")) for item in report.get("document_symbols", [])}:
+			errors.append(f"missing document symbol {symbol}")
+	if fixture.get("expect_formatting_idempotent") is True and report.get("formatting", {}).get("idempotent") is not True:
+		errors.append("expected formatter idempotency")
+
+
+def _check_language_server_rename_expectations(report: dict[str, Any], fixture: dict[str, Any], errors: list[str]) -> None:
+	_expected_bool(fixture, report, "ok", errors)
+	if report.get("format") != "apg.language-server-rename.v1":
+		errors.append("rename report format mismatch")
+	if "expected_replacement_count" in fixture and report.get("replacement_count") != fixture["expected_replacement_count"]:
+		errors.append(f"expected replacement_count={fixture['expected_replacement_count']}, got {report.get('replacement_count')}")
+	if "expected_requires_review" in fixture and report.get("requires_review") is not bool(fixture["expected_requires_review"]):
+		errors.append(f"expected requires_review={fixture['expected_requires_review']}, got {report.get('requires_review')}")
+	if fixture.get("expect_changed") is not None and report.get("changed") is not bool(fixture["expect_changed"]):
+		errors.append(f"expected changed={fixture['expect_changed']}, got {report.get('changed')}")
+	if fixture.get("expect_written") is not None and report.get("written") is not bool(fixture["expect_written"]):
+		errors.append(f"expected written={fixture['expect_written']}, got {report.get('written')}")
+	for text in fixture.get("expected_error_contains", []):
+		if not any(str(text).lower() in str(error).lower() for error in report.get("errors", [])):
+			errors.append(f"missing expected rename error containing {text!r}")
+
+
+def _check_language_server_code_action_expectations(report: dict[str, Any], fixture: dict[str, Any], errors: list[str]) -> None:
+	_expected_bool(fixture, report, "ok", errors)
+	if report.get("format") != "apg.language-server-code-actions.v1":
+		errors.append("code-action report format mismatch")
+	if int(report.get("action_count", 0)) < int(fixture.get("min_actions", 0)):
+		errors.append(f"expected at least {fixture.get('min_actions')} code actions")
+	action_ids = {str(action.get("id")) for action in report.get("actions", [])}
+	for action_id in fixture.get("expected_action_ids", []):
+		if str(action_id) not in action_ids:
+			errors.append(f"missing code action {action_id}")
+	for action in report.get("actions", []):
+		if "new_source" in action:
+			errors.append(f"dry-run code action leaked new_source for {action.get('id')}")
+
+
+def _expected_bool(fixture: dict[str, Any], report: dict[str, Any], key: str, errors: list[str]) -> None:
+	expected_key = f"expected_{key}"
+	if expected_key not in fixture:
+		return
+	expected_value = bool(fixture[expected_key])
+	actual_value = bool(report.get(key))
+	if actual_value != expected_value:
+		errors.append(f"expected {key}={expected_value}, got {actual_value}")
 
 
 def completion_items(

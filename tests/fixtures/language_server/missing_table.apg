@@ -1,0 +1,7 @@
+module missing_table version 1.0.0 {
+  description: "Missing table";
+}
+
+table SalesOrder {
+  customer: Customer;
+}

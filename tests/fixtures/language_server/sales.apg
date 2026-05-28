@@ -1,0 +1,13 @@
+module sales_ops version 1.0.0 {
+  description: "Sales operations";
+}
+
+table Customer {
+  name: str;
+}
+
+table SalesOrder {
+  customer_id: int;
+  customer: Customer;
+  total: float;
+}

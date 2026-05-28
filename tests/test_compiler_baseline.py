@@ -2480,6 +2480,23 @@ table SalesOrder {
 	assert "table Customer" in source.read_text(encoding="utf-8")
 
 
+def test_cli_language_server_audits_fixture_catalog():
+	result = CliRunner().invoke(cli, ["language-server", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.language-server-fixture-audit.v1"
+	assert report["ok"] is True
+	assert report["missing_tags"] == []
+	assert report["blocking_gaps"] == []
+	assert report["summary"]["fixture_count"] >= 4
+	assert report["summary"]["failing_fixture_count"] == 0
+	assert {"check", "completion", "document_symbols", "formatting"}.issubset(report["tags_covered"])
+	assert {"rename", "code_actions", "diagnostics", "source_immutability"}.issubset(report["tags_covered"])
+	assert {fixture["operation"] for fixture in report["fixtures"]} >= {"check", "rename", "code_actions"}
+	assert all(fixture["ok"] for fixture in report["fixtures"])
+
+
 def test_vscode_extension_audit_tracks_current_cli_contracts():
 	report = audit_vscode_extension(REPO_ROOT)
 

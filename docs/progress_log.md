@@ -7993,3 +7993,23 @@ Battery-conscious verification:
 - `.venv/bin/apg nl-plan --audit-fixtures` passed in text mode.
 - `.venv/bin/python -m py_compile compiler/nl_plan.py cli/nl_plan_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_nl_plan_json_proposes_valid_credit_memo_dsl_diff_without_writing tests/test_compiler_baseline.py::test_cli_nl_plan_rejects_unrepresentable_prompt tests/test_compiler_baseline.py::test_cli_nl_plan_audits_fixture_catalog -q` passed with 3 tests.
+
+Commit result:
+
+- Pushed commit `eaaa93c` (`Make NL planning fixture-audited`).
+
+### 2026-05-28 22:33 EAT
+
+In progress:
+
+- Turned language-server semantic-service behavior into a checked-in fixture audit.
+- Added `apg language-server --audit-fixtures --json`, emitting `apg.language-server-fixture-audit.v1`.
+- Added LSP fixtures for semantic checks, completions, document symbols, formatter idempotency, dry-run rename, code-action planning, ambiguous rename diagnostics, and source immutability.
+- Updated `docs/tooling.md` so the executable baseline, language-server specification, test strategy, and Phase 0 fixture gate include the language-server fixture audit.
+
+Battery-conscious verification:
+
+- `.venv/bin/apg language-server --audit-fixtures --json` passed with 4 fixtures, 4 passing fixtures, 0 missing tags, and 0 blocking gaps.
+- `.venv/bin/apg language-server --audit-fixtures` passed in text mode.
+- `.venv/bin/python -m py_compile language_server/semantic_service.py cli/main.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_language_server_check_json_uses_shared_semantic_model tests/test_compiler_baseline.py::test_cli_language_server_rename_json_dry_runs_without_writing tests/test_compiler_baseline.py::test_cli_language_server_code_actions_json_dry_runs_without_writing tests/test_compiler_baseline.py::test_cli_language_server_apply_code_action_writes_explicitly tests/test_compiler_baseline.py::test_cli_language_server_audits_fixture_catalog -q` passed with 5 tests.

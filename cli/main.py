@@ -171,6 +171,8 @@ def doctor():
 @click.argument("source_file", required=False, type=click.Path(path_type=Path))
 @click.option('--port', '-p', default=2087, help='Language server port')
 @click.option('--host', '-h', default='127.0.0.1', help='Language server host')
+@click.option("--audit-fixtures", is_flag=True, help="Audit checked-in language-server fixtures")
+@click.option("--fixtures", type=click.Path(path_type=Path), default=None, help="Language-server fixture catalog path")
 @click.option("--check", is_flag=True, help="Run a dependency-light language-service check for one APG file")
 @click.option("--code-actions", is_flag=True, help="Plan language-server code actions for one APG file")
 @click.option("--apply-action", "action_id", help="Apply one code action id; requires --code-actions")
@@ -183,6 +185,8 @@ def language_server(
 	source_file: Path | None,
 	port: int,
 	host: str,
+	audit_fixtures: bool,
+	fixtures: Path | None,
 	check: bool,
 	code_actions: bool,
 	action_id: str | None,
@@ -193,13 +197,32 @@ def language_server(
 	as_json: bool,
 ):
 	"""Start APG Language Server for IDE integration or check one APG file."""
-	selected_modes = sum(bool(value) for value in [check, code_actions, rename_symbol])
+	selected_modes = sum(bool(value) for value in [audit_fixtures, check, code_actions, rename_symbol])
 	if selected_modes > 1:
-		raise click.ClickException("--check, --code-actions, and --rename cannot be combined")
+		raise click.ClickException("--audit-fixtures, --check, --code-actions, and --rename cannot be combined")
 	if action_id and not code_actions:
 		raise click.ClickException("--apply-action requires --code-actions")
 	if write_rename and not (rename_symbol or action_id):
 		raise click.ClickException("--write is only valid with --rename or --code-actions --apply-action")
+
+	if audit_fixtures:
+		if source_file is not None:
+			raise click.ClickException("--audit-fixtures cannot be combined with SOURCE_FILE")
+		from language_server.semantic_service import audit_language_server_fixtures
+		report = audit_language_server_fixtures(fixtures)
+		if as_json:
+			click.echo(json.dumps(report, indent=2, sort_keys=True))
+		else:
+			summary = report["summary"]
+			status = "OK" if report["ok"] else "FAILED"
+			click.echo(
+				f"APG language-server fixtures {status}: "
+				f"{summary['passing_fixture_count']}/{summary['fixture_count']} passing, "
+				f"{summary['blocking_gap_count']} blocking gaps"
+			)
+		if not report["ok"]:
+			raise click.exceptions.Exit(1)
+		return
 
 	if check:
 		if source_file is None:

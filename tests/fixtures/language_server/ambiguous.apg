@@ -1,0 +1,11 @@
+module ambiguous version 1.0.0 {
+  description: "Ambiguous rename";
+}
+
+table Customer {
+  name: str;
+}
+
+table Product {
+  name: str;
+}
