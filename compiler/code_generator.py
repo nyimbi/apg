@@ -171,6 +171,9 @@ class PythonCodeGenerator:
 		files = {
 			"app.py": self._generate_python_app(ast),
 			"__init__.py": self._generate_package_init(ast),
+			".dockerignore": self._generate_python_dockerignore(),
+			".env.example": self._generate_python_env_example(ast),
+			"Dockerfile": self._generate_python_dockerfile(ast),
 			"README.md": self._generate_python_readme(ast),
 			"requirements.txt": self._generate_python_requirements(),
 		}
@@ -1525,6 +1528,54 @@ if __name__ == "__main__":
 # The default compiler target uses only the Python standard library.
 """
 
+	def _generate_python_dockerfile(self, module: ModuleDeclaration) -> str:
+		"""Generate a minimal container image for the dependency-free Python app."""
+		return f"""FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV APG_HOST=0.0.0.0
+ENV APG_PORT=8080
+
+WORKDIR /app
+COPY . /app
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \\
+  CMD python app.py --self-test >/tmp/{module.name}_self_test.json || exit 1
+
+CMD ["python", "app.py"]
+"""
+
+	def _generate_python_dockerignore(self) -> str:
+		"""Generate container build exclusions for generated apps."""
+		return """.git
+.venv
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+.pytest_cache/
+*.json.tmp
+"""
+
+	def _generate_python_env_example(self, module: ModuleDeclaration) -> str:
+		"""Generate documented runtime environment defaults."""
+		safe_name = module.name.replace(" ", "_").lower()
+		return f"""# APG generated app runtime configuration
+APG_HOST=127.0.0.1
+APG_PORT=8080
+
+# Optional JSON persistence path.
+# APG_DATA_FILE=./data/{safe_name}.json
+
+# Optional mutation API key.
+# APG_API_KEY=change-me
+
+# Set to 1 to enable HTTP request logging.
+APG_DEBUG=0
+"""
+
 	def _generate_python_readme(self, module: ModuleDeclaration) -> str:
 		"""Generate a runbook for the dependency-free Python target."""
 		agents = [entity for entity in module.entities if isinstance(entity, AIAgentDeclaration)]
@@ -1575,6 +1626,19 @@ if __name__ == "__main__":
 			"",
 			"Set `APG_DATA_FILE=/path/to/data.json` to persist records to JSON.",
 			"Set `APG_API_KEY=<key>` to require an API key for mutations.",
+			"",
+			"## Deployment",
+			"",
+			"```bash",
+			"docker build -t apg-generated-app .",
+			"docker run --rm -p 8080:8080 --env-file .env.example apg-generated-app",
+			"```",
+			"",
+			"Generated deployment artifacts:",
+			"",
+			"- `Dockerfile` - standard-library Python container entrypoint",
+			"- `.dockerignore` - container build exclusions",
+			"- `.env.example` - documented runtime environment variables",
 		]
 
 		if entities:

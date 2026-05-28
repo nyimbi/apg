@@ -80,8 +80,13 @@ def test_documented_python_target_generates_executable_application_files():
 	assert result.target_language == "python"
 	assert "app.py" in result.generated_files
 	assert "ai_agents.py" in result.generated_files
+	assert ".dockerignore" in result.generated_files
+	assert ".env.example" in result.generated_files
+	assert "Dockerfile" in result.generated_files
 	assert "README.md" in result.generated_files
 	app = result.generated_files["app.py"]
+	dockerfile = result.generated_files["Dockerfile"]
+	env_example = result.generated_files[".env.example"]
 	readme = result.generated_files["README.md"]
 	assert "APG Python Application" in app
 	assert "Flask-AppBuilder" not in app
@@ -90,7 +95,11 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "HTTPServer" in app
 	assert "run_server" in app
 	assert "openapi_document" in app
+	assert "python:3.11-slim" in dockerfile
+	assert "python app.py --self-test" in dockerfile
+	assert "APG_PORT=8080" in env_example
 	assert "python app.py --self-test" in readme
+	assert "docker build -t apg-generated-app ." in readme
 	assert "POST /agents/Planner/invoke" in readme
 	compile(app, "app.py", "exec")
 
@@ -748,13 +757,21 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "standard-library HTTP server" in result.output
 	assert (output / "app.py").exists()
 	assert (output / "ai_agents.py").exists()
+	assert (output / "Dockerfile").exists()
+	assert (output / ".dockerignore").exists()
+	assert (output / ".env.example").exists()
 	assert (output / "README.md").exists()
 	app = (output / "app.py").read_text(encoding="utf-8")
+	dockerfile = (output / "Dockerfile").read_text(encoding="utf-8")
+	env_example = (output / ".env.example").read_text(encoding="utf-8")
 	readme = (output / "README.md").read_text(encoding="utf-8")
 	requirements = (output / "requirements.txt").read_text(encoding="utf-8")
 	assert "APG Python Application" in app
 	assert "HTTPServer" in app
+	assert "HEALTHCHECK" in dockerfile
+	assert "APG_HOST=127.0.0.1" in env_example
 	assert "python app.py --self-test" in readme
+	assert "Dockerfile" in readme
 	assert "GET /openapi.json" in readme
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in requirements
