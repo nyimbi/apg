@@ -1488,6 +1488,38 @@ def test_cli_diagnostics_audits_registry_fixture_catalog():
 	assert "APG1104" in report["fixture_codes"]
 
 
+def test_cli_drift_json_compares_compiler_generated_artifact_and_runtime_surfaces(tmp_path):
+	source = tmp_path / "agent.apg"
+	output = tmp_path / "generated"
+	source.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["drift", str(source), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.drift-report.v1"
+	assert report["ok"] is True
+	assert set(report["surfaces"]) == {"compiler", "generated_artifact", "generated_runtime"}
+	assert report["surfaces"]["compiler"]["format"] == "apg.semantic-model.v1"
+	assert report["surfaces"]["generated_artifact"]["agent_count"] == 1
+	assert report["surfaces"]["generated_runtime"]["agent_count"] == 1
+	assert [comparison["ok"] for comparison in report["comparisons"]] == [True, True, True]
+	assert report["summary"]["drift_count"] == 0
+	assert not output.exists()
+
+
+def test_cli_drift_audit_fixtures_json_runs_checked_in_catalog():
+	result = CliRunner().invoke(cli, ["drift", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.drift-audit.v1"
+	assert report["ok"] is True
+	assert report["summary"]["fixture_count"] >= 2
+	assert report["summary"]["failed"] == 0
+	assert all(item["actual_ok"] is True for item in report["reports"])
+
+
 def test_cli_explain_json_covers_symbols_diagnostics_and_handlers():
 	source = REPO_ROOT / "examples" / "20_enterprise_erp_platform" / "main.apg"
 

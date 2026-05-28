@@ -7627,3 +7627,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_diagnostics_audits_registry_fixture_catalog tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers -q` -> 2 passed
 - `.venv/bin/apg diagnostics --audit-fixtures --json` -> emitted `apg.diagnostic-audit.v1` with 35/35 fixtures, no missing codes, no unknown codes, and no severity mismatches
 - `.venv/bin/apg diagnostics --json` -> emitted `apg.diagnostic-registry.v1`
+
+### 2026-05-28 20:08 EAT
+
+Completed checkpoint:
+
+- Implemented `compiler.drift.build_drift_report()` as a cross-tool semantic consistency verifier.
+- Added `apg drift SOURCE --json` and `apg drift --audit-fixtures --json`.
+- Drift verification now compares compiler semantic model output, generated `semantic_model.json`, and generated runtime `semantic_model()` after normalizing source-path-only metadata.
+- Added a checked-in semantic drift fixture catalog under `tests/fixtures/drift/catalog.json`.
+- Updated the tooling specification so `apg drift` is documented as an executable current command and CI fixture gate.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/drift.py cli/drift_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_drift_json_compares_compiler_generated_artifact_and_runtime_surfaces tests/test_compiler_baseline.py::test_cli_drift_audit_fixtures_json_runs_checked_in_catalog -q` -> 2 passed
+- `.venv/bin/apg drift examples/05_single_support_agent/main.apg --json` -> emitted `apg.drift-report.v1` with 3/3 comparisons passing and 0 drift
+- `.venv/bin/apg drift --audit-fixtures --json` -> emitted `apg.drift-audit.v1` with 2/2 fixtures passing

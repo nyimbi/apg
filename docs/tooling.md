@@ -44,6 +44,9 @@ APG currently has an executable compiler path:
   fixture catalog;
 - `apg explain <file> --symbol|--diagnostic|--handler ... --json` emits
   `apg.explain-report.v1` from the same semantic model used by `apg model`;
+- `apg drift <file> --json` emits `apg.drift-report.v1` by checking that the
+  compiler semantic model, generated `semantic_model.json`, and generated
+  runtime `semantic_model()` agree;
 - `apg nl-plan <file> --prompt ... --json` emits `apg.nl-plan.v1` with a
   linted APG DSL patch proposal before code generation;
 - `apg migrate-plan <previous> <current> --json` emits
@@ -657,6 +660,8 @@ apg diagnostics --audit-fixtures --json
 apg explain app.apg --symbol table.Customer --json
 apg explain app.apg --diagnostic APG0100 --json
 apg explain app.apg --handler OperationsDashboard.select --json
+apg drift app.apg --json
+apg drift --audit-fixtures --json
 apg nl-plan app.apg --prompt "Add credit memos to accounts receivable" --json
 apg migrate-plan previous.apg current.apg --backend postgresql --json
 apg package app.apg --target web --out dist --json
@@ -815,6 +820,21 @@ apg explain app.apg --handler InvoiceForm.Save
 Explain output should be human-readable by default and JSON with `--json`.
 The current executable contract emits `apg.explain-report.v1`, reuses
 `apg.semantic-model.v1`, and supports symbol, diagnostic, and handler queries.
+
+### `apg drift`
+
+```console
+apg drift app.apg --json
+apg drift --audit-fixtures --json
+```
+
+Emits `apg.drift-report.v1` by compiling in memory and comparing three
+semantic surfaces: the compiler semantic model, generated `semantic_model.json`,
+and the generated runtime `semantic_model()` export. The comparison normalizes
+source-file paths while preserving symbols, tables, agents, capabilities,
+composition, contracts, graph summaries, and diagnostics. `--audit-fixtures`
+loads `tests/fixtures/drift/catalog.json` and is the semantic drift fixture
+gate for CI.
 
 ### `apg migrate-plan`
 

@@ -1,0 +1,15 @@
+{
+  "format": "apg.drift-fixture-catalog.v1",
+  "fixtures": [
+    {
+      "name": "single_support_agent",
+      "source": "examples/05_single_support_agent/main.apg",
+      "expected_ok": true
+    },
+    {
+      "name": "basic_capability_contract",
+      "source": "examples/08_basic_capability_contract/main.apg",
+      "expected_ok": true
+    }
+  ]
+}

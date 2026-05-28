@@ -20,6 +20,7 @@ sys.path.insert(0, str(apg_root))
 from cli.create_project import create
 from cli.compile_command import compile_cmd
 from cli.diagnostics_command import diagnostics
+from cli.drift_command import drift
 from cli.explain_command import explain
 from cli.format_command import format_cmd
 from cli.graph_command import graph, graph_suite
@@ -52,6 +53,7 @@ def cli():
 cli.add_command(create)
 cli.add_command(compile_cmd, name='compile')
 cli.add_command(diagnostics)
+cli.add_command(drift)
 cli.add_command(explain)
 cli.add_command(format_cmd)
 cli.add_command(graph)

@@ -21,6 +21,7 @@ from .parser import APGParser
 from .ast_builder import ASTBuilder
 from .semantic_analyzer import SemanticAnalyzer
 from .diagnostics import audit_diagnostic_fixtures, diagnostic_registry, explain_diagnostic
+from .drift import audit_drift_fixtures, build_drift_report, compare_semantic_models
 from .explain import build_explain_report
 from .semantic_model import build_semantic_model, build_semantic_model_from_module
 from .parser_golden import audit_parser_golden
@@ -38,6 +39,9 @@ __all__ = [
     'audit_diagnostic_fixtures',
     'diagnostic_registry',
     'explain_diagnostic',
+    'audit_drift_fixtures',
+    'build_drift_report',
+    'compare_semantic_models',
     'build_explain_report',
     'build_semantic_model',
     'build_semantic_model_from_module',
