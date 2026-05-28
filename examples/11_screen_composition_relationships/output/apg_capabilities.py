@@ -744,15 +744,12 @@ def _missing_context_reference(text: str, resolved: Any, context: Dict[str, Any]
         return False
     try:
         int(text)
-        return False
     except ValueError:
-        pass
-    try:
-        float(text)
-        return False
-    except ValueError:
-        pass
-    return True
+        try:
+            float(text)
+        except ValueError:
+            return True
+    return False
 
 
 def _resolve_value(value: str, context: Dict[str, Any]) -> Any:

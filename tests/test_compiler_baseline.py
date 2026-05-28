@@ -270,6 +270,19 @@ def test_documented_python_target_generates_executable_application_files():
 	compile(smoke_test, "smoke_test.py", "exec")
 
 
+def test_generated_capability_runtime_has_no_bare_pass_stubs():
+	result = compile_apg_string(CAPABILITY_CATALOG_SOURCE)
+
+	assert result.success is True
+	capability_runtime = result.generated_files["apg_capabilities.py"]
+	assert not [
+		line_number
+		for line_number, line in enumerate(capability_runtime.splitlines(), start=1)
+		if line.strip() == "pass"
+	]
+	compile(capability_runtime, "apg_capabilities.py", "exec")
+
+
 def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path):
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
 	package_dir = tmp_path / "generated_pkg"

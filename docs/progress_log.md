@@ -8119,3 +8119,24 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_lint_audits_fixture_catalog tests/test_compiler_baseline.py::test_cli_tooling_audit_json_runs_all_fixture_catalogs -q` passed with 2 tests.
 - `.venv/bin/apg tooling audit --json` passed with 11 surfaces, 11 passing surfaces, 0 errors, and 0 blocking gaps.
 - `git diff --check -- compiler/linting.py cli/lint_command.py compiler/tooling_audit.py compiler/__init__.py tests/test_compiler_baseline.py tests/fixtures/lint docs/tooling.md docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `39e0f7b` (`Make lint behavior fixture-audited`).
+
+### 2026-05-28 23:24 EAT
+
+In progress:
+
+- Removed the remaining bare `pass` statements emitted into generated `apg_capabilities.py` runtime files.
+- Reworked generated numeric-literal detection so failed integer parsing falls through to float parsing and only returns missing-context status after both conversions fail.
+- Added a compiler regression test that compiles a capability runtime and fails if any generated line is a bare `pass`.
+- Recompiled all 20 numbered APG examples so checked-in generated outputs match the current compiler.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_capability_runtime_has_no_bare_pass_stubs tests/test_compiler_baseline.py::test_cli_baseline_json_audits_numbered_examples -q` passed with 2 tests.
+- `.venv/bin/apg baseline examples --json` passed with 20 examples, 20 passing examples, 0 failures, and python-only targeting.
+- `rg -n "^\\s+pass$" examples/*/output compiler/code_generator.py tests/test_compiler_baseline.py -g '*.py'` found no bare `pass` lines in the generated example outputs or touched compiler/test files.
+- `git diff --check -- compiler/code_generator.py tests/test_compiler_baseline.py examples docs/progress_log.md` passed.
