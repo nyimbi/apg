@@ -203,6 +203,7 @@ import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs
 
@@ -241,8 +242,91 @@ def list_records(entity_name: str | None = None) -> Dict[str, list[Dict[str, Any
         return {{
             name: [dict(record) for record in records]
             for name, records in RECORD_STORE.items()
-        }}
+    }}
     return [dict(record) for record in RECORD_STORE[entity_name]]
+
+
+def _data_path() -> Path | None:
+    raw_path = os.environ.get("APG_DATA_FILE") or os.environ.get("APG_DATA_PATH")
+    if not raw_path:
+        return None
+    return Path(raw_path)
+
+
+def _record_numeric_id(record: Dict[str, Any]) -> int | None:
+    value = record.get("id")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return None
+
+
+def _sync_next_record_ids() -> None:
+    for entity_name in ENTITY_NAMES:
+        numeric_ids = [
+            numeric_id
+            for record in RECORD_STORE[entity_name]
+            for numeric_id in [_record_numeric_id(record)]
+            if numeric_id is not None
+        ]
+        NEXT_RECORD_IDS[entity_name] = max(numeric_ids, default=0) + 1
+
+
+def _load_record_store() -> None:
+    path = _data_path()
+    if path is None or not path.exists():
+        return
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"APG could not load record data from {{path}}: {{error}}", file=sys.stderr)
+        return
+    if not isinstance(loaded, dict):
+        return
+    raw_records = loaded.get("records", loaded)
+    if not isinstance(raw_records, dict):
+        return
+    for entity_name in ENTITY_NAMES:
+        entity_records = raw_records.get(entity_name, [])
+        if isinstance(entity_records, list):
+            RECORD_STORE[entity_name] = [
+                dict(record)
+                for record in entity_records
+                if isinstance(record, dict)
+            ]
+    _sync_next_record_ids()
+
+
+def _persist_record_store() -> str | None:
+    path = _data_path()
+    if path is None:
+        return None
+    payload = {{
+        "module": MODULE_NAME,
+        "version": MODULE_VERSION,
+        "records": list_records(),
+        "next_record_ids": dict(NEXT_RECORD_IDS),
+    }}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = path.with_name(f".{{path.name}}.tmp")
+        temporary_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        os.replace(temporary_path, path)
+    except OSError as error:
+        return str(error)
+    return None
+
+
+def storage_status(include_records: bool = False) -> Dict[str, Any]:
+    path = _data_path()
+    status: Dict[str, Any] = {{
+        "mode": "file" if path is not None else "memory",
+        "path": str(path) if path is not None else None,
+    }}
+    if include_records:
+        status["records"] = list_records()
+    return status
 
 
 def describe_application() -> Dict[str, Any]:
@@ -459,6 +543,7 @@ def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
             "name": MODULE_NAME,
             "version": MODULE_VERSION,
             "valid": validation["valid"],
+            "storage": storage_status(),
             "warnings": validation["warnings"],
         }}
     if path == "/validate":
@@ -470,6 +555,8 @@ def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
         path.startswith("/entities/") and "/records" in path
     ):
         return _records_payload(path)
+    if path == "/storage":
+        return 200, storage_status(include_records=True)
     if path == "/agents":
         return 200, {{
             "agents": describe_application().get("ai_agent_descriptions", {{}}),
@@ -578,6 +665,9 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
         return 409, {{"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}}
     RECORD_STORE[entity_name].append(record)
+    persistence_error = _persist_record_store()
+    if persistence_error:
+        return 500, {{"error": "persistence_failed", "message": persistence_error}}
     return 201, {{
         "entity": entity_name,
         "record": dict(record),
@@ -602,6 +692,9 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
             updated.update(dict(raw_record))
             updated["id"] = existing.get("id")
             RECORD_STORE[entity_name][index] = updated
+            persistence_error = _persist_record_store()
+            if persistence_error:
+                return 500, {{"error": "persistence_failed", "message": persistence_error}}
             return 200, {{"entity": entity_name, "record": dict(updated)}}
     return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
 
@@ -617,6 +710,9 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
     for index, existing in enumerate(RECORD_STORE[entity_name]):
         if str(existing.get("id")) == str(record_id):
             deleted = RECORD_STORE[entity_name].pop(index)
+            persistence_error = _persist_record_store()
+            if persistence_error:
+                return 500, {{"error": "persistence_failed", "message": persistence_error}}
             return 200, {{
                 "entity": entity_name,
                 "deleted": dict(deleted),
@@ -657,6 +753,9 @@ def _put_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any
     ):
         return _update_record_payload(path, payload)
     return 404, {{"error": "not_found", "path": path}}
+
+
+_load_record_store()
 
 
 class ApplicationRequestHandler(BaseHTTPRequestHandler):

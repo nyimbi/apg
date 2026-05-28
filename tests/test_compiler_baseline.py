@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -261,6 +262,92 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert missing_payload["error"] == "record_not_found"
 	assert empty_list["records"] == []
 	assert form_created["record"] == {"id": 2, "name": "Kofi", "email": "kofi@example.com"}
+
+
+def test_generated_python_app_persists_records_with_data_file(tmp_path):
+	result = compile_apg_string(DATA_APP_SOURCE)
+	package_dir = tmp_path / "generated_persistent_app"
+	package_dir.mkdir()
+	for filename, content in result.generated_files.items():
+		(package_dir / filename).write_text(content, encoding="utf-8")
+
+	data_file = tmp_path / "records.json"
+	env = dict(os.environ, APG_DATA_FILE=str(data_file))
+
+	def start_app() -> tuple[subprocess.Popen, str]:
+		with socket.socket() as sock:
+			sock.bind(("127.0.0.1", 0))
+			port = sock.getsockname()[1]
+		process = subprocess.Popen(
+			[sys.executable, "app.py", "--host", "127.0.0.1", "--port", str(port)],
+			cwd=package_dir,
+			env=env,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			text=True,
+		)
+		base_url = f"http://127.0.0.1:{port}"
+		for _attempt in range(30):
+			try:
+				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
+					health = json.loads(response.read().decode("utf-8"))
+				assert health["storage"]["mode"] == "file"
+				assert health["storage"]["path"] == str(data_file)
+				return process, base_url
+			except OSError:
+				if process.poll() is not None:
+					stdout, stderr = process.communicate(timeout=1)
+					raise AssertionError(f"generated app exited early\nstdout={stdout}\nstderr={stderr}")
+				time.sleep(0.05)
+		raise AssertionError("generated persistent app did not answer /health")
+
+	def stop_app(process: subprocess.Popen) -> None:
+		process.terminate()
+		try:
+			process.wait(timeout=2)
+		except subprocess.TimeoutExpired:
+			process.kill()
+			process.wait(timeout=2)
+
+	first_process, first_base_url = start_app()
+	try:
+		request = urllib.request.Request(
+			f"{first_base_url}/entities/Customer/records",
+			data=json.dumps({"record": {"name": "Asha", "email": "asha@example.com"}}).encode("utf-8"),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		with urllib.request.urlopen(request, timeout=1) as response:
+			created = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{first_base_url}/storage", timeout=1) as response:
+			storage = json.loads(response.read().decode("utf-8"))
+	finally:
+		stop_app(first_process)
+
+	assert created["record"]["id"] == 1
+	assert storage["records"]["Customer"] == [created["record"]]
+	persisted = json.loads(data_file.read_text(encoding="utf-8"))
+	assert persisted["records"]["Customer"] == [created["record"]]
+
+	second_process, second_base_url = start_app()
+	try:
+		with urllib.request.urlopen(f"{second_base_url}/entities/Customer/records/1", timeout=1) as response:
+			reloaded = json.loads(response.read().decode("utf-8"))
+		request = urllib.request.Request(
+			f"{second_base_url}/entities/Customer/records",
+			data=json.dumps({"record": {"name": "Kofi", "email": "kofi@example.com"}}).encode("utf-8"),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		with urllib.request.urlopen(request, timeout=1) as response:
+			second_created = json.loads(response.read().decode("utf-8"))
+	finally:
+		stop_app(second_process)
+
+	assert reloaded["record"] == created["record"]
+	assert second_created["record"]["id"] == 2
+	persisted = json.loads(data_file.read_text(encoding="utf-8"))
+	assert persisted["records"]["Customer"] == [created["record"], second_created["record"]]
 
 
 def test_cli_compile_default_target_writes_generated_application(tmp_path):

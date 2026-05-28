@@ -5331,3 +5331,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `4d69f8b` (`Generate browser UI shells for apps`) to `origin/main`.
+
+### 2026-05-28 06:27 EAT
+
+Completed checkpoint:
+
+- Added optional durable JSON-file persistence to generated dependency-free `app.py` outputs.
+- Generated apps still default to in-memory records, but setting `APG_DATA_FILE` or `APG_DATA_PATH` now loads records at startup and persists record changes after create, update, or delete.
+- Added `/storage` JSON inspection and included storage mode/path in `/health`.
+- Persisted data includes module/version metadata, entity records, and next record ids so generated ids continue after restart.
+- Added a focused subprocess restart regression that starts a generated app with `APG_DATA_FILE`, creates a `Customer` record, verifies the persisted JSON file, restarts the generated app, reloads the record, creates another record, and verifies the next id is `2`.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- Direct generated `app.py` compile smoke from compiler output -> passed
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 13 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated persistence slice.
