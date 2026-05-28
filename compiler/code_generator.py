@@ -305,6 +305,37 @@ def query_records(entity_name: str, query: Dict[str, list[str]] | None = None) -
     }}
 
 
+def get_record(entity_name: str, record_id: Any) -> tuple[int, Dict[str, Any]]:
+    return _records_payload(f"/entities/{{entity_name}}/records/{{record_id}}")
+
+
+def create_record(entity_name: str, record: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    return _create_record_payload(f"/entities/{{entity_name}}/records", {{"record": record}})
+
+
+def update_record(
+    entity_name: str,
+    record_id: Any,
+    record: Dict[str, Any],
+    expected_revision: int | None = None,
+) -> tuple[int, Dict[str, Any]]:
+    payload: Dict[str, Any] = {{"record": record}}
+    if expected_revision is not None:
+        payload["expected_revision"] = expected_revision
+    return _update_record_payload(f"/entities/{{entity_name}}/records/{{record_id}}", payload)
+
+
+def delete_record(
+    entity_name: str,
+    record_id: Any,
+    expected_revision: int | None = None,
+) -> tuple[int, Dict[str, Any]]:
+    path = f"/entities/{{entity_name}}/records/{{record_id}}"
+    if expected_revision is not None:
+        path = f"{{path}}?expected_revision={{expected_revision}}"
+    return _delete_record_payload(path)
+
+
 def _data_path() -> Path | None:
     raw_path = os.environ.get("APG_DATA_FILE") or os.environ.get("APG_DATA_PATH")
     if not raw_path:
@@ -468,8 +499,15 @@ def component_manifest() -> Dict[str, Any]:
             "python": {{
                 "package": MODULE_NAME,
                 "exports": [
+                    "create_record",
+                    "delete_record",
                     "describe_application",
+                    "get_record",
+                    "list_records",
+                    "query_records",
                     "validate_application",
+                    "validate_record",
+                    "update_record",
                     "self_test",
                     "openapi_document",
                     "metrics_snapshot",
@@ -2059,6 +2097,8 @@ if __name__ == "__main__":
 			"- `GET /entities/{Entity}/records/export` - export records",
 			"- `POST /entities/{Entity}/records/import` - import records",
 			"",
+			"Python package helpers: `create_record()`, `get_record()`, `query_records()`, `update_record()`, and `delete_record()` expose the same executable record behavior for composition.",
+			"",
 			"Set `APG_DATA_FILE=/path/to/data.json` to persist records to JSON.",
 			"Set `APG_API_KEY=<key>` to require an API key for mutations.",
 			"",
@@ -3543,23 +3583,28 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import auth_status, coerce_record_types, component_manifest, describe_application, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, relationship_graph, self_test, storage_status, validate_application, validate_record',
+			'from .app import auth_status, coerce_record_types, component_manifest, create_record, delete_record, describe_application, get_record, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, self_test, storage_status, update_record, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
 			'    "auth_status",',
 			'    "coerce_record_types",',
 			'    "component_manifest",',
+			'    "create_record",',
+			'    "delete_record",',
 			'    "describe_application",',
+			'    "get_record",',
 			'    "list_entities",',
 			'    "list_events",',
 			'    "list_records",',
 			'    "main",',
 			'    "metrics_snapshot",',
 			'    "openapi_document",',
+			'    "query_records",',
 			'    "relationship_graph",',
 			'    "self_test",',
 			'    "storage_status",',
+			'    "update_record",',
 			'    "validate_application",',
 			'    "validate_record",',
 			']',

@@ -5919,3 +5919,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `2df4f40` (`Query generated records from browser screens`) to `origin/main`.
+
+### 2026-05-28 08:46 EAT
+
+Completed checkpoint:
+
+- Made generated app record operations composable from Python package consumers.
+- Generated apps now expose public `create_record()`, `get_record()`, `query_records()`, `update_record()`, and `delete_record()` helpers.
+- Component manifests now advertise record helper exports for application composition.
+- Generated package `__init__.py` now reexports the record helpers.
+- Generated READMEs now document the Python record helper surface alongside the HTTP record API.
+- Added focused regression coverage for programmatic typed create/read/query/update/delete, coercion, revision conflict handling, component manifest exports, and package `__all__`.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 19 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.

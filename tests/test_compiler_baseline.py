@@ -152,6 +152,10 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert component["composable"] is True
 	assert "/component.json" in component["interfaces"]["http"]["paths"]
 	assert "component_manifest" in component["interfaces"]["python"]["exports"]
+	assert "create_record" in component["interfaces"]["python"]["exports"]
+	assert "query_records" in component["interfaces"]["python"]["exports"]
+	assert "update_record" in component["interfaces"]["python"]["exports"]
+	assert "delete_record" in component["interfaces"]["python"]["exports"]
 	assert invocation["agent"] == "Planner"
 	assert invocation["runtime"] == "codex"
 	assert invocation["status"] == "adapter_required"
@@ -170,14 +174,19 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "auth_status" in module.__all__
 	assert "coerce_record_types" in module.__all__
 	assert "component_manifest" in module.__all__
+	assert "create_record" in module.__all__
+	assert "delete_record" in module.__all__
 	assert "describe_application" in module.__all__
+	assert "get_record" in module.__all__
 	assert "list_events" in module.__all__
 	assert "invoke_agent" in module.__all__
 	assert "metrics_snapshot" in module.__all__
 	assert "openapi_document" in module.__all__
+	assert "query_records" in module.__all__
 	assert "relationship_graph" in module.__all__
 	assert "self_test" in module.__all__
 	assert "storage_status" in module.__all__
+	assert "update_record" in module.__all__
 	assert "validate_application" in module.__all__
 	assert "validate_record" in module.__all__
 	assert "list_records" in module.__all__
@@ -564,6 +573,43 @@ def test_generated_python_app_validates_records_from_entity_fields():
 	)
 	assert status == 422
 	assert invalid_update["errors"] == ["active must be boolean"]
+
+
+def test_generated_python_app_exposes_programmatic_record_mutations():
+	result = compile_apg_string(TYPED_DATA_APP_SOURCE)
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	status, created = namespace["create_record"](
+		"InventoryItem",
+		{"name": "Widget", "quantity": "3", "active": "true"},
+	)
+	assert status == 201
+	assert created["record"] == {"id": 1, "_revision": 1, "name": "Widget", "quantity": 3, "active": True}
+
+	status, fetched = namespace["get_record"]("InventoryItem", 1)
+	assert status == 200
+	assert fetched["record"] == created["record"]
+
+	queried = namespace["query_records"]("InventoryItem", {"filter.name": ["Widget"]})
+	assert queried["records"] == [created["record"]]
+
+	status, updated = namespace["update_record"](
+		"InventoryItem",
+		1,
+		{"quantity": "4", "active": "false"},
+		expected_revision=1,
+	)
+	assert status == 200
+	assert updated["record"] == {"id": 1, "_revision": 2, "name": "Widget", "quantity": 4, "active": False}
+
+	status, stale = namespace["update_record"]("InventoryItem", 1, {"quantity": 5}, expected_revision=1)
+	assert status == 409
+	assert stale["error"] == "revision_conflict"
+
+	status, deleted = namespace["delete_record"]("InventoryItem", 1, expected_revision=2)
+	assert status == 200
+	assert deleted["deleted"] == updated["record"]
 
 
 def test_generated_python_app_coerces_typed_form_records(tmp_path):
