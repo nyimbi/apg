@@ -4944,3 +4944,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `a43d717` (`Make HCM WebSocket dashboards runtime-backed`) to `origin/main`.
+
+### 2026-05-28 04:46 EAT
+
+Completed checkpoint:
+
+- Made HCM Time Attendance compliance enforcement executable against runtime time entries.
+- Added tenant-scoped baseline compliance rules for daily maximum hours, minimum breaks, and overtime approval.
+- Replaced empty compliance and operational risk helpers with deterministic risk summaries from historical runtime data.
+- Updated compliance scoring from a fixed perfect score to the average active-rule compliance rate.
+- Extended focused HCM TAT regression coverage to verify long, no-break, unapproved overtime entries produce rule violations, corrections, compliance-score impact, and predictive compliance risks.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/service.py tests/test_hcm_tat_runtime_store.py`
+- `.venv/bin/pytest tests/test_hcm_tat_runtime_store.py -q` -> 11 passed
+- `git diff --check -- capabilities/hcm/tat/time_attendance/service.py tests/test_hcm_tat_runtime_store.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit for this checkpoint.

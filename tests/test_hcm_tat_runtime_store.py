@@ -1,6 +1,7 @@
 import ast
 import asyncio
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -30,6 +31,7 @@ from capabilities.hcm.tat.time_attendance.models import (
 	AIAgentType,
 	LeaveType,
 	ProductivityMetric,
+	TimeEntryStatus,
 	WorkMode,
 )
 from capabilities.hcm.tat.time_attendance.reporting import (
@@ -351,6 +353,34 @@ def test_websocket_dashboard_data_uses_service_runtime_store():
 	assert ai_agents["total_agents"] == 1
 	assert ai_agents["active_agents"] == 1
 	assert ai_agents["tasks_completed_today"] == 1
+
+
+def test_compliance_rules_detect_runtime_time_entry_violations():
+	TimeAttendanceService.reset_runtime_store()
+	service = TimeAttendanceService()
+	seed = _run(_seed_runtime(service, tenant_id="tenant_compliance"))
+	entry = _run(service.list_time_entries("tenant_compliance"))[0]
+	entry.total_hours = Decimal("17")
+	entry.regular_hours = Decimal("8")
+	entry.overtime_hours = Decimal("9")
+	entry.break_minutes = 0
+	entry.status = TimeEntryStatus.SUBMITTED
+	entry.approved_by = None
+	_run(service._save_time_entry(entry))
+
+	enforcement = _run(service.enforce_compliance_rules("tenant_compliance"))
+	analytics = _run(service.generate_workforce_predictions("tenant_compliance", 7, None))
+
+	assert enforcement["violations_detected"] >= 3
+	assert enforcement["corrections_applied"] >= 2
+	assert enforcement["compliance_score"] < 1.0
+	assert {violation["rule_code"] for violation in enforcement["violations"]} >= {
+		"DAILY_MAX_HOURS",
+		"MINIMUM_BREAK",
+		"OVERTIME_APPROVAL",
+	}
+	assert analytics.compliance_risks
+	assert seed["time_entry_id"] == entry.id
 
 
 def test_time_attendance_service_has_no_missing_private_helper_calls():

@@ -73,6 +73,7 @@ class TimeAttendanceService:
 			"leave_requests",
 			"fraud_detections",
 			"analytics",
+			"compliance_rules",
 			"integration_events",
 		):
 			store.setdefault(bucket_name, {})
@@ -1837,10 +1838,56 @@ class TimeAttendanceService:
 		return {"recommendation": "balance overtime before adding headcount"}
 
 	async def _analyze_compliance_risks(self, historical_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-		return []
+		entries = historical_data["entries"]
+		risks = []
+		missing_breaks = [
+			entry for entry in entries
+			if float(entry.total_hours or 0) >= 6 and (entry.break_minutes or 0) < self.config.compliance.minimum_break_minutes
+		]
+		high_overtime = [
+			entry for entry in entries
+			if float(entry.overtime_hours or 0) > self.config.compliance.daily_overtime_threshold_hours
+		]
+		if missing_breaks:
+			risks.append({
+				"type": "break_compliance",
+				"severity": "MAJOR",
+				"affected_records": [entry.id for entry in missing_breaks],
+				"count": len(missing_breaks),
+				"recommendation": "Review meal and rest break compliance for affected shifts",
+			})
+		if high_overtime:
+			risks.append({
+				"type": "overtime_compliance",
+				"severity": "WARNING",
+				"affected_records": [entry.id for entry in high_overtime],
+				"count": len(high_overtime),
+				"recommendation": "Require manager review for high-overtime entries",
+			})
+		return risks
 
 	async def _analyze_operational_risks(self, historical_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-		return []
+		entries = historical_data["entries"]
+		risks = []
+		employees = {entry.employee_id for entry in entries}
+		if historical_data.get("lookback_days", 0) and entries and len(entries) < len(employees):
+			risks.append({
+				"type": "coverage_gap",
+				"severity": "INFO",
+				"message": "Some employees have sparse time-entry coverage in the analysis window",
+			})
+		active_long_shifts = [
+			entry for entry in entries
+			if entry.clock_in and not entry.clock_out and entry.clock_in < datetime.utcnow() - timedelta(hours=12)
+		]
+		if active_long_shifts:
+			risks.append({
+				"type": "open_shift_overrun",
+				"severity": "WARNING",
+				"affected_records": [entry.id for entry in active_long_shifts],
+				"count": len(active_long_shifts),
+			})
+		return risks
 
 	async def _generate_actionable_insights(self, analytics: TAPredictiveAnalytics) -> List[Dict[str, Any]]:
 		return [{"type": "staffing", "message": "Review staffing levels against demand"}]
@@ -1875,10 +1922,124 @@ class TimeAttendanceService:
 		tenant_id: str,
 		rule_types: List[str] = None,
 	) -> List[TAComplianceRule]:
-		return []
+		stored_rules = self._records("compliance_rules", tenant_id)
+		if not stored_rules:
+			stored_rules = [
+				TAComplianceRule(
+					tenant_id=tenant_id,
+					created_by="system",
+					rule_name="Daily Maximum Hours",
+					rule_code="DAILY_MAX_HOURS",
+					rule_type="hours",
+					jurisdiction="default",
+					regulation_reference="APG baseline labor policy",
+					effective_date=date.today() - timedelta(days=1),
+					rule_description="Flags shifts above the configured daily maximum.",
+					rule_logic={"metric": "total_hours", "operator": ">", "threshold": 12.0},
+					validation_criteria={"field": "total_hours", "max": 12.0},
+					violation_severity="MAJOR",
+					auto_correction_enabled=False,
+					enforcement_actions=["manager_review"],
+					priority=1,
+				),
+				TAComplianceRule(
+					tenant_id=tenant_id,
+					created_by="system",
+					rule_name="Minimum Break Duration",
+					rule_code="MINIMUM_BREAK",
+					rule_type="break",
+					jurisdiction="default",
+					regulation_reference="APG baseline labor policy",
+					effective_date=date.today() - timedelta(days=1),
+					rule_description="Requires the configured minimum break for shifts of six hours or longer.",
+					rule_logic={
+						"metric": "break_minutes",
+						"operator": "<",
+						"threshold": self.config.compliance.minimum_break_minutes,
+						"when_total_hours_gte": 6.0,
+					},
+					validation_criteria={"field": "break_minutes", "minimum": self.config.compliance.minimum_break_minutes},
+					violation_severity="MAJOR",
+					auto_correction_enabled=True,
+					enforcement_actions=["manager_review", "employee_attestation"],
+					priority=2,
+				),
+				TAComplianceRule(
+					tenant_id=tenant_id,
+					created_by="system",
+					rule_name="Overtime Approval Required",
+					rule_code="OVERTIME_APPROVAL",
+					rule_type="overtime",
+					jurisdiction="default",
+					regulation_reference="APG baseline labor policy",
+					effective_date=date.today() - timedelta(days=1),
+					rule_description="Requires approval for overtime above the configured threshold.",
+					rule_logic={
+						"metric": "overtime_hours",
+						"operator": ">",
+						"threshold": self.config.compliance.daily_overtime_threshold_hours,
+						"requires_approved_status": True,
+					},
+					validation_criteria={"field": "overtime_hours", "max_unapproved": self.config.compliance.daily_overtime_threshold_hours},
+					violation_severity="WARNING",
+					auto_correction_enabled=True,
+					enforcement_actions=["require_approval"],
+					priority=3,
+				),
+			]
+			for rule in stored_rules:
+				self._save_record("compliance_rules", rule)
+		if rule_types:
+			stored_rules = [rule for rule in stored_rules if rule.rule_type in rule_types]
+		return [rule for rule in stored_rules if rule.is_current]
 
 	async def _check_rule_violations(self, rule: TAComplianceRule) -> List[Dict[str, Any]]:
-		return []
+		entries = await self.list_time_entries(rule.tenant_id)
+		violations = []
+		for entry in entries:
+			total_hours = float(entry.total_hours or entry.duration_hours or 0)
+			overtime_hours = float(entry.overtime_hours or 0)
+			break_minutes = entry.break_minutes or 0
+			current_value = 0.0
+			violated = False
+			message = ""
+			if rule.rule_code == "DAILY_MAX_HOURS":
+				current_value = total_hours
+				threshold = float(rule.rule_logic["threshold"])
+				violated = current_value > threshold
+				message = f"Shift total {current_value}h exceeds {threshold}h maximum"
+			elif rule.rule_code == "MINIMUM_BREAK":
+				current_value = float(break_minutes)
+				threshold = float(rule.rule_logic["threshold"])
+				violated = total_hours >= float(rule.rule_logic["when_total_hours_gte"]) and current_value < threshold
+				message = f"Break duration {current_value}m below {threshold}m minimum"
+			elif rule.rule_code == "OVERTIME_APPROVAL":
+				current_value = overtime_hours
+				threshold = float(rule.rule_logic["threshold"])
+				approved = entry.status == TimeEntryStatus.APPROVED and bool(entry.approved_by)
+				violated = current_value > threshold and not approved
+				message = f"Overtime {current_value}h requires approval above {threshold}h"
+			if not violated:
+				continue
+			violations.append({
+				"id": f"{rule.rule_code.lower()}_{entry.id}",
+				"rule_id": rule.id,
+				"rule_code": rule.rule_code,
+				"rule_type": rule.rule_type,
+				"tenant_id": rule.tenant_id,
+				"employee_id": entry.employee_id,
+				"time_entry_id": entry.id,
+				"severity": rule.violation_severity,
+				"current_value": current_value,
+				"threshold_value": rule.rule_logic.get("threshold"),
+				"message": message,
+				"detected_at": datetime.utcnow().isoformat(),
+			})
+		rule.violation_count = len(violations)
+		rule.last_violation_date = datetime.utcnow() if violations else rule.last_violation_date
+		rule.compliance_rate = max(0.0, 1.0 - (len(violations) / len(entries))) if entries else 1.0
+		self._save_record("compliance_rules", rule)
+		return violations
 
 	async def _apply_automatic_correction(
 		self,
@@ -1906,7 +2067,10 @@ class TimeAttendanceService:
 		})
 
 	async def _calculate_compliance_score(self, tenant_id: str) -> float:
-		return 1.0
+		rules = await self._get_active_compliance_rules(tenant_id)
+		if not rules:
+			return 1.0
+		return round(sum(rule.compliance_rate for rule in rules) / len(rules), 4)
 	
 	# Mock integration methods (for development and testing)
 	
