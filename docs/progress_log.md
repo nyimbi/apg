@@ -7354,3 +7354,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_lint_json_reports_valid_apg_file_without_generation tests/test_compiler_baseline.py::test_cli_lint_directory_json_aggregates_apg_files_deterministically tests/test_compiler_baseline.py::test_python_is_the_only_advertised_compiler_target -q` -> 3 passed
 - `.venv/bin/apg lint examples/01_minimal_customer_records/main.apg --json` -> exited 0 and emitted `apg.lint-report.v1`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 18:14 EAT
+
+Completed checkpoint:
+
+- Replaced the stale `apg validate` implementation that had drifted from the parser API with a lint-backed executable validation command.
+- Added `apg.validate-report.v1` JSON output with target compatibility, nested lint report, generator-readiness status, severity counts, and diagnostics.
+- Enforced the current Python-only compiler target policy in validation with `APG0802` diagnostics for non-`python` targets.
+- Updated the tooling specification so `apg validate` is listed in APG's executable baseline with its report contract.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile cli/validate_command.py cli/lint_command.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_validate_json_reports_generator_readiness_without_generation tests/test_compiler_baseline.py::test_cli_validate_rejects_non_python_target_with_apg0802 tests/test_compiler_baseline.py::test_cli_lint_json_reports_valid_apg_file_without_generation -q` -> 3 passed
+- `.venv/bin/apg validate examples/01_minimal_customer_records/main.apg --json` -> exited 0 and emitted `apg.validate-report.v1`
+- `.venv/bin/apg validate examples/01_minimal_customer_records/main.apg --target django --json` -> exited 1 with `APG0802`
+- Deferred broader pytest at the user's request to conserve battery.

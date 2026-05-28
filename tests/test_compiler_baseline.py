@@ -1260,6 +1260,44 @@ def test_cli_lint_directory_json_aggregates_apg_files_deterministically(tmp_path
 	assert report["diagnostics"][0]["file"] == str(second)
 
 
+def test_cli_validate_json_reports_generator_readiness_without_generation(tmp_path):
+	source = tmp_path / "baseline.apg"
+	output = tmp_path / "generated"
+	source.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["validate", str(source), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.validate-report.v1"
+	assert report["ok"] is True
+	assert report["generator_ready"] is True
+	assert report["target_compatibility"] == {
+		"requested": "python",
+		"supported": ["python"],
+		"ok": True,
+	}
+	assert report["lint"]["format"] == "apg.lint-report.v1"
+	assert report["files"] == [str(source)]
+	assert not output.exists()
+
+
+def test_cli_validate_rejects_non_python_target_with_apg0802(tmp_path):
+	source = tmp_path / "baseline.apg"
+	source.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["validate", str(source), "--target", "django", "--json"])
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.validate-report.v1"
+	assert report["ok"] is False
+	assert report["generator_ready"] is False
+	assert report["target_compatibility"]["ok"] is False
+	assert report["diagnostics"][-1]["code"] == "APG0802"
+	assert "must be 'python'" in report["diagnostics"][-1]["message"]
+
+
 def test_cli_init_describes_python_artifact_flow():
 	runner = CliRunner()
 	with runner.isolated_filesystem():

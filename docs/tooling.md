@@ -19,6 +19,8 @@ APG currently has an executable compiler path:
 - the primary generation command is `apg compile <file> --output <dir>`;
 - `apg lint <file-or-directory> --json` emits `apg.lint-report.v1` without
   writing generated code;
+- `apg validate <file> --target python --json` emits `apg.validate-report.v1`
+  with lint results and generator-readiness metadata;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -630,7 +632,8 @@ apg validate app.apg --target python --json
 Runs lint plus generator-readiness checks without writing generated code.
 Validation fails with `APG0802` when a requested target is not `python`, and
 the `apg.validate-report.v1` payload includes the requested target, declared
-application packaging profiles, and generator-readiness checks.
+application packaging profiles, the nested `apg.lint-report.v1`, and
+generator-readiness checks.
 
 ### `apg compile`
 
