@@ -6178,4 +6178,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push.
+- Pushed commit `b5e8a60` (`Make ENCR public interface executable`).
