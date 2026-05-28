@@ -6024,4 +6024,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push for this checkpoint.
+- Pushed commit `54a31c7` (`Document and compile numbered APG examples`).
