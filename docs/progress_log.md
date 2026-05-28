@@ -8430,3 +8430,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q tests/test_fintech_gateway_monitoring_alerts.py` passed with 4 tests.
 - `rg -n "Evaluate alert condition \\(simplified implementation\\)|For now, return False to simulate no alerts|query metrics and evaluate conditions" capabilities/fintech/gateway/monitoring_service.py tests/test_fintech_gateway_monitoring_alerts.py` found no stale alert-evaluator placeholder text.
 - `git diff --check -- capabilities/fintech/gateway/monitoring_service.py tests/test_fintech_gateway_monitoring_alerts.py` passed.
+
+### 2026-05-29 01:37 EAT
+
+Executable subscription analytics slice:
+
+- Fixed `subscription_api.py` so it compiles again by routing the analytics coroutine through the existing synchronous view async runner instead of using `await` in a non-async Flask view.
+- Replaced fixed subscription analytics mock values with calculations from subscription plans, subscription state, and invoice state.
+- Analytics now reports real summary counts, MRR/ARR/ARPU, paid revenue for the requested period, churn/retention, billing-cycle distribution, and top plans.
+- Added dependency-light regression coverage that loads the API with local Flask/FAB/service stubs and verifies merchant-scoped analytics plus empty-state zeroes.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/fintech/gateway/subscription_api.py tests/test_fintech_gateway_subscription_analytics.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_fintech_gateway_subscription_analytics.py` passed with 2 tests.
+- `rg -n "Get subscription analytics \\(mock data for now\\)|For now, return mock data|This would query the database for real analytics|analytics = await self\\._get_subscription_analytics" capabilities/fintech/gateway/subscription_api.py tests/test_fintech_gateway_subscription_analytics.py` found no stale analytics mock/syntax text.
+- `git diff --check -- capabilities/fintech/gateway/subscription_api.py tests/test_fintech_gateway_subscription_analytics.py` passed.
