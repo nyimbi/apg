@@ -18,18 +18,49 @@ from enum import Enum
 from uuid_extensions import uuid7str
 import logging
 from contextlib import asynccontextmanager
+import types
 
 # WebSocket and real-time support
-import websockets
-from websockets.server import serve
-from websockets.exceptions import ConnectionClosed, WebSocketException
+try:
+	import websockets
+	from websockets.server import serve
+	from websockets.exceptions import ConnectionClosed, WebSocketException
+except ModuleNotFoundError:
+	class _FallbackWebSocketProtocol:
+		async def send(self, message: str) -> None: return None
+	async def serve(*args, **kwargs): return None
+	class ConnectionClosed(Exception): pass
+	class WebSocketException(Exception): pass
+	websockets = types.SimpleNamespace(WebSocketServerProtocol=_FallbackWebSocketProtocol)
 
 # Message queuing and event streaming
-import redis.asyncio as redis
-import asyncio_mqtt
+try:
+	import redis.asyncio as redis
+except ModuleNotFoundError:
+	class _FallbackRedisClient:
+		pass
+	redis = types.SimpleNamespace(Redis=_FallbackRedisClient)
+try:
+	import asyncio_mqtt
+except ModuleNotFoundError:
+	class _FallbackMqttClient:
+		def __init__(self, *args, **kwargs): pass
+		async def __aenter__(self): return self
+		async def __aexit__(self, *args): return None
+		async def publish(self, *args, **kwargs): return None
+	class _FallbackMqttWill:
+		def __init__(self, *args, **kwargs): pass
+	asyncio_mqtt = types.SimpleNamespace(Client=_FallbackMqttClient, Will=_FallbackMqttWill)
 
 # APG integrations
-from ..common.real_time_collaboration.websocket_manager import websocket_manager, MessageType
+try:
+	from ..common.real_time_collaboration.websocket_manager import websocket_manager, MessageType
+except ModuleNotFoundError:
+	class MessageType(Enum):
+		SYSTEM = "system"
+	class _FallbackWebSocketManager:
+		async def broadcast(self, *args, **kwargs): return None
+	websocket_manager = _FallbackWebSocketManager()
 from .error_handling import ErrorHandler, ErrorCategory, ErrorSeverity, with_error_handling
 
 logger = logging.getLogger(__name__)
@@ -168,7 +199,7 @@ class ConflictInfo:
 
 class RealtimeSyncManager:
 	"""Comprehensive real-time configuration synchronization manager."""
-	
+
 	def __init__(
 		self,
 		redis_client: redis.Redis,
@@ -182,34 +213,34 @@ class RealtimeSyncManager:
 		self.mqtt_broker_host = mqtt_broker_host or "localhost"
 		self.mqtt_broker_port = mqtt_broker_port
 		self.node_id = node_id or f"node_{uuid7str()[:8]}"
-		
+
 		# Error handling
 		self.error_handler = ErrorHandler(f"realtime_sync_{self.node_id}")
-		
+
 		# Active connections and subscriptions
 		self.websocket_connections: Dict[str, websockets.WebSocketServerProtocol] = {}
 		self.subscription_patterns: Dict[str, Set[str]] = {}  # connection_id -> patterns
 		self.active_locks: Dict[str, Dict[str, Any]] = {}  # config_key -> lock_info
 		self.conflict_handlers: Dict[str, Callable] = {}
-		
+
 		# Operational transforms buffer
 		self.pending_transforms: Dict[str, List[OperationalTransform]] = {}
 		self.applied_transforms: Dict[str, List[OperationalTransform]] = {}
-		
+
 		# Synchronization state
 		self.last_sync_timestamps: Dict[str, datetime] = {}
 		self.sync_checkpoints: Dict[str, str] = {}
-		
+
 		# Event handlers
 		self.event_handlers: Dict[SyncEventType, List[Callable]] = {}
-		
+
 		# Message queuing
 		self.bytewax_dataflow: Optional[BytewaxDataflowBridge] = None
 		self.mqtt_client: Optional[asyncio_mqtt.Client] = None
-		
+
 		# Initialize event handlers
 		self._setup_default_event_handlers()
-	
+
 	def _setup_default_event_handlers(self):
 		"""Setup default event handlers."""
 		self.event_handlers = {
@@ -221,7 +252,7 @@ class RealtimeSyncManager:
 			SyncEventType.CONFLICT_DETECTED: [self._handle_conflict_detected],
 			SyncEventType.BATCH_UPDATE: [self._handle_batch_update],
 		}
-	
+
 	@with_error_handling(ErrorCategory.SYSTEM_ERROR, ErrorSeverity.HIGH)
 	async def initialize(self):
 		"""Initialize all synchronization components."""
@@ -229,25 +260,25 @@ class RealtimeSyncManager:
 			# Initialize Bytewax dataflow bridge
 			if self.bytewax_stream_names:
 				await self._initialize_bytewax()
-			
+
 			# Initialize MQTT client
 			if self.mqtt_broker_host:
 				await self._initialize_mqtt()
-			
+
 			# Start background tasks
 			asyncio.create_task(self._sync_heartbeat_task())
 			asyncio.create_task(self._conflict_resolution_task())
 			asyncio.create_task(self._cleanup_task())
-			
+
 			logger.info(f"Real-time sync manager initialized for node {self.node_id}")
-			
+
 		except Exception as e:
 			await self.error_handler.handle_error(
 				e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.CRITICAL,
 				"initialize_realtime_sync", {"node_id": self.node_id}
 			)
 			raise
-	
+
 	async def _initialize_bytewax(self):
 		"""Initialize Bytewax-style dataflow streams."""
 		try:
@@ -255,14 +286,14 @@ class RealtimeSyncManager:
 			await self.bytewax_dataflow.start()
 			await self.bytewax_dataflow.subscribe("apg_config_sync", self._bytewax_record_handler)
 			await self.bytewax_dataflow.subscribe("apg_config_conflicts", self._bytewax_record_handler)
-			
+
 		except Exception as e:
 			await self.error_handler.handle_error(
 				e, ErrorCategory.EXTERNAL_SERVICE_ERROR, ErrorSeverity.HIGH,
 				"initialize_bytewax", {"stream_names": self.bytewax_stream_names}
 			)
 			raise
-	
+
 	async def _initialize_mqtt(self):
 		"""Initialize MQTT client for lightweight messaging."""
 		try:
@@ -278,17 +309,17 @@ class RealtimeSyncManager:
 					retain=True
 				)
 			)
-			
+
 			# Start MQTT task
 			asyncio.create_task(self._mqtt_message_handler())
-			
+
 		except Exception as e:
 			await self.error_handler.handle_error(
 				e, ErrorCategory.EXTERNAL_SERVICE_ERROR, ErrorSeverity.MEDIUM,
 				"initialize_mqtt", {"broker": f"{self.mqtt_broker_host}:{self.mqtt_broker_port}"}
 			)
 			raise
-	
+
 	@with_error_handling(ErrorCategory.NETWORK_ERROR, ErrorSeverity.MEDIUM)
 	async def add_websocket_connection(
 		self,
@@ -299,21 +330,21 @@ class RealtimeSyncManager:
 		"""Add WebSocket connection for real-time updates."""
 		self.websocket_connections[connection_id] = websocket
 		self.subscription_patterns[connection_id] = set(subscription_patterns or ["*"])
-		
+
 		logger.info(f"Added WebSocket connection {connection_id} with patterns: {subscription_patterns}")
-		
+
 		# Send initial sync data
 		await self._send_initial_sync_data(connection_id)
-	
+
 	async def remove_websocket_connection(self, connection_id: str):
 		"""Remove WebSocket connection."""
 		if connection_id in self.websocket_connections:
 			del self.websocket_connections[connection_id]
 		if connection_id in self.subscription_patterns:
 			del self.subscription_patterns[connection_id]
-		
+
 		logger.info(f"Removed WebSocket connection {connection_id}")
-	
+
 	@with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.MEDIUM)
 	async def broadcast_sync_event(self, event: SyncEvent):
 		"""Broadcast synchronization event to all relevant connections."""
@@ -333,7 +364,7 @@ class RealtimeSyncManager:
 					"metadata": event.metadata
 				})
 			)
-			
+
 			# Publish to Bytewax-style dataflow for cross-region sync
 			if self.bytewax_dataflow:
 				await self.bytewax_dataflow.emit(
@@ -353,7 +384,7 @@ class RealtimeSyncManager:
 						"metadata": event.metadata
 					}
 				)
-			
+
 			# Send to MQTT for lightweight clients
 			if self.mqtt_client:
 				topic = f"apg/config/{event.tenant_id or 'global'}/{event.config_key or 'system'}"
@@ -368,10 +399,10 @@ class RealtimeSyncManager:
 					}),
 					qos=1
 				)
-			
+
 			# Broadcast to WebSocket connections
 			await self._broadcast_to_websockets(event)
-			
+
 			# Trigger event handlers
 			handlers = self.event_handlers.get(event.event_type, [])
 			for handler in handlers:
@@ -383,7 +414,7 @@ class RealtimeSyncManager:
 						f"event_handler_{handler.__name__}",
 						{"event_id": event.event_id, "event_type": event.event_type.value}
 					)
-			
+
 		except Exception as e:
 			await self.error_handler.handle_error(
 				e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.HIGH,
@@ -391,11 +422,11 @@ class RealtimeSyncManager:
 				{"event_id": event.event_id, "event_type": event.event_type.value}
 			)
 			raise
-	
+
 	async def _broadcast_to_websockets(self, event: SyncEvent):
 		"""Broadcast event to matching WebSocket connections."""
 		dead_connections = []
-		
+
 		for connection_id, websocket in self.websocket_connections.items():
 			try:
 				# Check if connection matches subscription patterns
@@ -412,9 +443,9 @@ class RealtimeSyncManager:
 						"version": event.version,
 						"metadata": event.metadata
 					}
-					
+
 					await websocket.send(json.dumps(message))
-					
+
 			except (ConnectionClosed, WebSocketException):
 				dead_connections.append(connection_id)
 			except Exception as e:
@@ -424,20 +455,20 @@ class RealtimeSyncManager:
 					{"connection_id": connection_id, "event_id": event.event_id}
 				)
 				dead_connections.append(connection_id)
-		
+
 		# Clean up dead connections
 		for connection_id in dead_connections:
 			await self.remove_websocket_connection(connection_id)
-	
+
 	def _matches_patterns(self, config_key: str, patterns: Set[str]) -> bool:
 		"""Check if config key matches any subscription patterns."""
 		import fnmatch
-		
+
 		for pattern in patterns:
 			if pattern == "*" or fnmatch.fnmatch(config_key, pattern):
 				return True
 		return False
-	
+
 	@with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.MEDIUM)
 	async def acquire_config_lock(
 		self,
@@ -455,7 +486,7 @@ class RealtimeSyncManager:
 			"expires_at": (datetime.now(timezone.utc) + timedelta(seconds=timeout)).isoformat(),
 			"node_id": self.node_id
 		}
-		
+
 		# Try to acquire lock in Redis
 		acquired = await self.redis_client.set(
 			lock_key,
@@ -463,10 +494,10 @@ class RealtimeSyncManager:
 			nx=True,  # Only set if key doesn't exist
 			ex=timeout  # Expire after timeout seconds
 		)
-		
+
 		if acquired:
 			self.active_locks[config_key] = lock_info
-			
+
 			# Broadcast lock acquisition
 			event = SyncEvent(
 				event_type=SyncEventType.CONFIG_LOCKED,
@@ -477,11 +508,11 @@ class RealtimeSyncManager:
 				metadata={"lock_info": lock_info}
 			)
 			await self.broadcast_sync_event(event)
-			
+
 			return True
-		
+
 		return False
-	
+
 	@with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.LOW)
 	async def release_config_lock(
 		self,
@@ -491,20 +522,20 @@ class RealtimeSyncManager:
 	) -> bool:
 		"""Release configuration lock."""
 		lock_key = f"lock:{config_key}"
-		
+
 		# Check if we own the lock
 		current_lock = await self.redis_client.get(lock_key)
 		if current_lock:
 			lock_info = json.loads(current_lock)
 			if lock_info.get("user_id") != user_id or lock_info.get("node_id") != self.node_id:
 				return False  # Don't own the lock
-		
+
 		# Release lock
 		released = await self.redis_client.delete(lock_key)
-		
+
 		if released and config_key in self.active_locks:
 			del self.active_locks[config_key]
-			
+
 			# Broadcast lock release
 			event = SyncEvent(
 				event_type=SyncEventType.CONFIG_UNLOCKED,
@@ -514,11 +545,11 @@ class RealtimeSyncManager:
 				config_key=config_key
 			)
 			await self.broadcast_sync_event(event)
-			
+
 			return True
-		
+
 		return False
-	
+
 	@with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.HIGH)
 	async def detect_and_resolve_conflicts(
 		self,
@@ -532,7 +563,7 @@ class RealtimeSyncManager:
 			competing_versions=competing_updates,
 			resolution_strategy=resolution_strategy
 		)
-		
+
 		try:
 			if resolution_strategy == ConflictResolutionStrategy.LAST_WRITE_WINS:
 				# Choose the version with the latest timestamp
@@ -544,7 +575,7 @@ class RealtimeSyncManager:
 				conflict.resolved = True
 				conflict.resolved_at = datetime.now(timezone.utc)
 				conflict.resolved_by = "system_last_write_wins"
-				
+
 			elif resolution_strategy == ConflictResolutionStrategy.OPERATIONAL_TRANSFORM:
 				# Apply operational transforms to merge changes
 				resolved_value = await self._apply_operational_transforms(
@@ -554,7 +585,7 @@ class RealtimeSyncManager:
 				conflict.resolved = True
 				conflict.resolved_at = datetime.now(timezone.utc)
 				conflict.resolved_by = "system_operational_transform"
-				
+
 			elif resolution_strategy == ConflictResolutionStrategy.MERGE_STRATEGIES:
 				# Attempt intelligent merging based on data types
 				merged_value = await self._merge_conflicting_values(competing_updates)
@@ -562,7 +593,7 @@ class RealtimeSyncManager:
 				conflict.resolved = True
 				conflict.resolved_at = datetime.now(timezone.utc)
 				conflict.resolved_by = "system_merge_strategy"
-			
+
 			# Broadcast conflict resolution
 			if conflict.resolved:
 				event = SyncEvent(
@@ -577,9 +608,9 @@ class RealtimeSyncManager:
 					}
 				)
 				await self.broadcast_sync_event(event)
-			
+
 			return conflict
-			
+
 		except Exception as e:
 			await self.error_handler.handle_error(
 				e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.HIGH,
@@ -591,7 +622,7 @@ class RealtimeSyncManager:
 				}
 			)
 			raise
-	
+
 	async def _apply_operational_transforms(
 		self,
 		config_key: str,
@@ -600,10 +631,10 @@ class RealtimeSyncManager:
 		"""Apply operational transforms to resolve conflicts."""
 		# This is a simplified implementation
 		# In production, you'd implement full operational transform algorithms
-		
+
 		base_value = competing_updates[0].get("old_value", {})
 		transforms = []
-		
+
 		for update in competing_updates:
 			transform = OperationalTransform(
 				operation_type="update",
@@ -614,10 +645,10 @@ class RealtimeSyncManager:
 				author=update.get("user_id", "unknown")
 			)
 			transforms.append(transform)
-		
+
 		# Sort transforms by timestamp
 		transforms.sort(key=lambda t: t.timestamp)
-		
+
 		# Apply transforms sequentially
 		result = base_value
 		for transform in transforms:
@@ -625,31 +656,31 @@ class RealtimeSyncManager:
 				result.update(transform.new_value)
 			else:
 				result = transform.new_value
-		
+
 		return result
-	
+
 	async def _merge_conflicting_values(self, competing_updates: List[Dict[str, Any]]) -> Any:
 		"""Merge conflicting values using intelligent strategies."""
 		if not competing_updates:
 			return None
-		
+
 		# Get all new values
 		new_values = [update.get("new_value") for update in competing_updates]
-		
+
 		# If all values are dictionaries, merge them
 		if all(isinstance(v, dict) for v in new_values):
 			merged = {}
 			for value in new_values:
 				merged.update(value)
 			return merged
-		
+
 		# If all values are lists, concatenate and deduplicate
 		elif all(isinstance(v, list) for v in new_values):
 			merged_list = []
 			for value in new_values:
 				merged_list.extend(value)
 			return list(set(merged_list))  # Remove duplicates
-		
+
 		# For scalar values, use last write wins
 		else:
 			latest_update = max(
@@ -657,43 +688,43 @@ class RealtimeSyncManager:
 				key=lambda x: datetime.fromisoformat(x.get("timestamp", "1970-01-01T00:00:00Z"))
 			)
 			return latest_update.get("new_value")
-	
+
 	# Event handlers
 	async def _handle_config_changed(self, event: SyncEvent):
 		"""Handle configuration change events."""
 		logger.debug(f"Config changed: {event.config_key} -> {event.new_value}")
-	
+
 	async def _handle_config_created(self, event: SyncEvent):
 		"""Handle configuration creation events."""
 		logger.debug(f"Config created: {event.config_key}")
-	
+
 	async def _handle_config_deleted(self, event: SyncEvent):
 		"""Handle configuration deletion events."""
 		logger.debug(f"Config deleted: {event.config_key}")
-	
+
 	async def _handle_config_locked(self, event: SyncEvent):
 		"""Handle configuration lock events."""
 		logger.debug(f"Config locked: {event.config_key} by {event.user_id}")
-	
+
 	async def _handle_config_unlocked(self, event: SyncEvent):
 		"""Handle configuration unlock events."""
 		logger.debug(f"Config unlocked: {event.config_key}")
-	
+
 	async def _handle_conflict_detected(self, event: SyncEvent):
 		"""Handle conflict detection events."""
 		logger.warning(f"Conflict detected for: {event.config_key}")
-	
+
 	async def _handle_batch_update(self, event: SyncEvent):
 		"""Handle batch update events."""
 		logger.debug(f"Batch update processed: {len(event.metadata.get('updates', []))} configs")
-	
+
 	# Background tasks
 	async def _sync_heartbeat_task(self):
 		"""Send periodic heartbeat for node health monitoring."""
 		while True:
 			try:
 				await asyncio.sleep(30)  # 30 second heartbeat
-				
+
 				heartbeat = {
 					"node_id": self.node_id,
 					"timestamp": datetime.now(timezone.utc).isoformat(),
@@ -701,104 +732,104 @@ class RealtimeSyncManager:
 					"active_locks": len(self.active_locks),
 					"status": "healthy"
 				}
-				
+
 				# Publish heartbeat to Redis
 				await self.redis_client.publish("apg:config:heartbeat", json.dumps(heartbeat))
-				
+
 			except Exception as e:
 				await self.error_handler.handle_error(
 					e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.LOW,
 					"sync_heartbeat", {"node_id": self.node_id}
 				)
-	
+
 	async def _conflict_resolution_task(self):
 		"""Background task for automatic conflict resolution."""
 		while True:
 			try:
 				await asyncio.sleep(10)  # Check every 10 seconds
-				
+
 				# Check for pending conflicts in Redis
 				conflict_keys = await self.redis_client.keys("conflict:*")
-				
+
 				for key_bytes in conflict_keys:
 					key = key_bytes.decode('utf-8')
 					conflict_data = await self.redis_client.get(key)
-					
+
 					if conflict_data:
 						conflict_info = json.loads(conflict_data)
 						if not conflict_info.get("resolved", False):
 							# Attempt automatic resolution
 							await self._attempt_auto_resolution(conflict_info)
-				
+
 			except Exception as e:
 				await self.error_handler.handle_error(
 					e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.LOW,
 					"conflict_resolution_task", {}
 				)
-	
+
 	async def _cleanup_task(self):
 		"""Background cleanup task for expired locks and old data."""
 		while True:
 			try:
 				await asyncio.sleep(300)  # Clean up every 5 minutes
-				
+
 				# Clean up expired locks
 				current_time = datetime.now(timezone.utc)
 				expired_locks = []
-				
+
 				for config_key, lock_info in self.active_locks.items():
 					expires_at = datetime.fromisoformat(lock_info["expires_at"])
 					if current_time > expires_at:
 						expired_locks.append(config_key)
-				
+
 				for config_key in expired_locks:
 					await self.release_config_lock(
 						config_key,
 						self.active_locks[config_key]["user_id"],
 						self.active_locks[config_key].get("tenant_id")
 					)
-				
+
 				# Clean up old sync events and conflicts
 				await self._cleanup_old_events()
-				
+
 			except Exception as e:
 				await self.error_handler.handle_error(
 					e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.LOW,
 					"cleanup_task", {}
 				)
-	
+
 	async def _cleanup_old_events(self):
 		"""Clean up old synchronization events and conflicts."""
 		cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
-		
+
 		# Clean up old conflict records
 		conflict_keys = await self.redis_client.keys("conflict:*")
 		for key_bytes in conflict_keys:
 			key = key_bytes.decode('utf-8')
 			conflict_data = await self.redis_client.get(key)
-			
+
 			if conflict_data:
 				conflict_info = json.loads(conflict_data)
 				created_at = datetime.fromisoformat(conflict_info.get("created_at", cutoff_time.isoformat()))
-				
+
 				if created_at < cutoff_time and conflict_info.get("resolved", False):
 					await self.redis_client.delete(key)
-	
+
 	async def _attempt_auto_resolution(self, conflict_info: Dict[str, Any]):
 		"""Attempt automatic conflict resolution."""
 		# This would implement more sophisticated auto-resolution logic
 		pass
-	
+
 	async def _send_initial_sync_data(self, connection_id: str):
 		"""Send initial synchronization data to new connection."""
 		# This would send current configuration state to new connections
 		pass
-	
+
 	async def _bytewax_record_handler(self, record: BytewaxStreamRecord):
 		"""Handle incoming Bytewax-style stream records."""
 		if not self.bytewax_dataflow:
 			return
-		
+
 		try:
 			event_data = record.value
 			event = SyncEvent(
@@ -817,67 +848,67 @@ class RealtimeSyncManager:
 			# Skip events from our own node to avoid loops
 			if event.source_node != self.node_id:
 				await self._process_remote_sync_event(event)
-		
+
 		except Exception as e:
 			await self.error_handler.handle_error(
 				e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.MEDIUM,
 				"bytewax_record_processing", {"stream": record.stream, "sequence": record.sequence}
 			)
-	
+
 	async def _mqtt_message_handler(self):
 		"""Handle incoming MQTT messages."""
 		if not self.mqtt_client:
 			return
-		
+
 		try:
 			async with self.mqtt_client:
 				# Subscribe to configuration topics
 				await self.mqtt_client.subscribe("apg/config/+/+")
 				await self.mqtt_client.subscribe(f"apg/config/sync/+/status")
-				
+
 				async for message in self.mqtt_client.messages:
 					try:
 						payload = json.loads(message.payload.decode())
 						# Process MQTT sync messages
 						await self._process_mqtt_sync_message(message.topic, payload)
-					
+
 					except Exception as e:
 						await self.error_handler.handle_error(
 							e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.LOW,
 							"mqtt_message_processing", {"topic": str(message.topic)}
 						)
-		
+
 		except Exception as e:
 			await self.error_handler.handle_error(
 				e, ErrorCategory.EXTERNAL_SERVICE_ERROR, ErrorSeverity.MEDIUM,
 				"mqtt_message_handler", {}
 			)
-	
+
 	async def _process_remote_sync_event(self, event: SyncEvent):
 		"""Process synchronization event from remote node."""
 		# Apply the remote change locally if needed
 		# This would integrate with the configuration service
 		pass
-	
+
 	async def _process_mqtt_sync_message(self, topic: str, payload: Dict[str, Any]):
 		"""Process MQTT synchronization message."""
 		# Handle lightweight sync messages from MQTT
 		pass
-	
+
 	async def close(self):
 		"""Clean up resources."""
 		# Close Bytewax dataflow bridge
 		if self.bytewax_dataflow:
 			await self.bytewax_dataflow.stop()
-		
+
 		# Close MQTT connection
 		if self.mqtt_client:
 			await self.mqtt_client.disconnect()
-		
+
 		# Close WebSocket connections
 		for connection in self.websocket_connections.values():
 			await connection.close()
-		
+
 		logger.info(f"Real-time sync manager closed for node {self.node_id}")
 
 # Factory functions
@@ -894,6 +925,6 @@ async def create_realtime_sync_manager(
 		mqtt_broker_host=mqtt_broker_host,
 		node_id=node_id
 	)
-	
+
 	await manager.initialize()
 	return manager

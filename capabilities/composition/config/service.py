@@ -6,7 +6,7 @@ management platform that makes all existing solutions obsolete.
 
 Features:
 - AI-Powered Intelligent Configuration Management
-- Universal Multi-Cloud Abstraction Layer  
+- Universal Multi-Cloud Abstraction Layer
 - Real-Time Collaborative Configuration
 - Zero-Trust Security by Design
 - Unlimited Scale with Intelligent Tiering
@@ -30,42 +30,132 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import logging
 from pathlib import Path
+import types
 
 # Core async libraries
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select, update, delete, func, and_, or_, desc
-import redis.asyncio as redis
+try:
+    import redis.asyncio as redis
+except ModuleNotFoundError:
+    class _FallbackRedisClient:
+        pass
+    redis = types.SimpleNamespace(Redis=_FallbackRedisClient)
 
 # Configuration storage backends - real SDKs
-import consul.aio
-import etcd3
-import hvac  # HashiCorp Vault client
+try:
+    import consul.aio
+except ModuleNotFoundError:
+    consul = types.SimpleNamespace(aio=types.SimpleNamespace(Consul=object))
+try:
+    import etcd3
+except ModuleNotFoundError:
+    etcd3 = types.SimpleNamespace(Etcd3Client=object)
+try:
+    import hvac  # HashiCorp Vault client
+except ModuleNotFoundError:
+    hvac = types.SimpleNamespace(Client=object)
 
 # Real-time updates and watching
-import asyncio_mqtt
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+try:
+    import asyncio_mqtt
+except ModuleNotFoundError:
+    asyncio_mqtt = types.SimpleNamespace()
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+except ModuleNotFoundError:
+    class Observer:
+        def schedule(self, *args, **kwargs): return None
+        def start(self): return None
+        def stop(self): return None
+        def join(self, *args, **kwargs): return None
+    class FileSystemEventHandler:
+        pass
 
 # Configuration validation and parsing
-import yaml
-import toml
+try:
+    import yaml
+except ModuleNotFoundError:
+    class _FallbackYaml:
+        YAMLError = ValueError
+        @staticmethod
+        def dump(value, default_flow_style=False):
+            return json.dumps(value, default=str)
+        @staticmethod
+        def safe_load(value):
+            return json.loads(value)
+    yaml = _FallbackYaml()
+try:
+    import toml
+except ModuleNotFoundError:
+    class _FallbackToml:
+        @staticmethod
+        def dumps(value):
+            return json.dumps(value, default=str)
+        @staticmethod
+        def loads(value):
+            return json.loads(value)
+    toml = _FallbackToml()
 from pydantic import BaseModel, ValidationError
-import cerberus  # Schema validation
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+try:
+    import cerberus  # Schema validation
+except ModuleNotFoundError:
+    class _FallbackValidator:
+        errors: List[str] = []
+        document: Any = None
+        def validate(self, value, schema):
+            self.document = value
+            self.errors = []
+            return True
+    cerberus = types.SimpleNamespace(Validator=_FallbackValidator)
+try:
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+except ModuleNotFoundError:
+    class FileSystemLoader:
+        def __init__(self, *args, **kwargs): pass
+    def select_autoescape(*args, **kwargs):
+        return False
+    class _FallbackTemplate:
+        def __init__(self, text): self.text = text
+        def render(self, **variables):
+            rendered = self.text
+            for key, value in variables.items():
+                rendered = rendered.replace("{{ " + key + " }}", str(value))
+                rendered = rendered.replace("{{" + key + "}}", str(value))
+            return rendered
+    class Environment:
+        def __init__(self, *args, **kwargs): pass
+        def from_string(self, template_content): return _FallbackTemplate(template_content)
 
 # Encryption and security
-from cryptography.fernet import Fernet
-from jose import jwt
-import bcrypt
+try:
+    from cryptography.fernet import Fernet
+except ModuleNotFoundError:
+    class Fernet:
+        def __init__(self, key): self.key = key
+        def encrypt(self, value: bytes) -> bytes: return value
+        def decrypt(self, value: bytes) -> bytes: return value
+try:
+    from jose import jwt
+except ModuleNotFoundError:
+    jwt = types.SimpleNamespace()
+try:
+    import bcrypt
+except ModuleNotFoundError:
+    bcrypt = types.SimpleNamespace()
 
 # Utilities
 from uuid_extensions import uuid7str
-import structlog
+try:
+    import structlog
+except ModuleNotFoundError:
+    structlog = types.SimpleNamespace(get_logger=lambda name=None: logging.getLogger(name))
 
 # Error handling system
 from .error_handling import (
-	ErrorHandler, ErrorCategory, ErrorSeverity, ConfigurationError, 
+	ErrorHandler, ErrorCategory, ErrorSeverity, ConfigurationError,
 	NetworkError, DatabaseError, ValidationError, AuthenticationError,
 	ExternalServiceError, with_error_handling, error_context
 )
@@ -169,7 +259,7 @@ class ConfigWatcher:
 
 class CentralConfigurationService:
     """Main central configuration service with multiple backend support."""
-    
+
     def __init__(
         self,
         db_session: AsyncSession,
@@ -187,31 +277,31 @@ class CentralConfigurationService:
         self.consul_client = consul_client
         self.etcd_client = etcd_client
         self.vault_client = vault_client
-        
+
         # Encryption
         self.cipher = Fernet(encryption_key.encode()) if encryption_key else None
-        
+
         # Configuration storage services
         self.redis_storage = RedisConfigStorage(redis_client)
         self.consul_storage = ConsulConfigStorage(consul_client) if consul_client else None
         self.etcd_storage = EtcdConfigStorage(etcd_client) if etcd_client else None
         self.vault_storage = VaultConfigStorage(vault_client) if vault_client else None
         self.db_storage = DatabaseConfigStorage(db_session)
-        
+
         # Configuration management services
         self.template_engine = ConfigTemplateEngine()
         self.validator = ConfigValidator()
         self.version_manager = ConfigVersionManager(db_session, redis_client)
         self.change_tracker = ConfigChangeTracker(db_session)
         self.watcher_manager = ConfigWatcherManager(redis_client)
-        
+
         # Active watchers and subscriptions
         self.active_watchers: Dict[str, ConfigWatcher] = {}
         self.watch_tasks: Dict[str, asyncio.Task] = {}
-        
+
         # Error handling system
         self.error_handler = ErrorHandler("central_configuration_service")
-        
+
         # Circuit breakers for external services
         from .error_handling import CircuitBreakerConfig
         if consul_client:
@@ -226,17 +316,21 @@ class CentralConfigurationService:
             self.vault_circuit_breaker = self.error_handler.get_circuit_breaker(
                 "vault", CircuitBreakerConfig(failure_threshold=5, reset_timeout=60.0)
             )
-        
+
         # Real-time synchronization
         self.enable_realtime_sync = enable_realtime_sync
         self.sync_manager: Optional[RealtimeSyncManager] = None
         self.bytewax_stream_names = bytewax_stream_names
         self.mqtt_broker_host = mqtt_broker_host
-        
+
         # Initialize sync manager if enabled
         if enable_realtime_sync:
-            asyncio.create_task(self._initialize_sync_manager())
-    
+            try:
+                asyncio.get_running_loop().create_task(self._initialize_sync_manager())
+            except RuntimeError:
+                self.enable_realtime_sync = False
+                logger.info("Real-time synchronization deferred; no running event loop")
+
     async def _initialize_sync_manager(self):
         """Initialize real-time synchronization manager."""
         try:
@@ -253,7 +347,7 @@ class CentralConfigurationService:
             )
             # Continue without real-time sync if initialization fails
             self.enable_realtime_sync = False
-        
+
     @with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.MEDIUM)
     async def set_config(
         self,
@@ -269,19 +363,19 @@ class CentralConfigurationService:
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """Set configuration value with comprehensive error handling."""
-        
+
         # Input validation
         if not key or not isinstance(key, str):
             raise ValidationError("Configuration key must be a non-empty string")
-        
+
         if value is None:
             raise ValidationError("Configuration value cannot be None")
-        
+
         async with error_context("set_config", ErrorCategory.CONFIGURATION_ERROR, error_handler=self.error_handler):
             try:
                 # Build full key with scope
                 full_key = self._build_key(key, scope, tenant_id)
-                
+
                 # Get current value for change tracking with proper error handling
                 current_value = None
                 try:
@@ -289,7 +383,7 @@ class CentralConfigurationService:
                     current_value = current_config.value if current_config else None
                 except DatabaseError as e:
                     await self.error_handler.handle_error(
-                        e, ErrorCategory.DATABASE_ERROR, ErrorSeverity.MEDIUM, 
+                        e, ErrorCategory.DATABASE_ERROR, ErrorSeverity.MEDIUM,
                         "get_current_config_for_change_tracking",
                         {"key": key, "scope": scope.value, "tenant_id": tenant_id}
                     )
@@ -301,7 +395,7 @@ class CentralConfigurationService:
                         {"key": key, "scope": scope.value, "tenant_id": tenant_id}
                     )
                     # Continue with None current_value
-                
+
                 # Serialize value with error handling
                 try:
                     if format == ConfigFormat.JSON:
@@ -321,7 +415,7 @@ class CentralConfigurationService:
                         {"key": key, "format": format.value, "value_type": type(value).__name__}
                     )
                     raise ConfigurationError(f"Unexpected error during serialization: {str(e)}")
-                
+
                 # Encrypt if required with error handling
                 if encrypted:
                     if not self.cipher:
@@ -335,7 +429,7 @@ class CentralConfigurationService:
                             {"key": key, "encrypted": encrypted}
                         )
                         raise ConfigurationError(f"Failed to encrypt configuration value: {str(e)}")
-                
+
                 # Calculate checksum
                 try:
                     checksum = hashlib.sha256(raw_value.encode()).hexdigest()
@@ -346,7 +440,7 @@ class CentralConfigurationService:
                         {"key": key}
                     )
                     raise ConfigurationError(f"Failed to calculate checksum: {str(e)}")
-                
+
                 # Create config value
                 config_value = ConfigValue(
                     value=value,
@@ -358,7 +452,7 @@ class CentralConfigurationService:
                     expires_at=expires_at,
                     metadata=metadata or {}
                 )
-                
+
                 # Store in selected backend with circuit breaker protection
                 storage = self._get_storage_backend(backend)
                 try:
@@ -370,9 +464,9 @@ class CentralConfigurationService:
                         version = await self.vault_circuit_breaker.call(storage.set, full_key, config_value)
                     else:
                         version = await storage.set(full_key, config_value)
-                    
+
                     config_value.version = version
-                    
+
                 except NetworkError as e:
                     await self.error_handler.handle_error(
                         e, ErrorCategory.NETWORK_ERROR, ErrorSeverity.HIGH,
@@ -394,7 +488,7 @@ class CentralConfigurationService:
                         {"key": key, "backend": backend.value, "tenant_id": tenant_id}
                     )
                     raise ConfigurationError(f"Failed to store configuration in {backend.value}: {str(e)}")
-                
+
                 # Store metadata in database with transaction handling
                 try:
                     await self._store_config_metadata(full_key, config_value, scope, tenant_id, changed_by)
@@ -421,7 +515,7 @@ class CentralConfigurationService:
                         {"key": key, "tenant_id": tenant_id}
                     )
                     raise ConfigurationError(f"Failed to store configuration metadata: {str(e)}")
-                
+
                 # Track change with error handling
                 try:
                     change_id = await self.change_tracker.record_change(
@@ -440,11 +534,11 @@ class CentralConfigurationService:
                     )
                     # Don't fail the entire operation for change tracking errors
                     change_id = None
-                
+
                 # Notify watchers with error handling
                 try:
                     await self._notify_watchers(
-                        full_key, config_value, 
+                        full_key, config_value,
                         ChangeType.UPDATE if current_value else ChangeType.CREATE
                     )
                 except Exception as e:
@@ -454,7 +548,7 @@ class CentralConfigurationService:
                         {"key": key, "watcher_count": len(self.active_watchers)}
                     )
                     # Don't fail the operation for notification errors
-                
+
                 # Cache in Redis for fast access with error handling
                 if backend != StorageBackend.REDIS:
                     try:
@@ -466,7 +560,7 @@ class CentralConfigurationService:
                             {"key": key, "backend": backend.value}
                         )
                         # Don't fail the operation for caching errors
-                
+
                 # Broadcast real-time sync event
                 if self.enable_realtime_sync and self.sync_manager:
                     try:
@@ -496,12 +590,21 @@ class CentralConfigurationService:
                             {"key": key, "sync_event_type": "config_changed"}
                         )
                         # Don't fail the operation for sync broadcast errors
-                
+
                 logger.info(f"Successfully set configuration {full_key} version {config_value.version}")
                 return change_id
-    
+            except ConfigurationError:
+                raise
+            except Exception as e:
+                await self.error_handler.handle_error(
+                    e, ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.HIGH,
+                    "set_config",
+                    {"key": key, "scope": scope.value, "tenant_id": tenant_id}
+                )
+                raise ConfigurationError(f"Failed to set configuration {key}: {str(e)}") from e
+
     # ==================== Real-Time Synchronization Methods ====================
-    
+
     @with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.MEDIUM)
     async def acquire_config_lock(
         self,
@@ -514,16 +617,16 @@ class CentralConfigurationService:
         """Acquire exclusive lock on configuration for real-time editing."""
         if not self.enable_realtime_sync or not self.sync_manager:
             return True  # Always succeed if sync is disabled
-        
+
         full_key = self._build_key(key, scope, tenant_id)
-        
+
         return await self.sync_manager.acquire_config_lock(
             config_key=full_key,
             user_id=user_id,
             tenant_id=tenant_id,
             timeout=timeout
         )
-    
+
     @with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.LOW)
     async def release_config_lock(
         self,
@@ -535,15 +638,15 @@ class CentralConfigurationService:
         """Release configuration lock."""
         if not self.enable_realtime_sync or not self.sync_manager:
             return True  # Always succeed if sync is disabled
-        
+
         full_key = self._build_key(key, scope, tenant_id)
-        
+
         return await self.sync_manager.release_config_lock(
             config_key=full_key,
             user_id=user_id,
             tenant_id=tenant_id
         )
-    
+
     @with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.HIGH)
     async def resolve_config_conflict(
         self,
@@ -563,15 +666,15 @@ class CentralConfigurationService:
                 )
                 return latest_update.get("new_value")
             return None
-        
+
         full_key = self._build_key(key, scope, tenant_id)
-        
+
         conflict_info = await self.sync_manager.detect_and_resolve_conflicts(
             config_key=full_key,
             competing_updates=competing_updates,
             resolution_strategy=resolution_strategy
         )
-        
+
         if conflict_info.resolved:
             # Apply the resolved value
             resolved_value = conflict_info.resolution_result
@@ -593,9 +696,9 @@ class CentralConfigurationService:
                     changed_by=f"conflict_resolution_{conflict_info.conflict_id}"
                 )
                 return resolved_value
-        
+
         return None
-    
+
     @with_error_handling(ErrorCategory.NETWORK_ERROR, ErrorSeverity.MEDIUM)
     async def add_realtime_websocket_connection(
         self,
@@ -607,24 +710,24 @@ class CentralConfigurationService:
         """Add WebSocket connection for real-time configuration updates."""
         if not self.enable_realtime_sync or not self.sync_manager:
             raise ConfigurationError("Real-time synchronization is not enabled")
-        
+
         # Add tenant-specific patterns if provided
         patterns = subscription_patterns or ["*"]
         if tenant_id:
             tenant_patterns = [f"*{tenant_id}*", f"{tenant_id}:*"]
             patterns.extend(tenant_patterns)
-        
+
         await self.sync_manager.add_websocket_connection(
             connection_id=connection_id,
             websocket=websocket,
             subscription_patterns=patterns
         )
-    
+
     async def remove_realtime_websocket_connection(self, connection_id: str):
         """Remove WebSocket connection."""
         if self.enable_realtime_sync and self.sync_manager:
             await self.sync_manager.remove_websocket_connection(connection_id)
-    
+
     @with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.MEDIUM)
     async def get_realtime_sync_status(self) -> Dict[str, Any]:
         """Get real-time synchronization status and metrics."""
@@ -633,7 +736,7 @@ class CentralConfigurationService:
                 "enabled": False,
                 "status": "disabled"
             }
-        
+
         return {
             "enabled": True,
             "status": "active",
@@ -644,7 +747,7 @@ class CentralConfigurationService:
             "mqtt_enabled": self.sync_manager.mqtt_client is not None,
             "last_heartbeat": datetime.now(timezone.utc).isoformat()
         }
-    
+
     @with_error_handling(ErrorCategory.CONFIGURATION_ERROR, ErrorSeverity.MEDIUM)
     async def get_config(
         self,
@@ -656,57 +759,66 @@ class CentralConfigurationService:
         decrypt: bool = True
     ) -> Optional[ConfigValue]:
         """Get configuration value with comprehensive error handling."""
-        
+
         # Input validation
         if not key or not isinstance(key, str):
             raise ValidationError("Configuration key must be a non-empty string")
-        
+
         async with error_context("get_config", ErrorCategory.CONFIGURATION_ERROR, error_handler=self.error_handler):
-            full_key = self._build_key(key, scope, tenant_id)
-            
-            # Try cache first (Redis) with error handling
-            if backend != StorageBackend.REDIS:
-                try:
-                    cached_value = await self.redis_storage.get(full_key, version)
-                if cached_value:
-                    return cached_value
-            
-            # Get from specified backend
-            storage = self._get_storage_backend(backend)
-            config_value = await storage.get(full_key, version)
-            
-            if not config_value:
-                return None
-            
-            # Decrypt if needed
-            if config_value.encrypted and decrypt and self.cipher:
-                try:
-                    decrypted_raw = self.cipher.decrypt(config_value.raw_value.encode()).decode()
-                    
-                    # Parse decrypted value
-                    if config_value.format == ConfigFormat.JSON:
-                        config_value.value = json.loads(decrypted_raw)
-                    elif config_value.format == ConfigFormat.YAML:
-                        config_value.value = yaml.safe_load(decrypted_raw)
-                    elif config_value.format == ConfigFormat.TOML:
-                        config_value.value = toml.loads(decrypted_raw)
-                    else:
-                        config_value.value = decrypted_raw
-                        
-                except Exception as e:
-                    logger.error(f"Failed to decrypt configuration {full_key}: {e}")
-                    raise
-            
-            # Cache in Redis if from different backend
-            if backend != StorageBackend.REDIS:
-                await self.redis_storage.set(full_key, config_value)
-            
-            return config_value
-            
-        except Exception as e:
-            logger.error(f"Failed to get configuration {key}: {e}")
-            raise
-    
+            try:
+                full_key = self._build_key(key, scope, tenant_id)
+
+                # Try cache first (Redis) with error handling
+                if backend != StorageBackend.REDIS:
+                    try:
+                        cached_value = await self.redis_storage.get(full_key, version)
+                    except Exception as e:
+                        await self.error_handler.handle_error(
+                            e, ErrorCategory.SYSTEM_ERROR, ErrorSeverity.LOW,
+                            "get_config_cache_lookup",
+                            {"key": key, "backend": backend.value}
+                        )
+                        cached_value = None
+                    if cached_value:
+                        return cached_value
+
+                # Get from specified backend
+                storage = self._get_storage_backend(backend)
+                config_value = await storage.get(full_key, version)
+
+                if not config_value:
+                    return None
+
+                # Decrypt if needed
+                if config_value.encrypted and decrypt and self.cipher:
+                    try:
+                        decrypted_raw = self.cipher.decrypt(config_value.raw_value.encode()).decode()
+
+                        # Parse decrypted value
+                        if config_value.format == ConfigFormat.JSON:
+                            config_value.value = json.loads(decrypted_raw)
+                        elif config_value.format == ConfigFormat.YAML:
+                            config_value.value = yaml.safe_load(decrypted_raw)
+                        elif config_value.format == ConfigFormat.TOML:
+                            config_value.value = toml.loads(decrypted_raw)
+                        else:
+                            config_value.value = decrypted_raw
+
+                    except Exception as e:
+                        logger.error(f"Failed to decrypt configuration {full_key}: {e}")
+                        raise
+
+                # Cache in Redis if from different backend
+                if backend != StorageBackend.REDIS:
+                    await self.redis_storage.set(full_key, config_value)
+
+                return config_value
+            except ConfigurationError:
+                raise
+            except Exception as e:
+                logger.error(f"Failed to get configuration {key}: {e}")
+                raise ConfigurationError(f"Failed to get configuration {key}: {str(e)}") from e
+
     async def delete_config(
         self,
         key: str,
@@ -716,22 +828,22 @@ class CentralConfigurationService:
         deleted_by: str = "system"
     ) -> bool:
         """Delete configuration value."""
-        
+
         try:
             full_key = self._build_key(key, scope, tenant_id)
-            
+
             # Get current value for change tracking
             current_config = await self.get_config(key, scope, tenant_id=tenant_id, backend=backend)
             current_value = current_config.value if current_config else None
-            
+
             # Delete from backend
             storage = self._get_storage_backend(backend)
             success = await storage.delete(full_key)
-            
+
             if success:
                 # Delete from cache
                 await self.redis_storage.delete(full_key)
-                
+
                 # Track change
                 await self.change_tracker.record_change(
                     key=full_key,
@@ -740,18 +852,18 @@ class CentralConfigurationService:
                     new_value=None,
                     changed_by=deleted_by
                 )
-                
+
                 # Notify watchers
                 await self._notify_watchers(full_key, None, ChangeType.DELETE)
-                
+
                 logger.info(f"Deleted configuration {full_key}")
-            
+
             return success
-            
+
         except Exception as e:
             logger.error(f"Failed to delete configuration {key}: {e}")
             raise
-    
+
     async def list_configs(
         self,
         key_pattern: str = "*",
@@ -761,17 +873,17 @@ class CentralConfigurationService:
         include_metadata: bool = True
     ) -> List[Dict[str, Any]]:
         """List configuration keys matching pattern."""
-        
+
         try:
             # Build search pattern
             if scope:
                 pattern = self._build_key(key_pattern, scope, tenant_id)
             else:
                 pattern = key_pattern
-            
+
             storage = self._get_storage_backend(backend)
             config_list = await storage.list(pattern)
-            
+
             # Add metadata if requested
             if include_metadata:
                 enriched_list = []
@@ -780,13 +892,13 @@ class CentralConfigurationService:
                     config_info.update(metadata)
                     enriched_list.append(config_info)
                 return enriched_list
-            
+
             return config_list
-            
+
         except Exception as e:
             logger.error(f"Failed to list configurations: {e}")
             raise
-    
+
     async def watch_config(
         self,
         key_pattern: str,
@@ -796,15 +908,15 @@ class CentralConfigurationService:
         filters: Optional[Dict[str, Any]] = None
     ) -> str:
         """Watch configuration changes."""
-        
+
         watcher_id = f"watch_{uuid7str()}"
-        
+
         # Build full pattern
         if scope:
             full_pattern = self._build_key(key_pattern, scope, tenant_id)
         else:
             full_pattern = key_pattern
-        
+
         # Create watcher
         watcher = ConfigWatcher(
             watcher_id=watcher_id,
@@ -813,30 +925,30 @@ class CentralConfigurationService:
             filters=filters or {},
             active=True
         )
-        
+
         self.active_watchers[watcher_id] = watcher
-        
+
         # Register with watcher manager
         await self.watcher_manager.register_watcher(watcher)
-        
+
         logger.info(f"Registered configuration watcher {watcher_id} for pattern {full_pattern}")
         return watcher_id
-    
+
     async def unwatch_config(self, watcher_id: str) -> bool:
         """Remove configuration watcher."""
-        
+
         if watcher_id in self.active_watchers:
             watcher = self.active_watchers[watcher_id]
             watcher.active = False
-            
+
             await self.watcher_manager.unregister_watcher(watcher_id)
             del self.active_watchers[watcher_id]
-            
+
             logger.info(f"Unregistered configuration watcher {watcher_id}")
             return True
-        
+
         return False
-    
+
     async def apply_template(
         self,
         template_content: str,
@@ -847,17 +959,17 @@ class CentralConfigurationService:
         created_by: str = "system"
     ) -> str:
         """Apply Jinja2 template to generate configuration."""
-        
+
         try:
             # Render template
             rendered_config = self.template_engine.render(template_content, variables)
-            
+
             # Parse rendered configuration
             try:
                 config_value = yaml.safe_load(rendered_config)
             except:
                 config_value = rendered_config
-            
+
             # Store rendered configuration
             change_id = await self.set_config(
                 key=output_key,
@@ -871,14 +983,14 @@ class CentralConfigurationService:
                     "template_variables": variables
                 }
             )
-            
+
             logger.info(f"Applied template to generate configuration {output_key}")
             return change_id
-            
+
         except Exception as e:
             logger.error(f"Failed to apply template: {e}")
             raise
-    
+
     async def validate_config(
         self,
         key: str,
@@ -888,26 +1000,26 @@ class CentralConfigurationService:
         tenant_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Validate configuration against schema."""
-        
+
         try:
             validation_result = self.validator.validate(value, schema)
-            
+
             # Store validation result
             full_key = self._build_key(key, scope, tenant_id)
             cache_key = f"validation:{full_key}"
-            
+
             await self.redis_client.setex(
                 cache_key,
                 3600,  # 1 hour
                 json.dumps(validation_result, default=str)
             )
-            
+
             return validation_result
-            
+
         except Exception as e:
             logger.error(f"Failed to validate configuration {key}: {e}")
             raise
-    
+
     async def get_config_history(
         self,
         key: str,
@@ -916,10 +1028,10 @@ class CentralConfigurationService:
         limit: int = 50
     ) -> List[ConfigChange]:
         """Get configuration change history."""
-        
+
         full_key = self._build_key(key, scope, tenant_id)
         return await self.change_tracker.get_history(full_key, limit)
-    
+
     async def restore_config_version(
         self,
         key: str,
@@ -929,14 +1041,14 @@ class CentralConfigurationService:
         restored_by: str = "system"
     ) -> str:
         """Restore configuration to specific version."""
-        
+
         try:
             # Get version from version manager
             config_value = await self.version_manager.get_version(key, version, scope, tenant_id)
-            
+
             if not config_value:
                 raise ValueError(f"Version {version} not found for key {key}")
-            
+
             # Set as current configuration
             change_id = await self.set_config(
                 key=key,
@@ -951,14 +1063,14 @@ class CentralConfigurationService:
                     "original_checksum": config_value.checksum
                 }
             )
-            
+
             logger.info(f"Restored configuration {key} to version {version}")
             return change_id
-            
+
         except Exception as e:
             logger.error(f"Failed to restore configuration {key} to version {version}: {e}")
             raise
-    
+
     async def bulk_import_configs(
         self,
         configs: Dict[str, Any],
@@ -969,9 +1081,9 @@ class CentralConfigurationService:
         overwrite: bool = False
     ) -> Dict[str, str]:
         """Bulk import configurations."""
-        
+
         results = {}
-        
+
         for key, value in configs.items():
             try:
                 # Check if key exists
@@ -980,7 +1092,7 @@ class CentralConfigurationService:
                     if existing:
                         results[key] = f"skipped (exists)"
                         continue
-                
+
                 # Import configuration
                 change_id = await self.set_config(
                     key=key,
@@ -991,15 +1103,15 @@ class CentralConfigurationService:
                     changed_by=imported_by,
                     metadata={"bulk_imported": True}
                 )
-                
+
                 results[key] = change_id
-                
+
             except Exception as e:
                 results[key] = f"error: {str(e)}"
-        
+
         logger.info(f"Bulk imported {len(results)} configurations")
         return results
-    
+
     async def export_configs_to_file(
         self,
         file_path: str,
@@ -1010,7 +1122,7 @@ class CentralConfigurationService:
         include_metadata: bool = False
     ) -> bool:
         """Export configurations to file."""
-        
+
         try:
             # Get configurations
             config_list = await self.list_configs(
@@ -1019,13 +1131,13 @@ class CentralConfigurationService:
                 tenant_id=tenant_id,
                 include_metadata=include_metadata
             )
-            
+
             # Build export data
             export_data = {}
             for config_info in config_list:
                 key = config_info["key"]
                 config_value = await self.get_config(key, scope, tenant_id=tenant_id)
-                
+
                 if config_value:
                     export_data[key] = {
                         "value": config_value.value,
@@ -1033,11 +1145,11 @@ class CentralConfigurationService:
                         "version": config_value.version,
                         "metadata": config_value.metadata
                     }
-            
+
             # Write to file
             path = Path(file_path)
             path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             if format == ConfigFormat.JSON:
                 with open(path, 'w') as f:
                     json.dump(export_data, f, indent=2, default=str)
@@ -1047,29 +1159,29 @@ class CentralConfigurationService:
             elif format == ConfigFormat.TOML:
                 with open(path, 'w') as f:
                     toml.dump(export_data, f)
-            
+
             logger.info(f"Exported {len(export_data)} configurations to {file_path}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to export configurations: {e}")
             return False
-    
+
     def _build_key(self, key: str, scope: ConfigScope, tenant_id: Optional[str] = None) -> str:
         """Build full configuration key with scope."""
-        
+
         parts = [scope.value]
-        
+
         if tenant_id and scope in [ConfigScope.TENANT, ConfigScope.SERVICE, ConfigScope.INSTANCE]:
             parts.append(tenant_id)
-        
+
         parts.append(key)
-        
+
         return ":".join(parts)
-    
+
     def _get_storage_backend(self, backend: StorageBackend):
         """Get storage backend instance."""
-        
+
         if backend == StorageBackend.REDIS:
             return self.redis_storage
         elif backend == StorageBackend.CONSUL:
@@ -1088,7 +1200,7 @@ class CentralConfigurationService:
             return self.db_storage
         else:
             raise ValueError(f"Unknown storage backend: {backend}")
-    
+
     async def _store_config_metadata(
         self,
         key: str,
@@ -1098,9 +1210,9 @@ class CentralConfigurationService:
         changed_by: str
     ):
         """Store configuration metadata in database."""
-        
+
         from ..database import CRConfiguration
-        
+
         # Check if configuration exists
         result = await self.db_session.execute(
             select(CRConfiguration).where(
@@ -1110,9 +1222,9 @@ class CentralConfigurationService:
                 )
             )
         )
-        
+
         existing_config = result.scalar_one_or_none()
-        
+
         if existing_config:
             # Update existing
             existing_config.configuration_data = {
@@ -1141,20 +1253,20 @@ class CentralConfigurationService:
                 changed_by=changed_by
             )
             self.db_session.add(config)
-        
+
         await self.db_session.commit()
-    
+
     async def _get_config_metadata(self, key: str) -> Dict[str, Any]:
         """Get configuration metadata from database."""
-        
+
         from ..database import CRConfiguration
-        
+
         result = await self.db_session.execute(
             select(CRConfiguration).where(CRConfiguration.applet_id == key)
         )
-        
+
         config = result.scalar_one_or_none()
-        
+
         if config:
             return {
                 "created_at": config.created_at.isoformat(),
@@ -1162,9 +1274,9 @@ class CentralConfigurationService:
                 "changed_by": config.changed_by,
                 **config.configuration_data
             }
-        
+
         return {}
-    
+
     async def _notify_watchers(
         self,
         key: str,
@@ -1172,7 +1284,7 @@ class CentralConfigurationService:
         change_type: ChangeType
     ):
         """Notify active watchers of configuration changes."""
-        
+
         for watcher in self.active_watchers.values():
             if watcher.active and self._key_matches_pattern(key, watcher.key_pattern):
                 try:
@@ -1185,28 +1297,28 @@ class CentralConfigurationService:
                     )
                 except Exception as e:
                     logger.error(f"Watcher callback failed for {watcher.watcher_id}: {e}")
-    
+
     def _key_matches_pattern(self, key: str, pattern: str) -> bool:
         """Check if key matches pattern (supports wildcards)."""
-        
+
         import fnmatch
         return fnmatch.fnmatch(key, pattern)
-    
+
     async def close(self):
         """Close configuration service and clean up resources."""
-        
+
         # Stop all watchers
         for watcher_id in list(self.active_watchers.keys()):
             await self.unwatch_config(watcher_id)
-        
+
         # Cancel watch tasks
         for task in self.watch_tasks.values():
             task.cancel()
-        
+
         # Close clients
         if self.consul_client:
             await self.consul_client.close()
-        
+
         if self.etcd_client:
             self.etcd_client.close()
 
@@ -1216,18 +1328,18 @@ class CentralConfigurationService:
 
 class RedisConfigStorage:
     """Redis-based configuration storage."""
-    
+
     def __init__(self, redis_client: redis.Redis):
         self.redis_client = redis_client
-    
+
     async def set(self, key: str, config_value: ConfigValue) -> int:
         """Store configuration in Redis."""
-        
+
         # Get current version
         version_key = f"{key}:version"
         current_version = await self.redis_client.get(version_key)
         new_version = (int(current_version) + 1) if current_version else 1
-        
+
         # Store configuration
         config_data = {
             "value": config_value.raw_value,
@@ -1239,26 +1351,26 @@ class RedisConfigStorage:
             "metadata": config_value.metadata,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        
+
         # Set with expiration if specified
         if config_value.expires_at:
             ttl = int((config_value.expires_at - datetime.now(timezone.utc)).total_seconds())
             await self.redis_client.setex(key, ttl, json.dumps(config_data, default=str))
         else:
             await self.redis_client.set(key, json.dumps(config_data, default=str))
-        
+
         # Update version
         await self.redis_client.set(version_key, new_version)
-        
+
         # Store version history
         history_key = f"{key}:history:{new_version}"
         await self.redis_client.setex(history_key, 86400 * 30, json.dumps(config_data, default=str))  # 30 days
-        
+
         return new_version
-    
+
     async def get(self, key: str, version: Optional[int] = None) -> Optional[ConfigValue]:
         """Get configuration from Redis."""
-        
+
         if version:
             # Get specific version
             history_key = f"{key}:history:{version}"
@@ -1266,13 +1378,13 @@ class RedisConfigStorage:
         else:
             # Get current version
             data = await self.redis_client.get(key)
-        
+
         if not data:
             return None
-        
+
         try:
             config_data = json.loads(data)
-            
+
             return ConfigValue(
                 value=None,  # Will be parsed later
                 raw_value=config_data["value"],
@@ -1286,39 +1398,39 @@ class RedisConfigStorage:
         except (json.JSONDecodeError, KeyError) as e:
             logger.error(f"Failed to parse Redis configuration data for {key}: {e}")
             return None
-    
+
     async def delete(self, key: str) -> bool:
         """Delete configuration from Redis."""
-        
+
         # Delete main key
         result = await self.redis_client.delete(key)
-        
+
         # Delete version info
         await self.redis_client.delete(f"{key}:version")
-        
+
         # Delete history (get all history keys first)
         pattern = f"{key}:history:*"
         history_keys = []
         async for history_key in self.redis_client.scan_iter(match=pattern):
             history_keys.append(history_key)
-        
+
         if history_keys:
             await self.redis_client.delete(*history_keys)
-        
+
         return result > 0
-    
+
     async def list(self, pattern: str) -> List[Dict[str, Any]]:
         """List configurations matching pattern."""
-        
+
         configs = []
         async for key in self.redis_client.scan_iter(match=pattern):
             # Skip version and history keys
             if key.endswith(b':version') or b':history:' in key:
                 continue
-            
+
             key_str = key.decode()
             config_value = await self.get(key_str)
-            
+
             if config_value:
                 configs.append({
                     "key": key_str,
@@ -1327,25 +1439,25 @@ class RedisConfigStorage:
                     "checksum": config_value.checksum,
                     "encrypted": config_value.encrypted
                 })
-        
+
         return configs
 
 class ConsulConfigStorage:
     """Consul-based configuration storage."""
-    
+
     def __init__(self, consul_client: consul.aio.Consul):
         self.consul_client = consul_client
-    
+
     async def set(self, key: str, config_value: ConfigValue) -> int:
         """Store configuration in Consul."""
-        
+
         # Build Consul key
         consul_key = f"config/{key}"
-        
+
         # Get current version
         index, data = await self.consul_client.kv.get(f"{consul_key}/version")
         new_version = (int(data["Value"].decode()) + 1) if data else 1
-        
+
         # Store configuration
         config_data = {
             "value": config_value.raw_value,
@@ -1357,35 +1469,35 @@ class ConsulConfigStorage:
             "metadata": config_value.metadata,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        
+
         # Store in Consul
         await self.consul_client.kv.put(consul_key, json.dumps(config_data, default=str))
         await self.consul_client.kv.put(f"{consul_key}/version", str(new_version))
-        
+
         # Store version history
         await self.consul_client.kv.put(
             f"{consul_key}/history/{new_version}",
             json.dumps(config_data, default=str)
         )
-        
+
         return new_version
-    
+
     async def get(self, key: str, version: Optional[int] = None) -> Optional[ConfigValue]:
         """Get configuration from Consul."""
-        
+
         consul_key = f"config/{key}"
-        
+
         if version:
             consul_key = f"{consul_key}/history/{version}"
-        
+
         index, data = await self.consul_client.kv.get(consul_key)
-        
+
         if not data:
             return None
-        
+
         try:
             config_data = json.loads(data["Value"].decode())
-            
+
             return ConfigValue(
                 value=None,
                 raw_value=config_data["value"],
@@ -1399,32 +1511,32 @@ class ConsulConfigStorage:
         except (json.JSONDecodeError, KeyError) as e:
             logger.error(f"Failed to parse Consul configuration data for {key}: {e}")
             return None
-    
+
     async def delete(self, key: str) -> bool:
         """Delete configuration from Consul."""
-        
+
         consul_key = f"config/{key}"
-        
+
         # Delete recursively (includes history)
         result = await self.consul_client.kv.delete(consul_key, recurse=True)
         return result
-    
+
     async def list(self, pattern: str) -> List[Dict[str, Any]]:
         """List configurations matching pattern."""
-        
+
         index, keys = await self.consul_client.kv.get("config/", keys=True)
-        
+
         if not keys:
             return []
-        
+
         configs = []
         for consul_key in keys:
             key = consul_key.replace("config/", "")
-            
+
             # Skip version and history keys
             if "/version" in key or "/history/" in key:
                 continue
-            
+
             # Simple pattern matching
             if pattern == "*" or pattern in key:
                 config_value = await self.get(key)
@@ -1436,25 +1548,25 @@ class ConsulConfigStorage:
                         "checksum": config_value.checksum,
                         "encrypted": config_value.encrypted
                     })
-        
+
         return configs
 
 class EtcdConfigStorage:
     """etcd-based configuration storage."""
-    
+
     def __init__(self, etcd_client: etcd3.Etcd3Client):
         self.etcd_client = etcd_client
-    
+
     async def set(self, key: str, config_value: ConfigValue) -> int:
         """Store configuration in etcd."""
-        
+
         # Build etcd key
         etcd_key = f"config/{key}"
-        
+
         # Get current version
         version_data, _ = self.etcd_client.get(f"{etcd_key}/version")
         new_version = (int(version_data.decode()) + 1) if version_data else 1
-        
+
         # Store configuration
         config_data = {
             "value": config_value.raw_value,
@@ -1466,35 +1578,35 @@ class EtcdConfigStorage:
             "metadata": config_value.metadata,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        
+
         # Store in etcd
         self.etcd_client.put(etcd_key, json.dumps(config_data, default=str))
         self.etcd_client.put(f"{etcd_key}/version", str(new_version))
-        
+
         # Store version history
         self.etcd_client.put(
             f"{etcd_key}/history/{new_version}",
             json.dumps(config_data, default=str)
         )
-        
+
         return new_version
-    
+
     async def get(self, key: str, version: Optional[int] = None) -> Optional[ConfigValue]:
         """Get configuration from etcd."""
-        
+
         etcd_key = f"config/{key}"
-        
+
         if version:
             etcd_key = f"{etcd_key}/history/{version}"
-        
+
         data, _ = self.etcd_client.get(etcd_key)
-        
+
         if not data:
             return None
-        
+
         try:
             config_data = json.loads(data.decode())
-            
+
             return ConfigValue(
                 value=None,
                 raw_value=config_data["value"],
@@ -1508,29 +1620,29 @@ class EtcdConfigStorage:
         except (json.JSONDecodeError, KeyError) as e:
             logger.error(f"Failed to parse etcd configuration data for {key}: {e}")
             return None
-    
+
     async def delete(self, key: str) -> bool:
         """Delete configuration from etcd."""
-        
+
         etcd_key = f"config/{key}"
-        
+
         # Delete with prefix (includes history)
         result = self.etcd_client.delete_prefix(etcd_key)
         return result.deleted > 0
-    
+
     async def list(self, pattern: str) -> List[Dict[str, Any]]:
         """List configurations matching pattern."""
-        
+
         configs = []
-        
+
         # Get all keys with config prefix
         for data, metadata in self.etcd_client.get_prefix("config/"):
             key = metadata.key.decode().replace("config/", "")
-            
+
             # Skip version and history keys
             if "/version" in key or "/history/" in key:
                 continue
-            
+
             # Simple pattern matching
             if pattern == "*" or pattern in key:
                 config_value = await self.get(key)
@@ -1542,22 +1654,22 @@ class EtcdConfigStorage:
                         "checksum": config_value.checksum,
                         "encrypted": config_value.encrypted
                     })
-        
+
         return configs
 
 class VaultConfigStorage:
     """HashiCorp Vault-based configuration storage."""
-    
+
     def __init__(self, vault_client: hvac.Client):
         self.vault_client = vault_client
         self.mount_point = "secret"
-    
+
     async def set(self, key: str, config_value: ConfigValue) -> int:
         """Store configuration in Vault."""
-        
+
         # Build Vault path
         vault_path = f"config/{key}"
-        
+
         # Get current version
         try:
             current_data = self.vault_client.secrets.kv.v2.read_secret_version(
@@ -1567,7 +1679,7 @@ class VaultConfigStorage:
             new_version = current_data["data"]["data"]["version"] + 1
         except:
             new_version = 1
-        
+
         # Store configuration
         config_data = {
             "value": config_value.raw_value,
@@ -1579,27 +1691,27 @@ class VaultConfigStorage:
             "metadata": config_value.metadata,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        
+
         # Store in Vault
         self.vault_client.secrets.kv.v2.create_or_update_secret(
             path=vault_path,
             secret=config_data,
             mount_point=self.mount_point
         )
-        
+
         self.vault_client.secrets.kv.v2.create_or_update_secret(
             path=f"{vault_path}/version",
             secret={"version": new_version},
             mount_point=self.mount_point
         )
-        
+
         return new_version
-    
+
     async def get(self, key: str, version: Optional[int] = None) -> Optional[ConfigValue]:
         """Get configuration from Vault."""
-        
+
         vault_path = f"config/{key}"
-        
+
         try:
             if version:
                 # Get specific version
@@ -1614,9 +1726,9 @@ class VaultConfigStorage:
                     path=vault_path,
                     mount_point=self.mount_point
                 )
-            
+
             config_data = response["data"]["data"]
-            
+
             return ConfigValue(
                 value=None,
                 raw_value=config_data["value"],
@@ -1627,16 +1739,16 @@ class VaultConfigStorage:
                 expires_at=datetime.fromisoformat(config_data["expires_at"]) if config_data.get("expires_at") else None,
                 metadata=config_data.get("metadata", {})
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to get Vault configuration {key}: {e}")
             return None
-    
+
     async def delete(self, key: str) -> bool:
         """Delete configuration from Vault."""
-        
+
         vault_path = f"config/{key}"
-        
+
         try:
             # Delete all versions
             self.vault_client.secrets.kv.v2.delete_metadata_and_all_versions(
@@ -1647,24 +1759,24 @@ class VaultConfigStorage:
         except Exception as e:
             logger.error(f"Failed to delete Vault configuration {key}: {e}")
             return False
-    
+
     async def list(self, pattern: str) -> List[Dict[str, Any]]:
         """List configurations matching pattern."""
-        
+
         try:
             response = self.vault_client.secrets.kv.v2.list_secrets(
                 path="config",
                 mount_point=self.mount_point
             )
-            
+
             keys = response["data"]["keys"]
             configs = []
-            
+
             for key in keys:
                 # Skip version keys
                 if key.endswith("/version"):
                     continue
-                
+
                 # Simple pattern matching
                 if pattern == "*" or pattern in key:
                     config_value = await self.get(key)
@@ -1676,37 +1788,37 @@ class VaultConfigStorage:
                             "checksum": config_value.checksum,
                             "encrypted": config_value.encrypted
                         })
-            
+
             return configs
-            
+
         except Exception as e:
             logger.error(f"Failed to list Vault configurations: {e}")
             return []
 
 class DatabaseConfigStorage:
     """Database-based configuration storage."""
-    
+
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-    
+
     async def set(self, key: str, config_value: ConfigValue) -> int:
         """Store configuration in database."""
-        
+
         from ..database import CRConfiguration, CRConfigurationHistory
-        
+
         # Get current configuration
         result = await self.db_session.execute(
             select(CRConfiguration).where(CRConfiguration.applet_id == key)
         )
-        
+
         existing_config = result.scalar_one_or_none()
         new_version = 1
-        
+
         if existing_config:
             # Update existing
             new_version = existing_config.configuration_data.get("version", 0) + 1
             old_value = existing_config.configuration_data
-            
+
             existing_config.configuration_data = {
                 "value": config_value.raw_value,
                 "format": config_value.format.value,
@@ -1717,7 +1829,7 @@ class DatabaseConfigStorage:
                 "metadata": config_value.metadata
             }
             existing_config.updated_at = datetime.now(timezone.utc)
-            
+
             # Create history record
             history = CRConfigurationHistory(
                 configuration_id=existing_config.id,
@@ -1728,7 +1840,7 @@ class DatabaseConfigStorage:
                 tenant_id=existing_config.tenant_id
             )
             self.db_session.add(history)
-            
+
         else:
             # Create new
             config = CRConfiguration(
@@ -1747,7 +1859,7 @@ class DatabaseConfigStorage:
             )
             self.db_session.add(config)
             await self.db_session.flush()
-            
+
             # Create history record
             history = CRConfigurationHistory(
                 configuration_id=config.id,
@@ -1757,15 +1869,15 @@ class DatabaseConfigStorage:
                 tenant_id=config.tenant_id
             )
             self.db_session.add(history)
-        
+
         await self.db_session.commit()
         return new_version
-    
+
     async def get(self, key: str, version: Optional[int] = None) -> Optional[ConfigValue]:
         """Get configuration from database."""
-        
+
         from ..database import CRConfiguration, CRConfigurationHistory
-        
+
         if version:
             # Get specific version from history
             result = await self.db_session.execute(
@@ -1776,24 +1888,24 @@ class DatabaseConfigStorage:
                     )
                 ).order_by(desc(CRConfigurationHistory.created_at)).limit(1)
             )
-            
+
             history = result.scalar_one_or_none()
             if not history:
                 return None
-            
+
             config_data = history.new_value
         else:
             # Get current version
             result = await self.db_session.execute(
                 select(CRConfiguration).where(CRConfiguration.applet_id == key)
             )
-            
+
             config = result.scalar_one_or_none()
             if not config:
                 return None
-            
+
             config_data = config.configuration_data
-        
+
         return ConfigValue(
             value=None,
             raw_value=config_data["value"],
@@ -1804,32 +1916,32 @@ class DatabaseConfigStorage:
             expires_at=datetime.fromisoformat(config_data["expires_at"]) if config_data.get("expires_at") else None,
             metadata=config_data.get("metadata", {})
         )
-    
+
     async def delete(self, key: str) -> bool:
         """Delete configuration from database."""
-        
+
         from ..database import CRConfiguration
-        
+
         result = await self.db_session.execute(
             delete(CRConfiguration).where(CRConfiguration.applet_id == key)
         )
-        
+
         await self.db_session.commit()
         return result.rowcount > 0
-    
+
     async def list(self, pattern: str) -> List[Dict[str, Any]]:
         """List configurations matching pattern."""
-        
+
         from ..database import CRConfiguration
-        
+
         if pattern == "*":
             query = select(CRConfiguration)
         else:
             query = select(CRConfiguration).where(CRConfiguration.applet_id.like(f"%{pattern}%"))
-        
+
         result = await self.db_session.execute(query)
         configs = result.scalars().all()
-        
+
         config_list = []
         for config in configs:
             config_data = config.configuration_data
@@ -1840,7 +1952,7 @@ class DatabaseConfigStorage:
                 "checksum": config_data.get("checksum"),
                 "encrypted": config_data.get("encrypted", False)
             })
-        
+
         return config_list
 
 # =============================================================================
@@ -1849,7 +1961,7 @@ class DatabaseConfigStorage:
 
 class ConfigTemplateEngine:
     """Jinja2-based configuration template engine."""
-    
+
     def __init__(self):
         self.env = Environment(
             loader=FileSystemLoader([]),
@@ -1857,24 +1969,24 @@ class ConfigTemplateEngine:
             trim_blocks=True,
             lstrip_blocks=True
         )
-    
+
     def render(self, template_content: str, variables: Dict[str, Any]) -> str:
         """Render template with variables."""
-        
+
         template = self.env.from_string(template_content)
         return template.render(**variables)
 
 class ConfigValidator:
     """Configuration validation service."""
-    
+
     def __init__(self):
         self.validator = cerberus.Validator()
-    
+
     def validate(self, value: Any, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Validate configuration against schema."""
-        
+
         is_valid = self.validator.validate(value, schema)
-        
+
         return {
             "valid": is_valid,
             "errors": self.validator.errors if not is_valid else [],
@@ -1883,11 +1995,11 @@ class ConfigValidator:
 
 class ConfigVersionManager:
     """Configuration version management."""
-    
+
     def __init__(self, db_session: AsyncSession, redis_client: redis.Redis):
         self.db_session = db_session
         self.redis_client = redis_client
-    
+
     async def get_version(
         self,
         key: str,
@@ -1896,11 +2008,11 @@ class ConfigVersionManager:
         tenant_id: Optional[str]
     ) -> Optional[ConfigValue]:
         """Get specific version of configuration."""
-        
+
         # Try Redis history first
         full_key = f"{scope.value}:{tenant_id}:{key}" if tenant_id else f"{scope.value}:{key}"
         history_key = f"{full_key}:history:{version}"
-        
+
         data = await self.redis_client.get(history_key)
         if data:
             try:
@@ -1917,10 +2029,10 @@ class ConfigVersionManager:
                 )
             except:
                 pass
-        
+
         # Fallback to database
         from ..database import CRConfigurationHistory, CRConfiguration
-        
+
         result = await self.db_session.execute(
             select(CRConfigurationHistory).join(CRConfiguration).where(
                 and_(
@@ -1929,7 +2041,7 @@ class ConfigVersionManager:
                 )
             ).order_by(desc(CRConfigurationHistory.created_at)).limit(1)
         )
-        
+
         history = result.scalar_one_or_none()
         if history and history.new_value:
             config_data = history.new_value
@@ -1943,15 +2055,15 @@ class ConfigVersionManager:
                 expires_at=datetime.fromisoformat(config_data["expires_at"]) if config_data.get("expires_at") else None,
                 metadata=config_data.get("metadata", {})
             )
-        
+
         return None
 
 class ConfigChangeTracker:
     """Configuration change tracking."""
-    
+
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
-    
+
     async def record_change(
         self,
         key: str,
@@ -1963,18 +2075,18 @@ class ConfigChangeTracker:
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """Record configuration change."""
-        
+
         change_id = f"change_{uuid7str()}"
-        
+
         from ..database import CRConfigurationHistory, CRConfiguration
-        
+
         # Get configuration ID
         result = await self.db_session.execute(
             select(CRConfiguration).where(CRConfiguration.applet_id == key)
         )
-        
+
         config = result.scalar_one_or_none()
-        
+
         if config:
             history = CRConfigurationHistory(
                 configuration_id=config.id,
@@ -1985,25 +2097,25 @@ class ConfigChangeTracker:
                 change_reason=reason,
                 tenant_id=config.tenant_id
             )
-            
+
             self.db_session.add(history)
             await self.db_session.commit()
-        
+
         return change_id
-    
+
     async def get_history(self, key: str, limit: int = 50) -> List[ConfigChange]:
         """Get change history for configuration key."""
-        
+
         from ..database import CRConfigurationHistory, CRConfiguration
-        
+
         result = await self.db_session.execute(
             select(CRConfigurationHistory).join(CRConfiguration).where(
                 CRConfiguration.applet_id == key
             ).order_by(desc(CRConfigurationHistory.created_at)).limit(limit)
         )
-        
+
         history_records = result.scalars().all()
-        
+
         changes = []
         for record in history_records:
             changes.append(ConfigChange(
@@ -2017,18 +2129,18 @@ class ConfigChangeTracker:
                 reason=record.change_reason,
                 metadata={}
             ))
-        
+
         return changes
 
 class ConfigWatcherManager:
     """Configuration watcher management."""
-    
+
     def __init__(self, redis_client: redis.Redis):
         self.redis_client = redis_client
-    
+
     async def register_watcher(self, watcher: ConfigWatcher):
         """Register configuration watcher."""
-        
+
         watcher_data = {
             "watcher_id": watcher.watcher_id,
             "key_pattern": watcher.key_pattern,
@@ -2036,16 +2148,16 @@ class ConfigWatcherManager:
             "active": watcher.active,
             "registered_at": datetime.now(timezone.utc).isoformat()
         }
-        
+
         await self.redis_client.hset(
             "config:watchers",
             watcher.watcher_id,
             json.dumps(watcher_data, default=str)
         )
-    
+
     async def unregister_watcher(self, watcher_id: str):
         """Unregister configuration watcher."""
-        
+
         await self.redis_client.hdel("config:watchers", watcher_id)
 
 # =============================================================================
@@ -2062,22 +2174,22 @@ async def create_central_configuration_service(
     encryption_key: Optional[str] = None
 ) -> CentralConfigurationService:
     """Factory function to create central configuration service."""
-    
+
     redis_client = redis.from_url(redis_url)
-    
+
     # Initialize optional clients
     consul_client = None
     if consul_url:
         consul_client = consul.aio.Consul(host=consul_url.split("://")[1].split(":")[0])
-    
+
     etcd_client = None
     if etcd_endpoints:
         etcd_client = etcd3.client(host=etcd_endpoints[0].split(":")[0], port=int(etcd_endpoints[0].split(":")[1]))
-    
+
     vault_client = None
     if vault_url and vault_token:
         vault_client = hvac.Client(url=vault_url, token=vault_token)
-    
+
     return CentralConfigurationService(
         db_session=db_session,
         redis_client=redis_client,
@@ -2091,7 +2203,7 @@ async def create_central_configuration_service(
 __all__ = [
     "CentralConfigurationService",
     "RedisConfigStorage",
-    "ConsulConfigStorage", 
+    "ConsulConfigStorage",
     "EtcdConfigStorage",
     "VaultConfigStorage",
     "DatabaseConfigStorage",

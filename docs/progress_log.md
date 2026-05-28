@@ -6237,3 +6237,24 @@ Battery-conscious verification:
 - `.venv/bin/python - <<'PY' ... compile_apg_file(source, source.parent / "output") ... PY` -> 20/20 examples compiled successfully
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 3 passed
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 11:31 EAT
+
+Completed checkpoint:
+
+- Made the central configuration service importable in a dependency-light APG environment.
+- Added local fallbacks for optional Redis, Consul, etcd, Vault, MQTT, watchdog, Cerberus, Jinja2, JOSE, bcrypt, structlog, and websocket runtime imports used by the central configuration path.
+- Fixed unmatched defensive `try` blocks in `set_config()` and `get_config()` so `service.py` compiles again.
+- Normalized enterprise integration event types/severities as string enums and replaced the base connector `NotImplementedError` with a generic webhook sender.
+- Aligned enterprise connector imports with the current `CentralConfigurationService` name.
+- Made central configuration and enterprise integration construction safe outside a running event loop.
+- Added focused regression coverage for dependency-light Redis storage, event normalization, and generic webhook payload delivery.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/config/service.py capabilities/composition/config/realtime_sync.py capabilities/composition/config/integrations/enterprise_connectors.py tests/test_composition_config_dependency_light.py`
+- `.venv/bin/python -m pytest tests/test_composition_config_dependency_light.py -q` -> 3 passed
+- `.venv/bin/python - <<'PY' ... central config dependency-light imports ... PY` -> import ok
+- `rg -n "raise NotImplementedError|not yet implemented|TODO" capabilities/composition/config/service.py capabilities/composition/config/realtime_sync.py capabilities/composition/config/integrations/enterprise_connectors.py tests/test_composition_config_dependency_light.py -S` -> no matches
+- `git diff --check capabilities/composition/config/service.py capabilities/composition/config/realtime_sync.py capabilities/composition/config/integrations/enterprise_connectors.py tests/test_composition_config_dependency_light.py`
+- Deferred broader pytest at the user's request to conserve battery.

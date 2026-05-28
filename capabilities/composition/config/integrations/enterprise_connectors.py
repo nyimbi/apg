@@ -13,7 +13,7 @@ import json
 import hmac
 import hashlib
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional, Callable
 from enum import Enum
 from dataclasses import dataclass, asdict
@@ -21,10 +21,10 @@ import uuid
 import httpx
 from urllib.parse import urlencode
 
-from ..service import CentralConfigurationEngine
+from ..service import CentralConfigurationService as CentralConfigurationEngine
 
 
-class IntegrationType(Enum):
+class IntegrationType(str, Enum):
 	"""Types of enterprise integrations."""
 	MESSAGING = "messaging"
 	TICKETING = "ticketing"
@@ -35,7 +35,7 @@ class IntegrationType(Enum):
 	WORKFLOW = "workflow"
 
 
-class EventType(Enum):
+class EventType(str, Enum):
 	"""Types of events to send to integrations."""
 	CONFIGURATION_CREATED = "configuration_created"
 	CONFIGURATION_UPDATED = "configuration_updated"
@@ -47,6 +47,17 @@ class EventType(Enum):
 	DEPLOYMENT_STATUS = "deployment_status"
 	BACKUP_STATUS = "backup_status"
 	AI_INSIGHT = "ai_insight"
+
+
+class EventSeverity(str, Enum):
+	"""Normalized event severities used across enterprise connectors."""
+	INFO = "low"
+	LOW = "low"
+	WARNING = "medium"
+	MEDIUM = "medium"
+	ERROR = "high"
+	HIGH = "high"
+	CRITICAL = "critical"
 
 
 @dataclass
@@ -76,59 +87,85 @@ class IntegrationEvent:
 	source: str
 	data: Dict[str, Any]
 	metadata: Dict[str, Any]
-	severity: str  # low, medium, high, critical
+	severity: EventSeverity | str  # low, medium, high, critical
+
+	def __post_init__(self) -> None:
+		if not isinstance(self.event_type, EventType):
+			self.event_type = EventType(self.event_type)
+		if not isinstance(self.severity, EventSeverity):
+			self.severity = EventSeverity(self.severity)
+
+	@property
+	def message(self) -> str:
+		return str(
+			self.data.get("message")
+			or self.metadata.get("message")
+			or self.data.get("description")
+			or self.event_type.value.replace("_", " ").title()
+		)
+
+	@property
+	def source_service(self) -> str:
+		return self.source
 
 
 class EnterpriseIntegrationManager:
 	"""Manager for enterprise integration connectors."""
-	
+
 	def __init__(self, config_engine: CentralConfigurationEngine):
 		"""Initialize integration manager."""
 		self.config_engine = config_engine
 		self.integrations: Dict[str, IntegrationConfig] = {}
 		self.event_queue: List[IntegrationEvent] = []
 		self.connectors: Dict[str, Any] = {}
-		
+
 		# Rate limiting
 		self.rate_limits: Dict[str, List[datetime]] = {}
-		
-		# Initialize connectors
-		asyncio.create_task(self._initialize_connectors())
-		asyncio.create_task(self._start_event_processor())
-	
+		self._event_processor_task: Optional[asyncio.Task] = None
+
+		self._register_connectors()
+		try:
+			self._event_processor_task = asyncio.get_running_loop().create_task(self._start_event_processor())
+		except RuntimeError:
+			self._event_processor_task = None
+
 	# ==================== Initialization ====================
-	
-	async def _initialize_connectors(self):
-		"""Initialize all enterprise connectors."""
+
+	def _register_connectors(self):
+		"""Register enterprise connectors without requiring an event loop."""
 		# Messaging connectors
 		self.connectors["slack"] = SlackConnector()
 		self.connectors["teams"] = MicrosoftTeamsConnector()
 		self.connectors["discord"] = DiscordConnector()
-		
+
 		# Ticketing connectors
 		self.connectors["jira"] = JiraConnector()
 		self.connectors["servicenow"] = ServiceNowConnector()
 		self.connectors["zendesk"] = ZendeskConnector()
-		
+
 		# Monitoring connectors
 		self.connectors["datadog"] = DatadogConnector()
 		self.connectors["newrelic"] = NewRelicConnector()
 		self.connectors["splunk"] = SplunkConnector()
-		
+
 		# CI/CD connectors
 		self.connectors["jenkins"] = JenkinsConnector()
 		self.connectors["github"] = GitHubConnector()
 		self.connectors["gitlab"] = GitLabConnector()
-		
+
 		# Identity connectors
 		self.connectors["okta"] = OktaConnector()
 		self.connectors["auth0"] = Auth0Connector()
 		self.connectors["azure_ad"] = AzureADConnector()
-		
+
 		print(f"🔌 Initialized {len(self.connectors)} enterprise connectors")
-	
+
+	async def _initialize_connectors(self):
+		"""Retained for async factory compatibility."""
+		self._register_connectors()
+
 	# ==================== Integration Management ====================
-	
+
 	async def add_integration(
 		self,
 		name: str,
@@ -139,7 +176,7 @@ class EnterpriseIntegrationManager:
 	) -> str:
 		"""Add a new enterprise integration."""
 		integration_id = f"integration_{uuid.uuid4().hex[:8]}"
-		
+
 		integration = IntegrationConfig(
 			integration_id=integration_id,
 			name=name,
@@ -159,18 +196,18 @@ class EnterpriseIntegrationManager:
 			created_at=datetime.now(timezone.utc),
 			last_used=None
 		)
-		
+
 		# Validate configuration
 		if platform.lower() in self.connectors:
 			connector = self.connectors[platform.lower()]
 			if hasattr(connector, 'validate_config'):
 				await connector.validate_config(config)
-		
+
 		self.integrations[integration_id] = integration
-		
+
 		print(f"✅ Added integration: {name} ({platform})")
 		return integration_id
-	
+
 	async def remove_integration(self, integration_id: str) -> bool:
 		"""Remove an enterprise integration."""
 		if integration_id in self.integrations:
@@ -178,7 +215,7 @@ class EnterpriseIntegrationManager:
 			print(f"🗑️ Removed integration: {integration_id}")
 			return True
 		return False
-	
+
 	async def update_integration(
 		self,
 		integration_id: str,
@@ -187,9 +224,9 @@ class EnterpriseIntegrationManager:
 		"""Update an existing integration."""
 		if integration_id not in self.integrations:
 			return False
-		
+
 		integration = self.integrations[integration_id]
-		
+
 		# Update allowed fields
 		if "enabled" in updates:
 			integration.enabled = updates["enabled"]
@@ -199,12 +236,12 @@ class EnterpriseIntegrationManager:
 			integration.event_filters = [EventType(et) for et in updates["event_filters"]]
 		if "rate_limit_per_minute" in updates:
 			integration.rate_limit_per_minute = updates["rate_limit_per_minute"]
-		
+
 		print(f"📝 Updated integration: {integration.name}")
 		return True
-	
+
 	# ==================== Event Processing ====================
-	
+
 	async def send_event(
 		self,
 		event_type: EventType,
@@ -223,49 +260,49 @@ class EnterpriseIntegrationManager:
 			metadata=metadata or {},
 			severity=severity
 		)
-		
+
 		self.event_queue.append(event)
 		print(f"📨 Queued event: {event_type.value} from {source}")
-	
+
 	async def _start_event_processor(self):
 		"""Start processing events from the queue."""
 		print("🔄 Starting event processor")
-		
+
 		while True:
 			try:
 				if self.event_queue:
 					event = self.event_queue.pop(0)
 					await self._process_event(event)
-				
+
 				await asyncio.sleep(1)  # Process events every second
-				
+
 			except Exception as e:
 				print(f"❌ Event processing error: {e}")
 				await asyncio.sleep(5)
-	
+
 	async def _process_event(self, event: IntegrationEvent):
 		"""Process a single event by sending to relevant integrations."""
 		relevant_integrations = []
-		
+
 		# Find integrations that should receive this event
 		for integration in self.integrations.values():
-			if (integration.enabled and 
+			if (integration.enabled and
 				event.event_type in integration.event_filters):
 				relevant_integrations.append(integration)
-		
+
 		if not relevant_integrations:
 			return
-		
+
 		# Send to integrations
 		send_tasks = []
 		for integration in relevant_integrations:
 			if await self._check_rate_limit(integration.integration_id):
 				task = self._send_to_integration(integration, event)
 				send_tasks.append(task)
-		
+
 		if send_tasks:
 			await asyncio.gather(*send_tasks, return_exceptions=True)
-	
+
 	async def _send_to_integration(
 		self,
 		integration: IntegrationConfig,
@@ -276,19 +313,19 @@ class EnterpriseIntegrationManager:
 			if integration.platform in self.connectors:
 				connector = self.connectors[integration.platform]
 				await connector.send_event(integration, event)
-				
+
 				integration.last_used = datetime.now(timezone.utc)
 				print(f"✅ Sent event to {integration.name}: {event.event_type.value}")
 			else:
 				print(f"⚠️ No connector for platform: {integration.platform}")
-		
+
 		except Exception as e:
 			print(f"❌ Failed to send event to {integration.name}: {e}")
-			
+
 			# Retry logic
 			if integration.retry_config.get("max_retries", 0) > 0:
 				await self._retry_send(integration, event, 1)
-	
+
 	async def _retry_send(
 		self,
 		integration: IntegrationConfig,
@@ -297,17 +334,17 @@ class EnterpriseIntegrationManager:
 	):
 		"""Retry sending event to integration."""
 		max_retries = integration.retry_config.get("max_retries", 3)
-		
+
 		if attempt > max_retries:
 			print(f"❌ Max retries exceeded for {integration.name}")
 			return
-		
+
 		delay = integration.retry_config.get("retry_delay_seconds", 5)
 		if integration.retry_config.get("exponential_backoff", False):
 			delay = delay * (2 ** (attempt - 1))
-		
+
 		await asyncio.sleep(delay)
-		
+
 		try:
 			connector = self.connectors[integration.platform]
 			await connector.send_event(integration, event)
@@ -315,30 +352,30 @@ class EnterpriseIntegrationManager:
 		except Exception as e:
 			print(f"❌ Retry {attempt} failed for {integration.name}: {e}")
 			await self._retry_send(integration, event, attempt + 1)
-	
+
 	async def _check_rate_limit(self, integration_id: str) -> bool:
 		"""Check if integration is within rate limits."""
 		if integration_id not in self.integrations:
 			return False
-		
+
 		integration = self.integrations[integration_id]
 		now = datetime.now(timezone.utc)
-		
+
 		# Initialize rate limit tracking
 		if integration_id not in self.rate_limits:
 			self.rate_limits[integration_id] = []
-		
+
 		# Clean old timestamps (older than 1 minute)
 		minute_ago = now - timedelta(minutes=1)
 		self.rate_limits[integration_id] = [
 			ts for ts in self.rate_limits[integration_id] if ts > minute_ago
 		]
-		
+
 		# Check if under rate limit
 		if len(self.rate_limits[integration_id]) < integration.rate_limit_per_minute:
 			self.rate_limits[integration_id].append(now)
 			return True
-		
+
 		return False
 
 
@@ -346,15 +383,32 @@ class EnterpriseIntegrationManager:
 
 class BaseConnector:
 	"""Base class for enterprise connectors."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
-		"""Send event to the platform. Override in subclasses."""
-		raise NotImplementedError
-	
+		"""Send a generic webhook event for custom/simple integrations."""
+		webhook_url = integration.config.get("webhook_url") or integration.webhook_url
+		if not webhook_url:
+			raise ValueError(f"{integration.platform} webhook_url not configured")
+
+		payload = {
+			"event_id": event.event_id,
+			"event_type": self._event_type_value(event),
+			"severity": self._severity_value(event),
+			"source": event.source,
+			"timestamp": event.timestamp.isoformat(),
+			"message": event.message,
+			"data": event.data,
+			"metadata": event.metadata,
+		}
+
+		async with httpx.AsyncClient(timeout=30.0) as client:
+			response = await client.post(webhook_url, json=payload)
+			response.raise_for_status()
+
 	async def validate_config(self, config: Dict[str, Any]) -> bool:
 		"""Validate integration configuration. Override in subclasses."""
 		return True
-	
+
 	def _format_message(self, event: IntegrationEvent) -> str:
 		"""Format event as human-readable message."""
 		severity_emoji = {
@@ -363,34 +417,44 @@ class BaseConnector:
 			"high": "🚨",
 			"critical": "🔥"
 		}
-		
-		emoji = severity_emoji.get(event.severity, "📢")
-		
-		message = f"{emoji} **{event.event_type.value.replace('_', ' ').title()}**\n"
+
+		severity = self._severity_value(event)
+		emoji = severity_emoji.get(severity, "📢")
+
+		message = f"{emoji} **{self._get_event_title(event)}**\n"
 		message += f"**Source:** {event.source}\n"
 		message += f"**Time:** {event.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
-		message += f"**Severity:** {event.severity.upper()}\n"
-		
+		message += f"**Severity:** {severity.upper()}\n"
+
 		if event.data:
 			message += "\n**Details:**\n"
 			for key, value in event.data.items():
 				message += f"• {key.replace('_', ' ').title()}: {value}\n"
-		
+
 		return message
+
+	def _event_type_value(self, event: IntegrationEvent) -> str:
+		return event.event_type.value if isinstance(event.event_type, EventType) else str(event.event_type)
+
+	def _severity_value(self, event: IntegrationEvent) -> str:
+		return event.severity.value if isinstance(event.severity, EventSeverity) else str(event.severity)
+
+	def _get_event_title(self, event: IntegrationEvent) -> str:
+		return self._event_type_value(event).replace("_", " ").title()
 
 
 class SlackConnector(BaseConnector):
 	"""Slack integration connector."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Send event to Slack."""
 		webhook_url = integration.config.get("webhook_url")
 		if not webhook_url:
 			raise ValueError("Slack webhook_url not configured")
-		
+
 		# Format message for Slack
 		message = self._format_slack_message(event)
-		
+
 		# Send to Slack
 		async with httpx.AsyncClient() as client:
 			response = await client.post(
@@ -399,16 +463,16 @@ class SlackConnector(BaseConnector):
 				timeout=30.0
 			)
 			response.raise_for_status()
-	
+
 	def _format_slack_message(self, event: IntegrationEvent) -> Dict[str, Any]:
 		"""Format event as Slack message."""
 		color_map = {
 			"low": "#36a64f",
-			"medium": "#ff9500", 
+			"medium": "#ff9500",
 			"high": "#ff0000",
 			"critical": "#8B0000"
 		}
-		
+
 		attachment = {
 			"color": color_map.get(event.severity, "#36a64f"),
 			"title": f"{event.event_type.value.replace('_', ' ').title()}",
@@ -428,7 +492,7 @@ class SlackConnector(BaseConnector):
 			"footer": "APG Central Configuration",
 			"ts": int(event.timestamp.timestamp())
 		}
-		
+
 		# Add event data as fields
 		for key, value in event.data.items():
 			attachment["fields"].append({
@@ -436,33 +500,33 @@ class SlackConnector(BaseConnector):
 				"value": str(value),
 				"short": len(str(value)) < 50
 			})
-		
+
 		return {"attachments": [attachment]}
-	
+
 	async def validate_config(self, config: Dict[str, Any]) -> bool:
 		"""Validate Slack configuration."""
 		if "webhook_url" not in config:
 			raise ValueError("Slack webhook_url is required")
-		
+
 		webhook_url = config["webhook_url"]
 		if not webhook_url.startswith("https://hooks.slack.com/"):
 			raise ValueError("Invalid Slack webhook URL")
-		
+
 		return True
 
 
 class MicrosoftTeamsConnector(BaseConnector):
 	"""Microsoft Teams integration connector."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Send event to Microsoft Teams."""
 		webhook_url = integration.config.get("webhook_url")
 		if not webhook_url:
 			raise ValueError("Teams webhook_url not configured")
-		
+
 		# Format message for Teams
 		message = self._format_teams_message(event)
-		
+
 		# Send to Teams
 		async with httpx.AsyncClient() as client:
 			response = await client.post(
@@ -471,29 +535,29 @@ class MicrosoftTeamsConnector(BaseConnector):
 				timeout=30.0
 			)
 			response.raise_for_status()
-	
+
 	def _format_teams_message(self, event: IntegrationEvent) -> Dict[str, Any]:
 		"""Format event as Teams message card."""
 		color_map = {
 			"low": "Good",
 			"medium": "Warning",
-			"high": "Attention", 
+			"high": "Attention",
 			"critical": "Attention"
 		}
-		
+
 		facts = [
 			{"name": "Source", "value": event.source},
 			{"name": "Severity", "value": event.severity.upper()},
 			{"name": "Time", "value": event.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}
 		]
-		
+
 		# Add event data as facts
 		for key, value in event.data.items():
 			facts.append({
 				"name": key.replace('_', ' ').title(),
 				"value": str(value)
 			})
-		
+
 		return {
 			"@type": "MessageCard",
 			"@context": "https://schema.org/extensions",
@@ -509,21 +573,21 @@ class MicrosoftTeamsConnector(BaseConnector):
 
 class JiraConnector(BaseConnector):
 	"""JIRA integration connector."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Send event to JIRA (create ticket for high/critical events)."""
 		# Only create tickets for high/critical severity events
 		if event.severity not in ["high", "critical"]:
 			return
-		
+
 		base_url = integration.config.get("base_url")
 		username = integration.config.get("username")
 		api_token = integration.config.get("api_token")
 		project_key = integration.config.get("project_key")
-		
+
 		if not all([base_url, username, api_token, project_key]):
 			raise ValueError("JIRA configuration incomplete")
-		
+
 		# Create JIRA ticket
 		ticket_data = {
 			"fields": {
@@ -535,10 +599,10 @@ class JiraConnector(BaseConnector):
 				"labels": ["apg-central-config", f"severity-{event.severity}"]
 			}
 		}
-		
+
 		auth = (username, api_token)
 		url = f"{base_url}/rest/api/2/issue"
-		
+
 		async with httpx.AsyncClient() as client:
 			response = await client.post(
 				url,
@@ -551,16 +615,16 @@ class JiraConnector(BaseConnector):
 
 class ServiceNowConnector(BaseConnector):
 	"""ServiceNow integration connector."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Send event to ServiceNow."""
 		base_url = integration.config.get("base_url")
-		username = integration.config.get("username") 
+		username = integration.config.get("username")
 		password = integration.config.get("password")
-		
+
 		if not all([base_url, username, password]):
 			raise ValueError("ServiceNow configuration incomplete")
-		
+
 		# Create incident for high/critical events
 		if event.severity in ["high", "critical"]:
 			incident_data = {
@@ -572,10 +636,10 @@ class ServiceNowConnector(BaseConnector):
 				"subcategory": "Configuration Management",
 				"caller_id": username
 			}
-			
+
 			auth = (username, password)
 			url = f"{base_url}/api/now/table/incident"
-			
+
 			async with httpx.AsyncClient() as client:
 				response = await client.post(
 					url,
@@ -588,13 +652,13 @@ class ServiceNowConnector(BaseConnector):
 
 class DatadogConnector(BaseConnector):
 	"""Datadog integration connector."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Send event to Datadog."""
 		api_key = integration.config.get("api_key")
 		if not api_key:
 			raise ValueError("Datadog API key not configured")
-		
+
 		# Send as Datadog event
 		event_data = {
 			"title": f"APG Config: {event.event_type.value.replace('_', ' ').title()}",
@@ -608,10 +672,10 @@ class DatadogConnector(BaseConnector):
 			],
 			"alert_type": "info" if event.severity == "low" else "warning" if event.severity == "medium" else "error"
 		}
-		
+
 		headers = {"DD-API-KEY": api_key}
 		url = "https://api.datadoghq.com/api/v1/events"
-		
+
 		async with httpx.AsyncClient() as client:
 			response = await client.post(
 				url,
@@ -626,13 +690,13 @@ class DatadogConnector(BaseConnector):
 
 class DiscordConnector(BaseConnector):
 	"""Complete Discord webhook integration."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Send event to Discord webhook with rich embeds."""
 		webhook_url = integration.config.get("webhook_url")
 		if not webhook_url:
 			raise ValueError("Discord webhook_url not configured")
-		
+
 		# Create Discord embed
 		embed = {
 			"title": self._get_event_title(event),
@@ -646,7 +710,7 @@ class DiscordConnector(BaseConnector):
 			],
 			"footer": {"text": "APG Central Configuration"}
 		}
-		
+
 		if event.metadata:
 			for key, value in event.metadata.items():
 				if len(embed["fields"]) < 25:  # Discord limit
@@ -655,13 +719,13 @@ class DiscordConnector(BaseConnector):
 						"value": str(value)[:1024],  # Discord field value limit
 						"inline": True
 					})
-		
+
 		payload = {
 			"embeds": [embed],
 			"username": "APG Central Config",
 			"avatar_url": integration.config.get("avatar_url", "")
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				webhook_url,
@@ -669,7 +733,7 @@ class DiscordConnector(BaseConnector):
 				headers={"Content-Type": "application/json"}
 			)
 			response.raise_for_status()
-	
+
 	def _get_discord_color(self, severity: EventSeverity) -> int:
 		"""Get Discord embed color based on severity."""
 		color_map = {
@@ -683,20 +747,20 @@ class DiscordConnector(BaseConnector):
 
 class ZendeskConnector(BaseConnector):
 	"""Complete Zendesk ticket integration."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Create Zendesk ticket for critical events."""
 		base_url = integration.config.get("base_url")
 		email = integration.config.get("email")
 		api_token = integration.config.get("api_token")
-		
+
 		if not all([base_url, email, api_token]):
 			raise ValueError("Zendesk base_url, email, and api_token required")
-		
+
 		# Only create tickets for warnings and above
 		if event.severity not in [EventSeverity.WARNING, EventSeverity.ERROR, EventSeverity.CRITICAL]:
 			return
-		
+
 		# Create ticket payload
 		ticket_data = {
 			"ticket": {
@@ -707,17 +771,17 @@ class ZendeskConnector(BaseConnector):
 				"status": "new",
 				"tags": ["apg", "central-config", event.event_type.lower()],
 				"custom_fields": [
-					{"id": integration.config.get("severity_field_id", 123456), 
+					{"id": integration.config.get("severity_field_id", 123456),
 					 "value": event.severity.value},
-					{"id": integration.config.get("source_field_id", 123457), 
+					{"id": integration.config.get("source_field_id", 123457),
 					 "value": event.source_service}
 				]
 			}
 		}
-		
+
 		auth = httpx.BasicAuth(f"{email}/token", api_token)
 		url = f"{base_url}/api/v2/tickets.json"
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				url,
@@ -726,10 +790,10 @@ class ZendeskConnector(BaseConnector):
 				headers={"Content-Type": "application/json"}
 			)
 			response.raise_for_status()
-			
+
 		ticket_info = response.json()
 		event.metadata["zendesk_ticket_id"] = ticket_info["ticket"]["id"]
-	
+
 	def _format_zendesk_description(self, event: IntegrationEvent) -> str:
 		"""Format event details for Zendesk ticket description."""
 		description = f"""
@@ -744,14 +808,14 @@ Event Details:
 Message:
 {event.message}
 """
-		
+
 		if event.metadata:
 			description += "\n\nAdditional Information:\n"
 			for key, value in event.metadata.items():
 				description += f"- {key}: {value}\n"
-		
+
 		return description.strip()
-	
+
 	def _get_zendesk_priority(self, severity: EventSeverity) -> str:
 		"""Map event severity to Zendesk priority."""
 		priority_map = {
@@ -765,15 +829,15 @@ Message:
 
 class NewRelicConnector(BaseConnector):
 	"""Complete New Relic custom events integration."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Send custom event to New Relic Insights."""
 		account_id = integration.config.get("account_id")
 		insert_key = integration.config.get("insert_key")
-		
+
 		if not all([account_id, insert_key]):
 			raise ValueError("New Relic account_id and insert_key required")
-		
+
 		# Create New Relic event
 		nr_event = {
 			"eventType": "APGConfigurationEvent",
@@ -784,7 +848,7 @@ class NewRelicConnector(BaseConnector):
 			"message": event.message[:4000],  # New Relic limit
 			"apgVersion": "1.0.0"
 		}
-		
+
 		# Add metadata as custom attributes
 		if event.metadata:
 			for key, value in event.metadata.items():
@@ -792,13 +856,13 @@ class NewRelicConnector(BaseConnector):
 				clean_key = re.sub(r'[^a-zA-Z0-9_]', '_', str(key))
 				if len(clean_key) <= 255:  # New Relic limit
 					nr_event[clean_key] = str(value)[:4000]
-		
+
 		url = f"https://insights-collector.newrelic.com/v1/accounts/{account_id}/events"
 		headers = {
 			"Content-Type": "application/json",
 			"X-Insert-Key": insert_key
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				url,
@@ -810,16 +874,16 @@ class NewRelicConnector(BaseConnector):
 
 class SplunkConnector(BaseConnector):
 	"""Complete Splunk HEC (HTTP Event Collector) integration."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Send event to Splunk via HTTP Event Collector."""
 		hec_url = integration.config.get("hec_url")
 		hec_token = integration.config.get("hec_token")
 		index = integration.config.get("index", "main")
-		
+
 		if not all([hec_url, hec_token]):
 			raise ValueError("Splunk hec_url and hec_token required")
-		
+
 		# Create Splunk event
 		splunk_event = {
 			"time": int(event.timestamp.timestamp()),
@@ -836,12 +900,12 @@ class SplunkConnector(BaseConnector):
 				"metadata": event.metadata or {}
 			}
 		}
-		
+
 		headers = {
 			"Authorization": f"Splunk {hec_token}",
 			"Content-Type": "application/json"
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"{hec_url}/services/collector/event",
@@ -853,22 +917,22 @@ class SplunkConnector(BaseConnector):
 
 class JenkinsConnector(BaseConnector):
 	"""Complete Jenkins build trigger integration."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Trigger Jenkins build for deployment events."""
 		jenkins_url = integration.config.get("jenkins_url")
 		username = integration.config.get("username")
 		api_token = integration.config.get("api_token")
 		job_name = integration.config.get("job_name")
-		
+
 		if not all([jenkins_url, username, api_token, job_name]):
 			raise ValueError("Jenkins jenkins_url, username, api_token, and job_name required")
-		
+
 		# Only trigger builds for specific event types
 		trigger_events = integration.config.get("trigger_events", ["configuration_deployed", "configuration_updated"])
 		if event.event_type not in trigger_events:
 			return
-		
+
 		# Build parameters
 		parameters = {
 			"APG_EVENT_TYPE": event.event_type,
@@ -877,17 +941,17 @@ class JenkinsConnector(BaseConnector):
 			"APG_MESSAGE": event.message,
 			"APG_TIMESTAMP": event.timestamp.isoformat()
 		}
-		
+
 		# Add metadata as build parameters
 		if event.metadata:
 			for key, value in event.metadata.items():
 				param_key = f"APG_{str(key).upper().replace(' ', '_')}"
 				parameters[param_key] = str(value)
-		
+
 		# Build Jenkins URL
 		auth = httpx.BasicAuth(username, api_token)
 		build_url = f"{jenkins_url}/job/{job_name}/buildWithParameters"
-		
+
 		async with httpx.AsyncClient(timeout=60.0) as client:
 			response = await client.post(
 				build_url,
@@ -895,7 +959,7 @@ class JenkinsConnector(BaseConnector):
 				auth=auth
 			)
 			response.raise_for_status()
-			
+
 		# Get queue item location from response
 		if "Location" in response.headers:
 			event.metadata["jenkins_queue_url"] = response.headers["Location"]
@@ -903,29 +967,29 @@ class JenkinsConnector(BaseConnector):
 
 class GitHubConnector(BaseConnector):
 	"""Complete GitHub API integration for issues and deployments."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Create GitHub issue or deployment status."""
 		token = integration.config.get("token")
 		repository = integration.config.get("repository")  # Format: owner/repo
-		
+
 		if not all([token, repository]):
 			raise ValueError("GitHub token and repository required")
-		
+
 		headers = {
 			"Authorization": f"token {token}",
 			"Accept": "application/vnd.github.v3+json",
 			"Content-Type": "application/json"
 		}
-		
+
 		base_url = f"https://api.github.com/repos/{repository}"
-		
+
 		# Handle different event types
 		if event.event_type in ["security_alert", "critical_error"] and event.severity in [EventSeverity.ERROR, EventSeverity.CRITICAL]:
 			await self._create_github_issue(base_url, headers, event)
 		elif event.event_type in ["configuration_deployed", "deployment_started"]:
 			await self._create_deployment_status(base_url, headers, event)
-	
+
 	async def _create_github_issue(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Create GitHub issue for critical events."""
 		issue_data = {
@@ -934,7 +998,7 @@ class GitHubConnector(BaseConnector):
 			"labels": ["apg", "alert", event.severity.value.lower()],
 			"assignees": []  # Could be configured per integration
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"{base_url}/issues",
@@ -942,30 +1006,30 @@ class GitHubConnector(BaseConnector):
 				headers=headers
 			)
 			response.raise_for_status()
-			
+
 		issue_info = response.json()
 		event.metadata["github_issue_number"] = issue_info["number"]
 		event.metadata["github_issue_url"] = issue_info["html_url"]
-	
+
 	async def _create_deployment_status(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Update GitHub deployment status."""
 		deployment_id = event.metadata.get("deployment_id")
 		if not deployment_id:
 			return  # No deployment to update
-		
+
 		state_map = {
 			"deployment_started": "in_progress",
 			"configuration_deployed": "success",
 			"deployment_failed": "failure"
 		}
-		
+
 		status_data = {
 			"state": state_map.get(event.event_type, "pending"),
 			"description": event.message[:140],  # GitHub limit
 			"environment": event.metadata.get("environment", "production"),
 			"auto_inactive": True
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"{base_url}/deployments/{deployment_id}/statuses",
@@ -973,7 +1037,7 @@ class GitHubConnector(BaseConnector):
 				headers=headers
 			)
 			response.raise_for_status()
-	
+
 	def _format_github_issue_body(self, event: IntegrationEvent) -> str:
 		"""Format event details for GitHub issue body."""
 		body = f"""
@@ -988,39 +1052,39 @@ class GitHubConnector(BaseConnector):
 **Message:**
 {event.message}
 """
-		
+
 		if event.metadata:
 			body += "\n\n**Additional Information:**\n"
 			for key, value in event.metadata.items():
 				body += f"- **{key}:** {value}\n"
-		
+
 		body += "\n\n---\n*This issue was created automatically by APG Central Configuration*"
 		return body.strip()
 
 
 class GitLabConnector(BaseConnector):
 	"""Complete GitLab API integration for issues and merge requests."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Create GitLab issue or update merge request."""
 		token = integration.config.get("token")
 		project_id = integration.config.get("project_id")
 		gitlab_url = integration.config.get("gitlab_url", "https://gitlab.com")
-		
+
 		if not all([token, project_id]):
 			raise ValueError("GitLab token and project_id required")
-		
+
 		headers = {
 			"Authorization": f"Bearer {token}",
 			"Content-Type": "application/json"
 		}
-		
+
 		base_url = f"{gitlab_url}/api/v4/projects/{project_id}"
-		
+
 		# Create issue for critical events
 		if event.severity in [EventSeverity.ERROR, EventSeverity.CRITICAL]:
 			await self._create_gitlab_issue(base_url, headers, event)
-	
+
 	async def _create_gitlab_issue(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Create GitLab issue for critical events."""
 		issue_data = {
@@ -1029,7 +1093,7 @@ class GitLabConnector(BaseConnector):
 			"labels": f"apg,alert,{event.severity.value.lower()}",
 			"issue_type": "incident" if event.severity == EventSeverity.CRITICAL else "issue"
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"{base_url}/issues",
@@ -1037,11 +1101,11 @@ class GitLabConnector(BaseConnector):
 				headers=headers
 			)
 			response.raise_for_status()
-			
+
 		issue_info = response.json()
 		event.metadata["gitlab_issue_iid"] = issue_info["iid"]
 		event.metadata["gitlab_issue_url"] = issue_info["web_url"]
-	
+
 	def _format_gitlab_issue_description(self, event: IntegrationEvent) -> str:
 		"""Format event details for GitLab issue description."""
 		description = f"""
@@ -1049,42 +1113,42 @@ class GitLabConnector(BaseConnector):
 
 **Event Details:**
 - **Type:** {event.event_type}
-- **Severity:** {event.severity.value}  
+- **Severity:** {event.severity.value}
 - **Source:** {event.source_service}
 - **Timestamp:** {event.timestamp.isoformat()}
 
 **Message:**
 {event.message}
 """
-		
+
 		if event.metadata:
 			description += "\n\n**Additional Information:**\n"
 			for key, value in event.metadata.items():
 				description += f"- **{key}:** {value}\n"
-		
+
 		description += "\n\n---\n*This issue was created automatically by APG Central Configuration*"
 		return description.strip()
 
 
 class OktaConnector(BaseConnector):
 	"""Complete Okta API integration for user and group management."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Handle Okta user/group management events."""
 		domain = integration.config.get("domain")
 		api_token = integration.config.get("api_token")
-		
+
 		if not all([domain, api_token]):
 			raise ValueError("Okta domain and api_token required")
-		
+
 		headers = {
 			"Authorization": f"SSWS {api_token}",
 			"Accept": "application/json",
 			"Content-Type": "application/json"
 		}
-		
+
 		base_url = f"https://{domain}/api/v1"
-		
+
 		# Handle user provisioning events
 		if event.event_type == "user_provisioning_required":
 			await self._provision_okta_user(base_url, headers, event)
@@ -1092,13 +1156,13 @@ class OktaConnector(BaseConnector):
 			await self._deprovision_okta_user(base_url, headers, event)
 		elif event.event_type == "group_membership_update":
 			await self._update_group_membership(base_url, headers, event)
-	
+
 	async def _provision_okta_user(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Provision new user in Okta."""
 		user_data = event.metadata.get("user_data", {})
 		if not user_data:
 			return
-		
+
 		okta_user = {
 			"profile": {
 				"firstName": user_data.get("first_name"),
@@ -1114,7 +1178,7 @@ class OktaConnector(BaseConnector):
 				}
 			}
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"{base_url}/users",
@@ -1123,32 +1187,32 @@ class OktaConnector(BaseConnector):
 				params={"activate": "true"}
 			)
 			response.raise_for_status()
-			
+
 		user_info = response.json()
 		event.metadata["okta_user_id"] = user_info["id"]
-	
+
 	async def _deprovision_okta_user(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Deactivate user in Okta."""
 		user_id = event.metadata.get("okta_user_id")
 		if not user_id:
 			return
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"{base_url}/users/{user_id}/lifecycle/deactivate",
 				headers=headers
 			)
 			response.raise_for_status()
-	
+
 	async def _update_group_membership(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Update user group membership in Okta."""
 		user_id = event.metadata.get("okta_user_id")
 		group_id = event.metadata.get("okta_group_id")
 		action = event.metadata.get("action", "add")  # add or remove
-		
+
 		if not all([user_id, group_id]):
 			return
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			if action == "add":
 				response = await client.put(
@@ -1165,32 +1229,32 @@ class OktaConnector(BaseConnector):
 
 class Auth0Connector(BaseConnector):
 	"""Complete Auth0 Management API integration."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Handle Auth0 user management events."""
 		domain = integration.config.get("domain")
 		client_id = integration.config.get("client_id")
 		client_secret = integration.config.get("client_secret")
-		
+
 		if not all([domain, client_id, client_secret]):
 			raise ValueError("Auth0 domain, client_id, and client_secret required")
-		
+
 		# Get management API token
 		access_token = await self._get_auth0_token(domain, client_id, client_secret)
-		
+
 		headers = {
 			"Authorization": f"Bearer {access_token}",
 			"Content-Type": "application/json"
 		}
-		
+
 		base_url = f"https://{domain}/api/v2"
-		
+
 		# Handle user management events
 		if event.event_type == "user_provisioning_required":
 			await self._create_auth0_user(base_url, headers, event)
 		elif event.event_type == "user_role_update":
 			await self._update_user_roles(base_url, headers, event)
-	
+
 	async def _get_auth0_token(self, domain: str, client_id: str, client_secret: str) -> str:
 		"""Get Auth0 Management API access token."""
 		token_data = {
@@ -1199,7 +1263,7 @@ class Auth0Connector(BaseConnector):
 			"audience": f"https://{domain}/api/v2/",
 			"grant_type": "client_credentials"
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"https://{domain}/oauth/token",
@@ -1207,16 +1271,16 @@ class Auth0Connector(BaseConnector):
 				headers={"Content-Type": "application/json"}
 			)
 			response.raise_for_status()
-			
+
 		token_info = response.json()
 		return token_info["access_token"]
-	
+
 	async def _create_auth0_user(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Create user in Auth0."""
 		user_data = event.metadata.get("user_data", {})
 		if not user_data:
 			return
-		
+
 		auth0_user = {
 			"email": user_data.get("email"),
 			"username": user_data.get("username"),
@@ -1230,7 +1294,7 @@ class Auth0Connector(BaseConnector):
 				"created_by": "apg_provisioning"
 			}
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"{base_url}/users",
@@ -1238,20 +1302,20 @@ class Auth0Connector(BaseConnector):
 				headers=headers
 			)
 			response.raise_for_status()
-			
+
 		user_info = response.json()
 		event.metadata["auth0_user_id"] = user_info["user_id"]
-	
+
 	async def _update_user_roles(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Update user roles in Auth0."""
 		user_id = event.metadata.get("auth0_user_id")
 		roles = event.metadata.get("roles", [])
-		
+
 		if not user_id or not roles:
 			return
-		
+
 		role_data = {"roles": roles}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"{base_url}/users/{user_id}/roles",
@@ -1263,32 +1327,32 @@ class Auth0Connector(BaseConnector):
 
 class AzureADConnector(BaseConnector):
 	"""Complete Azure Active Directory Graph API integration."""
-	
+
 	async def send_event(self, integration: IntegrationConfig, event: IntegrationEvent):
 		"""Handle Azure AD user management events."""
 		tenant_id = integration.config.get("tenant_id")
 		client_id = integration.config.get("client_id")
 		client_secret = integration.config.get("client_secret")
-		
+
 		if not all([tenant_id, client_id, client_secret]):
 			raise ValueError("Azure AD tenant_id, client_id, and client_secret required")
-		
+
 		# Get access token
 		access_token = await self._get_azure_token(tenant_id, client_id, client_secret)
-		
+
 		headers = {
 			"Authorization": f"Bearer {access_token}",
 			"Content-Type": "application/json"
 		}
-		
+
 		base_url = "https://graph.microsoft.com/v1.0"
-		
+
 		# Handle user management events
 		if event.event_type == "user_provisioning_required":
 			await self._create_azure_user(base_url, headers, event)
 		elif event.event_type == "group_membership_update":
 			await self._update_group_membership_azure(base_url, headers, event)
-	
+
 	async def _get_azure_token(self, tenant_id: str, client_id: str, client_secret: str) -> str:
 		"""Get Azure AD access token."""
 		token_data = {
@@ -1297,7 +1361,7 @@ class AzureADConnector(BaseConnector):
 			"scope": "https://graph.microsoft.com/.default",
 			"grant_type": "client_credentials"
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
@@ -1305,16 +1369,16 @@ class AzureADConnector(BaseConnector):
 				headers={"Content-Type": "application/x-www-form-urlencoded"}
 			)
 			response.raise_for_status()
-			
+
 		token_info = response.json()
 		return token_info["access_token"]
-	
+
 	async def _create_azure_user(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Create user in Azure AD."""
 		user_data = event.metadata.get("user_data", {})
 		if not user_data:
 			return
-		
+
 		azure_user = {
 			"accountEnabled": True,
 			"displayName": f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip(),
@@ -1329,7 +1393,7 @@ class AzureADConnector(BaseConnector):
 			"jobTitle": user_data.get("job_title", ""),
 			"department": user_data.get("department", "")
 		}
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				f"{base_url}/users",
@@ -1337,19 +1401,19 @@ class AzureADConnector(BaseConnector):
 				headers=headers
 			)
 			response.raise_for_status()
-			
+
 		user_info = response.json()
 		event.metadata["azure_user_id"] = user_info["id"]
-	
+
 	async def _update_group_membership_azure(self, base_url: str, headers: Dict[str, str], event: IntegrationEvent):
 		"""Update group membership in Azure AD."""
 		user_id = event.metadata.get("azure_user_id")
 		group_id = event.metadata.get("azure_group_id")
 		action = event.metadata.get("action", "add")
-		
+
 		if not all([user_id, group_id]):
 			return
-		
+
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			if action == "add":
 				member_data = {
