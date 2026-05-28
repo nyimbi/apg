@@ -699,3 +699,38 @@ def test_generated_capability_i18n_rejects_unknown_language_codes():
         "InvalidLocalization unknown fallback language qq",
         "InvalidLocalization fallback language qq is not supported",
     ]
+
+
+def test_generated_app_cli_fails_when_validation_or_self_test_fails(tmp_path):
+    result = APGCompiler().compile_string(INVALID_I18N_SOURCE, "invalid_i18n.apg")
+    assert result.success is True
+
+    app_dir = tmp_path / "invalid_i18n_app"
+    app_dir.mkdir()
+    for filename, content in result.generated_files.items():
+        (app_dir / filename).write_text(content, encoding="utf-8")
+
+    validation = subprocess.run(
+        [sys.executable, "app.py", "--validate"],
+        cwd=app_dir,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    self_test = subprocess.run(
+        [sys.executable, "app.py", "--self-test"],
+        cwd=app_dir,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    validation_report = json.loads(validation.stdout)
+    self_test_report = json.loads(self_test.stdout)
+
+    assert validation.returncode == 1
+    assert validation_report["valid"] is False
+    assert "capability_i18n: InvalidLocalization unsupported language code zz" in validation_report["errors"]
+    assert self_test.returncode == 1
+    assert self_test_report["passed"] is False
+    assert self_test_report["checks"]["validation"]["valid"] is False

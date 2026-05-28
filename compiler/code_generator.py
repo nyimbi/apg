@@ -1567,11 +1567,13 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(describe_application(), indent=2, sort_keys=True))
         return
     if "--validate" in args:
-        print(json.dumps(validate_application(), indent=2, sort_keys=True))
-        return
+        report = validate_application()
+        print(json.dumps(report, indent=2, sort_keys=True))
+        raise SystemExit(0 if report["valid"] else 1)
     if "--self-test" in args:
-        print(json.dumps(self_test(), indent=2, sort_keys=True))
-        return
+        report = self_test()
+        print(json.dumps(report, indent=2, sort_keys=True))
+        raise SystemExit(0 if report["passed"] else 1)
     host = _arg_value(args, "--host", os.environ.get("APG_HOST") or os.environ.get("HOST") or "127.0.0.1")
     port = _arg_value(args, "--port", os.environ.get("APG_PORT") or os.environ.get("PORT") or "8080")
     run_server(host, port)

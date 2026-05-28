@@ -5739,3 +5739,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `3159279` (`Expose generated component manifests`) to `origin/main`.
+
+### 2026-05-28 07:57 EAT
+
+Completed checkpoint:
+
+- Fixed generated app CLI validation exit codes.
+- `python app.py --validate` now emits the validation JSON report and exits `1` when generated validation fails.
+- `python app.py --self-test` now emits the self-test JSON report and exits `1` when self-test fails.
+- This makes generated Docker `HEALTHCHECK` behavior meaningful because failed generated self-tests now fail the process.
+- Added focused regression coverage using a generated invalid-i18n app to verify failing `--validate` and `--self-test` exit codes while preserving JSON output.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 11 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated CLI health exit-code slice.
