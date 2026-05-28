@@ -8446,3 +8446,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q tests/test_fintech_gateway_subscription_analytics.py` passed with 2 tests.
 - `rg -n "Get subscription analytics \\(mock data for now\\)|For now, return mock data|This would query the database for real analytics|analytics = await self\\._get_subscription_analytics" capabilities/fintech/gateway/subscription_api.py tests/test_fintech_gateway_subscription_analytics.py` found no stale analytics mock/syntax text.
 - `git diff --check -- capabilities/fintech/gateway/subscription_api.py tests/test_fintech_gateway_subscription_analytics.py` passed.
+
+### 2026-05-29 01:44 EAT
+
+Executable COLB chat retrieval slice:
+
+- Made COLB importable in this checkout by adding a local SQLAlchemy mixin fallback when the APG auth/RBAC model base is unavailable and by falling back to a no-op WebSocket manager if WebRTC signaling configuration cannot initialize.
+- Replaced fabricated page-chat rows in `CollaborationService.get_chat_messages()` with runtime retrieval from `RTCPageCollaboration.chat_messages` and `RTCMessage` rows linked to the page's collaboration session.
+- Normalized stored JSON chat and ORM chat models into the existing public response shape, sorted by timestamp, and applied the requested limit after merging sources.
+- Added focused regression coverage with a fake async DB session for page chat, session chat, timestamp sorting, and limit behavior.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/colb/models.py capabilities/common/colb/service.py tests/test_common_colb_chat_messages.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_common_colb_chat_messages.py` passed with 2 tests.
+- `rg -n "For now, return mock data|In real implementation, would fetch from database|User 1|User 2|How can I help with this form" capabilities/common/colb/service.py tests/test_common_colb_chat_messages.py` found no stale COLB chat mock text.
+- `git diff --check -- capabilities/common/colb/models.py capabilities/common/colb/service.py tests/test_common_colb_chat_messages.py` passed.
