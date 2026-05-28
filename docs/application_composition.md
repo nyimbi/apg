@@ -47,3 +47,7 @@ Application screens are executable in the generated standard-library Python app.
 If an `app` declares `screens: {Home: {route: "/erp"}}`, `GET /erp` returns an
 HTML composition page. Plain `routes: ["/finance"]` entries are also indexed and
 rendered when no capability screen owns that route.
+
+The generated `/ui` page links application routes, capability screens,
+capabilities, AI agents, and AI agent teams so a composed app can be inspected
+from one browser entry point.

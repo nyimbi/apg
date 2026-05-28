@@ -1038,10 +1038,10 @@ app EnterpriseERPPlatform {
 
 The compiler emits `apg_application.py`, includes application composition
 metadata in generated manifests, exposes `GET /applications`, renders declared
-application screens/routes as HTML in generated apps, and validates local
-capability/agent references when the generated runtime catalogs are present. See
-[Application Composition](./application_composition.md) for the executable
-contract.
+application screens/routes as HTML in generated apps, links composed routes from
+`/ui`, and validates local capability/agent references when the generated
+runtime catalogs are present. See [Application Composition](./application_composition.md)
+for the executable contract.
 
 ### Screen Composition
 

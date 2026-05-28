@@ -1085,27 +1085,73 @@ def relationship_graph() -> Dict[str, Any]:
 
 
 def _ui_index_html() -> str:
-    links = "".join(
+    app = describe_application()
+    entity_links = "".join(
         f'<li><a href="/ui/entities/{{html.escape(entity["name"], quote=True)}}">'
         f'{{html.escape(entity["name"])}}</a> '
         f'<code>{{html.escape(entity["type"])}}</code></li>'
         for entity in ENTITIES
     )
-    if not links:
-        links = "<li>No APG entities declared.</li>"
+    if not entity_links:
+        entity_links = "<li>No APG entities declared.</li>"
+    application_route_links = "".join(
+        f'<li><a href="{{html.escape(route, quote=True)}}">{{html.escape(route)}}</a> '
+        f'<code>{{html.escape(str(screen.get("application", "application")))}}</code></li>'
+        for route, screen in sorted(app.get("application_routes", {{}}).items())
+    )
+    if not application_route_links:
+        application_route_links = "<li>No application routes declared.</li>"
+    capability_route_links = "".join(
+        f'<li><a href="{{html.escape(route, quote=True)}}">{{html.escape(route)}}</a> '
+        f'<code>{{html.escape(str(screen.get("capability", "capability")))}}</code></li>'
+        for route, screen in sorted(app.get("ui_routes", {{}}).items())
+    )
+    if not capability_route_links:
+        capability_route_links = "<li>No capability screens declared.</li>"
+    capability_links = "".join(
+        f'<li><a href="/capabilities">{{html.escape(name)}}</a></li>'
+        for name in app.get("capabilities", [])
+    )
+    if not capability_links:
+        capability_links = "<li>No capabilities declared.</li>"
+    agent_links = "".join(
+        f'<li><a href="/agents/{{html.escape(name, quote=True)}}/invoke">{{html.escape(name)}}</a></li>'
+        for name in app.get("ai_agents", [])
+    )
+    if not agent_links:
+        agent_links = "<li>No AI agents declared.</li>"
+    team_links = "".join(
+        f'<li><a href="/agent-teams/{{html.escape(name, quote=True)}}/invoke">{{html.escape(name)}}</a></li>'
+        for name in app.get("ai_agent_teams", [])
+    )
+    if not team_links:
+        team_links = "<li>No AI agent teams declared.</li>"
     body = (
         f"<h1>{{html.escape(MODULE_NAME)}}</h1>"
         f"<p>{{html.escape(MODULE_DESCRIPTION or 'Generated APG application')}}</p>"
         '<nav><a href="/manifest">Manifest JSON</a> | '
         '<a href="/component.json">Component JSON</a> | '
+        '<a href="/applications">Applications</a> | '
+        '<a href="/capabilities">Capabilities</a> | '
+        '<a href="/agents">Agents</a> | '
         '<a href="/events">Events</a> | '
         '<a href="/metrics">Metrics</a> | '
         '<a href="/self-test">Self-Test</a> | '
         '<a href="/records">Record JSON</a> | '
         '<a href="/relationships">Relationships</a> | '
         '<a href="/openapi.json">API Contract</a></nav>'
+        "<h2>Application Routes</h2>"
+        f"<ul>{{application_route_links}}</ul>"
+        "<h2>Capability Screens</h2>"
+        f"<ul>{{capability_route_links}}</ul>"
         "<h2>Entities</h2>"
-        f"<ul>{{links}}</ul>"
+        f"<ul>{{entity_links}}</ul>"
+        "<h2>Capabilities</h2>"
+        f"<ul>{{capability_links}}</ul>"
+        "<h2>AI Agents</h2>"
+        f"<ul>{{agent_links}}</ul>"
+        "<h2>AI Agent Teams</h2>"
+        f"<ul>{{team_links}}</ul>"
     )
     return _html_page(MODULE_NAME, body)
 

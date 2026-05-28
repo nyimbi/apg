@@ -121,6 +121,7 @@ def test_generated_app_manifest_includes_application_composition():
         applications_payload = app._route_payload("/applications")[1]
         app_screen = app._application_screen("/")
         app_screen_status, app_screen_html = app._application_screen_payload("/")
+        ui_status, ui_html = app._ui_payload("/ui")
         openapi = app.openapi_document()
     finally:
         sys.modules.pop("apg_application", None)
@@ -139,6 +140,11 @@ def test_generated_app_manifest_includes_application_composition():
     assert app_screen_status == 200
     assert "EnterpriseSuite" in app_screen_html
     assert "GeneralLedger" in app_screen_html
+    assert ui_status == 200
+    assert "Application Routes" in ui_html
+    assert 'href="/finance"' in ui_html
+    assert "Capabilities" in ui_html
+    assert "GeneralLedger" in ui_html
     assert "/" in openapi["paths"]
     assert "/finance" in openapi["paths"]
 

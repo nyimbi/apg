@@ -6068,3 +6068,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `6ddda9c` (`Render application composition routes`).
+
+### 2026-05-28 10:06 EAT
+
+Completed checkpoint:
+
+- Expanded the generated `/ui` index into a composition discovery surface.
+- `/ui` now links application routes, capability screens, capabilities, AI agents, and AI agent teams in generated dependency-free Python apps.
+- Added regression coverage proving generated app routes and capabilities are visible from `/ui`.
+- Regenerated numbered example outputs so checked-in generated apps include the new browser discovery surface.
+- Updated application-composition docs and language reference.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_application_composition_runtime.py tests/test_examples_parseable.py`
+- `.venv/bin/pytest tests/test_application_composition_runtime.py tests/test_code_generator_executable_defaults.py tests/test_capability_composition_runtime.py tests/test_examples_parseable.py -q` -> 23 passed
+- `.venv/bin/python -c '...'` py-compiled 77 generated Python files under `examples/[0-9][0-9]*/output/`
+- `git diff --check`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.
