@@ -7,6 +7,11 @@ Generated from first-class APG AI agent declarations.
 
 from __future__ import annotations
 
+import json
+import os
+import shlex
+import subprocess
+
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -159,25 +164,158 @@ def _invocation_input(payload: Optional[Dict[str, Any]]) -> Any:
     return dict(payload)
 
 
-def invoke_agent(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    agent = get_agent(name)
-    runtime = canonical_runtime(agent.runtime)
-    runtime_spec = dict(AI_AGENT_RUNTIME_DATA[runtime])
-    requires_adapter = runtime != "local"
+def _env_fragment(value: str) -> str:
+    return "".join(character if character.isalnum() else "_" for character in value.upper()).strip("_")
+
+
+def runtime_adapter_environment_keys(runtime: str, agent_name: Optional[str] = None) -> List[str]:
+    keys: List[str] = []
+    if agent_name:
+        keys.append(f"APG_AGENT_{_env_fragment(agent_name)}_COMMAND")
+    keys.extend([
+        f"APG_AGENT_RUNTIME_{_env_fragment(runtime)}_COMMAND",
+        f"APG_AGENT_{_env_fragment(runtime)}_COMMAND",
+        "APG_AGENT_RUNTIME_COMMAND",
+    ])
+    return keys
+
+
+def _coerce_command(value: Any) -> Optional[List[str]]:
+    if isinstance(value, list) and all(isinstance(item, str) and item for item in value):
+        return list(value)
+    if isinstance(value, str) and value.strip():
+        return shlex.split(value)
+    return None
+
+
+def _adapter_command(agent: AIAgentSpec, runtime: str) -> tuple[Optional[List[str]], Optional[str]]:
+    configured = (
+        agent.configuration.get("adapter_command")
+        or agent.configuration.get("runtime_command")
+        or agent.configuration.get("agent_command")
+    )
+    command = _coerce_command(configured)
+    if command:
+        return command, "agent.configuration"
+    for key in runtime_adapter_environment_keys(runtime, agent.name):
+        command = _coerce_command(os.environ.get(key))
+        if command:
+            return command, key
+    return None, None
+
+
+def _adapter_timeout(agent: AIAgentSpec) -> float:
+    configured = agent.configuration.get("adapter_timeout", agent.configuration.get("timeout"))
+    raw_value = os.environ.get("APG_AGENT_RUNTIME_TIMEOUT", configured)
+    try:
+        return float(raw_value)
+    except (TypeError, ValueError):
+        return 120.0
+
+
+def _agent_invocation_base(agent: AIAgentSpec, runtime: str, runtime_spec: Dict[str, Any], payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return {
         "agent": agent.name,
         "role": agent.role,
         "model": agent.model,
         "runtime": runtime,
-        "runtime_spec": runtime_spec,
-        "status": "adapter_required" if requires_adapter else "completed",
-        "mode": "planned" if requires_adapter else "local",
+        "runtime_spec": dict(runtime_spec),
         "input": _invocation_input(payload),
         "system": agent.system,
         "capabilities": list(agent.capabilities),
         "tools": list(agent.tools),
         "configuration": dict(agent.configuration),
         "handoffs": [dict(edge) for edge in agent.handoffs],
+    }
+
+
+def _external_invocation_envelope(agent: AIAgentSpec, runtime: str, runtime_spec: Dict[str, Any], payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    return {
+        "agent": describe_agent(agent.name),
+        "runtime": runtime,
+        "runtime_spec": dict(runtime_spec),
+        "input": _invocation_input(payload),
+        "payload": dict(payload) if isinstance(payload, dict) else {},
+    }
+
+
+def _run_external_agent(agent: AIAgentSpec, runtime: str, runtime_spec: Dict[str, Any], payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    command, command_source = _adapter_command(agent, runtime)
+    if not command:
+        return None
+    envelope = _external_invocation_envelope(agent, runtime, runtime_spec, payload)
+    try:
+        completed = subprocess.run(
+            command,
+            input=json.dumps(envelope, sort_keys=True),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_adapter_timeout(agent),
+            cwd=os.environ.get("APG_AGENT_WORKDIR") or None,
+        )
+    except FileNotFoundError as error:
+        return {
+            "status": "failed",
+            "mode": "external",
+            "output": {
+                "message": str(error),
+                "requires_adapter": False,
+                "adapter_command": command,
+                "adapter_source": command_source,
+                "error": "adapter_command_not_found",
+            },
+        }
+    except subprocess.TimeoutExpired as error:
+        return {
+            "status": "failed",
+            "mode": "external",
+            "output": {
+                "message": f"External runtime adapter timed out after {error.timeout} seconds.",
+                "requires_adapter": False,
+                "adapter_command": command,
+                "adapter_source": command_source,
+                "error": "adapter_timeout",
+            },
+        }
+    stdout = completed.stdout.strip()
+    stderr = completed.stderr.strip()
+    parsed_output: Any = None
+    if stdout:
+        try:
+            parsed_output = json.loads(stdout)
+        except json.JSONDecodeError:
+            parsed_output = stdout
+    return {
+        "status": "completed" if completed.returncode == 0 else "failed",
+        "mode": "external",
+        "output": {
+            "message": "External runtime adapter completed." if completed.returncode == 0 else "External runtime adapter failed.",
+            "requires_adapter": False,
+            "adapter_command": command,
+            "adapter_source": command_source,
+            "returncode": completed.returncode,
+            "stdout": stdout,
+            "stderr": stderr,
+            "parsed": parsed_output,
+        },
+    }
+
+
+def invoke_agent(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    agent = get_agent(name)
+    runtime = canonical_runtime(agent.runtime)
+    runtime_spec = dict(AI_AGENT_RUNTIME_DATA[runtime])
+    requires_adapter = runtime != "local"
+    base = _agent_invocation_base(agent, runtime, runtime_spec, payload)
+    if requires_adapter:
+        external = _run_external_agent(agent, runtime, runtime_spec, payload)
+        if external is not None:
+            base.update(external)
+            return base
+    base.update({
+        "status": "adapter_required" if requires_adapter else "completed",
+        "mode": "planned" if requires_adapter else "local",
         "output": {
             "message": (
                 f"{agent.name} is ready for a {runtime} adapter."
@@ -185,8 +323,10 @@ def invoke_agent(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[st
                 else f"{agent.name} handled the request locally."
             ),
             "requires_adapter": requires_adapter,
+            "adapter_environment_keys": runtime_adapter_environment_keys(runtime, agent.name) if requires_adapter else [],
         },
-    }
+    })
+    return base
 
 
 def invoke_team(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -195,9 +335,15 @@ def invoke_team(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str
         invoke_agent(agent_name, payload)
         for agent_name in team.agents
     ]
+    if any(item["status"] == "failed" for item in invocations):
+        status = "failed"
+    elif any(item["output"].get("requires_adapter") for item in invocations):
+        status = "planned"
+    else:
+        status = "completed"
     return {
         "team": team.name,
-        "status": "planned" if any(item["output"]["requires_adapter"] for item in invocations) else "completed",
+        "status": status,
         "policy": dict(team.policy),
         "configuration": dict(team.configuration),
         "flow": [dict(edge) for edge in team.flow],

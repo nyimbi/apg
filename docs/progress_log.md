@@ -7169,3 +7169,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile cli/compile_command.py tests/test_compiler_baseline.py`
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application -q` -> 1 passed
 - Deferred broader CLI tests at the user's request to conserve battery.
+
+### 2026-05-28 16:58 EAT
+
+Completed checkpoint:
+
+- Added dependency-free generated external AI-agent runtime adapters so non-local runtimes such as Codex, Claude Code, OpenCode, and Pi can execute through configured commands instead of only returning `adapter_required`.
+- Generated `ai_agents.py` now sends a structured JSON invocation envelope to configured adapter commands, captures stdout/stderr/return code, parses JSON stdout when present, and keeps offline `adapter_required` behavior when no command is configured.
+- Re-exported `runtime_adapter_environment_keys()` from generated packages, documented adapter configuration in `docs/ai_agent_composition.md`, and refreshed the numbered example outputs.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_ai_agent_composition.py::test_ai_agent_composition_generates_runtime_manifest tests/test_ai_agent_composition.py::test_ai_agent_external_runtime_adapter_executes_configured_command tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed
+- Deferred broader pytest at the user's request to conserve battery.

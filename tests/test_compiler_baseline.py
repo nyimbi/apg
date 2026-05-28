@@ -215,6 +215,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "validate_record" in module.__all__
 	assert "list_records" in module.__all__
 	assert "list_agents" in module.__all__
+	assert "runtime_adapter_environment_keys" in module.__all__
 
 
 def test_generated_python_app_serves_http_endpoints(tmp_path):

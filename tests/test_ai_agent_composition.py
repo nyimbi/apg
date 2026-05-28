@@ -3,6 +3,7 @@ First-class AI agent composition tests.
 """
 
 import json
+import shlex
 import sys
 import types
 
@@ -160,6 +161,43 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert crew_invocation["team"] == "SupportCrew"
     assert crew_invocation["status"] == "planned"
     assert [item["agent"] for item in crew_invocation["invocations"]] == ["Planner", "Writer"]
+
+
+def test_ai_agent_external_runtime_adapter_executes_configured_command(monkeypatch):
+    result = APGCompiler().compile_string(AI_AGENT_SOURCE, "support.apg")
+    assert result.success is True
+
+    code = (
+        "import json, sys; "
+        "envelope=json.load(sys.stdin); "
+        "print(json.dumps({"
+        "'agent': envelope['agent']['name'], "
+        "'runtime': envelope['runtime'], "
+        "'input': envelope['input']"
+        "}))"
+    )
+    monkeypatch.setenv("APG_AGENT_RUNTIME_CODEX_COMMAND", shlex.join([sys.executable, "-c", code]))
+
+    namespace = {}
+    exec(compile(result.generated_files["ai_agents.py"], "ai_agents.py", "exec"), namespace)
+
+    invocation = namespace["invoke_agent"]("Planner", {"input": {"ticket": "late order"}})
+    team_invocation = namespace["invoke_team"]("SupportCrew", {"input": {"ticket": "late order"}})
+
+    assert invocation["agent"] == "Planner"
+    assert invocation["runtime"] == "codex"
+    assert invocation["status"] == "completed"
+    assert invocation["mode"] == "external"
+    assert invocation["output"]["requires_adapter"] is False
+    assert invocation["output"]["returncode"] == 0
+    assert invocation["output"]["adapter_source"] == "APG_AGENT_RUNTIME_CODEX_COMMAND"
+    assert invocation["output"]["parsed"] == {
+        "agent": "Planner",
+        "runtime": "codex",
+        "input": {"ticket": "late order"},
+    }
+    assert team_invocation["status"] == "completed"
+    assert [item["status"] for item in team_invocation["invocations"]] == ["completed", "completed"]
 
 
 def test_ai_agent_runtime_catalog_supports_fast_moving_agent_tools():

@@ -50,6 +50,7 @@ try:
         list_agent_teams,
         list_agents,
         list_teams,
+        runtime_adapter_environment_keys,
         validate_agent_runtimes,
     )
 except ImportError:
@@ -64,6 +65,7 @@ else:
         "list_agent_teams",
         "list_agents",
         "list_teams",
+        "runtime_adapter_environment_keys",
         "validate_agent_runtimes",
     ])
 

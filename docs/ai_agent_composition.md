@@ -110,9 +110,10 @@ The file contains:
 - `get_agent(name)`, `get_team(name)`, and `describe_team(name)` helpers.
 - `AI_AGENT_RUNTIME_DATA`: dependency-free runtime catalog for generated apps.
 - `list_agent_runtimes()`, `canonical_runtime()`, `agents_by_runtime()`, and `validate_agent_runtimes()` helpers.
+- `runtime_adapter_environment_keys(runtime, agent_name)`: environment variable names the generated runtime checks for external adapter commands.
 - Per-agent and per-team `capabilities`, `configuration`, `rules`, `ui`, and `theme` metadata.
 
-The runtime manifest is dependency-free. Provider SDK wiring belongs in the selected AI capability integration, while `ai_agents.py` remains the stable contract between APG syntax and application code. Generated apps can still validate declared runtimes before deployment:
+The runtime manifest is dependency-free. Provider SDK wiring belongs in the selected AI capability integration, while `ai_agents.py` remains the stable contract between APG syntax and application code. Generated apps can validate declared runtimes before deployment:
 
 ```python
 from ai_agents import agents_by_runtime, validate_agent_runtimes
@@ -120,6 +121,38 @@ from ai_agents import agents_by_runtime, validate_agent_runtimes
 assert validate_agent_runtimes()["errors"] == []
 codex_agents = agents_by_runtime().get("codex", [])
 ```
+
+Generated apps can also execute non-local runtimes through a simple external adapter command. The adapter receives a JSON invocation envelope on stdin and should write either JSON or text to stdout. Configure it through agent configuration:
+
+```apg
+agent CodeReviewer {
+    role: "reviewer";
+    model: "openai:gpt-5.4";
+    runtime: codex;
+    system: "Review the current workspace.";
+    config: {
+        adapter_command: "codex exec --json";
+        adapter_timeout: 300;
+    };
+}
+```
+
+Or configure it at deployment time with environment variables:
+
+```bash
+export APG_AGENT_RUNTIME_CODEX_COMMAND='codex exec --json'
+export APG_AGENT_RUNTIME_CLAUDE_CODE_COMMAND='claude -p --output-format json'
+export APG_AGENT_RUNTIME_OPENCODE_COMMAND='opencode run --json'
+export APG_AGENT_RUNTIME_PI_COMMAND='pi-agent --json'
+```
+
+Agent-specific commands take precedence:
+
+```bash
+export APG_AGENT_CODEREVIEWER_COMMAND='codex exec --json'
+```
+
+If no adapter command is configured, non-local runtimes return `adapter_required` with the environment keys the generated app checked. This keeps generated applications executable in offline tests while allowing deployments to bind Codex, Claude Code, OpenCode, Pi, or a future tool without changing APG grammar.
 
 Generated dependency-free Python apps also expose browser consoles for declared
 agents and teams. Open `/ui`, choose an agent or team, enter a message plus an
