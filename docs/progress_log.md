@@ -5608,4 +5608,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push for the generated self-test slice.
+- Pushed commit `7e98101` (`Give generated apps a self-test contract`) to `origin/main`.
