@@ -171,6 +171,7 @@ class PythonCodeGenerator:
 		files = {
 			"app.py": self._generate_python_app(ast),
 			"__init__.py": self._generate_package_init(ast),
+			"README.md": self._generate_python_readme(ast),
 			"requirements.txt": self._generate_python_requirements(),
 		}
 		files.update(self._generate_ai_agent_files(ast))
@@ -1485,6 +1486,122 @@ if __name__ == "__main__":
 		return """# APG generated Python application requirements
 # The default compiler target uses only the Python standard library.
 """
+
+	def _generate_python_readme(self, module: ModuleDeclaration) -> str:
+		"""Generate a runbook for the dependency-free Python target."""
+		agents = [entity for entity in module.entities if isinstance(entity, AIAgentDeclaration)]
+		teams = [entity for entity in module.entities if isinstance(entity, AgentTeamDeclaration)]
+		capabilities = [entity for entity in module.entities if isinstance(entity, CapabilityDeclaration)]
+		entities = [
+			entity for entity in module.entities
+			if not isinstance(entity, (AIAgentDeclaration, AgentTeamDeclaration, CapabilityDeclaration))
+		]
+
+		lines = [
+			f"# {module.name}",
+			"",
+			"Dependency-free APG generated Python application.",
+			"",
+			"## Run",
+			"",
+			"```bash",
+			"python app.py",
+			"```",
+			"",
+			"## Verify",
+			"",
+			"```bash",
+			"python app.py --self-test",
+			"python app.py --describe",
+			"python app.py --validate",
+			"```",
+			"",
+			"## Core HTTP endpoints",
+			"",
+			"- `GET /health` - runtime health and validation summary",
+			"- `GET /self-test` - generated app smoke contract",
+			"- `GET /manifest` - application manifest",
+			"- `GET /openapi.json` - OpenAPI 3.1 contract",
+			"- `GET /metrics` - runtime metrics snapshot",
+			"- `GET /ui` - generated HTML application index",
+			"",
+			"## Data records",
+			"",
+			"- `GET /records` - all records grouped by entity",
+			"- `GET /entities/{Entity}/records` - query records for an entity",
+			"- `POST /entities/{Entity}/records` - create a record",
+			"- `PUT /entities/{Entity}/records/{id}` - update a record",
+			"- `DELETE /entities/{Entity}/records/{id}` - delete a record",
+			"- `GET /entities/{Entity}/records/export` - export records",
+			"- `POST /entities/{Entity}/records/import` - import records",
+			"",
+			"Set `APG_DATA_FILE=/path/to/data.json` to persist records to JSON.",
+			"Set `APG_API_KEY=<key>` to require an API key for mutations.",
+		]
+
+		if entities:
+			lines.extend(["", "## Entities", ""])
+			for entity in entities:
+				lines.append(f"- `{entity.name}`")
+
+		if agents:
+			lines.extend(["", "## AI agents", ""])
+			for agent in agents:
+				runtime = agent.runtime or "local"
+				lines.append(f"- `{agent.name}` - runtime `{runtime}`, invoke with `POST /agents/{agent.name}/invoke`")
+
+		if teams:
+			lines.extend(["", "## AI agent teams", ""])
+			for team in teams:
+				lines.append(f"- `{team.name}` - invoke with `POST /agent-teams/{team.name}/invoke`")
+
+		if capabilities:
+			lines.extend(["", "## Capabilities", ""])
+			for capability in capabilities:
+				provides = ", ".join(capability.provides) if capability.provides else "no declared services"
+				lines.append(f"- `{capability.name}` - provides {provides}")
+			lines.extend([
+				"",
+				"Capability operations:",
+				"",
+				"- `GET /capabilities` - capability catalog and dependency graph",
+				"- `POST /capabilities/{Capability}/rules/evaluate` - evaluate capability rules",
+				"- `POST /capabilities/{Capability}/configuration/resolve` - resolve configuration",
+				"- `POST /capabilities/{Capability}/configuration/validate` - validate configuration",
+				"- `POST /capabilities/{Capability}/approval/plan` - plan approvals",
+			])
+			screen_routes = self._capability_screen_routes(capabilities)
+			if screen_routes:
+				lines.extend(["", "Capability screens:", ""])
+				for route in screen_routes:
+					lines.append(f"- `GET {route}`")
+
+		lines.append("")
+		return "\n".join(lines)
+
+	def _capability_screen_routes(self, capabilities: List[CapabilityDeclaration]) -> List[str]:
+		"""Extract declared capability screen routes for generated documentation."""
+		routes: List[str] = []
+		for capability in capabilities:
+			ui_routes = capability.ui.get("routes", [])
+			if isinstance(ui_routes, list):
+				for route in ui_routes:
+					if isinstance(route, dict) and route.get("path"):
+						routes.append(str(route["path"]))
+			declared = capability.screens or capability.ui.get("screens", {})
+			if isinstance(declared, dict):
+				for screen in declared.values():
+					if isinstance(screen, dict):
+						route = screen.get("route") or screen.get("path")
+						if route:
+							routes.append(str(route))
+			elif isinstance(declared, list):
+				for screen in declared:
+					if isinstance(screen, dict):
+						route = screen.get("route") or screen.get("path")
+						if route:
+							routes.append(str(route))
+		return sorted(set(routes))
 
 	def _generate_python_entity_catalog_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Generate dependency-free entity metadata for hybrid template mode."""

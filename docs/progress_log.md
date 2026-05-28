@@ -5630,3 +5630,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `f45fdfb` (`Serve declared capability screens`) to `origin/main`.
+
+### 2026-05-28 07:37 EAT
+
+Completed checkpoint:
+
+- Added generated app `README.md` runbooks to the dependency-free Python target.
+- Generated READMEs now document run commands, `--self-test`, `--describe`, `--validate`, health, manifest, OpenAPI, metrics, UI, record CRUD/import/export, JSON persistence, and API-key mutation protection.
+- Generated READMEs now document AI agent invocation endpoints for declared agents and teams.
+- Generated READMEs now document capability catalog/rule/configuration/approval operations and declared capability screen routes.
+- Added focused regression coverage for generated README creation through direct compilation and CLI compilation, AI-agent invocation documentation, OpenAPI/self-test guidance, capability operation documentation, and capability screen route documentation.
+- Ran the root repository hygiene gate; tracked root docs/tests are already in expected locations.
+
+Battery-conscious verification:
+
+- `.venv/bin/pytest tests/test_repository_hygiene.py -q` -> 14 passed
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py -q` -> 26 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated README runbook slice.

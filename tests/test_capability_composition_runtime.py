@@ -190,6 +190,7 @@ def test_capability_declaration_generates_runtime_manifest():
     assert "apg_capabilities.py" in result.generated_files
 
     runtime = result.generated_files["apg_capabilities.py"]
+    readme = result.generated_files["README.md"]
     assert "CAPABILITIES" in runtime
     assert "CapabilitySpec" in runtime
     assert not re.search(r"^\s*pass\s*$", runtime, re.MULTILINE)
@@ -197,6 +198,9 @@ def test_capability_declaration_generates_runtime_manifest():
     assert "'erp_modules': ['finance', 'general_ledger', 'accounts_payable']" in runtime
     assert "'supported_languages': ['en', 'sw', 'ha', 'yo', 'zu']" in runtime
     assert "'processor': 'bytewax'" in runtime
+    assert "`GeneralLedger` - provides journal_entries, chart_of_accounts, financial_periods" in readme
+    assert "POST /capabilities/{Capability}/rules/evaluate" in readme
+    assert "GET /finance/gl/journals" in readme
 
     namespace = {}
     exec(compile(runtime, "apg_capabilities.py", "exec"), namespace)
