@@ -470,7 +470,7 @@ apg --version
 ### Basic Usage
 ```bash
 # Compile APG to executable Python artifacts
-apg compile myapp.apg --output ./generated
+apg compile myapp.apg --output ./generated --verify
 
 # Verify generated contracts and runtime surface
 python generated/app.py --self-test
@@ -487,7 +487,7 @@ mkdir my-project && cd my-project
 apg init
 
 # Edit main.apg, then compile
-apg compile main.apg --output generated
+apg compile main.apg --output generated --verify
 
 # Inspect generated app metadata and OpenAPI
 python generated/app.py --describe

@@ -7155,3 +7155,17 @@ Battery-conscious verification:
 
 - `rg -n "apg deploy|apg dev|python main.py|localhost:5000|PostgreSQL|Redis|workflow create|createdb|DATABASE_URL|REDIS_URL" docs/quickstart.md README.md` -> no stale quickstart/runtime hits
 - Deferred broader documentation link checks at the user's request to conserve battery.
+
+### 2026-05-28 16:51 EAT
+
+Completed checkpoint:
+
+- Added `apg compile --verify` so compilation can immediately run the generated application self-test and generated `smoke_test.py` after writing artifacts.
+- Updated the compiler baseline test to prove `--verify` succeeds for generated Python apps.
+- Updated README and quickstart commands to use the one-command compile-and-verify path.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile cli/compile_command.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application -q` -> 1 passed
+- Deferred broader CLI tests at the user's request to conserve battery.

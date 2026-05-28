@@ -24,7 +24,7 @@ The compiler target is `python`. Older framework-style targets such as `flask-ap
 Compile the smallest checked-in example:
 
 ```bash
-apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-customer-records
+apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-customer-records --verify
 ```
 
 The generated directory contains:
@@ -97,7 +97,7 @@ agent SupportPlanner {
 Compile and verify it:
 
 ```bash
-apg compile customer_ops.apg --output generated/customer_ops
+apg compile customer_ops.apg --output generated/customer_ops --verify
 python generated/customer_ops/app.py --self-test
 python generated/customer_ops/smoke_test.py
 ```

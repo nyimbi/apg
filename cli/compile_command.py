@@ -10,6 +10,7 @@ import sys
 import os
 import json
 import shutil
+import subprocess
 import time
 from pathlib import Path
 from typing import Optional, List
@@ -42,9 +43,10 @@ console = Console()
 @click.option('--no-runtime', is_flag=True, help='Skip runtime generation')
 @click.option('--tests', is_flag=True, help='Generate test files')
 @click.option('--docs', is_flag=True, help='Generate documentation')
+@click.option('--verify', is_flag=True, help='Run generated self-test and smoke test after compilation')
 def compile_cmd(source_file: Optional[str], output: Optional[str], target: str,
 			   generate_parser: bool, verbose: bool, watch: bool, 
-			   no_runtime: bool, tests: bool, docs: bool):
+			   no_runtime: bool, tests: bool, docs: bool, verify: bool):
 	"""Compile APG source files to Python artifacts."""
 	
 	if generate_parser:
@@ -103,7 +105,7 @@ def compile_cmd(source_file: Optional[str], output: Optional[str], target: str,
 	if watch:
 		_watch_and_compile(source_path, config)
 	else:
-		_compile_single(source_path, config, verbose)
+		_compile_single(source_path, config, verbose, verify)
 
 
 def _generate_parser():
@@ -171,7 +173,7 @@ def _strip_generated_parser_whitespace(output_dir: Path):
 		file_path.write_text(cleaned, encoding="utf-8")
 
 
-def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool):
+def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool, verify: bool = False):
 	"""Compile a single APG source file"""
 	
 	console.print(Panel(f"[bold blue]APG Compiler[/bold blue]", 
@@ -220,7 +222,11 @@ def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool):
 				_show_compilation_details(result, config)
 			
 			# Write generated files
-			_write_generated_files(result.generated_files, Path(config.output_directory))
+			output_dir = Path(config.output_directory)
+			_write_generated_files(result.generated_files, output_dir)
+
+			if verify and not _verify_generated_app(output_dir):
+				raise click.ClickException("Generated verification failed")
 			
 			console.print(f"\n[green]Next steps:[/green]")
 			console.print(f"  1. Inspect generated files in {config.output_directory}", soft_wrap=True)
@@ -228,6 +234,7 @@ def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool):
 			console.print(f"  3. python {config.output_directory}/app.py", soft_wrap=True)
 			console.print(f"  4. python {config.output_directory}/app.py --describe", soft_wrap=True)
 			console.print(f"  5. python {config.output_directory}/app.py --self-test", soft_wrap=True)
+			console.print(f"  6. apg compile {source_path} --output {config.output_directory} --verify", soft_wrap=True)
 			console.print("\n[green]The generated Python app starts a standard-library HTTP server. Use --self-test for a local health contract.[/green]")
 			
 		else:
@@ -314,6 +321,42 @@ def _write_generated_files(generated_files: dict, output_dir: Path):
 			f.write(content)
 		
 		console.print(f"  ✅ {filename}")
+
+
+def _verify_generated_app(output_dir: Path) -> bool:
+	"""Run generated app verification commands."""
+	app_path = output_dir / "app.py"
+	smoke_path = output_dir / "smoke_test.py"
+	if not app_path.exists():
+		console.print(f"[red]Generated app not found: {app_path}[/red]")
+		return False
+	if not smoke_path.exists():
+		console.print(f"[red]Generated smoke test not found: {smoke_path}[/red]")
+		return False
+
+	checks = [
+		("generated self-test", [sys.executable, "app.py", "--self-test"]),
+		("generated smoke test", [sys.executable, "smoke_test.py"]),
+	]
+	console.print("\n[blue]Verifying generated application...[/blue]")
+	for label, command in checks:
+		completed = subprocess.run(
+			command,
+			cwd=output_dir,
+			check=False,
+			capture_output=True,
+			text=True,
+		)
+		if completed.returncode != 0:
+			console.print(f"[red]❌ {label} failed[/red]")
+			if completed.stdout:
+				console.print(completed.stdout.rstrip())
+			if completed.stderr:
+				console.print(completed.stderr.rstrip())
+			return False
+		console.print(f"  ✅ {label}")
+	console.print("[green]Generated verification passed[/green]")
+	return True
 
 
 def _watch_and_compile(source_path: Path, config: CodeGenConfig):

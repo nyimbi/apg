@@ -1074,14 +1074,16 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	output = tmp_path / "generated"
 	source.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")
 
-	result = CliRunner().invoke(cli, ["compile", str(source), "--output", str(output), "--verbose"])
+	result = CliRunner().invoke(cli, ["compile", str(source), "--output", str(output), "--verbose", "--verify"])
 
 	assert result.exit_code == 0, result.output
 	assert "Compilation successful" in result.output
 	assert f"python {output}/app.py" in result.output
 	assert f"python {output}/app.py --describe" in result.output
 	assert f"python {output}/app.py --self-test" in result.output
+	assert f"apg compile {source} --output {output} --verify" in result.output
 	assert "standard-library HTTP server" in result.output
+	assert "Generated verification passed" in result.output
 	assert (output / "app.py").exists()
 	assert (output / "ai_agents.py").exists()
 	assert (output / "Dockerfile").exists()
@@ -1094,13 +1096,6 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	env_example = (output / ".env.example").read_text(encoding="utf-8")
 	readme = (output / "README.md").read_text(encoding="utf-8")
 	requirements = (output / "requirements.txt").read_text(encoding="utf-8")
-	smoke = subprocess.run(
-		[sys.executable, "smoke_test.py"],
-		cwd=output,
-		check=False,
-		capture_output=True,
-		text=True,
-	)
 	assert "APG Python Application" in app
 	assert "HTTPServer" in app
 	assert "HEALTHCHECK" in dockerfile
@@ -1111,8 +1106,6 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "Dockerfile" in readme
 	assert "GET /openapi.json" in readme
 	assert "Typed APG fields render as matching HTML controls" in readme
-	assert smoke.returncode == 0
-	assert json.loads(smoke.stdout)["passed"] is True
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in requirements
 	assert "standard library" in requirements
