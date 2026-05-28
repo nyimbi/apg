@@ -5045,3 +5045,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `4ebb918` (`Make generated Python packages importable`) to `origin/main`.
+
+### 2026-05-28 05:14 EAT
+
+Completed checkpoint:
+
+- Made generated AI-agent runtime descriptions serializable plain dictionaries.
+- Added `describe_agent()` for generated AI-agent metadata while keeping `get_agent()` and `get_team()` as typed dataclass accessors.
+- Updated `describe_team()` to include agent dictionaries, agent names, flow, policy, configuration, rules, UI, and theme without returning dataclass instances.
+- Added focused regression coverage proving `describe_team()` can round-trip through `json.dumps`/`json.loads`.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_ai_agent_composition.py`
+- `.venv/bin/pytest tests/test_ai_agent_composition.py -q` -> 5 passed
+- Direct serialization smoke check for generated `describe_team("SupportCrew")` -> JSON round-trip preserved agent name `Planner`
+- `git diff --check -- compiler/code_generator.py tests/test_ai_agent_composition.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push.

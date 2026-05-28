@@ -1259,6 +1259,27 @@ def get_team(name: str) -> AgentTeamSpec:
     return AI_AGENT_TEAMS[name]
 
 
+def describe_agent(name: str) -> Dict[str, Any]:
+    agent = get_agent(name)
+    return {{
+        "name": agent.name,
+        "role": agent.role,
+        "model": agent.model,
+        "runtime": agent.runtime,
+        "system": agent.system,
+        "capabilities": list(agent.capabilities),
+        "tools": list(agent.tools),
+        "memory": dict(agent.memory) if agent.memory else None,
+        "inputs": list(agent.inputs),
+        "outputs": list(agent.outputs),
+        "handoffs": [dict(edge) for edge in agent.handoffs],
+        "configuration": dict(agent.configuration),
+        "rules": [dict(rule) for rule in agent.rules],
+        "ui": dict(agent.ui),
+        "theme": dict(agent.theme),
+    }}
+
+
 def list_agents() -> List[str]:
     return sorted(AI_AGENTS)
 
@@ -1324,10 +1345,15 @@ def describe_team(name: str) -> Dict[str, Any]:
     team = get_team(name)
     return {{
         "name": team.name,
-        "agents": [AI_AGENTS[agent] for agent in team.agents],
-        "capabilities": team.capabilities,
-        "flow": team.flow,
-        "policy": team.policy,
+        "agents": [describe_agent(agent) for agent in team.agents],
+        "agent_names": list(team.agents),
+        "capabilities": list(team.capabilities),
+        "flow": [dict(edge) for edge in team.flow],
+        "policy": dict(team.policy),
+        "configuration": dict(team.configuration),
+        "rules": [dict(rule) for rule in team.rules],
+        "ui": dict(team.ui),
+        "theme": dict(team.theme),
     }}
 '''
 

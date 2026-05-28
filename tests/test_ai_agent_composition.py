@@ -2,6 +2,7 @@
 First-class AI agent composition tests.
 """
 
+import json
 import sys
 import types
 
@@ -134,7 +135,13 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert namespace["list_teams"]() == ["SupportCrew"]
     assert "codex" in namespace["list_agent_runtimes"]()
     assert namespace["canonical_runtime"]("claude") == "claude_code"
-    assert namespace["describe_team"]("SupportCrew")["capabilities"] == ["support_response"]
+    assert namespace["describe_agent"]("Planner")["runtime"] == "codex"
+    team_description = namespace["describe_team"]("SupportCrew")
+    assert team_description["capabilities"] == ["support_response"]
+    assert team_description["agent_names"] == ["Planner", "Writer"]
+    assert team_description["agents"][0]["name"] == "Planner"
+    assert team_description["configuration"] == {"handoff_mode": "sequential"}
+    assert json.loads(json.dumps(team_description))["name"] == "SupportCrew"
     assert namespace["agents_by_runtime"]()["codex"][0].name == "Planner"
     assert namespace["validate_agent_runtimes"]()["errors"] == []
     assert namespace["validate_agent_runtimes"](["local"])["errors"] == [
