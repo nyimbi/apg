@@ -477,6 +477,7 @@ def component_manifest() -> Dict[str, Any]:
                 ],
             }},
             "records": sorted(ENTITY_NAMES),
+            "theme": "/theme.css",
         }},
         "entities": list_entities(),
         "ai_agents": app.get("ai_agents", []),
@@ -640,6 +641,7 @@ def openapi_document() -> Dict[str, Any]:
         "/auth": {{"get": _api_operation("Authentication status", "Authentication mode")}},
         "/metrics": {{"get": _api_operation("Application metrics", "Runtime metrics")}},
         "/self-test": {{"get": _api_operation("Application self-test", "Self-test report")}},
+        "/theme.css": {{"get": _api_operation("Generated visual theme stylesheet", "CSS theme stylesheet")}},
         "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
         "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph")}},
         "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
@@ -800,6 +802,54 @@ def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
 
 
+def _css_name(value: str) -> str:
+    normalized = "".join(char.lower() if char.isalnum() else "-" for char in str(value))
+    normalized = "-".join(part for part in normalized.split("-") if part)
+    return normalized or "value"
+
+
+def theme_stylesheet() -> str:
+    lines = [
+        ":root {{",
+        "  --apg-accent: #126e82;",
+        "  --apg-surface: #ffffff;",
+        "  --apg-border: #d0d7de;",
+        "  --apg-text: #1f2328;",
+        "  --apg-muted: #59636e;",
+        "}}",
+    ]
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities") and hasattr(APG_CAPABILITIES, "capability_theme"):
+        for capability_name in APG_CAPABILITIES.list_capabilities():
+            try:
+                theme = APG_CAPABILITIES.capability_theme(capability_name)
+            except KeyError:
+                continue
+            theme_name = _css_name(str(theme.get("name") or capability_name))
+            tokens = theme.get("tokens", {{}})
+            if isinstance(tokens, dict):
+                for token_name, token_value in sorted(tokens.items()):
+                    css_var = f"--apg-theme-{{theme_name}}-{{_css_name(str(token_name))}}"
+                    lines.append(":root {{ " + css_var + ": " + str(token_value) + "; }}")
+                    if str(token_name).lower() in {{"accent", "primary", "brand"}}:
+                        lines.append(":root {{ --apg-accent: var(" + css_var + "); }}")
+    lines.extend([
+        "body {{ margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--apg-text); background: #f6f8fa; line-height: 1.5; }}",
+        "body > * {{ max-width: 1100px; margin-left: auto; margin-right: auto; }}",
+        "h1 {{ margin-top: 24px; color: var(--apg-text); }}",
+        "h2 {{ margin-top: 24px; color: var(--apg-text); }}",
+        "nav {{ margin: 16px auto; padding: 10px 0; border-bottom: 1px solid var(--apg-border); }}",
+        "a {{ color: var(--apg-accent); text-decoration: none; }}",
+        "a:hover {{ text-decoration: underline; }}",
+        "form {{ padding: 16px; background: var(--apg-surface); border: 1px solid var(--apg-border); border-radius: 8px; }}",
+        "label {{ display: block; margin: 8px 0; color: var(--apg-muted); }}",
+        "input {{ min-width: 280px; padding: 8px; border: 1px solid var(--apg-border); border-radius: 6px; }}",
+        "button {{ padding: 8px 12px; border: 1px solid var(--apg-accent); border-radius: 6px; background: var(--apg-accent); color: white; cursor: pointer; }}",
+        "pre {{ padding: 16px; overflow: auto; background: var(--apg-surface); border: 1px solid var(--apg-border); border-left: 4px solid var(--apg-accent); border-radius: 8px; }}",
+        "code {{ color: var(--apg-accent); }}",
+    ])
+    return "\\n".join(lines) + "\\n"
+
+
 def _html_page(title: str, body: str) -> str:
     safe_title = html.escape(title)
     return (
@@ -807,6 +857,7 @@ def _html_page(title: str, body: str) -> str:
         "<html><head>"
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<link rel="stylesheet" href="/theme.css">'
         f"<title>{{safe_title}}</title>"
         "</head><body>"
         f"{{body}}"
@@ -1483,7 +1534,11 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path, _, raw_query = self.path.partition("?")
         query = parse_qs(raw_query, keep_blank_values=True)
-        if path == "/ui" or path.startswith("/ui/"):
+        if path == "/theme.css":
+            body = theme_stylesheet().encode("utf-8")
+            status = 200
+            content_type = "text/css; charset=utf-8"
+        elif path == "/ui" or path.startswith("/ui/"):
             status, html_payload = _ui_payload(path)
             body = html_payload.encode("utf-8")
             content_type = "text/html; charset=utf-8"

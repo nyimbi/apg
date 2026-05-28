@@ -5780,3 +5780,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `a857bb3` (`Generate standalone app smoke tests`) to `origin/main`.
+
+### 2026-05-28 08:10 EAT
+
+Completed checkpoint:
+
+- Made generated capability visual themes executable in generated HTML apps.
+- Generated apps now serve `GET /theme.css`.
+- Generated HTML pages now link `/theme.css`.
+- Generated stylesheets convert capability theme tokens into CSS variables and apply accent tokens to generated UI controls, links, and data panels.
+- Generated OpenAPI contracts now advertise `/theme.css`.
+- Generated component manifests now identify `/theme.css` as the generated theme interface.
+- Added focused regression coverage for CSS content type, CSS variable generation from capability theme tokens, HTML stylesheet links, OpenAPI exposure, and component manifest theme metadata.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py -q` -> 28 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated visual theming slice.

@@ -382,6 +382,9 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 			events = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/metrics", timeout=1) as response:
 			metrics = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/theme.css", timeout=1) as response:
+			theme_content_type = response.headers["Content-Type"]
+			theme_css = response.read().decode("utf-8")
 	finally:
 		process.terminate()
 		try:
@@ -400,6 +403,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert created["event"]["record_id"] == 1
 	assert ui_content_type.startswith("text/html")
 	assert "/ui/entities/Customer" in ui_index
+	assert 'href="/theme.css"' in ui_index
 	assert "/component.json" in ui_index
 	assert "/events" in ui_index
 	assert "/metrics" in ui_index
@@ -416,6 +420,9 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert "/events" in openapi["paths"]
 	assert "/metrics" in openapi["paths"]
 	assert "/self-test" in openapi["paths"]
+	assert "/theme.css" in openapi["paths"]
+	assert theme_content_type.startswith("text/css")
+	assert "--apg-accent" in theme_css
 	assert "ApiKeyAuth" in openapi["components"]["securitySchemes"]
 	assert "/entities/Customer/records" in openapi["paths"]
 	assert "/entities/Customer/records/{id}" in openapi["paths"]
