@@ -402,6 +402,31 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
     return status
 
 
+def auth_status() -> Dict[str, Any]:
+    return {{
+        "mode": "api_key" if os.environ.get("APG_API_KEY") else "open",
+        "header": "Authorization: Bearer <key> or X-APG-API-Key" if os.environ.get("APG_API_KEY") else None,
+    }}
+
+
+def _authorized(headers: Any) -> bool:
+    required_key = os.environ.get("APG_API_KEY")
+    if not required_key:
+        return True
+    supplied_key = headers.get("X-APG-API-Key")
+    authorization = headers.get("Authorization", "")
+    if authorization.startswith("Bearer "):
+        supplied_key = authorization.removeprefix("Bearer ").strip()
+    return supplied_key == required_key
+
+
+def _auth_failure_payload() -> tuple[int, Dict[str, Any]]:
+    return 401, {{
+        "error": "unauthorized",
+        "message": "Set Authorization: Bearer <key> or X-APG-API-Key to mutate this APG app.",
+    }}
+
+
 def list_events(entity_name: str | None = None) -> list[Dict[str, Any]]:
     events = [dict(event) for event in EVENT_LOG]
     if entity_name is None:
@@ -476,6 +501,7 @@ def openapi_document() -> Dict[str, Any]:
         "/manifest": {{"get": _api_operation("Application manifest", "APG manifest")}},
         "/validate": {{"get": _api_operation("Application validation", "Validation report")}},
         "/events": {{"get": _api_operation("Record mutation events", "Event log")}},
+        "/auth": {{"get": _api_operation("Authentication status", "Authentication mode")}},
         "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
         "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph")}},
         "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
@@ -524,7 +550,13 @@ def openapi_document() -> Dict[str, Any]:
             "description": MODULE_DESCRIPTION,
         }},
         "paths": paths,
-        "components": {{"schemas": schemas}},
+        "components": {{
+            "schemas": schemas,
+            "securitySchemes": {{
+                "ApiKeyAuth": {{"type": "apiKey", "in": "header", "name": "X-APG-API-Key"}},
+                "BearerAuth": {{"type": "http", "scheme": "bearer"}},
+            }},
+        }},
     }}
 
 
@@ -865,6 +897,7 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
             "version": MODULE_VERSION,
             "valid": validation["valid"],
             "storage": storage_status(),
+            "auth": auth_status(),
             "warnings": validation["warnings"],
         }}
     if path == "/validate":
@@ -874,6 +907,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, openapi_document()
     if path == "/entities":
         return 200, {{"entities": list_entities()}}
+    if path == "/auth":
+        return 200, auth_status()
     if path == "/events":
         return 200, {{"events": list_events()}}
     if path == "/records" or path.startswith("/records/") or (
@@ -1139,6 +1174,21 @@ _load_record_store()
 
 
 class ApplicationRequestHandler(BaseHTTPRequestHandler):
+    def _send_json(self, status: int, response: Dict[str, Any]) -> None:
+        body = _json_bytes(response)
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _authorize_mutation(self) -> bool:
+        if _authorized(self.headers):
+            return True
+        status, response = _auth_failure_payload()
+        self._send_json(status, response)
+        return False
+
     def do_GET(self) -> None:
         path, _, raw_query = self.path.partition("?")
         query = parse_qs(raw_query, keep_blank_values=True)
@@ -1158,6 +1208,8 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
+        if not self._authorize_mutation():
+            return
         try:
             length = int(self.headers.get("Content-Length") or "0")
             raw_body = self.rfile.read(length) if length else b"{{}}"
@@ -1172,15 +1224,12 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
             status, response = _post_payload(path, payload)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
             status, response = 400, {{"error": "invalid_json", "message": str(error)}}
-        body = _json_bytes(response)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        self._send_json(status, response)
 
     def do_PUT(self) -> None:
         path = self.path.split("?", 1)[0]
+        if not self._authorize_mutation():
+            return
         try:
             length = int(self.headers.get("Content-Length") or "0")
             raw_body = self.rfile.read(length) if length else b"{{}}"
@@ -1190,22 +1239,14 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
             status, response = _put_payload(path, payload)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
             status, response = 400, {{"error": "invalid_json", "message": str(error)}}
-        body = _json_bytes(response)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        self._send_json(status, response)
 
     def do_DELETE(self) -> None:
         path = self.path.split("?", 1)[0]
+        if not self._authorize_mutation():
+            return
         status, response = _delete_record_payload(path)
-        body = _json_bytes(response)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        self._send_json(status, response)
 
     def log_message(self, format: str, *args: Any) -> None:
         if os.environ.get("APG_DEBUG") == "1":
@@ -2568,10 +2609,11 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import describe_application, list_entities, list_events, list_records, main, openapi_document, relationship_graph, storage_status, validate_application, validate_record',
+			'from .app import auth_status, describe_application, list_entities, list_events, list_records, main, openapi_document, relationship_graph, storage_status, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
+			'    "auth_status",',
 			'    "describe_application",',
 			'    "list_entities",',
 			'    "list_events",',

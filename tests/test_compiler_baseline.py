@@ -122,11 +122,13 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.list_records("Planner") == []
 	assert module.list_agents() == ["Planner"]
 	assert manifest["ai_agents"] == ["Planner"]
+	assert module.auth_status()["mode"] == "open"
 	assert module.openapi_document()["openapi"] == "3.1.0"
 	assert module.relationship_graph()["nodes"][0]["id"] == "Planner"
 	assert module.storage_status()["mode"] == "memory"
 	assert module.validate_record("Planner", {})["valid"] is True
 	assert module.validate_application()["valid"] is True
+	assert "auth_status" in module.__all__
 	assert "describe_application" in module.__all__
 	assert "list_events" in module.__all__
 	assert "openapi_document" in module.__all__
@@ -186,6 +188,7 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 			process.wait(timeout=2)
 
 	assert health["status"] == "ok"
+	assert health["auth"]["mode"] == "open"
 	assert manifest["name"] == "baseline"
 	assert agents["agents"]["Planner"]["runtime"] == "codex"
 	assert validation["valid"] is True
@@ -339,7 +342,9 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert openapi_content_type.startswith("application/json")
 	assert openapi["openapi"] == "3.1.0"
 	assert openapi["info"]["title"] == "customer_ops"
+	assert "/auth" in openapi["paths"]
 	assert "/events" in openapi["paths"]
+	assert "ApiKeyAuth" in openapi["components"]["securitySchemes"]
 	assert "/entities/Customer/records" in openapi["paths"]
 	assert "/entities/Customer/records/{id}" in openapi["paths"]
 	customer_schema = openapi["components"]["schemas"]["CustomerRecord"]
@@ -548,6 +553,87 @@ def test_generated_python_app_persists_records_with_data_file(tmp_path):
 	persisted = json.loads(data_file.read_text(encoding="utf-8"))
 	assert persisted["records"]["Customer"] == [created["record"], second_created["record"]]
 	assert [event["id"] for event in persisted["events"]] == [1, 2]
+
+
+def test_generated_python_app_can_require_api_key_for_mutations(tmp_path):
+	result = compile_apg_string(DATA_APP_SOURCE)
+	package_dir = tmp_path / "generated_secured_app"
+	package_dir.mkdir()
+	for filename, content in result.generated_files.items():
+		(package_dir / filename).write_text(content, encoding="utf-8")
+
+	with socket.socket() as sock:
+		sock.bind(("127.0.0.1", 0))
+		port = sock.getsockname()[1]
+
+	env = dict(os.environ, APG_API_KEY="secret-key")
+	process = subprocess.Popen(
+		[sys.executable, "app.py", "--host", "127.0.0.1", "--port", str(port)],
+		cwd=package_dir,
+		env=env,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE,
+		text=True,
+	)
+	try:
+		base_url = f"http://127.0.0.1:{port}"
+		for _attempt in range(30):
+			try:
+				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
+					health = json.loads(response.read().decode("utf-8"))
+				break
+			except OSError:
+				if process.poll() is not None:
+					stdout, stderr = process.communicate(timeout=1)
+					raise AssertionError(f"generated app exited early\nstdout={stdout}\nstderr={stderr}")
+				time.sleep(0.05)
+		else:
+			raise AssertionError("generated secured app did not answer /health")
+
+		with urllib.request.urlopen(f"{base_url}/auth", timeout=1) as response:
+			auth = json.loads(response.read().decode("utf-8"))
+		unauthorized_request = urllib.request.Request(
+			f"{base_url}/entities/Customer/records",
+			data=json.dumps({"record": {"name": "Asha", "email": "asha@example.com"}}).encode("utf-8"),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		try:
+			urllib.request.urlopen(unauthorized_request, timeout=1)
+		except urllib.error.HTTPError as error:
+			unauthorized_status = error.code
+			unauthorized = json.loads(error.read().decode("utf-8"))
+		else:
+			raise AssertionError("generated secured app accepted mutation without an API key")
+		authorized_request = urllib.request.Request(
+			f"{base_url}/entities/Customer/records",
+			data=json.dumps({"record": {"name": "Asha", "email": "asha@example.com"}}).encode("utf-8"),
+			headers={"Content-Type": "application/json", "Authorization": "Bearer secret-key"},
+			method="POST",
+		)
+		with urllib.request.urlopen(authorized_request, timeout=1) as response:
+			created = json.loads(response.read().decode("utf-8"))
+		delete_request = urllib.request.Request(
+			f"{base_url}/entities/Customer/records/1",
+			headers={"X-APG-API-Key": "secret-key"},
+			method="DELETE",
+		)
+		with urllib.request.urlopen(delete_request, timeout=1) as response:
+			deleted = json.loads(response.read().decode("utf-8"))
+	finally:
+		process.terminate()
+		try:
+			process.wait(timeout=2)
+		except subprocess.TimeoutExpired:
+			process.kill()
+			process.wait(timeout=2)
+
+	assert health["auth"]["mode"] == "api_key"
+	assert auth["mode"] == "api_key"
+	assert unauthorized_status == 401
+	assert unauthorized["error"] == "unauthorized"
+	assert created["record"] == {"id": 1, "name": "Asha", "email": "asha@example.com"}
+	assert deleted["deleted"] == created["record"]
 
 
 def test_cli_compile_default_target_writes_generated_application(tmp_path):

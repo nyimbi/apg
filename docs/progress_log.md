@@ -5495,3 +5495,26 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `d4eff55` (`Import and export generated app records`) to `origin/main`.
+
+### 2026-05-28 07:09 EAT
+
+Completed checkpoint:
+
+- Added optional API-key protection to generated dependency-free apps.
+- Generated apps remain open by default for zero-config local execution.
+- Setting `APG_API_KEY` now protects POST, PUT, and DELETE mutations.
+- Mutations accept either `Authorization: Bearer <key>` or `X-APG-API-Key`.
+- Generated apps now expose `GET /auth` and include auth mode in `/health`.
+- Generated `/openapi.json` now includes API-key and bearer security schemes.
+- Generated packages now reexport `auth_status()` for Python consumers.
+- Added focused subprocess regression coverage for open-mode health, API-key mode health/auth, unauthenticated mutation rejection, bearer-token mutation acceptance, and `X-APG-API-Key` deletion.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 16 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated API-key protection slice.
