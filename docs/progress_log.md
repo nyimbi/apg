@@ -6750,3 +6750,17 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_composition_gateway_production_optimizer_runtime.py -q` -> 2 passed, 4 pre-existing warnings
 - `git diff --check capabilities/composition/gateway/production_optimizer.py tests/test_composition_gateway_production_optimizer_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:40 EAT
+
+Completed checkpoint:
+
+- Made CONF API authentication configurable through environment variables for generated deployments.
+- `_configured_api_keys()` now merges Flask app config, JSON `APG_CONF_API_KEYS`, and single-key `APG_CONF_API_KEY`/user/tenant/permission environment settings.
+- Added focused auth coverage proving env-configured API keys resolve a principal and permissions without requiring application config mutation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conf/api.py tests/test_common_conf_api_auth_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_conf_api_auth_runtime.py -q` -> 4 passed, 10 pre-existing warnings
+- Deferred broader pytest at the user's request to conserve battery.

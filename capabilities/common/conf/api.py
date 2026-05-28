@@ -10,6 +10,8 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 import asyncio
 import hashlib
+import json
+import os
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from flask import Flask, abort, current_app, request, jsonify, g
@@ -111,7 +113,28 @@ def _api_response(success: bool, message: str, status_code: int, errors: Optiona
 
 def _configured_api_keys() -> Dict[str, Dict[str, Any]]:
 	"""Return configured API keys keyed by token value"""
-	configured = current_app.config.get("APG_CONF_API_KEYS", {})
+	api_keys = _normalize_api_key_config(current_app.config.get("APG_CONF_API_KEYS", {}))
+
+	env_config = os.getenv("APG_CONF_API_KEYS")
+	if env_config:
+		try:
+			api_keys.update(_normalize_api_key_config(json.loads(env_config)))
+		except json.JSONDecodeError:
+			logger.warning("Ignoring invalid APG_CONF_API_KEYS JSON")
+
+	single_key = os.getenv("APG_CONF_API_KEY")
+	if single_key and single_key not in api_keys:
+		api_keys[single_key] = {
+			"user_id": os.getenv("APG_CONF_API_KEY_USER", "env-api-key"),
+			"tenant_id": os.getenv("APG_CONF_API_KEY_TENANT"),
+			"permissions": _permissions_from_header(os.getenv("APG_CONF_API_KEY_PERMISSIONS")),
+		}
+
+	return api_keys
+
+
+def _normalize_api_key_config(configured: Any) -> Dict[str, Dict[str, Any]]:
+	"""Normalize dict/list API key configuration into principal records"""
 	if isinstance(configured, dict):
 		return {
 			key: value if isinstance(value, dict) else {"user_id": str(value)}

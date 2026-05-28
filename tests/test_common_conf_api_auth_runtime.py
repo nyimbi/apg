@@ -55,6 +55,32 @@ async def test_require_auth_accepts_configured_api_key() -> None:
 
 
 @pytest.mark.asyncio
+async def test_require_auth_accepts_env_configured_api_key(monkeypatch) -> None:
+	app = Flask(__name__)
+	monkeypatch.setenv("APG_CONF_API_KEY", "env-key")
+	monkeypatch.setenv("APG_CONF_API_KEY_USER", "env-client")
+	monkeypatch.setenv("APG_CONF_API_KEY_TENANT", "tenant-env")
+	monkeypatch.setenv("APG_CONF_API_KEY_PERMISSIONS", "config.read, config.deploy")
+
+	@require_auth
+	async def protected():
+		return jsonify({
+			"user_id": g.current_user["user_id"],
+			"tenant_id": g.current_user["tenant_id"],
+			"permissions": sorted(g.current_user["permissions"]),
+		})
+
+	with app.test_request_context("/config", headers={"X-API-Key": "env-key"}):
+		response = await protected()
+
+	assert response.get_json() == {
+		"user_id": "env-client",
+		"tenant_id": "tenant-env",
+		"permissions": ["config.deploy", "config.read"],
+	}
+
+
+@pytest.mark.asyncio
 async def test_require_permission_enforces_declared_permission() -> None:
 	app = _app()
 
