@@ -70,17 +70,26 @@ class ExportDeclaration(ASTNode):
 
 class EntityType(Enum):
 	"""Types of APG entities"""
+	ENTITY = "entity"
 	AGENT = "agent"
 	AI_AGENT = "ai_agent"
 	AGENT_TEAM = "agent_team"
 	SWARM = "swarm"
+	APP = "app"
+	APPLICATION = "application"
 	CAPABILITY = "capability"
 	DIGITAL_TWIN = "digital_twin"
 	WORKFLOW = "workflow"
+	FLOW = "flow"
 	DATABASE = "database"
 	API = "api"
 	FORM = "form"
+	SCREEN = "screen"
 	UI_COMPONENT = "ui_component"
+	RULE = "rule"
+	RULE_SET = "rule_set"
+	POLICY = "policy"
+	AGENT_RUNTIME = "agent_runtime"
 	NOTIFICATION = "notification"
 	ANALYTICS = "analytics"
 
@@ -434,6 +443,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		super().__init__()
 		self.current_source_file: Optional[str] = None
 		self.errors: List[str] = []
+		self._source_entity_keyword_cache: Optional[set[str]] = None
 	
 	def build_ast(self, parse_tree, source_file: Optional[str] = None) -> Optional[ModuleDeclaration]:
 		"""
@@ -482,12 +492,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				module.entities.append(self._parse_source_capability(name, body, source_file))
 				continue
 			properties, methods = self._parse_source_members(body, source_file)
-			entity_type = {
-				"agent": EntityType.AGENT,
-				"digital_twin": EntityType.DIGITAL_TWIN,
-				"workflow": EntityType.WORKFLOW,
-				"db": EntityType.DATABASE,
-			}.get(kind, EntityType.AGENT)
+			entity_type = self._entity_type_for_source_kind(kind)
 			module.entities.append(EntityDeclaration(
 				entity_type=entity_type,
 				name=name,
@@ -503,7 +508,14 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		return re.sub(r"//.*", "", source_code)
 
 	def _iter_source_entities(self, source_code: str):
-		pattern = re.compile(r"\b(module|agent|capability|digital_twin|workflow|db)\s+([^\s{]+)\s*(?:version\s+[^\s{]+)?\s*\{", re.UNICODE)
+		keywords = self._source_entity_keywords()
+		pattern = re.compile(
+			r"\b(" + "|".join(
+				re.escape(keyword)
+				for keyword in sorted(keywords, key=len, reverse=True)
+			) + r")\s+([^\s{]+)\s*(?:version\s+[^\s{]+)?\s*\{",
+			re.UNICODE,
+		)
 		position = 0
 		while True:
 			match = pattern.search(source_code, position)
@@ -520,6 +532,63 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				index += 1
 			yield match.group(1), match.group(2), source_code[body_start:index - 1]
 			position = index
+
+	def _source_entity_keywords(self) -> set[str]:
+		"""Return grammar-backed entity keywords for source-backed AST building."""
+		if self._source_entity_keyword_cache is not None:
+			return set(self._source_entity_keyword_cache)
+
+		keywords = {
+			"module",
+			"agent",
+			"capability",
+			"digital_twin",
+			"workflow",
+			"database",
+			"db",
+		}
+		grammar_path = Path(__file__).resolve().parent.parent / "spec" / "apg.g4"
+		try:
+			grammar = grammar_path.read_text(encoding="utf-8")
+			match = re.search(r"^entity_type\s*\n\s*:(.*?)\n\s*;", grammar, flags=re.MULTILINE | re.DOTALL)
+			if match:
+				keywords.update(re.findall(r"'([^']+)'", match.group(1)))
+		except OSError:
+			keywords.update({"app", "flow", "screen", "twin", "agent_runtime"})
+
+		self._source_entity_keyword_cache = set(keywords)
+		return set(keywords)
+
+	def _entity_type_for_source_kind(self, kind: str) -> EntityType:
+		"""Map source keywords to AST entity categories while preserving key APG surfaces."""
+		return {
+			"agent": EntityType.AGENT,
+			"team": EntityType.AGENT_TEAM,
+			"agent_team": EntityType.AGENT_TEAM,
+			"swarm": EntityType.SWARM,
+			"app": EntityType.APP,
+			"application": EntityType.APPLICATION,
+			"digital_twin": EntityType.DIGITAL_TWIN,
+			"twin": EntityType.DIGITAL_TWIN,
+			"workflow": EntityType.WORKFLOW,
+			"flow": EntityType.FLOW,
+			"db": EntityType.DATABASE,
+			"database": EntityType.DATABASE,
+			"api": EntityType.API,
+			"form": EntityType.FORM,
+			"screen": EntityType.SCREEN,
+			"view": EntityType.SCREEN,
+			"ui": EntityType.UI_COMPONENT,
+			"component": EntityType.UI_COMPONENT,
+			"widget": EntityType.UI_COMPONENT,
+			"rule": EntityType.RULE,
+			"rule_set": EntityType.RULE_SET,
+			"policy": EntityType.POLICY,
+			"agent_runtime": EntityType.AGENT_RUNTIME,
+			"report": EntityType.ANALYTICS,
+			"dashboard": EntityType.ANALYTICS,
+			"notify": EntityType.NOTIFICATION,
+		}.get(kind, EntityType.ENTITY)
 
 	def _parse_source_capability(self, name: str, body: str, source_file: Optional[str]) -> CapabilityDeclaration:
 		"""Parse the first-class capability contract surface from source text."""

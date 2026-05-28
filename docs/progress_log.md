@@ -4985,3 +4985,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `41422df` (`Accept grammar-backed APG declarations`) to `origin/main`.
+
+### 2026-05-28 05:01 EAT
+
+Completed checkpoint:
+
+- Made source-backed AST building discover APG entity keywords from `spec/apg.g4` instead of the old hard-coded `agent|capability|digital_twin|workflow|db` set.
+- Added explicit AST entity categories for key first-class APG surfaces including `app`, `screen`, `flow`, `rule`, `rule_set`, `policy`, and `agent_runtime`.
+- Verified that grammar-backed declarations for `twin`, `screen`, `app`, `flow`, and `agent_runtime` now parse, materialize as AST entities, and compile into the generated Python entity catalog.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/ast_builder.py tests/test_apg_language_contract.py`
+- `.venv/bin/pytest tests/test_apg_language_contract.py -q` -> 8 passed
+- Direct compiler smoke check for `twin`, `screen`, `app`, `flow`, and `agent_runtime` -> generated `app.py` lists all five entities with expected types
+- `git diff --check -- compiler/ast_builder.py tests/test_apg_language_contract.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push.

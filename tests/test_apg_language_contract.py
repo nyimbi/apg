@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from compiler.ast_builder import ASTBuilder
+from compiler.compiler import APGCompiler
 from compiler.parser import APGParser
 
 
@@ -43,15 +45,42 @@ def test_grammar_promotes_composable_capabilities_to_first_class_entities():
 
 def test_parser_accepts_first_class_entity_keywords_from_grammar():
 	parser = APGParser()
-	for source in [
-		'twin Machine { sync: opc; }',
-		'screen Dashboard { route: "/"; }',
-		'app ERP { }',
-		'flow Fulfillment { }',
-		'agent_runtime CodexRuntime { runner: codex; }',
+	builder = ASTBuilder()
+	for source, expected_name, expected_type in [
+		('twin Machine { sync: opc; }', "Machine", "digital_twin"),
+		('screen Dashboard { route: "/"; }', "Dashboard", "screen"),
+		('app ERP { }', "ERP", "app"),
+		('flow Fulfillment { }', "Fulfillment", "flow"),
+		('agent_runtime CodexRuntime { runner: codex; }', "CodexRuntime", "agent_runtime"),
 	]:
 		result = parser.parse_string(source, "<entity-keyword>")
 		assert result["success"] is True, (source, [str(error) for error in result["errors"]])
+		ast = builder.build_ast(result["parse_tree"], "<entity-keyword>")
+		assert [(entity.name, entity.entity_type.value) for entity in ast.entities] == [
+			(expected_name, expected_type)
+		]
+
+	compile_source = """
+		twin Machine { }
+		screen Dashboard { }
+		app ERP { }
+		flow Fulfillment { }
+		agent_runtime CodexRuntime { }
+	"""
+	compile_result = APGCompiler().compile_string(compile_source, "entity_keywords.apg")
+	assert compile_result.success is True, compile_result.errors
+	namespace = {}
+	exec(compile(compile_result.generated_files["app.py"], "app.py", "exec"), namespace)
+	assert [
+		(entity["name"], entity["type"])
+		for entity in namespace["list_entities"]()
+	] == [
+		("Machine", "digital_twin"),
+		("Dashboard", "screen"),
+		("ERP", "app"),
+		("Fulfillment", "flow"),
+		("CodexRuntime", "agent_runtime"),
+	]
 
 	result = parser.parse_string("invalid_entity Broken { }", "<invalid>")
 	assert result["success"] is False
