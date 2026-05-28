@@ -6795,3 +6795,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile capabilities/composition/registry/composition_engine.py tests/test_composition_registry_conflict_detection.py`
 - `.venv/bin/python -m pytest tests/test_composition_registry_conflict_detection.py -q` -> 3 passed, 2 pre-existing warnings
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:56 EAT
+
+Completed checkpoint:
+
+- Made gateway AI policy processing importable without TensorFlow, PyTorch, scikit-learn, pandas, NLTK, or aiohttp.
+- Added lightweight local fallback surfaces for heavyweight ML/NLP dependencies so generated applications can still use deterministic natural-language policy behavior offline.
+- Natural-language intent classification now returns compatibility aliases (`intent`, `primary_intent`) plus simple extracted service/path entities.
+- Policy rule generation now accepts both classified intent dictionaries and direct intent strings, preserving service helper compatibility.
+- Fixed ASM service AI helper integration so processed intents compile to concrete rule lists and affected service sets.
+- Added focused runtime coverage for offline intent classification, fallback policy generation, and ASM service helper compilation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/ai_engine.py capabilities/composition/gateway/service.py tests/test_composition_gateway_ai_engine_offline_runtime.py`
+- `.venv/bin/python -m pytest tests/test_composition_gateway_ai_engine_offline_runtime.py -q` -> 2 passed, 4 pre-existing warnings
+- `git diff --check capabilities/composition/gateway/ai_engine.py capabilities/composition/gateway/service.py tests/test_composition_gateway_ai_engine_offline_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.

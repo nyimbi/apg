@@ -507,7 +507,7 @@ class ASMService:
 		result = await ai_model.classify_intent(intent)
 		
 		return {
-			"intent_type": result["intent"],
+			"intent_type": result.get("primary_intent") or result.get("intent", "unknown"),
 			"extracted_entities": result.get("parameters", {}),
 			"confidence": result["confidence"],
 			"processed_at": datetime.utcnow().isoformat(),
@@ -525,11 +525,22 @@ class ASMService:
 			processed_intent.get("extracted_entities", {}),
 			strategy
 		)
+		rule_list = rules if isinstance(rules, list) else rules.get("rules", [])
+		affected_services = sorted({
+			value
+			for rule in rule_list
+			for value in [
+				rule.get("target"),
+				(rule.get("destination") or {}).get("service"),
+				rule.get("service"),
+			]
+			if value
+		})
 		
 		return {
-			"route_rules": rules.get("rules", []),
+			"route_rules": rule_list,
 			"deployment_strategy": strategy or "canary",
-			"affected_services": rules.get("services", []),
+			"affected_services": affected_services,
 			"compiled_at": datetime.utcnow().isoformat()
 		}
 	

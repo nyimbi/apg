@@ -23,8 +23,6 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 import asyncio
 import logging
-import numpy as np
-import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -34,25 +32,322 @@ import json
 import hashlib
 
 # Deep Learning Frameworks - Using only open source models
-import tensorflow as tf
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
+try:
+	import numpy as np
+except ImportError:  # pragma: no cover - lightweight generated-app fallback
+	import math
+	import random
+
+	class _NumpyRandomFallback:
+		@staticmethod
+		def seed(seed: int) -> None:
+			random.seed(seed)
+
+		@staticmethod
+		def random() -> float:
+			return random.random()
+
+		@staticmethod
+		def uniform(low: float, high: float) -> float:
+			return random.uniform(low, high)
+
+		@staticmethod
+		def normal(mean: float, stddev: float, size: Any = None):
+			if size is None:
+				return random.gauss(mean, stddev)
+			if isinstance(size, tuple):
+				rows, columns = size
+				return [[random.gauss(mean, stddev) for _ in range(columns)] for _ in range(rows)]
+			return [random.gauss(mean, stddev) for _ in range(size)]
+
+		@staticmethod
+		def multivariate_normal(mean: Any, cov: Any, size: int):
+			width = len(mean) if hasattr(mean, "__len__") else 1
+			return [[random.gauss(0, 1) for _ in range(width)] for _ in range(size)]
+
+	class _NumpyFallback:
+		ndarray = list
+		random = _NumpyRandomFallback()
+		pi = math.pi
+
+		@staticmethod
+		def sin(values: Any):
+			return [math.sin(value) for value in values]
+
+		@staticmethod
+		def linspace(start: float, stop: float, count: int):
+			if count <= 1:
+				return [start]
+			step = (stop - start) / (count - 1)
+			return [start + step * index for index in range(count)]
+
+		@staticmethod
+		def array(values: Any):
+			return values
+
+		@staticmethod
+		def zeros(size: int):
+			return [0.0 for _ in range(size)]
+
+		@staticmethod
+		def ones(size: int):
+			return [1.0 for _ in range(size)]
+
+		@staticmethod
+		def eye(size: int):
+			return [[1.0 if row == col else 0.0 for col in range(size)] for row in range(size)]
+
+		@staticmethod
+		def vstack(values: Any):
+			result = []
+			for value in values:
+				result.extend(value)
+			return result
+
+		@staticmethod
+		def column_stack(values: Any):
+			return [list(row) for row in zip(*values)]
+
+	np = _NumpyFallback()
+
+try:
+	import pandas as pd
+except ImportError:  # pragma: no cover - optional analytics dependency
+	pd = None
+
+try:
+	import tensorflow as tf
+except ImportError:  # pragma: no cover - optional ML dependency
+	class _FallbackTensor:
+		def __init__(self, value: float = 0.0):
+			self.value = value
+
+		def numpy(self):
+			return [[self.value]]
+
+	class _FallbackLayer:
+		def __init__(self, *args: Any, **kwargs: Any):
+			self.args = args
+			self.kwargs = kwargs
+
+		def __call__(self, inputs: Any, *args: Any, **kwargs: Any) -> Any:
+			return inputs
+
+	class _FallbackAdd(_FallbackLayer):
+		def __call__(self, inputs: Any, *args: Any, **kwargs: Any) -> Any:
+			return inputs[0] if isinstance(inputs, list) and inputs else inputs
+
+	class _FallbackKerasModel:
+		def __init__(self, *args: Any, **kwargs: Any):
+			pass
+
+		def compile(self, *args: Any, **kwargs: Any) -> None:
+			return None
+
+		def fit(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+			return {"history": {}}
+
+		def save_weights(self, *args: Any, **kwargs: Any) -> None:
+			return None
+
+		def load_weights(self, *args: Any, **kwargs: Any) -> None:
+			return None
+
+		def __call__(self, *args: Any, **kwargs: Any) -> _FallbackTensor:
+			return _FallbackTensor(0.0)
+
+	class _FallbackLayers:
+		LSTM = _FallbackLayer
+		Dense = _FallbackLayer
+		Dropout = _FallbackLayer
+		MultiHeadAttention = _FallbackLayer
+		Add = _FallbackAdd
+
+	class _FallbackKeras:
+		Model = _FallbackKerasModel
+		layers = _FallbackLayers()
+
+	class _FallbackTensorFlow:
+		keras = _FallbackKeras()
+
+	tf = _FallbackTensorFlow()
+
+try:
+	import torch
+	import torch.nn as nn
+	import torch.optim as optim
+	from torch.utils.data import DataLoader, Dataset
+except ImportError:  # pragma: no cover - optional ML dependency
+	class _FallbackModule:
+		def __init__(self, *args: Any, **kwargs: Any):
+			pass
+
+		def __call__(self, value: Any) -> Any:
+			return value
+
+		def parameters(self) -> List[Any]:
+			return []
+
+		def state_dict(self) -> Dict[str, Any]:
+			return {}
+
+		def load_state_dict(self, state: Dict[str, Any]) -> None:
+			return None
+
+		def train(self) -> None:
+			return None
+
+		def eval(self) -> None:
+			return None
+
+	class _FallbackSequential(_FallbackModule):
+		def __init__(self, *layers: Any):
+			self.layers = layers
+
+	class _FallbackLoss:
+		def __call__(self, *args: Any, **kwargs: Any):
+			return type("LossValue", (), {"item": lambda self: 0.0, "backward": lambda self: None})()
+
+	class _FallbackNN:
+		Module = _FallbackModule
+		Sequential = _FallbackSequential
+		Linear = _FallbackModule
+		ReLU = _FallbackModule
+		Dropout = _FallbackModule
+		Sigmoid = _FallbackModule
+		BCELoss = _FallbackLoss
+		MSELoss = _FallbackLoss
+
+		class utils:
+			@staticmethod
+			def clip_grad_norm_(*args: Any, **kwargs: Any) -> None:
+				return None
+
+	class _FallbackOptimizer:
+		def __init__(self, *args: Any, **kwargs: Any):
+			pass
+
+		def zero_grad(self) -> None:
+			return None
+
+		def step(self) -> None:
+			return None
+
+	class _FallbackOptim:
+		Adam = _FallbackOptimizer
+
+	class _FallbackNoGrad:
+		def __enter__(self):
+			return self
+
+		def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+			return None
+
+	class _FallbackTorch:
+		float32 = "float32"
+		nn = _FallbackNN()
+
+		@staticmethod
+		def tensor(data: Any, dtype: Any = None) -> Any:
+			return data
+
+		@staticmethod
+		def FloatTensor(data: Any) -> Any:
+			return data
+
+		@staticmethod
+		def load(path: Any) -> Dict[str, Any]:
+			return {}
+
+		@staticmethod
+		def save(state: Any, path: Any) -> None:
+			return None
+
+		@staticmethod
+		def no_grad() -> _FallbackNoGrad:
+			return _FallbackNoGrad()
+
+		@staticmethod
+		def cat(values: Any, dim: int = 0) -> Any:
+			result = []
+			for value in values:
+				result.extend(value)
+			return result
+
+		@staticmethod
+		def zeros_like(value: Any) -> Any:
+			return 0
+
+		@staticmethod
+		def normal(mean: float, stddev: float, shape: Any) -> float:
+			return 0.0
+
+	class _FallbackDataLoader:
+		def __init__(self, dataset: Any, batch_size: int = 32, shuffle: bool = False):
+			self.dataset = dataset
+
+		def __iter__(self):
+			return iter([])
+
+		def __len__(self):
+			return 1
+
+	class _FallbackDataset:
+		pass
+
+	torch = _FallbackTorch()
+	nn = _FallbackNN()
+	optim = _FallbackOptim()
+	DataLoader = _FallbackDataLoader
+	Dataset = _FallbackDataset
 
 # ML Libraries - Open source only
-from sklearn.ensemble import IsolationForest, RandomForestRegressor
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+try:
+	from sklearn.ensemble import IsolationForest, RandomForestRegressor
+	from sklearn.preprocessing import StandardScaler, LabelEncoder
+	from sklearn.model_selection import train_test_split
+	from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+except ImportError:  # pragma: no cover - optional ML dependency
+	IsolationForest = RandomForestRegressor = StandardScaler = LabelEncoder = None
+	train_test_split = None
+	accuracy_score = None
+	precision_recall_fscore_support = None
 
 # Time Series - Open source only
-import pandas as pd
 
 # NLP Libraries - Open source + Ollama
-import nltk
-from nltk.sentiment import SentimentIntensityAnalyzer
-import aiohttp
+try:
+	import nltk
+	from nltk.sentiment import SentimentIntensityAnalyzer
+except ImportError:  # pragma: no cover - optional NLP dependency
+	class _FallbackNltk:
+		@staticmethod
+		def download(*args: Any, **kwargs: Any) -> bool:
+			return False
+
+	class SentimentIntensityAnalyzer:
+		def polarity_scores(self, text: str) -> Dict[str, float]:
+			positive = sum(1 for word in ("good", "healthy", "stable", "fast") if word in text.lower())
+			negative = sum(1 for word in ("bad", "down", "error", "slow", "failed") if word in text.lower())
+			return {"compound": (positive - negative) / max(1, positive + negative)}
+
+	nltk = _FallbackNltk()
+
+try:
+	import aiohttp
+except ImportError:  # pragma: no cover - optional Ollama HTTP dependency
+	class _FallbackAioHttp:
+		class ClientSession:
+			async def close(self) -> None:
+				return None
+
+			def post(self, *args: Any, **kwargs: Any):
+				raise RuntimeError("aiohttp is not installed")
+
+			def get(self, *args: Any, **kwargs: Any):
+				raise RuntimeError("aiohttp is not installed")
+
+	aiohttp = _FallbackAioHttp()
 
 # Simple federated learning implementation
 import json
@@ -326,9 +621,11 @@ class NaturalLanguagePolicyModel:
 					intent_result = self._fallback_intent_classification(text)
 			
 			return {
+				'intent': intent_result.get('intent', 'unknown'),
 				'primary_intent': intent_result.get('intent', 'unknown'),
 				'confidence': float(intent_result.get('confidence', 0.0)),
 				'sentiment': sentiment,
+				'parameters': self._extract_entities(text),
 				'embedding': embedding[:100] if embedding else [],  # Limit embedding size
 				'processing_method': 'ollama' if embedding else 'fallback'
 			}
@@ -365,10 +662,12 @@ class NaturalLanguagePolicyModel:
 			sentiment = self.sentiment_analyzer.polarity_scores(text) if self.sentiment_analyzer else {'compound': 0.0}
 			
 			return {
+				'intent': primary_intent[0],
 				'primary_intent': primary_intent[0],
 				'confidence': min(primary_intent[1] * 2, 1.0),  # Boost confidence for keyword matching
 				'all_intents': intent_scores,
 				'sentiment': sentiment,
+				'parameters': self._extract_entities(text),
 				'embedding': [],
 				'processing_method': 'keyword_fallback'
 			}
@@ -376,19 +675,47 @@ class NaturalLanguagePolicyModel:
 		except Exception as e:
 			logger.error(f"Fallback intent classification error: {e}")
 			return {
+				'intent': 'unknown',
 				'primary_intent': 'unknown',
 				'confidence': 0.0,
 				'all_intents': {},
 				'sentiment': {'compound': 0.0},
+				'parameters': {},
 				'embedding': [],
 				'processing_method': 'error_fallback'
 			}
 	
-	async def generate_policy_rules(self, intent: Dict[str, Any], context: Dict[str, Any]) -> List[Dict[str, Any]]:
+	def _extract_entities(self, text: str) -> Dict[str, Any]:
+		"""Extract simple service-mesh entities from natural language text."""
+		entities: Dict[str, Any] = {}
+		words = [word.strip(".,;:!?()[]{}\"'") for word in text.split()]
+		for index, word in enumerate(words):
+			lower = word.lower()
+			if lower in {"service", "svc", "app"} and index + 1 < len(words):
+				entities.setdefault("service", words[index + 1])
+			elif lower in {"to", "toward", "destination"} and index + 1 < len(words):
+				entities.setdefault("target_service", words[index + 1])
+			elif lower in {"path", "endpoint"} and index + 1 < len(words):
+				entities.setdefault("path", words[index + 1])
+		return entities
+
+	async def generate_policy_rules(
+		self,
+		intent: Union[Dict[str, Any], str],
+		context: Optional[Dict[str, Any]] = None,
+		strategy: Optional[str] = None
+	) -> List[Dict[str, Any]]:
 		"""Generate policy rules from classified intent using Ollama."""
 		try:
-			intent_type = intent['primary_intent']
-			confidence = intent['confidence']
+			context = context or {}
+			if isinstance(intent, str):
+				intent_type = intent
+				confidence = 0.75
+			else:
+				intent_type = intent.get('primary_intent') or intent.get('intent', 'unknown')
+				confidence = float(intent.get('confidence', 0.0))
+			if strategy:
+				context.setdefault("deployment_strategy", strategy)
 			
 			# Use Ollama to generate sophisticated policy rules
 			policy_prompt = f"""
@@ -457,7 +784,11 @@ class NaturalLanguagePolicyModel:
 			
 		except Exception as e:
 			logger.error(f"Policy generation error: {e}")
-			return self._generate_fallback_rules(intent.get('primary_intent', 'unknown'), context)
+			if isinstance(intent, str):
+				fallback_intent = intent
+			else:
+				fallback_intent = intent.get('primary_intent') or intent.get('intent', 'unknown')
+			return self._generate_fallback_rules(fallback_intent, context or {})
 	
 	def _generate_fallback_rules(self, intent_type: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
 		"""Generate fallback rules when Ollama is not available."""
