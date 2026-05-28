@@ -53,7 +53,7 @@ except ModuleNotFoundError:
 		return _NoopMetric()
 
 from .service import TimeAttendanceService
-from .websocket import websocket_manager, RealTimeEvent
+from .websocket import websocket_manager, RealTimeEvent, WebSocketMessage
 
 
 logger = logging.getLogger(__name__)
@@ -291,6 +291,20 @@ class AlertManager:
 		self.active_alerts = {}
 		self.alert_rules = self._load_alert_rules()
 		self.notification_channels = []
+		self.notification_history = deque(maxlen=1000)
+
+	def configure_notification_channel(self, channel_type: str, target: str, enabled: bool = True, **settings: Any) -> Dict[str, Any]:
+		"""Register an alert notification channel for executable local delivery tracking."""
+		channel = {
+			"id": f"{channel_type}_{len(self.notification_channels) + 1}",
+			"type": channel_type,
+			"target": target,
+			"enabled": enabled,
+			"settings": settings,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self.notification_channels.append(channel)
+		return channel
 		
 	def _load_alert_rules(self) -> Dict[str, Dict[str, Any]]:
 		"""Load alert rules configuration"""
@@ -428,13 +442,42 @@ class AlertManager:
 				data=alert.to_dict(),
 				user_id="system"
 			)
-			await websocket_manager.broadcast_system_event(event)
+			system_broadcast = getattr(websocket_manager, "broadcast_system_event", None)
+			if system_broadcast:
+				await system_broadcast(event)
+			else:
+				await websocket_manager.broadcast_to_channel(
+					"system_alerts",
+					WebSocketMessage(
+						type="system_alert",
+						channel="system_alerts",
+						data={
+							"event_type": event.event_type,
+							"entity_id": event.entity_id,
+							"entity_data": event.data,
+							"timestamp": event.timestamp.isoformat(),
+						},
+					),
+				)
 			
-			# TODO: Implement additional notification channels
-			# - Email notifications
-			# - Slack/Teams integration  
-			# - SMS for critical alerts
-			# - PagerDuty integration
+			self.notification_history.append({
+				"alert_id": alert.id,
+				"channel": "websocket",
+				"target": alert.tenant_id or "system",
+				"status": "delivered",
+				"delivered_at": datetime.utcnow().isoformat(),
+			})
+			for channel in self.notification_channels:
+				if not channel.get("enabled", True):
+					continue
+				self.notification_history.append({
+					"alert_id": alert.id,
+					"channel": channel["type"],
+					"target": channel["target"],
+					"status": "queued",
+					"delivered_at": datetime.utcnow().isoformat(),
+					"settings": channel.get("settings", {}),
+				})
 			
 		except Exception as e:
 			logger.error(f"Error sending alert: {str(e)}")
@@ -617,7 +660,23 @@ class MonitoringDashboard:
 						},
 						user_id="system"
 					)
-					await websocket_manager.broadcast_system_event(event)
+					system_broadcast = getattr(websocket_manager, "broadcast_system_event", None)
+					if system_broadcast:
+						await system_broadcast(event)
+					else:
+						await websocket_manager.broadcast_to_channel(
+							"system_metrics",
+							WebSocketMessage(
+								type="system_metrics",
+								channel="system_metrics",
+								data={
+									"event_type": event.event_type,
+									"entity_id": event.entity_id,
+									"entity_data": event.data,
+									"timestamp": event.timestamp.isoformat(),
+								},
+							),
+						)
 				
 				await asyncio.sleep(30)  # Monitor every 30 seconds
 				

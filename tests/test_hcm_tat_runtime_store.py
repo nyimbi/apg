@@ -1,6 +1,6 @@
 import ast
 import asyncio
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,7 +20,12 @@ from capabilities.hcm.tat.time_attendance.mobile_api import (
 	get_mobile_user,
 	mobile_router,
 )
-from capabilities.hcm.tat.time_attendance.monitoring import BusinessMetricsMonitor
+from capabilities.hcm.tat.time_attendance.monitoring import (
+	Alert,
+	AlertManager,
+	AlertSeverity,
+	BusinessMetricsMonitor,
+)
 from capabilities.hcm.tat.time_attendance.models import (
 	AIAgentType,
 	LeaveType,
@@ -299,6 +304,29 @@ def test_business_monitoring_uses_service_runtime_store():
 	assert metrics["approval_pending_count"] >= 1
 	assert health["tenant_id"] == "tenant_monitoring"
 	assert health["business_metrics"]["active_employees"] == 1
+
+
+def test_alert_manager_records_configured_notification_channels():
+	manager = AlertManager()
+	channel = manager.configure_notification_channel("email", "ops@example.com", priority="high")
+	alert = Alert(
+		id="alert_001",
+		title="High Overtime",
+		description="Overtime exceeded threshold",
+		severity=AlertSeverity.WARNING,
+		metric_name="overtime_hours",
+		current_value=12.0,
+		threshold_value=8.0,
+		timestamp=datetime.utcnow(),
+		tenant_id="tenant_monitoring",
+	)
+
+	_run(manager.send_alert(alert))
+
+	assert channel["type"] == "email"
+	assert list(manager.notification_history)[0]["channel"] == "websocket"
+	assert list(manager.notification_history)[1]["channel"] == "email"
+	assert list(manager.notification_history)[1]["status"] == "queued"
 
 
 def test_time_attendance_service_has_no_missing_private_helper_calls():

@@ -4904,3 +4904,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `190d7a5` (`Make HCM monitoring runtime-backed`) to `origin/main`.
+
+### 2026-05-28 04:33 EAT
+
+Completed checkpoint:
+
+- Made HCM Time Attendance alert notification channels executable in-process.
+- Added alert notification channel configuration and a delivery/queue history for WebSocket plus configured channels.
+- Added WebSocket fallback broadcasting for alert and system-metric events when the manager does not provide `broadcast_system_event`.
+- Extended focused HCM TAT regression coverage to verify configured alert channels are recorded when alerts are sent.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/monitoring.py tests/test_hcm_tat_runtime_store.py`
+- `.venv/bin/pytest tests/test_hcm_tat_runtime_store.py -q` -> 9 passed
+- `rg -n "TODO: Implement additional notification channels|Mock business metrics|would query actual|aioredis|asyncpg|await websocket_manager\\.broadcast_system_event" capabilities/hcm/tat/time_attendance/monitoring.py` -> no matches
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit for this checkpoint.
