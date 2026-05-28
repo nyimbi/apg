@@ -61,6 +61,34 @@ capability GeneralLedger {
 """
 
 
+SCREEN_SOURCE = """
+capability OperationsWorkbench {
+    contract: {
+        id: operations_workbench,
+        provides: [operations_ui],
+        configuration: {tenant_scoped: true},
+        ui: {shell: python},
+        theme: {name: ops_theme}
+    };
+    screens: {
+        Dashboard: {
+            route: "/ops",
+            layout: dashboard,
+            contains: [KpiStrip, ApprovalQueue],
+            composes: [LedgerTable],
+            binds: [ledger.entries],
+            actions: [approve, reject],
+            events: [{on: "select", do: "filter", target: LedgerTable}],
+            relationships: [
+                {from: KpiStrip, to: LedgerTable, via: filters},
+                ApprovalQueue -> LedgerTable
+            ]
+        }
+    };
+}
+"""
+
+
 def test_capability_declaration_parses_to_first_class_ast():
     parse_result = APGParser().parse_string(CAPABILITY_SOURCE, "erp_ops.apg")
     assert parse_result["success"] is True, parse_result["errors"]
@@ -84,6 +112,50 @@ def test_capability_declaration_parses_to_first_class_ast():
     assert capability.theme["tokens"]["accent"] == "#126E82"
     assert capability.i18n["supported_languages"] == ["en", "sw", "ha", "yo", "zu"]
     assert capability.streaming == {"processor": "bytewax", "state": "ledger_posting_state"}
+
+
+def test_capability_screens_compile_to_executable_composition_manifest():
+    parse_result = APGParser().parse_string(SCREEN_SOURCE, "screens.apg")
+    assert parse_result["success"] is True, parse_result["errors"]
+    ast = ASTBuilder().build_ast(parse_result["parse_tree"], "screens.apg")
+    capability = ast.entities[0]
+
+    assert isinstance(capability, CapabilityDeclaration)
+    assert capability.screens["Dashboard"]["route"] == "/ops"
+    assert capability.screens["Dashboard"]["relationships"][0]["via"] == "filters"
+
+    result = APGCompiler().compile_string(SCREEN_SOURCE, "screens.apg")
+    assert result.success is True, result.errors
+
+    namespace = {}
+    exec(compile(result.generated_files["apg_capabilities.py"], "apg_capabilities.py", "exec"), namespace)
+
+    screens = namespace["capability_screens"]("OperationsWorkbench")
+    assert len(screens) == 1
+    dashboard = screens[0]
+    assert dashboard["name"] == "Dashboard"
+    assert dashboard["path"] == "/ops"
+    assert dashboard["layout"] == "dashboard"
+    assert dashboard["contains"] == ["KpiStrip", "ApprovalQueue"]
+    assert dashboard["composes"] == ["LedgerTable"]
+    assert dashboard["binds"] == ["ledger.entries"]
+    assert dashboard["actions"] == ["approve", "reject"]
+    assert dashboard["events"] == [{"on": "select", "do": "filter", "target": "LedgerTable"}]
+    assert dashboard["relationships"] == [
+        {"from": "KpiStrip", "to": "LedgerTable", "via": "filters"},
+        {"type": "relates_to", "from": "ApprovalQueue", "to": "LedgerTable"},
+    ]
+    assert namespace["ui_route_index"]()["/ops"]["name"] == "Dashboard"
+
+    graph_edges = {
+        (edge["source"], edge["relation"], edge["target"])
+        for edge in namespace["composition_graph"]()["edges"]
+    }
+    assert ("screen:OperationsWorkbench.Dashboard", "contains", "component:KpiStrip") in graph_edges
+    assert ("screen:OperationsWorkbench.Dashboard", "composes", "component:LedgerTable") in graph_edges
+    assert ("screen:OperationsWorkbench.Dashboard", "binds_to", "binding:ledger.entries") in graph_edges
+    assert ("component:KpiStrip", "filters", "component:LedgerTable") in graph_edges
+    assert ("component:ApprovalQueue", "relates_to", "component:LedgerTable") in graph_edges
 
 
 def test_capability_semantics_require_executable_contract_shape():

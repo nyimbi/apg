@@ -321,6 +321,7 @@ def list_entities() -> list[Dict[str, Any]]:
 				"master_data": capability.master_data,
 				"i18n": capability.i18n,
 				"streaming": capability.streaming,
+				"screens": capability.screens,
 			}
 			for capability in capabilities
 		}
@@ -356,6 +357,7 @@ class CapabilitySpec:
     master_data: Any
     i18n: Dict[str, Any]
     streaming: Dict[str, Any]
+    screens: Any
 
 
 CAPABILITY_DATA: Dict[str, Dict[str, Any]] = {capability_specs!r}
@@ -912,28 +914,110 @@ def _decision_from_action(action: Any) -> str:
     return "allow"
 
 
+def _as_list(value: Any) -> List[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return list(value)
+    return [value]
+
+
+def _screen_relationships(value: Any) -> List[Dict[str, Any]]:
+    relationships: List[Dict[str, Any]] = []
+    for item in _as_list(value):
+        if isinstance(item, dict):
+            relationships.append(dict(item))
+            continue
+        text = str(item).strip()
+        if not text:
+            continue
+        relation = {{"type": "relates_to"}}
+        if "->" in text:
+            source, target = [part.strip() for part in text.split("->", 1)]
+            relation.update({{"from": source, "to": target}})
+        else:
+            relation["to"] = text
+        relationships.append(relation)
+    return relationships
+
+
+def _normalize_screen(
+    capability: CapabilitySpec,
+    name: str,
+    spec: Any,
+    index: int = 0,
+) -> Dict[str, Any]:
+    screen_spec = dict(spec) if isinstance(spec, dict) else {{"component": spec or name}}
+    route = screen_spec.get("route", screen_spec.get("path", ""))
+    component = screen_spec.get("component", name)
+    return {{
+        "id": f"{{capability.name}}.{{name}}",
+        "capability": capability.name,
+        "name": name,
+        "path": route,
+        "route": route,
+        "layout": screen_spec.get("layout"),
+        "component": component,
+        "contains": _as_list(screen_spec.get("contains")),
+        "composes": _as_list(screen_spec.get("composes")),
+        "binds": _as_list(screen_spec.get("binds")),
+        "actions": _as_list(screen_spec.get("actions")),
+        "events": _as_list(screen_spec.get("events")),
+        "relationships": _screen_relationships(screen_spec.get("relationships")),
+        "permission": screen_spec.get("permission"),
+        "permissions": _as_list(screen_spec.get("permissions")),
+        "rules": _as_list(screen_spec.get("rules")),
+        "nav_group": screen_spec.get("nav_group"),
+        "shell": capability.ui.get("shell"),
+        "theme": screen_spec.get("theme", capability.theme.get("name")),
+        "spec": screen_spec,
+    }}
+
+
+def _declared_screen_specs(capability: CapabilitySpec) -> Any:
+    if capability.screens:
+        return capability.screens
+    ui_screens = capability.ui.get("screens")
+    return ui_screens if ui_screens else {{}}
+
+
 def capability_screens(capability_name: str) -> List[Dict[str, Any]]:
     capability = get_capability(capability_name)
-    routes = capability.ui.get("routes", [])
-    if not isinstance(routes, list):
-        return []
     screens: List[Dict[str, Any]] = []
-    for index, route in enumerate(routes):
-        if not isinstance(route, dict):
-            continue
-        name = str(route.get("name") or route.get("component") or f"screen_{{index + 1}}")
-        component = route.get("component", name)
-        screens.append({{
-            "id": f"{{capability.name}}.{{name}}",
-            "capability": capability.name,
-            "name": name,
-            "path": route.get("path", ""),
-            "component": component,
-            "permission": route.get("permission"),
-            "nav_group": route.get("nav_group"),
-            "shell": capability.ui.get("shell"),
-            "theme": capability.theme.get("name"),
-        }})
+    declared = _declared_screen_specs(capability)
+    if isinstance(declared, dict):
+        for index, (name, spec) in enumerate(declared.items()):
+            screens.append(_normalize_screen(capability, str(name), spec, index))
+    elif isinstance(declared, list):
+        for index, item in enumerate(declared):
+            if isinstance(item, dict):
+                name = str(item.get("name") or item.get("id") or item.get("component") or f"screen_{{index + 1}}")
+                screens.append(_normalize_screen(capability, name, item, index))
+            else:
+                name = str(item)
+                screens.append(_normalize_screen(capability, name, {{"component": name}}, index))
+
+    known_names = {{screen["name"] for screen in screens}}
+    routes = capability.ui.get("routes", [])
+    if isinstance(routes, list):
+        for index, route in enumerate(routes):
+            if not isinstance(route, dict):
+                continue
+            name = str(route.get("name") or route.get("component") or f"screen_{{index + 1}}")
+            if name in known_names:
+                continue
+            component = route.get("component", name)
+            screens.append({{
+                "id": f"{{capability.name}}.{{name}}",
+                "capability": capability.name,
+                "name": name,
+                "path": route.get("path", ""),
+                "component": component,
+                "permission": route.get("permission"),
+                "nav_group": route.get("nav_group"),
+                "shell": capability.ui.get("shell"),
+                "theme": capability.theme.get("name"),
+            }})
     return screens
 
 
@@ -991,6 +1075,31 @@ def composition_graph() -> Dict[str, List[Dict[str, Any]]]:
                 component_id = f"component:{{component}}"
                 node(component_id, "component", name=str(component))
                 edge(screen_id, component_id, "renders")
+            for contained in screen.get("contains", []):
+                contained_id = f"component:{{contained}}"
+                node(contained_id, "component", name=str(contained))
+                edge(screen_id, contained_id, "contains")
+            for composed in screen.get("composes", []):
+                composed_id = f"component:{{composed}}"
+                node(composed_id, "component", name=str(composed))
+                edge(screen_id, composed_id, "composes")
+            for binding in screen.get("binds", []):
+                binding_id = f"binding:{{binding}}"
+                node(binding_id, "binding", name=str(binding))
+                edge(screen_id, binding_id, "binds_to")
+            for relationship in screen.get("relationships", []):
+                if not isinstance(relationship, dict):
+                    continue
+                source = relationship.get("from")
+                target = relationship.get("to")
+                if not source or not target:
+                    continue
+                source_id = f"component:{{source}}"
+                target_id = f"component:{{target}}"
+                relation = str(relationship.get("via") or relationship.get("type") or "relates_to")
+                node(source_id, "component", name=str(source))
+                node(target_id, "component", name=str(target))
+                edge(source_id, target_id, relation)
 
         if isinstance(capability.components, dict):
             for component_name, component_spec in capability_components(capability.name).items():

@@ -160,6 +160,7 @@ class CapabilityDeclaration(EntityDeclaration):
 	master_data: Any = field(default_factory=dict)
 	i18n: Dict[str, Any] = field(default_factory=dict)
 	streaming: Dict[str, Any] = field(default_factory=dict)
+	screens: Any = field(default_factory=dict)
 
 
 @dataclass
@@ -549,6 +550,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			master_data=props.get("master_data", {}),
 			i18n=_dict_value(props.get("i18n", props.get("localization"))),
 			streaming=_dict_value(props.get("streaming")),
+			screens=contract_value("screens", props.get("screens", {})),
 			source_file=source_file,
 		)
 

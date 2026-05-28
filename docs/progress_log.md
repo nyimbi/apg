@@ -4707,3 +4707,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `7936c9c` (`Make screen composition first class in APG grammar`) to `origin/main`.
+
+### 2026-05-28 03:15 EAT
+
+Completed checkpoint:
+
+- Made the new APG `screens:` contract executable through the first-class capability compiler path.
+- Extended `CapabilityDeclaration` with a `screens` contract payload parsed from capability source.
+- Updated generated `apg_capabilities.py` manifests to expose declared screens, route indexes, contained/composed elements, bindings, actions, events, permissions, rules, and relationship metadata.
+- Extended the generated composition graph so screen nodes connect to rendered, contained, composed, bound, and explicitly related elements.
+- Added focused compiler coverage for parsing a capability screen contract and executing the generated screen/composition manifest.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/ast_builder.py compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 5 passed
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py tests/test_compiler_baseline.py tests/test_apg_language_contract.py tests/test_ai_agent_composition.py tests/test_code_generator_executable_defaults.py -q` -> 30 passed
+- `git diff --check -- compiler/ast_builder.py compiler/code_generator.py tests/test_capability_composition_runtime.py` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push for this checkpoint.
