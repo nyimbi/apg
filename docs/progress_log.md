@@ -7644,3 +7644,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_drift_json_compares_compiler_generated_artifact_and_runtime_surfaces tests/test_compiler_baseline.py::test_cli_drift_audit_fixtures_json_runs_checked_in_catalog -q` -> 2 passed
 - `.venv/bin/apg drift examples/05_single_support_agent/main.apg --json` -> emitted `apg.drift-report.v1` with 3/3 comparisons passing and 0 drift
 - `.venv/bin/apg drift --audit-fixtures --json` -> emitted `apg.drift-audit.v1` with 2/2 fixtures passing
+
+### 2026-05-28 20:13 EAT
+
+Completed checkpoint:
+
+- Promoted executable capability contract inspection from the legacy `python cli.py capabilities ...` helper surface into the installed Click CLI.
+- Added `apg capabilities contracts --json`, `apg capabilities validate-contracts --json`, and `apg capabilities list --category ... --json`.
+- Capability command JSON now emits `apg.capability-contracts.v1` and `apg.capability-contract-validation.v1` reports over the real capability contract registry.
+- Updated the tooling specification so the current executable baseline advertises `apg capabilities ...` while keeping `python cli.py capabilities ...` documented only as a compatibility alias.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile cli/capabilities_command.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_capabilities_contracts_json_uses_click_surface tests/test_compiler_baseline.py::test_cli_capabilities_validate_contracts_json_uses_click_surface -q` -> 2 passed
+- `.venv/bin/apg capabilities contracts --json` -> emitted `apg.capability-contracts.v1` with 109 contracts
+- `.venv/bin/apg capabilities validate-contracts --json` -> emitted `apg.capability-contract-validation.v1` with 109 valid contracts and 0 errors
+- `.venv/bin/apg capabilities list --category composition --json` -> emitted `apg.capability-contracts.v1` with 6 composition contracts

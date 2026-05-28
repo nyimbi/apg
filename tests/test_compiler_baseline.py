@@ -1520,6 +1520,32 @@ def test_cli_drift_audit_fixtures_json_runs_checked_in_catalog():
 	assert all(item["actual_ok"] is True for item in report["reports"])
 
 
+def test_cli_capabilities_contracts_json_uses_click_surface():
+	result = CliRunner().invoke(cli, ["capabilities", "contracts", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.capability-contracts.v1"
+	assert report["ok"] is True
+	assert report["contract_count"] >= 100
+	assert any(record["capability"] == "composition_events" for record in report["records"])
+	assert any(record["capability"] == "fintech_gateway" for record in report["records"])
+	assert all(record["routes"] > 0 for record in report["records"])
+	assert all(record["rules"] > 0 for record in report["records"])
+
+
+def test_cli_capabilities_validate_contracts_json_uses_click_surface():
+	result = CliRunner().invoke(cli, ["capabilities", "validate-contracts", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.capability-contract-validation.v1"
+	assert report["ok"] is True
+	assert report["valid"] is True
+	assert report["contract_count"] >= 100
+	assert report["error_count"] == 0
+
+
 def test_cli_explain_json_covers_symbols_diagnostics_and_handlers():
 	source = REPO_ROOT / "examples" / "20_enterprise_erp_platform" / "main.apg"
 

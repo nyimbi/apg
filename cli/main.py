@@ -17,6 +17,7 @@ from rich.console import Console
 apg_root = Path(__file__).parent.parent
 sys.path.insert(0, str(apg_root))
 
+from cli.capabilities_command import capabilities
 from cli.create_project import create
 from cli.compile_command import compile_cmd
 from cli.diagnostics_command import diagnostics
@@ -50,6 +51,7 @@ def cli():
 
 
 # Add subcommands
+cli.add_command(capabilities)
 cli.add_command(create)
 cli.add_command(compile_cmd, name='compile')
 cli.add_command(diagnostics)

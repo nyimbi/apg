@@ -63,8 +63,10 @@ APG currently has an executable compiler path:
 - generated apps expose `--self-test`, `--describe`, `--validate`, HTTP
   routes, OpenAPI JSON, component manifest JSON, and semantic-model JSON;
 - capability contracts can be inspected with
-  `python cli.py capabilities contracts --json` and validated with
-  `python cli.py capabilities validate-contracts`.
+  `apg capabilities contracts --json` and validated with
+  `apg capabilities validate-contracts --json`; the legacy
+  `python cli.py capabilities ...` helper path remains available as a
+  compatibility alias.
 
 The sections below define where the tooling needs to go. When a command is not
 implemented yet, the command name is the desired stable contract, not a claim
@@ -671,8 +673,8 @@ apg validate
 apg run
 apg doctor
 apg language-server
-python cli.py capabilities contracts --json
-python cli.py capabilities validate-contracts
+apg capabilities contracts --json
+apg capabilities validate-contracts --json
 ```
 
 `python` is the only compiler target. Desktop, mobile, web, and deployment
