@@ -34,6 +34,7 @@ from cli.migrate_plan_command import migrate_plan
 from cli.model_command import model
 from cli.nl_plan_command import nl_plan
 from cli.package_command import package
+from cli.package_verify_command import package_verify
 from cli.parser_golden_command import parser_golden
 from cli.release_command import release
 from cli.run_command import run
@@ -73,6 +74,7 @@ cli.add_command(migrate_plan)
 cli.add_command(model)
 cli.add_command(nl_plan)
 cli.add_command(package)
+cli.add_command(package_verify)
 cli.add_command(parser_golden)
 cli.add_command(release)
 cli.add_command(run)

@@ -1732,6 +1732,42 @@ def test_cli_deployment_verify_reports_package_evidence(tmp_path):
 	assert report["resource_hints"]["healthcheck"] is True
 
 
+def test_cli_package_verify_reports_mobile_profile_evidence(tmp_path):
+	source = REPO_ROOT / "examples" / "16_hr_payroll_operations" / "main.apg"
+	out_dir = tmp_path / "dist"
+
+	package_result = CliRunner().invoke(
+		cli,
+		["package", str(source), "--target", "mobile", "--out", str(out_dir), "--json"],
+	)
+	assert package_result.exit_code == 0, package_result.output
+	package_report = json.loads(package_result.output)
+	package_dir = Path(package_report["output_dir"])
+
+	result = CliRunner().invoke(cli, ["package-verify", str(package_dir), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.package-verification-report.v1"
+	assert report["ok"] is True
+	assert report["profile"] == "mobile"
+	assert report["manifest"]["base_target"] == "python"
+	assert report["release_evidence"]["ok"] is True
+	assert report["runtime"]["loaded"] is True
+	assert report["runtime"]["self_test"]["passed"] is True
+	assert report["runtime"]["contracts"]["openapi"]["errors"] == []
+	assert report["runtime"]["contracts"]["route_dispatch"]["errors"] == []
+	assert report["profile_checks"] == {
+		"metadata_exists": True,
+		"signing_posture_declared": True,
+		"offline_policy_declared": True,
+		"permissions_explained": True,
+		"screens_fit_target_density": True,
+		"smoke_launch_path_exists": True,
+		"smoke_test_runs": True,
+	}
+
+
 def test_cli_nl_plan_json_proposes_valid_credit_memo_dsl_diff_without_writing(tmp_path):
 	source = tmp_path / "finance.apg"
 	output = tmp_path / "generated"

@@ -60,6 +60,10 @@ APG currently has an executable compiler path:
 - `apg package <file> --target web|desktop|mobile|container --out <dir> --json`
   emits `apg.package-report.v1`, writes a generated Python application package,
   attaches release evidence, and adds profile-specific launch/manifest files;
+- `apg package-verify <package-dir> --json` emits
+  `apg.package-verification-report.v1` by validating an existing package
+  directory's manifest, release evidence, generated runtime contracts, smoke
+  test, and profile-specific web, desktop, mobile, container, or python checks;
 - `apg deployment verify <generated-or-package-dir> --json` emits
   `apg.deployment-verification-report.v1` by loading the generated package
   entrypoint, checking runtime self-test/component-manifest/semantic-model
@@ -711,6 +715,7 @@ apg migrate-plan previous.apg current.apg --backend postgresql --json
 apg package app.apg --target web --out dist --json
 apg package app.apg --target desktop --out dist
 apg package app.apg --target mobile --out dist
+apg package-verify dist/app-mobile --json
 apg deployment verify dist/app-container --json
 apg validate
 apg run
@@ -922,6 +927,12 @@ The current executable contract emits `apg.package-report.v1` and writes a
 package directory containing generated Python artifacts, `package_manifest.json`,
 `release_report.json`, and profile-specific files such as `run_web.py`,
 `run_desktop.py`, `mobile_profile.json`, or `container_profile.json`.
+`apg package-verify <package-dir> --json` emits
+`apg.package-verification-report.v1` for an existing package directory. It
+validates package metadata, release evidence, generated runtime contracts,
+OpenAPI/component/route dispatch checks, smoke tests, signing posture, offline
+policy, permissions, launchers, and profile-specific metadata without rebuilding
+the package.
 
 ### `apg deployment`
 

@@ -7847,3 +7847,24 @@ Battery-conscious verification:
 - `.venv/bin/apg package examples/10_themed_i18n_streaming_capability/main.apg --target container --out /private/tmp/apg_deployment_verify_smoke --json` passed and wrote a verified package.
 - `.venv/bin/apg deployment verify /private/tmp/apg_deployment_verify_smoke/localized_streaming_capability-container` passed with all six deployment checks green.
 - `git diff --check -- compiler/deployment_verifier.py cli/deployment_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `9a2bd25` (`Make deployment verification executable`).
+
+### 2026-05-28 21:45 EAT
+
+In progress:
+
+- Added standalone package profile verification for existing generated APG package directories.
+- Added `compiler.package_verifier.build_package_verification_report()` and `apg package-verify <package-dir> --json`.
+- Package verification now validates package manifests, release evidence, runtime OpenAPI/component/route contracts, generated smoke tests, and profile-specific web, desktop, mobile, container, or python package evidence.
+- Updated `docs/tooling.md` so package verification is documented as a current executable contract.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/package_verifier.py cli/package_verify_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_package_verify_reports_mobile_profile_evidence -q` passed with 1 test.
+- `.venv/bin/apg package examples/16_hr_payroll_operations/main.apg --target mobile --out /private/tmp/apg_package_verify_smoke --json` passed and wrote a verified mobile package.
+- `.venv/bin/apg package-verify /private/tmp/apg_package_verify_smoke/hr_payroll_operations-mobile` passed with all mobile profile checks green.
+- `git diff --check -- compiler/package_verifier.py cli/package_verify_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
