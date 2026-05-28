@@ -19,7 +19,8 @@ from .ast_builder import (
 	MethodDeclaration, Parameter, TypeAnnotation, Expression, Statement,
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
 	AssignmentStatement, ReturnStatement, BlockStatement, EntityType,
-	AIAgentDeclaration, AgentTeamDeclaration, ApplicationDeclaration, CapabilityDeclaration, ListExpression, DictExpression
+	AIAgentDeclaration, AgentTeamDeclaration, ApplicationDeclaration, CapabilityDeclaration,
+	DatabaseDeclaration, ListExpression, DictExpression
 )
 
 
@@ -583,12 +584,16 @@ class SemanticAnalyzer:
 	def _validate_database_constraints(self, entity: EntityDeclaration):
 		"""Validate database-specific constraints"""
 		# Check for connection properties
-		has_connection = any(
+		has_connection_config = (
+			isinstance(entity, DatabaseDeclaration)
+			and any(entity.connection_config.get(key) is not None for key in ["url", "host", "port", "database"])
+		)
+		has_connection_property = any(
 			prop.name in ['url', 'host', 'port', 'database'] 
 			for prop in entity.properties
 		)
 		
-		if not has_connection:
+		if not (has_connection_config or has_connection_property):
 			self.warnings.append(SemanticError(
 				f"Database '{entity.name}' should have connection configuration",
 				entity,

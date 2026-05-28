@@ -513,6 +513,9 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			if kind == "capability":
 				module.entities.append(self._parse_source_capability(name, body, source_file))
 				continue
+			if kind in {"db", "database"}:
+				module.entities.append(self._parse_source_database(name, body, source_file))
+				continue
 			properties, methods = self._parse_source_members(body, source_file)
 			entity_type = self._entity_type_for_source_kind(kind)
 			module.entities.append(EntityDeclaration(
@@ -526,8 +529,52 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		return module
 
 	def _strip_comments(self, source_code: str) -> str:
-		source_code = re.sub(r"/\*.*?\*/", "", source_code, flags=re.DOTALL)
-		return re.sub(r"//.*", "", source_code)
+		"""Strip APG comments while preserving comment markers inside strings."""
+		result: List[str] = []
+		index = 0
+		quote: Optional[str] = None
+		escaped = False
+
+		while index < len(source_code):
+			char = source_code[index]
+			next_char = source_code[index + 1:index + 2]
+
+			if quote:
+				result.append(char)
+				if escaped:
+					escaped = False
+				elif char == "\\":
+					escaped = True
+				elif char == quote:
+					quote = None
+				index += 1
+				continue
+
+			if char in {"'", '"'}:
+				quote = char
+				result.append(char)
+				index += 1
+				continue
+
+			if char == "/" and next_char == "/":
+				index += 2
+				while index < len(source_code) and source_code[index] != "\n":
+					index += 1
+				continue
+
+			if char == "/" and next_char == "*":
+				index += 2
+				while index + 1 < len(source_code) and source_code[index:index + 2] != "*/":
+					if source_code[index] == "\n":
+						result.append("\n")
+					index += 1
+				index += 2
+				continue
+
+			result.append(char)
+			index += 1
+
+		return "".join(result)
 
 	def _iter_source_entities(self, source_code: str):
 		keywords = self._source_entity_keywords()
@@ -677,6 +724,141 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			source_file=source_file,
 		)
 
+	def _parse_source_database(
+		self,
+		name: str,
+		body: str,
+		source_file: Optional[str],
+	) -> DatabaseDeclaration:
+		"""Parse DB connection metadata and DBML schemas from source text."""
+		from .ai_agent_composition import _parse_value, _split_statements
+
+		body_without_schemas = self._remove_source_blocks(body, {"schema"})
+		connection_config: Dict[str, Any] = {}
+		properties: List[PropertyDeclaration] = []
+
+		for statement in _split_statements(body_without_schemas):
+			if ":" not in statement:
+				continue
+			key, value = statement.split(":", 1)
+			config_key = key.strip()
+			if not config_key:
+				continue
+			parsed_value = _parse_value(value.strip())
+			connection_config[config_key] = parsed_value
+			properties.append(PropertyDeclaration(
+				name=config_key,
+				type_annotation=self._parse_source_type(type(parsed_value).__name__, source_file),
+				default_value=parsed_value,
+				source_file=source_file,
+			))
+
+		return DatabaseDeclaration(
+			entity_type=EntityType.DATABASE,
+			name=name,
+			properties=properties,
+			connection_config=connection_config,
+			schemas=[
+				self._parse_source_database_schema(schema_name, schema_body, source_file)
+				for schema_name, schema_body in self._iter_named_source_blocks(body, {"schema"})
+			],
+			source_file=source_file,
+		)
+
+	def _parse_source_database_schema(
+		self,
+		name: str,
+		body: str,
+		source_file: Optional[str],
+	) -> DatabaseSchema:
+		"""Parse a DBML schema body into database AST nodes."""
+		return DatabaseSchema(
+			name=name,
+			tables=[
+				self._parse_source_table(table_name, table_body, source_file)
+				for table_name, table_body in self._iter_named_source_blocks(body, {"table"})
+			],
+			source_file=source_file,
+		)
+
+	def _parse_source_table(
+		self,
+		name: str,
+		body: str,
+		source_file: Optional[str],
+	) -> TableDeclaration:
+		"""Parse a DBML table body into column and index declarations."""
+		return TableDeclaration(
+			name=name,
+			columns=self._parse_source_columns(self._remove_source_blocks(body, {"indexes"}), source_file),
+			indexes=self._parse_source_indexes(body, source_file),
+			source_file=source_file,
+		)
+
+	def _parse_source_columns(
+		self,
+		body: str,
+		source_file: Optional[str],
+	) -> List[ColumnDeclaration]:
+		"""Parse DBML column declarations from a table body."""
+		columns: List[ColumnDeclaration] = []
+		column_pattern = re.compile(
+			r"^\s*(?P<name>[^\W\d]\w*)\s+"
+			r"(?P<type>[^\s\[]+(?:\([^)]*\))?)"
+			r"(?:\s+(?P<nullable>not\s+null|null))?"
+			r"(?:\s*\[(?P<constraints>[^\]]*)\])?\s*$",
+			re.UNICODE,
+		)
+
+		for line in body.splitlines():
+			stripped = line.strip()
+			if not stripped or stripped.startswith(("constraint ", "trigger ", "vector_index ")):
+				continue
+			match = column_pattern.match(stripped)
+			if not match:
+				continue
+			constraints = self._split_source_options(match.group("constraints") or "")
+			nullable_text = (match.group("nullable") or "").lower()
+			constraint_text = " ".join(constraints).lower()
+			columns.append(ColumnDeclaration(
+				name=match.group("name"),
+				data_type=match.group("type"),
+				is_primary_key="pk" in constraints or "primary key" in constraint_text,
+				is_nullable=not ("not null" in nullable_text or "not null" in constraint_text),
+				default_value=self._extract_source_option_value(constraints, "default"),
+				constraints=constraints,
+				source_file=source_file,
+			))
+		return columns
+
+	def _parse_source_indexes(
+		self,
+		body: str,
+		source_file: Optional[str],
+	) -> List[IndexDeclaration]:
+		"""Parse DBML indexes blocks from a table body."""
+		indexes: List[IndexDeclaration] = []
+		for _block_name, indexes_body in self._iter_named_source_blocks(body, {"indexes"}):
+			for line in indexes_body.splitlines():
+				stripped = line.strip()
+				if not stripped:
+					continue
+				options_match = re.search(r"\[(?P<options>[^\]]*)\]\s*$", stripped)
+				options = self._split_source_options(options_match.group("options") if options_match else "")
+				columns_text = stripped[:options_match.start()].strip() if options_match else stripped
+				columns_text = columns_text.strip("()")
+				columns = [column.strip() for column in columns_text.split(",") if column.strip()]
+				if not columns:
+					continue
+				indexes.append(IndexDeclaration(
+					name=self._extract_source_option_value(options, "name"),
+					columns=columns,
+					is_unique="unique" in options,
+					index_type=self._extract_source_option_value(options, "type"),
+					source_file=source_file,
+				))
+		return indexes
+
 	def _parse_source_members(self, body: str, source_file: Optional[str]):
 		properties: List[PropertyDeclaration] = []
 		methods: List[MethodDeclaration] = []
@@ -740,6 +922,106 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		if index < len(body) and body[index] == ";":
 			index += 1
 		return match.start(), index
+
+	def _iter_named_source_blocks(self, body: str, block_names: set[str]):
+		"""Yield named source blocks such as schema/table blocks."""
+		header = re.compile(
+			r"\b(" + "|".join(re.escape(name) for name in sorted(block_names)) + r")\b(?:\s+([^\s{\[]+))?[^{]*\{",
+			re.UNICODE,
+		)
+		position = 0
+		while True:
+			match = header.search(body, position)
+			if not match:
+				break
+			open_brace = body.find("{", match.end() - 1)
+			close_brace = self._find_source_matching_brace(body, open_brace)
+			if close_brace < 0:
+				break
+			yield match.group(2) or match.group(1), body[open_brace + 1:close_brace]
+			position = close_brace + 1
+
+	def _remove_source_blocks(self, body: str, block_names: set[str]) -> str:
+		"""Remove named nested blocks before parsing top-level statements."""
+		header = re.compile(
+			r"\b(" + "|".join(re.escape(name) for name in sorted(block_names)) + r")\b(?:\s+[^\s{\[]+)?[^{]*\{",
+			re.UNICODE,
+		)
+		ranges: List[tuple[int, int]] = []
+		for match in header.finditer(body):
+			open_brace = body.find("{", match.end() - 1)
+			close_brace = self._find_source_matching_brace(body, open_brace)
+			if close_brace >= 0:
+				ranges.append((match.start(), close_brace + 1))
+		if not ranges:
+			return body
+
+		result: List[str] = []
+		start = 0
+		for range_start, range_end in ranges:
+			result.append(body[start:range_start])
+			start = range_end
+		result.append(body[start:])
+		return "".join(result)
+
+	def _find_source_matching_brace(self, source: str, open_brace: int) -> int:
+		"""Find a matching brace while respecting quoted strings."""
+		if open_brace < 0:
+			return -1
+		depth = 0
+		quote: Optional[str] = None
+		escaped = False
+		for index in range(open_brace, len(source)):
+			char = source[index]
+			if quote:
+				if escaped:
+					escaped = False
+				elif char == "\\":
+					escaped = True
+				elif char == quote:
+					quote = None
+				continue
+			if char in {"'", '"'}:
+				quote = char
+			elif char == "{":
+				depth += 1
+			elif char == "}":
+				depth -= 1
+				if depth == 0:
+					return index
+		return -1
+
+	def _split_source_options(self, options_text: str) -> List[str]:
+		"""Split DBML bracket options while preserving option values."""
+		if not options_text.strip():
+			return []
+		options: List[str] = []
+		start = 0
+		quote: Optional[str] = None
+		for index, char in enumerate(options_text):
+			if quote:
+				if char == quote and options_text[index - 1:index] != "\\":
+					quote = None
+				continue
+			if char in {"'", '"'}:
+				quote = char
+			elif char == ",":
+				option = options_text[start:index].strip()
+				if option:
+					options.append(option)
+				start = index + 1
+		last_option = options_text[start:].strip()
+		if last_option:
+			options.append(last_option)
+		return options
+
+	def _extract_source_option_value(self, options: List[str], key: str) -> Optional[str]:
+		"""Extract a `key: value` DBML option value."""
+		prefix = f"{key}:"
+		for option in options:
+			if option.startswith(prefix):
+				return option[len(prefix):].strip().strip("'\"")
+		return None
 
 	def _parse_source_parameters(self, params: str, source_file: Optional[str]) -> List[Parameter]:
 		parsed: List[Parameter] = []

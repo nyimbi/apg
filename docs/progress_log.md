@@ -6878,3 +6878,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_composition_registry_service_metadata.py -q` -> 2 passed, 2 pre-existing warnings
 - `git diff --check capabilities/composition/registry/service.py tests/test_composition_registry_service_metadata.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:25 EAT
+
+Completed checkpoint:
+
+- Made source-backed `db` / `database` declarations build typed `DatabaseDeclaration` AST nodes instead of generic entities.
+- Database AST now preserves connection config, schema names, table names, columns, column constraints, defaults, nullability, primary keys, and DBML indexes.
+- Fixed APG source comment stripping so `//` inside quoted strings, including database URLs, is not treated as a comment.
+- Updated semantic database validation to use typed `DatabaseDeclaration.connection_config` as well as legacy properties.
+- Added focused compiler regression coverage for database AST construction and semantic validation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/ast_builder.py compiler/semantic_analyzer.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 2 passed
+- `.venv/bin/python -m pytest tests/test_parser.py::TestAPGParser::test_database_parsing tests/test_semantic_analyzer.py::TestSemanticAnalyzer::test_database_validation -q` -> 2 passed, 1 pre-existing warning
+- `git diff --check compiler/ast_builder.py compiler/semantic_analyzer.py tests/test_compiler_database_ast.py`
+- Deferred broader pytest at the user's request to conserve battery.
