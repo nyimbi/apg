@@ -657,37 +657,133 @@ EdgeComputingManager._initialize_sample_edge_infrastructure = _initialize_sample
 # Additional helper methods for EdgeComputingManager
 async def _discover_device_clusters(self, device_id: str):
     """Auto-discover potential device clusters"""
-    pass  # Implementation for device clustering discovery
+    device = self.devices[device_id]
+    nearby_devices = []
+    for candidate_id, candidate in self.devices.items():
+        if candidate_id == device_id:
+            continue
+        same_timezone = candidate.location.get("timezone") == device.location.get("timezone")
+        same_type = candidate.device_type == device.device_type
+        if same_timezone or same_type:
+            nearby_devices.append(candidate_id)
+            discovery = candidate.metadata.setdefault("cluster_discovery", {
+                "nearby_devices": [],
+                "candidate_count": 0,
+                "discovered_at": datetime.now().isoformat()
+            })
+            if device_id not in discovery["nearby_devices"]:
+                discovery["nearby_devices"].append(device_id)
+                discovery["candidate_count"] = len(discovery["nearby_devices"])
+                discovery["discovered_at"] = datetime.now().isoformat()
+    device.metadata["cluster_discovery"] = {
+        "nearby_devices": nearby_devices,
+        "candidate_count": len(nearby_devices),
+        "discovered_at": datetime.now().isoformat()
+    }
 
 
 async def _initialize_device_monitoring(self, device_id: str):
     """Initialize monitoring for edge device"""
-    pass  # Implementation for device monitoring setup
+    device = self.devices[device_id]
+    device.health_status = "healthy"
+    device.last_heartbeat = datetime.now()
+    self.device_heartbeats[device_id] = device.last_heartbeat
+    device.metadata["monitoring"] = {
+        "enabled": True,
+        "heartbeat_interval_seconds": self.edge_settings["heartbeat_interval_seconds"],
+        "health_check_interval_seconds": self.edge_settings["health_check_interval_seconds"],
+        "initialized_at": datetime.now().isoformat()
+    }
 
 
 async def _optimize_cluster_geography(self, cluster: EdgeCluster):
     """Optimize cluster for geographic proximity"""
-    pass  # Implementation for geographic optimization
+    devices = [self.devices[device_id] for device_id in cluster.devices if device_id in self.devices]
+    if not devices:
+        cluster.metadata["geographic_optimization"] = {"status": "skipped", "reason": "no devices"}
+        return
+    average_latitude = sum(float(device.location["latitude"]) for device in devices) / len(devices)
+    average_longitude = sum(float(device.location["longitude"]) for device in devices) / len(devices)
+    timezones = sorted({device.location.get("timezone", "unknown") for device in devices})
+    cluster.geographic_region.update({
+        "centroid": {
+            "latitude": round(average_latitude, 6),
+            "longitude": round(average_longitude, 6)
+        },
+        "timezones": timezones,
+        "device_count": len(devices)
+    })
+    cluster.metadata["geographic_optimization"] = {
+        "status": "optimized",
+        "optimized_at": datetime.now().isoformat()
+    }
 
 
 async def _configure_cluster_networking(self, cluster: EdgeCluster):
     """Configure cluster networking and load balancing"""
-    pass  # Implementation for cluster networking
+    connectivity_counts: Dict[str, int] = {}
+    for device_id in cluster.devices:
+        device = self.devices.get(device_id)
+        if not device:
+            continue
+        for connectivity in device.connectivity:
+            connectivity_counts[connectivity.value] = connectivity_counts.get(connectivity.value, 0) + 1
+    preferred_connectivity = max(connectivity_counts, key=connectivity_counts.get) if connectivity_counts else "unknown"
+    cluster.failover_configuration.update({
+        "enabled": True,
+        "preferred_connectivity": preferred_connectivity,
+        "connectivity_counts": connectivity_counts,
+        "minimum_healthy_devices": max(1, len(cluster.devices) // 2)
+    })
+    if len(cluster.devices) > 10:
+        cluster.load_balancing_strategy = "least_connections"
 
 
 async def _initialize_cluster_monitoring(self, cluster: EdgeCluster):
     """Initialize cluster health monitoring"""
-    pass  # Implementation for cluster monitoring
+    healthy_devices = 0
+    now = datetime.now()
+    for device_id in cluster.devices:
+        last_heartbeat = self.device_heartbeats.get(device_id)
+        if last_heartbeat and (now - last_heartbeat).total_seconds() <= self.edge_settings["heartbeat_interval_seconds"] * 2:
+            healthy_devices += 1
+    cluster.health_score = (healthy_devices / len(cluster.devices) * 100) if cluster.devices else 0.0
+    cluster.metadata["monitoring"] = {
+        "enabled": True,
+        "healthy_devices": healthy_devices,
+        "total_devices": len(cluster.devices),
+        "initialized_at": now.isoformat()
+    }
 
 
 async def _validate_edge_targets(self, config: EdgeConfiguration):
     """Validate edge configuration targets"""
-    pass  # Implementation for target validation
+    missing_devices = [device_id for device_id in config.target_devices if device_id not in self.devices]
+    missing_clusters = [cluster_id for cluster_id in config.target_clusters if cluster_id not in self.clusters]
+    if missing_devices:
+        raise ValueError(f"Unknown edge target devices: {', '.join(missing_devices)}")
+    if missing_clusters:
+        raise ValueError(f"Unknown edge target clusters: {', '.join(missing_clusters)}")
+    expanded_targets = set(config.target_devices)
+    for cluster_id in config.target_clusters:
+        expanded_targets.update(self.clusters[cluster_id].devices)
+    if not expanded_targets:
+        raise ValueError("Edge configuration must target at least one device")
+    config.configuration_spec.setdefault("target_summary", {
+        "device_count": len(expanded_targets),
+        "cluster_count": len(config.target_clusters)
+    })
 
 
 async def _optimize_configuration_bandwidth(self, config: EdgeConfiguration):
     """Optimize configuration for bandwidth constraints"""
-    pass  # Implementation for bandwidth optimization
+    networking = config.configuration_spec.setdefault("networking", {})
+    networking.setdefault("compression", "gzip")
+    networking.setdefault("delta_sync", True)
+    networking.setdefault("max_payload_kb", 512)
+    monitoring = config.monitoring_configuration
+    monitoring.setdefault("sampling_interval_seconds", 60)
+    monitoring.setdefault("batch_metrics", True)
 
 
 async def _generate_resource_constraints(self, config: EdgeConfiguration) -> Dict[str, Any]:
@@ -712,7 +808,17 @@ async def _generate_edge_security_policies(self, config: EdgeConfiguration) -> D
 
 async def _expand_cluster_targets(self, deployment: EdgeDeploymentExecution):
     """Expand cluster targets to individual devices"""
-    pass  # Implementation for cluster expansion
+    ordered_targets = list(deployment.target_devices)
+    seen = set(ordered_targets)
+    for cluster_id in deployment.target_clusters:
+        cluster = self.clusters.get(cluster_id)
+        if not cluster:
+            raise ValueError(f"Cluster {cluster_id} not found")
+        for device_id in cluster.devices:
+            if device_id not in seen:
+                ordered_targets.append(device_id)
+                seen.add(device_id)
+    deployment.target_devices = ordered_targets
 
 
 async def _optimize_deployment_order(self, deployment: EdgeDeploymentExecution) -> List[str]:
@@ -722,37 +828,137 @@ async def _optimize_deployment_order(self, deployment: EdgeDeploymentExecution) 
 
 async def _execute_blue_green_deployment(self, deployment: EdgeDeploymentExecution, deployment_order: List[str]):
     """Execute blue-green deployment strategy"""
-    pass  # Implementation for blue-green deployment
+    deployment.execution_log.append({
+        "phase": "blue_green_prepare",
+        "message": "Prepared green configuration slot",
+        "timestamp": datetime.now().isoformat()
+    })
+    batch_results = await self._deploy_to_device_batch(deployment.configuration_id, deployment_order)
+    for device_id, success in batch_results.items():
+        if success:
+            deployment.successful_devices.append(device_id)
+        else:
+            deployment.failed_devices.append(device_id)
+    await self._perform_deployment_health_check(deployment)
+    deployment.status = "completed" if not deployment.failed_devices else "failed"
+    deployment.progress_percentage = 100.0
+    deployment.completed_at = datetime.now()
 
 
 async def _execute_canary_deployment(self, deployment: EdgeDeploymentExecution, deployment_order: List[str]):
     """Execute canary deployment strategy"""
-    pass  # Implementation for canary deployment
+    canary_size = max(1, len(deployment_order) // 10)
+    canary_devices = deployment_order[:canary_size]
+    remaining_devices = deployment_order[canary_size:]
+    canary_results = await self._deploy_to_device_batch(deployment.configuration_id, canary_devices)
+    for device_id, success in canary_results.items():
+        if success:
+            deployment.successful_devices.append(device_id)
+        else:
+            deployment.failed_devices.append(device_id)
+    await self._perform_deployment_health_check(deployment)
+    if deployment.failed_devices:
+        deployment.status = "failed"
+        deployment.rollback_triggered = True
+        deployment.completed_at = datetime.now()
+        deployment.progress_percentage = len(deployment.successful_devices) / len(deployment_order) * 100
+        return
+    remaining_results = await self._deploy_to_device_batch(deployment.configuration_id, remaining_devices)
+    for device_id, success in remaining_results.items():
+        if success:
+            deployment.successful_devices.append(device_id)
+        else:
+            deployment.failed_devices.append(device_id)
+    deployment.status = "completed" if not deployment.failed_devices else "partially_completed"
+    deployment.progress_percentage = 100.0
+    deployment.completed_at = datetime.now()
 
 
 async def _execute_geographic_deployment(self, deployment: EdgeDeploymentExecution, deployment_order: List[str]):
     """Execute geographic rollout deployment"""
-    pass  # Implementation for geographic deployment
+    by_timezone: Dict[str, List[str]] = {}
+    for device_id in deployment_order:
+        device = self.devices.get(device_id)
+        timezone = device.location.get("timezone", "unknown") if device else "unknown"
+        by_timezone.setdefault(timezone, []).append(device_id)
+    for timezone in sorted(by_timezone):
+        deployment.execution_log.append({
+            "phase": "geographic_rollout",
+            "timezone": timezone,
+            "device_count": len(by_timezone[timezone]),
+            "timestamp": datetime.now().isoformat()
+        })
+        results = await self._deploy_to_device_batch(deployment.configuration_id, by_timezone[timezone])
+        for device_id, success in results.items():
+            if success:
+                deployment.successful_devices.append(device_id)
+            else:
+                deployment.failed_devices.append(device_id)
+        await self._perform_deployment_health_check(deployment)
+    deployment.status = "completed" if not deployment.failed_devices else "partially_completed"
+    deployment.progress_percentage = 100.0
+    deployment.completed_at = datetime.now()
 
 
 async def _perform_deployment_health_check(self, deployment: EdgeDeploymentExecution):
     """Perform health check during deployment"""
-    pass  # Implementation for deployment health checks
+    checked_devices = deployment.successful_devices + deployment.failed_devices
+    healthy_devices = 0
+    now = datetime.now()
+    for device_id in checked_devices:
+        last_heartbeat = self.device_heartbeats.get(device_id)
+        if last_heartbeat and (now - last_heartbeat).total_seconds() <= 120:
+            healthy_devices += 1
+    total_checked = len(checked_devices)
+    success_rate = healthy_devices / total_checked if total_checked else 1.0
+    deployment.health_checks.append({
+        "healthy": success_rate >= 0.8,
+        "healthy_devices": healthy_devices,
+        "checked_devices": total_checked,
+        "success_rate": success_rate,
+        "timestamp": now.isoformat()
+    })
+    if total_checked and success_rate < 0.5:
+        deployment.rollback_triggered = True
 
 
 async def _optimize_resource_requirements(self, resources: Dict[str, Any], capabilities: List[Dict[str, Any]]):
     """Optimize resource requirements for edge devices"""
-    pass  # Implementation for resource optimization
+    if not capabilities:
+        return
+    min_cpu = min(int(item["hardware"].get("cpu_cores", 1)) for item in capabilities)
+    min_memory_mb = min(int(float(item["hardware"].get("memory_gb", 1)) * 1024) for item in capabilities)
+    min_storage_mb = min(int(float(item["hardware"].get("storage_gb", 1)) * 1024) for item in capabilities)
+    resources["cpu_cores"] = min(int(resources.get("cpu_cores", min_cpu)), min_cpu)
+    resources["memory_mb"] = min(int(resources.get("memory_mb", min_memory_mb)), min_memory_mb)
+    resources["storage_mb"] = min(int(resources.get("storage_mb", min_storage_mb)), min_storage_mb)
+    resources["optimized_for_edge"] = True
 
 
 async def _optimize_network_configuration(self, networking: Dict[str, Any], capabilities: List[Dict[str, Any]]):
     """Optimize network configuration for edge devices"""
-    pass  # Implementation for network optimization
+    connectivity_counts: Dict[str, int] = {}
+    for capability in capabilities:
+        for connectivity in capability["connectivity"]:
+            connectivity_counts[connectivity.value] = connectivity_counts.get(connectivity.value, 0) + 1
+    preferred = max(connectivity_counts, key=connectivity_counts.get) if connectivity_counts else "unknown"
+    networking["preferred_connectivity"] = preferred
+    networking["retry_policy"] = {
+        "max_retries": 3,
+        "backoff_seconds": 5
+    }
+    networking["offline_tolerant"] = preferred in {EdgeConnectivity.SATELLITE.value, EdgeConnectivity.LORA.value, EdgeConnectivity.CELLULAR_4G.value}
 
 
 async def _optimize_storage_configuration(self, storage: Dict[str, Any], capabilities: List[Dict[str, Any]]):
     """Optimize storage configuration for edge devices"""
-    pass  # Implementation for storage optimization
+    if not capabilities:
+        return
+    min_storage_gb = min(float(item["hardware"].get("storage_gb", 1)) for item in capabilities)
+    requested_cache_mb = int(storage.get("cache_mb", min_storage_gb * 1024 * 0.1))
+    storage["cache_mb"] = min(requested_cache_mb, int(min_storage_gb * 1024 * 0.2))
+    storage["retention_policy"] = storage.get("retention_policy", "size_bounded")
+    storage["local_persistence"] = storage.get("local_persistence", True)
 
 
 # Attach helper methods to the class
