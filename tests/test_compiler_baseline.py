@@ -109,6 +109,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 		spec.loader.exec_module(module)
 		manifest = module.describe_application()
 		invocation = module.invoke_agent("Planner", {"input": {"task": "plan"}})
+		self_test = module.self_test()
 	finally:
 		sys.modules.pop("generated_pkg", None)
 		for name in list(sys.modules):
@@ -127,6 +128,9 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert invocation["runtime"] == "codex"
 	assert invocation["status"] == "adapter_required"
 	assert invocation["input"] == {"task": "plan"}
+	assert self_test["passed"] is True
+	assert "/self-test" in self_test["routes"]
+	assert self_test["checks"]["entity_count"] == 1
 	assert module.auth_status()["mode"] == "open"
 	assert module.metrics_snapshot()["entity_count"] == 1
 	assert module.openapi_document()["openapi"] == "3.1.0"
@@ -141,6 +145,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "metrics_snapshot" in module.__all__
 	assert "openapi_document" in module.__all__
 	assert "relationship_graph" in module.__all__
+	assert "self_test" in module.__all__
 	assert "storage_status" in module.__all__
 	assert "validate_application" in module.__all__
 	assert "validate_record" in module.__all__
@@ -189,6 +194,8 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 			validation = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/openapi.json", timeout=1) as response:
 			openapi = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/self-test", timeout=1) as response:
+			self_test = json.loads(response.read().decode("utf-8"))
 		request = urllib.request.Request(
 			f"{base_url}/agents/Planner/invoke",
 			data=json.dumps({"input": {"ticket": "reset password"}}).encode("utf-8"),
@@ -213,6 +220,9 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	assert invocation["status"] == "adapter_required"
 	assert invocation["input"] == {"ticket": "reset password"}
 	assert "/agents/Planner/invoke" in openapi["paths"]
+	assert "/self-test" in openapi["paths"]
+	assert self_test["passed"] is True
+	assert self_test["checks"]["route_count"] >= 1
 	assert validation["valid"] is True
 
 
@@ -360,6 +370,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert "/ui/entities/Customer" in ui_index
 	assert "/events" in ui_index
 	assert "/metrics" in ui_index
+	assert "/self-test" in ui_index
 	assert "/openapi.json" in ui_index
 	assert 'action="/entities/Customer/records"' in entity_ui
 	assert "<pre>" in entity_ui
@@ -370,6 +381,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert "/auth" in openapi["paths"]
 	assert "/events" in openapi["paths"]
 	assert "/metrics" in openapi["paths"]
+	assert "/self-test" in openapi["paths"]
 	assert "ApiKeyAuth" in openapi["components"]["securitySchemes"]
 	assert "/entities/Customer/records" in openapi["paths"]
 	assert "/entities/Customer/records/{id}" in openapi["paths"]
@@ -728,6 +740,7 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "Compilation successful" in result.output
 	assert f"python {output}/app.py" in result.output
 	assert f"python {output}/app.py --describe" in result.output
+	assert f"python {output}/app.py --self-test" in result.output
 	assert "standard-library HTTP server" in result.output
 	assert (output / "app.py").exists()
 	assert (output / "ai_agents.py").exists()
@@ -748,6 +761,7 @@ def test_cli_init_describes_python_artifact_flow():
 	assert result.exit_code == 0, result.output
 	assert "generate Python artifacts" in result.output
 	assert "python generated/app.py" in result.output
+	assert "python generated/app.py --self-test" in result.output
 	assert "Flask-AppBuilder" not in result.output
 
 

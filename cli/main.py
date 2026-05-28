@@ -240,6 +240,7 @@ agent BasicAgent {{
 	console.print("  2. Run 'apg compile' to generate Python artifacts")
 	console.print("  3. Run 'python generated/app.py' to start the generated application")
 	console.print("  4. Run 'python generated/app.py --describe' to inspect JSON metadata")
+	console.print("  5. Run 'python generated/app.py --self-test' to verify the generated application")
 
 
 if __name__ == '__main__':

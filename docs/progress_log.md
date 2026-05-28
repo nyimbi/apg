@@ -5587,3 +5587,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `bf07627` (`Make generated AI agents invocable`) to `origin/main`.
+
+### 2026-05-28 07:29 EAT
+
+Completed checkpoint:
+
+- Added a generated application self-test contract.
+- Generated apps now expose `self_test()` from Python packages.
+- Generated apps now serve `GET /self-test` for health, validation, metrics, route count, entity count, and route inventory.
+- Generated `/ui` links to self-test and generated OpenAPI advertises `/self-test`.
+- Generated app CLI now supports `python app.py --self-test`.
+- APG compile/init next-step text now points users to the self-test command.
+- Added focused regression coverage for package self-test, HTTP self-test, OpenAPI/UI exposure, and compile/init guidance.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py cli/compile_command.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 17 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated self-test slice.

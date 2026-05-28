@@ -425,6 +425,26 @@ def metrics_snapshot() -> Dict[str, Any]:
     }}
 
 
+def self_test() -> Dict[str, Any]:
+    validation = validate_application()
+    openapi = openapi_document()
+    routes = sorted(openapi["paths"])
+    metrics = metrics_snapshot()
+    return {{
+        "name": MODULE_NAME,
+        "version": MODULE_VERSION,
+        "passed": validation["valid"],
+        "status": "ok" if validation["valid"] else "warning",
+        "checks": {{
+            "validation": validation,
+            "metrics": metrics,
+            "route_count": len(routes),
+            "entity_count": metrics["entity_count"],
+        }},
+        "routes": routes,
+    }}
+
+
 def auth_status() -> Dict[str, Any]:
     return {{
         "mode": "api_key" if os.environ.get("APG_API_KEY") else "open",
@@ -555,6 +575,7 @@ def openapi_document() -> Dict[str, Any]:
         "/events": {{"get": _api_operation("Record mutation events", "Event log")}},
         "/auth": {{"get": _api_operation("Authentication status", "Authentication mode")}},
         "/metrics": {{"get": _api_operation("Application metrics", "Runtime metrics")}},
+        "/self-test": {{"get": _api_operation("Application self-test", "Self-test report")}},
         "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
         "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph")}},
         "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
@@ -845,6 +866,7 @@ def _ui_index_html() -> str:
         '<nav><a href="/manifest">Manifest JSON</a> | '
         '<a href="/events">Events</a> | '
         '<a href="/metrics">Metrics</a> | '
+        '<a href="/self-test">Self-Test</a> | '
         '<a href="/records">Record JSON</a> | '
         '<a href="/relationships">Relationships</a> | '
         '<a href="/openapi.json">API Contract</a></nav>'
@@ -976,6 +998,9 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, {{"events": list_events()}}
     if path == "/metrics":
         return 200, metrics_snapshot()
+    if path == "/self-test":
+        report = self_test()
+        return (200 if report["passed"] else 422), report
     if path == "/records" or path.startswith("/records/") or (
         path.startswith("/entities/") and "/records" in path
     ):
@@ -1387,6 +1412,9 @@ def main(argv: list[str] | None = None) -> None:
         return
     if "--validate" in args:
         print(json.dumps(validate_application(), indent=2, sort_keys=True))
+        return
+    if "--self-test" in args:
+        print(json.dumps(self_test(), indent=2, sort_keys=True))
         return
     host = _arg_value(args, "--host", os.environ.get("APG_HOST") or os.environ.get("HOST") or "127.0.0.1")
     port = _arg_value(args, "--port", os.environ.get("APG_PORT") or os.environ.get("PORT") or "8080")
@@ -2775,7 +2803,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import auth_status, describe_application, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, relationship_graph, storage_status, validate_application, validate_record',
+			'from .app import auth_status, describe_application, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, relationship_graph, self_test, storage_status, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
@@ -2788,6 +2816,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    "metrics_snapshot",',
 			'    "openapi_document",',
 			'    "relationship_graph",',
+			'    "self_test",',
 			'    "storage_status",',
 			'    "validate_application",',
 			'    "validate_record",',

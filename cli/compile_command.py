@@ -227,7 +227,8 @@ def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool):
 			console.print(f"  2. pip install -r {config.output_directory}/requirements.txt", soft_wrap=True)
 			console.print(f"  3. python {config.output_directory}/app.py", soft_wrap=True)
 			console.print(f"  4. python {config.output_directory}/app.py --describe", soft_wrap=True)
-			console.print("\n[green]The generated Python app starts a standard-library HTTP server. Use --describe for JSON metadata.[/green]")
+			console.print(f"  5. python {config.output_directory}/app.py --self-test", soft_wrap=True)
+			console.print("\n[green]The generated Python app starts a standard-library HTTP server. Use --self-test for a local health contract.[/green]")
 			
 		else:
 			progress.update(task, description="❌ Compilation failed")
