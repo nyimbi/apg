@@ -8479,3 +8479,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q tests/test_compiler_database_ast.py` passed with 9 tests.
 - `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_compiler_database_ast.py tests/test_examples_parseable.py` passed with 101 tests.
 - `.venv/bin/python cli/main.py compile examples/01_minimal_customer_records/main.apg --output /private/tmp/apg_compiler_probe --verify` generated 9 files and passed generated self-test plus smoke test.
+
+### 2026-05-29 01:58 EAT
+
+Executable CACH dashboard metrics slice:
+
+- Made the CACH dashboard importable in this checkout when optional Plotly, LZ4, and Zstandard packages are absent.
+- Replaced fixed dashboard demo metrics with runtime metrics from an injected or registered cache service.
+- Dashboard metrics now report actual entry counts, hit/miss rates, latency percentiles, throughput, error rate, memory use, CPU use, tier distribution, top keys, and recent cache operations.
+- Added honest zero-state reporting when no cache service is registered.
+- Added focused regression coverage for zero-state metrics, service-derived metrics, explicit operation history normalization, and Plotly-free chart JSON serialization.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_common_cach_dashboard_metrics.py` passed with 4 tests.
+- `rg -n "This would integrate with the actual cache service|For now, return mock data|125000|user:12345:profile|api:products:list|missing:key|CacheManagementService|pandas as pd" capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py` found no stale CACH dashboard demo metrics.
+- `git diff --check -- capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py docs/progress_log.md` passed.
