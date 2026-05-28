@@ -1,6 +1,7 @@
 """Source-backed database AST coverage for executable APG compilation."""
 
 from compiler.ast_builder import ASTBuilder, DatabaseDeclaration
+from compiler.code_generator import CodeGenConfig, PythonCodeGenerator
 from compiler.parser import APGParser
 from compiler.semantic_analyzer import SemanticAnalyzer
 
@@ -87,3 +88,32 @@ def test_database_semantic_validation_uses_connection_config():
 		warning for warning in result["warnings"]
 		if "connection configuration" in str(warning)
 	]
+
+
+def test_generated_python_metadata_preserves_database_schema_details():
+	parse_result = APGParser().parse_string(DATABASE_SOURCE, "database.apg")
+	ast = ASTBuilder().build_ast(parse_result["parse_tree"], "database.apg")
+
+	files = PythonCodeGenerator(CodeGenConfig(use_composable_templates=False)).generate(ast)
+	namespace = {}
+	exec(files["app.py"], namespace)
+
+	database = namespace["list_entities"]()[0]
+
+	assert database["connection_config"]["url"] == "postgresql://localhost:5432/ledger"
+	assert database["schemas"][0]["name"] == "accounting"
+	assert database["schemas"][0]["tables"][0]["name"] == "journals"
+	assert database["schemas"][0]["tables"][0]["columns"][0] == {
+		"name": "id",
+		"type": "serial",
+		"primary_key": True,
+		"nullable": True,
+		"default": None,
+		"constraints": ["pk"],
+	}
+	assert database["schemas"][0]["tables"][0]["indexes"][0] == {
+		"name": "idx_journals_external_id",
+		"columns": ["external_id"],
+		"unique": True,
+		"type": None,
+	}

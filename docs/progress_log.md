@@ -6896,3 +6896,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_parser.py::TestAPGParser::test_database_parsing tests/test_semantic_analyzer.py::TestSemanticAnalyzer::test_database_validation -q` -> 2 passed, 1 pre-existing warning
 - `git diff --check compiler/ast_builder.py compiler/semantic_analyzer.py tests/test_compiler_database_ast.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:30 EAT
+
+Completed checkpoint:
+
+- Extended dependency-free Python code generation so database entities retain typed runtime metadata instead of only generic property names.
+- Generated `app.py` and hybrid `entities.py` now expose database connection config, schemas, tables, columns, defaults, nullability, primary keys, constraints, and indexes through `list_entities()`.
+- Added focused regression coverage that compiles a parsed APG database declaration, executes generated `app.py`, and verifies the emitted database metadata.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 3 passed
+- `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
+- Deferred broader pytest at the user's request to conserve battery.

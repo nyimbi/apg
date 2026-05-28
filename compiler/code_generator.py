@@ -18,7 +18,8 @@ from .ast_builder import (
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
 	UnaryExpression, MemberExpression, IndexExpression, ListExpression,
 	DictExpression,
-	AIAgentDeclaration, AgentTeamDeclaration, ApplicationDeclaration, CapabilityDeclaration
+	AIAgentDeclaration, AgentTeamDeclaration, ApplicationDeclaration, CapabilityDeclaration,
+	DatabaseDeclaration
 )
 
 # Import composable template system
@@ -184,25 +185,61 @@ class PythonCodeGenerator:
 		files.update(self._generate_capability_files(ast))
 		return files
 
+	def _entity_spec(self, entity: Any) -> Dict[str, Any]:
+		"""Convert an APG entity AST node into generated runtime metadata."""
+		spec: Dict[str, Any] = {
+			"name": entity.name,
+			"type": entity.entity_type.value,
+			"properties": [property.name for property in entity.properties],
+			"fields": [
+				{
+					"name": property.name,
+					"type": property.type_annotation.type_name if property.type_annotation else "any",
+					"required": property.is_required,
+				}
+				for property in entity.properties
+			],
+			"methods": [method.name for method in entity.methods],
+		}
+		if isinstance(entity, DatabaseDeclaration):
+			spec["connection_config"] = dict(entity.connection_config)
+			spec["schemas"] = [
+				{
+					"name": schema.name,
+					"tables": [
+						{
+							"name": table.name,
+							"columns": [
+								{
+									"name": column.name,
+									"type": column.data_type,
+									"primary_key": column.is_primary_key,
+									"nullable": column.is_nullable,
+									"default": column.default_value,
+									"constraints": list(column.constraints),
+								}
+								for column in table.columns
+							],
+							"indexes": [
+								{
+									"name": index.name,
+									"columns": list(index.columns),
+									"unique": index.is_unique,
+									"type": index.index_type,
+								}
+								for index in table.indexes
+							],
+						}
+						for table in schema.tables
+					],
+				}
+				for schema in entity.schemas
+			]
+		return spec
+
 	def _generate_python_app(self, module: ModuleDeclaration) -> str:
 		"""Generate a framework-neutral Python app.py entrypoint."""
-		entity_specs = [
-			{
-				"name": entity.name,
-				"type": entity.entity_type.value,
-				"properties": [property.name for property in entity.properties],
-				"fields": [
-					{
-						"name": property.name,
-						"type": property.type_annotation.type_name if property.type_annotation else "any",
-						"required": property.is_required,
-					}
-					for property in entity.properties
-				],
-				"methods": [method.name for method in entity.methods],
-			}
-			for entity in module.entities
-		]
+		entity_specs = [self._entity_spec(entity) for entity in module.entities]
 		return f'''"""
 {module.name} - APG Python Application
 {"=" * (len(module.name) + 25)}
@@ -2453,15 +2490,7 @@ if __name__ == "__main__":
 
 	def _generate_python_entity_catalog(self, module: ModuleDeclaration) -> str:
 		"""Generate a framework-neutral entity catalog module."""
-		entity_specs = [
-			{
-				"name": entity.name,
-				"type": entity.entity_type.value,
-				"properties": [property.name for property in entity.properties],
-				"methods": [method.name for method in entity.methods],
-			}
-			for entity in module.entities
-		]
+		entity_specs = [self._entity_spec(entity) for entity in module.entities]
 		return f'''"""
 {module.name} Entity Catalog
 {"=" * (len(module.name) + 15)}
