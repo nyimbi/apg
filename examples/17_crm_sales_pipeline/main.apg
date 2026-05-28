@@ -1,0 +1,49 @@
+// Example 17: CRM and sales pipeline.
+// Complexity focus: sales data records, pipeline rules, and dashboard route.
+
+module crm_sales_pipeline version 1.0.0 {
+    description: "CRM capability for leads, opportunities, and sales forecasting";
+}
+
+table Lead {
+    company: str;
+    contact_name: str;
+    email: str;
+    score: int;
+    qualified: bool;
+}
+
+table Opportunity {
+    lead_id: int;
+    stage: str;
+    amount: float;
+    probability: int;
+    // Use an ISO date string until the semantic analyzer promotes `date` to a core field type.
+    expected_close_date: str;
+}
+
+capability SalesPipeline {
+    contract: {
+        id: sales_pipeline,
+        provides: [lead_management, opportunity_tracking, forecast_metrics],
+        requires: [customer_master],
+        configuration: {default_probability: 25, forecast_currency: "KES"},
+        rules: [
+            {name: "qualified_lead_minimum", when: "score < 50", action: "warn"},
+            {name: "large_deal_review", when: "amount > 1000000", action: "require_review"}
+        ],
+        ui: {shell: python, routes: [{name: "Pipeline", path: "/crm/pipeline", component: "PipelineScreen"}]},
+        theme: {name: sales_theme, tokens: {accent: "#DD6B20"}}
+    };
+
+    erp_modules: [crm, sales, project_accounting];
+    screens: {
+        ForecastDashboard: {
+            route: "/crm/forecast",
+            layout: dashboard,
+            contains: [StageFunnel, OpportunityTable, ForecastKpis],
+            binds: [opportunities.active],
+            actions: [advance_stage, mark_won, mark_lost]
+        }
+    };
+}

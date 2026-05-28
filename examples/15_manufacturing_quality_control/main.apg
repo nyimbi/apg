@@ -1,0 +1,42 @@
+// Example 15: manufacturing quality control.
+// Complexity focus: production records, quality rules, and shop-floor dashboard composition.
+
+module manufacturing_quality_control version 1.0.0 {
+    description: "Manufacturing production and quality-control capability";
+}
+
+table ProductionRun {
+    line_code: str;
+    product_sku: str;
+    planned_quantity: int;
+    completed_quantity: int;
+    defect_count: int;
+    active: bool;
+}
+
+capability QualityControl {
+    contract: {
+        id: quality_control,
+        provides: [quality_inspections, defect_tracking, production_oee],
+        requires: [stock_movements, audit_events],
+        configuration: {defect_threshold: 3, inspection_frequency_minutes: 60},
+        rules: [
+            {name: "defect_threshold", when: "defect_count > defect_threshold", action: "require_review"},
+            {name: "run_completion", when: "completed_quantity >= planned_quantity", action: "audit"}
+        ],
+        ui: {shell: python, routes: [{name: "Quality", path: "/manufacturing/quality", component: "QualityScreen"}]},
+        theme: {name: shop_floor_theme, tokens: {accent: "#B83280"}}
+    };
+
+    erp_modules: [manufacturing, inventory];
+    screens: {
+        LineDashboard: {
+            route: "/manufacturing/line",
+            layout: dashboard,
+            contains: [RunSummary, DefectChart, InspectionQueue],
+            binds: [production_runs.active],
+            actions: [pause_line, approve_run, escalate_quality]
+        }
+    };
+    streaming: {processor: bytewax, state: quality_event_state};
+}

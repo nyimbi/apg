@@ -1,0 +1,20 @@
+// Example 02: two related tables.
+// Complexity focus: composing records with a conventional foreign-key field.
+
+module customer_orders version 1.0.0 {
+    description: "Customer and order records with a simple relationship";
+}
+
+table Customer {
+    // This entity is the parent side of the relationship.
+    name: str;
+    email: str;
+}
+
+table SalesOrder {
+    // The generated relationship graph recognizes *_id naming conventions.
+    customer_id: int;
+    order_number: str;
+    total: float;
+    status: str;
+}

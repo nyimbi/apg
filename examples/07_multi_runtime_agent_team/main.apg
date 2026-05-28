@@ -1,0 +1,37 @@
+// Example 07: agent composition across rapidly changing runtimes.
+// Complexity focus: Codex, Claude Code, OpenCode, OpenAI, Ollama, and Pi as swappable runtimes.
+
+module agent_runtime_portfolio version 1.0.0 {
+    description: "Agent team that can route work across several AI runtimes";
+}
+
+agent Researcher {
+    role: "researcher";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "Gather structured evidence and cite source IDs.";
+    tools: [web.search, docs.read];
+}
+
+agent Coder {
+    role: "implementation_engineer";
+    model: "claude:sonnet";
+    runtime: claude_code;
+    system: "Implement focused code changes from accepted plans.";
+    tools: [repo.edit, tests.run];
+}
+
+agent LocalReviewer {
+    role: "local_review";
+    model: "ollama:llama3.1";
+    runtime: ollama;
+    system: "Review diffs locally without sending code to external services.";
+}
+
+swarm DeliverySwarm {
+    agents: [Researcher, Coder, LocalReviewer];
+    runtimes: [codex, claude_code, opencode, openai, ollama, pi];
+    flow: Researcher -> Coder -> LocalReviewer;
+    config: {handoff_mode: sequential, fallback_runtime: opencode};
+    rules: [{name: "local_review_required", when: "code_changed", action: "require_review"}];
+}

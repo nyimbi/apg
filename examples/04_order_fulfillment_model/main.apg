@@ -1,0 +1,32 @@
+// Example 04: small operational data model.
+// Complexity focus: multiple tables that become generated CRUD screens and JSON APIs.
+
+module fulfillment_ops version 1.0.0 {
+    description: "Order fulfillment records for customers, orders, shipments, and events";
+}
+
+table Customer {
+    name: str;
+    email: str;
+}
+
+table SalesOrder {
+    customer_id: int;
+    order_number: str;
+    total: float;
+    status: str;
+}
+
+table Shipment {
+    sales_order_id: int;
+    carrier: str;
+    tracking_number: str;
+    delivered: bool;
+}
+
+table FulfillmentEvent {
+    shipment_id: int;
+    event_type: str;
+    // Use `str` for timestamps in this executable baseline; apps can later add richer date types.
+    event_time: str;
+}

@@ -1,0 +1,34 @@
+// Example 06: multi-agent team.
+// Complexity focus: two agents connected by a handoff flow and grouped as a team.
+
+module support_team version 1.0.0 {
+    description: "Planner and writer agent team for support responses";
+}
+
+agent Planner {
+    role: "planner";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "Break the ticket into concrete resolution steps.";
+    tools: [tickets.read, docs.search];
+}
+
+agent Writer {
+    role: "writer";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "Write concise customer-facing replies from a plan.";
+    tools: [tickets.update];
+}
+
+team SupportCrew {
+    // `agents` declares the composable team members.
+    agents: [Planner, Writer];
+
+    // `flow` declares the relationship between members.
+    flow: Planner -> Writer;
+
+    // Team configuration is preserved in generated manifests.
+    config: {handoff_mode: sequential};
+    rules: [{name: "low_confidence", when: "confidence < 0.6", action: "human_review"}];
+}

@@ -5939,4 +5939,33 @@ Battery-conscious verification:
 
 Commit result:
 
+- Pushed commit `d573f3e` (`Expose generated record helpers for composition`) to `origin/main`.
+
+### 2026-05-28 08:53 EAT
+
+Completed checkpoint:
+
+- Added 20 APG language examples under `examples/`, each in its own numbered directory with an annotated `main.apg`.
+- Ordered the examples by increasing complexity:
+  - minimal tables and relationships,
+  - typed generated record apps,
+  - first-class AI agents and agent teams,
+  - multi-runtime agent composition,
+  - capability contracts,
+  - rule/configuration/approval contracts,
+  - UI/screen composition,
+  - ERP capabilities,
+  - multi-capability dependency planning,
+  - enterprise ERP platform composition.
+- Updated `examples/README.md` with an index for the numbered path.
+- Kept examples compiler-clean by using currently supported field types for executable generated apps.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -c '...'` parser pass over `examples/[0-9][0-9]*/main.apg` -> 20 OK
+- `.venv/bin/python -c '...'` compiler pass over `examples/[0-9][0-9]*/main.apg` -> 20 OK
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
 - Pending commit and push for this checkpoint.

@@ -1,0 +1,28 @@
+// Example 12: finance ERP capability.
+// Complexity focus: ERP modules, components, rules, approvals, screens, i18n, and streaming.
+
+module finance_general_ledger version 1.0.0 {
+    description: "General Ledger capability suitable for an ERP finance app";
+}
+
+capability GeneralLedger {
+    contract: {
+        id: general_ledger,
+        name: "General Ledger",
+        version: "1.0.0",
+        provides: [journal_entries, chart_of_accounts, financial_periods],
+        requires: [audit_events],
+        configuration: {currency: "KES", fiscal_calendar: "monthly"},
+        rules: [{name: "balanced_journal", when: "debits != credits", action: "deny"}],
+        ui: {shell: python, routes: [{name: "Journals", path: "/finance/gl/journals", component: "JournalScreen"}]},
+        theme: {name: finance_ops, tokens: {accent: "#126E82"}}
+    };
+
+    erp_modules: [finance, general_ledger, accounts_payable];
+    components: {posting: {capability: journal_entries, permissions: [post, reverse]}};
+    business_rules: [{name: "period_open", when: "period.closed", action: "deny", priority: 100}];
+    approvals: {levels: 2, approvers: [controller, cfo]};
+    master_data: {entities: [account, cost_center, financial_period]};
+    i18n: {supported_languages: [en, sw, ha, yo, zu], default_language: en, fallback_language: en};
+    streaming: {processor: bytewax, state: ledger_posting_state};
+}

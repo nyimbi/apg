@@ -1,0 +1,39 @@
+// Example 16: HR and payroll operations.
+// Complexity focus: employee/payroll records, approvals, policy rules, and localized UI.
+
+module hr_payroll_operations version 1.0.0 {
+    description: "HR and payroll capability for employee records and pay-run approval";
+}
+
+table Employee {
+    employee_number: str;
+    full_name: str;
+    department: str;
+    active: bool;
+}
+
+table PayRun {
+    period: str;
+    gross_amount: float;
+    net_amount: float;
+    approved: bool;
+}
+
+capability PayrollOperations {
+    contract: {
+        id: payroll_operations,
+        provides: [employee_master, payroll_runs, payslip_generation],
+        requires: [audit_events, general_ledger],
+        configuration: {currency: "KES", pay_frequency: "monthly"},
+        rules: [
+            {name: "payrun_requires_approval", when: "approved == false", action: "require_review"},
+            {name: "positive_net_pay", when: "net_amount < 0", action: "deny"}
+        ],
+        ui: {shell: python, routes: [{name: "Payroll", path: "/hr/payroll", component: "PayrollScreen"}]},
+        theme: {name: people_ops_theme, tokens: {accent: "#805AD5"}}
+    };
+
+    erp_modules: [hr, payroll, finance];
+    approvals: {levels: 2, approvers: [hr_manager, payroll_controller]};
+    i18n: {supported_languages: [en, sw, am, rw, zu], default_language: en, fallback_language: en};
+}

@@ -1,0 +1,33 @@
+// Example 11: screen composition.
+// Complexity focus: a capability screen that contains, composes, binds, and relates UI elements.
+
+module screen_composition version 1.0.0 {
+    description: "Capability screen with explicit element relationships";
+}
+
+capability OperationsWorkbench {
+    contract: {
+        id: operations_workbench,
+        provides: [operations_ui],
+        configuration: {tenant_scoped: true},
+        ui: {shell: python},
+        theme: {name: ops_theme, tokens: {accent: "#345995"}}
+    };
+
+    screens: {
+        Dashboard: {
+            route: "/ops",
+            title: "Operations Dashboard",
+            layout: dashboard,
+            contains: [KpiStrip, ApprovalQueue],
+            composes: [LedgerTable],
+            binds: [ledger.entries],
+            actions: [approve, reject],
+            events: [{on: "select", do: "filter", target: LedgerTable}],
+            relationships: [
+                {from: KpiStrip, to: LedgerTable, via: filters},
+                ApprovalQueue -> LedgerTable
+            ]
+        }
+    };
+}

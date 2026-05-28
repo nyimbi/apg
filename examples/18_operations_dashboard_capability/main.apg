@@ -1,0 +1,39 @@
+// Example 18: cross-functional operations dashboard.
+// Complexity focus: composing metrics from finance, inventory, manufacturing, and sales.
+
+module operations_dashboard_capability version 1.0.0 {
+    description: "Executive operations dashboard capability";
+}
+
+capability OperationsDashboard {
+    contract: {
+        id: operations_dashboard,
+        provides: [executive_kpis, exception_queue, operations_scorecards],
+        requires: [journal_entries, stock_balances, production_oee, forecast_metrics],
+        configuration: {refresh_seconds: 30, tenant_scoped: true},
+        rules: [
+            {name: "critical_exception_review", when: "severity == critical", action: "require_review"},
+            {name: "stale_metric_warning", when: "metric_age_minutes > 15", action: "warn"}
+        ],
+        ui: {shell: python, routes: [{name: "Operations", path: "/ops/dashboard", component: "OpsDashboard"}]},
+        theme: {name: executive_theme, tokens: {accent: "#1A365D", surface: "#F7FAFC"}}
+    };
+
+    erp_modules: [finance, inventory, manufacturing, sales, hr];
+    screens: {
+        ExecutiveDashboard: {
+            route: "/ops/executive",
+            layout: dashboard,
+            contains: [FinanceKpis, InventoryKpis, ProductionKpis, SalesKpis],
+            composes: [ExceptionQueue],
+            binds: [executive_kpis.current],
+            relationships: [
+                FinanceKpis -> ExceptionQueue,
+                InventoryKpis -> ExceptionQueue,
+                ProductionKpis -> ExceptionQueue,
+                SalesKpis -> ExceptionQueue
+            ]
+        }
+    };
+    streaming: {processor: bytewax, state: operations_dashboard_state};
+}

@@ -1,0 +1,24 @@
+// Example 09: capability rules and configuration.
+// Complexity focus: executable rule metadata plus tenant-ready configuration.
+
+module credit_control version 1.0.0 {
+    description: "Credit-control capability with rules and approvals";
+}
+
+capability CreditControl {
+    contract: {
+        id: credit_control,
+        name: "Credit Control",
+        version: "1.0.0",
+        provides: [credit_limit_checks, hold_release],
+        requires: [audit_events],
+        configuration: {default_limit: 10000, currency: "KES"},
+        rules: [
+            {name: "over_limit", when: "order_total > credit_limit", action: "deny"},
+            {name: "manual_review", when: "risk_score > 0.75", action: "require_review"}
+        ]
+    };
+
+    approvals: {levels: 2, approvers: [credit_manager, finance_controller]};
+    master_data: {entities: [customer_credit_profile]};
+}

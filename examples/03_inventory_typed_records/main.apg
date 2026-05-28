@@ -1,0 +1,14 @@
+// Example 03: typed record validation.
+// Complexity focus: integer and boolean fields that generated forms coerce before validation.
+
+module inventory_records version 1.0.0 {
+    description: "Inventory item records with typed quantities and active flags";
+}
+
+table InventoryItem {
+    sku: str;
+    name: str;
+    quantity: int;
+    reorder_level: int;
+    active: bool;
+}

@@ -1,0 +1,27 @@
+// Example 05: first-class AI agent.
+// Complexity focus: one executable agent declaration with model, runtime, tools, memory, and rules.
+
+module support_agent version 1.0.0 {
+    description: "Single support triage agent";
+}
+
+agent TriageAgent {
+    // `role`, `model`, and `runtime` become the generated AI agent manifest.
+    role: "support_triage";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+
+    // `system` is the instruction contract for the agent runtime adapter.
+    system: "Classify incoming tickets and produce a concise next action.";
+
+    // Tools and memory are declared as composable dependencies.
+    tools: [tickets.read, knowledge.search];
+    memory: vector support_memory;
+
+    // Input/output names make the agent contract readable to callers.
+    input: ticket;
+    output: triage_plan;
+
+    // Rules stay declarative and executable by generated rule metadata.
+    rules: [{name: "ticket_required", when: "ticket missing", action: "reject"}];
+}

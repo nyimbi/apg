@@ -1,0 +1,35 @@
+// Example 13: procurement approvals.
+// Complexity focus: approval planning, purchasing components, and an approval screen.
+
+module procurement_approval_workbench version 1.0.0 {
+    description: "Procurement capability for purchase requests and approvals";
+}
+
+capability ProcurementWorkbench {
+    contract: {
+        id: procurement_workbench,
+        provides: [purchase_requests, supplier_quotes, approval_plans],
+        requires: [audit_events, supplier_master],
+        configuration: {currency: "KES", approval_threshold: 50000},
+        rules: [
+            {name: "budget_required", when: "budget_code missing", action: "deny"},
+            {name: "high_value_approval", when: "amount > approval_threshold", action: "require_review"}
+        ],
+        ui: {shell: python, routes: [{name: "Procurement", path: "/procurement", component: "ProcurementScreen"}]},
+        theme: {name: procurement_theme, tokens: {accent: "#6C8EAD"}}
+    };
+
+    erp_modules: [procurement, finance, inventory];
+    components: {requesting: {capability: purchase_requests, permissions: [create, approve]}};
+    approvals: {levels: 3, approvers: [request_manager, procurement_lead, finance_controller]};
+    master_data: {entities: [supplier, item_catalog, cost_center]};
+    screens: {
+        ApprovalQueue: {
+            route: "/procurement/approvals",
+            layout: split,
+            contains: [RequestList, ApprovalPanel],
+            binds: [purchase_requests.pending],
+            actions: [approve, reject, request_changes]
+        }
+    };
+}

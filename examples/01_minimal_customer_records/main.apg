@@ -1,0 +1,14 @@
+// Example 01: minimal generated application.
+// Complexity focus: one module plus one typed record entity.
+// Compile this with: apg compile examples/01_minimal_customer_records/main.apg --output generated/customer_records
+
+module customer_records version 1.0.0 {
+    // The module block names the generated application and provides runbook metadata.
+    description: "Smallest useful APG app: a customer record table";
+}
+
+table Customer {
+    // `str` fields compile into string schema properties and browser text inputs.
+    name: str;
+    email: str;
+}

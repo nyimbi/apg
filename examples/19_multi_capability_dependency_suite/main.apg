@@ -1,0 +1,48 @@
+// Example 19: multi-capability dependency suite.
+// Complexity focus: several capabilities with provides/requires dependency planning.
+
+module multi_capability_dependency_suite version 1.0.0 {
+    description: "Composable ERP capabilities with explicit dependencies";
+}
+
+capability AuditEvents {
+    contract: {
+        id: audit_events,
+        provides: [audit_events],
+        configuration: {retention_days: 365}
+    };
+    streaming: {processor: bytewax, state: audit_event_state};
+}
+
+capability CustomerMaster {
+    contract: {
+        id: customer_master,
+        provides: [customer_master],
+        requires: [audit_events],
+        configuration: {deduplicate: true}
+    };
+    master_data: {entities: [customer, address, contact]};
+}
+
+capability OrderManagement {
+    contract: {
+        id: order_management,
+        provides: [sales_orders, order_fulfillment],
+        requires: [customer_master, audit_events],
+        configuration: {default_status: "pending"},
+        rules: [{name: "customer_required", when: "customer_id missing", action: "deny"}],
+        ui: {shell: python, routes: [{name: "Orders", path: "/orders", component: "OrderScreen"}]}
+    };
+    erp_modules: [sales, inventory, finance];
+}
+
+capability Billing {
+    contract: {
+        id: billing,
+        provides: [invoice_generation, payment_allocation],
+        requires: [sales_orders, customer_master, audit_events],
+        configuration: {currency: "KES"},
+        rules: [{name: "invoice_requires_order", when: "order_id missing", action: "deny"}]
+    };
+    erp_modules: [finance, sales];
+}

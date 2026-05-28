@@ -6,6 +6,31 @@ Additional generated APG demonstration outputs live under `examples/generated/`.
 Those files are retained as runnable/reference artifacts but are kept out of the
 repository root so root-level entrypoints remain easy to scan.
 
+## Parseable APG Language Examples
+
+The numbered directories below contain fully annotated `main.apg` scripts. They are ordered from minimal record apps to larger ERP platform composition examples, and each script is parseable and compiler-clean with the current APG toolchain.
+
+1. `01_minimal_customer_records/` - one table and module metadata.
+2. `02_customer_orders_relationship/` - two related record entities.
+3. `03_inventory_typed_records/` - typed integer and boolean fields.
+4. `04_order_fulfillment_model/` - customer, order, shipment, and event records.
+5. `05_single_support_agent/` - one first-class AI agent.
+6. `06_support_agent_team/` - two agents connected by a team flow.
+7. `07_multi_runtime_agent_team/` - Codex, Claude Code, OpenCode, OpenAI, Ollama, and Pi runtime declarations.
+8. `08_basic_capability_contract/` - smallest capability contract.
+9. `09_capability_rules_configuration/` - rules, approvals, and configuration.
+10. `10_themed_i18n_streaming_capability/` - UI route, theme tokens, language codes, and ByteWax streaming.
+11. `11_screen_composition_relationships/` - screen composition and element relationships.
+12. `12_finance_general_ledger/` - finance ERP capability.
+13. `13_procurement_approval_workbench/` - procurement approvals.
+14. `14_inventory_warehouse_operations/` - inventory records plus warehouse capability.
+15. `15_manufacturing_quality_control/` - production and quality-control capability.
+16. `16_hr_payroll_operations/` - HR/payroll records, rules, approvals, and i18n.
+17. `17_crm_sales_pipeline/` - CRM records and pipeline capability.
+18. `18_operations_dashboard_capability/` - cross-functional operations dashboard.
+19. `19_multi_capability_dependency_suite/` - dependency-planned capability suite.
+20. `20_enterprise_erp_platform/` - larger ERP platform skeleton with records, capabilities, screens, rules, themes, i18n, and streaming.
+
 ## Features
 
 ### 🎯 **Computer Vision Capabilities**

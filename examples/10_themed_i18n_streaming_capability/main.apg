@@ -1,0 +1,20 @@
+// Example 10: capability with UI, theme, localization, and ByteWax streaming.
+// Complexity focus: generated manifests include visual theming, language codes, and stream topology.
+
+module localized_streaming_capability version 1.0.0 {
+    description: "Operations capability with UI route, theme tokens, i18n, and ByteWax streaming";
+}
+
+capability OperationsFeed {
+    contract: {
+        id: operations_feed,
+        provides: [operations_events, operations_dashboard],
+        configuration: {tenant_scoped: true},
+        ui: {shell: python, routes: [{name: "Operations", path: "/ops", component: "OperationsScreen"}]},
+        theme: {name: ops_theme, tokens: {accent: "#126E82", surface: "#F7FAFC"}},
+        runtime: {backend: python, streaming: {processor: bytewax}}
+    };
+
+    i18n: {supported_languages: [en, sw, ha, yo, zu, am, rw], default_language: en, fallback_language: en};
+    streaming: {processor: bytewax, state: operations_feed_state};
+}

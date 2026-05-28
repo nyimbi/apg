@@ -1,0 +1,41 @@
+// Example 14: inventory and warehouse operations.
+// Complexity focus: inventory data records plus warehouse capability contracts.
+
+module inventory_warehouse_operations version 1.0.0 {
+    description: "Warehouse app with stock records and inventory capability metadata";
+}
+
+table StockItem {
+    sku: str;
+    description: str;
+    on_hand: int;
+    reserved: int;
+    reorder_level: int;
+    active: bool;
+}
+
+table StockMovement {
+    stock_item_id: int;
+    movement_type: str;
+    quantity: int;
+    reference: str;
+}
+
+capability WarehouseInventory {
+    contract: {
+        id: warehouse_inventory,
+        provides: [stock_balances, stock_movements, reorder_alerts],
+        requires: [audit_events],
+        configuration: {default_warehouse: "NBO-01", cycle_count_days: 30},
+        rules: [
+            {name: "no_negative_stock", when: "on_hand - reserved < 0", action: "deny"},
+            {name: "reorder_needed", when: "on_hand <= reorder_level", action: "warn"}
+        ],
+        ui: {shell: python, routes: [{name: "Inventory", path: "/warehouse/inventory", component: "InventoryScreen"}]},
+        theme: {name: warehouse_theme, tokens: {accent: "#2F855A"}}
+    };
+
+    erp_modules: [inventory, warehouse, procurement];
+    master_data: {entities: [stock_item, warehouse, bin_location]};
+    streaming: {processor: bytewax, state: inventory_movement_state};
+}
