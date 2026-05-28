@@ -8013,3 +8013,20 @@ Battery-conscious verification:
 - `.venv/bin/apg language-server --audit-fixtures` passed in text mode.
 - `.venv/bin/python -m py_compile language_server/semantic_service.py cli/main.py tests/test_compiler_baseline.py` passed.
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_language_server_check_json_uses_shared_semantic_model tests/test_compiler_baseline.py::test_cli_language_server_rename_json_dry_runs_without_writing tests/test_compiler_baseline.py::test_cli_language_server_code_actions_json_dry_runs_without_writing tests/test_compiler_baseline.py::test_cli_language_server_apply_code_action_writes_explicitly tests/test_compiler_baseline.py::test_cli_language_server_audits_fixture_catalog -q` passed with 5 tests.
+
+### 2026-05-28 22:41 EAT
+
+In progress:
+
+- Added an aggregate compiler tooling fixture audit command.
+- Added `compiler.tooling_audit.audit_tooling_fixtures()` and the `apg tooling audit --json` CLI, emitting `apg.tooling-fixture-audit.v1`.
+- The aggregate audit runs the parser-golden, diagnostics, formatter, semantic drift, graph, language-server, natural-language planning, migration, and release-evidence fixture catalogs.
+- Updated `docs/tooling.md` so the executable baseline, command reference, test strategy, and Phase 0 exit criteria include the umbrella tooling audit gate.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/tooling_audit.py cli/tooling_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/apg tooling audit --json` passed with 9 surfaces, 9 passing surfaces, 0 errors, and 0 blocking gaps.
+- `.venv/bin/apg tooling audit` passed in text mode.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_tooling_audit_json_runs_all_fixture_catalogs -q` passed with 1 test.
+- `git diff --check -- compiler/tooling_audit.py cli/tooling_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.

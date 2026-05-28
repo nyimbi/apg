@@ -40,6 +40,7 @@ from cli.parser_golden_command import parser_golden
 from cli.release_command import release
 from cli.run_command import run
 from cli.studio_command import studio
+from cli.tooling_command import tooling
 from cli.validate_command import validate
 
 console = Console()
@@ -81,6 +82,7 @@ cli.add_command(parser_golden)
 cli.add_command(release)
 cli.add_command(run)
 cli.add_command(studio)
+cli.add_command(tooling)
 cli.add_command(validate)
 
 

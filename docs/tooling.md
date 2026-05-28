@@ -91,6 +91,10 @@ APG currently has an executable compiler path:
 - `apg evidence --audit-fixtures --json` emits
   `apg.release-evidence-fixture-audit.v1` by running checked-in verifier
   fixtures across web, desktop, mobile, and container profiles;
+- `apg tooling audit --json` emits `apg.tooling-fixture-audit.v1` by running
+  every checked-in compiler tooling fixture catalog as one CI-friendly gate:
+  parser-golden, diagnostics, formatter, drift, graph, language-server,
+  natural-language planning, migrations, and release evidence;
 - `apg language-server <file> --check --json` emits
   `apg.language-server-check.v1` from the shared semantic model and formatter,
   proving editor-facing diagnostics, completions, definitions, references,
@@ -237,8 +241,9 @@ designers, and natural-language tools.
 | `compiler.migrations` | Existing semantic-model diff planner for database and capability ownership changes. It emits `apg.migration-plan.v1` from previous/current APG sources or semantic-model JSON files. |
 | `compiler.nl_plan` | Existing constrained natural-language-to-APG-patch planner. It emits reviewable append-only DSL diffs, candidate lint, migration previews, and test plans without writing generated code. |
 | `compiler.release` | Existing release evidence builder for generated applications. Extend it toward capability package and deployment evidence. |
+| `compiler.tooling_audit` | Existing aggregate fixture audit over compiler tooling catalogs. Keep it as the umbrella CI gate when Phase 0 contracts need to be proven together. |
 | `language_server.server` | Existing LSP entry point. It should move from direct parser/analyzer calls to the shared semantic model. |
-| `cli.*` | Existing Click CLI entry points. Add stable JSON/text contracts for new lint, format, graph, explain, package, and planning commands. |
+| `cli.*` | Existing Click CLI entry points. Add stable JSON/text contracts for lint, format, graph, explain, package, planning, and aggregate tooling commands. |
 
 The exact file layout can evolve, but these boundaries should remain visible.
 The parser, semantic model, diagnostics, and formatter must be usable without
@@ -759,6 +764,7 @@ apg package-verify dist/app-mobile --json
 apg deployment verify dist/app-container --json
 apg evidence app.apg --target web --out dist/evidence --json
 apg evidence --audit-fixtures --json
+apg tooling audit --json
 apg validate
 apg run
 apg doctor
@@ -1029,6 +1035,25 @@ package target is not covered by a passing fixture, release/package/deployment
 verifier formats drift, package profile checks fail, capability publish planning
 stops being side-effect-free, or a required verifier behavior tag lacks a
 passing fixture.
+
+### `apg tooling audit`
+
+```console
+apg tooling audit --json
+```
+
+The tooling audit emits `apg.tooling-fixture-audit.v1` and runs every
+checked-in compiler tooling fixture catalog through one command. It aggregates
+parser-golden, diagnostics, formatter, semantic drift, graph-suite,
+language-server, natural-language planner, migration, and release-evidence
+fixture audits. Each surface reports its expected format, actual format,
+format match, summary, error count, and blocking-gap count. The aggregate exits
+non-zero if any surface fails or emits the wrong report contract.
+
+This is the Phase 0 umbrella CI gate. Individual fixture commands remain useful
+for focused debugging, but `apg tooling audit --json` is the fastest way to
+prove that the compiler-adjacent tooling baseline is bedded down before moving
+to larger platform capabilities.
 
 ### `apg capabilities`
 
@@ -1391,6 +1416,7 @@ Tooling tests must be fixture-driven and deterministic.
 | Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios, enforced by `apg migrate-plan --audit-fixtures --json` and the `apg.migration-fixture-audit.v1` report. |
 | Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, migration previews, source immutability, and rejected unsafe plans, enforced by `apg nl-plan --audit-fixtures --json` and the `apg.nl-plan-fixture-audit.v1` report. |
 | Verifier tests | Web/mobile/desktop/capability/deployment release evidence contracts, enforced by `apg evidence --audit-fixtures --json` and the `apg.release-evidence-fixture-audit.v1` report. |
+| Aggregate tooling gate | All checked-in compiler-adjacent fixture catalogs, enforced by `apg tooling audit --json` and the `apg.tooling-fixture-audit.v1` report. |
 | Drift tests | CLI, LSP, IDE, generator, and tests consume the same semantic model. |
 
 ### Parser Golden Audit
@@ -1433,7 +1459,8 @@ Exit criteria:
   `apg language-server --audit-fixtures --json`,
   `apg nl-plan --audit-fixtures --json`,
   `apg migrate-plan --audit-fixtures --json`,
-  `apg evidence --audit-fixtures --json`, and `apg drift <file> --json`.
+  `apg evidence --audit-fixtures --json`,
+  `apg drift --audit-fixtures --json`, and `apg tooling audit --json`.
 
 ### Phase 1: Shared Semantic Model MVP
 

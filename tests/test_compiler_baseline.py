@@ -2497,6 +2497,34 @@ def test_cli_language_server_audits_fixture_catalog():
 	assert all(fixture["ok"] for fixture in report["fixtures"])
 
 
+def test_cli_tooling_audit_json_runs_all_fixture_catalogs():
+	result = CliRunner().invoke(cli, ["tooling", "audit", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.tooling-fixture-audit.v1"
+	assert report["ok"] is True
+	assert report["surface_count"] == 9
+	assert report["summary"]["failing_surface_count"] == 0
+	assert report["summary"]["blocking_gap_count"] == 0
+	assert report["summary"]["error_count"] == 0
+	surfaces = {surface["name"]: surface for surface in report["surfaces"]}
+	assert set(surfaces) == {
+		"parser_golden",
+		"diagnostics",
+		"formatter",
+		"drift",
+		"graph",
+		"language_server",
+		"nl_plan",
+		"migration",
+		"release_evidence",
+	}
+	assert all(surface["ok"] and surface["format_ok"] for surface in surfaces.values())
+	assert surfaces["parser_golden"]["format"] == "apg.parser-golden-audit.v1"
+	assert surfaces["release_evidence"]["format"] == "apg.release-evidence-fixture-audit.v1"
+
+
 def test_vscode_extension_audit_tracks_current_cli_contracts():
 	report = audit_vscode_extension(REPO_ROOT)
 
