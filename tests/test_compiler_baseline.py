@@ -199,6 +199,11 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 			fetched = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/records", timeout=1) as response:
 			all_records = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/ui", timeout=1) as response:
+			ui_content_type = response.headers["Content-Type"]
+			ui_index = response.read().decode("utf-8")
+		with urllib.request.urlopen(f"{base_url}/ui/entities/Customer", timeout=1) as response:
+			entity_ui = response.read().decode("utf-8")
 		update_request = urllib.request.Request(
 			f"{base_url}/entities/Customer/records/1",
 			data=json.dumps({"record": {"email": "asha@new.example", "status": "active"}}).encode("utf-8"),
@@ -222,6 +227,14 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 			raise AssertionError("deleted generated app record was still fetchable")
 		with urllib.request.urlopen(f"{base_url}/entities/Customer/records", timeout=1) as response:
 			empty_list = json.loads(response.read().decode("utf-8"))
+		form_request = urllib.request.Request(
+			f"{base_url}/entities/Customer/records",
+			data=b"name=Kofi&email=kofi%40example.com",
+			headers={"Content-Type": "application/x-www-form-urlencoded"},
+			method="POST",
+		)
+		with urllib.request.urlopen(form_request, timeout=1) as response:
+			form_created = json.loads(response.read().decode("utf-8"))
 	finally:
 		process.terminate()
 		try:
@@ -236,12 +249,18 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert listed["records"] == [created["record"]]
 	assert fetched["record"] == created["record"]
 	assert all_records["records"]["Customer"] == [created["record"]]
+	assert ui_content_type.startswith("text/html")
+	assert "/ui/entities/Customer" in ui_index
+	assert 'action="/entities/Customer/records"' in entity_ui
+	assert "<pre>" in entity_ui
+	assert "asha@example.com" in entity_ui
 	assert updated["record"] == {"id": 1, "name": "Asha", "email": "asha@new.example", "status": "active"}
 	assert deleted["deleted"] == updated["record"]
 	assert deleted["count"] == 0
 	assert missing_status == 404
 	assert missing_payload["error"] == "record_not_found"
 	assert empty_list["records"] == []
+	assert form_created["record"] == {"id": 2, "name": "Kofi", "email": "kofi@example.com"}
 
 
 def test_cli_compile_default_target_writes_generated_application(tmp_path):

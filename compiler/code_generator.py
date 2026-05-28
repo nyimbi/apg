@@ -198,11 +198,13 @@ Generated from APG source as dependency-free Python artifacts.
 from __future__ import annotations
 
 import importlib
+import html
 import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Optional
+from urllib.parse import parse_qs
 
 
 MODULE_NAME = {module.name!r}
@@ -324,6 +326,83 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
 
 def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+
+
+def _html_page(title: str, body: str) -> str:
+    safe_title = html.escape(title)
+    return (
+        "<!doctype html>"
+        "<html><head>"
+        '<meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{{safe_title}}</title>"
+        "</head><body>"
+        f"{{body}}"
+        "</body></html>"
+    )
+
+
+def _entity_spec(entity_name: str) -> Dict[str, Any] | None:
+    for entity in ENTITIES:
+        if entity["name"] == entity_name:
+            return dict(entity)
+    return None
+
+
+def _ui_index_html() -> str:
+    links = "".join(
+        f'<li><a href="/ui/entities/{{html.escape(entity["name"], quote=True)}}">'
+        f'{{html.escape(entity["name"])}}</a> '
+        f'<code>{{html.escape(entity["type"])}}</code></li>'
+        for entity in ENTITIES
+    )
+    if not links:
+        links = "<li>No APG entities declared.</li>"
+    body = (
+        f"<h1>{{html.escape(MODULE_NAME)}}</h1>"
+        f"<p>{{html.escape(MODULE_DESCRIPTION or 'Generated APG application')}}</p>"
+        '<nav><a href="/manifest">Manifest JSON</a> | '
+        '<a href="/records">Record JSON</a></nav>'
+        "<h2>Entities</h2>"
+        f"<ul>{{links}}</ul>"
+    )
+    return _html_page(MODULE_NAME, body)
+
+
+def _ui_entity_html(entity_name: str) -> tuple[int, str]:
+    entity = _entity_spec(entity_name)
+    if entity is None:
+        return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
+    safe_entity = html.escape(entity_name, quote=True)
+    properties = entity.get("properties") or ["value"]
+    inputs = "".join(
+        f'<label>{{html.escape(str(property_name))}} '
+        f'<input name="{{html.escape(str(property_name), quote=True)}}"></label><br>'
+        for property_name in properties
+    )
+    records_json = html.escape(json.dumps(list_records(entity_name), indent=2, sort_keys=True))
+    body = (
+        f'<nav><a href="/ui">Application</a> | '
+        f'<a href="/entities/{{safe_entity}}/records">Record JSON</a></nav>'
+        f"<h1>{{html.escape(entity_name)}}</h1>"
+        f"<p><code>{{html.escape(entity.get('type', 'entity'))}}</code></p>"
+        f'<form method="post" action="/entities/{{safe_entity}}/records">'
+        f"{{inputs}}"
+        '<button type="submit">Create record</button>'
+        "</form>"
+        "<h2>Records</h2>"
+        f"<pre>{{records_json}}</pre>"
+    )
+    return 200, _html_page(entity_name, body)
+
+
+def _ui_payload(path: str) -> tuple[int, str]:
+    parts = [part for part in path.split("/") if part]
+    if parts == ["ui"]:
+        return 200, _ui_index_html()
+    if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
+        return _ui_entity_html(parts[2])
+    return 404, _html_page("Not found", f"<h1>Not found</h1><p>{{html.escape(path)}}</p>")
 
 
 def _record_route(path: str) -> Dict[str, str | None] | None:
@@ -583,10 +662,16 @@ def _put_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any
 class ApplicationRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
-        status, payload = _route_payload(path)
-        body = _json_bytes(payload)
+        if path == "/ui" or path.startswith("/ui/"):
+            status, html_payload = _ui_payload(path)
+            body = html_payload.encode("utf-8")
+            content_type = "text/html; charset=utf-8"
+        else:
+            status, payload = _route_payload(path)
+            body = _json_bytes(payload)
+            content_type = "application/json; charset=utf-8"
         self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -596,7 +681,12 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length") or "0")
             raw_body = self.rfile.read(length) if length else b"{{}}"
-            payload = json.loads(raw_body.decode("utf-8") or "{{}}")
+            content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip()
+            if content_type == "application/x-www-form-urlencoded":
+                parsed = parse_qs(raw_body.decode("utf-8"), keep_blank_values=True)
+                payload = {{"record": {{key: values[-1] if values else "" for key, values in parsed.items()}}}}
+            else:
+                payload = json.loads(raw_body.decode("utf-8") or "{{}}")
             if not isinstance(payload, dict):
                 raise ValueError("JSON body must be an object")
             status, response = _post_payload(path, payload)

@@ -5309,3 +5309,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `1f575a2` (`Complete generated app record CRUD`) to `origin/main`.
+
+### 2026-05-28 06:20 EAT
+
+Completed checkpoint:
+
+- Added a dependency-free browser UI shell to generated `app.py` outputs.
+- Generated apps now expose:
+  - `GET /ui` for an application/entity index.
+  - `GET /ui/entities/{EntityName}` for an entity screen with a record creation form and current record JSON.
+- Generated app POST handling now accepts `application/x-www-form-urlencoded` form submissions for record creation in addition to JSON bodies.
+- Extended the generated app subprocess regression to verify HTML content type, entity UI links, record form action, rendered record content, and browser form submission.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- Direct generated `app.py` compile smoke from compiler output -> passed
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 12 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated UI shell slice.
