@@ -189,7 +189,20 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert {"method": "DELETE", "target": "_delete_record_payload"} in route_contract["routes"]["/entities/Planner/records/{id}"]
 	assert module.auth_status()["mode"] == "open"
 	assert module.metrics_snapshot()["entity_count"] == 1
-	assert module.openapi_document()["openapi"] == "3.1.0"
+	openapi = module.openapi_document()
+	assert openapi["openapi"] == "3.1.0"
+	assert openapi["components"]["schemas"]["SelfTestReport"]["properties"]["checks"] == {
+		"$ref": "#/components/schemas/SelfTestChecks"
+	}
+	assert openapi["components"]["schemas"]["SelfTestChecks"]["properties"]["validation"] == {
+		"$ref": "#/components/schemas/ValidationReport"
+	}
+	assert openapi["components"]["schemas"]["SelfTestChecks"]["properties"]["metrics"] == {
+		"$ref": "#/components/schemas/MetricsSnapshot"
+	}
+	assert openapi["components"]["schemas"]["SelfTestChecks"]["properties"]["capability_health"] == {
+		"$ref": "#/components/schemas/CapabilityHealthReport"
+	}
 	assert module.relationship_graph()["nodes"][0]["id"] == "Planner"
 	assert module.storage_status()["mode"] == "memory"
 	assert module.coerce_record_types("Planner", {"x": "1"}) == {"x": "1"}

@@ -963,10 +963,22 @@ def _database_openapi_schemas() -> Dict[str, Any]:
                 "version": {{"type": "string"}},
                 "passed": {{"type": "boolean"}},
                 "status": {{"type": "string"}},
-                "checks": generic_object,
+                "checks": _schema_ref("SelfTestChecks"),
                 "routes": {{"type": "array", "items": {{"type": "string"}}}},
             }},
             "required": ["name", "version", "passed", "status", "checks", "routes"],
+        }},
+        "SelfTestChecks": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "validation": _schema_ref("ValidationReport"),
+                "metrics": _schema_ref("MetricsSnapshot"),
+                "route_count": {{"type": "integer"}},
+                "entity_count": {{"type": "integer"}},
+                "capability_health": _schema_ref("CapabilityHealthReport"),
+            }},
+            "required": ["validation", "metrics", "route_count", "entity_count"],
         }},
         "RelationshipNode": {{
             "type": "object",

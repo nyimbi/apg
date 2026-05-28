@@ -7219,3 +7219,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated app reports healthy capability health, 86 routes, and 107 documented methods
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 17:25 EAT
+
+Completed checkpoint:
+
+- Tightened the generated OpenAPI self-test contract by replacing the generic `checks` object with a named `SelfTestChecks` schema.
+- Documented the executable self-test checks shape in generated OpenAPI: validation report, metrics snapshot, route count, entity count, and optional capability health report.
+- Refreshed all 20 numbered example outputs so their generated OpenAPI contracts expose the stronger self-test schema.
+
+Battery-conscious verification:
+
+- Regenerated `examples/[01-20]*/output` with the compiler after the OpenAPI schema change.
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_compiler_baseline.py::test_documented_python_target_generates_executable_application_files tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated OpenAPI now reports `SelfTestChecks` in referenced schemas and 56 component schemas
+- Deferred broader pytest at the user's request to conserve battery.
