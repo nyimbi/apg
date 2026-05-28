@@ -149,6 +149,37 @@ capability AuditLog {
 }
 """
 
+DATABASE_BACKED_FORM_SOURCE = """
+module database_backed_form version 1.0.0 {
+	description: "Database-backed form";
+}
+
+table Customer {
+	name: str;
+	email: str;
+}
+
+form CustomerForm {
+	name: str;
+	email: str;
+}
+"""
+
+INVALID_DATABASE_BACKED_FORM_SOURCE = """
+module invalid_database_backed_form version 1.0.0 {
+	description: "Database-backed form with bad binding";
+}
+
+table Customer {
+	name: str;
+}
+
+form CustomerForm {
+	name: str;
+	phone: str;
+}
+"""
+
 
 def write_capability_catalog(root: Path, capability_id: str = "customer_master") -> Path:
 	catalog_dir = root / "capabilities" / capability_id
@@ -1509,6 +1540,37 @@ def test_cli_model_json_emits_semantic_model_without_generation(tmp_path):
 	assert report["graphs"]["er"]["edges"] >= 1
 	assert report["deployment"] == {"target": "python", "source": str(source)}
 	assert not output.exists()
+
+
+def test_cli_model_json_validates_database_backed_form_bindings(tmp_path):
+	source = tmp_path / "customer_form.apg"
+	source.write_text(DATABASE_BACKED_FORM_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["model", str(source), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.semantic-model.v1"
+	assert report["ok"] is True
+	assert report["views"]["CustomerForm"]["type"] == "form"
+	assert report["views"]["CustomerForm"]["bindings"] == ["name", "email"]
+	assert all(diagnostic["severity"] != "error" for diagnostic in report["diagnostics"])
+
+
+def test_cli_model_json_rejects_unknown_database_backed_form_field(tmp_path):
+	source = tmp_path / "customer_form.apg"
+	source.write_text(INVALID_DATABASE_BACKED_FORM_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["model", str(source), "--json"])
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.semantic-model.v1"
+	assert report["ok"] is False
+	errors = [diagnostic for diagnostic in report["diagnostics"] if diagnostic["severity"] == "error"]
+	assert [diagnostic["code"] for diagnostic in errors] == ["APG0402"]
+	assert "CustomerForm" in errors[0]["message"]
+	assert "phone" in errors[0]["message"]
 
 
 def test_cli_model_text_summarizes_agent_semantics(tmp_path):

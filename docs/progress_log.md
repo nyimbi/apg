@@ -8055,3 +8055,20 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `da0f457` (`Validate capability catalogs through lint`).
+
+### 2026-05-28 22:58 EAT
+
+In progress:
+
+- Continued Phase 1 shared semantic-model closure by adding database-backed form binding validation to `apg.semantic-model.v1`.
+- `apg model` now resolves `CustomerForm`-style forms against table `Customer`, accepts bindings to known table fields and lookup paths, and emits APG0402 when a form field is not backed by the table model.
+- Updated `docs/tooling.md` so the semantic model contract and Phase 1 exit criteria document the executable database-backed form validation behavior.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/semantic_model.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_model_json_emits_semantic_model_without_generation tests/test_compiler_baseline.py::test_cli_model_json_validates_database_backed_form_bindings tests/test_compiler_baseline.py::test_cli_model_json_rejects_unknown_database_backed_form_field -q` passed with 3 tests.
+- `.venv/bin/apg model examples/02_customer_orders_relationship/main.apg --json` passed and emitted `apg.semantic-model.v1`.
+- `.venv/bin/python -m py_compile compiler/semantic_model.py cli/lint_command.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_lint_json_reports_valid_apg_file_without_generation tests/test_compiler_baseline.py::test_cli_lint_catalog_uses_shared_semantic_model_for_capability_resolution tests/test_compiler_baseline.py::test_cli_lint_catalog_reports_unknown_declared_capability tests/test_compiler_baseline.py::test_cli_lint_directory_json_aggregates_apg_files_deterministically tests/test_compiler_baseline.py::test_cli_model_json_emits_semantic_model_without_generation tests/test_compiler_baseline.py::test_cli_model_json_validates_database_backed_form_bindings tests/test_compiler_baseline.py::test_cli_model_json_rejects_unknown_database_backed_form_field -q` passed with 7 tests.
+- `git diff --check -- compiler/semantic_model.py cli/lint_command.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.

@@ -52,7 +52,8 @@ def build_semantic_model(path: Path) -> dict[str, Any]:
 
 	model = _model_from_module(module, path)
 	model["diagnostics"] = diagnostics
-	model["ok"] = not any(diagnostic["severity"] == "error" for diagnostic in diagnostics)
+	model["diagnostics"].extend(_database_backed_view_diagnostics(model, path))
+	model["ok"] = not any(diagnostic["severity"] == "error" for diagnostic in model["diagnostics"])
 	return model
 
 
@@ -68,7 +69,8 @@ def build_semantic_model_from_module(module: ModuleDeclaration, source: str | Pa
 		diagnostics.append(_diagnostic_from_error(warning, path, "warning"))
 	model = _model_from_module(module, path)
 	model["diagnostics"] = diagnostics
-	model["ok"] = not any(diagnostic["severity"] == "error" for diagnostic in diagnostics)
+	model["diagnostics"].extend(_database_backed_view_diagnostics(model, path))
+	model["ok"] = not any(diagnostic["severity"] == "error" for diagnostic in model["diagnostics"])
 	return model
 
 
@@ -418,6 +420,99 @@ def _graph_summaries(module: ModuleDeclaration, path: Path) -> dict[str, dict[st
 			"edges": len(graph_dict["edges"]),
 		}
 	return graphs
+
+
+VIEW_METADATA_BINDINGS = {
+	"table",
+	"subject",
+	"entity",
+	"model",
+	"title",
+	"route",
+	"layout",
+	"description",
+}
+
+
+def _database_backed_view_diagnostics(model: dict[str, Any], path: Path) -> list[dict[str, Any]]:
+	diagnostics: list[dict[str, Any]] = []
+	tables = model.get("tables", {})
+	symbols = model.get("symbols", {})
+	for view_name, view in model.get("views", {}).items():
+		if view.get("type") != "form":
+			continue
+		subject = _view_subject_table(view_name, view, tables)
+		if subject is None:
+			continue
+		symbol = symbols.get(_symbol_id("form", view_name))
+		table = tables.get(subject)
+		if table is None:
+			diagnostics.append(_semantic_diagnostic(
+				"APG0401",
+				"Unknown view subject table",
+				"error",
+				f"Form '{view_name}' is backed by unknown table '{subject}'.",
+				path,
+				symbol,
+			))
+			continue
+		valid_bindings = set(table.get("fields", {})) | set(table.get("lookup_paths", {}))
+		for binding in view.get("bindings", []):
+			if binding in VIEW_METADATA_BINDINGS:
+				continue
+			if binding not in valid_bindings:
+				diagnostics.append(_semantic_diagnostic(
+					"APG0402",
+					"Invalid view binding",
+					"error",
+					f"Form '{view_name}' binds '{binding}', but table '{subject}' has no such field or lookup path.",
+					path,
+					symbol,
+				))
+	return diagnostics
+
+
+def _view_subject_table(view_name: str, view: dict[str, Any], tables: dict[str, Any]) -> str | None:
+	properties = view.get("properties", {})
+	for key in ["table", "subject", "entity", "model"]:
+		value = properties.get(key, {}).get("type")
+		if isinstance(value, str) and value:
+			return value
+	if view_name in tables:
+		return view_name
+	if view_name.endswith("Form"):
+		candidate = view_name[:-4]
+		if candidate:
+			return candidate
+	return None
+
+
+def _semantic_diagnostic(
+	code: str,
+	title: str,
+	severity: str,
+	message: str,
+	path: Path,
+	symbol: dict[str, Any] | None,
+) -> dict[str, Any]:
+	start = (
+		symbol.get("range", {}).get("start", {"line": 0, "character": 0})
+		if symbol else {"line": 0, "character": 0}
+	)
+	return {
+		"code": code,
+		"title": title,
+		"severity": severity,
+		"message": message,
+		"file": str(path),
+		"range": {
+			"start": start,
+			"end": {"line": start["line"], "character": start["character"] + 1},
+		},
+		"related_locations": [],
+		"fixes": [],
+		"docs_url": "docs/tooling.md#semantic-model-contract",
+	}
 
 
 def _diagnostic_from_error(error: APGSyntaxError | SemanticError | Exception, path: Path, severity: str) -> dict[str, Any]:

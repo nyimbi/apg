@@ -29,7 +29,8 @@ APG currently has an executable compiler path:
   with lint results and generator-readiness metadata;
 - `apg model <file> --json` emits `apg.semantic-model.v1` with normalized
   symbols, tables, agents, capabilities, composition metadata, diagnostics,
-  deployment metadata, and graph summaries without generating application files;
+  deployment metadata, graph summaries, and database-backed form binding
+  diagnostics without generating application files;
 - `apg format <file> --check|--write|--json` emits `apg.format-result.v1`
   and applies deterministic APG whitespace formatting;
 - `apg format --audit-fixtures --json` emits `apg.formatter-audit.v1` by
@@ -384,6 +385,12 @@ handlers.
   "handlers": [{"event": "Save", "target": "SubmitInvoice"}]
 }
 ```
+
+The current executable model validates database-backed forms by resolving a
+`CustomerForm`-style form against table `Customer`, or by using explicit form
+metadata keys such as `table`, `subject`, `entity`, or `model`. Form bindings
+that do not resolve to a table field or lookup path emit `APG0402`; forms
+backed by unknown tables emit `APG0401`.
 
 ### Workflow Model
 
@@ -1484,7 +1491,8 @@ Exit criteria:
 Exit criteria:
 
 - CLI and tests can load the same semantic model.
-- Database-backed form field validation uses the shared model.
+- Database-backed form field validation uses the shared model through
+  `apg model`.
 - capability catalog validation uses the shared model through
   `apg lint --catalog`.
 
