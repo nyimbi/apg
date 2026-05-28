@@ -255,6 +255,16 @@ def describe_application() -> Dict[str, Any]:
         description["capability_descriptions"] = APG_CAPABILITIES.describe_capabilities()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capabilities_by_erp_module"):
         description["capability_descriptions_by_erp_module"] = APG_CAPABILITIES.describe_capabilities_by_erp_module()
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_dependency_graph"):
+        description["capability_dependency_graph"] = APG_CAPABILITIES.capability_dependency_graph()
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_load_order"):
+        description["capability_load_order"] = APG_CAPABILITIES.capability_load_order()
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "ui_route_index"):
+        description["ui_routes"] = APG_CAPABILITIES.ui_route_index()
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "composition_graph"):
+        description["composition_graph"] = APG_CAPABILITIES.composition_graph()
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "streaming_processor_index"):
+        description["streaming_processors"] = APG_CAPABILITIES.streaming_processor_index()
     return description
 
 
@@ -1622,23 +1632,33 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			'try:',
 			'    from .apg_capabilities import (',
+			'        capability_dependency_graph,',
+			'        capability_load_order,',
 			'        describe_capabilities,',
 			'        describe_capabilities_by_erp_module,',
 			'        describe_capability,',
 			'        capability_names_by_erp_module,',
+			'        composition_graph,',
 			'        get_capability,',
 			'        list_capabilities,',
+			'        streaming_processor_index,',
+			'        ui_route_index,',
 			'    )',
 			'except ImportError:',
 			'    pass',
 			'else:',
 			'    __all__.extend([',
+			'        "capability_dependency_graph",',
+			'        "capability_load_order",',
 			'        "describe_capabilities",',
 			'        "describe_capabilities_by_erp_module",',
 			'        "describe_capability",',
 			'        "capability_names_by_erp_module",',
+			'        "composition_graph",',
 			'        "get_capability",',
 			'        "list_capabilities",',
+			'        "streaming_processor_index",',
+			'        "ui_route_index",',
 			'    ])',
 		])
 		

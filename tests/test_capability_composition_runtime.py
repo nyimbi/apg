@@ -390,7 +390,36 @@ def test_generated_app_manifest_includes_capability_descriptions():
         "fiscal_calendar": "monthly",
     }
     assert manifest["capability_descriptions_by_erp_module"]["finance"][0]["name"] == "GeneralLedger"
+    assert manifest["capability_dependency_graph"] == {"GeneralLedger": []}
+    assert manifest["capability_load_order"]["unresolved"] == {"GeneralLedger": ["audit_log"]}
+    assert manifest["ui_routes"]["/finance/gl/journals"]["component"] == "JournalScreen"
+    assert manifest["streaming_processors"] == {"bytewax": ["GeneralLedger"]}
     assert json.loads(json.dumps(manifest))["capability_descriptions"]["GeneralLedger"]["name"] == "GeneralLedger"
+
+
+def test_generated_app_manifest_includes_capability_composition_topology():
+    result = APGCompiler().compile_string(SCREEN_SOURCE, "screens.apg")
+    assert result.success is True
+
+    capabilities = types.ModuleType("apg_capabilities")
+    sys.modules["apg_capabilities"] = capabilities
+    try:
+        exec(compile(result.generated_files["apg_capabilities.py"], "apg_capabilities.py", "exec"), capabilities.__dict__)
+
+        app = types.ModuleType("app")
+        exec(compile(result.generated_files["app.py"], "app.py", "exec"), app.__dict__)
+        manifest = app.describe_application()
+    finally:
+        sys.modules.pop("apg_capabilities", None)
+
+    assert manifest["ui_routes"]["/ops"]["name"] == "Dashboard"
+    graph_edges = {
+        (edge["source"], edge["relation"], edge["target"])
+        for edge in manifest["composition_graph"]["edges"]
+    }
+    assert ("screen:OperationsWorkbench.Dashboard", "contains", "component:KpiStrip") in graph_edges
+    assert ("component:KpiStrip", "filters", "component:LedgerTable") in graph_edges
+    assert json.loads(json.dumps(manifest))["ui_routes"]["/ops"]["component"] == "Dashboard"
 
 
 def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
@@ -420,7 +449,11 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
 
     assert grouped["finance"][0]["name"] == "GeneralLedger"
     assert module.capability_names_by_erp_module()["general_ledger"] == ["GeneralLedger"]
+    assert module.capability_dependency_graph() == {"GeneralLedger": []}
+    assert module.streaming_processor_index() == {"bytewax": ["GeneralLedger"]}
+    assert module.ui_route_index()["/finance/gl/journals"]["component"] == "JournalScreen"
     assert "describe_capabilities_by_erp_module" in module.__all__
+    assert "composition_graph" in module.__all__
     assert json.loads(json.dumps(grouped))["accounts_payable"][0]["name"] == "GeneralLedger"
 
 

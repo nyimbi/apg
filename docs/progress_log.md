@@ -5130,3 +5130,28 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `da3943f` (`Expose grouped capability metadata for app composition`) to `origin/main`.
+
+### 2026-05-28 05:37 EAT
+
+In-progress checkpoint:
+
+- Enriched generated app manifests with executable capability topology metadata:
+  - `capability_dependency_graph`
+  - `capability_load_order`
+  - `ui_routes`
+  - `composition_graph`
+  - `streaming_processors`
+- Reexported topology helpers from generated package `__init__.py` so Python consumers can inspect dependencies, routes, screen composition, and Bytewax stream processor indexes without importing generated internals directly.
+- Added focused regressions for dependency/load-order metadata, route indexes, composition graph edges, stream processor indexes, and package reexports.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 8 passed
+- Direct generated app manifest smoke with `SCREEN_SOURCE` -> `ui_routes["/ops"]["name"]` returned `Dashboard`, composition graph included the `filters` relationship, and JSON round-trip preserved route metadata.
+- `git diff --check -- compiler/code_generator.py tests/test_capability_composition_runtime.py docs/progress_log.md` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending.
