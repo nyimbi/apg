@@ -278,6 +278,24 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 		)
 		with urllib.request.urlopen(form_request, timeout=1) as response:
 			form_created = json.loads(response.read().decode("utf-8"))
+		request = urllib.request.Request(
+			f"{base_url}/entities/Customer/records",
+			data=json.dumps({"record": {"name": "Amara", "email": "amara@example.com"}}).encode("utf-8"),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		with urllib.request.urlopen(request, timeout=1) as response:
+			third_created = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(
+			f"{base_url}/entities/Customer/records?filter.name=Kofi",
+			timeout=1,
+		) as response:
+			filtered = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(
+			f"{base_url}/entities/Customer/records?sort=name&order=desc&limit=2&offset=0",
+			timeout=1,
+		) as response:
+			sorted_page = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/events", timeout=1) as response:
 			events = json.loads(response.read().decode("utf-8"))
 	finally:
@@ -324,8 +342,20 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert missing_payload["error"] == "record_not_found"
 	assert empty_list["records"] == []
 	assert form_created["record"] == {"id": 2, "name": "Kofi", "email": "kofi@example.com"}
-	assert [event["action"] for event in events["events"]] == ["create", "update", "delete", "create"]
-	assert events["events"][-1]["after"] == form_created["record"]
+	assert third_created["record"] == {"id": 3, "name": "Amara", "email": "amara@example.com"}
+	assert filtered["records"] == [form_created["record"]]
+	assert filtered["filters"] == {"name": "Kofi"}
+	assert filtered["total"] == 1
+	assert sorted_page["records"] == [form_created["record"], third_created["record"]]
+	assert sorted_page["count"] == 2
+	assert sorted_page["total"] == 2
+	assert sorted_page["limit"] == 2
+	assert sorted_page["sort"] == "name"
+	assert sorted_page["order"] == "desc"
+	parameters = openapi["paths"]["/entities/Customer/records"]["get"]["parameters"]
+	assert {parameter["name"] for parameter in parameters} >= {"filter.<field>", "sort", "order", "limit", "offset"}
+	assert [event["action"] for event in events["events"]] == ["create", "update", "delete", "create", "create"]
+	assert events["events"][-1]["after"] == third_created["record"]
 
 
 def test_generated_python_app_exposes_relationship_graph_from_fields(tmp_path):

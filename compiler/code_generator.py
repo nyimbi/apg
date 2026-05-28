@@ -256,6 +256,50 @@ def list_records(entity_name: str | None = None) -> Dict[str, list[Dict[str, Any
     return [dict(record) for record in RECORD_STORE[entity_name]]
 
 
+def query_records(entity_name: str, query: Dict[str, list[str]] | None = None) -> Dict[str, Any]:
+    query = query or {{}}
+    records = list_records(entity_name)
+    filters = {{
+        key.removeprefix("filter."): values[-1]
+        for key, values in query.items()
+        if values and key not in {{"limit", "offset", "sort", "order"}}
+    }}
+    records = [
+        record
+        for record in records
+        if all(str(record.get(field, "")) == str(expected) for field, expected in filters.items())
+    ]
+    sort_field = query.get("sort", [None])[-1]
+    if sort_field:
+        reverse = query.get("order", ["asc"])[-1].lower() == "desc"
+        records = sorted(records, key=lambda record: str(record.get(sort_field, "")), reverse=reverse)
+    total = len(records)
+    try:
+        offset = max(0, int(query.get("offset", ["0"])[-1]))
+    except (TypeError, ValueError):
+        offset = 0
+    limit = query.get("limit", [None])[-1]
+    try:
+        parsed_limit = int(limit) if limit not in (None, "") else None
+    except (TypeError, ValueError):
+        parsed_limit = None
+    if parsed_limit is not None:
+        records = records[offset:offset + max(0, parsed_limit)]
+    elif offset:
+        records = records[offset:]
+    return {{
+        "entity": entity_name,
+        "records": records,
+        "count": len(records),
+        "total": total,
+        "offset": offset,
+        "limit": parsed_limit,
+        "filters": filters,
+        "sort": sort_field,
+        "order": query.get("order", ["asc"])[-1],
+    }}
+
+
 def _data_path() -> Path | None:
     raw_path = os.environ.get("APG_DATA_FILE") or os.environ.get("APG_DATA_PATH")
     if not raw_path:
@@ -446,6 +490,13 @@ def openapi_document() -> Dict[str, Any]:
             "get": _api_operation(f"List {{entity_name}} records", "Record list"),
             "post": _api_operation(f"Create {{entity_name}} record", "Created record", status="201", request_body=True),
         }}
+        paths[f"/entities/{{entity_name}}/records"]["get"]["parameters"] = [
+            {{"name": "filter.<field>", "in": "query", "required": False, "description": "Exact field filter"}},
+            {{"name": "sort", "in": "query", "required": False, "description": "Field to sort by"}},
+            {{"name": "order", "in": "query", "required": False, "description": "asc or desc"}},
+            {{"name": "limit", "in": "query", "required": False, "description": "Maximum records to return"}},
+            {{"name": "offset", "in": "query", "required": False, "description": "Records to skip"}},
+        ]
         paths[f"/entities/{{entity_name}}/records/{{{{id}}}}"] = {{
             "get": _api_operation(f"Fetch {{entity_name}} record", "Record"),
             "put": _api_operation(f"Update {{entity_name}} record", "Updated record", request_body=True),
@@ -763,6 +814,10 @@ def _record_by_id(entity_name: str, record_id: str) -> Dict[str, Any] | None:
 
 
 def _records_payload(path: str) -> tuple[int, Dict[str, Any]]:
+    return _records_payload_with_query(path, {{}})
+
+
+def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
     if route is None:
         return 404, {{"error": "not_found", "path": path}}
@@ -773,15 +828,14 @@ def _records_payload(path: str) -> tuple[int, Dict[str, Any]]:
     if entity_name not in ENTITY_NAMES:
         return 404, {{"error": "unknown_entity", "entity": entity_name}}
     if record_id is None:
-        records = list_records(entity_name)
-        return 200, {{"entity": entity_name, "records": records, "count": len(records)}}
+        return 200, query_records(entity_name, query)
     record = _record_by_id(entity_name, record_id)
     if record is None:
         return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
     return 200, {{"entity": entity_name, "record": record}}
 
 
-def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
+def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
     if path in {{"/", "/manifest", "/application"}}:
         return 200, describe_application()
@@ -807,7 +861,7 @@ def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
     if path == "/records" or path.startswith("/records/") or (
         path.startswith("/entities/") and "/records" in path
     ):
-        return _records_payload(path)
+        return _records_payload_with_query(path, query)
     if path == "/relationships":
         return 200, relationship_graph()
     if path == "/storage":
@@ -1026,13 +1080,14 @@ _load_record_store()
 
 class ApplicationRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
-        path = self.path.split("?", 1)[0]
+        path, _, raw_query = self.path.partition("?")
+        query = parse_qs(raw_query, keep_blank_values=True)
         if path == "/ui" or path.startswith("/ui/"):
             status, html_payload = _ui_payload(path)
             body = html_payload.encode("utf-8")
             content_type = "text/html; charset=utf-8"
         else:
-            status, payload = _route_payload(path)
+            status, payload = _route_payload(path, query)
             body = _json_bytes(payload)
             content_type = "application/json; charset=utf-8"
         self.send_response(status)

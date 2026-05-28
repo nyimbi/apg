@@ -5447,3 +5447,28 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `b0f4c96` (`Emit generated record mutation events`) to `origin/main`.
+
+### 2026-05-28 06:58 EAT
+
+Completed checkpoint:
+
+- Added generated record-list querying for executable apps.
+- Generated `GET /entities/{EntityName}/records` now supports:
+  - exact field filters with `filter.<field>=value` or `<field>=value`.
+  - `sort=<field>`.
+  - `order=asc|desc`.
+  - `limit=<n>`.
+  - `offset=<n>`.
+- Generated list responses now include query metadata: count, total, offset, limit, filters, sort, and order.
+- Generated `/openapi.json` advertises record-list query parameters.
+- Added focused subprocess regression coverage for generated record filtering, sorting, limit, query metadata, and OpenAPI parameter exposure.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 15 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated record-query slice.
