@@ -1,0 +1,638 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 3,
+    "name": "hr_payroll_operations",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "PayrollOperations": {
+      "approvals": {
+        "approvers": [
+          "hr_manager",
+          "payroll_controller"
+        ],
+        "levels": 2
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "currency": "KES",
+        "pay_frequency": "monthly"
+      },
+      "erp_modules": [
+        "hr",
+        "payroll",
+        "finance"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw",
+          "am",
+          "rw",
+          "zu"
+        ]
+      },
+      "master_data": {},
+      "name": "PayrollOperations",
+      "provides": [
+        "employee_master",
+        "payroll_runs",
+        "payslip_generation"
+      ],
+      "requires": [
+        "audit_events",
+        "general_ledger"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "payrun_requires_approval",
+          "when": "approved == false"
+        },
+        {
+          "action": "deny",
+          "name": "positive_net_pay",
+          "when": "net_amount < 0"
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {
+        "name": "people_ops_theme",
+        "tokens": {
+          "accent": "#805AD5"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PayrollScreen",
+            "name": "Payroll",
+            "path": "/hr/payroll"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "PayrollOperations": [
+        "audit_events",
+        "general_ledger"
+      ]
+    }
+  },
+  "contracts": {
+    "PayrollOperations": {
+      "configuration": {
+        "currency": "KES",
+        "pay_frequency": "monthly"
+      },
+      "id": "payroll_operations",
+      "provides": [
+        "employee_master",
+        "payroll_runs",
+        "payslip_generation"
+      ],
+      "requires": [
+        "audit_events",
+        "general_ledger"
+      ],
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "payrun_requires_approval",
+          "when": "approved == false"
+        },
+        {
+          "action": "deny",
+          "name": "positive_net_pay",
+          "when": "net_amount < 0"
+        }
+      ],
+      "theme": {
+        "name": "people_ops_theme",
+        "tokens": {
+          "accent": "#805AD5"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PayrollScreen",
+            "name": "Payroll",
+            "path": "/hr/payroll"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "hr_payroll_operations.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "hr_payroll_operations.apg",
+      "fixes": [],
+      "message": "Property 'employee_number' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "hr_payroll_operations.apg",
+      "fixes": [],
+      "message": "Property 'full_name' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "hr_payroll_operations.apg",
+      "fixes": [],
+      "message": "Property 'department' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "hr_payroll_operations.apg",
+      "fixes": [],
+      "message": "Property 'active' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "hr_payroll_operations.apg",
+      "fixes": [],
+      "message": "Property 'period' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "hr_payroll_operations.apg",
+      "fixes": [],
+      "message": "Property 'gross_amount' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "hr_payroll_operations.apg",
+      "fixes": [],
+      "message": "Property 'net_amount' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "hr_payroll_operations.apg",
+      "fixes": [],
+      "message": "Property 'approved' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 2,
+      "kind": "capability",
+      "nodes": 3
+    },
+    "deployment": {
+      "edges": 3,
+      "kind": "deployment",
+      "nodes": 4
+    },
+    "er": {
+      "edges": 8,
+      "kind": "er",
+      "nodes": 10
+    },
+    "handler": {
+      "edges": 3,
+      "kind": "handler",
+      "nodes": 4
+    },
+    "lookup": {
+      "edges": 3,
+      "kind": "lookup",
+      "nodes": 4
+    },
+    "package": {
+      "edges": 3,
+      "kind": "package",
+      "nodes": 4
+    },
+    "security": {
+      "edges": 3,
+      "kind": "security",
+      "nodes": 4
+    },
+    "workflow": {
+      "edges": 3,
+      "kind": "workflow",
+      "nodes": 4
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "PayrollOperations.payrun_requires_approval": {
+      "action": "require_review",
+      "name": "payrun_requires_approval",
+      "when": "approved == false"
+    },
+    "PayrollOperations.positive_net_pay": {
+      "action": "deny",
+      "name": "positive_net_pay",
+      "when": "net_amount < 0"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "hr_payroll_operations.apg"
+  ],
+  "symbols": {
+    "capability.PayrollOperations": {
+      "file": "hr_payroll_operations.apg",
+      "id": "capability.PayrollOperations",
+      "kind": "capability",
+      "name": "PayrollOperations",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.active": {
+      "file": "hr_payroll_operations.apg",
+      "id": "field.Employee.active",
+      "kind": "field",
+      "name": "Employee.active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.department": {
+      "file": "hr_payroll_operations.apg",
+      "id": "field.Employee.department",
+      "kind": "field",
+      "name": "Employee.department",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.employee_number": {
+      "file": "hr_payroll_operations.apg",
+      "id": "field.Employee.employee_number",
+      "kind": "field",
+      "name": "Employee.employee_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.full_name": {
+      "file": "hr_payroll_operations.apg",
+      "id": "field.Employee.full_name",
+      "kind": "field",
+      "name": "Employee.full_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.approved": {
+      "file": "hr_payroll_operations.apg",
+      "id": "field.PayRun.approved",
+      "kind": "field",
+      "name": "PayRun.approved",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.gross_amount": {
+      "file": "hr_payroll_operations.apg",
+      "id": "field.PayRun.gross_amount",
+      "kind": "field",
+      "name": "PayRun.gross_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.net_amount": {
+      "file": "hr_payroll_operations.apg",
+      "id": "field.PayRun.net_amount",
+      "kind": "field",
+      "name": "PayRun.net_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.period": {
+      "file": "hr_payroll_operations.apg",
+      "id": "field.PayRun.period",
+      "kind": "field",
+      "name": "PayRun.period",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.hr_payroll_operations": {
+      "file": "hr_payroll_operations.apg",
+      "id": "module.hr_payroll_operations",
+      "kind": "module",
+      "name": "hr_payroll_operations",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Employee": {
+      "file": "hr_payroll_operations.apg",
+      "id": "table.Employee",
+      "kind": "table",
+      "name": "Employee",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.PayRun": {
+      "file": "hr_payroll_operations.apg",
+      "id": "table.PayRun",
+      "kind": "table",
+      "name": "PayRun",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Employee": {
+      "fields": {
+        "active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "department": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "employee_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Employee"
+    },
+    "PayRun": {
+      "fields": {
+        "approved": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "gross_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "net_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "period": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "PayRun"
+    }
+  },
+  "views": {}
+}

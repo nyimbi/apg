@@ -27,6 +27,7 @@ RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity i
 NEXT_RECORD_IDS: Dict[str, int] = {entity["name"]: 1 for entity in ENTITIES}
 EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
+SEMANTIC_MODEL: Dict[str, Any] = {'format': 'apg.semantic-model.v1', 'ok': True, 'source_files': ['manufacturing_quality_control.apg'], 'app': {'name': 'manufacturing_quality_control', 'version': '1.0.0', 'description': None, 'entity_count': 2}, 'symbols': {'module.manufacturing_quality_control': {'id': 'module.manufacturing_quality_control', 'kind': 'module', 'name': 'manufacturing_quality_control', 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'table.ProductionRun': {'id': 'table.ProductionRun', 'kind': 'table', 'name': 'ProductionRun', 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.ProductionRun.line_code': {'id': 'field.ProductionRun.line_code', 'kind': 'field', 'name': 'ProductionRun.line_code', 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.ProductionRun.product_sku': {'id': 'field.ProductionRun.product_sku', 'kind': 'field', 'name': 'ProductionRun.product_sku', 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.ProductionRun.planned_quantity': {'id': 'field.ProductionRun.planned_quantity', 'kind': 'field', 'name': 'ProductionRun.planned_quantity', 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.ProductionRun.completed_quantity': {'id': 'field.ProductionRun.completed_quantity', 'kind': 'field', 'name': 'ProductionRun.completed_quantity', 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.ProductionRun.defect_count': {'id': 'field.ProductionRun.defect_count', 'kind': 'field', 'name': 'ProductionRun.defect_count', 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.ProductionRun.active': {'id': 'field.ProductionRun.active', 'kind': 'field', 'name': 'ProductionRun.active', 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'capability.QualityControl': {'id': 'capability.QualityControl', 'kind': 'capability', 'name': 'QualityControl', 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}}, 'tables': {'ProductionRun': {'name': 'ProductionRun', 'fields': {'line_code': {'type': 'str', 'required': True, 'relationship': None}, 'product_sku': {'type': 'str', 'required': True, 'relationship': None}, 'planned_quantity': {'type': 'int', 'required': True, 'relationship': None}, 'completed_quantity': {'type': 'int', 'required': True, 'relationship': None}, 'defect_count': {'type': 'int', 'required': True, 'relationship': None}, 'active': {'type': 'bool', 'required': True, 'relationship': None}}, 'lookup_paths': {}}}, 'views': {}, 'flows': {}, 'operations': {}, 'rules': {'QualityControl.defect_threshold': {'name': 'defect_threshold', 'when': 'defect_count > defect_threshold', 'action': 'require_review'}, 'QualityControl.run_completion': {'name': 'run_completion', 'when': 'completed_quantity >= planned_quantity', 'action': 'audit'}}, 'roles': {}, 'security': {}, 'agents': {}, 'llms': {}, 'capabilities': {'QualityControl': {'name': 'QualityControl', 'provides': ['quality_inspections', 'defect_tracking', 'production_oee'], 'requires': ['stock_movements', 'audit_events'], 'configuration': {'defect_threshold': 3, 'inspection_frequency_minutes': 60}, 'rules': [{'name': 'defect_threshold', 'when': 'defect_count > defect_threshold', 'action': 'require_review'}, {'name': 'run_completion', 'when': 'completed_quantity >= planned_quantity', 'action': 'audit'}], 'rule_engine': {}, 'ui': {'shell': 'python', 'routes': [{'name': 'Quality', 'path': '/manufacturing/quality', 'component': 'QualityScreen'}]}, 'theme': {'name': 'shop_floor_theme', 'tokens': {'accent': '#B83280'}}, 'runtime': {}, 'erp_modules': ['manufacturing', 'inventory'], 'components': {}, 'business_rules': [], 'approvals': {}, 'master_data': {}, 'i18n': {}, 'streaming': {'processor': 'bytewax', 'state': 'quality_event_state'}, 'screens': {'LineDashboard': {'route': '/manufacturing/line', 'layout': 'dashboard', 'contains': ['RunSummary', 'DefectChart', 'InspectionQueue'], 'binds': ['production_runs.active'], 'actions': ['pause_line', 'approve_run', 'escalate_quality']}}}}, 'composition': {'applications': {}, 'agent_teams': {}, 'capability_dependencies': {'QualityControl': ['stock_movements', 'audit_events']}}, 'contracts': {'QualityControl': {'id': 'quality_control', 'provides': ['quality_inspections', 'defect_tracking', 'production_oee'], 'requires': ['stock_movements', 'audit_events'], 'configuration': {'defect_threshold': 3, 'inspection_frequency_minutes': 60}, 'rules': [{'name': 'defect_threshold', 'when': 'defect_count > defect_threshold', 'action': 'require_review'}, {'name': 'run_completion', 'when': 'completed_quantity >= planned_quantity', 'action': 'audit'}], 'ui': {'shell': 'python', 'routes': [{'name': 'Quality', 'path': '/manufacturing/quality', 'component': 'QualityScreen'}]}, 'theme': {'name': 'shop_floor_theme', 'tokens': {'accent': '#B83280'}}}}, 'deployment': {'target': 'python', 'source': 'manufacturing_quality_control.apg'}, 'packages': {}, 'graphs': {'er': {'kind': 'er', 'nodes': 7, 'edges': 6}, 'lookup': {'kind': 'lookup', 'nodes': 3, 'edges': 2}, 'workflow': {'kind': 'workflow', 'nodes': 3, 'edges': 2}, 'handler': {'kind': 'handler', 'nodes': 3, 'edges': 2}, 'capability': {'kind': 'capability', 'nodes': 3, 'edges': 2}, 'security': {'kind': 'security', 'nodes': 3, 'edges': 2}, 'agent': {'kind': 'agent', 'nodes': 0, 'edges': 0}, 'deployment': {'kind': 'deployment', 'nodes': 3, 'edges': 2}, 'package': {'kind': 'package', 'nodes': 3, 'edges': 2}}, 'diagnostics': [{'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'line_code' appears to be unused", 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'product_sku' appears to be unused", 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'planned_quantity' appears to be unused", 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'completed_quantity' appears to be unused", 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'defect_count' appears to be unused", 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'active' appears to be unused", 'file': 'manufacturing_quality_control.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}]}
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -106,6 +107,10 @@ def list_entities() -> list[Dict[str, Any]]:
 
 def list_databases() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+
+
+def semantic_model() -> Dict[str, Any]:
+    return json.loads(json.dumps(SEMANTIC_MODEL))
 
 
 def database_status() -> Dict[str, Any]:
@@ -410,6 +415,7 @@ def component_manifest() -> Dict[str, Any]:
                     "relationship_graph",
                     "runtime_adapter_environment_keys",
                     "self_test",
+                    "semantic_model",
                     "storage_status",
                     "update_record",
                     "capability_health",
@@ -424,6 +430,7 @@ def component_manifest() -> Dict[str, Any]:
             },
             "records": sorted(ENTITY_NAMES),
             "theme": "/theme.css",
+            "semantic_model": "/semantic-model.json",
         },
         "entities": list_entities(),
         "databases": list_databases(),
@@ -440,6 +447,7 @@ def component_manifest() -> Dict[str, Any]:
                 "app.py",
                 "__init__.py",
                 "README.md",
+                "semantic_model.json",
                 "requirements.txt",
                 "Dockerfile",
                 ".dockerignore",
@@ -449,6 +457,7 @@ def component_manifest() -> Dict[str, Any]:
             "commands": {
                 "run": "python app.py",
                 "describe": "python app.py --describe",
+                "semantic_model": "python app.py --semantic-model",
                 "validate": "python app.py --validate",
                 "self_test": "python app.py --self-test",
                 "smoke_test": "python smoke_test.py",
@@ -670,6 +679,7 @@ def _database_openapi_schemas() -> Dict[str, Any]:
     generic_object = {"type": "object", "additionalProperties": True}
     return {
         "ApplicationDescription": generic_object,
+        "SemanticModel": generic_object,
         "ComponentManifest": {
             "type": "object",
             "additionalProperties": True,
@@ -1172,6 +1182,7 @@ def openapi_document() -> Dict[str, Any]:
         "/health": {"get": _api_operation("Application health", "Health report", response_schema=_schema_ref("HealthReport"))},
         "/component.json": {"get": _api_operation("Composable component manifest", "APG component manifest", response_schema=_schema_ref("ComponentManifest"))},
         "/manifest": {"get": _api_operation("Application manifest", "APG manifest", response_schema=_schema_ref("ApplicationDescription"))},
+        "/semantic-model.json": {"get": _api_operation("Semantic model", "APG semantic model", response_schema=_schema_ref("SemanticModel"))},
         "/openapi.json": {"get": _api_operation("OpenAPI contract", "OpenAPI 3.1 contract", response_schema={"type": "object", "additionalProperties": True})},
         "/validate": {"get": _api_operation("Application validation", "Validation report", response_schema=_schema_ref("ValidationReport"))},
         "/events": {"get": _api_operation("Record mutation events", "Event log", response_schema=_schema_ref("EventLog"))},
@@ -1364,8 +1375,10 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
         errors.append("component manifest record interface does not match generated entities")
     if interfaces.get("theme") != "/theme.css":
         errors.append("component manifest theme interface must point to /theme.css")
+    if interfaces.get("semantic_model") != "/semantic-model.json":
+        errors.append("component manifest semantic model interface must point to /semantic-model.json")
     deployment = manifest.get("deployment", {})
-    expected_artifacts = ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
+    expected_artifacts = ["app.py", "__init__.py", "README.md", "semantic_model.json", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
     raw_artifacts = deployment.get("artifacts", []) if isinstance(deployment, dict) else []
     artifacts: set[str] = set()
     if not isinstance(raw_artifacts, list):
@@ -1390,6 +1403,7 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
     expected_commands = {
         "run": "python app.py",
         "describe": "python app.py --describe",
+        "semantic_model": "python app.py --semantic-model",
         "validate": "python app.py --validate",
         "self_test": "python app.py --self-test",
         "smoke_test": "python smoke_test.py",
@@ -1513,6 +1527,7 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             "/manifest",
             "/application",
             "/component.json",
+            "/semantic-model.json",
             "/health",
             "/validate",
             "/openapi.json",
@@ -2755,6 +2770,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, describe_application()
     if path == "/component.json":
         return 200, component_manifest()
+    if path == "/semantic-model.json":
+        return 200, semantic_model()
     if path == "/health":
         validation = validate_application()
         return 200, {
@@ -3296,6 +3313,9 @@ def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
     if "--describe" in args:
         print(json.dumps(describe_application(), indent=2, sort_keys=True))
+        return
+    if "--semantic-model" in args:
+        print(json.dumps(semantic_model(), indent=2, sort_keys=True))
         return
     if "--validate" in args:
         report = validate_application()

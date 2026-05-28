@@ -1,0 +1,410 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 4,
+    "name": "multi_capability_dependency_suite",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "AuditEvents": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "retention_days": 365
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "AuditEvents",
+      "provides": [
+        "audit_events"
+      ],
+      "requires": [],
+      "rule_engine": {},
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "audit_event_state"
+      },
+      "theme": {},
+      "ui": {}
+    },
+    "Billing": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "currency": "KES"
+      },
+      "erp_modules": [
+        "finance",
+        "sales"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Billing",
+      "provides": [
+        "invoice_generation",
+        "payment_allocation"
+      ],
+      "requires": [
+        "sales_orders",
+        "customer_master",
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "invoice_requires_order",
+          "when": "order_id missing"
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {},
+      "ui": {}
+    },
+    "CustomerMaster": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "deduplicate": true
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "customer",
+          "address",
+          "contact"
+        ]
+      },
+      "name": "CustomerMaster",
+      "provides": [
+        "customer_master"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {},
+      "ui": {}
+    },
+    "OrderManagement": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "default_status": "pending"
+      },
+      "erp_modules": [
+        "sales",
+        "inventory",
+        "finance"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "OrderManagement",
+      "provides": [
+        "sales_orders",
+        "order_fulfillment"
+      ],
+      "requires": [
+        "customer_master",
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "customer_required",
+          "when": "customer_id missing"
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {},
+      "ui": {
+        "routes": [
+          {
+            "component": "OrderScreen",
+            "name": "Orders",
+            "path": "/orders"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "AuditEvents": [],
+      "Billing": [
+        "sales_orders",
+        "customer_master",
+        "audit_events"
+      ],
+      "CustomerMaster": [
+        "audit_events"
+      ],
+      "OrderManagement": [
+        "customer_master",
+        "audit_events"
+      ]
+    }
+  },
+  "contracts": {
+    "AuditEvents": {
+      "configuration": {
+        "retention_days": 365
+      },
+      "id": "audit_events",
+      "provides": [
+        "audit_events"
+      ]
+    },
+    "Billing": {
+      "configuration": {
+        "currency": "KES"
+      },
+      "id": "billing",
+      "provides": [
+        "invoice_generation",
+        "payment_allocation"
+      ],
+      "requires": [
+        "sales_orders",
+        "customer_master",
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "invoice_requires_order",
+          "when": "order_id missing"
+        }
+      ]
+    },
+    "CustomerMaster": {
+      "configuration": {
+        "deduplicate": true
+      },
+      "id": "customer_master",
+      "provides": [
+        "customer_master"
+      ],
+      "requires": [
+        "audit_events"
+      ]
+    },
+    "OrderManagement": {
+      "configuration": {
+        "default_status": "pending"
+      },
+      "id": "order_management",
+      "provides": [
+        "sales_orders",
+        "order_fulfillment"
+      ],
+      "requires": [
+        "customer_master",
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "customer_required",
+          "when": "customer_id missing"
+        }
+      ],
+      "ui": {
+        "routes": [
+          {
+            "component": "OrderScreen",
+            "name": "Orders",
+            "path": "/orders"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "multi_capability_dependency_suite.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 6,
+      "kind": "capability",
+      "nodes": 7
+    },
+    "deployment": {
+      "edges": 4,
+      "kind": "deployment",
+      "nodes": 5
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 4,
+      "kind": "handler",
+      "nodes": 5
+    },
+    "lookup": {
+      "edges": 4,
+      "kind": "lookup",
+      "nodes": 5
+    },
+    "package": {
+      "edges": 4,
+      "kind": "package",
+      "nodes": 5
+    },
+    "security": {
+      "edges": 4,
+      "kind": "security",
+      "nodes": 5
+    },
+    "workflow": {
+      "edges": 4,
+      "kind": "workflow",
+      "nodes": 5
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "Billing.invoice_requires_order": {
+      "action": "deny",
+      "name": "invoice_requires_order",
+      "when": "order_id missing"
+    },
+    "OrderManagement.customer_required": {
+      "action": "deny",
+      "name": "customer_required",
+      "when": "customer_id missing"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "multi_capability_dependency_suite.apg"
+  ],
+  "symbols": {
+    "capability.AuditEvents": {
+      "file": "multi_capability_dependency_suite.apg",
+      "id": "capability.AuditEvents",
+      "kind": "capability",
+      "name": "AuditEvents",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.Billing": {
+      "file": "multi_capability_dependency_suite.apg",
+      "id": "capability.Billing",
+      "kind": "capability",
+      "name": "Billing",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.CustomerMaster": {
+      "file": "multi_capability_dependency_suite.apg",
+      "id": "capability.CustomerMaster",
+      "kind": "capability",
+      "name": "CustomerMaster",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.OrderManagement": {
+      "file": "multi_capability_dependency_suite.apg",
+      "id": "capability.OrderManagement",
+      "kind": "capability",
+      "name": "OrderManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.multi_capability_dependency_suite": {
+      "file": "multi_capability_dependency_suite.apg",
+      "id": "module.multi_capability_dependency_suite",
+      "kind": "module",
+      "name": "multi_capability_dependency_suite",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

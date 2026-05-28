@@ -1,0 +1,274 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 1,
+    "name": "operations_dashboard_capability",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "OperationsDashboard": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "refresh_seconds": 30,
+        "tenant_scoped": true
+      },
+      "erp_modules": [
+        "finance",
+        "inventory",
+        "manufacturing",
+        "sales",
+        "hr"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "OperationsDashboard",
+      "provides": [
+        "executive_kpis",
+        "exception_queue",
+        "operations_scorecards"
+      ],
+      "requires": [
+        "journal_entries",
+        "stock_balances",
+        "production_oee",
+        "forecast_metrics"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "critical_exception_review",
+          "when": "severity == critical"
+        },
+        {
+          "action": "warn",
+          "name": "stale_metric_warning",
+          "when": "metric_age_minutes > 15"
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "ExecutiveDashboard": {
+          "binds": [
+            "executive_kpis.current"
+          ],
+          "composes": [
+            "ExceptionQueue"
+          ],
+          "contains": [
+            "FinanceKpis",
+            "InventoryKpis",
+            "ProductionKpis",
+            "SalesKpis"
+          ],
+          "layout": "dashboard",
+          "relationships": [
+            "FinanceKpis -> ExceptionQueue",
+            "InventoryKpis -> ExceptionQueue",
+            "ProductionKpis -> ExceptionQueue",
+            "SalesKpis -> ExceptionQueue"
+          ],
+          "route": "/ops/executive"
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "state": "operations_dashboard_state"
+      },
+      "theme": {
+        "name": "executive_theme",
+        "tokens": {
+          "accent": "#1A365D",
+          "surface": "#F7FAFC"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "OpsDashboard",
+            "name": "Operations",
+            "path": "/ops/dashboard"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "OperationsDashboard": [
+        "journal_entries",
+        "stock_balances",
+        "production_oee",
+        "forecast_metrics"
+      ]
+    }
+  },
+  "contracts": {
+    "OperationsDashboard": {
+      "configuration": {
+        "refresh_seconds": 30,
+        "tenant_scoped": true
+      },
+      "id": "operations_dashboard",
+      "provides": [
+        "executive_kpis",
+        "exception_queue",
+        "operations_scorecards"
+      ],
+      "requires": [
+        "journal_entries",
+        "stock_balances",
+        "production_oee",
+        "forecast_metrics"
+      ],
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "critical_exception_review",
+          "when": "severity == critical"
+        },
+        {
+          "action": "warn",
+          "name": "stale_metric_warning",
+          "when": "metric_age_minutes > 15"
+        }
+      ],
+      "theme": {
+        "name": "executive_theme",
+        "tokens": {
+          "accent": "#1A365D",
+          "surface": "#F7FAFC"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "OpsDashboard",
+            "name": "Operations",
+            "path": "/ops/dashboard"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "operations_dashboard_capability.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 4,
+      "kind": "capability",
+      "nodes": 5
+    },
+    "deployment": {
+      "edges": 1,
+      "kind": "deployment",
+      "nodes": 2
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 1,
+      "kind": "handler",
+      "nodes": 2
+    },
+    "lookup": {
+      "edges": 1,
+      "kind": "lookup",
+      "nodes": 2
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    },
+    "security": {
+      "edges": 1,
+      "kind": "security",
+      "nodes": 2
+    },
+    "workflow": {
+      "edges": 1,
+      "kind": "workflow",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "OperationsDashboard.critical_exception_review": {
+      "action": "require_review",
+      "name": "critical_exception_review",
+      "when": "severity == critical"
+    },
+    "OperationsDashboard.stale_metric_warning": {
+      "action": "warn",
+      "name": "stale_metric_warning",
+      "when": "metric_age_minutes > 15"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "operations_dashboard_capability.apg"
+  ],
+  "symbols": {
+    "capability.OperationsDashboard": {
+      "file": "operations_dashboard_capability.apg",
+      "id": "capability.OperationsDashboard",
+      "kind": "capability",
+      "name": "OperationsDashboard",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.operations_dashboard_capability": {
+      "file": "operations_dashboard_capability.apg",
+      "id": "module.operations_dashboard_capability",
+      "kind": "module",
+      "name": "operations_dashboard_capability",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

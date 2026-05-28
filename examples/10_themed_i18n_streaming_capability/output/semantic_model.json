@@ -1,0 +1,214 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 1,
+    "name": "localized_streaming_capability",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "OperationsFeed": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "tenant_scoped": true
+      },
+      "erp_modules": [],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw",
+          "ha",
+          "yo",
+          "zu",
+          "am",
+          "rw"
+        ]
+      },
+      "master_data": {},
+      "name": "OperationsFeed",
+      "provides": [
+        "operations_events",
+        "operations_dashboard"
+      ],
+      "requires": [],
+      "rule_engine": {},
+      "rules": [],
+      "runtime": {
+        "backend": "python",
+        "streaming": {
+          "processor": "bytewax"
+        }
+      },
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "operations_feed_state"
+      },
+      "theme": {
+        "name": "ops_theme",
+        "tokens": {
+          "accent": "#126E82",
+          "surface": "#F7FAFC"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "OperationsScreen",
+            "name": "Operations",
+            "path": "/ops"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "OperationsFeed": []
+    }
+  },
+  "contracts": {
+    "OperationsFeed": {
+      "configuration": {
+        "tenant_scoped": true
+      },
+      "id": "operations_feed",
+      "provides": [
+        "operations_events",
+        "operations_dashboard"
+      ],
+      "runtime": {
+        "backend": "python",
+        "streaming": {
+          "processor": "bytewax"
+        }
+      },
+      "theme": {
+        "name": "ops_theme",
+        "tokens": {
+          "accent": "#126E82",
+          "surface": "#F7FAFC"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "OperationsScreen",
+            "name": "Operations",
+            "path": "/ops"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "localized_streaming_capability.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "deployment": {
+      "edges": 1,
+      "kind": "deployment",
+      "nodes": 2
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 1,
+      "kind": "handler",
+      "nodes": 2
+    },
+    "lookup": {
+      "edges": 1,
+      "kind": "lookup",
+      "nodes": 2
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    },
+    "security": {
+      "edges": 1,
+      "kind": "security",
+      "nodes": 2
+    },
+    "workflow": {
+      "edges": 1,
+      "kind": "workflow",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "localized_streaming_capability.apg"
+  ],
+  "symbols": {
+    "capability.OperationsFeed": {
+      "file": "localized_streaming_capability.apg",
+      "id": "capability.OperationsFeed",
+      "kind": "capability",
+      "name": "OperationsFeed",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.localized_streaming_capability": {
+      "file": "localized_streaming_capability.apg",
+      "id": "module.localized_streaming_capability",
+      "kind": "module",
+      "name": "localized_streaming_capability",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

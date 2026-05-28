@@ -1,0 +1,210 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 1,
+    "name": "customer_records",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "customer_records.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "customer_records.apg",
+      "fixes": [],
+      "message": "Property 'name' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "customer_records.apg",
+      "fixes": [],
+      "message": "Property 'email' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 1,
+      "kind": "deployment",
+      "nodes": 2
+    },
+    "er": {
+      "edges": 2,
+      "kind": "er",
+      "nodes": 3
+    },
+    "handler": {
+      "edges": 1,
+      "kind": "handler",
+      "nodes": 2
+    },
+    "lookup": {
+      "edges": 1,
+      "kind": "lookup",
+      "nodes": 2
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    },
+    "security": {
+      "edges": 1,
+      "kind": "security",
+      "nodes": 2
+    },
+    "workflow": {
+      "edges": 1,
+      "kind": "workflow",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "customer_records.apg"
+  ],
+  "symbols": {
+    "field.Customer.email": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.email",
+      "kind": "field",
+      "name": "Customer.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.name": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.name",
+      "kind": "field",
+      "name": "Customer.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.customer_records": {
+      "file": "customer_records.apg",
+      "id": "module.customer_records",
+      "kind": "module",
+      "name": "customer_records",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Customer": {
+      "file": "customer_records.apg",
+      "id": "table.Customer",
+      "kind": "table",
+      "name": "Customer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Customer": {
+      "fields": {
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Customer"
+    }
+  },
+  "views": {}
+}

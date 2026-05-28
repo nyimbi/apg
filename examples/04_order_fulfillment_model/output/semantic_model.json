@@ -1,0 +1,756 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 4,
+    "name": "fulfillment_ops",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "fulfillment_ops.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'name' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'email' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'customer_id' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'order_number' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'total' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'status' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'sales_order_id' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'carrier' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'tracking_number' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'delivered' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'shipment_id' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'event_type' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fulfillment_ops.apg",
+      "fixes": [],
+      "message": "Property 'event_time' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 4,
+      "kind": "deployment",
+      "nodes": 5
+    },
+    "er": {
+      "edges": 16,
+      "kind": "er",
+      "nodes": 17
+    },
+    "handler": {
+      "edges": 4,
+      "kind": "handler",
+      "nodes": 5
+    },
+    "lookup": {
+      "edges": 4,
+      "kind": "lookup",
+      "nodes": 5
+    },
+    "package": {
+      "edges": 4,
+      "kind": "package",
+      "nodes": 5
+    },
+    "security": {
+      "edges": 4,
+      "kind": "security",
+      "nodes": 5
+    },
+    "workflow": {
+      "edges": 4,
+      "kind": "workflow",
+      "nodes": 5
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "fulfillment_ops.apg"
+  ],
+  "symbols": {
+    "field.Customer.email": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.Customer.email",
+      "kind": "field",
+      "name": "Customer.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.name": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.Customer.name",
+      "kind": "field",
+      "name": "Customer.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FulfillmentEvent.event_time": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.FulfillmentEvent.event_time",
+      "kind": "field",
+      "name": "FulfillmentEvent.event_time",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FulfillmentEvent.event_type": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.FulfillmentEvent.event_type",
+      "kind": "field",
+      "name": "FulfillmentEvent.event_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FulfillmentEvent.shipment_id": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.FulfillmentEvent.shipment_id",
+      "kind": "field",
+      "name": "FulfillmentEvent.shipment_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.customer_id": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.SalesOrder.customer_id",
+      "kind": "field",
+      "name": "SalesOrder.customer_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.order_number": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.SalesOrder.order_number",
+      "kind": "field",
+      "name": "SalesOrder.order_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.status": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.SalesOrder.status",
+      "kind": "field",
+      "name": "SalesOrder.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.total": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.SalesOrder.total",
+      "kind": "field",
+      "name": "SalesOrder.total",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Shipment.carrier": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.Shipment.carrier",
+      "kind": "field",
+      "name": "Shipment.carrier",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Shipment.delivered": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.Shipment.delivered",
+      "kind": "field",
+      "name": "Shipment.delivered",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Shipment.sales_order_id": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.Shipment.sales_order_id",
+      "kind": "field",
+      "name": "Shipment.sales_order_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Shipment.tracking_number": {
+      "file": "fulfillment_ops.apg",
+      "id": "field.Shipment.tracking_number",
+      "kind": "field",
+      "name": "Shipment.tracking_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.fulfillment_ops": {
+      "file": "fulfillment_ops.apg",
+      "id": "module.fulfillment_ops",
+      "kind": "module",
+      "name": "fulfillment_ops",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Customer": {
+      "file": "fulfillment_ops.apg",
+      "id": "table.Customer",
+      "kind": "table",
+      "name": "Customer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.FulfillmentEvent": {
+      "file": "fulfillment_ops.apg",
+      "id": "table.FulfillmentEvent",
+      "kind": "table",
+      "name": "FulfillmentEvent",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.SalesOrder": {
+      "file": "fulfillment_ops.apg",
+      "id": "table.SalesOrder",
+      "kind": "table",
+      "name": "SalesOrder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Shipment": {
+      "file": "fulfillment_ops.apg",
+      "id": "table.Shipment",
+      "kind": "table",
+      "name": "Shipment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Customer": {
+      "fields": {
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Customer"
+    },
+    "FulfillmentEvent": {
+      "fields": {
+        "event_time": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "event_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "shipment_id": {
+          "relationship": {
+            "alias": "shipment",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Shipment"
+          },
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {},
+      "name": "FulfillmentEvent"
+    },
+    "SalesOrder": {
+      "fields": {
+        "customer_id": {
+          "relationship": {
+            "alias": "customer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Customer"
+          },
+          "required": true,
+          "type": "int"
+        },
+        "order_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {},
+      "name": "SalesOrder"
+    },
+    "Shipment": {
+      "fields": {
+        "carrier": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "delivered": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "sales_order_id": {
+          "relationship": {
+            "alias": "sales_order",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "SalesOrder"
+          },
+          "required": true,
+          "type": "int"
+        },
+        "tracking_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Shipment"
+    }
+  },
+  "views": {}
+}

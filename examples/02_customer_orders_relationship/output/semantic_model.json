@@ -1,0 +1,406 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 2,
+    "name": "customer_orders",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "customer_orders.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "customer_orders.apg",
+      "fixes": [],
+      "message": "Property 'name' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "customer_orders.apg",
+      "fixes": [],
+      "message": "Property 'email' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "customer_orders.apg",
+      "fixes": [],
+      "message": "Property 'customer_id' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "customer_orders.apg",
+      "fixes": [],
+      "message": "Property 'order_number' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "customer_orders.apg",
+      "fixes": [],
+      "message": "Property 'total' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "customer_orders.apg",
+      "fixes": [],
+      "message": "Property 'status' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 2,
+      "kind": "deployment",
+      "nodes": 3
+    },
+    "er": {
+      "edges": 7,
+      "kind": "er",
+      "nodes": 8
+    },
+    "handler": {
+      "edges": 2,
+      "kind": "handler",
+      "nodes": 3
+    },
+    "lookup": {
+      "edges": 2,
+      "kind": "lookup",
+      "nodes": 3
+    },
+    "package": {
+      "edges": 2,
+      "kind": "package",
+      "nodes": 3
+    },
+    "security": {
+      "edges": 2,
+      "kind": "security",
+      "nodes": 3
+    },
+    "workflow": {
+      "edges": 2,
+      "kind": "workflow",
+      "nodes": 3
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "customer_orders.apg"
+  ],
+  "symbols": {
+    "field.Customer.email": {
+      "file": "customer_orders.apg",
+      "id": "field.Customer.email",
+      "kind": "field",
+      "name": "Customer.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.name": {
+      "file": "customer_orders.apg",
+      "id": "field.Customer.name",
+      "kind": "field",
+      "name": "Customer.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.customer_id": {
+      "file": "customer_orders.apg",
+      "id": "field.SalesOrder.customer_id",
+      "kind": "field",
+      "name": "SalesOrder.customer_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.order_number": {
+      "file": "customer_orders.apg",
+      "id": "field.SalesOrder.order_number",
+      "kind": "field",
+      "name": "SalesOrder.order_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.status": {
+      "file": "customer_orders.apg",
+      "id": "field.SalesOrder.status",
+      "kind": "field",
+      "name": "SalesOrder.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.total": {
+      "file": "customer_orders.apg",
+      "id": "field.SalesOrder.total",
+      "kind": "field",
+      "name": "SalesOrder.total",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.customer_orders": {
+      "file": "customer_orders.apg",
+      "id": "module.customer_orders",
+      "kind": "module",
+      "name": "customer_orders",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Customer": {
+      "file": "customer_orders.apg",
+      "id": "table.Customer",
+      "kind": "table",
+      "name": "Customer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.SalesOrder": {
+      "file": "customer_orders.apg",
+      "id": "table.SalesOrder",
+      "kind": "table",
+      "name": "SalesOrder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Customer": {
+      "fields": {
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Customer"
+    },
+    "SalesOrder": {
+      "fields": {
+        "customer_id": {
+          "relationship": {
+            "alias": "customer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Customer"
+          },
+          "required": true,
+          "type": "int"
+        },
+        "order_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {},
+      "name": "SalesOrder"
+    }
+  },
+  "views": {}
+}

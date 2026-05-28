@@ -1,0 +1,1146 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 7,
+    "name": "enterprise_erp_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "EnterpriseFinance": {
+      "approvals": {
+        "approvers": [
+          "controller",
+          "cfo"
+        ],
+        "levels": 2
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "currency": "KES",
+        "fiscal_calendar": "monthly"
+      },
+      "erp_modules": [
+        "finance",
+        "general_ledger",
+        "accounts_payable"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw",
+          "ha",
+          "yo",
+          "zu",
+          "am",
+          "rw"
+        ]
+      },
+      "master_data": {
+        "entities": [
+          "account",
+          "cost_center",
+          "financial_period"
+        ]
+      },
+      "name": "EnterpriseFinance",
+      "provides": [
+        "journal_entries",
+        "invoice_generation",
+        "payment_allocation"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "balanced_journal",
+          "when": "debits != credits"
+        },
+        {
+          "action": "deny",
+          "name": "invoice_requires_order",
+          "when": "order_id missing"
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "finance_event_state"
+      },
+      "theme": {
+        "name": "finance_theme",
+        "tokens": {
+          "accent": "#126E82"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "FinanceWorkbench",
+            "name": "Finance",
+            "path": "/erp/finance"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "EnterpriseOperations": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "default_warehouse": "NBO-01",
+        "refresh_seconds": 30
+      },
+      "erp_modules": [
+        "inventory",
+        "warehouse",
+        "manufacturing",
+        "sales"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "EnterpriseOperations",
+      "provides": [
+        "stock_balances",
+        "order_fulfillment",
+        "executive_kpis"
+      ],
+      "requires": [
+        "journal_entries",
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_negative_stock",
+          "when": "on_hand - reserved < 0"
+        },
+        {
+          "action": "require_review",
+          "name": "critical_exception_review",
+          "when": "severity == critical"
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "OperationsDashboard": {
+          "actions": [
+            "approve",
+            "reject",
+            "escalate"
+          ],
+          "binds": [
+            "executive_kpis.current"
+          ],
+          "composes": [
+            "FulfillmentTable",
+            "FinanceKpis"
+          ],
+          "contains": [
+            "InventoryKpis",
+            "OrderQueue",
+            "ExceptionQueue"
+          ],
+          "events": [
+            {
+              "do": "filter",
+              "on": "select",
+              "target": "FulfillmentTable"
+            }
+          ],
+          "layout": "dashboard",
+          "relationships": [
+            "InventoryKpis -> ExceptionQueue",
+            "OrderQueue -> FulfillmentTable",
+            "FinanceKpis -> ExceptionQueue"
+          ],
+          "route": "/erp/operations/dashboard",
+          "title": "Enterprise Operations"
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "state": "operations_event_state"
+      },
+      "theme": {
+        "name": "operations_theme",
+        "tokens": {
+          "accent": "#2F855A",
+          "surface": "#F7FAFC"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "OperationsWorkbench",
+            "name": "Operations",
+            "path": "/erp/operations"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "PlatformAudit": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "retention_days": 730
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "PlatformAudit",
+      "provides": [
+        "audit_events"
+      ],
+      "requires": [],
+      "rule_engine": {},
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "platform_audit_state"
+      },
+      "theme": {},
+      "ui": {}
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "EnterpriseERPPlatform": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "PlatformAudit",
+          "EnterpriseFinance",
+          "EnterpriseOperations"
+        ],
+        "components": {
+          "audit_console": {
+            "capability": "audit_events",
+            "route": "/erp/audit"
+          },
+          "finance_workbench": {
+            "capability": "journal_entries",
+            "route": "/erp/finance"
+          },
+          "operations_workbench": {
+            "capability": "executive_kpis",
+            "route": "/erp/operations"
+          }
+        },
+        "configuration": {},
+        "deployments": {
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "Composable ERP application shell that assembles finance, operations, and audit capabilities",
+        "integrations": {},
+        "name": "EnterpriseERPPlatform",
+        "policies": {},
+        "routes": [
+          "/erp/finance",
+          "/erp/operations",
+          "/erp/operations/dashboard"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {
+          "ExecutiveHome": {
+            "capability": "EnterpriseOperations",
+            "component": "ExecutiveHome",
+            "route": "/erp"
+          }
+        },
+        "theme": {
+          "name": "enterprise_theme",
+          "tokens": {
+            "accent": "#174EA6",
+            "surface": "#F8FAFC"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "EnterpriseFinance": [
+        "audit_events"
+      ],
+      "EnterpriseOperations": [
+        "journal_entries",
+        "audit_events"
+      ],
+      "PlatformAudit": []
+    }
+  },
+  "contracts": {
+    "EnterpriseFinance": {
+      "configuration": {
+        "currency": "KES",
+        "fiscal_calendar": "monthly"
+      },
+      "id": "enterprise_finance",
+      "provides": [
+        "journal_entries",
+        "invoice_generation",
+        "payment_allocation"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "balanced_journal",
+          "when": "debits != credits"
+        },
+        {
+          "action": "deny",
+          "name": "invoice_requires_order",
+          "when": "order_id missing"
+        }
+      ],
+      "theme": {
+        "name": "finance_theme",
+        "tokens": {
+          "accent": "#126E82"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "FinanceWorkbench",
+            "name": "Finance",
+            "path": "/erp/finance"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "EnterpriseOperations": {
+      "configuration": {
+        "default_warehouse": "NBO-01",
+        "refresh_seconds": 30
+      },
+      "id": "enterprise_operations",
+      "provides": [
+        "stock_balances",
+        "order_fulfillment",
+        "executive_kpis"
+      ],
+      "requires": [
+        "journal_entries",
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_negative_stock",
+          "when": "on_hand - reserved < 0"
+        },
+        {
+          "action": "require_review",
+          "name": "critical_exception_review",
+          "when": "severity == critical"
+        }
+      ],
+      "theme": {
+        "name": "operations_theme",
+        "tokens": {
+          "accent": "#2F855A",
+          "surface": "#F7FAFC"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "OperationsWorkbench",
+            "name": "Operations",
+            "path": "/erp/operations"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "PlatformAudit": {
+      "configuration": {
+        "retention_days": 730
+      },
+      "id": "platform_audit",
+      "provides": [
+        "audit_events"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "enterprise_erp_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'customer_number' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'legal_name' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'email' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'active' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'sku' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'description' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'unit_price' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'active' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'customer_id' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'order_number' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'total' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp_platform.apg",
+      "fixes": [],
+      "message": "Property 'status' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 6,
+      "kind": "capability",
+      "nodes": 6
+    },
+    "deployment": {
+      "edges": 7,
+      "kind": "deployment",
+      "nodes": 8
+    },
+    "er": {
+      "edges": 13,
+      "kind": "er",
+      "nodes": 15
+    },
+    "handler": {
+      "edges": 7,
+      "kind": "handler",
+      "nodes": 8
+    },
+    "lookup": {
+      "edges": 7,
+      "kind": "lookup",
+      "nodes": 8
+    },
+    "package": {
+      "edges": 7,
+      "kind": "package",
+      "nodes": 8
+    },
+    "security": {
+      "edges": 7,
+      "kind": "security",
+      "nodes": 8
+    },
+    "workflow": {
+      "edges": 7,
+      "kind": "workflow",
+      "nodes": 8
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "EnterpriseFinance.balanced_journal": {
+      "action": "deny",
+      "name": "balanced_journal",
+      "when": "debits != credits"
+    },
+    "EnterpriseFinance.invoice_requires_order": {
+      "action": "deny",
+      "name": "invoice_requires_order",
+      "when": "order_id missing"
+    },
+    "EnterpriseOperations.critical_exception_review": {
+      "action": "require_review",
+      "name": "critical_exception_review",
+      "when": "severity == critical"
+    },
+    "EnterpriseOperations.no_negative_stock": {
+      "action": "deny",
+      "name": "no_negative_stock",
+      "when": "on_hand - reserved < 0"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "enterprise_erp_platform.apg"
+  ],
+  "symbols": {
+    "app.EnterpriseERPPlatform": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "app.EnterpriseERPPlatform",
+      "kind": "app",
+      "name": "EnterpriseERPPlatform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.EnterpriseFinance": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "capability.EnterpriseFinance",
+      "kind": "capability",
+      "name": "EnterpriseFinance",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.EnterpriseOperations": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "capability.EnterpriseOperations",
+      "kind": "capability",
+      "name": "EnterpriseOperations",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.PlatformAudit": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "capability.PlatformAudit",
+      "kind": "capability",
+      "name": "PlatformAudit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.active": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.Customer.active",
+      "kind": "field",
+      "name": "Customer.active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.customer_number": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.Customer.customer_number",
+      "kind": "field",
+      "name": "Customer.customer_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.email": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.Customer.email",
+      "kind": "field",
+      "name": "Customer.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.legal_name": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.Customer.legal_name",
+      "kind": "field",
+      "name": "Customer.legal_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Item.active": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.Item.active",
+      "kind": "field",
+      "name": "Item.active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Item.description": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.Item.description",
+      "kind": "field",
+      "name": "Item.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Item.sku": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.Item.sku",
+      "kind": "field",
+      "name": "Item.sku",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Item.unit_price": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.Item.unit_price",
+      "kind": "field",
+      "name": "Item.unit_price",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.customer_id": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.SalesOrder.customer_id",
+      "kind": "field",
+      "name": "SalesOrder.customer_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.order_number": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.SalesOrder.order_number",
+      "kind": "field",
+      "name": "SalesOrder.order_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.status": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.SalesOrder.status",
+      "kind": "field",
+      "name": "SalesOrder.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.total": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "field.SalesOrder.total",
+      "kind": "field",
+      "name": "SalesOrder.total",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.enterprise_erp_platform": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "module.enterprise_erp_platform",
+      "kind": "module",
+      "name": "enterprise_erp_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Customer": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "table.Customer",
+      "kind": "table",
+      "name": "Customer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Item": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "table.Item",
+      "kind": "table",
+      "name": "Item",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.SalesOrder": {
+      "file": "enterprise_erp_platform.apg",
+      "id": "table.SalesOrder",
+      "kind": "table",
+      "name": "SalesOrder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Customer": {
+      "fields": {
+        "active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "customer_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "legal_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Customer"
+    },
+    "Item": {
+      "fields": {
+        "active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "sku": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "unit_price": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Item"
+    },
+    "SalesOrder": {
+      "fields": {
+        "customer_id": {
+          "relationship": {
+            "alias": "customer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Customer"
+          },
+          "required": true,
+          "type": "int"
+        },
+        "order_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {},
+      "name": "SalesOrder"
+    }
+  },
+  "views": {}
+}

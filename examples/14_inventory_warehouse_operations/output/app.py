@@ -27,6 +27,7 @@ RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity i
 NEXT_RECORD_IDS: Dict[str, int] = {entity["name"]: 1 for entity in ENTITIES}
 EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
+SEMANTIC_MODEL: Dict[str, Any] = {'format': 'apg.semantic-model.v1', 'ok': True, 'source_files': ['inventory_warehouse_operations.apg'], 'app': {'name': 'inventory_warehouse_operations', 'version': '1.0.0', 'description': None, 'entity_count': 3}, 'symbols': {'module.inventory_warehouse_operations': {'id': 'module.inventory_warehouse_operations', 'kind': 'module', 'name': 'inventory_warehouse_operations', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'table.StockItem': {'id': 'table.StockItem', 'kind': 'table', 'name': 'StockItem', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockItem.sku': {'id': 'field.StockItem.sku', 'kind': 'field', 'name': 'StockItem.sku', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockItem.description': {'id': 'field.StockItem.description', 'kind': 'field', 'name': 'StockItem.description', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockItem.on_hand': {'id': 'field.StockItem.on_hand', 'kind': 'field', 'name': 'StockItem.on_hand', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockItem.reserved': {'id': 'field.StockItem.reserved', 'kind': 'field', 'name': 'StockItem.reserved', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockItem.reorder_level': {'id': 'field.StockItem.reorder_level', 'kind': 'field', 'name': 'StockItem.reorder_level', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockItem.active': {'id': 'field.StockItem.active', 'kind': 'field', 'name': 'StockItem.active', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'table.StockMovement': {'id': 'table.StockMovement', 'kind': 'table', 'name': 'StockMovement', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockMovement.stock_item_id': {'id': 'field.StockMovement.stock_item_id', 'kind': 'field', 'name': 'StockMovement.stock_item_id', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockMovement.movement_type': {'id': 'field.StockMovement.movement_type', 'kind': 'field', 'name': 'StockMovement.movement_type', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockMovement.quantity': {'id': 'field.StockMovement.quantity', 'kind': 'field', 'name': 'StockMovement.quantity', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.StockMovement.reference': {'id': 'field.StockMovement.reference', 'kind': 'field', 'name': 'StockMovement.reference', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'capability.WarehouseInventory': {'id': 'capability.WarehouseInventory', 'kind': 'capability', 'name': 'WarehouseInventory', 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}}, 'tables': {'StockItem': {'name': 'StockItem', 'fields': {'sku': {'type': 'str', 'required': True, 'relationship': None}, 'description': {'type': 'str', 'required': True, 'relationship': None}, 'on_hand': {'type': 'int', 'required': True, 'relationship': None}, 'reserved': {'type': 'int', 'required': True, 'relationship': None}, 'reorder_level': {'type': 'int', 'required': True, 'relationship': None}, 'active': {'type': 'bool', 'required': True, 'relationship': None}}, 'lookup_paths': {}}, 'StockMovement': {'name': 'StockMovement', 'fields': {'stock_item_id': {'type': 'int', 'required': True, 'relationship': {'target_table': 'StockItem', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'stock_item'}}, 'movement_type': {'type': 'str', 'required': True, 'relationship': None}, 'quantity': {'type': 'int', 'required': True, 'relationship': None}, 'reference': {'type': 'str', 'required': True, 'relationship': None}}, 'lookup_paths': {}}}, 'views': {}, 'flows': {}, 'operations': {}, 'rules': {'WarehouseInventory.no_negative_stock': {'name': 'no_negative_stock', 'when': 'on_hand - reserved < 0', 'action': 'deny'}, 'WarehouseInventory.reorder_needed': {'name': 'reorder_needed', 'when': 'on_hand <= reorder_level', 'action': 'warn'}}, 'roles': {}, 'security': {}, 'agents': {}, 'llms': {}, 'capabilities': {'WarehouseInventory': {'name': 'WarehouseInventory', 'provides': ['stock_balances', 'stock_movements', 'reorder_alerts'], 'requires': ['audit_events'], 'configuration': {'default_warehouse': 'NBO-01', 'cycle_count_days': 30}, 'rules': [{'name': 'no_negative_stock', 'when': 'on_hand - reserved < 0', 'action': 'deny'}, {'name': 'reorder_needed', 'when': 'on_hand <= reorder_level', 'action': 'warn'}], 'rule_engine': {}, 'ui': {'shell': 'python', 'routes': [{'name': 'Inventory', 'path': '/warehouse/inventory', 'component': 'InventoryScreen'}]}, 'theme': {'name': 'warehouse_theme', 'tokens': {'accent': '#2F855A'}}, 'runtime': {}, 'erp_modules': ['inventory', 'warehouse', 'procurement'], 'components': {}, 'business_rules': [], 'approvals': {}, 'master_data': {'entities': ['stock_item', 'warehouse', 'bin_location']}, 'i18n': {}, 'streaming': {'processor': 'bytewax', 'state': 'inventory_movement_state'}, 'screens': {}}}, 'composition': {'applications': {}, 'agent_teams': {}, 'capability_dependencies': {'WarehouseInventory': ['audit_events']}}, 'contracts': {'WarehouseInventory': {'id': 'warehouse_inventory', 'provides': ['stock_balances', 'stock_movements', 'reorder_alerts'], 'requires': ['audit_events'], 'configuration': {'default_warehouse': 'NBO-01', 'cycle_count_days': 30}, 'rules': [{'name': 'no_negative_stock', 'when': 'on_hand - reserved < 0', 'action': 'deny'}, {'name': 'reorder_needed', 'when': 'on_hand <= reorder_level', 'action': 'warn'}], 'ui': {'shell': 'python', 'routes': [{'name': 'Inventory', 'path': '/warehouse/inventory', 'component': 'InventoryScreen'}]}, 'theme': {'name': 'warehouse_theme', 'tokens': {'accent': '#2F855A'}}}}, 'deployment': {'target': 'python', 'source': 'inventory_warehouse_operations.apg'}, 'packages': {}, 'graphs': {'er': {'kind': 'er', 'nodes': 12, 'edges': 11}, 'lookup': {'kind': 'lookup', 'nodes': 4, 'edges': 3}, 'workflow': {'kind': 'workflow', 'nodes': 4, 'edges': 3}, 'handler': {'kind': 'handler', 'nodes': 4, 'edges': 3}, 'capability': {'kind': 'capability', 'nodes': 2, 'edges': 1}, 'security': {'kind': 'security', 'nodes': 4, 'edges': 3}, 'agent': {'kind': 'agent', 'nodes': 0, 'edges': 0}, 'deployment': {'kind': 'deployment', 'nodes': 4, 'edges': 3}, 'package': {'kind': 'package', 'nodes': 4, 'edges': 3}}, 'diagnostics': [{'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'sku' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'description' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'on_hand' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'reserved' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'reorder_level' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'active' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'stock_item_id' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'movement_type' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'quantity' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'reference' appears to be unused", 'file': 'inventory_warehouse_operations.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}]}
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -106,6 +107,10 @@ def list_entities() -> list[Dict[str, Any]]:
 
 def list_databases() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+
+
+def semantic_model() -> Dict[str, Any]:
+    return json.loads(json.dumps(SEMANTIC_MODEL))
 
 
 def database_status() -> Dict[str, Any]:
@@ -410,6 +415,7 @@ def component_manifest() -> Dict[str, Any]:
                     "relationship_graph",
                     "runtime_adapter_environment_keys",
                     "self_test",
+                    "semantic_model",
                     "storage_status",
                     "update_record",
                     "capability_health",
@@ -424,6 +430,7 @@ def component_manifest() -> Dict[str, Any]:
             },
             "records": sorted(ENTITY_NAMES),
             "theme": "/theme.css",
+            "semantic_model": "/semantic-model.json",
         },
         "entities": list_entities(),
         "databases": list_databases(),
@@ -440,6 +447,7 @@ def component_manifest() -> Dict[str, Any]:
                 "app.py",
                 "__init__.py",
                 "README.md",
+                "semantic_model.json",
                 "requirements.txt",
                 "Dockerfile",
                 ".dockerignore",
@@ -449,6 +457,7 @@ def component_manifest() -> Dict[str, Any]:
             "commands": {
                 "run": "python app.py",
                 "describe": "python app.py --describe",
+                "semantic_model": "python app.py --semantic-model",
                 "validate": "python app.py --validate",
                 "self_test": "python app.py --self-test",
                 "smoke_test": "python smoke_test.py",
@@ -670,6 +679,7 @@ def _database_openapi_schemas() -> Dict[str, Any]:
     generic_object = {"type": "object", "additionalProperties": True}
     return {
         "ApplicationDescription": generic_object,
+        "SemanticModel": generic_object,
         "ComponentManifest": {
             "type": "object",
             "additionalProperties": True,
@@ -1172,6 +1182,7 @@ def openapi_document() -> Dict[str, Any]:
         "/health": {"get": _api_operation("Application health", "Health report", response_schema=_schema_ref("HealthReport"))},
         "/component.json": {"get": _api_operation("Composable component manifest", "APG component manifest", response_schema=_schema_ref("ComponentManifest"))},
         "/manifest": {"get": _api_operation("Application manifest", "APG manifest", response_schema=_schema_ref("ApplicationDescription"))},
+        "/semantic-model.json": {"get": _api_operation("Semantic model", "APG semantic model", response_schema=_schema_ref("SemanticModel"))},
         "/openapi.json": {"get": _api_operation("OpenAPI contract", "OpenAPI 3.1 contract", response_schema={"type": "object", "additionalProperties": True})},
         "/validate": {"get": _api_operation("Application validation", "Validation report", response_schema=_schema_ref("ValidationReport"))},
         "/events": {"get": _api_operation("Record mutation events", "Event log", response_schema=_schema_ref("EventLog"))},
@@ -1364,8 +1375,10 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
         errors.append("component manifest record interface does not match generated entities")
     if interfaces.get("theme") != "/theme.css":
         errors.append("component manifest theme interface must point to /theme.css")
+    if interfaces.get("semantic_model") != "/semantic-model.json":
+        errors.append("component manifest semantic model interface must point to /semantic-model.json")
     deployment = manifest.get("deployment", {})
-    expected_artifacts = ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
+    expected_artifacts = ["app.py", "__init__.py", "README.md", "semantic_model.json", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
     raw_artifacts = deployment.get("artifacts", []) if isinstance(deployment, dict) else []
     artifacts: set[str] = set()
     if not isinstance(raw_artifacts, list):
@@ -1390,6 +1403,7 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
     expected_commands = {
         "run": "python app.py",
         "describe": "python app.py --describe",
+        "semantic_model": "python app.py --semantic-model",
         "validate": "python app.py --validate",
         "self_test": "python app.py --self-test",
         "smoke_test": "python smoke_test.py",
@@ -1513,6 +1527,7 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             "/manifest",
             "/application",
             "/component.json",
+            "/semantic-model.json",
             "/health",
             "/validate",
             "/openapi.json",
@@ -2755,6 +2770,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, describe_application()
     if path == "/component.json":
         return 200, component_manifest()
+    if path == "/semantic-model.json":
+        return 200, semantic_model()
     if path == "/health":
         validation = validate_application()
         return 200, {
@@ -3296,6 +3313,9 @@ def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
     if "--describe" in args:
         print(json.dumps(describe_application(), indent=2, sort_keys=True))
+        return
+    if "--semantic-model" in args:
+        print(json.dumps(semantic_model(), indent=2, sort_keys=True))
         return
     if "--validate" in args:
         report = validate_application()

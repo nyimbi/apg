@@ -1,0 +1,174 @@
+{
+  "agents": {
+    "TriageAgent": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [
+        "ticket"
+      ],
+      "memory": {
+        "kind": "vector",
+        "name": "support_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "TriageAgent",
+      "outputs": [
+        "triage_plan"
+      ],
+      "role": "support_triage",
+      "rules": [
+        {
+          "action": "reject",
+          "name": "ticket_required",
+          "when": "ticket missing"
+        }
+      ],
+      "runtime": "codex",
+      "system": "Classify incoming tickets and produce a concise next action.",
+      "theme": {},
+      "tools": [
+        "tickets.read",
+        "knowledge.search"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": "Single support triage agent",
+    "entity_count": 1,
+    "name": "support_agent",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "support_agent.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 1
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 1,
+      "kind": "deployment",
+      "nodes": 2
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 1,
+      "kind": "handler",
+      "nodes": 2
+    },
+    "lookup": {
+      "edges": 1,
+      "kind": "lookup",
+      "nodes": 2
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    },
+    "security": {
+      "edges": 1,
+      "kind": "security",
+      "nodes": 2
+    },
+    "workflow": {
+      "edges": 1,
+      "kind": "workflow",
+      "nodes": 2
+    }
+  },
+  "llms": {
+    "TriageAgent": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": "codex"
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "support_agent.apg"
+  ],
+  "symbols": {
+    "agent.TriageAgent": {
+      "file": "support_agent.apg",
+      "id": "agent.TriageAgent",
+      "kind": "agent",
+      "name": "TriageAgent",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 8
+        },
+        "start": {
+          "character": 0,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "support_agent.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 8
+        },
+        "start": {
+          "character": 0,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "module.support_agent": {
+      "file": "support_agent.apg",
+      "id": "module.support_agent",
+      "kind": "module",
+      "name": "support_agent",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

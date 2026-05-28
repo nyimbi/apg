@@ -1,0 +1,336 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 1,
+    "name": "inventory_records",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "inventory_records.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_records.apg",
+      "fixes": [],
+      "message": "Property 'sku' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_records.apg",
+      "fixes": [],
+      "message": "Property 'name' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_records.apg",
+      "fixes": [],
+      "message": "Property 'quantity' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_records.apg",
+      "fixes": [],
+      "message": "Property 'reorder_level' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_records.apg",
+      "fixes": [],
+      "message": "Property 'active' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 1,
+      "kind": "deployment",
+      "nodes": 2
+    },
+    "er": {
+      "edges": 5,
+      "kind": "er",
+      "nodes": 6
+    },
+    "handler": {
+      "edges": 1,
+      "kind": "handler",
+      "nodes": 2
+    },
+    "lookup": {
+      "edges": 1,
+      "kind": "lookup",
+      "nodes": 2
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    },
+    "security": {
+      "edges": 1,
+      "kind": "security",
+      "nodes": 2
+    },
+    "workflow": {
+      "edges": 1,
+      "kind": "workflow",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "inventory_records.apg"
+  ],
+  "symbols": {
+    "field.InventoryItem.active": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.active",
+      "kind": "field",
+      "name": "InventoryItem.active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.name": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.name",
+      "kind": "field",
+      "name": "InventoryItem.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.quantity": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.quantity",
+      "kind": "field",
+      "name": "InventoryItem.quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reorder_level": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.reorder_level",
+      "kind": "field",
+      "name": "InventoryItem.reorder_level",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.sku": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.sku",
+      "kind": "field",
+      "name": "InventoryItem.sku",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.inventory_records": {
+      "file": "inventory_records.apg",
+      "id": "module.inventory_records",
+      "kind": "module",
+      "name": "inventory_records",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.InventoryItem": {
+      "file": "inventory_records.apg",
+      "id": "table.InventoryItem",
+      "kind": "table",
+      "name": "InventoryItem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "InventoryItem": {
+      "fields": {
+        "active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reorder_level": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "sku": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "InventoryItem"
+    }
+  },
+  "views": {}
+}

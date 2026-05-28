@@ -7492,3 +7492,22 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_release_json_emits_generated_application_evidence_without_output tests/test_compiler_baseline.py::test_cli_release_text_summarizes_evidence -q` -> 2 passed
 - `.venv/bin/apg release examples/05_single_support_agent/main.apg --json` -> exited 0 and emitted `apg.release-report.v1`
 - `.venv/bin/apg release examples/08_basic_capability_contract/main.apg` -> exited 0 and summarized release evidence with `self-test=ok`
+
+### 2026-05-28 19:20 EAT
+
+Completed checkpoint:
+
+- Proved the compiler bed-down gate across all 20 curated APG examples with `apg release <file> --json`.
+- Proved `apg compile <file> --target python --output <dir> --verify` across all 20 curated examples in `/private/tmp/apg_compile_verify_matrix`.
+- Regenerated each checked-in `examples/*/output` directory from the current compiler so example artifacts match executable reality.
+- Added missing `semantic_model.json` generated artifacts for all 20 checked-in example outputs.
+- Added a regression test that recompiles every curated example in memory and compares checked-in output files with current compiler output, ignoring local `__pycache__` residue.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -c "<release matrix over examples/[0-9][0-9]_*/main.apg>"` -> 20 release checks passed, 0 failures
+- `.venv/bin/python -c "<compile --verify matrix over examples/[0-9][0-9]_*/main.apg>"` -> 20 compile/verify checks passed, 0 failures
+- `.venv/bin/python -m py_compile tests/test_compiler_baseline.py`
+- `git diff --check tests/test_compiler_baseline.py docs/progress_log.md examples`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler -q` -> 1 passed
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler tests/test_compiler_baseline.py::test_cli_release_json_emits_generated_application_evidence_without_output tests/test_compiler_baseline.py::test_cli_release_text_summarizes_evidence -q` -> 3 passed

@@ -1,0 +1,245 @@
+{
+  "agents": {
+    "Planner": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "openai:gpt-4.1-mini",
+      "name": "Planner",
+      "outputs": [],
+      "role": "planner",
+      "rules": [],
+      "runtime": "codex",
+      "system": "Break the ticket into concrete resolution steps.",
+      "theme": {},
+      "tools": [
+        "tickets.read",
+        "docs.search"
+      ],
+      "ui": {}
+    },
+    "Writer": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "openai:gpt-4.1-mini",
+      "name": "Writer",
+      "outputs": [],
+      "role": "writer",
+      "rules": [],
+      "runtime": "codex",
+      "system": "Write concise customer-facing replies from a plan.",
+      "theme": {},
+      "tools": [
+        "tickets.update"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": "Planner and writer agent team for support responses",
+    "entity_count": 3,
+    "name": "support_team",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {
+      "SupportCrew": {
+        "agents": [
+          "Planner",
+          "Writer"
+        ],
+        "capabilities": [],
+        "configuration": {
+          "handoff_mode": "sequential"
+        },
+        "flow": [
+          {
+            "condition": "done",
+            "from": "Planner",
+            "to": "Writer"
+          }
+        ],
+        "rules": [
+          {
+            "action": "human_review",
+            "name": "low_confidence",
+            "when": "confidence < 0.6"
+          }
+        ],
+        "theme": {},
+        "ui": {}
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "support_team.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 2,
+      "kind": "agent",
+      "nodes": 3
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 3,
+      "kind": "deployment",
+      "nodes": 4
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 3,
+      "kind": "handler",
+      "nodes": 4
+    },
+    "lookup": {
+      "edges": 3,
+      "kind": "lookup",
+      "nodes": 4
+    },
+    "package": {
+      "edges": 3,
+      "kind": "package",
+      "nodes": 4
+    },
+    "security": {
+      "edges": 3,
+      "kind": "security",
+      "nodes": 4
+    },
+    "workflow": {
+      "edges": 3,
+      "kind": "workflow",
+      "nodes": 4
+    }
+  },
+  "llms": {
+    "Planner": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": "codex"
+    },
+    "Writer": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": "codex"
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "support_team.apg"
+  ],
+  "symbols": {
+    "agent.Planner": {
+      "file": "support_team.apg",
+      "id": "agent.Planner",
+      "kind": "agent",
+      "name": "Planner",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 8
+        },
+        "start": {
+          "character": 0,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "agent.Writer": {
+      "file": "support_team.apg",
+      "id": "agent.Writer",
+      "kind": "agent",
+      "name": "Writer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 16
+        },
+        "start": {
+          "character": 0,
+          "line": 16
+        }
+      },
+      "references": []
+    },
+    "composition.SupportCrew": {
+      "file": "support_team.apg",
+      "id": "composition.SupportCrew",
+      "kind": "composition",
+      "name": "SupportCrew",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 24
+        },
+        "start": {
+          "character": 0,
+          "line": 24
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "support_team.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 16
+        },
+        "start": {
+          "character": 0,
+          "line": 16
+        }
+      },
+      "references": []
+    },
+    "module.support_team": {
+      "file": "support_team.apg",
+      "id": "module.support_team",
+      "kind": "module",
+      "name": "support_team",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

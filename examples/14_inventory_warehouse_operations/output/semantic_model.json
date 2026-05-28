@@ -1,0 +1,717 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 3,
+    "name": "inventory_warehouse_operations",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "WarehouseInventory": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "cycle_count_days": 30,
+        "default_warehouse": "NBO-01"
+      },
+      "erp_modules": [
+        "inventory",
+        "warehouse",
+        "procurement"
+      ],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "stock_item",
+          "warehouse",
+          "bin_location"
+        ]
+      },
+      "name": "WarehouseInventory",
+      "provides": [
+        "stock_balances",
+        "stock_movements",
+        "reorder_alerts"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_negative_stock",
+          "when": "on_hand - reserved < 0"
+        },
+        {
+          "action": "warn",
+          "name": "reorder_needed",
+          "when": "on_hand <= reorder_level"
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "inventory_movement_state"
+      },
+      "theme": {
+        "name": "warehouse_theme",
+        "tokens": {
+          "accent": "#2F855A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "InventoryScreen",
+            "name": "Inventory",
+            "path": "/warehouse/inventory"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "WarehouseInventory": [
+        "audit_events"
+      ]
+    }
+  },
+  "contracts": {
+    "WarehouseInventory": {
+      "configuration": {
+        "cycle_count_days": 30,
+        "default_warehouse": "NBO-01"
+      },
+      "id": "warehouse_inventory",
+      "provides": [
+        "stock_balances",
+        "stock_movements",
+        "reorder_alerts"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_negative_stock",
+          "when": "on_hand - reserved < 0"
+        },
+        {
+          "action": "warn",
+          "name": "reorder_needed",
+          "when": "on_hand <= reorder_level"
+        }
+      ],
+      "theme": {
+        "name": "warehouse_theme",
+        "tokens": {
+          "accent": "#2F855A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "InventoryScreen",
+            "name": "Inventory",
+            "path": "/warehouse/inventory"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "inventory_warehouse_operations.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'sku' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'description' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'on_hand' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'reserved' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'reorder_level' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'active' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'stock_item_id' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'movement_type' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'quantity' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse_operations.apg",
+      "fixes": [],
+      "message": "Property 'reference' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 1,
+      "kind": "capability",
+      "nodes": 2
+    },
+    "deployment": {
+      "edges": 3,
+      "kind": "deployment",
+      "nodes": 4
+    },
+    "er": {
+      "edges": 11,
+      "kind": "er",
+      "nodes": 12
+    },
+    "handler": {
+      "edges": 3,
+      "kind": "handler",
+      "nodes": 4
+    },
+    "lookup": {
+      "edges": 3,
+      "kind": "lookup",
+      "nodes": 4
+    },
+    "package": {
+      "edges": 3,
+      "kind": "package",
+      "nodes": 4
+    },
+    "security": {
+      "edges": 3,
+      "kind": "security",
+      "nodes": 4
+    },
+    "workflow": {
+      "edges": 3,
+      "kind": "workflow",
+      "nodes": 4
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "WarehouseInventory.no_negative_stock": {
+      "action": "deny",
+      "name": "no_negative_stock",
+      "when": "on_hand - reserved < 0"
+    },
+    "WarehouseInventory.reorder_needed": {
+      "action": "warn",
+      "name": "reorder_needed",
+      "when": "on_hand <= reorder_level"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "inventory_warehouse_operations.apg"
+  ],
+  "symbols": {
+    "capability.WarehouseInventory": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "capability.WarehouseInventory",
+      "kind": "capability",
+      "name": "WarehouseInventory",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockItem.active": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockItem.active",
+      "kind": "field",
+      "name": "StockItem.active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockItem.description": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockItem.description",
+      "kind": "field",
+      "name": "StockItem.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockItem.on_hand": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockItem.on_hand",
+      "kind": "field",
+      "name": "StockItem.on_hand",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockItem.reorder_level": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockItem.reorder_level",
+      "kind": "field",
+      "name": "StockItem.reorder_level",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockItem.reserved": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockItem.reserved",
+      "kind": "field",
+      "name": "StockItem.reserved",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockItem.sku": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockItem.sku",
+      "kind": "field",
+      "name": "StockItem.sku",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.movement_type": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockMovement.movement_type",
+      "kind": "field",
+      "name": "StockMovement.movement_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.quantity": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockMovement.quantity",
+      "kind": "field",
+      "name": "StockMovement.quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.reference": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockMovement.reference",
+      "kind": "field",
+      "name": "StockMovement.reference",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.stock_item_id": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "field.StockMovement.stock_item_id",
+      "kind": "field",
+      "name": "StockMovement.stock_item_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.inventory_warehouse_operations": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "module.inventory_warehouse_operations",
+      "kind": "module",
+      "name": "inventory_warehouse_operations",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.StockItem": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "table.StockItem",
+      "kind": "table",
+      "name": "StockItem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.StockMovement": {
+      "file": "inventory_warehouse_operations.apg",
+      "id": "table.StockMovement",
+      "kind": "table",
+      "name": "StockMovement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "StockItem": {
+      "fields": {
+        "active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "on_hand": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reorder_level": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reserved": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "sku": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "StockItem"
+    },
+    "StockMovement": {
+      "fields": {
+        "movement_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reference": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "stock_item_id": {
+          "relationship": {
+            "alias": "stock_item",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "StockItem"
+          },
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {},
+      "name": "StockMovement"
+    }
+  },
+  "views": {}
+}

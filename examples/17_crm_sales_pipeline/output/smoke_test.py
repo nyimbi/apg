@@ -23,7 +23,7 @@ def main() -> int:
         print(json.dumps({"capability_health": capability_health}, indent=2, sort_keys=True))
         return 1
     component = app.component_manifest()
-    required_routes = {"/health", "/self-test", "/component.json", "/openapi.json"}
+    required_routes = {"/health", "/self-test", "/component.json", "/semantic-model.json", "/openapi.json"}
     missing_routes = sorted(required_routes.difference(component["interfaces"]["http"]["paths"]))
     if missing_routes:
         print(json.dumps({"missing_routes": missing_routes}, indent=2, sort_keys=True))

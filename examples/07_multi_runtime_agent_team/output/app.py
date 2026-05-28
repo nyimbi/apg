@@ -27,6 +27,7 @@ RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity i
 NEXT_RECORD_IDS: Dict[str, int] = {entity["name"]: 1 for entity in ENTITIES}
 EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
+SEMANTIC_MODEL: Dict[str, Any] = {'format': 'apg.semantic-model.v1', 'ok': True, 'source_files': ['agent_runtime_portfolio.apg'], 'app': {'name': 'agent_runtime_portfolio', 'version': '1.0.0', 'description': 'Agent team that can route work across several AI runtimes', 'entity_count': 4}, 'symbols': {'module.agent_runtime_portfolio': {'id': 'module.agent_runtime_portfolio', 'kind': 'module', 'name': 'agent_runtime_portfolio', 'file': 'agent_runtime_portfolio.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'agent.Researcher': {'id': 'agent.Researcher', 'kind': 'agent', 'name': 'Researcher', 'file': 'agent_runtime_portfolio.apg', 'range': {'start': {'line': 8, 'character': 0}, 'end': {'line': 8, 'character': 1}}, 'references': []}, 'llm.openai:gpt-4.1-mini': {'id': 'llm.openai:gpt-4.1-mini', 'kind': 'llm', 'name': 'openai:gpt-4.1-mini', 'file': 'agent_runtime_portfolio.apg', 'range': {'start': {'line': 8, 'character': 0}, 'end': {'line': 8, 'character': 1}}, 'references': []}, 'agent.Coder': {'id': 'agent.Coder', 'kind': 'agent', 'name': 'Coder', 'file': 'agent_runtime_portfolio.apg', 'range': {'start': {'line': 16, 'character': 0}, 'end': {'line': 16, 'character': 1}}, 'references': []}, 'llm.claude:sonnet': {'id': 'llm.claude:sonnet', 'kind': 'llm', 'name': 'claude:sonnet', 'file': 'agent_runtime_portfolio.apg', 'range': {'start': {'line': 16, 'character': 0}, 'end': {'line': 16, 'character': 1}}, 'references': []}, 'agent.LocalReviewer': {'id': 'agent.LocalReviewer', 'kind': 'agent', 'name': 'LocalReviewer', 'file': 'agent_runtime_portfolio.apg', 'range': {'start': {'line': 24, 'character': 0}, 'end': {'line': 24, 'character': 1}}, 'references': []}, 'llm.ollama:llama3.1': {'id': 'llm.ollama:llama3.1', 'kind': 'llm', 'name': 'ollama:llama3.1', 'file': 'agent_runtime_portfolio.apg', 'range': {'start': {'line': 24, 'character': 0}, 'end': {'line': 24, 'character': 1}}, 'references': []}, 'composition.DeliverySwarm': {'id': 'composition.DeliverySwarm', 'kind': 'composition', 'name': 'DeliverySwarm', 'file': 'agent_runtime_portfolio.apg', 'range': {'start': {'line': 31, 'character': 0}, 'end': {'line': 31, 'character': 1}}, 'references': []}}, 'tables': {}, 'views': {}, 'flows': {}, 'operations': {}, 'rules': {}, 'roles': {}, 'security': {}, 'agents': {'Researcher': {'name': 'Researcher', 'role': 'researcher', 'model': 'openai:gpt-4.1-mini', 'runtime': 'codex', 'system': 'Gather structured evidence and cite source IDs.', 'capabilities': [], 'tools': ['web.search', 'docs.read'], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {}, 'rules': [], 'ui': {}, 'theme': {}}, 'Coder': {'name': 'Coder', 'role': 'implementation_engineer', 'model': 'claude:sonnet', 'runtime': 'claude_code', 'system': 'Implement focused code changes from accepted plans.', 'capabilities': [], 'tools': ['repo.edit', 'tests.run'], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {}, 'rules': [], 'ui': {}, 'theme': {}}, 'LocalReviewer': {'name': 'LocalReviewer', 'role': 'local_review', 'model': 'ollama:llama3.1', 'runtime': 'ollama', 'system': 'Review diffs locally without sending code to external services.', 'capabilities': [], 'tools': [], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {}, 'rules': [], 'ui': {}, 'theme': {}}}, 'llms': {'Researcher': {'model': 'openai:gpt-4.1-mini', 'runtime': 'codex'}, 'Coder': {'model': 'claude:sonnet', 'runtime': 'claude_code'}, 'LocalReviewer': {'model': 'ollama:llama3.1', 'runtime': 'ollama'}}, 'capabilities': {}, 'composition': {'applications': {}, 'agent_teams': {'DeliverySwarm': {'agents': ['Researcher', 'Coder', 'LocalReviewer'], 'flow': [{'from': 'Researcher', 'to': 'Coder', 'condition': 'done'}, {'from': 'Coder', 'to': 'LocalReviewer', 'condition': 'done'}], 'capabilities': [], 'configuration': {'handoff_mode': 'sequential', 'fallback_runtime': 'opencode'}, 'rules': [{'name': 'local_review_required', 'when': 'code_changed', 'action': 'require_review'}], 'ui': {}, 'theme': {}}}, 'capability_dependencies': {}}, 'contracts': {}, 'deployment': {'target': 'python', 'source': 'agent_runtime_portfolio.apg'}, 'packages': {}, 'graphs': {'er': {'kind': 'er', 'nodes': 0, 'edges': 0}, 'lookup': {'kind': 'lookup', 'nodes': 5, 'edges': 4}, 'workflow': {'kind': 'workflow', 'nodes': 5, 'edges': 4}, 'handler': {'kind': 'handler', 'nodes': 5, 'edges': 4}, 'capability': {'kind': 'capability', 'nodes': 0, 'edges': 0}, 'security': {'kind': 'security', 'nodes': 5, 'edges': 4}, 'agent': {'kind': 'agent', 'nodes': 4, 'edges': 3}, 'deployment': {'kind': 'deployment', 'nodes': 5, 'edges': 4}, 'package': {'kind': 'package', 'nodes': 5, 'edges': 4}}, 'diagnostics': []}
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -106,6 +107,10 @@ def list_entities() -> list[Dict[str, Any]]:
 
 def list_databases() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+
+
+def semantic_model() -> Dict[str, Any]:
+    return json.loads(json.dumps(SEMANTIC_MODEL))
 
 
 def database_status() -> Dict[str, Any]:
@@ -410,6 +415,7 @@ def component_manifest() -> Dict[str, Any]:
                     "relationship_graph",
                     "runtime_adapter_environment_keys",
                     "self_test",
+                    "semantic_model",
                     "storage_status",
                     "update_record",
                     "capability_health",
@@ -424,6 +430,7 @@ def component_manifest() -> Dict[str, Any]:
             },
             "records": sorted(ENTITY_NAMES),
             "theme": "/theme.css",
+            "semantic_model": "/semantic-model.json",
         },
         "entities": list_entities(),
         "databases": list_databases(),
@@ -440,6 +447,7 @@ def component_manifest() -> Dict[str, Any]:
                 "app.py",
                 "__init__.py",
                 "README.md",
+                "semantic_model.json",
                 "requirements.txt",
                 "Dockerfile",
                 ".dockerignore",
@@ -449,6 +457,7 @@ def component_manifest() -> Dict[str, Any]:
             "commands": {
                 "run": "python app.py",
                 "describe": "python app.py --describe",
+                "semantic_model": "python app.py --semantic-model",
                 "validate": "python app.py --validate",
                 "self_test": "python app.py --self-test",
                 "smoke_test": "python smoke_test.py",
@@ -670,6 +679,7 @@ def _database_openapi_schemas() -> Dict[str, Any]:
     generic_object = {"type": "object", "additionalProperties": True}
     return {
         "ApplicationDescription": generic_object,
+        "SemanticModel": generic_object,
         "ComponentManifest": {
             "type": "object",
             "additionalProperties": True,
@@ -1172,6 +1182,7 @@ def openapi_document() -> Dict[str, Any]:
         "/health": {"get": _api_operation("Application health", "Health report", response_schema=_schema_ref("HealthReport"))},
         "/component.json": {"get": _api_operation("Composable component manifest", "APG component manifest", response_schema=_schema_ref("ComponentManifest"))},
         "/manifest": {"get": _api_operation("Application manifest", "APG manifest", response_schema=_schema_ref("ApplicationDescription"))},
+        "/semantic-model.json": {"get": _api_operation("Semantic model", "APG semantic model", response_schema=_schema_ref("SemanticModel"))},
         "/openapi.json": {"get": _api_operation("OpenAPI contract", "OpenAPI 3.1 contract", response_schema={"type": "object", "additionalProperties": True})},
         "/validate": {"get": _api_operation("Application validation", "Validation report", response_schema=_schema_ref("ValidationReport"))},
         "/events": {"get": _api_operation("Record mutation events", "Event log", response_schema=_schema_ref("EventLog"))},
@@ -1364,8 +1375,10 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
         errors.append("component manifest record interface does not match generated entities")
     if interfaces.get("theme") != "/theme.css":
         errors.append("component manifest theme interface must point to /theme.css")
+    if interfaces.get("semantic_model") != "/semantic-model.json":
+        errors.append("component manifest semantic model interface must point to /semantic-model.json")
     deployment = manifest.get("deployment", {})
-    expected_artifacts = ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
+    expected_artifacts = ["app.py", "__init__.py", "README.md", "semantic_model.json", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
     raw_artifacts = deployment.get("artifacts", []) if isinstance(deployment, dict) else []
     artifacts: set[str] = set()
     if not isinstance(raw_artifacts, list):
@@ -1390,6 +1403,7 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
     expected_commands = {
         "run": "python app.py",
         "describe": "python app.py --describe",
+        "semantic_model": "python app.py --semantic-model",
         "validate": "python app.py --validate",
         "self_test": "python app.py --self-test",
         "smoke_test": "python smoke_test.py",
@@ -1513,6 +1527,7 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             "/manifest",
             "/application",
             "/component.json",
+            "/semantic-model.json",
             "/health",
             "/validate",
             "/openapi.json",
@@ -2755,6 +2770,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, describe_application()
     if path == "/component.json":
         return 200, component_manifest()
+    if path == "/semantic-model.json":
+        return 200, semantic_model()
     if path == "/health":
         validation = validate_application()
         return 200, {
@@ -3296,6 +3313,9 @@ def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
     if "--describe" in args:
         print(json.dumps(describe_application(), indent=2, sort_keys=True))
+        return
+    if "--semantic-model" in args:
+        print(json.dumps(semantic_model(), indent=2, sort_keys=True))
         return
     if "--validate" in args:
         report = validate_application()

@@ -1,0 +1,325 @@
+{
+  "agents": {
+    "Coder": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "claude:sonnet",
+      "name": "Coder",
+      "outputs": [],
+      "role": "implementation_engineer",
+      "rules": [],
+      "runtime": "claude_code",
+      "system": "Implement focused code changes from accepted plans.",
+      "theme": {},
+      "tools": [
+        "repo.edit",
+        "tests.run"
+      ],
+      "ui": {}
+    },
+    "LocalReviewer": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "ollama:llama3.1",
+      "name": "LocalReviewer",
+      "outputs": [],
+      "role": "local_review",
+      "rules": [],
+      "runtime": "ollama",
+      "system": "Review diffs locally without sending code to external services.",
+      "theme": {},
+      "tools": [],
+      "ui": {}
+    },
+    "Researcher": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "openai:gpt-4.1-mini",
+      "name": "Researcher",
+      "outputs": [],
+      "role": "researcher",
+      "rules": [],
+      "runtime": "codex",
+      "system": "Gather structured evidence and cite source IDs.",
+      "theme": {},
+      "tools": [
+        "web.search",
+        "docs.read"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": "Agent team that can route work across several AI runtimes",
+    "entity_count": 4,
+    "name": "agent_runtime_portfolio",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {
+      "DeliverySwarm": {
+        "agents": [
+          "Researcher",
+          "Coder",
+          "LocalReviewer"
+        ],
+        "capabilities": [],
+        "configuration": {
+          "fallback_runtime": "opencode",
+          "handoff_mode": "sequential"
+        },
+        "flow": [
+          {
+            "condition": "done",
+            "from": "Researcher",
+            "to": "Coder"
+          },
+          {
+            "condition": "done",
+            "from": "Coder",
+            "to": "LocalReviewer"
+          }
+        ],
+        "rules": [
+          {
+            "action": "require_review",
+            "name": "local_review_required",
+            "when": "code_changed"
+          }
+        ],
+        "theme": {},
+        "ui": {}
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "agent_runtime_portfolio.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 3,
+      "kind": "agent",
+      "nodes": 4
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 4,
+      "kind": "deployment",
+      "nodes": 5
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 4,
+      "kind": "handler",
+      "nodes": 5
+    },
+    "lookup": {
+      "edges": 4,
+      "kind": "lookup",
+      "nodes": 5
+    },
+    "package": {
+      "edges": 4,
+      "kind": "package",
+      "nodes": 5
+    },
+    "security": {
+      "edges": 4,
+      "kind": "security",
+      "nodes": 5
+    },
+    "workflow": {
+      "edges": 4,
+      "kind": "workflow",
+      "nodes": 5
+    }
+  },
+  "llms": {
+    "Coder": {
+      "model": "claude:sonnet",
+      "runtime": "claude_code"
+    },
+    "LocalReviewer": {
+      "model": "ollama:llama3.1",
+      "runtime": "ollama"
+    },
+    "Researcher": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": "codex"
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "agent_runtime_portfolio.apg"
+  ],
+  "symbols": {
+    "agent.Coder": {
+      "file": "agent_runtime_portfolio.apg",
+      "id": "agent.Coder",
+      "kind": "agent",
+      "name": "Coder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 16
+        },
+        "start": {
+          "character": 0,
+          "line": 16
+        }
+      },
+      "references": []
+    },
+    "agent.LocalReviewer": {
+      "file": "agent_runtime_portfolio.apg",
+      "id": "agent.LocalReviewer",
+      "kind": "agent",
+      "name": "LocalReviewer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 24
+        },
+        "start": {
+          "character": 0,
+          "line": 24
+        }
+      },
+      "references": []
+    },
+    "agent.Researcher": {
+      "file": "agent_runtime_portfolio.apg",
+      "id": "agent.Researcher",
+      "kind": "agent",
+      "name": "Researcher",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 8
+        },
+        "start": {
+          "character": 0,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "composition.DeliverySwarm": {
+      "file": "agent_runtime_portfolio.apg",
+      "id": "composition.DeliverySwarm",
+      "kind": "composition",
+      "name": "DeliverySwarm",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 31
+        },
+        "start": {
+          "character": 0,
+          "line": 31
+        }
+      },
+      "references": []
+    },
+    "llm.claude:sonnet": {
+      "file": "agent_runtime_portfolio.apg",
+      "id": "llm.claude:sonnet",
+      "kind": "llm",
+      "name": "claude:sonnet",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 16
+        },
+        "start": {
+          "character": 0,
+          "line": 16
+        }
+      },
+      "references": []
+    },
+    "llm.ollama:llama3.1": {
+      "file": "agent_runtime_portfolio.apg",
+      "id": "llm.ollama:llama3.1",
+      "kind": "llm",
+      "name": "ollama:llama3.1",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 24
+        },
+        "start": {
+          "character": 0,
+          "line": 24
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "agent_runtime_portfolio.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 8
+        },
+        "start": {
+          "character": 0,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "module.agent_runtime_portfolio": {
+      "file": "agent_runtime_portfolio.apg",
+      "id": "module.agent_runtime_portfolio",
+      "kind": "module",
+      "name": "agent_runtime_portfolio",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

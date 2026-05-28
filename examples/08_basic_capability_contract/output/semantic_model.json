@@ -1,0 +1,158 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 1,
+    "name": "capability_basics",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "AuditLog": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "retention_days": 365
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "audit_event"
+        ]
+      },
+      "name": "AuditLog",
+      "provides": [
+        "audit_events"
+      ],
+      "requires": [],
+      "rule_engine": {},
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {},
+      "ui": {}
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "AuditLog": []
+    }
+  },
+  "contracts": {
+    "AuditLog": {
+      "configuration": {
+        "retention_days": 365
+      },
+      "id": "audit_log",
+      "provides": [
+        "audit_events"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_basics.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "deployment": {
+      "edges": 1,
+      "kind": "deployment",
+      "nodes": 2
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 1,
+      "kind": "handler",
+      "nodes": 2
+    },
+    "lookup": {
+      "edges": 1,
+      "kind": "lookup",
+      "nodes": 2
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    },
+    "security": {
+      "edges": 1,
+      "kind": "security",
+      "nodes": 2
+    },
+    "workflow": {
+      "edges": 1,
+      "kind": "workflow",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "capability_basics.apg"
+  ],
+  "symbols": {
+    "capability.AuditLog": {
+      "file": "capability_basics.apg",
+      "id": "capability.AuditLog",
+      "kind": "capability",
+      "name": "AuditLog",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.capability_basics": {
+      "file": "capability_basics.apg",
+      "id": "module.capability_basics",
+      "kind": "module",
+      "name": "capability_basics",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

@@ -1,0 +1,268 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 1,
+    "name": "finance_general_ledger",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "GeneralLedger": {
+      "approvals": {
+        "approvers": [
+          "controller",
+          "cfo"
+        ],
+        "levels": 2
+      },
+      "business_rules": [
+        {
+          "action": "deny",
+          "name": "period_open",
+          "priority": 100,
+          "when": "period.closed"
+        }
+      ],
+      "components": {
+        "posting": {
+          "capability": "journal_entries",
+          "permissions": [
+            "post",
+            "reverse"
+          ]
+        }
+      },
+      "configuration": {
+        "currency": "KES",
+        "fiscal_calendar": "monthly"
+      },
+      "erp_modules": [
+        "finance",
+        "general_ledger",
+        "accounts_payable"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw",
+          "ha",
+          "yo",
+          "zu"
+        ]
+      },
+      "master_data": {
+        "entities": [
+          "account",
+          "cost_center",
+          "financial_period"
+        ]
+      },
+      "name": "GeneralLedger",
+      "provides": [
+        "journal_entries",
+        "chart_of_accounts",
+        "financial_periods"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "balanced_journal",
+          "when": "debits != credits"
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "ledger_posting_state"
+      },
+      "theme": {
+        "name": "finance_ops",
+        "tokens": {
+          "accent": "#126E82"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "JournalScreen",
+            "name": "Journals",
+            "path": "/finance/gl/journals"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "GeneralLedger": [
+        "audit_events"
+      ]
+    }
+  },
+  "contracts": {
+    "GeneralLedger": {
+      "configuration": {
+        "currency": "KES",
+        "fiscal_calendar": "monthly"
+      },
+      "id": "general_ledger",
+      "name": "General Ledger",
+      "provides": [
+        "journal_entries",
+        "chart_of_accounts",
+        "financial_periods"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "balanced_journal",
+          "when": "debits != credits"
+        }
+      ],
+      "theme": {
+        "name": "finance_ops",
+        "tokens": {
+          "accent": "#126E82"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "JournalScreen",
+            "name": "Journals",
+            "path": "/finance/gl/journals"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    }
+  },
+  "deployment": {
+    "source": "finance_general_ledger.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 1,
+      "kind": "capability",
+      "nodes": 2
+    },
+    "deployment": {
+      "edges": 1,
+      "kind": "deployment",
+      "nodes": 2
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 1,
+      "kind": "handler",
+      "nodes": 2
+    },
+    "lookup": {
+      "edges": 1,
+      "kind": "lookup",
+      "nodes": 2
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    },
+    "security": {
+      "edges": 1,
+      "kind": "security",
+      "nodes": 2
+    },
+    "workflow": {
+      "edges": 1,
+      "kind": "workflow",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "GeneralLedger.balanced_journal": {
+      "action": "deny",
+      "name": "balanced_journal",
+      "when": "debits != credits"
+    },
+    "GeneralLedger.period_open": {
+      "action": "deny",
+      "name": "period_open",
+      "priority": 100,
+      "when": "period.closed"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "finance_general_ledger.apg"
+  ],
+  "symbols": {
+    "capability.GeneralLedger": {
+      "file": "finance_general_ledger.apg",
+      "id": "capability.GeneralLedger",
+      "kind": "capability",
+      "name": "GeneralLedger",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.finance_general_ledger": {
+      "file": "finance_general_ledger.apg",
+      "id": "module.finance_general_ledger",
+      "kind": "module",
+      "name": "finance_general_ledger",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

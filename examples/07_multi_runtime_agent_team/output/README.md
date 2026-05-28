@@ -14,6 +14,7 @@ python app.py
 python app.py --self-test
 python smoke_test.py
 python app.py --describe
+python app.py --semantic-model
 python app.py --validate
 ```
 
@@ -21,6 +22,7 @@ python app.py --validate
 
 - `GET /health` - runtime health and validation summary
 - `GET /component.json` - composable application component manifest
+- `GET /semantic-model.json` - normalized APG semantic model
 - `GET /self-test` - generated app smoke contract
 - `GET /manifest` - application manifest
 - `GET /openapi.json` - OpenAPI 3.1 contract
@@ -61,6 +63,7 @@ Generated deployment artifacts:
 - `Dockerfile` - standard-library Python container entrypoint
 - `.dockerignore` - container build exclusions
 - `.env.example` - documented runtime environment variables
+- `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
 ## AI agents

@@ -27,6 +27,7 @@ RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity i
 NEXT_RECORD_IDS: Dict[str, int] = {entity["name"]: 1 for entity in ENTITIES}
 EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
+SEMANTIC_MODEL: Dict[str, Any] = {'format': 'apg.semantic-model.v1', 'ok': True, 'source_files': ['crm_sales_pipeline.apg'], 'app': {'name': 'crm_sales_pipeline', 'version': '1.0.0', 'description': None, 'entity_count': 3}, 'symbols': {'module.crm_sales_pipeline': {'id': 'module.crm_sales_pipeline', 'kind': 'module', 'name': 'crm_sales_pipeline', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'table.Lead': {'id': 'table.Lead', 'kind': 'table', 'name': 'Lead', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.company': {'id': 'field.Lead.company', 'kind': 'field', 'name': 'Lead.company', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.contact_name': {'id': 'field.Lead.contact_name', 'kind': 'field', 'name': 'Lead.contact_name', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.email': {'id': 'field.Lead.email', 'kind': 'field', 'name': 'Lead.email', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.score': {'id': 'field.Lead.score', 'kind': 'field', 'name': 'Lead.score', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.qualified': {'id': 'field.Lead.qualified', 'kind': 'field', 'name': 'Lead.qualified', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'table.Opportunity': {'id': 'table.Opportunity', 'kind': 'table', 'name': 'Opportunity', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.lead_id': {'id': 'field.Opportunity.lead_id', 'kind': 'field', 'name': 'Opportunity.lead_id', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.stage': {'id': 'field.Opportunity.stage', 'kind': 'field', 'name': 'Opportunity.stage', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.amount': {'id': 'field.Opportunity.amount', 'kind': 'field', 'name': 'Opportunity.amount', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.probability': {'id': 'field.Opportunity.probability', 'kind': 'field', 'name': 'Opportunity.probability', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.expected_close_date': {'id': 'field.Opportunity.expected_close_date', 'kind': 'field', 'name': 'Opportunity.expected_close_date', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'capability.SalesPipeline': {'id': 'capability.SalesPipeline', 'kind': 'capability', 'name': 'SalesPipeline', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}}, 'tables': {'Lead': {'name': 'Lead', 'fields': {'company': {'type': 'str', 'required': True, 'relationship': None}, 'contact_name': {'type': 'str', 'required': True, 'relationship': None}, 'email': {'type': 'str', 'required': True, 'relationship': None}, 'score': {'type': 'int', 'required': True, 'relationship': None}, 'qualified': {'type': 'bool', 'required': True, 'relationship': None}}, 'lookup_paths': {}}, 'Opportunity': {'name': 'Opportunity', 'fields': {'lead_id': {'type': 'int', 'required': True, 'relationship': {'target_table': 'Lead', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'lead'}}, 'stage': {'type': 'str', 'required': True, 'relationship': None}, 'amount': {'type': 'float', 'required': True, 'relationship': None}, 'probability': {'type': 'int', 'required': True, 'relationship': None}, 'expected_close_date': {'type': 'str', 'required': True, 'relationship': None}}, 'lookup_paths': {}}}, 'views': {}, 'flows': {}, 'operations': {}, 'rules': {'SalesPipeline.qualified_lead_minimum': {'name': 'qualified_lead_minimum', 'when': 'score < 50', 'action': 'warn'}, 'SalesPipeline.large_deal_review': {'name': 'large_deal_review', 'when': 'amount > 1000000', 'action': 'require_review'}}, 'roles': {}, 'security': {}, 'agents': {}, 'llms': {}, 'capabilities': {'SalesPipeline': {'name': 'SalesPipeline', 'provides': ['lead_management', 'opportunity_tracking', 'forecast_metrics'], 'requires': ['customer_master'], 'configuration': {'default_probability': 25, 'forecast_currency': 'KES'}, 'rules': [{'name': 'qualified_lead_minimum', 'when': 'score < 50', 'action': 'warn'}, {'name': 'large_deal_review', 'when': 'amount > 1000000', 'action': 'require_review'}], 'rule_engine': {}, 'ui': {'shell': 'python', 'routes': [{'name': 'Pipeline', 'path': '/crm/pipeline', 'component': 'PipelineScreen'}]}, 'theme': {'name': 'sales_theme', 'tokens': {'accent': '#DD6B20'}}, 'runtime': {}, 'erp_modules': ['crm', 'sales', 'project_accounting'], 'components': {}, 'business_rules': [], 'approvals': {}, 'master_data': {}, 'i18n': {}, 'streaming': {}, 'screens': {'ForecastDashboard': {'route': '/crm/forecast', 'layout': 'dashboard', 'contains': ['StageFunnel', 'OpportunityTable', 'ForecastKpis'], 'binds': ['opportunities.active'], 'actions': ['advance_stage', 'mark_won', 'mark_lost']}}}}, 'composition': {'applications': {}, 'agent_teams': {}, 'capability_dependencies': {'SalesPipeline': ['customer_master']}}, 'contracts': {'SalesPipeline': {'id': 'sales_pipeline', 'provides': ['lead_management', 'opportunity_tracking', 'forecast_metrics'], 'requires': ['customer_master'], 'configuration': {'default_probability': 25, 'forecast_currency': 'KES'}, 'rules': [{'name': 'qualified_lead_minimum', 'when': 'score < 50', 'action': 'warn'}, {'name': 'large_deal_review', 'when': 'amount > 1000000', 'action': 'require_review'}], 'ui': {'shell': 'python', 'routes': [{'name': 'Pipeline', 'path': '/crm/pipeline', 'component': 'PipelineScreen'}]}, 'theme': {'name': 'sales_theme', 'tokens': {'accent': '#DD6B20'}}}}, 'deployment': {'target': 'python', 'source': 'crm_sales_pipeline.apg'}, 'packages': {}, 'graphs': {'er': {'kind': 'er', 'nodes': 12, 'edges': 11}, 'lookup': {'kind': 'lookup', 'nodes': 4, 'edges': 3}, 'workflow': {'kind': 'workflow', 'nodes': 4, 'edges': 3}, 'handler': {'kind': 'handler', 'nodes': 4, 'edges': 3}, 'capability': {'kind': 'capability', 'nodes': 2, 'edges': 1}, 'security': {'kind': 'security', 'nodes': 4, 'edges': 3}, 'agent': {'kind': 'agent', 'nodes': 0, 'edges': 0}, 'deployment': {'kind': 'deployment', 'nodes': 4, 'edges': 3}, 'package': {'kind': 'package', 'nodes': 4, 'edges': 3}}, 'diagnostics': [{'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'company' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'contact_name' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'email' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'score' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'qualified' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'lead_id' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'stage' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'amount' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'probability' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}, {'code': 'APG0100', 'title': 'Semantic warning', 'severity': 'warning', 'message': "Property 'expected_close_date' appears to be unused", 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'related_locations': [], 'fixes': [], 'docs_url': 'docs/tooling.md#semantic-model-contract'}]}
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -106,6 +107,10 @@ def list_entities() -> list[Dict[str, Any]]:
 
 def list_databases() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+
+
+def semantic_model() -> Dict[str, Any]:
+    return json.loads(json.dumps(SEMANTIC_MODEL))
 
 
 def database_status() -> Dict[str, Any]:
@@ -410,6 +415,7 @@ def component_manifest() -> Dict[str, Any]:
                     "relationship_graph",
                     "runtime_adapter_environment_keys",
                     "self_test",
+                    "semantic_model",
                     "storage_status",
                     "update_record",
                     "capability_health",
@@ -424,6 +430,7 @@ def component_manifest() -> Dict[str, Any]:
             },
             "records": sorted(ENTITY_NAMES),
             "theme": "/theme.css",
+            "semantic_model": "/semantic-model.json",
         },
         "entities": list_entities(),
         "databases": list_databases(),
@@ -440,6 +447,7 @@ def component_manifest() -> Dict[str, Any]:
                 "app.py",
                 "__init__.py",
                 "README.md",
+                "semantic_model.json",
                 "requirements.txt",
                 "Dockerfile",
                 ".dockerignore",
@@ -449,6 +457,7 @@ def component_manifest() -> Dict[str, Any]:
             "commands": {
                 "run": "python app.py",
                 "describe": "python app.py --describe",
+                "semantic_model": "python app.py --semantic-model",
                 "validate": "python app.py --validate",
                 "self_test": "python app.py --self-test",
                 "smoke_test": "python smoke_test.py",
@@ -670,6 +679,7 @@ def _database_openapi_schemas() -> Dict[str, Any]:
     generic_object = {"type": "object", "additionalProperties": True}
     return {
         "ApplicationDescription": generic_object,
+        "SemanticModel": generic_object,
         "ComponentManifest": {
             "type": "object",
             "additionalProperties": True,
@@ -1172,6 +1182,7 @@ def openapi_document() -> Dict[str, Any]:
         "/health": {"get": _api_operation("Application health", "Health report", response_schema=_schema_ref("HealthReport"))},
         "/component.json": {"get": _api_operation("Composable component manifest", "APG component manifest", response_schema=_schema_ref("ComponentManifest"))},
         "/manifest": {"get": _api_operation("Application manifest", "APG manifest", response_schema=_schema_ref("ApplicationDescription"))},
+        "/semantic-model.json": {"get": _api_operation("Semantic model", "APG semantic model", response_schema=_schema_ref("SemanticModel"))},
         "/openapi.json": {"get": _api_operation("OpenAPI contract", "OpenAPI 3.1 contract", response_schema={"type": "object", "additionalProperties": True})},
         "/validate": {"get": _api_operation("Application validation", "Validation report", response_schema=_schema_ref("ValidationReport"))},
         "/events": {"get": _api_operation("Record mutation events", "Event log", response_schema=_schema_ref("EventLog"))},
@@ -1364,8 +1375,10 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
         errors.append("component manifest record interface does not match generated entities")
     if interfaces.get("theme") != "/theme.css":
         errors.append("component manifest theme interface must point to /theme.css")
+    if interfaces.get("semantic_model") != "/semantic-model.json":
+        errors.append("component manifest semantic model interface must point to /semantic-model.json")
     deployment = manifest.get("deployment", {})
-    expected_artifacts = ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
+    expected_artifacts = ["app.py", "__init__.py", "README.md", "semantic_model.json", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
     raw_artifacts = deployment.get("artifacts", []) if isinstance(deployment, dict) else []
     artifacts: set[str] = set()
     if not isinstance(raw_artifacts, list):
@@ -1390,6 +1403,7 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
     expected_commands = {
         "run": "python app.py",
         "describe": "python app.py --describe",
+        "semantic_model": "python app.py --semantic-model",
         "validate": "python app.py --validate",
         "self_test": "python app.py --self-test",
         "smoke_test": "python smoke_test.py",
@@ -1513,6 +1527,7 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             "/manifest",
             "/application",
             "/component.json",
+            "/semantic-model.json",
             "/health",
             "/validate",
             "/openapi.json",
@@ -2755,6 +2770,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, describe_application()
     if path == "/component.json":
         return 200, component_manifest()
+    if path == "/semantic-model.json":
+        return 200, semantic_model()
     if path == "/health":
         validation = validate_application()
         return 200, {
@@ -3296,6 +3313,9 @@ def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
     if "--describe" in args:
         print(json.dumps(describe_application(), indent=2, sort_keys=True))
+        return
+    if "--semantic-model" in args:
+        print(json.dumps(semantic_model(), indent=2, sort_keys=True))
         return
     if "--validate" in args:
         report = validate_application()

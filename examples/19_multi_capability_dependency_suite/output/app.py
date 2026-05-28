@@ -27,6 +27,7 @@ RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity i
 NEXT_RECORD_IDS: Dict[str, int] = {entity["name"]: 1 for entity in ENTITIES}
 EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
+SEMANTIC_MODEL: Dict[str, Any] = {'format': 'apg.semantic-model.v1', 'ok': True, 'source_files': ['multi_capability_dependency_suite.apg'], 'app': {'name': 'multi_capability_dependency_suite', 'version': '1.0.0', 'description': None, 'entity_count': 4}, 'symbols': {'module.multi_capability_dependency_suite': {'id': 'module.multi_capability_dependency_suite', 'kind': 'module', 'name': 'multi_capability_dependency_suite', 'file': 'multi_capability_dependency_suite.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'capability.AuditEvents': {'id': 'capability.AuditEvents', 'kind': 'capability', 'name': 'AuditEvents', 'file': 'multi_capability_dependency_suite.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'capability.CustomerMaster': {'id': 'capability.CustomerMaster', 'kind': 'capability', 'name': 'CustomerMaster', 'file': 'multi_capability_dependency_suite.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'capability.OrderManagement': {'id': 'capability.OrderManagement', 'kind': 'capability', 'name': 'OrderManagement', 'file': 'multi_capability_dependency_suite.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'capability.Billing': {'id': 'capability.Billing', 'kind': 'capability', 'name': 'Billing', 'file': 'multi_capability_dependency_suite.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}}, 'tables': {}, 'views': {}, 'flows': {}, 'operations': {}, 'rules': {'OrderManagement.customer_required': {'name': 'customer_required', 'when': 'customer_id missing', 'action': 'deny'}, 'Billing.invoice_requires_order': {'name': 'invoice_requires_order', 'when': 'order_id missing', 'action': 'deny'}}, 'roles': {}, 'security': {}, 'agents': {}, 'llms': {}, 'capabilities': {'AuditEvents': {'name': 'AuditEvents', 'provides': ['audit_events'], 'requires': [], 'configuration': {'retention_days': 365}, 'rules': [], 'rule_engine': {}, 'ui': {}, 'theme': {}, 'runtime': {}, 'erp_modules': [], 'components': {}, 'business_rules': [], 'approvals': {}, 'master_data': {}, 'i18n': {}, 'streaming': {'processor': 'bytewax', 'state': 'audit_event_state'}, 'screens': {}}, 'CustomerMaster': {'name': 'CustomerMaster', 'provides': ['customer_master'], 'requires': ['audit_events'], 'configuration': {'deduplicate': True}, 'rules': [], 'rule_engine': {}, 'ui': {}, 'theme': {}, 'runtime': {}, 'erp_modules': [], 'components': {}, 'business_rules': [], 'approvals': {}, 'master_data': {'entities': ['customer', 'address', 'contact']}, 'i18n': {}, 'streaming': {}, 'screens': {}}, 'OrderManagement': {'name': 'OrderManagement', 'provides': ['sales_orders', 'order_fulfillment'], 'requires': ['customer_master', 'audit_events'], 'configuration': {'default_status': 'pending'}, 'rules': [{'name': 'customer_required', 'when': 'customer_id missing', 'action': 'deny'}], 'rule_engine': {}, 'ui': {'shell': 'python', 'routes': [{'name': 'Orders', 'path': '/orders', 'component': 'OrderScreen'}]}, 'theme': {}, 'runtime': {}, 'erp_modules': ['sales', 'inventory', 'finance'], 'components': {}, 'business_rules': [], 'approvals': {}, 'master_data': {}, 'i18n': {}, 'streaming': {}, 'screens': {}}, 'Billing': {'name': 'Billing', 'provides': ['invoice_generation', 'payment_allocation'], 'requires': ['sales_orders', 'customer_master', 'audit_events'], 'configuration': {'currency': 'KES'}, 'rules': [{'name': 'invoice_requires_order', 'when': 'order_id missing', 'action': 'deny'}], 'rule_engine': {}, 'ui': {}, 'theme': {}, 'runtime': {}, 'erp_modules': ['finance', 'sales'], 'components': {}, 'business_rules': [], 'approvals': {}, 'master_data': {}, 'i18n': {}, 'streaming': {}, 'screens': {}}}, 'composition': {'applications': {}, 'agent_teams': {}, 'capability_dependencies': {'AuditEvents': [], 'CustomerMaster': ['audit_events'], 'OrderManagement': ['customer_master', 'audit_events'], 'Billing': ['sales_orders', 'customer_master', 'audit_events']}}, 'contracts': {'AuditEvents': {'id': 'audit_events', 'provides': ['audit_events'], 'configuration': {'retention_days': 365}}, 'CustomerMaster': {'id': 'customer_master', 'provides': ['customer_master'], 'requires': ['audit_events'], 'configuration': {'deduplicate': True}}, 'OrderManagement': {'id': 'order_management', 'provides': ['sales_orders', 'order_fulfillment'], 'requires': ['customer_master', 'audit_events'], 'configuration': {'default_status': 'pending'}, 'rules': [{'name': 'customer_required', 'when': 'customer_id missing', 'action': 'deny'}], 'ui': {'shell': 'python', 'routes': [{'name': 'Orders', 'path': '/orders', 'component': 'OrderScreen'}]}}, 'Billing': {'id': 'billing', 'provides': ['invoice_generation', 'payment_allocation'], 'requires': ['sales_orders', 'customer_master', 'audit_events'], 'configuration': {'currency': 'KES'}, 'rules': [{'name': 'invoice_requires_order', 'when': 'order_id missing', 'action': 'deny'}]}}, 'deployment': {'target': 'python', 'source': 'multi_capability_dependency_suite.apg'}, 'packages': {}, 'graphs': {'er': {'kind': 'er', 'nodes': 0, 'edges': 0}, 'lookup': {'kind': 'lookup', 'nodes': 5, 'edges': 4}, 'workflow': {'kind': 'workflow', 'nodes': 5, 'edges': 4}, 'handler': {'kind': 'handler', 'nodes': 5, 'edges': 4}, 'capability': {'kind': 'capability', 'nodes': 7, 'edges': 6}, 'security': {'kind': 'security', 'nodes': 5, 'edges': 4}, 'agent': {'kind': 'agent', 'nodes': 0, 'edges': 0}, 'deployment': {'kind': 'deployment', 'nodes': 5, 'edges': 4}, 'package': {'kind': 'package', 'nodes': 5, 'edges': 4}}, 'diagnostics': []}
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -106,6 +107,10 @@ def list_entities() -> list[Dict[str, Any]]:
 
 def list_databases() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+
+
+def semantic_model() -> Dict[str, Any]:
+    return json.loads(json.dumps(SEMANTIC_MODEL))
 
 
 def database_status() -> Dict[str, Any]:
@@ -410,6 +415,7 @@ def component_manifest() -> Dict[str, Any]:
                     "relationship_graph",
                     "runtime_adapter_environment_keys",
                     "self_test",
+                    "semantic_model",
                     "storage_status",
                     "update_record",
                     "capability_health",
@@ -424,6 +430,7 @@ def component_manifest() -> Dict[str, Any]:
             },
             "records": sorted(ENTITY_NAMES),
             "theme": "/theme.css",
+            "semantic_model": "/semantic-model.json",
         },
         "entities": list_entities(),
         "databases": list_databases(),
@@ -440,6 +447,7 @@ def component_manifest() -> Dict[str, Any]:
                 "app.py",
                 "__init__.py",
                 "README.md",
+                "semantic_model.json",
                 "requirements.txt",
                 "Dockerfile",
                 ".dockerignore",
@@ -449,6 +457,7 @@ def component_manifest() -> Dict[str, Any]:
             "commands": {
                 "run": "python app.py",
                 "describe": "python app.py --describe",
+                "semantic_model": "python app.py --semantic-model",
                 "validate": "python app.py --validate",
                 "self_test": "python app.py --self-test",
                 "smoke_test": "python smoke_test.py",
@@ -670,6 +679,7 @@ def _database_openapi_schemas() -> Dict[str, Any]:
     generic_object = {"type": "object", "additionalProperties": True}
     return {
         "ApplicationDescription": generic_object,
+        "SemanticModel": generic_object,
         "ComponentManifest": {
             "type": "object",
             "additionalProperties": True,
@@ -1172,6 +1182,7 @@ def openapi_document() -> Dict[str, Any]:
         "/health": {"get": _api_operation("Application health", "Health report", response_schema=_schema_ref("HealthReport"))},
         "/component.json": {"get": _api_operation("Composable component manifest", "APG component manifest", response_schema=_schema_ref("ComponentManifest"))},
         "/manifest": {"get": _api_operation("Application manifest", "APG manifest", response_schema=_schema_ref("ApplicationDescription"))},
+        "/semantic-model.json": {"get": _api_operation("Semantic model", "APG semantic model", response_schema=_schema_ref("SemanticModel"))},
         "/openapi.json": {"get": _api_operation("OpenAPI contract", "OpenAPI 3.1 contract", response_schema={"type": "object", "additionalProperties": True})},
         "/validate": {"get": _api_operation("Application validation", "Validation report", response_schema=_schema_ref("ValidationReport"))},
         "/events": {"get": _api_operation("Record mutation events", "Event log", response_schema=_schema_ref("EventLog"))},
@@ -1364,8 +1375,10 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
         errors.append("component manifest record interface does not match generated entities")
     if interfaces.get("theme") != "/theme.css":
         errors.append("component manifest theme interface must point to /theme.css")
+    if interfaces.get("semantic_model") != "/semantic-model.json":
+        errors.append("component manifest semantic model interface must point to /semantic-model.json")
     deployment = manifest.get("deployment", {})
-    expected_artifacts = ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
+    expected_artifacts = ["app.py", "__init__.py", "README.md", "semantic_model.json", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
     raw_artifacts = deployment.get("artifacts", []) if isinstance(deployment, dict) else []
     artifacts: set[str] = set()
     if not isinstance(raw_artifacts, list):
@@ -1390,6 +1403,7 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
     expected_commands = {
         "run": "python app.py",
         "describe": "python app.py --describe",
+        "semantic_model": "python app.py --semantic-model",
         "validate": "python app.py --validate",
         "self_test": "python app.py --self-test",
         "smoke_test": "python smoke_test.py",
@@ -1513,6 +1527,7 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             "/manifest",
             "/application",
             "/component.json",
+            "/semantic-model.json",
             "/health",
             "/validate",
             "/openapi.json",
@@ -2755,6 +2770,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, describe_application()
     if path == "/component.json":
         return 200, component_manifest()
+    if path == "/semantic-model.json":
+        return 200, semantic_model()
     if path == "/health":
         validation = validate_application()
         return 200, {
@@ -3296,6 +3313,9 @@ def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
     if "--describe" in args:
         print(json.dumps(describe_application(), indent=2, sort_keys=True))
+        return
+    if "--semantic-model" in args:
+        print(json.dumps(semantic_model(), indent=2, sort_keys=True))
         return
     if "--validate" in args:
         report = validate_application()

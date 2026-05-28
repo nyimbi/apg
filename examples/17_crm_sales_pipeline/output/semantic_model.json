@@ -1,0 +1,726 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 3,
+    "name": "crm_sales_pipeline",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "SalesPipeline": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "default_probability": 25,
+        "forecast_currency": "KES"
+      },
+      "erp_modules": [
+        "crm",
+        "sales",
+        "project_accounting"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "SalesPipeline",
+      "provides": [
+        "lead_management",
+        "opportunity_tracking",
+        "forecast_metrics"
+      ],
+      "requires": [
+        "customer_master"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "warn",
+          "name": "qualified_lead_minimum",
+          "when": "score < 50"
+        },
+        {
+          "action": "require_review",
+          "name": "large_deal_review",
+          "when": "amount > 1000000"
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "ForecastDashboard": {
+          "actions": [
+            "advance_stage",
+            "mark_won",
+            "mark_lost"
+          ],
+          "binds": [
+            "opportunities.active"
+          ],
+          "contains": [
+            "StageFunnel",
+            "OpportunityTable",
+            "ForecastKpis"
+          ],
+          "layout": "dashboard",
+          "route": "/crm/forecast"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "name": "sales_theme",
+        "tokens": {
+          "accent": "#DD6B20"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PipelineScreen",
+            "name": "Pipeline",
+            "path": "/crm/pipeline"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "SalesPipeline": [
+        "customer_master"
+      ]
+    }
+  },
+  "contracts": {
+    "SalesPipeline": {
+      "configuration": {
+        "default_probability": 25,
+        "forecast_currency": "KES"
+      },
+      "id": "sales_pipeline",
+      "provides": [
+        "lead_management",
+        "opportunity_tracking",
+        "forecast_metrics"
+      ],
+      "requires": [
+        "customer_master"
+      ],
+      "rules": [
+        {
+          "action": "warn",
+          "name": "qualified_lead_minimum",
+          "when": "score < 50"
+        },
+        {
+          "action": "require_review",
+          "name": "large_deal_review",
+          "when": "amount > 1000000"
+        }
+      ],
+      "theme": {
+        "name": "sales_theme",
+        "tokens": {
+          "accent": "#DD6B20"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PipelineScreen",
+            "name": "Pipeline",
+            "path": "/crm/pipeline"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "crm_sales_pipeline.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'company' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'contact_name' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'email' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'score' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'qualified' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'lead_id' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'stage' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'amount' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'probability' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales_pipeline.apg",
+      "fixes": [],
+      "message": "Property 'expected_close_date' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 1,
+      "kind": "capability",
+      "nodes": 2
+    },
+    "deployment": {
+      "edges": 3,
+      "kind": "deployment",
+      "nodes": 4
+    },
+    "er": {
+      "edges": 11,
+      "kind": "er",
+      "nodes": 12
+    },
+    "handler": {
+      "edges": 3,
+      "kind": "handler",
+      "nodes": 4
+    },
+    "lookup": {
+      "edges": 3,
+      "kind": "lookup",
+      "nodes": 4
+    },
+    "package": {
+      "edges": 3,
+      "kind": "package",
+      "nodes": 4
+    },
+    "security": {
+      "edges": 3,
+      "kind": "security",
+      "nodes": 4
+    },
+    "workflow": {
+      "edges": 3,
+      "kind": "workflow",
+      "nodes": 4
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "SalesPipeline.large_deal_review": {
+      "action": "require_review",
+      "name": "large_deal_review",
+      "when": "amount > 1000000"
+    },
+    "SalesPipeline.qualified_lead_minimum": {
+      "action": "warn",
+      "name": "qualified_lead_minimum",
+      "when": "score < 50"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "crm_sales_pipeline.apg"
+  ],
+  "symbols": {
+    "capability.SalesPipeline": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "capability.SalesPipeline",
+      "kind": "capability",
+      "name": "SalesPipeline",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.company": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Lead.company",
+      "kind": "field",
+      "name": "Lead.company",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.contact_name": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Lead.contact_name",
+      "kind": "field",
+      "name": "Lead.contact_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.email": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Lead.email",
+      "kind": "field",
+      "name": "Lead.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.qualified": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Lead.qualified",
+      "kind": "field",
+      "name": "Lead.qualified",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.score": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Lead.score",
+      "kind": "field",
+      "name": "Lead.score",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.amount": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Opportunity.amount",
+      "kind": "field",
+      "name": "Opportunity.amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.expected_close_date": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Opportunity.expected_close_date",
+      "kind": "field",
+      "name": "Opportunity.expected_close_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.lead_id": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Opportunity.lead_id",
+      "kind": "field",
+      "name": "Opportunity.lead_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.probability": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Opportunity.probability",
+      "kind": "field",
+      "name": "Opportunity.probability",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.stage": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "field.Opportunity.stage",
+      "kind": "field",
+      "name": "Opportunity.stage",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.crm_sales_pipeline": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "module.crm_sales_pipeline",
+      "kind": "module",
+      "name": "crm_sales_pipeline",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Lead": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "table.Lead",
+      "kind": "table",
+      "name": "Lead",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Opportunity": {
+      "file": "crm_sales_pipeline.apg",
+      "id": "table.Opportunity",
+      "kind": "table",
+      "name": "Opportunity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Lead": {
+      "fields": {
+        "company": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "contact_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "qualified": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "score": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Lead"
+    },
+    "Opportunity": {
+      "fields": {
+        "amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "expected_close_date": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "lead_id": {
+          "relationship": {
+            "alias": "lead",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Lead"
+          },
+          "required": true,
+          "type": "int"
+        },
+        "probability": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "stage": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Opportunity"
+    }
+  },
+  "views": {}
+}

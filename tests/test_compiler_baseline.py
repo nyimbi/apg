@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 from click.testing import CliRunner
 
@@ -21,6 +22,8 @@ from compiler.code_generator import CodeGenerator
 from compiler.compiler import APGCompiler, compile_apg_string
 from compiler.semantic_analyzer import SemanticError
 
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 MINIMAL_AGENT_SOURCE = """
 module baseline version 1.0.0 {
@@ -1401,6 +1404,38 @@ def test_cli_release_text_summarizes_evidence(tmp_path):
 	assert "APG release OK" in result.output
 	assert "artifact(s)" in result.output
 	assert "self-test=ok" in result.output
+
+
+def test_checked_in_example_outputs_match_current_compiler():
+	examples = sorted((REPO_ROOT / "examples").glob("[0-9][0-9]_*/main.apg"))
+	assert len(examples) == 20
+	mismatches: list[str] = []
+
+	for source_file in examples:
+		compiler = APGCompiler()
+		result = compiler.compile_file(source_file, target_language="python")
+		assert result.success is True, f"{source_file}: {result.errors}"
+		output_dir = source_file.parent / "output"
+		assert output_dir.exists(), f"{source_file.parent.name}: missing output directory"
+
+		expected_files = set(result.generated_files)
+		actual_files = {
+			str(path.relative_to(output_dir))
+			for path in output_dir.rglob("*")
+			if path.is_file()
+			and "__pycache__" not in path.relative_to(output_dir).parts
+			and not path.name.endswith(".pyc")
+		}
+		for missing in sorted(expected_files - actual_files):
+			mismatches.append(f"{source_file.parent.name}: missing {missing}")
+		for extra in sorted(actual_files - expected_files):
+			mismatches.append(f"{source_file.parent.name}: extra {extra}")
+		for file_name in sorted(expected_files & actual_files):
+			actual = (output_dir / file_name).read_text(encoding="utf-8")
+			if actual != result.generated_files[file_name]:
+				mismatches.append(f"{source_file.parent.name}: changed {file_name}")
+
+	assert mismatches == []
 
 
 def test_cli_format_json_formats_source_without_writing(tmp_path):

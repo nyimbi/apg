@@ -1,0 +1,211 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 1,
+    "name": "credit_control",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "CreditControl": {
+      "approvals": {
+        "approvers": [
+          "credit_manager",
+          "finance_controller"
+        ],
+        "levels": 2
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "currency": "KES",
+        "default_limit": 10000
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "customer_credit_profile"
+        ]
+      },
+      "name": "CreditControl",
+      "provides": [
+        "credit_limit_checks",
+        "hold_release"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "over_limit",
+          "when": "order_total > credit_limit"
+        },
+        {
+          "action": "require_review",
+          "name": "manual_review",
+          "when": "risk_score > 0.75"
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {},
+      "ui": {}
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "CreditControl": [
+        "audit_events"
+      ]
+    }
+  },
+  "contracts": {
+    "CreditControl": {
+      "configuration": {
+        "currency": "KES",
+        "default_limit": 10000
+      },
+      "id": "credit_control",
+      "name": "Credit Control",
+      "provides": [
+        "credit_limit_checks",
+        "hold_release"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "over_limit",
+          "when": "order_total > credit_limit"
+        },
+        {
+          "action": "require_review",
+          "name": "manual_review",
+          "when": "risk_score > 0.75"
+        }
+      ],
+      "version": "1.0.0"
+    }
+  },
+  "deployment": {
+    "source": "credit_control.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 1,
+      "kind": "capability",
+      "nodes": 2
+    },
+    "deployment": {
+      "edges": 1,
+      "kind": "deployment",
+      "nodes": 2
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 1,
+      "kind": "handler",
+      "nodes": 2
+    },
+    "lookup": {
+      "edges": 1,
+      "kind": "lookup",
+      "nodes": 2
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    },
+    "security": {
+      "edges": 1,
+      "kind": "security",
+      "nodes": 2
+    },
+    "workflow": {
+      "edges": 1,
+      "kind": "workflow",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "CreditControl.manual_review": {
+      "action": "require_review",
+      "name": "manual_review",
+      "when": "risk_score > 0.75"
+    },
+    "CreditControl.over_limit": {
+      "action": "deny",
+      "name": "over_limit",
+      "when": "order_total > credit_limit"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "credit_control.apg"
+  ],
+  "symbols": {
+    "capability.CreditControl": {
+      "file": "credit_control.apg",
+      "id": "capability.CreditControl",
+      "kind": "capability",
+      "name": "CreditControl",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.credit_control": {
+      "file": "credit_control.apg",
+      "id": "module.credit_control",
+      "kind": "module",
+      "name": "credit_control",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

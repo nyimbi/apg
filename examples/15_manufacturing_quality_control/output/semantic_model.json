@@ -1,0 +1,535 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 2,
+    "name": "manufacturing_quality_control",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "QualityControl": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "defect_threshold": 3,
+        "inspection_frequency_minutes": 60
+      },
+      "erp_modules": [
+        "manufacturing",
+        "inventory"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "QualityControl",
+      "provides": [
+        "quality_inspections",
+        "defect_tracking",
+        "production_oee"
+      ],
+      "requires": [
+        "stock_movements",
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "defect_threshold",
+          "when": "defect_count > defect_threshold"
+        },
+        {
+          "action": "audit",
+          "name": "run_completion",
+          "when": "completed_quantity >= planned_quantity"
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "LineDashboard": {
+          "actions": [
+            "pause_line",
+            "approve_run",
+            "escalate_quality"
+          ],
+          "binds": [
+            "production_runs.active"
+          ],
+          "contains": [
+            "RunSummary",
+            "DefectChart",
+            "InspectionQueue"
+          ],
+          "layout": "dashboard",
+          "route": "/manufacturing/line"
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "state": "quality_event_state"
+      },
+      "theme": {
+        "name": "shop_floor_theme",
+        "tokens": {
+          "accent": "#B83280"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "QualityScreen",
+            "name": "Quality",
+            "path": "/manufacturing/quality"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "QualityControl": [
+        "stock_movements",
+        "audit_events"
+      ]
+    }
+  },
+  "contracts": {
+    "QualityControl": {
+      "configuration": {
+        "defect_threshold": 3,
+        "inspection_frequency_minutes": 60
+      },
+      "id": "quality_control",
+      "provides": [
+        "quality_inspections",
+        "defect_tracking",
+        "production_oee"
+      ],
+      "requires": [
+        "stock_movements",
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "defect_threshold",
+          "when": "defect_count > defect_threshold"
+        },
+        {
+          "action": "audit",
+          "name": "run_completion",
+          "when": "completed_quantity >= planned_quantity"
+        }
+      ],
+      "theme": {
+        "name": "shop_floor_theme",
+        "tokens": {
+          "accent": "#B83280"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "QualityScreen",
+            "name": "Quality",
+            "path": "/manufacturing/quality"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "manufacturing_quality_control.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "manufacturing_quality_control.apg",
+      "fixes": [],
+      "message": "Property 'line_code' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "manufacturing_quality_control.apg",
+      "fixes": [],
+      "message": "Property 'product_sku' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "manufacturing_quality_control.apg",
+      "fixes": [],
+      "message": "Property 'planned_quantity' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "manufacturing_quality_control.apg",
+      "fixes": [],
+      "message": "Property 'completed_quantity' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "manufacturing_quality_control.apg",
+      "fixes": [],
+      "message": "Property 'defect_count' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "manufacturing_quality_control.apg",
+      "fixes": [],
+      "message": "Property 'active' appears to be unused",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 2,
+      "kind": "capability",
+      "nodes": 3
+    },
+    "deployment": {
+      "edges": 2,
+      "kind": "deployment",
+      "nodes": 3
+    },
+    "er": {
+      "edges": 6,
+      "kind": "er",
+      "nodes": 7
+    },
+    "handler": {
+      "edges": 2,
+      "kind": "handler",
+      "nodes": 3
+    },
+    "lookup": {
+      "edges": 2,
+      "kind": "lookup",
+      "nodes": 3
+    },
+    "package": {
+      "edges": 2,
+      "kind": "package",
+      "nodes": 3
+    },
+    "security": {
+      "edges": 2,
+      "kind": "security",
+      "nodes": 3
+    },
+    "workflow": {
+      "edges": 2,
+      "kind": "workflow",
+      "nodes": 3
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "QualityControl.defect_threshold": {
+      "action": "require_review",
+      "name": "defect_threshold",
+      "when": "defect_count > defect_threshold"
+    },
+    "QualityControl.run_completion": {
+      "action": "audit",
+      "name": "run_completion",
+      "when": "completed_quantity >= planned_quantity"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "manufacturing_quality_control.apg"
+  ],
+  "symbols": {
+    "capability.QualityControl": {
+      "file": "manufacturing_quality_control.apg",
+      "id": "capability.QualityControl",
+      "kind": "capability",
+      "name": "QualityControl",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionRun.active": {
+      "file": "manufacturing_quality_control.apg",
+      "id": "field.ProductionRun.active",
+      "kind": "field",
+      "name": "ProductionRun.active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionRun.completed_quantity": {
+      "file": "manufacturing_quality_control.apg",
+      "id": "field.ProductionRun.completed_quantity",
+      "kind": "field",
+      "name": "ProductionRun.completed_quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionRun.defect_count": {
+      "file": "manufacturing_quality_control.apg",
+      "id": "field.ProductionRun.defect_count",
+      "kind": "field",
+      "name": "ProductionRun.defect_count",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionRun.line_code": {
+      "file": "manufacturing_quality_control.apg",
+      "id": "field.ProductionRun.line_code",
+      "kind": "field",
+      "name": "ProductionRun.line_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionRun.planned_quantity": {
+      "file": "manufacturing_quality_control.apg",
+      "id": "field.ProductionRun.planned_quantity",
+      "kind": "field",
+      "name": "ProductionRun.planned_quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionRun.product_sku": {
+      "file": "manufacturing_quality_control.apg",
+      "id": "field.ProductionRun.product_sku",
+      "kind": "field",
+      "name": "ProductionRun.product_sku",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.manufacturing_quality_control": {
+      "file": "manufacturing_quality_control.apg",
+      "id": "module.manufacturing_quality_control",
+      "kind": "module",
+      "name": "manufacturing_quality_control",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ProductionRun": {
+      "file": "manufacturing_quality_control.apg",
+      "id": "table.ProductionRun",
+      "kind": "table",
+      "name": "ProductionRun",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "ProductionRun": {
+      "fields": {
+        "active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "completed_quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "defect_count": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "line_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "planned_quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "product_sku": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "ProductionRun"
+    }
+  },
+  "views": {}
+}
