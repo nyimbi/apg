@@ -5801,4 +5801,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push for the generated visual theming slice.
+- Pushed commit `25fe951` (`Apply generated capability themes to UI`) to `origin/main`.
