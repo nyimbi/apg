@@ -8415,3 +8415,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q capabilities/common/regy/tests/test_service.py::TestServiceRegistryService::test_registry_statistics` passed with 1 test.
 - `rg -n "75% hit rate placeholder|cache hit rate \\(simplified\\)|actual cache hit/miss counters" capabilities/common/regy/service.py tests/test_common_regy_cache_metrics.py` found no stale REGY cache placeholder text.
 - `git diff --check -- capabilities/common/regy/service.py tests/test_common_regy_cache_metrics.py` passed.
+
+### 2026-05-29 01:31 EAT
+
+Executable fintech gateway alerting slice:
+
+- Made the payment gateway monitoring module importable without optional `structlog` or `prometheus_client` packages by adding dependency-light logger and metric collector fallbacks.
+- Replaced the alert evaluator that always returned `False` with deterministic condition parsing and metric evaluation for error rate, success rate, processor availability, p95 latency, fraud rate, settlement failures, database connections, and ML model accuracy.
+- Added focused regression coverage for dependency-light import, metric text export, alert conditions from recorded transactions, alert trigger/resolution, and latency histogram evaluation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/fintech/gateway/monitoring_service.py tests/test_fintech_gateway_monitoring_alerts.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_fintech_gateway_monitoring_alerts.py` passed with 4 tests.
+- `rg -n "Evaluate alert condition \\(simplified implementation\\)|For now, return False to simulate no alerts|query metrics and evaluate conditions" capabilities/fintech/gateway/monitoring_service.py tests/test_fintech_gateway_monitoring_alerts.py` found no stale alert-evaluator placeholder text.
+- `git diff --check -- capabilities/fintech/gateway/monitoring_service.py tests/test_fintech_gateway_monitoring_alerts.py` passed.
