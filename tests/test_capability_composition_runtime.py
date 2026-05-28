@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 import importlib.util
 import re
+import socket
+import subprocess
 import sys
+import time
 import types
+import urllib.request
 
 from compiler.ast_builder import ASTBuilder, CapabilityDeclaration
 from compiler.compiler import APGCompiler
@@ -429,6 +433,77 @@ def test_generated_app_manifest_includes_capability_composition_topology():
     assert ("screen:OperationsWorkbench.Dashboard", "contains", "component:KpiStrip") in graph_edges
     assert ("component:KpiStrip", "filters", "component:LedgerTable") in graph_edges
     assert json.loads(json.dumps(manifest))["ui_routes"]["/ops"]["component"] == "Dashboard"
+
+
+def test_generated_app_evaluates_capability_rules_over_http(tmp_path):
+    result = APGCompiler().compile_string(CAPABILITY_SOURCE, "erp_ops.apg")
+    assert result.success is True
+
+    app_dir = tmp_path / "generated_erp_ops"
+    app_dir.mkdir()
+    for filename, content in result.generated_files.items():
+        (app_dir / filename).write_text(content, encoding="utf-8")
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+
+    process = subprocess.Popen(
+        [sys.executable, "app.py", "--host", "127.0.0.1", "--port", str(port)],
+        cwd=app_dir,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        base_url = f"http://127.0.0.1:{port}"
+        for _attempt in range(30):
+            try:
+                with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
+                    assert response.status == 200
+                break
+            except OSError:
+                if process.poll() is not None:
+                    stdout, stderr = process.communicate(timeout=1)
+                    raise AssertionError(f"generated app exited early\nstdout={stdout}\nstderr={stderr}")
+                time.sleep(0.05)
+        else:
+            raise AssertionError("generated app did not answer /health")
+
+        request = urllib.request.Request(
+            f"{base_url}/capabilities/GeneralLedger/rules/evaluate",
+            data=json.dumps({
+                "context": {"debits": 100, "credits": 90, "period": {"closed": False}}
+            }).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=1) as response:
+            denied = json.loads(response.read().decode("utf-8"))
+
+        request = urllib.request.Request(
+            f"{base_url}/rules/evaluate",
+            data=json.dumps({
+                "capability": "GeneralLedger",
+                "context": {"debits": 100, "credits": 100, "period": {"closed": False}},
+            }).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=1) as response:
+            allowed = json.loads(response.read().decode("utf-8"))
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+
+    assert denied["decision"] == "deny"
+    assert denied["matched_rules"] == ["balanced_journal"]
+    assert allowed["decision"] == "allow"
+    assert allowed["matched_rules"] == []
 
 
 def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):

@@ -352,11 +352,57 @@ def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
     return 404, {{"error": "not_found", "path": path}}
 
 
+def _rule_evaluation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    capability_name = payload.get("capability") or payload.get("capability_name")
+    if path.startswith("/capabilities/") and path.endswith("/rules/evaluate"):
+        parts = [part for part in path.split("/") if part]
+        if len(parts) >= 3:
+            capability_name = parts[1]
+    if not capability_name:
+        return 400, {{"error": "missing_capability"}}
+    if APG_CAPABILITIES is None or not hasattr(APG_CAPABILITIES, "evaluate_capability_rules"):
+        return 404, {{"error": "capability_rules_unavailable"}}
+    context = payload.get("context", {{}})
+    if not isinstance(context, dict):
+        return 400, {{"error": "context_must_be_object"}}
+    try:
+        return 200, APG_CAPABILITIES.evaluate_capability_rules(str(capability_name), context)
+    except KeyError:
+        return 404, {{"error": "unknown_capability", "capability": str(capability_name)}}
+
+
+def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    path = path.rstrip("/") or "/"
+    if path in {{"/rules/evaluate", "/capabilities/rules/evaluate"}} or (
+        path.startswith("/capabilities/") and path.endswith("/rules/evaluate")
+    ):
+        return _rule_evaluation_payload(path, payload)
+    return 404, {{"error": "not_found", "path": path}}
+
+
 class ApplicationRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         status, payload = _route_payload(path)
         body = _json_bytes(payload)
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self) -> None:
+        path = self.path.split("?", 1)[0]
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+            raw_body = self.rfile.read(length) if length else b"{{}}"
+            payload = json.loads(raw_body.decode("utf-8") or "{{}}")
+            if not isinstance(payload, dict):
+                raise ValueError("JSON body must be an object")
+            status, response = _post_payload(path, payload)
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
+            status, response = 400, {{"error": "invalid_json", "message": str(error)}}
+        body = _json_bytes(response)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

@@ -5214,3 +5214,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `a081d07` (`Generate runnable standard-library applications`) to `origin/main`.
+
+### 2026-05-28 05:55 EAT
+
+Completed checkpoint:
+
+- Added executable HTTP behavior to generated apps with POST rule evaluation.
+- Generated apps now support:
+  - `POST /rules/evaluate` with `{"capability": "...", "context": {...}}`
+  - `POST /capabilities/{CapabilityName}/rules/evaluate` with `{"context": {...}}`
+- The endpoint executes generated `apg_capabilities.evaluate_capability_rules()` and returns decision, matched rules, actions, and context as JSON.
+- Added a focused subprocess regression that starts a generated ERP capability app and verifies deny/allow rule decisions over HTTP.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 9 passed
+- `git diff --check -- compiler/code_generator.py tests/test_capability_composition_runtime.py docs/progress_log.md` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending.
