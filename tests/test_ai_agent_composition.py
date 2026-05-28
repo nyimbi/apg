@@ -217,3 +217,9 @@ def test_generated_app_manifest_includes_ai_agents_and_teams():
 
     assert manifest["ai_agents"] == ["Planner", "Writer"]
     assert manifest["ai_agent_teams"] == ["SupportCrew"]
+    assert manifest["ai_agent_descriptions"]["Planner"]["runtime"] == "codex"
+    assert manifest["ai_agent_team_descriptions"]["SupportCrew"]["agent_names"] == [
+        "Planner",
+        "Writer",
+    ]
+    assert json.loads(json.dumps(manifest))["ai_agent_team_descriptions"]["SupportCrew"]["name"] == "SupportCrew"

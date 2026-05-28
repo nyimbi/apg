@@ -5087,3 +5087,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `4e44bf4` (`Describe generated capabilities as data`) to `origin/main`.
+
+### 2026-05-28 05:24 EAT
+
+Completed checkpoint:
+
+- Enriched generated `app.py` manifests so `describe_application()` includes serializable AI-agent, AI-agent-team, and capability description dictionaries when the generated runtime modules provide them.
+- Preserved existing name-list fields (`ai_agents`, `ai_agent_teams`, `capabilities`) while adding richer metadata fields for application/package consumers.
+- Added focused regressions proving generated app manifests include rich AI-agent/team metadata and capability metadata that round-trips through JSON.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py -q` -> 11 passed
+- Direct AI app manifest smoke -> `Planner` runtime `codex`, team agent names `['Planner', 'Writer']`, JSON round-trip retained app name `support`
+- Direct capability app manifest smoke -> `GeneralLedger` capability description retained currency `KES`, JSON round-trip retained app name `erp_ops`
+- `git diff --check -- compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push.

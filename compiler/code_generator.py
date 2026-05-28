@@ -237,10 +237,22 @@ def describe_application() -> Dict[str, Any]:
     }}
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents"):
         description["ai_agents"] = AI_AGENTS.list_agents()
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "describe_agent") and hasattr(AI_AGENTS, "list_agents"):
+        description["ai_agent_descriptions"] = {{
+            name: AI_AGENTS.describe_agent(name)
+            for name in AI_AGENTS.list_agents()
+        }}
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agent_teams"):
         description["ai_agent_teams"] = AI_AGENTS.list_agent_teams()
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "describe_team") and hasattr(AI_AGENTS, "list_agent_teams"):
+        description["ai_agent_team_descriptions"] = {{
+            name: AI_AGENTS.describe_team(name)
+            for name in AI_AGENTS.list_agent_teams()
+        }}
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities"):
         description["capabilities"] = APG_CAPABILITIES.list_capabilities()
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capabilities"):
+        description["capability_descriptions"] = APG_CAPABILITIES.describe_capabilities()
     return description
 
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import sys
+import types
 
 from compiler.ast_builder import ASTBuilder, CapabilityDeclaration
 from compiler.compiler import APGCompiler
@@ -355,6 +357,30 @@ def test_capability_declaration_generates_runtime_manifest():
     validation = namespace["validate_capability_contracts"]()
     assert validation["errors"] == []
     assert validation["warnings"] == ["GeneralLedger requires external service audit_log"]
+
+
+def test_generated_app_manifest_includes_capability_descriptions():
+    result = APGCompiler().compile_string(CAPABILITY_SOURCE, "erp_ops.apg")
+
+    assert result.success is True
+
+    capabilities = types.ModuleType("apg_capabilities")
+    sys.modules["apg_capabilities"] = capabilities
+    try:
+        exec(compile(result.generated_files["apg_capabilities.py"], "apg_capabilities.py", "exec"), capabilities.__dict__)
+
+        app = types.ModuleType("app")
+        exec(compile(result.generated_files["app.py"], "app.py", "exec"), app.__dict__)
+        manifest = app.describe_application()
+    finally:
+        sys.modules.pop("apg_capabilities", None)
+
+    assert manifest["capabilities"] == ["GeneralLedger"]
+    assert manifest["capability_descriptions"]["GeneralLedger"]["configuration"] == {
+        "currency": "KES",
+        "fiscal_calendar": "monthly",
+    }
+    assert json.loads(json.dumps(manifest))["capability_descriptions"]["GeneralLedger"]["name"] == "GeneralLedger"
 
 
 def test_capability_dependency_planning_uses_provides_requires_contracts():
