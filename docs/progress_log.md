@@ -8580,3 +8580,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile capabilities/common/keym/views.py capabilities/common/keym/tests/test_views_runtime.py` passed.
 - `.venv/bin/python -m pytest -q capabilities/common/keym/tests/test_views_runtime.py` passed with 3 tests.
 - `rg -n "Get keys data \\(would integrate with actual service\\)|Placeholder data - would integrate with actual service|Placeholder - would integrate with actual service|Production API Key|Database Encryption Key|Legacy System Key|total_keys': 245|security_alerts': 7|usage_count': 1542" capabilities/common/keym/views.py capabilities/common/keym/tests/test_views_runtime.py` found no stale KEYM view placeholder rows or fixed demo API stats.
+
+### 2026-05-29 02:41 EAT
+
+Executable composition gateway load-balancer selection slice:
+
+- Replaced random least-connections endpoint selection with runtime-aware connection-count selection.
+- Least-connections now reads endpoint-local counters first and falls back to Redis `lb:connections:{endpoint_id}` metrics.
+- Added weighted least-connections routing that selects by active-connection-to-capacity ratio.
+- IP-hash routing without a client IP now uses stable endpoint ordering instead of randomness.
+- Removed the now-unused `random` import from the gateway service layer.
+- Added capability-local focused coverage for endpoint-local connection counts, Redis connection metrics, weight-aware selection, and stable no-client-IP fallback.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/service.py capabilities/composition/gateway/tests/test_load_balancer_runtime_selection.py` passed.
+- `.venv/bin/python -m pytest -q capabilities/composition/gateway/tests/test_load_balancer_runtime_selection.py` passed with 4 tests.
+- `rg -n "For now, return random endpoint|random\\.choice|import random" capabilities/composition/gateway/service.py capabilities/composition/gateway/tests/test_load_balancer_runtime_selection.py` found no stale random endpoint selection.

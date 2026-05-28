@@ -11,7 +11,6 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 import asyncio
 import json
 import time
-import random
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Union, Tuple
@@ -1023,6 +1022,8 @@ class LoadBalancerService:
 			selected = await self._weighted_round_robin_selection(available_endpoints, route_match.route_id)
 		elif algorithm == "least_connections":
 			selected = await self._least_connections_selection(available_endpoints)
+		elif algorithm == "weighted_least_connections":
+			selected = await self._weighted_least_connections_selection(available_endpoints)
 		elif algorithm == "ip_hash":
 			selected = await self._ip_hash_selection(available_endpoints, request_context.get("client_ip", ""))
 		else:
@@ -1100,24 +1101,85 @@ class LoadBalancerService:
 		endpoints: List[Dict[str, Any]]
 	) -> Dict[str, Any]:
 		"""Least connections endpoint selection."""
-		# In a real implementation, this would track active connections
-		# For now, return random endpoint
-		return random.choice(endpoints)
-	
+		connection_counts = []
+		for endpoint in endpoints:
+			connection_counts.append((await self._endpoint_connection_count(endpoint), endpoint))
+
+		return min(
+			connection_counts,
+			key=lambda item: (
+				item[0],
+				-(item[1].get("weight", 100) * item[1].get("service_weight", 100)),
+				self._endpoint_sort_key(item[1])
+			)
+		)[1]
+
+	async def _weighted_least_connections_selection(
+		self,
+		endpoints: List[Dict[str, Any]]
+	) -> Dict[str, Any]:
+		"""Select by lowest active-connections-to-weight ratio."""
+		scored_endpoints = []
+		for endpoint in endpoints:
+			connections = await self._endpoint_connection_count(endpoint)
+			weight = max(1, endpoint.get("weight", 100) * endpoint.get("service_weight", 100))
+			scored_endpoints.append((connections / weight, connections, endpoint))
+
+		return min(
+			scored_endpoints,
+			key=lambda item: (
+				item[0],
+				item[1],
+				self._endpoint_sort_key(item[2])
+			)
+		)[2]
+
+	async def _endpoint_connection_count(self, endpoint: Dict[str, Any]) -> int:
+		"""Read active connection count from endpoint data or Redis metrics."""
+		for field_name in ("active_connections", "connections", "in_flight_requests"):
+			if field_name in endpoint:
+				return max(0, int(endpoint.get(field_name) or 0))
+
+		endpoint_id = endpoint.get("endpoint_id")
+		if not endpoint_id or not hasattr(self.redis_client, "get"):
+			return 0
+
+		value = self.redis_client.get(f"lb:connections:{endpoint_id}")
+		if asyncio.iscoroutine(value):
+			value = await value
+		if value is None:
+			return 0
+		if isinstance(value, bytes):
+			value = value.decode()
+		try:
+			return max(0, int(value))
+		except (TypeError, ValueError):
+			return 0
+
 	async def _ip_hash_selection(
 		self,
 		endpoints: List[Dict[str, Any]],
 		client_ip: str
 	) -> Dict[str, Any]:
 		"""IP hash-based endpoint selection for session affinity."""
+		ordered_endpoints = sorted(endpoints, key=self._endpoint_sort_key)
 		if not client_ip:
-			return random.choice(endpoints)
-		
+			return ordered_endpoints[0]
+
 		# Use hash of client IP to consistently select endpoint
 		hash_value = int(hashlib.md5(client_ip.encode()).hexdigest(), 16)
-		index = hash_value % len(endpoints)
-		
-		return endpoints[index]
+		index = hash_value % len(ordered_endpoints)
+
+		return ordered_endpoints[index]
+
+	def _endpoint_sort_key(self, endpoint: Dict[str, Any]) -> Tuple[str, str, int, str]:
+		"""Stable endpoint sort key for deterministic tie-breaking."""
+		return (
+			str(endpoint.get("endpoint_id", "")),
+			str(endpoint.get("host", "")),
+			int(endpoint.get("port", 0) or 0),
+			str(endpoint.get("path", ""))
+		)
 
 # =============================================================================
 # Policy Engine Service
