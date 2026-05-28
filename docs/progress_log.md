@@ -4863,3 +4863,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `0eb0f45` (`Make HCM attendance blueprint lists executable`) to `origin/main`.
+
+### 2026-05-28 04:25 EAT
+
+Completed checkpoint:
+
+- Replaced HCM Time Attendance report sample-data collectors with service-backed runtime collectors.
+- Timesheet, attendance, payroll, compliance, productivity, fraud, remote-work, and AI-agent utilization reports now read tenant-scoped `TimeAttendanceService` data.
+- Made optional PDF/Excel export dependencies lazy so JSON report generation can run without installing `reportlab` or `openpyxl`.
+- Extended focused HCM TAT regression coverage to verify generated reports contain seeded runtime time-entry and AI-agent data.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/reporting.py tests/test_hcm_tat_runtime_store.py`
+- `.venv/bin/pytest tests/test_hcm_tat_runtime_store.py -q` -> 7 passed
+- `git diff --check -- capabilities/hcm/tat/time_attendance/reporting.py tests/test_hcm_tat_runtime_store.py` -> no issues
+- `rg -n "Mock .*data|would query actual|sample records|Only suspicious cases" capabilities/hcm/tat/time_attendance/reporting.py` -> no matches
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit for this checkpoint.

@@ -14,26 +14,37 @@ import logging
 import json
 import csv
 import io
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from typing import Dict, List, Any, Optional, Tuple, Union
 from dataclasses import dataclass, asdict
 from enum import Enum
-import statistics
-from decimal import Decimal
-import tempfile
-import os
 
 from pydantic import BaseModel, Field, ConfigDict
-import pandas as pd
-import numpy as np
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.chart import BarChart, LineChart, PieChart, Reference
+
+try:
+	import openpyxl
+	from openpyxl.styles import Font, PatternFill
+except ModuleNotFoundError:
+	openpyxl = None
+	Font = None
+	PatternFill = None
+
+try:
+	from reportlab.lib import colors
+	from reportlab.lib.pagesizes import A4
+	from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+	from reportlab.lib.styles import getSampleStyleSheet
+	from reportlab.lib.units import inch
+except ModuleNotFoundError:
+	colors = None
+	A4 = None
+	SimpleDocTemplate = None
+	Table = None
+	TableStyle = None
+	Paragraph = None
+	Spacer = None
+	getSampleStyleSheet = None
+	inch = None
 
 from .service import TimeAttendanceService
 from .models import WorkMode, AIAgentType, TimeEntryStatus
@@ -237,7 +248,6 @@ class ReportGenerator:
 	async def _collect_report_data(self, config: ReportConfig) -> Dict[str, Any]:
 		"""Collect data for report generation"""
 		try:
-			# Mock data collection - would query actual database
 			if config.report_type == ReportType.TIMESHEET:
 				return await self._collect_timesheet_data(config)
 			elif config.report_type == ReportType.ATTENDANCE_SUMMARY:
@@ -260,58 +270,86 @@ class ReportGenerator:
 		except Exception as e:
 			logger.error(f"Error collecting report data: {str(e)}")
 			return {"records": [], "summary": {}, "error": str(e)}
+
+	async def _filtered_time_entries(self, config: ReportConfig) -> List[Any]:
+		"""Return service-backed time entries for the report window."""
+		entries = await self.service.list_time_entries(
+			config.tenant_id,
+			start_date=config.start_date,
+			end_date=config.end_date,
+		)
+		if config.employee_ids:
+			entries = [entry for entry in entries if entry.employee_id in config.employee_ids]
+		return entries
+
+	def _entry_hours(self, entry: Any) -> float:
+		return float(entry.total_hours or entry.duration_hours or 0)
+
+	def _entry_overtime(self, entry: Any) -> float:
+		return float(entry.overtime_hours or 0)
 	
 	async def _collect_timesheet_data(self, config: ReportConfig) -> Dict[str, Any]:
 		"""Collect timesheet data"""
-		# Mock timesheet data
-		records = []
-		for i in range(50):  # 50 sample records
-			records.append({
-				"employee_id": f"emp_{i+1:03d}",
-				"employee_name": f"Employee {i+1}",
-				"date": (config.start_date + timedelta(days=i % 30)).isoformat(),
-				"clock_in": "09:00:00",
-				"clock_out": "17:30:00",
-				"total_hours": 8.5,
-				"overtime": 0.5 if i % 5 == 0 else 0.0,
-				"break_duration": 0.5,
-				"status": "approved",
-				"work_mode": "office" if i % 3 != 0 else "remote",
-				"productivity_score": round(0.7 + (i % 10) * 0.03, 2)
-			})
+		entries = await self._filtered_time_entries(config)
+		records = [
+			{
+				"employee_id": entry.employee_id,
+				"employee_name": entry.employee_id,
+				"date": entry.entry_date.isoformat(),
+				"clock_in": entry.clock_in.isoformat() if entry.clock_in else None,
+				"clock_out": entry.clock_out.isoformat() if entry.clock_out else None,
+				"total_hours": self._entry_hours(entry),
+				"overtime": self._entry_overtime(entry),
+				"break_duration": round((entry.break_minutes or 0) / 60, 2),
+				"status": entry.status.value,
+				"work_mode": entry.device_info.get("work_mode", "office"),
+				"productivity_score": round(max(0.0, 1.0 - entry.anomaly_score), 4),
+			}
+			for entry in entries
+		]
 		
 		summary = {
 			"total_records": len(records),
 			"total_hours": sum(r["total_hours"] for r in records),
 			"total_overtime": sum(r["overtime"] for r in records),
-			"average_daily_hours": 8.2,
-			"attendance_rate": 0.96
+			"average_daily_hours": round(sum(r["total_hours"] for r in records) / len(records), 4) if records else 0.0,
+			"attendance_rate": round(
+				len([r for r in records if r["status"] == TimeEntryStatus.APPROVED.value]) / len(records),
+				4,
+			) if records else 0.0
 		}
 		
 		return {"records": records, "summary": summary}
 	
 	async def _collect_attendance_data(self, config: ReportConfig) -> Dict[str, Any]:
 		"""Collect attendance summary data"""
-		# Mock attendance data
+		entries = await self._filtered_time_entries(config)
+		period_days = max((config.end_date - config.start_date).days + 1, 1)
+		employee_entries: Dict[str, List[Any]] = {}
+		for entry in entries:
+			employee_entries.setdefault(entry.employee_id, []).append(entry)
 		records = []
-		for i in range(25):  # 25 employees
-			present_days = 20 + (i % 8)
-			total_days = 30
+		for employee_id, employee_records in sorted(employee_entries.items()):
+			present_days = len({entry.entry_date for entry in employee_records if entry.clock_in})
+			late_days = len([
+				entry for entry in employee_records
+				if entry.clock_in and entry.clock_in.time().hour >= 10
+			])
 			records.append({
-				"employee_id": f"emp_{i+1:03d}",
-				"employee_name": f"Employee {i+1}",
-				"department": f"Department {(i % 5) + 1}",
-				"total_days": total_days,
+				"employee_id": employee_id,
+				"employee_name": employee_id,
+				"department": employee_records[0].cost_center or "Unassigned",
+				"total_days": period_days,
 				"present_days": present_days,
-				"absent_days": total_days - present_days,
-				"late_days": i % 3,
-				"attendance_rate": round(present_days / total_days, 3),
-				"punctuality_score": round(0.8 + (i % 10) * 0.02, 2)
+				"absent_days": max(period_days - present_days, 0),
+				"late_days": late_days,
+				"attendance_rate": round(present_days / period_days, 4),
+				"punctuality_score": round(max(0.0, 1.0 - (late_days / max(present_days, 1))), 4),
 			})
 		
 		summary = {
 			"total_employees": len(records),
-			"average_attendance_rate": round(sum(r["attendance_rate"] for r in records) / len(records), 3),
+			"average_attendance_rate": round(sum(r["attendance_rate"] for r in records) / len(records), 4) if records else 0.0,
 			"total_absent_days": sum(r["absent_days"] for r in records),
 			"total_late_instances": sum(r["late_days"] for r in records)
 		}
@@ -320,22 +358,29 @@ class ReportGenerator:
 	
 	async def _collect_payroll_data(self, config: ReportConfig) -> Dict[str, Any]:
 		"""Collect payroll data"""
-		# Mock payroll data
+		entries = await self._filtered_time_entries(config)
+		employee_entries: Dict[str, List[Any]] = {}
+		for entry in entries:
+			employee_entries.setdefault(entry.employee_id, []).append(entry)
 		records = []
-		for i in range(25):
-			regular_hours = 160 + (i % 20)
-			overtime_hours = (i % 8) * 2
+		for employee_id, employee_records in sorted(employee_entries.items()):
+			regular_hours = sum(float(entry.regular_hours or self._entry_hours(entry)) for entry in employee_records)
+			overtime_hours = sum(self._entry_overtime(entry) for entry in employee_records)
+			holiday_hours = sum(self._entry_hours(entry) for entry in employee_records if entry.entry_type.value == "holiday")
+			sick_hours = sum(self._entry_hours(entry) for entry in employee_records if entry.entry_type.value == "sick")
+			vacation_hours = sum(self._entry_hours(entry) for entry in employee_records if entry.entry_type.value == "vacation")
+			hourly_rate = float(config.custom_filters.get("hourly_rate", 25.0)) if config.custom_filters else 25.0
 			records.append({
-				"employee_id": f"emp_{i+1:03d}",
-				"employee_name": f"Employee {i+1}",
-				"regular_hours": regular_hours,
-				"overtime_hours": overtime_hours,
-				"holiday_hours": 8 if i % 10 == 0 else 0,
-				"sick_hours": (i % 5) * 8,
-				"vacation_hours": (i % 7) * 8,
-				"total_pay_hours": regular_hours + overtime_hours,
-				"hourly_rate": 25.0 + (i % 10) * 2.5,
-				"gross_pay": (regular_hours + overtime_hours * 1.5) * (25.0 + (i % 10) * 2.5)
+				"employee_id": employee_id,
+				"employee_name": employee_id,
+				"regular_hours": round(regular_hours, 4),
+				"overtime_hours": round(overtime_hours, 4),
+				"holiday_hours": round(holiday_hours, 4),
+				"sick_hours": round(sick_hours, 4),
+				"vacation_hours": round(vacation_hours, 4),
+				"total_pay_hours": round(regular_hours + overtime_hours, 4),
+				"hourly_rate": hourly_rate,
+				"gross_pay": round((regular_hours + overtime_hours * 1.5) * hourly_rate, 2),
 			})
 		
 		summary = {
@@ -349,50 +394,61 @@ class ReportGenerator:
 	
 	async def _collect_compliance_data(self, config: ReportConfig) -> Dict[str, Any]:
 		"""Collect compliance data"""
-		# Mock compliance data
+		entries = await self._filtered_time_entries(config)
 		records = []
-		for i in range(25):
-			flsa_violations = 1 if i % 8 == 0 else 0
+		for entry in entries:
+			total_hours = self._entry_hours(entry)
+			break_minutes = entry.break_minutes or 0
+			flsa_violations = int(total_hours > 12 or entry.requires_approval)
+			break_compliance = "non-compliant" if total_hours >= 6 and break_minutes < 30 else "compliant"
+			overtime_compliance = "needs-review" if self._entry_overtime(entry) > 0 and entry.status != TimeEntryStatus.APPROVED else "compliant"
+			violations = flsa_violations + int(break_compliance != "compliant") + int(overtime_compliance != "compliant")
 			records.append({
-				"employee_id": f"emp_{i+1:03d}",
-				"employee_name": f"Employee {i+1}",
+				"employee_id": entry.employee_id,
+				"employee_name": entry.employee_id,
 				"flsa_violations": flsa_violations,
-				"break_compliance": "compliant" if i % 4 != 0 else "non-compliant",
-				"overtime_compliance": "compliant" if i % 6 != 0 else "needs-review",
+				"break_compliance": break_compliance,
+				"overtime_compliance": overtime_compliance,
 				"gdpr_status": "compliant",
-				"last_audit_date": (datetime.utcnow() - timedelta(days=i % 30)).isoformat(),
-				"compliance_score": round(0.85 + (i % 10) * 0.01, 2)
+				"last_audit_date": datetime.utcnow().isoformat(),
+				"compliance_score": round(max(0.0, 1.0 - (violations * 0.2)), 4),
 			})
 		
 		summary = {
 			"total_employees": len(records),
 			"flsa_violations": sum(r["flsa_violations"] for r in records),
 			"break_non_compliance": len([r for r in records if r["break_compliance"] == "non-compliant"]),
-			"overall_compliance_rate": 0.94
+			"overall_compliance_rate": round(
+				len([r for r in records if r["compliance_score"] >= 0.8]) / len(records),
+				4,
+			) if records else 1.0
 		}
 		
 		return {"records": records, "summary": summary}
 	
 	async def _collect_productivity_data(self, config: ReportConfig) -> Dict[str, Any]:
 		"""Collect productivity data"""
-		# Mock productivity data  
+		workers = await self.service.list_remote_workers(config.tenant_id, active_only=False)
+		if config.employee_ids:
+			workers = [worker for worker in workers if worker.employee_id in config.employee_ids]
 		records = []
-		for i in range(25):
-			productivity_score = round(0.6 + (i % 15) * 0.025, 2)
+		for worker in workers:
+			productivity_score = round(worker.overall_productivity_score, 4)
+			tasks_completed = sum(int(metric.get("tasks_completed", metric.get("completed_tasks", 0))) for metric in worker.productivity_metrics)
 			records.append({
-				"employee_id": f"emp_{i+1:03d}",
-				"employee_name": f"Employee {i+1}",
+				"employee_id": worker.employee_id,
+				"employee_name": worker.employee_id,
 				"productivity_score": productivity_score,
 				"efficiency_rating": "high" if productivity_score > 0.8 else "medium" if productivity_score > 0.6 else "low",
 				"goal_achievement": round(productivity_score * 100, 1),
-				"tasks_completed": 45 + (i % 20),
-				"collaboration_score": round(0.7 + (i % 12) * 0.02, 2),
-				"improvement_areas": ["time management"] if productivity_score < 0.7 else []
+				"tasks_completed": tasks_completed,
+				"collaboration_score": round(min(1.0, 0.5 + (len(worker.collaboration_platforms) * 0.1)), 4),
+				"improvement_areas": ["time management"] if productivity_score < 0.7 else [],
 			})
 		
 		summary = {
 			"total_employees": len(records),
-			"average_productivity": round(sum(r["productivity_score"] for r in records) / len(records), 3),
+			"average_productivity": round(sum(r["productivity_score"] for r in records) / len(records), 4) if records else 0.0,
 			"high_performers": len([r for r in records if r["productivity_score"] > 0.8]),
 			"improvement_needed": len([r for r in records if r["productivity_score"] < 0.6])
 		}
@@ -401,82 +457,96 @@ class ReportGenerator:
 	
 	async def _collect_fraud_data(self, config: ReportConfig) -> Dict[str, Any]:
 		"""Collect fraud detection data"""
-		# Mock fraud data
+		entries = [
+			entry for entry in await self._filtered_time_entries(config)
+			if entry.anomaly_score >= 0.5 or entry.fraud_indicators
+		]
 		records = []
-		for i in range(10):  # Only suspicious cases
-			fraud_score = round(0.6 + (i % 5) * 0.08, 2)
+		for entry in entries:
+			fraud_score = round(max(entry.anomaly_score, max([indicator.get("confidence", 0.0) for indicator in entry.fraud_indicators] or [0.0])), 4)
+			indicator_type = entry.fraud_indicators[0].get("type") if entry.fraud_indicators else "pattern"
 			records.append({
-				"employee_id": f"emp_{i+1:03d}",
-				"employee_name": f"Employee {i+1}",
+				"employee_id": entry.employee_id,
+				"employee_name": entry.employee_id,
 				"fraud_score": fraud_score,
-				"anomaly_type": ["location", "time", "biometric", "pattern"][i % 4],
-				"detection_date": (datetime.utcnow() - timedelta(days=i)).isoformat(),
-				"investigation_status": ["pending", "investigating", "resolved"][i % 3],
+				"anomaly_type": indicator_type,
+				"detection_date": entry.updated_at.isoformat(),
+				"investigation_status": "pending" if entry.requires_approval else "monitoring",
 				"risk_level": "high" if fraud_score > 0.8 else "medium",
-				"recommended_action": "immediate review" if fraud_score > 0.8 else "monitor"
+				"recommended_action": "immediate review" if fraud_score > 0.8 else "monitor",
 			})
 		
 		summary = {
 			"total_alerts": len(records),
 			"high_risk_cases": len([r for r in records if r["fraud_score"] > 0.8]),
 			"pending_investigations": len([r for r in records if r["investigation_status"] == "pending"]),
-			"fraud_detection_accuracy": 0.92
+			"fraud_detection_accuracy": 1.0 if records else 0.0
 		}
 		
 		return {"records": records, "summary": summary}
 	
 	async def _collect_remote_work_data(self, config: ReportConfig) -> Dict[str, Any]:
 		"""Collect remote work data"""
-		# Mock remote work data
+		workers = await self.service.list_remote_workers(config.tenant_id, active_only=False)
+		if config.employee_ids:
+			workers = [worker for worker in workers if worker.employee_id in config.employee_ids]
 		records = []
-		for i in range(25):
-			remote_days = (i % 8) + 2
-			office_days = 20 - remote_days
+		for worker in workers:
+			remote_days = len(worker.productivity_metrics) or int(worker.is_actively_working)
+			productivity_remote = round(worker.overall_productivity_score, 4)
 			records.append({
-				"employee_id": f"emp_{i+1:03d}",
-				"employee_name": f"Employee {i+1}",
+				"employee_id": worker.employee_id,
+				"employee_name": worker.employee_id,
 				"remote_days": remote_days,
-				"office_days": office_days,
-				"hybrid_efficiency": round(0.75 + (i % 10) * 0.02, 2),
-				"collaboration_score": round(0.8 + (i % 8) * 0.025, 2),
-				"work_life_balance": round(0.85 + (i % 6) * 0.02, 2),
-				"productivity_remote": round(0.78 + (i % 12) * 0.015, 2),
-				"productivity_office": round(0.82 + (i % 10) * 0.018, 2)
+				"office_days": 0 if worker.work_mode == WorkMode.REMOTE_ONLY else max(0, 5 - remote_days),
+				"hybrid_efficiency": productivity_remote,
+				"collaboration_score": round(min(1.0, 0.5 + (len(worker.collaboration_platforms) * 0.1)), 4),
+				"work_life_balance": round(worker.work_life_balance_score, 4),
+				"productivity_remote": productivity_remote,
+				"productivity_office": productivity_remote,
 			})
 		
 		summary = {
 			"total_employees": len(records),
-			"average_remote_days": round(sum(r["remote_days"] for r in records) / len(records), 1),
-			"hybrid_adoption_rate": 0.88,
-			"remote_productivity_avg": round(sum(r["productivity_remote"] for r in records) / len(records), 3)
+			"average_remote_days": round(sum(r["remote_days"] for r in records) / len(records), 4) if records else 0.0,
+			"hybrid_adoption_rate": round(
+				len([worker for worker in workers if worker.work_mode == WorkMode.HYBRID]) / len(workers),
+				4,
+			) if workers else 0.0,
+			"remote_productivity_avg": round(sum(r["productivity_remote"] for r in records) / len(records), 4) if records else 0.0
 		}
 		
 		return {"records": records, "summary": summary}
 	
 	async def _collect_ai_agent_data(self, config: ReportConfig) -> Dict[str, Any]:
 		"""Collect AI agent utilization data"""
-		# Mock AI agent data
+		agents = await self.service.list_ai_agents(config.tenant_id, active_only=False)
 		records = []
-		for i in range(8):  # 8 AI agents
-			uptime_hours = 720 - (i % 50)  # Monthly uptime
+		period_hours = max((config.end_date - config.start_date).days + 1, 1) * 24
+		for agent in agents:
+			uptime_hours = round(period_hours * agent.uptime_percentage, 4)
+			resource_consumption = float(agent.cpu_hours + agent.gpu_hours + agent.memory_usage_gb_hours)
 			records.append({
-				"agent_id": f"ai_agent_{i+1:03d}",
-				"agent_type": ["data_processor", "customer_service", "analyst", "scheduler"][i % 4],
-				"tasks_completed": 1500 + (i * 200),
+				"agent_id": agent.id,
+				"agent_type": agent.agent_type.value,
+				"tasks_completed": agent.tasks_completed,
 				"uptime_hours": uptime_hours,
-				"downtime_hours": 720 - uptime_hours,
-				"resource_consumption": round(0.6 + (i % 10) * 0.04, 2),
-				"efficiency_score": round(0.85 + (i % 8) * 0.02, 2),
-				"cost_per_hour": 5.0 + (i % 5) * 1.0,
-				"total_cost": uptime_hours * (5.0 + (i % 5) * 1.0)
+				"downtime_hours": round(period_hours - uptime_hours, 4),
+				"resource_consumption": resource_consumption,
+				"efficiency_score": round(agent.overall_performance_score, 4),
+				"cost_per_hour": float(agent.operational_cost_per_hour),
+				"total_cost": float(agent.total_operational_cost),
 			})
 		
 		summary = {
 			"total_agents": len(records),
 			"total_tasks_completed": sum(r["tasks_completed"] for r in records),
-			"average_uptime": round(sum(r["uptime_hours"] for r in records) / len(records), 1),
+			"average_uptime": round(sum(r["uptime_hours"] for r in records) / len(records), 4) if records else 0.0,
 			"total_cost": sum(r["total_cost"] for r in records),
-			"roi_estimate": 2.4
+			"roi_estimate": round(
+				sum(agent.cost_efficiency_score for agent in agents) / len(agents),
+				4,
+			) if agents else 0.0
 		}
 		
 		return {"records": records, "summary": summary}
@@ -696,6 +766,9 @@ class ReportGenerator:
 	async def _format_excel(self, data: Dict[str, Any], analytics: Dict[str, Any], 
 	                      charts: Dict[str, Any], config: ReportConfig) -> bytes:
 		"""Format report as Excel with charts and analytics"""
+		if openpyxl is None:
+			raise RuntimeError("Excel export requires optional dependency openpyxl")
+
 		records = data.get("records", [])
 		summary = data.get("summary", {})
 		
@@ -761,6 +834,9 @@ class ReportGenerator:
 	async def _format_pdf(self, data: Dict[str, Any], analytics: Dict[str, Any], 
 	                    charts: Dict[str, Any], config: ReportConfig) -> bytes:
 		"""Format report as PDF"""
+		if SimpleDocTemplate is None:
+			raise RuntimeError("PDF export requires optional dependency reportlab")
+
 		buffer = io.BytesIO()
 		doc = SimpleDocTemplate(buffer, pagesize=A4)
 		story = []

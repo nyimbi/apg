@@ -26,6 +26,13 @@ from capabilities.hcm.tat.time_attendance.models import (
 	ProductivityMetric,
 	WorkMode,
 )
+from capabilities.hcm.tat.time_attendance.reporting import (
+	ReportConfig,
+	ReportFormat,
+	ReportGenerator,
+	ReportPeriod,
+	ReportType,
+)
 from capabilities.hcm.tat.time_attendance.service import TimeAttendanceService
 
 
@@ -230,6 +237,49 @@ def test_flask_blueprint_lists_use_service_runtime_store():
 	assert ai_agents.status_code == 200
 	assert ai_agents.json["data"]["total"] == 1
 	assert ai_agents.json["data"]["ai_agents"][0]["agent_name"] == "Codex"
+
+
+def test_reporting_generator_uses_service_runtime_store():
+	TimeAttendanceService.reset_runtime_store()
+	service = TimeAttendanceService()
+	_run(_seed_runtime(service, tenant_id="tenant_reporting"))
+	generator = ReportGenerator(service)
+	start = date.today() - timedelta(days=7)
+	end = date.today() + timedelta(days=1)
+
+	timesheet = _run(
+		generator.generate_report(
+			ReportConfig(
+				report_type=ReportType.TIMESHEET,
+				format=ReportFormat.JSON,
+				period=ReportPeriod.CUSTOM,
+				start_date=start,
+				end_date=end,
+				tenant_id="tenant_reporting",
+			),
+			"admin",
+		)
+	)
+	ai_agents = _run(
+		generator.generate_report(
+			ReportConfig(
+				report_type=ReportType.AI_AGENT_UTILIZATION,
+				format=ReportFormat.JSON,
+				period=ReportPeriod.CUSTOM,
+				start_date=start,
+				end_date=end,
+				tenant_id="tenant_reporting",
+			),
+			"admin",
+		)
+	)
+
+	assert timesheet["success"] is True
+	assert timesheet["data"]["report_data"]["summary"]["total_records"] == 1
+	assert timesheet["data"]["report_data"]["records"][0]["employee_id"] == "emp_001"
+	assert ai_agents["success"] is True
+	assert ai_agents["data"]["report_data"]["summary"]["total_agents"] == 1
+	assert ai_agents["data"]["report_data"]["summary"]["total_tasks_completed"] == 1
 
 
 def test_time_attendance_service_has_no_missing_private_helper_calls():
