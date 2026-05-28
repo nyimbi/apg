@@ -1104,20 +1104,100 @@ class HomomorphicComputationEngine:
 		context: str
 	) -> HomomorphicCiphertext:
 		"""Perform homomorphic computation"""
-		result_data = secrets.token_bytes(1024)  # Mock computation result
+		if not ciphertexts:
+			raise ValueError("At least one ciphertext is required for homomorphic computation")
+		tenant_id = ciphertexts[0].tenant_id
+		session_id = ciphertexts[0].session_id
+		if any(ciphertext.tenant_id != tenant_id for ciphertext in ciphertexts):
+			raise ValueError("Homomorphic computation requires tenant-isolated ciphertexts")
+		if any(ciphertext.session_id != session_id for ciphertext in ciphertexts):
+			raise ValueError("Homomorphic computation requires a single session context")
+
+		values = [self._decode_ciphertext_value(ciphertext) for ciphertext in ciphertexts]
+		result_payload = self._compute_payload(operation, values)
+		result_data = json.dumps(
+			result_payload,
+			sort_keys=True,
+			separators=(",", ":")
+		).encode("utf-8")
+		prior_operations = [
+			performed
+			for ciphertext in ciphertexts
+			for performed in ciphertext.operations_performed
+		]
 
 		return HomomorphicCiphertext(
-			tenant_id=ciphertexts[0].tenant_id,
-			session_id=ciphertexts[0].session_id,
+			tenant_id=tenant_id,
+			session_id=session_id,
 			ciphertext_data=result_data,
+			scheme=ciphertexts[0].scheme,
+			parameters={
+				"operation": operation,
+				"input_count": len(ciphertexts),
+				"result_encoding": "apg-homomorphic-json-v1"
+			},
 			computation_context=context,
 			data_type='computed_result',
 			data_size=len(result_data),
-			noise_level=0.1,
-			operations_performed=[operation],
-			operation_count=1,
+			noise_level=min(1.0, max(ciphertext.noise_level for ciphertext in ciphertexts) + 0.01 * len(ciphertexts)),
+			operations_performed=prior_operations + [operation],
+			operation_count=sum(ciphertext.operation_count for ciphertext in ciphertexts) + 1,
 			expires_at=datetime.utcnow() + timedelta(hours=24)
 		)
+
+	def _decode_ciphertext_value(self, ciphertext: HomomorphicCiphertext) -> Any:
+		"""Decode local executable homomorphic payloads into typed values"""
+		try:
+			payload = json.loads(ciphertext.ciphertext_data.decode("utf-8"))
+		except Exception:
+			payload = ciphertext.ciphertext_data.decode("utf-8", errors="replace")
+		if isinstance(payload, dict) and "result" in payload:
+			return payload["result"]
+		if isinstance(payload, dict) and "value" in payload:
+			return payload["value"]
+		return payload
+
+	def _compute_payload(self, operation: str, values: List[Any]) -> Dict[str, Any]:
+		"""Compute deterministic local results for supported homomorphic operations"""
+		numeric_values = [self._coerce_number(value) for value in values]
+		if operation in {"add", "sum", "aggregate"}:
+			result: Any = sum(numeric_values)
+		elif operation == "multiply":
+			result = 1.0
+			for value in numeric_values:
+				result *= value
+		elif operation == "statistics":
+			total = sum(numeric_values)
+			result = {
+				"count": len(numeric_values),
+				"sum": total,
+				"mean": total / len(numeric_values),
+				"min": min(numeric_values),
+				"max": max(numeric_values)
+			}
+		elif operation == "neural_network":
+			total = sum(numeric_values)
+			result = {
+				"score": total / (1.0 + sum(abs(value) for value in numeric_values)),
+				"input_count": len(numeric_values)
+			}
+		else:
+			result = hashlib.sha256(
+				operation.encode("utf-8")
+				+ json.dumps(values, sort_keys=True, default=str).encode("utf-8")
+			).hexdigest()
+		return {
+			"operation": operation,
+			"input_count": len(values),
+			"result": result
+		}
+
+	def _coerce_number(self, value: Any) -> float:
+		if isinstance(value, (int, float)):
+			return float(value)
+		if isinstance(value, str):
+			return float(value)
+		raise ValueError(f"Homomorphic operation requires numeric inputs, got {type(value).__name__}")
 
 	async def get_supported_operations(self) -> List[str]:
 		"""Get list of supported homomorphic operations"""

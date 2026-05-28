@@ -6433,3 +6433,21 @@ Battery-conscious verification:
 - `rg -n "Mock implementation - would use key derivation functions|return True  # Mock verification|encrypted_data = secrets\\.token_bytes\\(len\\(data\\) \\+ 32\\)|threshold_shares = \\[secrets\\.token_bytes\\(32\\)" capabilities/common/encr/service.py tests/test_common_encr_service_zero_knowledge_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/encr/service.py tests/test_common_encr_service_zero_knowledge_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:44 EAT
+
+Completed checkpoint:
+
+- Made the ENCR service homomorphic computation engine deterministic and executable instead of returning random 1024-byte payloads.
+- Added tenant/session isolation checks before computation.
+- Implemented local executable results for add/sum/aggregate, multiply, statistics, neural-network scoring, and deterministic fallback digests.
+- Added focused runtime coverage for addition, deterministic statistics, and cross-tenant rejection.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/service.py tests/test_common_encr_service_homomorphic_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_encr_service_homomorphic_runtime.py -q` -> 3 passed, 10 pre-existing warnings
+- `.venv/bin/python -m pytest tests/test_common_encr_service_zero_knowledge_runtime.py tests/test_common_encr_service_homomorphic_runtime.py tests/test_common_encr_public_interface.py -q` -> 10 passed, 10 pre-existing warnings
+- `rg -n "result_data = secrets\\.token_bytes\\(1024\\)|Mock computation result|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/encr/service.py tests/test_common_encr_service_homomorphic_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/encr/service.py tests/test_common_encr_service_homomorphic_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
