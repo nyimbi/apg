@@ -1091,8 +1091,57 @@ def _ui_record_editor_input_html(field: Dict[str, Any], record: Dict[str, Any], 
     return f'<input form="{{safe_form_id}}" name="{{safe_name}}" value="{{safe_value}}" {{attributes}}>'
 
 
-def _ui_records_table_html(entity_name: str) -> str:
-    records = list_records(entity_name)
+def _ui_query_value(query: Dict[str, list[str]], name: str) -> str:
+    values = query.get(name)
+    return str(values[-1]) if values else ""
+
+
+def _ui_records_query_form_html(entity_name: str, query: Dict[str, list[str]]) -> str:
+    safe_entity_path = html.escape(quote(entity_name, safe=""), quote=True)
+    fields = _field_specs(entity_name)
+    filter_inputs = []
+    for field in fields:
+        field_name = str(field["name"])
+        input_name = f"filter.{{field_name}}"
+        safe_input_name = html.escape(input_name, quote=True)
+        safe_label = html.escape(field_name)
+        safe_value = html.escape(_ui_query_value(query, input_name), quote=True)
+        filter_inputs.append(
+            f'<label>{{safe_label}} <input type="text" name="{{safe_input_name}}" value="{{safe_value}}"></label>'
+        )
+    sort_options = ["", "id", "_revision"] + [
+        str(field["name"]) for field in fields if str(field["name"]) not in {{"id", "_revision"}}
+    ]
+    selected_sort = _ui_query_value(query, "sort")
+    sort_select = "".join(
+        f'<option value="{{html.escape(option, quote=True)}}"{{" selected" if option == selected_sort else ""}}>'
+        f'{{html.escape(option or "none")}}</option>'
+        for option in sort_options
+    )
+    selected_order = (_ui_query_value(query, "order") or "asc").lower()
+    order_select = "".join(
+        f'<option value="{{option}}"{{" selected" if option == selected_order else ""}}>{{option}}</option>'
+        for option in ["asc", "desc"]
+    )
+    limit_value = html.escape(_ui_query_value(query, "limit"), quote=True)
+    offset_value = html.escape(_ui_query_value(query, "offset"), quote=True)
+    filters = "".join(filter_inputs) or "<span>No fields available.</span>"
+    return (
+        f'<form method="get" action="/ui/entities/{{safe_entity_path}}">'
+        f'<fieldset><legend>Query records</legend>'
+        f"{{filters}}"
+        f'<label>Sort <select name="sort">{{sort_select}}</select></label>'
+        f'<label>Order <select name="order">{{order_select}}</select></label>'
+        f'<label>Limit <input type="number" min="0" step="1" name="limit" value="{{limit_value}}"></label>'
+        f'<label>Offset <input type="number" min="0" step="1" name="offset" value="{{offset_value}}"></label>'
+        '<button type="submit">Apply</button> '
+        f'<a href="/ui/entities/{{safe_entity_path}}">Reset</a>'
+        '</fieldset></form>'
+    )
+
+
+def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None) -> str:
+    records = records if records is not None else list_records(entity_name)
     if not records:
         return "<p>No records yet.</p>"
     fields = _field_specs(entity_name)
@@ -1130,15 +1179,21 @@ def _ui_records_table_html(entity_name: str) -> str:
     return f"<table><thead><tr>{{header}}<th>Actions</th></tr></thead><tbody>{{''.join(rows)}}</tbody></table>"
 
 
-def _ui_entity_html(entity_name: str, notice: str = "") -> tuple[int, str]:
+def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[str]] | None = None) -> tuple[int, str]:
     entity = _entity_spec(entity_name)
     if entity is None:
         return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
+    query = query or {{}}
+    query_result = query_records(entity_name, query)
     safe_entity = html.escape(entity_name, quote=True)
     fields = _field_specs(entity_name) or [{{"name": "value", "type": "string", "required": True}}]
     inputs = "".join(_ui_field_input_html(field) for field in fields)
-    records_table = _ui_records_table_html(entity_name)
-    records_json = html.escape(json.dumps(list_records(entity_name), indent=2, sort_keys=True))
+    query_form = _ui_records_query_form_html(entity_name, query)
+    records_table = _ui_records_table_html(entity_name, query_result["records"])
+    records_json = html.escape(json.dumps(query_result["records"], indent=2, sort_keys=True))
+    result_summary = (
+        f'<p>Showing {{query_result["count"]}} of {{query_result["total"]}} matching records.</p>'
+    )
     notice_html = f'<section role="alert"><strong>{{html.escape(notice)}}</strong></section>' if notice else ""
     body = (
         f'<nav><a href="/ui">Application</a> | '
@@ -1151,6 +1206,8 @@ def _ui_entity_html(entity_name: str, notice: str = "") -> tuple[int, str]:
         '<button type="submit">Create record</button>'
         "</form>"
         "<h2>Records</h2>"
+        f"{{query_form}}"
+        f"{{result_summary}}"
         f"{{records_table}}"
         "<details><summary>Record JSON</summary>"
         f"<pre>{{records_json}}</pre>"
@@ -1185,12 +1242,12 @@ def _ui_error_payload(path: str, response: Dict[str, Any]) -> str:
     return _html_page("Form error", f"<h1>Form error</h1><p>{{html.escape(message)}}</p><pre>{{details}}</pre>")
 
 
-def _ui_payload(path: str) -> tuple[int, str]:
+def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, str]:
     parts = [part for part in path.split("/") if part]
     if parts == ["ui"]:
         return 200, _ui_index_html()
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
-        return _ui_entity_html(parts[2])
+        return _ui_entity_html(parts[2], query=query)
     return 404, _html_page("Not found", f"<h1>Not found</h1><p>{{html.escape(path)}}</p>")
 
 
@@ -1751,7 +1808,7 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
             status = 200
             content_type = "text/css; charset=utf-8"
         elif path == "/ui" or path.startswith("/ui/"):
-            status, html_payload = _ui_payload(path)
+            status, html_payload = _ui_payload(path, query)
             body = html_payload.encode("utf-8")
             content_type = "text/html; charset=utf-8"
         elif _capability_screen(path) is not None:

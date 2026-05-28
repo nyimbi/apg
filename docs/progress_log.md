@@ -5900,3 +5900,22 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `b192b85` (`Document generated browser application flow`) to `origin/main`.
+
+### 2026-05-28 08:39 EAT
+
+Completed checkpoint:
+
+- Made generated entity browser screens use the same record query engine as the JSON API.
+- Generated entity screens now include dependency-free query controls for field filters, sort field, order, limit, and offset.
+- Generated record tables and expandable JSON now render the active query result instead of always showing the full store.
+- Added focused regression coverage for browser filtering with multiple records, sorted/limited query parameters, preserved filter values, HTML content type, and exclusion of non-matching records.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 18 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.

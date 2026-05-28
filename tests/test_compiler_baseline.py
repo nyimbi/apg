@@ -649,6 +649,21 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 			updated_ui = response.read().decode("utf-8")
 		with urllib.request.urlopen(f"{base_url}/entities/InventoryItem/records/1", timeout=1) as response:
 			updated = json.loads(response.read().decode("utf-8"))
+		second_request = urllib.request.Request(
+			f"{base_url}/entities/InventoryItem/records",
+			data=json.dumps({"record": {"name": "Widget Spare", "quantity": 1, "active": True}}).encode("utf-8"),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		with urllib.request.urlopen(second_request, timeout=1) as response:
+			second_created = json.loads(response.read().decode("utf-8"))
+		query_url = (
+			f"{base_url}/ui/entities/InventoryItem?"
+			+ urllib.parse.urlencode({"filter.name": "Widget Pro", "sort": "quantity", "order": "desc", "limit": "1"})
+		)
+		with urllib.request.urlopen(query_url, timeout=1) as response:
+			queried_content_type = response.headers["Content-Type"]
+			queried_ui = response.read().decode("utf-8")
 		delete_data = urllib.parse.urlencode({"expected_revision": "2"}).encode("utf-8")
 		delete_request = urllib.request.Request(
 			f"{base_url}/ui/entities/InventoryItem/records/1/delete",
@@ -672,6 +687,8 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 	assert 'type="hidden" name="active" value="false"' in entity_ui
 	assert 'type="checkbox" name="active" value="true"' in entity_ui
 	assert 'action="/ui/entities/InventoryItem/records"' in entity_ui
+	assert 'name="filter.name"' in entity_ui
+	assert "Query records" in entity_ui
 	assert invalid_status == 422
 	assert invalid_content_type.startswith("text/html")
 	assert 'role="alert"' in invalid_ui
@@ -684,8 +701,14 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 	assert created["record"] == {"id": 1, "_revision": 1, "name": "Widget", "quantity": 7, "active": True}
 	assert "Widget Pro" in updated_ui
 	assert updated["record"] == {"id": 1, "_revision": 2, "name": "Widget Pro", "quantity": 8, "active": False}
-	assert "Widget" not in deleted_ui
-	assert records_after_delete["records"] == []
+	assert queried_content_type.startswith("text/html")
+	assert 'value="Widget Pro"' in queried_ui
+	assert "Showing 1 of 1 matching records." in queried_ui
+	assert "Widget Pro" in queried_ui
+	assert "Widget Spare" not in queried_ui
+	assert "Widget Pro" not in deleted_ui
+	assert "Widget Spare" in deleted_ui
+	assert records_after_delete["records"] == [second_created["record"]]
 
 
 def test_generated_python_app_supports_optimistic_record_revisions():
