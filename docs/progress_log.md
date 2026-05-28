@@ -7744,3 +7744,23 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_studio_snapshot_projects_dsl_into_designer_panels tests/test_compiler_baseline.py::test_studio_visual_edit_plan_adds_field_without_writing tests/test_compiler_baseline.py::test_studio_visual_edit_rejects_unknown_table tests/test_compiler_baseline.py::test_cli_studio_snapshot_and_plan_edit_json -q` -> 4 passed
 - `.venv/bin/apg studio snapshot examples/02_customer_orders_relationship/main.apg --json` -> emitted `apg.studio-snapshot.v1`
 - `.venv/bin/apg studio plan-edit examples/02_customer_orders_relationship/main.apg --edit-json '{"operation":"add_field","table":"Customer","name":"phone","type":"str"}' --json` -> emitted `apg.studio-edit-plan.v1` with a dry-run field-add diff and no file write
+
+### 2026-05-28 21:10 EAT
+
+In progress:
+
+- Followed the tooling specification's compiler bed-down gate by continuing repository hygiene around executable compiler baseline artifacts.
+- Moved tracked source-root operational markdown notes into `docs/archive/source-root-notes/`.
+- Added a repository hygiene guard so completion, status, summary, and plan markdown files do not return directly under source roots such as `capabilities/`, `gen/`, or `mobile_apps/`.
+
+Verification planned before commit:
+
+- Compile the updated repository hygiene test.
+- Run only the focused hygiene checks for root docs/tests and source-root operational markdown placement.
+- Check whitespace on the moved docs, progress log, and test update.
+
+Verification result:
+
+- `.venv/bin/python -m py_compile tests/test_repository_hygiene.py` passed.
+- `.venv/bin/python -m pytest tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories tests/test_repository_hygiene.py::test_operational_markdown_lives_under_docs_archive -q` passed with 2 tests.
+- `git diff --check -- tests/test_repository_hygiene.py docs/progress_log.md docs/archive/source-root-notes/capabilities/COMMON_ERP_REORGANIZATION_COMPLETE.md docs/archive/source-root-notes/capabilities/COMMON_REORGANIZATION_PLAN.md docs/archive/source-root-notes/capabilities/REORGANIZATION_COMPLETE.md docs/archive/source-root-notes/mobile_apps/IMPLEMENTATION_COMPLETE.md` passed.

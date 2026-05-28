@@ -8,6 +8,14 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_ROOT_MARKDOWN = {"README.md"}
+SOURCE_ROOT_OPERATIONAL_DOC_DIRECTORIES = {"capabilities", "gen", "mobile_apps"}
+SOURCE_ROOT_OPERATIONAL_DOC_SUFFIXES = (
+	"_COMPLETE.md",
+	"_COMPLETION.md",
+	"_PLAN.md",
+	"_SUMMARY.md",
+	"_STATUS.md",
+)
 FORBIDDEN_STREAMING_RUNTIME_TERMS = (
 	"kafka",
 	"confluent",
@@ -125,6 +133,18 @@ def test_root_tests_and_docs_stay_in_expected_directories():
 			or path.endswith("_test.py")
 			or (path.endswith(".md") and path not in ALLOWED_ROOT_MARKDOWN)
 		)
+	]
+
+	assert misplaced == []
+
+
+def test_operational_markdown_lives_under_docs_archive():
+	misplaced = [
+		path for path in _tracked_files()
+		if Path(path).parent.as_posix() in SOURCE_ROOT_OPERATIONAL_DOC_DIRECTORIES
+		and Path(path).suffix == ".md"
+		and Path(path).name != "README.md"
+		and Path(path).name.endswith(SOURCE_ROOT_OPERATIONAL_DOC_SUFFIXES)
 	]
 
 	assert misplaced == []
