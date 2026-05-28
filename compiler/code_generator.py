@@ -217,6 +217,7 @@ class PythonCodeGenerator:
 									"nullable": column.is_nullable,
 									"default": column.default_value,
 									"constraints": list(column.constraints),
+									**({"reference": dict(column.reference)} if column.reference else {}),
 								}
 								for column in table.columns
 							],
@@ -1088,12 +1089,70 @@ def relationship_graph() -> Dict[str, Any]:
         {{"id": str(entity["name"]), "name": str(entity["name"]), "type": str(entity["type"])}}
         for entity in ENTITIES
     ]
+    table_nodes_by_name: Dict[str, str] = {{}}
+    for entity in ENTITIES:
+        database_name = str(entity["name"])
+        for schema in entity.get("schemas", []):
+            schema_name = str(schema.get("name", "default"))
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                if not table_name:
+                    continue
+                node_id = f"{{database_name}}.{{schema_name}}.{{table_name}}"
+                nodes.append({{
+                    "id": node_id,
+                    "name": table_name,
+                    "type": "database_table",
+                    "database": database_name,
+                    "schema": schema_name,
+                }})
+                table_nodes_by_name[table_name.lower()] = node_id
+                table_nodes_by_name[f"{{schema_name}}.{{table_name}}".lower()] = node_id
     entity_names = {{str(entity["name"]) for entity in ENTITIES}}
     entity_names_by_lower = {{name.lower(): name for name in entity_names}}
     edges: list[Dict[str, Any]] = []
     seen_edges: set[tuple[str, str, str, str]] = set()
     for entity in ENTITIES:
         source = str(entity["name"])
+        for schema in entity.get("schemas", []):
+            schema_name = str(schema.get("name", "default"))
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                if not table_name:
+                    continue
+                table_node = f"{{source}}.{{schema_name}}.{{table_name}}"
+                contains_key = (source, table_node, schema_name, "contains_table")
+                if contains_key not in seen_edges:
+                    edges.append({{
+                        "from": source,
+                        "to": table_node,
+                        "field": schema_name,
+                        "relationship": "contains_table",
+                    }})
+                    seen_edges.add(contains_key)
+                for column in table.get("columns", []):
+                    reference = column.get("reference") if isinstance(column, dict) else None
+                    if not isinstance(reference, dict):
+                        continue
+                    target_table = str(reference.get("table", ""))
+                    target = table_nodes_by_name.get(target_table.lower())
+                    if not target:
+                        continue
+                    edge_key = (
+                        table_node,
+                        target,
+                        str(column.get("name", "")),
+                        str(reference.get("relationship", "db_ref")),
+                    )
+                    if edge_key not in seen_edges:
+                        edges.append({{
+                            "from": table_node,
+                            "to": target,
+                            "field": str(column.get("name", "")),
+                            "relationship": str(reference.get("relationship", "db_ref")),
+                            "target_column": str(reference.get("column", "")),
+                        }})
+                        seen_edges.add(edge_key)
         for field in _field_specs(source):
             field_name = str(field["name"])
             field_type = str(field.get("type", ""))

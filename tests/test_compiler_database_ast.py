@@ -22,6 +22,7 @@ db LedgerDB {
         table journals {
             id serial [pk]
             external_id varchar(64) [unique, not null]
+            account_id int [ref: > accounts.id, not null]
             amount decimal(12,2) [not null, default: 0]
             created_at timestamp [default: now()]
 
@@ -29,6 +30,11 @@ db LedgerDB {
                 (external_id) [unique, name: "idx_journals_external_id"]
                 (created_at) [type: btree]
             }
+        }
+
+        table accounts {
+            id serial [pk]
+            code varchar(32) [unique, not null]
         }
     }
 }
@@ -65,12 +71,21 @@ def test_source_database_builds_typed_ast_with_config_schema_and_indexes():
 	assert [column.name for column in table.columns] == [
 		"id",
 		"external_id",
+		"account_id",
 		"amount",
 		"created_at",
 	]
 	assert table.columns[0].is_primary_key is True
 	assert table.columns[1].is_nullable is False
-	assert table.columns[2].default_value == "0"
+	assert table.columns[2].reference == {
+		"kind": ">",
+		"relationship": "many_to_one",
+		"table": "accounts",
+		"column": "id",
+		"target": "accounts.id",
+	}
+	assert table.columns[2].is_nullable is False
+	assert table.columns[3].default_value == "0"
 	assert table.indexes[0].name == "idx_journals_external_id"
 	assert table.indexes[0].columns == ["external_id"]
 	assert table.indexes[0].is_unique is True
@@ -111,9 +126,25 @@ def test_generated_python_metadata_preserves_database_schema_details():
 		"default": None,
 		"constraints": ["pk"],
 	}
+	assert database["schemas"][0]["tables"][0]["columns"][2]["reference"] == {
+		"kind": ">",
+		"relationship": "many_to_one",
+		"table": "accounts",
+		"column": "id",
+		"target": "accounts.id",
+	}
 	assert database["schemas"][0]["tables"][0]["indexes"][0] == {
 		"name": "idx_journals_external_id",
 		"columns": ["external_id"],
 		"unique": True,
 		"type": None,
 	}
+
+	relationship_edges = namespace["relationship_graph"]()["edges"]
+	assert {
+		"from": "LedgerDB.accounting.journals",
+		"to": "LedgerDB.accounting.accounts",
+		"field": "account_id",
+		"relationship": "many_to_one",
+		"target_column": "id",
+	} in relationship_edges

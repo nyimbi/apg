@@ -6911,3 +6911,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 3 passed
 - `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:35 EAT
+
+Completed checkpoint:
+
+- Made DBML column references executable by parsing `ref: > table.column` options into typed column reference metadata.
+- Generated database metadata now includes parsed reference details for referenced columns instead of leaving relationships only as opaque constraint strings.
+- Extended generated `relationship_graph()` so database schemas produce table nodes, database-to-table containment edges, and table-to-table reference edges.
+- Added focused regression coverage proving parsed APG database relationships survive into generated Python runtime metadata and relationship graph output.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/ast_builder.py compiler/code_generator.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_parser.py::TestAPGParser::test_database_parsing tests/test_semantic_analyzer.py::TestSemanticAnalyzer::test_database_validation -q` -> 2 passed, 1 pre-existing warning
+- `git diff --check compiler/ast_builder.py compiler/code_generator.py tests/test_compiler_database_ast.py`
+- Deferred broader pytest at the user's request to conserve battery.

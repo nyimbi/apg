@@ -417,6 +417,7 @@ class ColumnDeclaration(ASTNode):
 	is_nullable: bool = True
 	default_value: Optional[Any] = None
 	constraints: List[str] = field(default_factory=list)
+	reference: Optional[Dict[str, str]] = None
 
 
 @dataclass
@@ -827,6 +828,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				is_nullable=not ("not null" in nullable_text or "not null" in constraint_text),
 				default_value=self._extract_source_option_value(constraints, "default"),
 				constraints=constraints,
+				reference=self._extract_source_reference(constraints),
 				source_file=source_file,
 			))
 		return columns
@@ -1021,6 +1023,30 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		for option in options:
 			if option.startswith(prefix):
 				return option[len(prefix):].strip().strip("'\"")
+		return None
+
+	def _extract_source_reference(self, options: List[str]) -> Optional[Dict[str, str]]:
+		"""Extract a DBML column reference option."""
+		for option in options:
+			match = re.match(
+				r"ref\s*:\s*(?P<kind><>|>|<|-)\s*(?P<table>[^\W\d]\w*)\.(?P<column>[^\W\d]\w*)$",
+				option,
+				flags=re.UNICODE,
+			)
+			if not match:
+				continue
+			return {
+				"kind": match.group("kind"),
+				"relationship": {
+					">": "many_to_one",
+					"<": "one_to_many",
+					"-": "one_to_one",
+					"<>": "many_to_many",
+				}.get(match.group("kind"), "references"),
+				"table": match.group("table"),
+				"column": match.group("column"),
+				"target": f"{match.group('table')}.{match.group('column')}",
+			}
 		return None
 
 	def _parse_source_parameters(self, params: str, source_file: Optional[str]) -> List[Parameter]:
