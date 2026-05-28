@@ -31,6 +31,7 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 ### Capabilities & Features
 - [Capabilities Overview](./capabilities/README.md) - Complete capability catalog
 - [Executable Capability Contracts](./capability_contracts.md) - Configuration, rule-engine, UI, and theme contract registry
+- [Screen Composition](./screen_composition.md) - First-class screen contracts, UI relationships, and generated composition graphs
 - [AI Agent Composition](./ai_agent_composition.md) - First-class AI agents, swarms, handoffs, and generated runtime manifests
 - [Proposed Capability Architecture](./proposed_capability_architecture.md) - Capability boundaries and platform architecture
 - [Marketplace Microservices Guide](./marketplace_microservices_guide.md) - Marketplace service design and integration
@@ -53,7 +54,7 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 |----------|---------------|
 | **Getting Started** | [Installation](./installation.md) → [Quick Start](./quickstart.md) |
 | **Core Platform** | [Architecture](./architecture.md) → [Language Reference](./language_reference.md) → [API Reference](./api/README.md) |
-| **Capabilities** | [Capabilities](./capabilities/README.md) → [Capability Contracts](./capability_contracts.md) → [AI Agent Composition](./ai_agent_composition.md) → [Marketplace Guide](./marketplace_microservices_guide.md) |
+| **Capabilities** | [Capabilities](./capabilities/README.md) → [Capability Contracts](./capability_contracts.md) → [Screen Composition](./screen_composition.md) → [AI Agent Composition](./ai_agent_composition.md) → [Marketplace Guide](./marketplace_microservices_guide.md) |
 | **Planning** | [Roadmaps](./roadmaps/) → [Specifications](./specifications/) → [Progress Log](./progress_log.md) |
 | **Operations** | [Deployment](./deployment.md) → [Reports](./reports/README.md) → [Progress Log](./progress_log.md) |
 

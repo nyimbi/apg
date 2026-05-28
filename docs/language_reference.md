@@ -1013,6 +1013,46 @@ swarm SupportCrew {
 
 The compiler validates agent references and emits `ai_agents.py` with `AI_AGENTS`, `AI_AGENT_TEAMS`, lookup helpers, runtime aliases, and per-agent/per-team capabilities, configuration, rules, UI, and theme metadata. See [AI Agent Composition](./ai_agent_composition.md) for the executable contract.
 
+### Screen Composition
+
+Capabilities can declare first-class screens when generated applications need
+more than a route list. Use `screens:` to describe the screen, its route, its
+layout, the elements it contains or composes, the data/services it binds to, the
+actions and events it exposes, and the relationships between composed elements.
+
+```apg
+capability OperationsWorkbench {
+    contract: {
+        id: operations_workbench,
+        provides: [operations_ui],
+        configuration: {tenant_scoped: true},
+        ui: {shell: python},
+        theme: {name: ops_theme}
+    };
+
+    screens: {
+        Dashboard: {
+            route: "/ops",
+            layout: dashboard,
+            contains: [KpiStrip, ApprovalQueue],
+            composes: [LedgerTable],
+            binds: [ledger.entries],
+            actions: [approve, reject],
+            events: [{on: "select", do: "filter", target: LedgerTable}],
+            relationships: [
+                {from: KpiStrip, to: LedgerTable, via: filters},
+                ApprovalQueue -> LedgerTable
+            ]
+        }
+    };
+}
+```
+
+The compiler preserves declared screens in `apg_capabilities.py` through
+`capability_screens()`, indexes routes with `ui_route_index()`, and exposes
+screen/component/binding/relationship edges through `composition_graph()`. See
+[Screen Composition](./screen_composition.md) for the full authoring guide.
+
 ```apg
 // Cognitive architecture
 @cognitive: {

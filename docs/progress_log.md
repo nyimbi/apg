@@ -4729,3 +4729,22 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `8a08a77` (`Generate executable screen composition manifests`) to `origin/main`.
+
+### 2026-05-28 03:18 EAT
+
+Completed checkpoint:
+
+- Added author-facing documentation for first-class APG screen composition.
+- Documented screen syntax, route/layout fields, contained and composed elements, bindings, actions, events, rules, permissions, and explicit relationships.
+- Documented the generated runtime helpers: `capability_screens()`, `ui_route_index()`, and `composition_graph()`.
+- Linked the new screen guide from the documentation index, capability-contract guide, and language reference.
+
+Battery-conscious verification:
+
+- `git diff --check -- docs/screen_composition.md docs/README.md docs/capability_contracts.md docs/language_reference.md` -> no issues
+- `rg -n "screen_composition|Screen Composition|capability_screens\\(|composition_graph\\(\\)" docs/README.md docs/capability_contracts.md docs/language_reference.md docs/screen_composition.md` -> links and helper references present
+- Deferred broad docs/link checks at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push for this checkpoint.

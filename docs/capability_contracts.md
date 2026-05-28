@@ -11,6 +11,12 @@ Every contract provides five required surfaces:
 - `ui`: routes, permissions, view shell, and theme requirement metadata.
 - `theme`: visual tokens and component-level styling metadata.
 
+Capabilities can also declare `screens` when UI composition needs to be
+explicit. Screens describe routes, layouts, contained or composed elements,
+bindings, actions, events, screen-level rules, permissions, and relationships
+between UI elements. See [Screen Composition](./screen_composition.md) for the
+authoring contract and generated runtime helpers.
+
 ## Registry API
 
 Use the registry when application code needs to discover, validate, or evaluate
@@ -83,6 +89,12 @@ Generated contracts use the same required surfaces as platform contracts:
 configuration, schema, deterministic rules, UI routes, and theme tokens. This
 keeps selected capabilities first-class inside the generated application rather
 than leaving contract metadata only in the APG source tree.
+
+When APG source is compiled directly, first-class capability declarations emit
+`apg_capabilities.py`. That manifest exposes `capability_screens()`,
+`ui_route_index()`, and `composition_graph()` so generated applications can
+discover screen routes, composed UI elements, bindings, and relationship edges
+without depending on a web framework.
 
 ## Adding a Contract
 
