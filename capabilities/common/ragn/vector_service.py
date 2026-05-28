@@ -19,8 +19,13 @@ from uuid_extensions import uuid7str
 from collections import defaultdict, deque
 
 # Database imports
-import asyncpg
-from asyncpg import Pool, Connection
+try:
+	import asyncpg
+	from asyncpg import Pool, Connection
+except ImportError:  # pragma: no cover - exercised in dependency-light test envs
+	asyncpg = None
+	Pool = Any
+	Connection = Any
 
 # APG imports
 from .models import (

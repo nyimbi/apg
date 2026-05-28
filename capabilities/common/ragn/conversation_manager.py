@@ -9,6 +9,7 @@ import asyncio
 import logging
 import time
 import json
+import hashlib
 from typing import Dict, Any, List, Optional, Tuple, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
@@ -17,14 +18,18 @@ from uuid_extensions import uuid7str
 from collections import deque, defaultdict
 
 # Database imports
-import asyncpg
-from asyncpg import Pool
+try:
+	import asyncpg
+	from asyncpg import Pool
+except ImportError:  # pragma: no cover - exercised in dependency-light test envs
+	asyncpg = None
+	Pool = Any
 
 # APG imports
 from .models import (
 	Conversation, ConversationCreate, ConversationUpdate,
 	ConversationTurn, ConversationTurnCreate, ConversationStatus,
-	TurnType, RetrievalRequest, RetrievalMethod, GenerationRequest,
+	TurnType, RetrievalRequest, RetrievalMethod, RetrievalResult, GenerationRequest,
 	APGBaseModel
 )
 from .retrieval_engine import IntelligentRetrievalEngine, RetrievalContext
@@ -298,6 +303,7 @@ class TurnProcessor:
 				retrieval_request, 
 				turn_context.retrieval_context
 			)
+			turn_context.user_context['_last_retrieval_result'] = retrieval_result
 			
 			retrieved_chunks = retrieval_result.retrieved_chunk_ids
 			retrieval_scores = retrieval_result.similarity_scores
@@ -405,9 +411,41 @@ class TurnProcessor:
 	                                              scores: List[float],
 	                                              turn_context: TurnContext):
 		"""Create retrieval result from existing chunks"""
-		# This would typically reconstruct the retrieval result
-		# For now, return None and let generation work without explicit retrieval result
-		return None
+		if not chunk_ids:
+			return None
+
+		stored_result = turn_context.user_context.get('_last_retrieval_result')
+		if (
+			isinstance(stored_result, RetrievalResult)
+			and stored_result.query_text == query
+			and stored_result.retrieved_chunk_ids == chunk_ids
+		):
+			return stored_result
+
+		padded_scores = list(scores[:len(chunk_ids)])
+		if len(padded_scores) < len(chunk_ids):
+			padded_scores.extend([0.0] * (len(chunk_ids) - len(padded_scores)))
+
+		quality_score = sum(padded_scores) / len(padded_scores) if padded_scores else 0.0
+		diversity_score = len(set(chunk_ids)) / len(chunk_ids)
+
+		return RetrievalResult(
+			tenant_id=turn_context.conversation.tenant_id,
+			conversation_turn_id=None,
+			query_text=query,
+			query_embedding=[0.0] * 1024,
+			query_hash=hashlib.sha256(query.encode()).hexdigest(),
+			knowledge_base_id=turn_context.conversation.knowledge_base_id or "",
+			k_retrievals=len(chunk_ids),
+			similarity_threshold=self.config.auto_retrieve_threshold,
+			retrieved_chunk_ids=chunk_ids,
+			similarity_scores=padded_scores,
+			retrieval_method=RetrievalMethod.HYBRID_SEARCH,
+			retrieval_time_ms=0,
+			total_candidates=len(chunk_ids),
+			result_quality_score=quality_score,
+			diversity_score=diversity_score
+		)
 
 class ConversationManager:
 	"""Main conversation management system"""

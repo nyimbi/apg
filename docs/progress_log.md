@@ -8529,6 +8529,23 @@ Battery-conscious verification:
 - `rg -n "Sample data for demonstration|Additional helper methods \\(simplified implementations\\)|Additional simplified implementations|1500000|1305000|195000|2025-08-09|cache_size_mb': 4096|35\\.2|67\\.8|Predicted Cache Load|Geographic Traffic Distribution|Sample throughput data|Sample latency data" capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py` found no stale CACH dashboard sample literals.
 - `git diff --check -- capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py docs/progress_log.md` passed.
 
+### 2026-05-29 02:54 EAT
+
+Executable RAGN conversation retrieval slice:
+
+- Preserved the actual `RetrievalResult` on turn context when user-turn retrieval runs.
+- Rebuilt a valid `RetrievalResult` from stored chunk ids and scores when assistant generation needs source context.
+- Padded missing scores, carried tenant and knowledge-base identifiers, generated stable query hashes, and computed quality/diversity metrics.
+- Made the RAGN conversation, retrieval, generation, and vector modules import-safe without optional `asyncpg` so dependency-light runtime paths can still execute.
+- Added focused coverage for stored-result reuse, fallback reconstruction, empty retrieval behavior, and `process_user_turn()` retrieval preservation.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/ragn/conversation_manager.py capabilities/common/ragn/retrieval_engine.py capabilities/common/ragn/vector_service.py capabilities/common/ragn/generation_engine.py capabilities/common/ragn/tests/test_conversation_retrieval_runtime.py` passed.
+- `./.venv/bin/python -m pytest -q capabilities/common/ragn/tests/test_conversation_retrieval_runtime.py` passed with 4 tests and existing deprecation warnings outside this slice.
+- `rg -n "This would typically reconstruct the retrieval result|For now, return None and let generation work without explicit retrieval result|No module named 'asyncpg'" capabilities/common/ragn/conversation_manager.py capabilities/common/ragn/retrieval_engine.py capabilities/common/ragn/vector_service.py capabilities/common/ragn/generation_engine.py capabilities/common/ragn/tests/test_conversation_retrieval_runtime.py` found no stale retrieval-result placeholder text or captured import-error text.
+- `git diff --check -- capabilities/common/ragn/conversation_manager.py capabilities/common/ragn/retrieval_engine.py capabilities/common/ragn/vector_service.py capabilities/common/ragn/generation_engine.py capabilities/common/ragn/tests/test_conversation_retrieval_runtime.py docs/progress_log.md` passed.
+
 ### 2026-05-29 02:50 EAT
 
 Compiler serviceability checkpoint:

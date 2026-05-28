@@ -19,8 +19,12 @@ from uuid_extensions import uuid7str
 from collections import defaultdict, Counter
 
 # Database imports
-import asyncpg
-from asyncpg import Pool
+try:
+	import asyncpg
+	from asyncpg import Pool
+except ImportError:  # pragma: no cover - exercised in dependency-light test envs
+	asyncpg = None
+	Pool = Any
 
 # APG imports
 from .models import (
