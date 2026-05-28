@@ -223,6 +223,8 @@ ENTITIES = {entity_specs!r}
 ENTITY_NAMES = {{entity["name"] for entity in ENTITIES}}
 RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {{entity["name"]: [] for entity in ENTITIES}}
 NEXT_RECORD_IDS: Dict[str, int] = {{entity["name"]: 1 for entity in ENTITIES}}
+EVENT_LOG: list[Dict[str, Any]] = []
+NEXT_EVENT_ID = 1
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -281,6 +283,17 @@ def _sync_next_record_ids() -> None:
         NEXT_RECORD_IDS[entity_name] = max(numeric_ids, default=0) + 1
 
 
+def _sync_next_event_id() -> None:
+    global NEXT_EVENT_ID
+    numeric_ids = [
+        numeric_id
+        for event in EVENT_LOG
+        for numeric_id in [_record_numeric_id(event)]
+        if numeric_id is not None
+    ]
+    NEXT_EVENT_ID = max(numeric_ids, default=0) + 1
+
+
 def _load_record_store() -> None:
     path = _data_path()
     if path is None or not path.exists():
@@ -303,7 +316,12 @@ def _load_record_store() -> None:
                 for record in entity_records
                 if isinstance(record, dict)
             ]
+    raw_events = loaded.get("events", [])
+    if isinstance(raw_events, list):
+        EVENT_LOG.clear()
+        EVENT_LOG.extend(dict(event) for event in raw_events if isinstance(event, dict))
     _sync_next_record_ids()
+    _sync_next_event_id()
 
 
 def _persist_record_store() -> str | None:
@@ -314,7 +332,9 @@ def _persist_record_store() -> str | None:
         "module": MODULE_NAME,
         "version": MODULE_VERSION,
         "records": list_records(),
+        "events": list_events(),
         "next_record_ids": dict(NEXT_RECORD_IDS),
+        "next_event_id": NEXT_EVENT_ID,
     }}
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -334,7 +354,38 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
     }}
     if include_records:
         status["records"] = list_records()
+        status["events"] = list_events()
     return status
+
+
+def list_events(entity_name: str | None = None) -> list[Dict[str, Any]]:
+    events = [dict(event) for event in EVENT_LOG]
+    if entity_name is None:
+        return events
+    return [event for event in events if event.get("entity") == entity_name]
+
+
+def _record_event(
+    action: str,
+    entity_name: str,
+    before: Dict[str, Any] | None = None,
+    after: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    global NEXT_EVENT_ID
+    record = after if after is not None else before if before is not None else {{}}
+    event = {{
+        "id": NEXT_EVENT_ID,
+        "action": action,
+        "entity": entity_name,
+        "record_id": record.get("id"),
+    }}
+    if before is not None:
+        event["before"] = dict(before)
+    if after is not None:
+        event["after"] = dict(after)
+    NEXT_EVENT_ID += 1
+    EVENT_LOG.append(event)
+    return dict(event)
 
 
 def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
@@ -380,6 +431,7 @@ def openapi_document() -> Dict[str, Any]:
         "/health": {{"get": _api_operation("Application health", "Health report")}},
         "/manifest": {{"get": _api_operation("Application manifest", "APG manifest")}},
         "/validate": {{"get": _api_operation("Application validation", "Validation report")}},
+        "/events": {{"get": _api_operation("Record mutation events", "Event log")}},
         "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
         "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph")}},
         "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
@@ -640,6 +692,7 @@ def _ui_index_html() -> str:
         f"<h1>{{html.escape(MODULE_NAME)}}</h1>"
         f"<p>{{html.escape(MODULE_DESCRIPTION or 'Generated APG application')}}</p>"
         '<nav><a href="/manifest">Manifest JSON</a> | '
+        '<a href="/events">Events</a> | '
         '<a href="/records">Record JSON</a> | '
         '<a href="/relationships">Relationships</a> | '
         '<a href="/openapi.json">API Contract</a></nav>'
@@ -749,6 +802,8 @@ def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
         return 200, openapi_document()
     if path == "/entities":
         return 200, {{"entities": list_entities()}}
+    if path == "/events":
+        return 200, {{"events": list_events()}}
     if path == "/records" or path.startswith("/records/") or (
         path.startswith("/entities/") and "/records" in path
     ):
@@ -868,12 +923,14 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
         return 409, {{"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}}
     RECORD_STORE[entity_name].append(record)
+    event = _record_event("create", entity_name, after=record)
     persistence_error = _persist_record_store()
     if persistence_error:
         return 500, {{"error": "persistence_failed", "message": persistence_error}}
     return 201, {{
         "entity": entity_name,
         "record": dict(record),
+        "event": event,
         "count": len(RECORD_STORE[entity_name]),
     }}
 
@@ -898,10 +955,11 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
             updated.update(dict(raw_record))
             updated["id"] = existing.get("id")
             RECORD_STORE[entity_name][index] = updated
+            event = _record_event("update", entity_name, before=existing, after=updated)
             persistence_error = _persist_record_store()
             if persistence_error:
                 return 500, {{"error": "persistence_failed", "message": persistence_error}}
-            return 200, {{"entity": entity_name, "record": dict(updated)}}
+            return 200, {{"entity": entity_name, "record": dict(updated), "event": event}}
     return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
 
 
@@ -916,12 +974,14 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
     for index, existing in enumerate(RECORD_STORE[entity_name]):
         if str(existing.get("id")) == str(record_id):
             deleted = RECORD_STORE[entity_name].pop(index)
+            event = _record_event("delete", entity_name, before=deleted)
             persistence_error = _persist_record_store()
             if persistence_error:
                 return 500, {{"error": "persistence_failed", "message": persistence_error}}
             return 200, {{
                 "entity": entity_name,
                 "deleted": dict(deleted),
+                "event": event,
                 "count": len(RECORD_STORE[entity_name]),
             }}
     return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
@@ -2393,12 +2453,13 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import describe_application, list_entities, list_records, main, openapi_document, relationship_graph, storage_status, validate_application, validate_record',
+			'from .app import describe_application, list_entities, list_events, list_records, main, openapi_document, relationship_graph, storage_status, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
 			'    "describe_application",',
 			'    "list_entities",',
+			'    "list_events",',
 			'    "list_records",',
 			'    "main",',
 			'    "openapi_document",',

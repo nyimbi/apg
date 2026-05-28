@@ -118,6 +118,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.list_entities() == [
 		{"name": "Planner", "type": "ai_agent", "properties": [], "fields": [], "methods": []}
 	]
+	assert module.list_events() == []
 	assert module.list_records("Planner") == []
 	assert module.list_agents() == ["Planner"]
 	assert manifest["ai_agents"] == ["Planner"]
@@ -127,6 +128,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.validate_record("Planner", {})["valid"] is True
 	assert module.validate_application()["valid"] is True
 	assert "describe_application" in module.__all__
+	assert "list_events" in module.__all__
 	assert "openapi_document" in module.__all__
 	assert "relationship_graph" in module.__all__
 	assert "storage_status" in module.__all__
@@ -276,6 +278,8 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 		)
 		with urllib.request.urlopen(form_request, timeout=1) as response:
 			form_created = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/events", timeout=1) as response:
+			events = json.loads(response.read().decode("utf-8"))
 	finally:
 		process.terminate()
 		try:
@@ -290,8 +294,11 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert listed["records"] == [created["record"]]
 	assert fetched["record"] == created["record"]
 	assert all_records["records"]["Customer"] == [created["record"]]
+	assert created["event"]["action"] == "create"
+	assert created["event"]["record_id"] == 1
 	assert ui_content_type.startswith("text/html")
 	assert "/ui/entities/Customer" in ui_index
+	assert "/events" in ui_index
 	assert "/openapi.json" in ui_index
 	assert 'action="/entities/Customer/records"' in entity_ui
 	assert "<pre>" in entity_ui
@@ -299,18 +306,26 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert openapi_content_type.startswith("application/json")
 	assert openapi["openapi"] == "3.1.0"
 	assert openapi["info"]["title"] == "customer_ops"
+	assert "/events" in openapi["paths"]
 	assert "/entities/Customer/records" in openapi["paths"]
 	assert "/entities/Customer/records/{id}" in openapi["paths"]
 	customer_schema = openapi["components"]["schemas"]["CustomerRecord"]
 	assert customer_schema["required"] == ["name", "email"]
 	assert customer_schema["properties"]["name"]["type"] == "string"
 	assert updated["record"] == {"id": 1, "name": "Asha", "email": "asha@new.example", "status": "active"}
+	assert updated["event"]["action"] == "update"
+	assert updated["event"]["before"] == created["record"]
+	assert updated["event"]["after"] == updated["record"]
 	assert deleted["deleted"] == updated["record"]
+	assert deleted["event"]["action"] == "delete"
+	assert deleted["event"]["before"] == updated["record"]
 	assert deleted["count"] == 0
 	assert missing_status == 404
 	assert missing_payload["error"] == "record_not_found"
 	assert empty_list["records"] == []
 	assert form_created["record"] == {"id": 2, "name": "Kofi", "email": "kofi@example.com"}
+	assert [event["action"] for event in events["events"]] == ["create", "update", "delete", "create"]
+	assert events["events"][-1]["after"] == form_created["record"]
 
 
 def test_generated_python_app_exposes_relationship_graph_from_fields(tmp_path):
@@ -451,9 +466,12 @@ def test_generated_python_app_persists_records_with_data_file(tmp_path):
 		stop_app(first_process)
 
 	assert created["record"]["id"] == 1
+	assert created["event"]["id"] == 1
 	assert storage["records"]["Customer"] == [created["record"]]
+	assert storage["events"] == [created["event"]]
 	persisted = json.loads(data_file.read_text(encoding="utf-8"))
 	assert persisted["records"]["Customer"] == [created["record"]]
+	assert persisted["events"] == [created["event"]]
 
 	second_process, second_base_url = start_app()
 	try:
@@ -472,8 +490,10 @@ def test_generated_python_app_persists_records_with_data_file(tmp_path):
 
 	assert reloaded["record"] == created["record"]
 	assert second_created["record"]["id"] == 2
+	assert second_created["event"]["id"] == 2
 	persisted = json.loads(data_file.read_text(encoding="utf-8"))
 	assert persisted["records"]["Customer"] == [created["record"], second_created["record"]]
+	assert [event["id"] for event in persisted["events"]] == [1, 2]
 
 
 def test_cli_compile_default_target_writes_generated_application(tmp_path):

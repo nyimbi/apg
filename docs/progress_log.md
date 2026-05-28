@@ -5423,3 +5423,27 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `554ce8c` (`Expose generated entity relationships`) to `origin/main`.
+
+### 2026-05-28 06:52 EAT
+
+Completed checkpoint:
+
+- Added generated record mutation events for executable apps.
+- Generated apps now emit deterministic events for record create, update, and delete operations.
+- Generated event entries include id, action, entity, record id, and before/after snapshots where applicable.
+- Generated apps now expose `GET /events`.
+- Generated `/ui` links to the event log.
+- Generated `/openapi.json` advertises the event endpoint.
+- Generated JSON-file persistence now stores and reloads events, with event ids continuing after restart.
+- Generated packages now reexport `list_events()` for Python consumers.
+- Added focused regression coverage for create/update/delete event payloads, `/events`, OpenAPI exposure, UI links, storage persistence, and post-restart event id continuity.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 15 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated event log slice.
