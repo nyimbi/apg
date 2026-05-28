@@ -7143,3 +7143,15 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated self-test reported `route_dispatch.errors == []` across 103 documented methods and 82 routes
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 16:49 EAT
+
+Completed checkpoint:
+
+- Replaced the stale quickstart workflow with the current executable compiler path: `uv` setup, `apg compile`, generated self-test, generated smoke test, app run command, Python compiler API, and numbered example workflow.
+- Updated the README basic usage and development workflow to use the real `python` target and generated standard-library application commands instead of unsupported `apg dev`, `apg test`, and `apg deploy` examples.
+
+Battery-conscious verification:
+
+- `rg -n "apg deploy|apg dev|python main.py|localhost:5000|PostgreSQL|Redis|workflow create|createdb|DATABASE_URL|REDIS_URL" docs/quickstart.md README.md` -> no stale quickstart/runtime hits
+- Deferred broader documentation link checks at the user's request to conserve battery.

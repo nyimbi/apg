@@ -469,29 +469,33 @@ apg --version
 
 ### Basic Usage
 ```bash
-# Compile APG to Python
-apg compile myapp.apg --output ./generated/
+# Compile APG to executable Python artifacts
+apg compile myapp.apg --output ./generated
 
-# Run generated application
-cd generated && python main.py
+# Verify generated contracts and runtime surface
+python generated/app.py --self-test
+python generated/smoke_test.py
 
-# Deploy to cloud
-apg deploy myapp.apg --platform aws --region us-east-1
+# Run the generated standard-library HTTP application
+python generated/app.py --host 127.0.0.1 --port 8080
 ```
 
 ### Development Workflow
 ```bash
 # Create new APG project
-apg init my-project --template digital-twin
+mkdir my-project && cd my-project
+apg init
 
-# Develop with hot reload
-apg dev my-project.apg --watch --reload
+# Edit main.apg, then compile
+apg compile main.apg --output generated
 
-# Test generated code
-apg test my-project.apg --coverage
+# Inspect generated app metadata and OpenAPI
+python generated/app.py --describe
+python generated/app.py --self-test
 
-# Deploy to production
-apg deploy my-project.apg --env production
+# Optional: run in Docker
+docker build -t apg-generated-app generated
+docker run --rm -p 8080:8080 apg-generated-app
 ```
 
 ## Contributing
