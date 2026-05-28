@@ -253,6 +253,39 @@ def test_ai_agent_external_runtime_adapter_discovers_default_shim(monkeypatch, t
     assert [item["status"] for item in team_invocation["invocations"]] == ["completed", "completed"]
 
 
+def test_ai_agent_runtime_preserves_adapter_shim_status(monkeypatch):
+    result = APGCompiler().compile_string(AI_AGENT_SOURCE, "support.apg")
+    assert result.success is True
+
+    monkeypatch.setenv(
+        "APG_AGENT_RUNTIME_CODEX_COMMAND",
+        shlex.join([sys.executable, "-m", "cli.agent_adapter", "codex"]),
+    )
+    for key in [
+        "APG_AGENT_CODEX_PROVIDER_COMMAND",
+        "APG_AGENT_CODEX_CLI",
+        "APG_AGENT_PROVIDER_COMMAND",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+
+    namespace = {}
+    exec(compile(result.generated_files["ai_agents.py"], "ai_agents.py", "exec"), namespace)
+
+    invocation = namespace["invoke_agent"]("Planner", {"input": {"ticket": "late order"}})
+    team_invocation = namespace["invoke_team"]("SupportCrew", {"input": {"ticket": "late order"}})
+
+    assert invocation["status"] == "adapter_required"
+    assert invocation["mode"] == "adapter_shim"
+    assert invocation["output"]["requires_adapter"] is True
+    assert invocation["output"]["adapter_source"] == "APG_AGENT_RUNTIME_CODEX_COMMAND"
+    assert invocation["output"]["parsed"]["provider_environment_keys"] == [
+        "APG_AGENT_CODEX_PROVIDER_COMMAND",
+        "APG_AGENT_CODEX_CLI",
+        "APG_AGENT_PROVIDER_COMMAND",
+    ]
+    assert team_invocation["status"] == "adapter_required"
+
+
 def test_ai_agent_runtime_catalog_supports_fast_moving_agent_tools():
     source = """
     agent CodexAgent {

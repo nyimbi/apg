@@ -302,12 +302,26 @@ def _run_external_agent(agent: AIAgentSpec, runtime: str, runtime_spec: Dict[str
             parsed_output = json.loads(stdout)
         except json.JSONDecodeError:
             parsed_output = stdout
+    adapter_status = "completed" if completed.returncode == 0 else "failed"
+    adapter_mode = "external"
+    adapter_message = "External runtime adapter completed." if completed.returncode == 0 else "External runtime adapter failed."
+    if isinstance(parsed_output, dict):
+        parsed_status = parsed_output.get("status")
+        if parsed_status in {"completed", "failed", "adapter_required"}:
+            adapter_status = parsed_status
+        parsed_mode = parsed_output.get("mode")
+        if isinstance(parsed_mode, str) and parsed_mode:
+            adapter_mode = parsed_mode
+        parsed_message = parsed_output.get("message")
+        if isinstance(parsed_message, str) and parsed_message:
+            adapter_message = parsed_message
+    adapter_requires = adapter_status == "adapter_required"
     return {
-        "status": "completed" if completed.returncode == 0 else "failed",
-        "mode": "external",
+        "status": adapter_status,
+        "mode": adapter_mode,
         "output": {
-            "message": "External runtime adapter completed." if completed.returncode == 0 else "External runtime adapter failed.",
-            "requires_adapter": False,
+            "message": adapter_message,
+            "requires_adapter": adapter_requires,
             "adapter_command": command,
             "adapter_source": command_source,
             "returncode": completed.returncode,

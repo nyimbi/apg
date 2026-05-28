@@ -100,6 +100,13 @@ setup(
             "apg-create=cli.create_project:create",
             "apg-validate=cli.validate_command:validate",
             "apg-language-server=language_server.server:main",
+            "apg-agent-codex=cli.agent_adapter:codex",
+            "apg-agent-claude-code=cli.agent_adapter:claude_code",
+            "apg-agent-claude=cli.agent_adapter:claude_code",
+            "apg-agent-opencode=cli.agent_adapter:opencode",
+            "apg-agent-openai=cli.agent_adapter:openai",
+            "apg-agent-ollama=cli.agent_adapter:ollama",
+            "apg-agent-pi=cli.agent_adapter:pi",
         ],
     },
     

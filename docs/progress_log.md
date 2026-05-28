@@ -8214,3 +8214,28 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `308863e` (`Let generated agents discover executable adapter shims`).
+
+### 2026-05-29 00:27 EAT
+
+In progress:
+
+- Added installable APG AI-agent adapter shim entry points for `codex`, `claude_code`, `opencode`, `openai`, `ollama`, and `pi`.
+- Added `cli/agent_adapter.py`, a dependency-free APG adapter protocol shim that reads the generated runtime JSON envelope from stdin.
+- Shims execute an explicitly configured provider command when `APG_AGENT_<RUNTIME>_PROVIDER_COMMAND`, `APG_AGENT_<RUNTIME>_CLI`, or `APG_AGENT_PROVIDER_COMMAND` is set.
+- When no provider command is configured, shims return structured `status: adapter_required` JSON instead of pretending a vendor runtime ran.
+- Generated agent runtimes now preserve structured adapter-shim statuses and messages from parsed JSON output.
+- Recompiled all 20 numbered APG examples so checked-in generated AI runtime artifacts match the current compiler.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile cli/agent_adapter.py compiler/code_generator.py setup.py tests/test_agent_adapter_shims.py tests/test_ai_agent_composition.py` passed.
+- `.venv/bin/python -m pytest tests/test_agent_adapter_shims.py tests/test_ai_agent_composition.py::test_ai_agent_runtime_preserves_adapter_shim_status tests/test_ai_agent_composition.py::test_ai_agent_external_runtime_adapter_discovers_default_shim -q` passed with 6 tests.
+- `.venv/bin/python -m pytest tests/test_agent_adapter_shims.py tests/test_ai_agent_composition.py::test_ai_agent_runtime_preserves_adapter_shim_status tests/test_ai_agent_composition.py::test_ai_agent_external_runtime_adapter_executes_configured_command tests/test_ai_agent_composition.py::test_ai_agent_external_runtime_adapter_discovers_default_shim tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler -q` passed with 8 tests.
+- `.venv/bin/apg baseline examples --json` passed with 20 examples, 20 passing examples, 0 failures, and python-only targeting.
+- `uv pip install -e . --python .venv/bin/python` rebuilt and reinstalled the editable package.
+- `.venv/bin/apg-agent-codex` smoke-tested the installed console script and returned structured `adapter_required` JSON for an unconfigured provider.
+- `git diff --check -- cli/agent_adapter.py setup.py compiler/code_generator.py tests/test_agent_adapter_shims.py tests/test_ai_agent_composition.py examples` passed.
+
+Commit result:
+
+- Pending.
