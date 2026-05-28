@@ -5472,3 +5472,26 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `7ffe63f` (`Query generated app records`) to `origin/main`.
+
+### 2026-05-28 07:02 EAT
+
+Completed checkpoint:
+
+- Added generated bulk record import/export support for executable apps.
+- Generated apps now support:
+  - `GET /entities/{EntityName}/records/export`
+  - `POST /entities/{EntityName}/records/import`
+- Imports validate each record against generated entity fields, create valid records, return per-index errors for invalid records, and continue importing valid records.
+- Successful imports emit `import` mutation events and persist through the existing JSON-file storage path when configured.
+- Generated `/openapi.json` advertises per-entity import/export routes.
+- Added focused subprocess regression coverage for generated export output, mixed valid/invalid import payloads, import validation errors, import event payloads, and API contract exposure.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 15 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated bulk import/export slice.

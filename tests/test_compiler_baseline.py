@@ -296,6 +296,21 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 			timeout=1,
 		) as response:
 			sorted_page = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/entities/Customer/records/export", timeout=1) as response:
+			exported = json.loads(response.read().decode("utf-8"))
+		import_request = urllib.request.Request(
+			f"{base_url}/entities/Customer/records/import",
+			data=json.dumps({
+				"records": [
+					{"name": "Zuri", "email": "zuri@example.com"},
+					{"name": "Broken"},
+				]
+			}).encode("utf-8"),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		with urllib.request.urlopen(import_request, timeout=1) as response:
+			imported = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/events", timeout=1) as response:
 			events = json.loads(response.read().decode("utf-8"))
 	finally:
@@ -352,10 +367,19 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert sorted_page["limit"] == 2
 	assert sorted_page["sort"] == "name"
 	assert sorted_page["order"] == "desc"
+	assert exported["records"] == [form_created["record"], third_created["record"]]
+	assert exported["count"] == 2
+	assert imported["count"] == 1
+	assert imported["failed"] == 1
+	assert imported["imported"][0] == {"id": 4, "name": "Zuri", "email": "zuri@example.com"}
+	assert imported["errors"] == [{"index": 1, "errors": ["email is required"]}]
+	assert imported["events"][0]["action"] == "import"
 	parameters = openapi["paths"]["/entities/Customer/records"]["get"]["parameters"]
 	assert {parameter["name"] for parameter in parameters} >= {"filter.<field>", "sort", "order", "limit", "offset"}
-	assert [event["action"] for event in events["events"]] == ["create", "update", "delete", "create", "create"]
-	assert events["events"][-1]["after"] == third_created["record"]
+	assert "/entities/Customer/records/export" in openapi["paths"]
+	assert "/entities/Customer/records/import" in openapi["paths"]
+	assert [event["action"] for event in events["events"]] == ["create", "update", "delete", "create", "create", "import"]
+	assert events["events"][-1]["after"] == imported["imported"][0]
 
 
 def test_generated_python_app_exposes_relationship_graph_from_fields(tmp_path):

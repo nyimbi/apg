@@ -497,6 +497,12 @@ def openapi_document() -> Dict[str, Any]:
             {{"name": "limit", "in": "query", "required": False, "description": "Maximum records to return"}},
             {{"name": "offset", "in": "query", "required": False, "description": "Records to skip"}},
         ]
+        paths[f"/entities/{{entity_name}}/records/export"] = {{
+            "get": _api_operation(f"Export {{entity_name}} records", "Record export"),
+        }}
+        paths[f"/entities/{{entity_name}}/records/import"] = {{
+            "post": _api_operation(f"Import {{entity_name}} records", "Record import", request_body=True),
+        }}
         paths[f"/entities/{{entity_name}}/records/{{{{id}}}}"] = {{
             "get": _api_operation(f"Fetch {{entity_name}} record", "Record"),
             "put": _api_operation(f"Update {{entity_name}} record", "Updated record", request_body=True),
@@ -792,16 +798,19 @@ def _ui_payload(path: str) -> tuple[int, str]:
 def _record_route(path: str) -> Dict[str, str | None] | None:
     parts = [part for part in path.split("/") if part]
     if parts == ["records"]:
-        return {{"entity": None, "record_id": None}}
+        return {{"entity": None, "record_id": None, "operation": None}}
     if len(parts) in {{2, 3}} and parts[0] == "records":
         return {{
             "entity": parts[1],
             "record_id": parts[2] if len(parts) == 3 else None,
+            "operation": None,
         }}
     if len(parts) in {{3, 4}} and parts[0] == "entities" and parts[2] == "records":
+        operation = parts[3] if len(parts) == 4 and parts[3] in {{"export", "import"}} else None
         return {{
             "entity": parts[1],
-            "record_id": parts[3] if len(parts) == 4 else None,
+            "record_id": None if operation else parts[3] if len(parts) == 4 else None,
+            "operation": operation,
         }}
     return None
 
@@ -823,10 +832,19 @@ def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = 
         return 404, {{"error": "not_found", "path": path}}
     entity_name = route["entity"]
     record_id = route["record_id"]
+    operation = route.get("operation")
     if entity_name is None:
         return 200, {{"records": list_records()}}
     if entity_name not in ENTITY_NAMES:
         return 404, {{"error": "unknown_entity", "entity": entity_name}}
+    if operation == "export":
+        return 200, {{
+            "entity": entity_name,
+            "records": list_records(entity_name),
+            "count": len(list_records(entity_name)),
+        }}
+    if operation is not None:
+        return 405, {{"error": "method_not_allowed", "operation": operation}}
     if record_id is None:
         return 200, query_records(entity_name, query)
     record = _record_by_id(entity_name, record_id)
@@ -959,6 +977,8 @@ def _approval_plan_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
 
 def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
+    if route is not None and route.get("operation") == "import":
+        return _import_records_payload(str(route["entity"]), payload)
     if route is None or route["entity"] is None or route["record_id"] is not None:
         return 404, {{"error": "not_found", "path": path}}
     entity_name = route["entity"]
@@ -986,6 +1006,46 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
         "record": dict(record),
         "event": event,
         "count": len(RECORD_STORE[entity_name]),
+    }}
+
+
+def _import_records_payload(entity_name: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    if entity_name not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": entity_name}}
+    raw_records = payload.get("records")
+    if not isinstance(raw_records, list):
+        return 400, {{"error": "records_must_be_array"}}
+    imported: list[Dict[str, Any]] = []
+    events: list[Dict[str, Any]] = []
+    errors: list[Dict[str, Any]] = []
+    for index, raw_record in enumerate(raw_records):
+        if not isinstance(raw_record, dict):
+            errors.append({{"index": index, "errors": ["record must be object"]}})
+            continue
+        record = dict(raw_record)
+        validation = validate_record(entity_name, record)
+        if not validation["valid"]:
+            errors.append({{"index": index, "errors": validation["errors"]}})
+            continue
+        if record.get("id") in (None, ""):
+            record["id"] = NEXT_RECORD_IDS[entity_name]
+            NEXT_RECORD_IDS[entity_name] += 1
+        elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
+            errors.append({{"index": index, "errors": [f"duplicate id {{record['id']}}"]}})
+            continue
+        RECORD_STORE[entity_name].append(record)
+        imported.append(dict(record))
+        events.append(_record_event("import", entity_name, after=record))
+    persistence_error = _persist_record_store()
+    if persistence_error:
+        return 500, {{"error": "persistence_failed", "message": persistence_error}}
+    return (201 if imported else 422), {{
+        "entity": entity_name,
+        "imported": imported,
+        "events": events,
+        "errors": errors,
+        "count": len(imported),
+        "failed": len(errors),
     }}
 
 
@@ -1043,7 +1103,7 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
 
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
-    if path.startswith("/records/") or (
+    if path.startswith("/records/") or path.endswith("/records/import") or (
         path.startswith("/entities/") and path.endswith("/records")
     ):
         return _create_record_payload(path, payload)
