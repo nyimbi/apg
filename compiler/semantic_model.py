@@ -1,0 +1,445 @@
+"""Serializable APG semantic model builder.
+
+This module turns parsed APG source into the stable JSON contract used by CLI,
+IDE, agents, tests, and generators. It is intentionally dependency-light and
+does not write generated application files.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from .ast_builder import (
+	AIAgentDeclaration,
+	AgentTeamDeclaration,
+	ApplicationDeclaration,
+	ASTBuilder,
+	CapabilityDeclaration,
+	DatabaseDeclaration,
+	EntityDeclaration,
+	EntityType,
+	ModuleDeclaration,
+	PropertyDeclaration,
+)
+from .graphs import SUPPORTED_GRAPH_KINDS, build_graph_from_module
+from .parser import APGParser, APGSyntaxError
+from .semantic_analyzer import SemanticAnalyzer, SemanticError
+
+
+def build_semantic_model(path: Path) -> dict[str, Any]:
+	"""Build an ``apg.semantic-model.v1`` report for one APG source file."""
+	parser = APGParser()
+	parse_result = parser.parse_file(str(path))
+	diagnostics = [
+		_diagnostic_from_error(error, path, "error")
+		for error in parse_result.get("errors", [])
+	]
+
+	module = parse_result.get("ast")
+	if module is None and parse_result.get("success"):
+		module = ASTBuilder().build_ast(parse_result["parse_tree"], str(path))
+
+	if module is None:
+		return _empty_model(path, diagnostics)
+
+	analyzer = SemanticAnalyzer()
+	analysis = analyzer.analyze(module)
+	for error in analysis.get("errors", []):
+		diagnostics.append(_diagnostic_from_error(error, path, "error"))
+	for warning in analysis.get("warnings", []):
+		diagnostics.append(_diagnostic_from_error(warning, path, "warning"))
+
+	model = _model_from_module(module, path)
+	model["diagnostics"] = diagnostics
+	model["ok"] = not any(diagnostic["severity"] == "error" for diagnostic in diagnostics)
+	return model
+
+
+def _empty_model(path: Path, diagnostics: list[dict[str, Any]]) -> dict[str, Any]:
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": False,
+		"source_files": [str(path)],
+		"app": {},
+		"symbols": {},
+		"tables": {},
+		"views": {},
+		"flows": {},
+		"operations": {},
+		"rules": {},
+		"roles": {},
+		"security": {},
+		"agents": {},
+		"llms": {},
+		"capabilities": {},
+		"composition": {},
+		"contracts": {},
+		"deployment": {},
+		"packages": {},
+		"graphs": {},
+		"diagnostics": diagnostics,
+	}
+
+
+def _model_from_module(module: ModuleDeclaration, path: Path) -> dict[str, Any]:
+	symbols: dict[str, dict[str, Any]] = {}
+	tables: dict[str, dict[str, Any]] = {}
+	views: dict[str, dict[str, Any]] = {}
+	flows: dict[str, dict[str, Any]] = {}
+	rules: dict[str, dict[str, Any]] = {}
+	agents: dict[str, dict[str, Any]] = {}
+	capabilities: dict[str, dict[str, Any]] = {}
+	composition: dict[str, Any] = {
+		"applications": {},
+		"agent_teams": {},
+		"capability_dependencies": {},
+	}
+	contracts: dict[str, dict[str, Any]] = {}
+	deployment: dict[str, Any] = {"target": "python", "source": str(path)}
+
+	symbols[_symbol_id("module", module.name)] = _symbol("module", module.name, module, path)
+
+	for entity in module.entities:
+		kind = _entity_kind(entity)
+		symbols[_symbol_id(kind, entity.name)] = _symbol(kind, entity.name, entity, path)
+
+		if isinstance(entity, AIAgentDeclaration):
+			agents[entity.name] = _agent_model(entity)
+			if entity.model:
+				symbols[_symbol_id("llm", entity.model)] = _symbol("llm", entity.model, entity, path)
+			continue
+
+		if isinstance(entity, AgentTeamDeclaration):
+			composition["agent_teams"][entity.name] = {
+				"agents": list(entity.agents),
+				"flow": [
+					{"from": handoff.source, "to": handoff.target, "condition": handoff.condition}
+					for handoff in entity.flow
+				],
+				"capabilities": list(entity.capabilities),
+				"configuration": dict(entity.configuration),
+				"rules": [dict(rule) for rule in entity.rules],
+				"ui": dict(entity.ui),
+				"theme": dict(entity.theme),
+			}
+			continue
+
+		if isinstance(entity, CapabilityDeclaration):
+			capabilities[entity.name] = _capability_model(entity)
+			contracts[entity.name] = dict(entity.contract)
+			composition["capability_dependencies"][entity.name] = list(entity.requires)
+			for rule in [*entity.rules, *entity.business_rules, *entity.rule_engine.get("rules", [])]:
+				if isinstance(rule, dict):
+					rule_name = str(rule.get("name") or f"{entity.name}.rule")
+					rules[f"{entity.name}.{rule_name}"] = dict(rule)
+			continue
+
+		if isinstance(entity, ApplicationDeclaration):
+			composition["applications"][entity.name] = _application_model(entity)
+			continue
+
+		if _is_table_like(entity):
+			tables[entity.name] = _table_model(entity)
+			for field in entity.properties:
+				symbols[_symbol_id("field", f"{entity.name}.{field.name}")] = _symbol(
+					"field",
+					f"{entity.name}.{field.name}",
+					field,
+					path,
+				)
+			continue
+
+		if entity.entity_type in {EntityType.SCREEN, EntityType.FORM, EntityType.UI_COMPONENT}:
+			views[entity.name] = _view_model(entity)
+		elif entity.entity_type in {EntityType.WORKFLOW, EntityType.FLOW}:
+			flows[entity.name] = _flow_model(entity)
+		elif entity.entity_type in {EntityType.RULE, EntityType.RULE_SET, EntityType.POLICY}:
+			rules[entity.name] = _generic_entity_model(entity)
+
+	for database in [entity for entity in module.entities if isinstance(entity, DatabaseDeclaration)]:
+		for schema in database.schemas:
+			for table in schema.tables:
+				table_id = f"{schema.name}.{table.name}" if schema.name else table.name
+				tables[table_id] = {
+					"name": table.name,
+					"schema": schema.name,
+					"database": database.name,
+					"fields": {
+						column.name: {
+							"type": column.data_type,
+							"required": not column.is_nullable,
+							"primary_key": column.is_primary_key,
+							"default": column.default_value,
+							"constraints": list(column.constraints),
+							"relationship": column.reference,
+						}
+						for column in table.columns
+					},
+					"indexes": [
+						{
+							"name": index.name,
+							"columns": list(index.columns),
+							"unique": index.is_unique,
+							"type": index.index_type,
+						}
+						for index in table.indexes
+					],
+				}
+
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"source_files": [str(path)],
+		"app": {
+			"name": module.name,
+			"version": module.version,
+			"description": module.description,
+			"entity_count": len(module.entities),
+		},
+		"symbols": symbols,
+		"tables": tables,
+		"views": views,
+		"flows": flows,
+		"operations": {},
+		"rules": rules,
+		"roles": {},
+		"security": {},
+		"agents": agents,
+		"llms": {
+			agent_name: {"model": agent["model"], "runtime": agent["runtime"]}
+			for agent_name, agent in agents.items()
+			if agent.get("model")
+		},
+		"capabilities": capabilities,
+		"composition": composition,
+		"contracts": contracts,
+		"deployment": deployment,
+		"packages": {},
+		"graphs": _graph_summaries(module, path),
+		"diagnostics": [],
+	}
+
+
+def _symbol(kind: str, name: str, node: Any, path: Path) -> dict[str, Any]:
+	line = max(0, int(getattr(node, "line", 0) or 0))
+	column = max(0, int(getattr(node, "column", 0) or 0))
+	return {
+		"id": _symbol_id(kind, name),
+		"kind": kind,
+		"name": name,
+		"file": str(path),
+		"range": {
+			"start": {"line": line, "character": column},
+			"end": {"line": line, "character": column + 1},
+		},
+		"references": [],
+	}
+
+
+def _symbol_id(kind: str, name: str) -> str:
+	return f"{kind}.{name}"
+
+
+def _entity_kind(entity: EntityDeclaration) -> str:
+	if _is_table_like(entity):
+		return "table"
+	if isinstance(entity, AIAgentDeclaration):
+		return "agent"
+	if isinstance(entity, AgentTeamDeclaration):
+		return "composition"
+	if isinstance(entity, CapabilityDeclaration):
+		return "capability"
+	if isinstance(entity, ApplicationDeclaration):
+		return "app"
+	if isinstance(entity, DatabaseDeclaration):
+		return "database"
+	return entity.entity_type.value
+
+
+def _is_table_like(entity: EntityDeclaration) -> bool:
+	return entity.entity_type == EntityType.ENTITY and bool(entity.properties)
+
+
+def _table_model(entity: EntityDeclaration) -> dict[str, Any]:
+	return {
+		"name": entity.name,
+		"fields": {
+			field.name: {
+				"type": _field_type(field),
+				"required": field.is_required,
+				"relationship": _field_relationship(field),
+			}
+			for field in entity.properties
+		},
+		"lookup_paths": {
+			f"{field.name}.id": {
+				"chain": [f"{entity.name}.{field.name}", f"{_field_type(field)}.id"],
+				"valid": True,
+			}
+			for field in entity.properties
+			if _field_type(field) not in {"str", "int", "float", "bool", "any", "list", "dict"}
+		},
+	}
+
+
+def _field_type(field: PropertyDeclaration) -> str:
+	return field.type_annotation.type_name if field.type_annotation else "any"
+
+
+def _field_relationship(field: PropertyDeclaration) -> dict[str, Any] | None:
+	field_type = _field_type(field)
+	if field_type not in {"str", "int", "float", "bool", "any", "list", "dict"}:
+		return {"target_table": field_type, "target_field": "id", "cardinality": "many-to-one"}
+	if field.name.endswith("_id"):
+		target = field.name[:-3]
+		if target:
+			return {
+				"target_table": "".join(part.capitalize() for part in target.split("_")),
+				"target_field": "id",
+				"cardinality": "many-to-one",
+				"alias": target,
+			}
+	return None
+
+
+def _agent_model(agent: AIAgentDeclaration) -> dict[str, Any]:
+	return {
+		"name": agent.name,
+		"role": agent.role,
+		"model": agent.model,
+		"runtime": agent.runtime,
+		"system": agent.system_prompt,
+		"capabilities": list(agent.capabilities),
+		"tools": list(agent.tools),
+		"memory": (
+			{"kind": agent.memory.kind, "name": agent.memory.name}
+			if agent.memory else None
+		),
+		"inputs": list(agent.inputs),
+		"outputs": list(agent.outputs),
+		"handoffs": [
+			{"from": handoff.source, "to": handoff.target, "condition": handoff.condition}
+			for handoff in agent.handoffs
+		],
+		"configuration": dict(agent.configuration),
+		"rules": [dict(rule) for rule in agent.rules],
+		"ui": dict(agent.ui),
+		"theme": dict(agent.theme),
+	}
+
+
+def _capability_model(capability: CapabilityDeclaration) -> dict[str, Any]:
+	return {
+		"name": capability.name,
+		"provides": list(capability.provides),
+		"requires": list(capability.requires),
+		"configuration": dict(capability.configuration),
+		"rules": [dict(rule) for rule in capability.rules],
+		"rule_engine": dict(capability.rule_engine),
+		"ui": dict(capability.ui),
+		"theme": dict(capability.theme),
+		"runtime": dict(capability.runtime),
+		"erp_modules": list(capability.erp_modules),
+		"components": capability.components,
+		"business_rules": [dict(rule) for rule in capability.business_rules],
+		"approvals": capability.approvals,
+		"master_data": capability.master_data,
+		"i18n": dict(capability.i18n),
+		"streaming": dict(capability.streaming),
+		"screens": capability.screens,
+	}
+
+
+def _application_model(application: ApplicationDeclaration) -> dict[str, Any]:
+	return {
+		"name": application.name,
+		"description": application.description,
+		"capabilities": list(application.capabilities),
+		"agents": list(application.agents),
+		"agent_teams": list(application.agent_teams),
+		"components": application.components,
+		"screens": application.screens,
+		"routes": list(application.routes),
+		"workflows": list(application.workflows),
+		"policies": application.policies,
+		"configuration": dict(application.configuration),
+		"theme": dict(application.theme),
+		"runtime": dict(application.runtime),
+		"integrations": application.integrations,
+		"deployments": application.deployments,
+	}
+
+
+def _view_model(entity: EntityDeclaration) -> dict[str, Any]:
+	return {**_generic_entity_model(entity), "bindings": [field.name for field in entity.properties]}
+
+
+def _flow_model(entity: EntityDeclaration) -> dict[str, Any]:
+	return {**_generic_entity_model(entity), "states": [], "transitions": []}
+
+
+def _generic_entity_model(entity: EntityDeclaration) -> dict[str, Any]:
+	return {
+		"name": entity.name,
+		"type": entity.entity_type.value,
+		"properties": {
+			field.name: {"type": _field_type(field), "required": field.is_required}
+			for field in entity.properties
+		},
+		"methods": [method.name for method in entity.methods],
+	}
+
+
+def _graph_summaries(module: ModuleDeclaration, path: Path) -> dict[str, dict[str, Any]]:
+	graphs: dict[str, dict[str, Any]] = {}
+	for kind in SUPPORTED_GRAPH_KINDS:
+		graph = build_graph_from_module(module, path, kind)
+		graph_dict = graph.to_dict()
+		graphs[kind] = {
+			"kind": kind,
+			"nodes": len(graph_dict["nodes"]),
+			"edges": len(graph_dict["edges"]),
+		}
+	return graphs
+
+
+def _diagnostic_from_error(error: APGSyntaxError | SemanticError | Exception, path: Path, severity: str) -> dict[str, Any]:
+	if isinstance(error, APGSyntaxError):
+		line = error.line
+		column = error.column
+		message = error.message
+		code = "APG0001"
+		title = "Syntax error"
+	elif isinstance(error, SemanticError):
+		node = error.node
+		line = getattr(node, "line", 1)
+		column = getattr(node, "column", 0)
+		message = error.message
+		code = "APG0100"
+		title = "Semantic warning" if severity == "warning" else "Semantic error"
+	else:
+		line = 1
+		column = 0
+		message = str(error)
+		code = "APG9000"
+		title = "Internal tooling error"
+
+	start = {
+		"line": max(0, int(line or 1) - 1),
+		"character": max(0, int(column or 0)),
+	}
+	return {
+		"code": code,
+		"title": title,
+		"severity": severity,
+		"message": message,
+		"file": str(path),
+		"range": {
+			"start": start,
+			"end": {"line": start["line"], "character": start["character"] + 1},
+		},
+		"related_locations": [],
+		"fixes": [],
+		"docs_url": "docs/tooling.md#semantic-model-contract",
+	}

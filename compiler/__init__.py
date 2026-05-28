@@ -20,6 +20,7 @@ __author__ = "APG Language Team"
 from .parser import APGParser
 from .ast_builder import ASTBuilder
 from .semantic_analyzer import SemanticAnalyzer
+from .semantic_model import build_semantic_model
 from .code_generator import CodeGenerator
 from .compiler import APGCompiler
 
@@ -27,6 +28,7 @@ __all__ = [
     'APGParser',
     'ASTBuilder', 
     'SemanticAnalyzer',
+    'build_semantic_model',
     'CodeGenerator',
     'APGCompiler',
 ]

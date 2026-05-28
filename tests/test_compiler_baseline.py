@@ -1298,6 +1298,50 @@ def test_cli_validate_rejects_non_python_target_with_apg0802(tmp_path):
 	assert "must be 'python'" in report["diagnostics"][-1]["message"]
 
 
+def test_cli_model_json_emits_semantic_model_without_generation(tmp_path):
+	source = tmp_path / "sales.apg"
+	output = tmp_path / "generated"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["model", str(source), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.semantic-model.v1"
+	assert report["ok"] is True
+	assert report["source_files"] == [str(source)]
+	assert report["app"]["name"] == "sales_ops"
+	assert "module.sales_ops" in report["symbols"]
+	assert "table.Customer" in report["symbols"]
+	assert "field.SalesOrder.customer_id" in report["symbols"]
+	assert report["tables"]["SalesOrder"]["fields"]["customer"]["relationship"] == {
+		"target_table": "Customer",
+		"target_field": "id",
+		"cardinality": "many-to-one",
+	}
+	assert report["tables"]["SalesOrder"]["fields"]["customer_id"]["relationship"] == {
+		"target_table": "Customer",
+		"target_field": "id",
+		"cardinality": "many-to-one",
+		"alias": "customer",
+	}
+	assert report["graphs"]["er"]["edges"] >= 1
+	assert report["deployment"] == {"target": "python", "source": str(source)}
+	assert not output.exists()
+
+
+def test_cli_model_text_summarizes_agent_semantics(tmp_path):
+	source = tmp_path / "agent.apg"
+	source.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["model", str(source)])
+
+	assert result.exit_code == 0, result.output
+	assert "APG model OK" in result.output
+	assert "agent(s)" in result.output
+	assert "1 agent(s)" in result.output
+
+
 def test_cli_format_json_formats_source_without_writing(tmp_path):
 	source = tmp_path / "messy.apg"
 	source.write_text(

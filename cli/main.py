@@ -22,6 +22,7 @@ from cli.compile_command import compile_cmd
 from cli.format_command import format_cmd
 from cli.graph_command import graph, graph_suite
 from cli.lint_command import lint
+from cli.model_command import model
 from cli.run_command import run
 from cli.validate_command import validate
 
@@ -47,6 +48,7 @@ cli.add_command(format_cmd)
 cli.add_command(graph)
 cli.add_command(graph_suite)
 cli.add_command(lint)
+cli.add_command(model)
 cli.add_command(run)
 cli.add_command(validate)
 

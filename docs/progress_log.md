@@ -7421,3 +7421,21 @@ Battery-conscious verification:
 - `.venv/bin/apg graph-suite examples/02_customer_orders_relationship/main.apg --json` -> exited 0 and emitted `apg.graph-suite-report.v1`
 - `.venv/bin/apg graph-suite examples/02_customer_orders_relationship/main.apg` -> exited 0 and printed per-kind node/edge counts
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 18:40 EAT
+
+Completed checkpoint:
+
+- Added `compiler.semantic_model` as the first executable `apg.semantic-model.v1` producer.
+- Added `apg model <file> --json` to expose normalized symbols, tables, agents, capabilities, composition metadata, diagnostics, deployment metadata, and graph summaries without writing generated application files.
+- Registered the semantic model command with the installed `apg` CLI and exported the builder from `compiler`.
+- Updated the APG tooling specification current baseline so the semantic-model contract is executable rather than aspirational.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/semantic_model.py cli/model_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_model_json_emits_semantic_model_without_generation tests/test_compiler_baseline.py::test_cli_model_text_summarizes_agent_semantics tests/test_compiler_baseline.py::test_cli_graph_suite_json_emits_all_supported_renderings -q` -> 3 passed
+- `.venv/bin/apg model examples/02_customer_orders_relationship/main.apg --json` -> exited 0 and emitted `apg.semantic-model.v1`
+- `.venv/bin/apg model examples/05_single_support_agent/main.apg` -> exited 0 and summarized one AI agent
+- `.venv/bin/apg model examples/08_basic_capability_contract/main.apg --json` -> exited 0 and emitted capability, contract, composition dependency, and graph summary metadata
+- Deferred broader pytest at the user's request to conserve battery.

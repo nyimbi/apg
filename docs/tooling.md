@@ -21,6 +21,9 @@ APG currently has an executable compiler path:
   writing generated code;
 - `apg validate <file> --target python --json` emits `apg.validate-report.v1`
   with lint results and generator-readiness metadata;
+- `apg model <file> --json` emits `apg.semantic-model.v1` with normalized
+  symbols, tables, agents, capabilities, composition metadata, diagnostics,
+  deployment metadata, and graph summaries without generating application files;
 - `apg format <file> --check|--write|--json` emits `apg.format-result.v1`
   and applies deterministic APG whitespace formatting;
 - `apg graph <file> --kind er --format json|mermaid|dot` emits
@@ -588,6 +591,7 @@ apg compile app.apg --output generated/app --verify
 apg compile app.apg --target python --output generated/app
 apg lint app.apg --json
 apg lint src/apg --strict --json
+apg model app.apg --json
 apg format app.apg --check
 apg format app.apg --write
 apg graph app.apg --kind er --format json
