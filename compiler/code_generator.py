@@ -1130,7 +1130,7 @@ def _ui_records_table_html(entity_name: str) -> str:
     return f"<table><thead><tr>{{header}}<th>Actions</th></tr></thead><tbody>{{''.join(rows)}}</tbody></table>"
 
 
-def _ui_entity_html(entity_name: str) -> tuple[int, str]:
+def _ui_entity_html(entity_name: str, notice: str = "") -> tuple[int, str]:
     entity = _entity_spec(entity_name)
     if entity is None:
         return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
@@ -1139,11 +1139,13 @@ def _ui_entity_html(entity_name: str) -> tuple[int, str]:
     inputs = "".join(_ui_field_input_html(field) for field in fields)
     records_table = _ui_records_table_html(entity_name)
     records_json = html.escape(json.dumps(list_records(entity_name), indent=2, sort_keys=True))
+    notice_html = f'<section role="alert"><strong>{{html.escape(notice)}}</strong></section>' if notice else ""
     body = (
         f'<nav><a href="/ui">Application</a> | '
         f'<a href="/entities/{{safe_entity}}/records">Record JSON</a></nav>'
         f"<h1>{{html.escape(entity_name)}}</h1>"
         f"<p><code>{{html.escape(entity.get('type', 'entity'))}}</code></p>"
+        f"{{notice_html}}"
         f'<form method="post" action="/ui/entities/{{safe_entity}}/records">'
         f"{{inputs}}"
         '<button type="submit">Create record</button>'
@@ -1155,6 +1157,32 @@ def _ui_entity_html(entity_name: str) -> tuple[int, str]:
         "</details>"
     )
     return 200, _html_page(entity_name, body)
+
+
+def _ui_error_message(response: Dict[str, Any]) -> str:
+    errors = response.get("errors")
+    if isinstance(errors, list) and errors:
+        return "; ".join(str(error) for error in errors)
+    if response.get("error") == "revision_conflict":
+        return (
+            "Revision conflict: record has revision "
+            f"{{response.get('current_revision')}} but form submitted revision {{response.get('expected_revision')}}"
+        )
+    if "message" in response:
+        return str(response["message"])
+    if "error" in response:
+        return str(response["error"])
+    return "The submitted form could not be applied."
+
+
+def _ui_error_payload(path: str, response: Dict[str, Any]) -> str:
+    parts = [part for part in path.split("/") if part]
+    message = _ui_error_message(response)
+    if len(parts) >= 3 and parts[0] == "ui" and parts[1] == "entities":
+        _status, body = _ui_entity_html(parts[2], notice=message)
+        return body
+    details = html.escape(json.dumps(response, indent=2, sort_keys=True))
+    return _html_page("Form error", f"<h1>Form error</h1><p>{{html.escape(message)}}</p><pre>{{details}}</pre>")
 
 
 def _ui_payload(path: str) -> tuple[int, str]:
@@ -1694,6 +1722,14 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_html(self, status: int, html_payload: str) -> None:
+        body = html_payload.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _send_redirect(self, status: int, location: str) -> None:
         self.send_response(status)
         self.send_header("Location", location)
@@ -1752,6 +1788,8 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
                 if status in {{302, 303}}:
                     self._send_redirect(status, str(response["location"]))
                     return
+                self._send_html(status, _ui_error_payload(path, response))
+                return
             else:
                 status, response = _post_payload(path, payload)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:

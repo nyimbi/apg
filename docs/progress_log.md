@@ -5863,3 +5863,22 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `75baa5a` (`Complete generated UI record editing`) to `origin/main`.
+
+### 2026-05-28 08:31 EAT
+
+Completed checkpoint:
+
+- Kept generated app users inside the browser UI when form submissions fail.
+- Generated UI form validation and conflict failures now render HTML entity screens with an alert instead of returning JSON error payloads.
+- Added reusable generated helpers for UI error message extraction and HTML error payload rendering.
+- Added focused regression coverage proving invalid typed UI form input returns `text/html`, includes the validation error, and preserves the entity form action.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 18 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.

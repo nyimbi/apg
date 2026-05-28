@@ -598,6 +598,23 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 
 		with urllib.request.urlopen(f"{base_url}/ui/entities/InventoryItem", timeout=1) as response:
 			entity_ui = response.read().decode("utf-8")
+		invalid_form_data = urllib.parse.urlencode(
+			{"name": "Widget", "quantity": "many", "active": "true"}
+		).encode("utf-8")
+		invalid_request = urllib.request.Request(
+			f"{base_url}/ui/entities/InventoryItem/records",
+			data=invalid_form_data,
+			headers={"Content-Type": "application/x-www-form-urlencoded"},
+			method="POST",
+		)
+		try:
+			urllib.request.urlopen(invalid_request, timeout=1)
+		except urllib.error.HTTPError as error:
+			invalid_status = error.code
+			invalid_content_type = error.headers["Content-Type"]
+			invalid_ui = error.read().decode("utf-8")
+		else:
+			raise AssertionError("invalid generated UI form submission unexpectedly succeeded")
 		form_data = urllib.parse.urlencode(
 			{"name": "Widget", "quantity": "7", "active": "true"}
 		).encode("utf-8")
@@ -652,6 +669,11 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 	assert 'type="hidden" name="active" value="false"' in entity_ui
 	assert 'type="checkbox" name="active" value="true"' in entity_ui
 	assert 'action="/ui/entities/InventoryItem/records"' in entity_ui
+	assert invalid_status == 422
+	assert invalid_content_type.startswith("text/html")
+	assert 'role="alert"' in invalid_ui
+	assert "quantity must be integer" in invalid_ui
+	assert 'action="/ui/entities/InventoryItem/records"' in invalid_ui
 	assert "<table>" in created_ui
 	assert "Widget" in created_ui
 	assert 'action="/ui/entities/InventoryItem/records/1"' in created_ui
