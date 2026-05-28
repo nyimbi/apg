@@ -55,6 +55,11 @@ APG currently has an executable compiler path:
 - `apg package <file> --target web|desktop|mobile|container --out <dir> --json`
   emits `apg.package-report.v1`, writes a generated Python application package,
   attaches release evidence, and adds profile-specific launch/manifest files;
+- `apg language-server <file> --check --json` emits
+  `apg.language-server-check.v1` from the shared semantic model and formatter,
+  proving editor-facing diagnostics, completions, definitions, references,
+  document symbols, code-action availability, and formatting without starting
+  a long-running LSP process;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -673,6 +678,7 @@ apg validate
 apg run
 apg doctor
 apg language-server
+apg language-server app.apg --check --json
 apg capabilities contracts --json
 apg capabilities validate-contracts --json
 ```
@@ -906,6 +912,15 @@ instead of free-form rewriting.
 
 The language server should use the same parser, semantic model, diagnostics,
 formatter, and graph builders as the CLI.
+
+The current executable baseline includes a dependency-light semantic service
+in `language_server.semantic_service` and the check command
+`apg language-server <file> --check --json`. That check emits
+`apg.language-server-check.v1`, reuses `apg.semantic-model.v1`, and proves the
+editor-facing surfaces that do not require a running pygls process: diagnostics,
+context completions, hover/definition data, references, document symbols,
+code-action suggestions, and shared formatting. The long-running TCP/stdio LSP
+server should remain a thin transport adapter over that service.
 
 ### Capabilities
 

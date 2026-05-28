@@ -52,6 +52,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from apg.compiler.parser import APGParser, APGSyntaxError
 from apg.compiler.ast_builder import ASTBuilder, ModuleDeclaration, EntityDeclaration, PropertyDeclaration, MethodDeclaration
 from apg.compiler.semantic_analyzer import SemanticAnalyzer, SemanticError, Symbol
+from language_server.semantic_service import (
+	build_language_service_snapshot,
+	code_actions as service_code_actions,
+	completion_items as service_completion_items,
+	definition as service_definition,
+	document_symbols as service_document_symbols,
+	hover as service_hover,
+	references as service_references,
+)
 
 
 # ========================================
@@ -84,6 +93,7 @@ class APGLanguageServer:
 		self.documents: Dict[str, str] = {}
 		self.parsed_documents: Dict[str, ModuleDeclaration] = {}
 		self.diagnostics_cache: Dict[str, List[Diagnostic]] = {}
+		self.snapshots: Dict[str, Dict[str, Any]] = {}
 		
 		# APG language keywords and built-ins
 		self.keywords = [
@@ -148,6 +158,7 @@ class APGLanguageServer:
 			self.documents.pop(uri, None)
 			self.parsed_documents.pop(uri, None)
 			self.diagnostics_cache.pop(uri, None)
+			self.snapshots.pop(uri, None)
 		
 		@self.server.feature(COMPLETION)
 		async def completion(ls, params: CompletionParams) -> List[CompletionItem]:
@@ -177,59 +188,13 @@ class APGLanguageServer:
 	async def _validate_document(self, uri: str, text: str):
 		"""Validate document and send diagnostics"""
 		try:
-			# Parse the document
 			file_path = self._uri_to_path(uri)
-			parse_result = self.parser.parse_string(text, file_path)
-			
-			diagnostics = []
-			
-			# Add syntax errors
-			for error in parse_result.get('errors', []):
-				diagnostic = Diagnostic(
-					range=Range(
-						start=Position(line=max(0, error.line - 1), character=error.column),
-						end=Position(line=max(0, error.line - 1), character=error.column + 10)
-					),
-					message=error.message,
-					severity=DiagnosticSeverity.Error,
-					source="apg-parser"
-				)
-				diagnostics.append(diagnostic)
-			
-			# If parsing succeeded, do semantic analysis
-			if parse_result.get('success', False) and parse_result.get('parse_tree'):
-				ast = self.ast_builder.build_ast(parse_result['parse_tree'], file_path)
-				if ast:
-					self.parsed_documents[uri] = ast
-					semantic_result = self.semantic_analyzer.analyze(ast)
-					
-					# Add semantic errors
-					for error in semantic_result.get('errors', []):
-						diagnostic = Diagnostic(
-							range=Range(
-								start=Position(line=max(0, error.node.line - 1), character=error.node.column),
-								end=Position(line=max(0, error.node.line - 1), character=error.node.column + 10)
-							),
-							message=error.message,
-							severity=DiagnosticSeverity.Error,
-							source="apg-semantic"
-						)
-						diagnostics.append(diagnostic)
-					
-					# Add semantic warnings
-					for warning in semantic_result.get('warnings', []):
-						diagnostic = Diagnostic(
-							range=Range(
-								start=Position(line=max(0, warning.node.line - 1), character=warning.node.column),
-								end=Position(line=max(0, warning.node.line - 1), character=warning.node.column + 10)
-							),
-							message=warning.message,
-							severity=DiagnosticSeverity.Warning,
-							source="apg-semantic"
-						)
-						diagnostics.append(diagnostic)
-			
-			# Cache and send diagnostics
+			snapshot = build_language_service_snapshot(text, file_path)
+			self.snapshots[uri] = snapshot
+			diagnostics = [
+				self._to_lsp_diagnostic(item)
+				for item in snapshot.get("diagnostics", [])
+			]
 			self.diagnostics_cache[uri] = diagnostics
 			self.server.publish_diagnostics(uri, diagnostics)
 			
@@ -252,39 +217,30 @@ class APGLanguageServer:
 		uri = params.text_document.uri
 		position = params.position
 		
-		completions = []
-		
 		try:
-			# Get current document text
 			text = self.documents.get(uri, "")
-			lines = text.split('\n')
-			
-			if position.line < len(lines):
-				current_line = lines[position.line]
-				line_prefix = current_line[:position.character]
-				
-				# Context-aware completions
-				if self._is_in_entity_context(line_prefix):
-					completions.extend(self._get_entity_completions())
-				elif self._is_in_property_context(line_prefix):
-					completions.extend(self._get_property_completions())
-				elif self._is_in_method_context(line_prefix):
-					completions.extend(self._get_method_completions())
-				elif self._is_in_database_context(line_prefix):
-					completions.extend(self._get_database_completions())
-				else:
-					# General completions
-					completions.extend(self._get_keyword_completions())
-					completions.extend(self._get_builtin_completions())
-					
-					# Add symbols from current document
-					if uri in self.parsed_documents:
-						completions.extend(self._get_symbol_completions(self.parsed_documents[uri]))
+			snapshot = self.snapshots.get(uri) or build_language_service_snapshot(text, self._uri_to_path(uri))
+			self.snapshots[uri] = snapshot
+			completions = service_completion_items(
+				snapshot["semantic_model"],
+				source=text,
+				line=position.line,
+				character=position.character,
+			)
+			return [
+				CompletionItem(
+					label=item["label"],
+					kind=self._completion_kind(item["kind"]),
+					detail=item.get("detail"),
+					insert_text=item.get("insert_text"),
+				)
+				for item in completions
+			]
 		
 		except Exception as e:
 			self.logger.error(f"Error getting completions: {e}")
 		
-		return completions
+		return []
 	
 	async def _get_hover_info(self, params: HoverParams) -> Optional[Hover]:
 		"""Get hover information for symbol under cursor"""
@@ -299,19 +255,16 @@ class APGLanguageServer:
 			if not word:
 				return None
 			
-			# Check if it's a keyword
-			if word in self.keywords:
-				return self._create_keyword_hover(word)
-			
-			# Check if it's a builtin function
-			if word in self.builtin_functions:
-				return self._create_builtin_hover(word)
-			
-			# Check if it's a symbol in the current document
-			if uri in self.parsed_documents:
-				symbol_info = self._find_symbol_info(self.parsed_documents[uri], word)
-				if symbol_info:
-					return self._create_symbol_hover(symbol_info)
+			snapshot = self.snapshots.get(uri) or build_language_service_snapshot(text, self._uri_to_path(uri))
+			self.snapshots[uri] = snapshot
+			content = service_hover(snapshot["semantic_model"], word)
+			if content:
+				return Hover(
+					contents=MarkupContent(
+						kind=MarkupKind.Markdown,
+						value=content["value"],
+					)
+				)
 		
 		except Exception as e:
 			self.logger.error(f"Error getting hover info: {e}")
@@ -327,13 +280,13 @@ class APGLanguageServer:
 			text = self.documents.get(uri, "")
 			word = self._get_word_at_position(text, position)
 			
-			if not word or uri not in self.parsed_documents:
+			if not word:
 				return None
-			
-			# Find symbol definition
-			definition_location = self._find_symbol_definition(self.parsed_documents[uri], word)
-			if definition_location:
-				return [Location(uri=uri, range=definition_location)]
+			snapshot = self.snapshots.get(uri) or build_language_service_snapshot(text, self._uri_to_path(uri))
+			self.snapshots[uri] = snapshot
+			location = service_definition(snapshot["semantic_model"], word)
+			if location:
+				return [Location(uri=uri, range=self._to_lsp_range(location["range"]))]
 		
 		except Exception as e:
 			self.logger.error(f"Error getting definition: {e}")
@@ -352,9 +305,11 @@ class APGLanguageServer:
 			if not word:
 				return None
 			
-			# Find all references in current document
-			references = self._find_symbol_references(text, word)
-			return [Location(uri=uri, range=ref) for ref in references]
+			reference_locations = service_references(text, word, self._uri_to_path(uri))
+			return [
+				Location(uri=uri, range=self._to_lsp_range(location["range"]))
+				for location in reference_locations
+			]
 		
 		except Exception as e:
 			self.logger.error(f"Error getting references: {e}")
@@ -366,11 +321,10 @@ class APGLanguageServer:
 		uri = params.text_document.uri
 		
 		try:
-			if uri not in self.parsed_documents:
-				return []
-			
-			ast = self.parsed_documents[uri]
-			return self._extract_document_symbols(ast)
+			text = self.documents.get(uri, "")
+			snapshot = self.snapshots.get(uri) or build_language_service_snapshot(text, self._uri_to_path(uri))
+			self.snapshots[uri] = snapshot
+			return [self._to_document_symbol(symbol) for symbol in service_document_symbols(snapshot["semantic_model"])]
 		
 		except Exception as e:
 			self.logger.error(f"Error getting document symbols: {e}")
@@ -384,6 +338,80 @@ class APGLanguageServer:
 		"""Convert URI to file path"""
 		parsed = urlparse(uri)
 		return parsed.path
+
+	def _to_lsp_position(self, position: Dict[str, Any]) -> Position:
+		"""Convert semantic-service position data to an LSP position."""
+		return Position(
+			line=max(0, int(position.get("line", 0))),
+			character=max(0, int(position.get("character", 0))),
+		)
+
+	def _to_lsp_range(self, value: Dict[str, Any]) -> Range:
+		"""Convert semantic-service range data to an LSP range."""
+		return Range(
+			start=self._to_lsp_position(value.get("start", {})),
+			end=self._to_lsp_position(value.get("end", value.get("start", {}))),
+		)
+
+	def _to_lsp_diagnostic(self, value: Dict[str, Any]) -> Diagnostic:
+		"""Convert shared APG diagnostic JSON to an LSP diagnostic."""
+		severity_name = str(value.get("severity", "error")).lower()
+		severity = {
+			"error": DiagnosticSeverity.Error,
+			"warning": DiagnosticSeverity.Warning,
+			"information": DiagnosticSeverity.Information,
+			"info": DiagnosticSeverity.Information,
+			"hint": DiagnosticSeverity.Hint,
+		}.get(severity_name, DiagnosticSeverity.Error)
+		return Diagnostic(
+			range=self._to_lsp_range(value.get("range", {})),
+			message=str(value.get("message", "")),
+			severity=severity,
+			source="apg-semantic-model",
+			code=str(value.get("code", "")) or None,
+		)
+
+	def _completion_kind(self, kind: str) -> CompletionItemKind:
+		"""Map service completion kinds to LSP completion kinds."""
+		return {
+			"Class": CompletionItemKind.Class,
+			"Function": CompletionItemKind.Function,
+			"Interface": CompletionItemKind.Interface,
+			"Keyword": CompletionItemKind.Keyword,
+			"Module": CompletionItemKind.Module,
+			"Property": CompletionItemKind.Property,
+			"TypeParameter": CompletionItemKind.TypeParameter,
+			"Variable": CompletionItemKind.Variable,
+		}.get(kind, CompletionItemKind.Text)
+
+	def _symbol_kind(self, kind: str) -> SymbolKind:
+		"""Map semantic symbol kinds to LSP symbol kinds."""
+		return {
+			"agent": SymbolKind.Class,
+			"app": SymbolKind.Module,
+			"capability": SymbolKind.Interface,
+			"composition": SymbolKind.Module,
+			"database": SymbolKind.Namespace,
+			"field": SymbolKind.Property,
+			"flow": SymbolKind.Event,
+			"form": SymbolKind.Object,
+			"module": SymbolKind.Module,
+			"operation": SymbolKind.Function,
+			"package": SymbolKind.Package,
+			"screen": SymbolKind.Object,
+			"table": SymbolKind.Class,
+			"view": SymbolKind.Object,
+		}.get(kind, SymbolKind.Variable)
+
+	def _to_document_symbol(self, value: Dict[str, Any]) -> DocumentSymbol:
+		"""Convert semantic-service document symbol data to an LSP document symbol."""
+		return DocumentSymbol(
+			name=value["name"],
+			kind=self._symbol_kind(value.get("kind", "")),
+			range=self._to_lsp_range(value.get("range", {})),
+			selection_range=self._to_lsp_range(value.get("selection_range", value.get("range", {}))),
+			children=[self._to_document_symbol(child) for child in value.get("children", [])],
+		)
 	
 	def _get_word_at_position(self, text: str, position: Position) -> Optional[str]:
 		"""Get word at cursor position"""
@@ -792,6 +820,12 @@ def create_server_capabilities() -> ServerCapabilities:
 # ========================================
 # CLI Entry Point
 # ========================================
+
+def start_language_server(host: str = "127.0.0.1", port: int = 2087) -> None:
+	"""Start the APG language server over TCP."""
+	server = APGLanguageServer()
+	server.run(host, port)
+
 
 def main():
 	"""Main entry point for APG language server"""

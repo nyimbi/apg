@@ -21,6 +21,13 @@ from cli.main import cli
 from compiler.code_generator import CodeGenerator
 from compiler.compiler import APGCompiler, compile_apg_string
 from compiler.semantic_analyzer import SemanticError
+from language_server.semantic_service import (
+	build_language_service_snapshot,
+	code_actions,
+	definition,
+	hover,
+	references,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -2004,6 +2011,52 @@ def test_python_is_the_only_advertised_compiler_target():
 	assert "fastapi" not in help_result.output
 	assert APGCompiler().get_supported_targets() == ["python"]
 	assert CodeGenerator.normalize_target("python") == "python"
+
+
+def test_language_service_uses_shared_semantic_model_for_editor_features(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+	snapshot = build_language_service_snapshot(source.read_text(encoding="utf-8"), source)
+	model = snapshot["semantic_model"]
+
+	assert snapshot["format"] == "apg.language-service-snapshot.v1"
+	assert model["format"] == "apg.semantic-model.v1"
+	assert snapshot["ok"] is True
+	assert "table.Customer" in model["symbols"]
+	assert "table.SalesOrder" in model["symbols"]
+	assert {item["label"] for item in snapshot["completions"]} >= {"table", "Customer", "SalesOrder"}
+	assert {symbol["name"] for symbol in snapshot["document_symbols"]} >= {"Customer", "SalesOrder"}
+	assert "Customer" in hover(model, "Customer")["value"]
+	assert definition(model, "Customer")["file"] == str(source)
+	assert len(references(source.read_text(encoding="utf-8"), "Customer", source)) >= 2
+
+
+def test_language_service_proposes_code_actions_for_invalid_source(tmp_path):
+	source = tmp_path / "bad.apg"
+	source.write_text("this is not apg", encoding="utf-8")
+	snapshot = build_language_service_snapshot(source.read_text(encoding="utf-8"), source)
+	actions = code_actions(snapshot["diagnostics"])
+
+	assert snapshot["ok"] is False
+	assert snapshot["diagnostics"][0]["code"] == "APG0001"
+	assert actions[0]["command"] == "apg.format.check"
+
+
+def test_cli_language_server_check_json_uses_shared_semantic_model(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["language-server", str(source), "--check", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.language-server-check.v1"
+	assert report["ok"] is True
+	assert report["semantic_model_format"] == "apg.semantic-model.v1"
+	assert report["completion_count"] >= 10
+	assert report["document_symbol_count"] >= 3
+	assert "textDocument/completion" in report["capabilities"]
+	assert "textDocument/codeAction" in report["capabilities"]
 
 
 def test_framework_names_are_not_silent_compiler_target_aliases():

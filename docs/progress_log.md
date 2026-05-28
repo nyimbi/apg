@@ -7661,3 +7661,19 @@ Battery-conscious verification:
 - `.venv/bin/apg capabilities contracts --json` -> emitted `apg.capability-contracts.v1` with 109 contracts
 - `.venv/bin/apg capabilities validate-contracts --json` -> emitted `apg.capability-contract-validation.v1` with 109 valid contracts and 0 errors
 - `.venv/bin/apg capabilities list --category composition --json` -> emitted `apg.capability-contracts.v1` with 6 composition contracts
+
+### 2026-05-28 20:22 EAT
+
+Completed checkpoint:
+
+- Started Phase 4 language-server execution by adding `language_server.semantic_service`, a dependency-light semantic service over the shared `apg.semantic-model.v1` model and shared formatter.
+- Restored the installed `apg language-server` entry point by adding the missing `start_language_server()` adapter.
+- Added `apg language-server <file> --check --json`, which emits `apg.language-server-check.v1` without starting a long-running LSP process.
+- The check report now proves editor-facing diagnostics, context completions, hover/definition data, references, document symbols, code-action suggestion availability, and formatting idempotency from the same semantic source used by compiler tooling.
+- Updated the tooling specification so language-server check mode is documented as an executable current contract and the TCP/stdio server is framed as a thin transport adapter over the semantic service.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile language_server/semantic_service.py language_server/server.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_language_service_uses_shared_semantic_model_for_editor_features tests/test_compiler_baseline.py::test_language_service_proposes_code_actions_for_invalid_source tests/test_compiler_baseline.py::test_cli_language_server_check_json_uses_shared_semantic_model -q` -> 3 passed
+- `.venv/bin/apg language-server examples/05_single_support_agent/main.apg --check --json` -> emitted `apg.language-server-check.v1` with `apg.semantic-model.v1`, 17 completions, 3 document symbols, and 0 diagnostics

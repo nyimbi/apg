@@ -8,6 +8,7 @@ Main command-line interface for APG (Application Programming Generation) languag
 
 import sys
 import os
+import json
 from pathlib import Path
 
 import click
@@ -155,10 +156,39 @@ def doctor():
 
 
 @cli.command()
+@click.argument("source_file", required=False, type=click.Path(path_type=Path))
 @click.option('--port', '-p', default=2087, help='Language server port')
 @click.option('--host', '-h', default='127.0.0.1', help='Language server host')
-def language_server(port: int, host: str):
-	"""Start APG Language Server for IDE integration"""
+@click.option("--check", is_flag=True, help="Run a dependency-light language-service check for one APG file")
+@click.option("--json", "as_json", is_flag=True, help="Emit apg.language-server-check.v1 JSON with --check")
+def language_server(source_file: Path | None, port: int, host: str, check: bool, as_json: bool):
+	"""Start APG Language Server for IDE integration or check one APG file."""
+	if check:
+		if source_file is None:
+			raise click.ClickException("--check requires SOURCE_FILE")
+		if not source_file.exists():
+			raise click.ClickException(f"APG source file not found: {source_file}")
+		if not source_file.is_file():
+			raise click.ClickException(f"APG language-server --check expects a file: {source_file}")
+		from language_server.semantic_service import build_language_server_check
+		report = build_language_server_check(source_file)
+		if as_json:
+			click.echo(json.dumps(report, indent=2, sort_keys=True))
+		else:
+			status = "OK" if report["ok"] else "FAILED"
+			click.echo(
+				f"APG language-server check {status}: {source_file}, "
+				f"{report['diagnostic_count']} diagnostic(s), "
+				f"{report['completion_count']} completion(s), "
+				f"{report['document_symbol_count']} document symbol(s)"
+			)
+		if not report["ok"]:
+			raise click.exceptions.Exit(1)
+		return
+
+	if source_file is not None:
+		raise click.ClickException("SOURCE_FILE is only accepted with --check")
+
 	console.print(f"[blue]Starting APG Language Server on {host}:{port}[/blue]")
 	
 	try:
