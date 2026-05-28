@@ -8258,3 +8258,26 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `34b2b85` (`Document APG agent adapter shims`).
+
+### 2026-05-29 00:38 EAT
+
+In progress:
+
+- Replaced remaining compliance/deployment mock posture in the composition gateway production validator with explicit configuration.
+- `ProductionReadinessValidator` now accepts `validation_config` and passes security/reliability sections through to the existing focused validators.
+- PCI DSS now defaults to compliant instead of emitting a canned production-readiness failure.
+- Deployment readiness now reports missing environment variables, pending migrations, and unavailable services only from explicit config or missing configured environment variables.
+- Added regression coverage proving default posture no longer emits compliance/deployment mock findings and configured posture still reports real issues.
+- Tightened boolean parsing so string values such as `"false"` correctly drive compliance and migration checks.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/production_validator.py tests/test_gateway_production_validator_compliance_deployment_config.py` passed.
+- `.venv/bin/python -m pytest tests/test_gateway_production_validator_compliance_deployment_config.py -q` passed with 2 tests.
+- `.venv/bin/python -m pytest tests/test_gateway_production_validator_security_config.py tests/test_gateway_production_validator_reliability_config.py tests/test_gateway_production_validator_compliance_deployment_config.py -q` passed with 6 tests.
+- `rg -n "Mock:|# Mock|Mock check|Mock: all present|not compliant" capabilities/composition/gateway/production_validator.py tests/test_gateway_production_validator_compliance_deployment_config.py` found no stale mock posture text.
+- `git diff --check -- capabilities/composition/gateway/production_validator.py tests/test_gateway_production_validator_compliance_deployment_config.py` passed.
+
+Commit result:
+
+- Pending.

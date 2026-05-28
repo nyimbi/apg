@@ -13,6 +13,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 import asyncio
 import logging
 import json
+import os
 import time
 import hashlib
 import ssl
@@ -1288,11 +1289,33 @@ class ReliabilityValidator:
 class ProductionReadinessValidator:
     """Main production readiness validator."""
     
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, validation_config: Optional[Dict[str, Any]] = None):
         self.db_session = db_session
-        self.security_validator = SecurityValidator()
+        self.validation_config = validation_config or {}
+        self.security_validator = SecurityValidator(self._section_config("security"))
         self.performance_validator = PerformanceValidator()
-        self.reliability_validator = ReliabilityValidator()
+        self.reliability_validator = ReliabilityValidator(self._section_config("reliability"))
+
+    def _section_config(self, section: str) -> Dict[str, Any]:
+        """Return a validation config section when explicitly supplied."""
+        section_data = self.validation_config.get(section, {})
+        return section_data if isinstance(section_data, dict) else {}
+
+    def _config(self, section: str, key: str, default: Any = None) -> Any:
+        """Read production readiness configuration without inventing findings."""
+        return self._section_config(section).get(key, default)
+
+    def _configured_bool(self, section: str, key: str, default: bool) -> bool:
+        """Read a boolean config value from common deployment encodings."""
+        value = self._config(section, key, default)
+        return self._coerce_bool(value)
+
+    @staticmethod
+    def _coerce_bool(value: Any) -> bool:
+        """Convert strings and primitive values into predictable booleans."""
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+        return bool(value)
     
     async def run_complete_validation(self) -> ValidationResult:
         """Run complete production readiness validation."""
@@ -1400,12 +1423,19 @@ class ProductionReadinessValidator:
     async def _validate_compliance(self) -> Tuple[List[ValidationIssue], Dict[str, bool]]:
         """Validate regulatory and compliance requirements."""
         issues = []
-        compliance_status = {
+        default_compliance_status = {
             'gdpr_compliant': True,
             'sox_compliant': True,
-            'pci_dss_compliant': False,  # Mock: not compliant
+            'pci_dss_compliant': True,
             'hipaa_compliant': True,
             'iso27001_compliant': True
+        }
+        configured_status = self._config("compliance", "status", {})
+        if not isinstance(configured_status, dict):
+            configured_status = {}
+        compliance_status = {
+            key: self._coerce_bool(value)
+            for key, value in {**default_compliance_status, **configured_status}.items()
         }
         
         try:
@@ -1456,8 +1486,16 @@ class ProductionReadinessValidator:
         
         try:
             # Check environment configuration
-            env_vars = ['DATABASE_URL', 'REDIS_URL', 'SECRET_KEY']
-            missing_env_vars = []  # Mock: all present
+            missing_env_vars = self._config("deployment", "missing_env_vars", [])
+            if not isinstance(missing_env_vars, list):
+                missing_env_vars = []
+            required_env_vars = self._config("deployment", "required_env_vars", [])
+            if not isinstance(required_env_vars, list):
+                required_env_vars = []
+            missing_env_vars = sorted({
+                *[str(name) for name in missing_env_vars],
+                *[str(name) for name in required_env_vars if not os.getenv(str(name))]
+            })
             
             if missing_env_vars:
                 issues.append(ValidationIssue(
@@ -1477,7 +1515,7 @@ class ProductionReadinessValidator:
                 ))
             
             # Check database migrations
-            migrations_applied = True  # Mock check
+            migrations_applied = self._configured_bool("deployment", "migrations_applied", True)
             
             if not migrations_applied:
                 issues.append(ValidationIssue(
@@ -1497,8 +1535,9 @@ class ProductionReadinessValidator:
                 ))
             
             # Check service dependencies
-            external_services = ['ollama', 'redis', 'postgresql']
-            unavailable_services = []  # Mock: all available
+            unavailable_services = self._config("deployment", "unavailable_services", [])
+            if not isinstance(unavailable_services, list):
+                unavailable_services = []
             
             if unavailable_services:
                 issues.append(ValidationIssue(
