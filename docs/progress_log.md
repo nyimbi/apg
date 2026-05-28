@@ -6628,3 +6628,20 @@ Battery-conscious verification:
 - `rg -n "placeholder|pass\\s*$|TODO" capabilities/composition/registry/validator.py tests/test_composition_registry_validator_resource_conflicts.py -S` -> no matches
 - `git diff --check capabilities/composition/registry/validator.py tests/test_composition_registry_validator_resource_conflicts.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:02 EAT
+
+Completed checkpoint:
+
+- Replaced marketplace capability and template update processing placeholders with executable sync behavior.
+- Added an in-memory marketplace sync cache for offline/dev operation and database-backed update application for local capability and template records.
+- Added marketplace metadata merging, pending-update recording for unmatched marketplace entries, and registry sync counters for composition UIs.
+- Added focused runtime coverage for full marketplace sync applying capability and template updates through the injected transport path.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/marketplace.py tests/test_composition_registry_marketplace_transport.py`
+- `.venv/bin/python -m pytest tests/test_composition_registry_marketplace_transport.py -q` -> 3 passed, 2 pre-existing warnings
+- `rg -n "Placeholder for processing marketplace capability updates|Placeholder for processing marketplace template updates|pass\\s*$" capabilities/composition/registry/marketplace.py tests/test_composition_registry_marketplace_transport.py -S` -> no matches
+- `git diff --check capabilities/composition/registry/marketplace.py tests/test_composition_registry_marketplace_transport.py`
+- Deferred broader pytest at the user's request to conserve battery.

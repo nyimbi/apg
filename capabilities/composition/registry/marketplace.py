@@ -128,11 +128,11 @@ class MarketplaceSubmission:
 class MarketplaceIntegration:
 	"""
 	Manages APG marketplace integration for capability registry.
-	
+
 	Provides capability publishing, marketplace synchronization,
 	and distribution management across the APG ecosystem.
 	"""
-	
+
 	def __init__(
 		self,
 		db_session: AsyncSession,
@@ -144,25 +144,30 @@ class MarketplaceIntegration:
 		self.tenant_id = tenant_id
 		self.user_id = user_id
 		self.marketplace_api_client = marketplace_api_client
-		
+
 		# Configuration
 		self.marketplace_url = os.getenv("APG_MARKETPLACE_URL", "https://marketplace.apg.platform")
 		self.marketplace_api_key = os.getenv("APG_MARKETPLACE_API_KEY")
 		self.api_version = "v1"
 		self.submission_cache: Dict[str, MarketplaceSubmission] = {}
-	
+		self.marketplace_sync_cache: Dict[str, Dict[str, Any]] = {
+			"capabilities": {},
+			"templates": {},
+			"last_sync": None
+		}
+
 	def _log_marketplace_operation(self, operation: str, details: str) -> str:
 		"""Log marketplace operations."""
 		return f"MP-{self.tenant_id}: {operation} - {details}"
-	
+
 	def _log_marketplace_performance(self, operation: str, duration_ms: float) -> str:
 		"""Log marketplace performance metrics."""
 		return f"MP-Performance: {operation} completed in {duration_ms:.2f}ms"
-	
+
 	# =================================================================
 	# Capability Publication
 	# =================================================================
-	
+
 	async def prepare_capability_for_marketplace(
 		self,
 		capability_id: str,
@@ -170,20 +175,20 @@ class MarketplaceIntegration:
 	) -> Dict[str, Any]:
 		"""
 		Prepare capability for marketplace publication.
-		
+
 		Args:
 			capability_id: Capability ID to publish
 			publication_metadata: Marketplace metadata
-			
+
 		Returns:
 			Publication preparation results
 		"""
 		start_time = datetime.utcnow()
-		
+
 		try:
-			print(self._log_marketplace_operation("prepare_capability", 
+			print(self._log_marketplace_operation("prepare_capability",
 				f"Preparing {capability_id} for marketplace"))
-			
+
 			# Get capability data
 			capability = await self._get_capability_with_details(capability_id)
 			if not capability:
@@ -192,25 +197,25 @@ class MarketplaceIntegration:
 					"message": "Capability not found",
 					"errors": [f"Capability {capability_id} not found"]
 				}
-			
+
 			# Validate capability for marketplace
 			validation_result = await self._validate_capability_for_marketplace(capability)
-			
+
 			if not validation_result["is_valid"]:
 				return {
 					"success": False,
 					"message": "Capability validation failed",
 					"errors": validation_result["errors"]
 				}
-			
+
 			# Create marketplace metadata
 			marketplace_metadata = await self._create_marketplace_metadata(
 				capability, publication_metadata
 			)
-			
+
 			# Generate documentation package
 			documentation = await self._generate_marketplace_documentation(capability)
-			
+
 			# Create publication package
 			publication_package = PublicationPackage(
 				metadata=marketplace_metadata,
@@ -222,10 +227,10 @@ class MarketplaceIntegration:
 				quality_score=await self._calculate_quality_score(capability),
 				compliance_check=await self._run_compliance_check(capability)
 			)
-			
+
 			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 			print(self._log_marketplace_performance("prepare_capability", duration_ms))
-			
+
 			return {
 				"success": True,
 				"message": "Capability prepared for marketplace",
@@ -250,7 +255,7 @@ class MarketplaceIntegration:
 				},
 				"errors": []
 			}
-			
+
 		except Exception as e:
 			print(self._log_marketplace_operation("prepare_capability", f"Error: {e}"))
 			return {
@@ -259,7 +264,7 @@ class MarketplaceIntegration:
 				"data": None,
 				"errors": [str(e)]
 			}
-	
+
 	async def _get_capability_with_details(self, capability_id: str) -> Optional[CRCapability]:
 		"""Get capability with all related data."""
 		try:
@@ -273,7 +278,7 @@ class MarketplaceIntegration:
 			return result.scalar_one_or_none()
 		except Exception:
 			return None
-	
+
 	async def _validate_capability_for_marketplace(
 		self,
 		capability: CRCapability
@@ -281,52 +286,52 @@ class MarketplaceIntegration:
 		"""Validate capability meets marketplace requirements."""
 		errors = []
 		warnings = []
-		
+
 		# Check basic requirements
 		if not capability.description or len(capability.description) < 50:
 			errors.append("Description must be at least 50 characters")
-		
+
 		if not capability.capability_name or len(capability.capability_name) < 5:
 			errors.append("Capability name must be at least 5 characters")
-		
+
 		if capability.status != CRCapabilityStatus.ACTIVE:
 			errors.append("Capability must be in active status")
-		
+
 		# Check version requirements
 		if not capability.versions or len(capability.versions) == 0:
 			errors.append("At least one version must be published")
-		
+
 		# Check quality metrics
 		if capability.quality_score < 0.7:
 			warnings.append("Quality score below recommended threshold (0.7)")
-		
+
 		# Check documentation
 		if not capability.documentation_path:
 			warnings.append("No documentation path specified")
-		
+
 		# Check repository
 		if not capability.repository_url:
 			warnings.append("No repository URL specified")
-		
+
 		return {
 			"is_valid": len(errors) == 0,
 			"errors": errors,
 			"warnings": warnings,
 			"validation_score": max(0, 1.0 - (len(errors) * 0.2) - (len(warnings) * 0.1))
 		}
-	
+
 	async def _create_marketplace_metadata(
 		self,
 		capability: CRCapability,
 		publication_metadata: Dict[str, Any]
 	) -> MarketplaceMetadata:
 		"""Create marketplace metadata from capability and user input."""
-		
+
 		# Extract or default values
 		title = publication_metadata.get("title", capability.capability_name)
 		description = publication_metadata.get("description", capability.description)
 		long_description = publication_metadata.get("long_description", description)
-		
+
 		# Generate tags from composition keywords and category
 		tags = list(set(
 			publication_metadata.get("tags", []) +
@@ -334,7 +339,7 @@ class MarketplaceIntegration:
 			[capability.category, capability.subcategory or ""]
 		))
 		tags = [tag for tag in tags if tag]  # Remove empty strings
-		
+
 		return MarketplaceMetadata(
 			publication_id=uuid7str(),
 			publication_type=PublicationType.CAPABILITY,
@@ -371,11 +376,11 @@ class MarketplaceIntegration:
 			quality_level=self._determine_quality_level(capability),
 			marketplace_status=MarketplaceStatus.DRAFT
 		)
-	
+
 	def _determine_quality_level(self, capability: CRCapability) -> QualityLevel:
 		"""Determine quality level based on capability metrics."""
 		score = capability.quality_score
-		
+
 		if score >= 0.95:
 			return QualityLevel.CERTIFIED
 		elif score >= 0.85:
@@ -386,14 +391,14 @@ class MarketplaceIntegration:
 			return QualityLevel.BETA
 		else:
 			return QualityLevel.EXPERIMENTAL
-	
+
 	async def _generate_marketplace_documentation(
 		self,
 		capability: CRCapability
 	) -> Dict[str, str]:
 		"""Generate documentation package for marketplace."""
 		documentation = {}
-		
+
 		# README
 		documentation["README.md"] = f"""# {capability.capability_name}
 
@@ -436,7 +441,7 @@ Please see the license information in the marketplace listing.
 
 For support and documentation, please visit the APG platform documentation.
 """
-		
+
 		# API Documentation
 		if capability.api_endpoints:
 			documentation["API.md"] = f"""# {capability.capability_name} API Reference
@@ -453,7 +458,7 @@ This capability integrates with APG's authentication system.
 
 Standard APG rate limiting applies.
 """
-		
+
 		# Configuration Guide
 		documentation["CONFIGURATION.md"] = f"""# {capability.capability_name} Configuration
 
@@ -470,9 +475,9 @@ If this capability requires database setup, it will be handled automatically by 
 This capability depends on:
 {chr(10).join([f"- {dep.depends_on_id}" for dep in capability.dependencies])}
 """
-		
+
 		return documentation
-	
+
 	async def _export_capability_data(self, capability: CRCapability) -> Dict[str, Any]:
 		"""Export capability data for marketplace."""
 		return {
@@ -519,11 +524,11 @@ This capability depends on:
 				for version in capability.versions
 			]
 		}
-	
+
 	async def _collect_capability_assets(self, capability: CRCapability) -> List[Dict[str, Any]]:
 		"""Collect assets for marketplace publication."""
 		assets = []
-		
+
 		# Code package
 		if capability.file_path:
 			assets.append({
@@ -534,7 +539,7 @@ This capability depends on:
 				"checksum": "sha256:...",  # Would be calculated
 				"description": "Main capability code package"
 			})
-		
+
 		# Documentation
 		if capability.documentation_path:
 			assets.append({
@@ -545,28 +550,28 @@ This capability depends on:
 				"checksum": "sha256:...",
 				"description": "Capability documentation"
 			})
-		
+
 		return assets
-	
+
 	async def _calculate_quality_score(self, capability: CRCapability) -> float:
 		"""Calculate comprehensive quality score."""
 		scores = []
-		
+
 		# Base quality score
 		scores.append(capability.quality_score)
-		
+
 		# Documentation completeness
 		if capability.description and len(capability.description) > 100:
 			scores.append(0.8)
 		else:
 			scores.append(0.4)
-		
+
 		# Version maturity
 		if capability.versions and len(capability.versions) > 1:
 			scores.append(0.9)
 		else:
 			scores.append(0.6)
-		
+
 		# Usage metrics
 		if capability.usage_count > 10:
 			scores.append(0.9)
@@ -574,15 +579,15 @@ This capability depends on:
 			scores.append(0.7)
 		else:
 			scores.append(0.5)
-		
+
 		# Dependencies health
 		if len(capability.dependencies) <= 5:
 			scores.append(0.8)
 		else:
 			scores.append(0.6)
-		
+
 		return sum(scores) / len(scores)
-	
+
 	async def _run_compliance_check(self, capability: CRCapability) -> Dict[str, Any]:
 		"""Run compliance checks for marketplace."""
 		checks = {
@@ -595,10 +600,10 @@ This capability depends on:
 			"no_security_issues": True,  # Would run security scan
 			"follows_conventions": True  # Would check naming conventions
 		}
-		
+
 		passed_checks = sum(1 for check in checks.values() if check)
 		total_checks = len(checks)
-		
+
 		return {
 			"passed": passed_checks == total_checks,
 			"score": passed_checks / total_checks,
@@ -606,30 +611,30 @@ This capability depends on:
 			"total_checks": total_checks,
 			"passed_checks": passed_checks
 		}
-	
+
 	# =================================================================
 	# Marketplace Submission
 	# =================================================================
-	
+
 	async def submit_to_marketplace(
 		self,
 		publication_package: PublicationPackage
 	) -> Dict[str, Any]:
 		"""
 		Submit capability to APG marketplace.
-		
+
 		Args:
 			publication_package: Complete publication package
-			
+
 		Returns:
 			Submission results
 		"""
 		start_time = datetime.utcnow()
-		
+
 		try:
-			print(self._log_marketplace_operation("submit_to_marketplace", 
+			print(self._log_marketplace_operation("submit_to_marketplace",
 				f"Submitting {publication_package.metadata.title}"))
-			
+
 			# Create submission record
 			submission = MarketplaceSubmission(
 				submission_id=uuid7str(),
@@ -643,10 +648,10 @@ This capability depends on:
 				approval_score=0.0,
 				estimated_review_time=self._estimate_review_time(publication_package)
 			)
-			
+
 			# Store in cache (in real implementation, would send to marketplace API)
 			self.submission_cache[submission.submission_id] = submission
-			
+
 			# Simulate marketplace API call
 			marketplace_response = await self._call_marketplace_api(
 				"submissions", "POST", {
@@ -656,10 +661,10 @@ This capability depends on:
 					"tenant_id": self.tenant_id
 				}
 			)
-			
+
 			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 			print(self._log_marketplace_performance("submit_to_marketplace", duration_ms))
-			
+
 			return {
 				"success": True,
 				"message": "Submission successful",
@@ -673,7 +678,7 @@ This capability depends on:
 				},
 				"errors": []
 			}
-			
+
 		except Exception as e:
 			print(self._log_marketplace_operation("submit_to_marketplace", f"Error: {e}"))
 			return {
@@ -682,28 +687,28 @@ This capability depends on:
 				"data": None,
 				"errors": [str(e)]
 			}
-	
+
 	def _estimate_review_time(self, package: PublicationPackage) -> int:
 		"""Estimate review time in hours."""
 		base_time = 24  # 24 hours base
-		
+
 		# Adjust based on quality
 		if package.quality_score > 0.9:
 			base_time -= 8
 		elif package.quality_score < 0.7:
 			base_time += 16
-		
+
 		# Adjust based on complexity
 		if package.capability_data:
 			complexity = package.capability_data.get("complexity_score", 1.0)
 			base_time += int(complexity * 8)
-		
+
 		# Adjust based on compliance
 		if not package.compliance_check.get("passed", False):
 			base_time += 24
-		
+
 		return max(8, min(72, base_time))  # Between 8 and 72 hours
-	
+
 	async def _call_marketplace_api(
 		self,
 		endpoint: str,
@@ -772,7 +777,7 @@ This capability depends on:
 	def _marketplace_endpoint_url(self, endpoint: str) -> str:
 		"""Build a marketplace endpoint URL from the base URL and API version."""
 		return f"{self.marketplace_url.rstrip('/')}/api/{self.api_version}/{endpoint.lstrip('/')}"
-	
+
 	def _serialize_publication_package(self, package: PublicationPackage) -> Dict[str, Any]:
 		"""Serialize publication package for API transmission."""
 		return {
@@ -793,45 +798,45 @@ This capability depends on:
 			"quality_score": package.quality_score,
 			"compliance_passed": package.compliance_check.get("passed", False)
 		}
-	
+
 	# =================================================================
 	# Marketplace Synchronization
 	# =================================================================
-	
+
 	async def sync_with_marketplace(self) -> Dict[str, Any]:
 		"""
 		Synchronize local registry with marketplace.
-		
+
 		Returns:
 			Synchronization results
 		"""
 		start_time = datetime.utcnow()
-		
+
 		try:
-			print(self._log_marketplace_operation("sync_marketplace", 
+			print(self._log_marketplace_operation("sync_marketplace",
 				"Starting marketplace synchronization"))
-			
+
 			# Get marketplace updates
 			updates = await self._fetch_marketplace_updates()
-			
+
 			# Process capability updates
 			capability_updates = 0
 			for update in updates.get("capabilities", []):
 				await self._process_capability_update(update)
 				capability_updates += 1
-			
+
 			# Process composition templates
 			template_updates = 0
 			for template in updates.get("templates", []):
 				await self._process_template_update(template)
 				template_updates += 1
-			
+
 			# Update registry metadata
 			await self._update_registry_marketplace_info()
-			
+
 			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 			print(self._log_marketplace_performance("sync_marketplace", duration_ms))
-			
+
 			return {
 				"success": True,
 				"message": "Marketplace sync completed",
@@ -843,7 +848,7 @@ This capability depends on:
 				},
 				"errors": []
 			}
-			
+
 		except Exception as e:
 			print(self._log_marketplace_operation("sync_marketplace", f"Error: {e}"))
 			return {
@@ -852,7 +857,7 @@ This capability depends on:
 				"data": None,
 				"errors": [str(e)]
 			}
-	
+
 	async def _fetch_marketplace_updates(self) -> Dict[str, Any]:
 		"""Fetch updates from marketplace."""
 		response = await self._call_marketplace_api(
@@ -865,31 +870,193 @@ This capability depends on:
 			"templates": response.get("templates", []),
 			"last_updated": response.get("last_updated", datetime.utcnow().isoformat())
 		}
-	
+
 	async def _process_capability_update(self, update: Dict[str, Any]):
 		"""Process a capability update from marketplace."""
-		# Placeholder for processing marketplace capability updates
-		pass
-	
+		update_key = str(
+			update.get("capability_id") or
+			update.get("capability_code") or
+			update.get("marketplace_id") or
+			uuid7str()
+		)
+		self.marketplace_sync_cache["capabilities"][update_key] = dict(update)
+
+		if not self.db_session:
+			return
+
+		capability = await self._find_capability_for_marketplace_update(update)
+		if not capability:
+			await self._record_pending_marketplace_update("capabilities", update_key, update)
+			return
+
+		field_map = {
+			"capability_name": "name",
+			"description": "description",
+			"category": "category",
+			"subcategory": "subcategory",
+			"quality_score": "quality_score",
+			"popularity_score": "popularity_score",
+			"repository_url": "repository_url",
+			"documentation_path": "documentation_url",
+			"business_value": "business_value",
+		}
+		for model_field, update_field in field_map.items():
+			if update.get(update_field) is not None:
+				setattr(capability, model_field, update[update_field])
+
+		version = update.get("version") or update.get("latest_version")
+		if version:
+			capability.version = str(version)
+
+		status = update.get("status")
+		if status in {item.value for item in CRCapabilityStatus}:
+			capability.status = status
+
+		for list_field in ("composition_keywords", "provides_services", "data_models", "api_endpoints", "target_users", "use_cases", "industry_focus"):
+			if isinstance(update.get(list_field), list):
+				setattr(capability, list_field, update[list_field])
+
+		capability.metadata = self._merge_marketplace_metadata(capability.metadata, update)
+		capability.updated_at = datetime.utcnow()
+		capability.updated_by = self.user_id
+		self.db_session.add(capability)
+
 	async def _process_template_update(self, template: Dict[str, Any]):
 		"""Process a template update from marketplace."""
-		# Placeholder for processing marketplace template updates
-		pass
-	
-	async def _update_registry_marketplace_info(self):
-		"""Update registry with marketplace information."""
+		template_key = str(
+			template.get("template_id") or
+			template.get("composition_id") or
+			template.get("name") or
+			template.get("marketplace_id") or
+			uuid7str()
+		)
+		self.marketplace_sync_cache["templates"][template_key] = dict(template)
+
+		if not self.db_session:
+			return
+
+		composition = await self._find_template_for_marketplace_update(template)
+		if not composition:
+			await self._record_pending_marketplace_update("templates", template_key, template)
+			return
+
+		for model_field, update_field in (
+			("name", "name"),
+			("description", "description"),
+			("composition_type", "composition_type"),
+			("industry_template", "industry_template"),
+			("deployment_strategy", "deployment_strategy"),
+		):
+			if template.get(update_field) is not None:
+				setattr(composition, model_field, template[update_field])
+
+		version = template.get("version") or template.get("latest_version")
+		if version:
+			composition.version = str(version)
+
+		for json_field in ("configuration", "environment_settings", "deployment_config", "business_requirements", "compliance_requirements", "target_users"):
+			if isinstance(template.get(json_field), (dict, list)):
+				setattr(composition, json_field, template[json_field])
+
+		composition.is_template = True
+		composition.metadata = self._merge_marketplace_metadata(composition.metadata, template)
+		composition.updated_at = datetime.utcnow()
+		composition.updated_by = self.user_id
+		self.db_session.add(composition)
+
+	async def _find_capability_for_marketplace_update(self, update: Dict[str, Any]) -> Optional[CRCapability]:
+		"""Find a local capability targeted by a marketplace update."""
+		capability_id = update.get("capability_id")
+		capability_code = update.get("capability_code") or update.get("code")
+		filters = [CRCapability.tenant_id == self.tenant_id]
+		identity_filters = []
+		if capability_id:
+			identity_filters.append(CRCapability.capability_id == capability_id)
+		if capability_code:
+			identity_filters.append(CRCapability.capability_code == capability_code)
+		if not identity_filters:
+			return None
+
+		result = await self.db_session.execute(
+			select(CRCapability).where(and_(*filters), or_(*identity_filters))
+		)
+		return result.scalar_one_or_none()
+
+	async def _find_template_for_marketplace_update(self, template: Dict[str, Any]) -> Optional[CRComposition]:
+		"""Find a local template composition targeted by a marketplace update."""
+		template_id = template.get("template_id") or template.get("composition_id")
+		name = template.get("name")
+		identity_filters = []
+		if template_id:
+			identity_filters.append(CRComposition.composition_id == template_id)
+		if name:
+			identity_filters.append(CRComposition.name == name)
+		if not identity_filters:
+			return None
+
+		result = await self.db_session.execute(
+			select(CRComposition).where(
+				CRComposition.tenant_id == self.tenant_id,
+				CRComposition.is_template == True,  # noqa: E712 - SQLAlchemy comparison
+				or_(*identity_filters)
+			)
+		)
+		return result.scalar_one_or_none()
+
+	async def _record_pending_marketplace_update(self, update_type: str, update_key: str, update: Dict[str, Any]) -> None:
+		"""Persist unmatched marketplace updates on the registry metadata for later review."""
+		registry = await self._get_registry_record()
+		if not registry:
+			return
+
+		registry.metadata = registry.metadata or {}
+		pending = registry.metadata.setdefault("marketplace_pending_updates", {})
+		pending.setdefault(update_type, {})[update_key] = update
+		registry.updated_at = datetime.utcnow()
+		registry.updated_by = self.user_id
+		self.db_session.add(registry)
+
+	def _merge_marketplace_metadata(self, metadata: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
+		"""Merge marketplace sync metadata while preserving local metadata."""
+		merged = dict(metadata or {})
+		marketplace = dict(merged.get("marketplace", {}))
+		marketplace.update({
+			"marketplace_id": update.get("marketplace_id") or update.get("publication_id"),
+			"last_marketplace_sync": datetime.utcnow().isoformat(),
+			"latest_version": update.get("latest_version") or update.get("version"),
+			"release_notes": update.get("release_notes"),
+			"quality_level": update.get("quality_level"),
+			"pricing_model": update.get("pricing_model"),
+			"raw_update": update,
+		})
+		merged["marketplace"] = {key: value for key, value in marketplace.items() if value is not None}
+		return merged
+
+	async def _get_registry_record(self) -> Optional[CRRegistry]:
+		if not self.db_session:
+			return None
+
 		registry_result = await self.db_session.execute(
 			select(CRRegistry).where(CRRegistry.tenant_id == self.tenant_id)
 		)
-		registry = registry_result.scalar_one_or_none()
-		
+		return registry_result.scalar_one_or_none()
+
+	async def _update_registry_marketplace_info(self):
+		"""Update registry with marketplace information."""
+		self.marketplace_sync_cache["last_sync"] = datetime.utcnow().isoformat()
+		registry = await self._get_registry_record()
+
 		if registry:
 			registry.metadata = registry.metadata or {}
 			registry.metadata["marketplace_last_sync"] = datetime.utcnow().isoformat()
 			registry.metadata["marketplace_integration"] = True
+			registry.metadata["marketplace_cached_capability_updates"] = len(self.marketplace_sync_cache["capabilities"])
+			registry.metadata["marketplace_cached_template_updates"] = len(self.marketplace_sync_cache["templates"])
 			registry.updated_at = datetime.utcnow()
 			registry.updated_by = self.user_id
-			
+
+			await self.db_session.commit()
+		elif self.db_session:
 			await self.db_session.commit()
 
 
