@@ -6113,3 +6113,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `c2945c3` (`Add browser consoles for generated operations`).
+
+### 2026-05-28 10:27 EAT
+
+Completed checkpoint:
+
+- Replaced the event-composition stream processor batch stub with bounded Bytewax-ledger execution.
+- Stream processors can now aggregate, window, join, filter, and map records from the in-process Bytewax stream ledger.
+- Aggregation, windowing, and join processors now emit concrete result events to configured output streams.
+- Bytewax consumers now expose stream offsets and metadata needed by subscription bookkeeping.
+- Added focused regression coverage for aggregation output, tumbling-window output, join correlation output, and consumer offsets.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/events/service.py capabilities/composition/events/tests/unit/test_services.py`
+- `.venv/bin/pytest capabilities/composition/events/tests/unit/test_services.py -q` -> 39 passed
+- `rg -n "not yet implemented|Implementation for|pass$|TODO|placeholder|NotImplemented|Kafka|kafka" capabilities/composition/events/service.py capabilities/composition/events/tests/unit/test_services.py -S` -> no executable placeholder/Kafka matches in touched paths; remaining `pass` lines are cancellation exception handlers.
+- `git diff --check capabilities/composition/events/service.py capabilities/composition/events/tests/unit/test_services.py`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push.

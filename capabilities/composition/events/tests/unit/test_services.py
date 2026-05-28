@@ -16,7 +16,7 @@ from ...service import (
 	EventStreamingService, EventPublishingService, EventConsumptionService,
 	StreamProcessingService, EventSourcingService, SchemaRegistryService,
 	StreamManagementService, ConsumerManagementService,
-	BYTEWAX_STREAMS, BytewaxAdminClient, BytewaxDataflowRuntime,
+	BYTEWAX_STREAMS, BytewaxAdminClient, BytewaxConsumer, BytewaxDataflowRuntime,
 	BytewaxResourceType, BytewaxStreamDefinition
 )
 from ...models import (
@@ -48,6 +48,23 @@ async def test_bytewax_runtime_uses_dataflow_native_stream_registration():
 	assert BytewaxResourceType.STREAM == "stream"
 	assert metadata.stream == "agent_events"
 	assert BYTEWAX_STREAMS["agent_events"][0]["value"]["event"] == "handoff"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_bytewax_consumer_messages_include_offsets():
+	"""Bytewax consumers should expose offsets for downstream bookkeeping."""
+	BYTEWAX_STREAMS.clear()
+	runtime = BytewaxDataflowRuntime(flow_id="unit-flow")
+	await runtime.append(stream="agent_events", value={"event": "handoff"}, key="Planner")
+
+	consumer = BytewaxConsumer("agent_events", group_id="consumer_group")
+	await consumer.start()
+	batch = await consumer.__anext__()
+
+	assert batch[0].offset == 0
+	assert batch[0].stream == "agent_events"
+	await consumer.stop()
 
 # =============================================================================
 # Event Publishing Service Tests
@@ -895,6 +912,108 @@ class TestStreamProcessingService:
 		
 		assert processed_count == 10
 		processing_service._process_events_batch.assert_called_once()
+
+	@pytest.mark.asyncio
+	async def test_process_stream_events_aggregation_emits_bytewax_output(self, processing_service):
+		"""Bounded aggregation processing should emit executable Bytewax output."""
+		BYTEWAX_STREAMS.clear()
+		runtime = BytewaxDataflowRuntime(flow_id="unit-flow")
+		await runtime.append(
+			stream="orders",
+			value={
+				"event_type": "order.created",
+				"aggregate_type": "order",
+				"timestamp": "2026-05-28T10:00:00+00:00",
+				"payload": {"amount": 10},
+			},
+			key="order-1",
+		)
+		await runtime.append(
+			stream="orders",
+			value={
+				"event_type": "order.created",
+				"aggregate_type": "order",
+				"timestamp": "2026-05-28T10:00:01+00:00",
+				"payload": {"amount": 5},
+			},
+			key="order-2",
+		)
+
+		processed_count = await processing_service.process_stream_events(
+			stream_id="orders",
+			processor_config={
+				"type": "aggregate",
+				"aggregation_field": "payload.amount",
+				"group_by_field": "aggregate_type",
+				"output_stream": "order_totals",
+			},
+		)
+
+		assert processed_count == 2
+		result = BYTEWAX_STREAMS["order_totals"][0]["value"]
+		assert result["event_type"] == "aggregation.result"
+		assert result["aggregation_results"]["order"]["count"] == 2
+		assert result["aggregation_results"]["order"]["sum"] == 15.0
+
+	@pytest.mark.asyncio
+	async def test_process_stream_events_windowing_emits_window_summary(self, processing_service):
+		"""Bounded windowing should materialize tumbling-window summaries."""
+		BYTEWAX_STREAMS.clear()
+		runtime = BytewaxDataflowRuntime(flow_id="unit-flow")
+		await runtime.append(
+			stream="events",
+			value={"event_type": "a", "timestamp": "2026-05-28T10:00:00+00:00"},
+		)
+		await runtime.append(
+			stream="events",
+			value={"event_type": "b", "timestamp": "2026-05-28T10:00:20+00:00"},
+		)
+
+		processed_count = await processing_service.process_stream_events(
+			stream_id="events",
+			processor_config={
+				"type": "window",
+				"duration_ms": 60000,
+				"output_stream": "event_windows",
+			},
+		)
+
+		assert processed_count == 2
+		window = BYTEWAX_STREAMS["event_windows"][0]["value"]
+		assert window["event_type"] == "window.result"
+		assert window["count"] == 2
+		assert [event["event_type"] for event in window["events"]] == ["a", "b"]
+
+	@pytest.mark.asyncio
+	async def test_process_stream_events_join_emits_correlated_pairs(self, processing_service):
+		"""Bounded joins should correlate records across two Bytewax streams."""
+		BYTEWAX_STREAMS.clear()
+		runtime = BytewaxDataflowRuntime(flow_id="unit-flow")
+		await runtime.append(
+			stream="users",
+			value={"event_type": "user.created", "payload": {"user_id": "u1"}},
+		)
+		await runtime.append(
+			stream="activations",
+			value={"event_type": "user.activated", "payload": {"user_id": "u1"}},
+		)
+
+		joined_count = await processing_service.process_stream_events(
+			stream_id="users",
+			processor_config={
+				"type": "join",
+				"join_stream": "activations",
+				"join_key": "payload.user_id",
+				"output_stream": "user_lifecycle",
+			},
+		)
+
+		assert joined_count == 1
+		joined = BYTEWAX_STREAMS["user_lifecycle"][0]["value"]
+		assert joined["event_type"] == "join.result"
+		assert joined["join_key"] == "u1"
+		assert joined["left"]["event_type"] == "user.created"
+		assert joined["right"]["event_type"] == "user.activated"
 	
 	@pytest.mark.asyncio
 	async def test_create_aggregation_window(self, processing_service):

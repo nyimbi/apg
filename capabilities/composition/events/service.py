@@ -189,7 +189,15 @@ class BytewaxDataflowRuntime:
 
 class BytewaxProducer(BytewaxDataflowRuntime):
     """Compatibility wrapper for older producer-named test doubles."""
-    pass
+
+    async def publish(
+        self,
+        stream: str,
+        value: Dict[str, Any],
+        key: Optional[str] = None,
+    ) -> BytewaxSendFuture:
+        """Append a record using producer terminology."""
+        return await self.append(stream=stream, value=value, key=key)
 
 
 class BytewaxConsumer:
@@ -223,7 +231,13 @@ class BytewaxConsumer:
         if not records:
             return []
         record = records[0]
-        return [type("BytewaxMessage", (), {"value": record["value"], "key": record["key"]})()]
+        return [type("BytewaxMessage", (), {
+            "value": record["value"],
+            "key": record["key"],
+            "offset": record["sequence"],
+            "stream": record["stream"],
+            "timestamp": record["timestamp"],
+        })()]
 
 
 class BytewaxStreamAlreadyExistsError(Exception):
@@ -1131,7 +1145,79 @@ class StreamProcessingService:
         return await self._process_events_batch(stream_id, processor_config)
 
     async def _process_events_batch(self, stream_id: str, processor_config: Dict[str, Any]) -> int:
-        return 0
+        processor_type = str(
+            processor_config.get("type")
+            or processor_config.get("processor_type")
+            or ProcessorType.AGGREGATE.value
+        ).lower()
+        cursor = int(processor_config.get("cursor", 0) or 0)
+        limit = processor_config.get("limit") or processor_config.get("batch_size")
+        records = self._read_stream_records(stream_id, cursor=cursor, limit=limit)
+        if not records:
+            return 0
+
+        if processor_type in {"aggregation", "aggregate", ProcessorType.AGGREGATE.value}:
+            aggregation_state: Dict[str, Any] = {}
+            for record in records:
+                await self._process_aggregation(aggregation_state, self._record_value(record), processor_config)
+            await self._emit_aggregation_results(
+                processor_config.get("processor_id", f"proc_{stream_id}"),
+                aggregation_state,
+                processor_config,
+            )
+            return len(records)
+
+        if processor_type in {"windowing", "window", ProcessorType.WINDOW.value}:
+            await self._emit_window_results(stream_id, records, processor_config)
+            return len(records)
+
+        if processor_type == ProcessorType.JOIN.value:
+            return await self._process_join_batch(stream_id, records, processor_config)
+
+        if processor_type == ProcessorType.FILTER.value:
+            return await self._process_filter_batch(records, processor_config)
+
+        if processor_type == ProcessorType.MAP.value:
+            return await self._process_map_batch(records, processor_config)
+
+        raise ValueError(f"Unsupported stream processor type: {processor_type}")
+
+    def _read_stream_records(
+        self,
+        stream_id: str,
+        cursor: int = 0,
+        limit: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Read a deterministic bounded slice from the local Bytewax ledger."""
+        records = BYTEWAX_STREAMS.get(stream_id, [])
+        bounded = records[max(cursor, 0):]
+        if limit is not None:
+            bounded = bounded[:int(limit)]
+        return list(bounded)
+
+    def _record_value(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        value = record.get("value", {})
+        return value if isinstance(value, dict) else {"value": value}
+
+    def _output_stream_name(self, config: Dict[str, Any], default: Optional[str] = None) -> Optional[str]:
+        return (
+            config.get("output_stream")
+            or config.get("output_topic")
+            or config.get("target_stream")
+            or config.get("target_stream_id")
+            or config.get("output_stream_id")
+            or default
+        )
+
+    async def _append_processor_output(
+        self,
+        stream_name: str,
+        value: Dict[str, Any],
+        key: Optional[str] = None,
+    ) -> None:
+        producer = BytewaxProducer(flow_id=self.bytewax_config.get("flow_id", "apg-event-streaming"))
+        await producer.start()
+        await _append_to_bytewax(producer, stream=stream_name, value=value, key=key)
 
     async def create_aggregation_window(self, stream_id: str, config: Dict[str, Any]) -> str:
         """Create a logical aggregation window for a stream."""
@@ -1301,8 +1387,8 @@ class StreamProcessingService:
     async def _emit_aggregation_results(self, processor_id: str, state: Dict[str, Any], config: Dict[str, Any]):
         """Emit aggregation results."""
         
-        output_topic = config.get('output_topic')
-        if not output_topic:
+        output_topic = self._output_stream_name(config)
+        if not output_topic or not state:
             return
         
         # Create aggregation result event
@@ -1317,17 +1403,159 @@ class StreamProcessingService:
         }
         
         # Publish to output stream through the Bytewax dataflow facade.
+        await self._append_processor_output(output_topic, result_event, key=processor_id)
         logger.info(f"Emitted aggregation results from processor {processor_id}")
+
+    async def _emit_window_results(
+        self,
+        stream_id: str,
+        records: List[Dict[str, Any]],
+        config: Dict[str, Any],
+    ) -> None:
+        """Emit deterministic tumbling-window summaries for a bounded batch."""
+        output_stream = self._output_stream_name(config, default=f"{stream_id}.windows")
+        duration_ms = int(
+            config.get("duration_ms")
+            or config.get("window_size_ms")
+            or config.get("window_ms")
+            or 60000
+        )
+        windows: Dict[int, List[Dict[str, Any]]] = {}
+
+        for record in records:
+            value = self._record_value(record)
+            timestamp_text = value.get("timestamp") or record.get("timestamp")
+            try:
+                event_time = datetime.fromisoformat(str(timestamp_text).replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                event_time = datetime.now(timezone.utc)
+            window_index = int(event_time.timestamp() * 1000) // duration_ms
+            windows.setdefault(window_index, []).append(value)
+
+        for window_index, events in sorted(windows.items()):
+            window_start_ms = window_index * duration_ms
+            window_end_ms = window_start_ms + duration_ms
+            result_event = {
+                "event_id": f"win_{uuid7str()}",
+                "event_type": "window.result",
+                "source_stream": stream_id,
+                "window_type": config.get("window_type", "tumbling"),
+                "window_start": datetime.fromtimestamp(window_start_ms / 1000, timezone.utc).isoformat(),
+                "window_end": datetime.fromtimestamp(window_end_ms / 1000, timezone.utc).isoformat(),
+                "count": len(events),
+                "events": events,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            await self._append_processor_output(output_stream, result_event, key=f"{stream_id}:{window_index}")
+
+    async def _process_join_batch(
+        self,
+        stream_id: str,
+        left_records: List[Dict[str, Any]],
+        config: Dict[str, Any],
+    ) -> int:
+        """Join a bounded batch with another Bytewax ledger stream."""
+        join_stream = (
+            config.get("join_stream")
+            or config.get("join_stream_id")
+            or config.get("right_stream")
+            or config.get("right_stream_id")
+        )
+        if not join_stream:
+            raise ValueError("join processor requires join_stream or right_stream")
+
+        output_stream = self._output_stream_name(config, default=f"{stream_id}.{join_stream}.joined")
+        left_key_path = config.get("left_key") or config.get("join_key") or "aggregate_id"
+        right_key_path = config.get("right_key") or config.get("join_key") or "aggregate_id"
+        right_records = self._read_stream_records(
+            join_stream,
+            cursor=int(config.get("right_cursor", 0) or 0),
+            limit=config.get("right_limit"),
+        )
+
+        right_index: Dict[Any, List[Dict[str, Any]]] = {}
+        for record in right_records:
+            value = self._record_value(record)
+            right_index.setdefault(self._extract_field_value(value, right_key_path), []).append(value)
+
+        joined_count = 0
+        for left_record in left_records:
+            left_value = self._record_value(left_record)
+            left_key = self._extract_field_value(left_value, left_key_path)
+            for right_value in right_index.get(left_key, []):
+                result_event = {
+                    "event_id": f"join_{uuid7str()}",
+                    "event_type": "join.result",
+                    "left_stream": stream_id,
+                    "right_stream": join_stream,
+                    "join_key": left_key,
+                    "left": left_value,
+                    "right": right_value,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                await self._append_processor_output(output_stream, result_event, key=str(left_key))
+                joined_count += 1
+
+        return joined_count
+
+    async def _process_filter_batch(self, records: List[Dict[str, Any]], config: Dict[str, Any]) -> int:
+        output_stream = self._output_stream_name(config)
+        if not output_stream:
+            return 0
+        field_path = config.get("field") or config.get("filter_field")
+        expected_value = config.get("equals", config.get("expected_value"))
+        emitted = 0
+        for record in records:
+            value = self._record_value(record)
+            if field_path is None or self._extract_field_value(value, field_path) == expected_value:
+                await self._append_processor_output(output_stream, value, key=record.get("key"))
+                emitted += 1
+        return emitted
+
+    async def _process_map_batch(self, records: List[Dict[str, Any]], config: Dict[str, Any]) -> int:
+        output_stream = self._output_stream_name(config)
+        if not output_stream:
+            return 0
+        add_fields = config.get("add_fields", {})
+        emitted = 0
+        for record in records:
+            mapped = dict(self._record_value(record))
+            mapped.update(add_fields)
+            await self._append_processor_output(output_stream, mapped, key=record.get("key"))
+            emitted += 1
+        return emitted
     
     async def _run_windowing_processor(self, processor_id: str, config: Dict[str, Any]):
         """Run windowing processor (tumbling, hopping, session windows)."""
-        # Implementation for windowing operations
-        logger.info(f"Windowing processor not yet implemented: {processor_id}")
+        stream_id = config.get("input_stream") or config.get("input_topic")
+        if not stream_id:
+            logger.error(f"Windowing processor missing input stream: {processor_id}")
+            return
+        cursor = int(config.get("cursor", 0) or 0)
+        while True:
+            processor_config = dict(config)
+            processor_config.update({"type": "windowing", "cursor": cursor})
+            processed = await self._process_events_batch(stream_id, processor_config)
+            if processed == 0:
+                await asyncio.sleep(float(config.get("poll_interval_seconds", 0.1)))
+            else:
+                cursor += processed
     
     async def _run_join_processor(self, processor_id: str, config: Dict[str, Any]):
         """Run stream join processor."""
-        # Implementation for stream joins
-        logger.info(f"Join processor not yet implemented: {processor_id}")
+        stream_id = config.get("input_stream") or config.get("input_topic") or config.get("left_stream")
+        if not stream_id:
+            logger.error(f"Join processor missing input stream: {processor_id}")
+            return
+        cursor = int(config.get("cursor", 0) or 0)
+        while True:
+            processor_config = dict(config)
+            processor_config.update({"type": "join", "cursor": cursor})
+            processed = await self._process_events_batch(stream_id, processor_config)
+            if processed == 0:
+                await asyncio.sleep(float(config.get("poll_interval_seconds", 0.1)))
+            else:
+                cursor += processed
     
     async def close(self):
         """Close all stream processors."""
