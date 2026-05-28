@@ -381,6 +381,7 @@ def test_generated_app_manifest_includes_capability_descriptions():
         app = types.ModuleType("app")
         exec(compile(result.generated_files["app.py"], "app.py", "exec"), app.__dict__)
         manifest = app.describe_application()
+        validation = app.validate_application()
     finally:
         sys.modules.pop("apg_capabilities", None)
 
@@ -395,6 +396,14 @@ def test_generated_app_manifest_includes_capability_descriptions():
     assert manifest["ui_routes"]["/finance/gl/journals"]["component"] == "JournalScreen"
     assert manifest["streaming_processors"] == {"bytewax": ["GeneralLedger"]}
     assert json.loads(json.dumps(manifest))["capability_descriptions"]["GeneralLedger"]["name"] == "GeneralLedger"
+    assert validation["valid"] is True
+    assert validation["errors"] == []
+    assert validation["checks"]["capability_contracts"]["errors"] == []
+    assert validation["checks"]["capability_dependencies"]["warnings"] == [
+        "GeneralLedger requires external service audit_log"
+    ]
+    assert "capability_contracts: GeneralLedger requires external service audit_log" in validation["warnings"]
+    assert json.loads(json.dumps(validation))["name"] == "erp_ops"
 
 
 def test_generated_app_manifest_includes_capability_composition_topology():
@@ -441,6 +450,7 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     try:
         spec.loader.exec_module(module)
         grouped = module.describe_capabilities_by_erp_module()
+        validation = module.validate_application()
     finally:
         sys.modules.pop("erp_ops_generated", None)
         for name in list(sys.modules):
@@ -452,8 +462,10 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert module.capability_dependency_graph() == {"GeneralLedger": []}
     assert module.streaming_processor_index() == {"bytewax": ["GeneralLedger"]}
     assert module.ui_route_index()["/finance/gl/journals"]["component"] == "JournalScreen"
+    assert validation["valid"] is True
     assert "describe_capabilities_by_erp_module" in module.__all__
     assert "composition_graph" in module.__all__
+    assert "validate_application" in module.__all__
     assert json.loads(json.dumps(grouped))["accounts_payable"][0]["name"] == "GeneralLedger"
 
 

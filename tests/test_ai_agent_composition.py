@@ -212,6 +212,8 @@ def test_generated_app_manifest_includes_ai_agents_and_teams():
         app = types.ModuleType("app")
         exec(compile(result.generated_files["app.py"], "app.py", "exec"), app.__dict__)
         manifest = app.describe_application()
+        validation = app.validate_application()
+        restricted_validation = app.validate_application(["local"])
     finally:
         sys.modules.pop("ai_agents", None)
 
@@ -223,3 +225,10 @@ def test_generated_app_manifest_includes_ai_agents_and_teams():
         "Writer",
     ]
     assert json.loads(json.dumps(manifest))["ai_agent_team_descriptions"]["SupportCrew"]["name"] == "SupportCrew"
+    assert validation["valid"] is True
+    assert validation["checks"]["ai_agent_runtimes"]["validated_agents"] == ["Planner", "Writer"]
+    assert restricted_validation["valid"] is False
+    assert restricted_validation["errors"] == [
+        "ai_agent_runtimes: Planner references unavailable runtime codex"
+    ]
+    assert json.loads(json.dumps(validation))["name"] == "support"

@@ -5155,3 +5155,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `618c028` (`Expose capability topology in generated app manifests`) to `origin/main`.
+
+### 2026-05-28 05:44 EAT
+
+Completed checkpoint:
+
+- Added generated `validate_application()` to framework-neutral `app.py` outputs.
+- The generated validator aggregates AI-agent runtime validation plus capability contract, dependency, component, master-data, i18n, and Bytewax streaming checks into one JSON-safe report with top-level `valid`, `errors`, `warnings`, and per-check details.
+- Reexported `validate_application()` from generated package `__init__.py`.
+- Added focused AI-agent and capability regressions for default validation, restricted runtime validation failures, package reexports, and JSON round-trips.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py -q` -> 13 passed
+- Direct generated AI app validation smoke -> restricted runtime report returned `ai_agent_runtimes: Planner references unavailable runtime codex`.
+- Direct generated capability app validation smoke -> valid report with warning `capability_contracts: GeneralLedger requires external service audit_log`.
+- `git diff --check -- compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py docs/progress_log.md` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending.

@@ -268,6 +268,45 @@ def describe_application() -> Dict[str, Any]:
     return description
 
 
+def _record_validation(report: Dict[str, Any], name: str, validation: Dict[str, Any]) -> None:
+    check = dict(validation)
+    errors = [str(error) for error in check.get("errors", [])]
+    warnings = [str(warning) for warning in check.get("warnings", [])]
+    report["checks"][name] = check
+    report["errors"].extend(f"{{name}}: {{error}}" for error in errors)
+    report["warnings"].extend(f"{{name}}: {{warning}}" for warning in warnings)
+
+
+def validate_application(available_agent_runtimes: list[str] | None = None) -> Dict[str, Any]:
+    report: Dict[str, Any] = {{
+        "name": MODULE_NAME,
+        "valid": True,
+        "errors": [],
+        "warnings": [],
+        "checks": {{}},
+    }}
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
+        _record_validation(
+            report,
+            "ai_agent_runtimes",
+            AI_AGENTS.validate_agent_runtimes(available_agent_runtimes),
+        )
+    if APG_CAPABILITIES is not None:
+        for check_name, function_name in (
+            ("capability_contracts", "validate_capability_contracts"),
+            ("capability_dependencies", "validate_capability_dependencies"),
+            ("component_contracts", "validate_component_contracts"),
+            ("master_data_contracts", "validate_master_data_contracts"),
+            ("capability_i18n", "validate_capability_i18n"),
+            ("streaming_contracts", "validate_streaming_contracts"),
+        ):
+            validator = getattr(APG_CAPABILITIES, function_name, None)
+            if validator is not None:
+                _record_validation(report, check_name, validator())
+    report["valid"] = not report["errors"]
+    return report
+
+
 def main() -> None:
     print(json.dumps(describe_application(), indent=2, sort_keys=True))
 
@@ -1598,13 +1637,14 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import describe_application, list_entities, main',
+			'from .app import describe_application, list_entities, main, validate_application',
 			'',
 			'__all__ = [',
 			'    "__version__",',
 			'    "describe_application",',
 			'    "list_entities",',
 			'    "main",',
+			'    "validate_application",',
 			']',
 			'',
 			'try:',
