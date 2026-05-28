@@ -1302,8 +1302,20 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
     if interfaces.get("theme") != "/theme.css":
         errors.append("component manifest theme interface must point to /theme.css")
     deployment = manifest.get("deployment", {})
-    artifacts = set(deployment.get("artifacts", [])) if isinstance(deployment, dict) else set()
     expected_artifacts = ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
+    raw_artifacts = deployment.get("artifacts", []) if isinstance(deployment, dict) else []
+    artifacts: set[str] = set()
+    if not isinstance(raw_artifacts, list):
+        errors.append("component manifest deployment artifacts must be an array")
+        raw_artifacts = []
+    for artifact in raw_artifacts:
+        if not isinstance(artifact, str):
+            errors.append("component manifest deployment artifacts must be strings")
+            continue
+        artifacts.add(artifact)
+    unexpected_artifacts = sorted(artifacts.difference(expected_artifacts))
+    for artifact in unexpected_artifacts:
+        errors.append(f"component manifest deployment has unexpected artifact {artifact}")
     artifact_root = Path(__file__).resolve().parent if "__file__" in globals() else None
     for artifact in expected_artifacts:
         if artifact not in artifacts:

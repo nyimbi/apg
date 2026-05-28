@@ -7289,3 +7289,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated component manifest validation reports zero errors with artifact existence checks enabled
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 17:47 EAT
+
+Completed checkpoint:
+
+- Strengthened generated component manifest validation so deployment artifacts must be string entries from the exact generated artifact set.
+- Added a focused regression that injects an unexpected legacy artifact and a non-string artifact entry, then verifies the generated validator rejects both.
+- Refreshed all 20 numbered example outputs so their generated validators enforce exact artifact metadata.
+
+Battery-conscious verification:
+
+- Regenerated `examples/[01-20]*/output` with the compiler after the exact-artifact validator change.
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_component_manifest_contract_rejects_unexpected_artifacts tests/test_compiler_baseline.py::test_generated_component_manifest_contract_rejects_missing_artifact_files tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated component manifest validation reports zero errors with exact artifact metadata
+- Deferred broader pytest at the user's request to conserve battery.
