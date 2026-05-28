@@ -6223,3 +6223,17 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `8fd6976` (`Make GLR period reporting executable`).
+
+### 2026-05-28 11:16 EAT
+
+Completed checkpoint:
+
+- Recompiled all 20 numbered APG examples with the current compiler.
+- Each example compiled successfully into its own `examples/[0-9][0-9]*/output/` directory.
+- The generated output tree was already current; the compile pass produced no generated-file diffs.
+
+Battery-conscious verification:
+
+- `.venv/bin/python - <<'PY' ... compile_apg_file(source, source.parent / "output") ... PY` -> 20/20 examples compiled successfully
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 3 passed
+- Deferred broader pytest at the user's request to conserve battery.
