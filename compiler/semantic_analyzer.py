@@ -19,7 +19,7 @@ from .ast_builder import (
 	MethodDeclaration, Parameter, TypeAnnotation, Expression, Statement,
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
 	AssignmentStatement, ReturnStatement, BlockStatement, EntityType,
-	AIAgentDeclaration, AgentTeamDeclaration, CapabilityDeclaration, ListExpression, DictExpression
+	AIAgentDeclaration, AgentTeamDeclaration, ApplicationDeclaration, CapabilityDeclaration, ListExpression, DictExpression
 )
 
 
@@ -395,6 +395,8 @@ class SemanticAnalyzer:
 			self._validate_agent_team_constraints(entity)
 		elif entity.entity_type == EntityType.CAPABILITY:
 			self._validate_capability_constraints(entity)
+		elif isinstance(entity, ApplicationDeclaration):
+			self._validate_application_constraints(entity)
 		elif entity.entity_type == EntityType.DIGITAL_TWIN:
 			# Digital twin-specific validations
 			self._validate_digital_twin_constraints(entity)
@@ -490,6 +492,28 @@ class SemanticAnalyzer:
 			if len(set(entity.capabilities)) != len(entity.capabilities):
 				self.errors.append(SemanticError(
 					f"Agent team '{entity.name}' declares duplicate capabilities",
+					entity
+				))
+
+	def _validate_application_constraints(self, entity: EntityDeclaration):
+		"""Validate first-class application composition shape."""
+		if not isinstance(entity, ApplicationDeclaration):
+			return
+		if not (entity.capabilities or entity.components or entity.routes):
+			self.warnings.append(SemanticError(
+				f"Application '{entity.name}' should compose capabilities, components, or routes",
+				entity,
+				"warning"
+			))
+		for field_name, values in {
+			"capabilities": entity.capabilities,
+			"agents": entity.agents,
+			"agent_teams": entity.agent_teams,
+			"routes": entity.routes,
+		}.items():
+			if len(set(values)) != len(values):
+				self.errors.append(SemanticError(
+					f"Application '{entity.name}' declares duplicate {field_name}",
 					entity
 				))
 

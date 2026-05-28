@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, quote
 MODULE_NAME = 'enterprise_erp_platform'
 MODULE_VERSION = '1.0.0'
 MODULE_DESCRIPTION = None
-ENTITIES = [{'name': 'Customer', 'type': 'entity', 'properties': ['customer_number', 'legal_name', 'email', 'active'], 'fields': [{'name': 'customer_number', 'type': 'str', 'required': True}, {'name': 'legal_name', 'type': 'str', 'required': True}, {'name': 'email', 'type': 'str', 'required': True}, {'name': 'active', 'type': 'bool', 'required': True}], 'methods': []}, {'name': 'Item', 'type': 'entity', 'properties': ['sku', 'description', 'unit_price', 'active'], 'fields': [{'name': 'sku', 'type': 'str', 'required': True}, {'name': 'description', 'type': 'str', 'required': True}, {'name': 'unit_price', 'type': 'float', 'required': True}, {'name': 'active', 'type': 'bool', 'required': True}], 'methods': []}, {'name': 'SalesOrder', 'type': 'entity', 'properties': ['customer_id', 'order_number', 'total', 'status'], 'fields': [{'name': 'customer_id', 'type': 'int', 'required': True}, {'name': 'order_number', 'type': 'str', 'required': True}, {'name': 'total', 'type': 'float', 'required': True}, {'name': 'status', 'type': 'str', 'required': True}], 'methods': []}, {'name': 'PlatformAudit', 'type': 'capability', 'properties': [], 'fields': [], 'methods': []}, {'name': 'EnterpriseFinance', 'type': 'capability', 'properties': [], 'fields': [], 'methods': []}, {'name': 'EnterpriseOperations', 'type': 'capability', 'properties': [], 'fields': [], 'methods': []}]
+ENTITIES = [{'name': 'EnterpriseERPPlatform', 'type': 'app', 'properties': [], 'fields': [], 'methods': []}, {'name': 'Customer', 'type': 'entity', 'properties': ['customer_number', 'legal_name', 'email', 'active'], 'fields': [{'name': 'customer_number', 'type': 'str', 'required': True}, {'name': 'legal_name', 'type': 'str', 'required': True}, {'name': 'email', 'type': 'str', 'required': True}, {'name': 'active', 'type': 'bool', 'required': True}], 'methods': []}, {'name': 'Item', 'type': 'entity', 'properties': ['sku', 'description', 'unit_price', 'active'], 'fields': [{'name': 'sku', 'type': 'str', 'required': True}, {'name': 'description', 'type': 'str', 'required': True}, {'name': 'unit_price', 'type': 'float', 'required': True}, {'name': 'active', 'type': 'bool', 'required': True}], 'methods': []}, {'name': 'SalesOrder', 'type': 'entity', 'properties': ['customer_id', 'order_number', 'total', 'status'], 'fields': [{'name': 'customer_id', 'type': 'int', 'required': True}, {'name': 'order_number', 'type': 'str', 'required': True}, {'name': 'total', 'type': 'float', 'required': True}, {'name': 'status', 'type': 'str', 'required': True}], 'methods': []}, {'name': 'PlatformAudit', 'type': 'capability', 'properties': [], 'fields': [], 'methods': []}, {'name': 'EnterpriseFinance', 'type': 'capability', 'properties': [], 'fields': [], 'methods': []}, {'name': 'EnterpriseOperations', 'type': 'capability', 'properties': [], 'fields': [], 'methods': []}]
 ENTITY_NAMES = {entity["name"] for entity in ENTITIES}
 RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity in ENTITIES}
 NEXT_RECORD_IDS: Dict[str, int] = {entity["name"]: 1 for entity in ENTITIES}
@@ -34,7 +34,7 @@ def _optional_module(name: str) -> Optional[Any]:
         try:
             return importlib.import_module(f".{name}", __package__)
         except ImportError:
-            pass
+            package_import_failed = True
     try:
         return importlib.import_module(name)
     except ImportError:
@@ -42,6 +42,7 @@ def _optional_module(name: str) -> Optional[Any]:
 
 
 AI_AGENTS = _optional_module("ai_agents")
+APG_APPLICATIONS = _optional_module("apg_application")
 APG_CAPABILITIES = _optional_module("apg_capabilities")
 
 
@@ -317,6 +318,8 @@ def component_manifest() -> Dict[str, Any]:
         "entities": list_entities(),
         "ai_agents": app.get("ai_agents", []),
         "ai_agent_teams": app.get("ai_agent_teams", []),
+        "application_compositions": app.get("application_compositions", []),
+        "application_dependency_graph": app.get("application_dependency_graph", {}),
         "capabilities": app.get("capabilities", []),
         "ui_routes": app.get("ui_routes", {}),
         "streaming_processors": app.get("streaming_processors", {}),
@@ -475,6 +478,7 @@ def openapi_document() -> Dict[str, Any]:
         "/events": {"get": _api_operation("Record mutation events", "Event log")},
         "/auth": {"get": _api_operation("Authentication status", "Authentication mode")},
         "/metrics": {"get": _api_operation("Application metrics", "Runtime metrics")},
+        "/applications": {"get": _api_operation("Application compositions", "Application composition catalog")},
         "/self-test": {"get": _api_operation("Application self-test", "Self-test report")},
         "/theme.css": {"get": _api_operation("Generated visual theme stylesheet", "CSS theme stylesheet")},
         "/records": {"get": _api_operation("All entity records", "Records by entity")},
@@ -575,6 +579,14 @@ def describe_application() -> Dict[str, Any]:
             name: AI_AGENTS.describe_team(name)
             for name in AI_AGENTS.list_agent_teams()
         }
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "list_applications"):
+        description["application_compositions"] = APG_APPLICATIONS.list_applications()
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "describe_application_compositions"):
+        description["application_composition_descriptions"] = APG_APPLICATIONS.describe_application_compositions()
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "application_dependency_graph"):
+        description["application_dependency_graph"] = APG_APPLICATIONS.application_dependency_graph()
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "application_component_catalog"):
+        description["application_component_catalog"] = APG_APPLICATIONS.application_component_catalog()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities"):
         description["capabilities"] = APG_CAPABILITIES.list_capabilities()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capabilities"):
@@ -616,6 +628,19 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
             report,
             "ai_agent_runtimes",
             AI_AGENTS.validate_agent_runtimes(available_agent_runtimes),
+        )
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "validate_application_compositions"):
+        available_capabilities = APG_CAPABILITIES.list_capabilities() if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities") else []
+        available_agents = AI_AGENTS.list_agents() if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents") else []
+        available_teams = AI_AGENTS.list_agent_teams() if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agent_teams") else []
+        _record_validation(
+            report,
+            "application_compositions",
+            APG_APPLICATIONS.validate_application_compositions(
+                available_capabilities=available_capabilities,
+                available_agents=available_agents,
+                available_teams=available_teams,
+            ),
         )
     if APG_CAPABILITIES is not None:
         for check_name, function_name in (
@@ -1277,6 +1302,13 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, {
             "agents": describe_application().get("ai_agent_descriptions", {}),
             "teams": describe_application().get("ai_agent_team_descriptions", {}),
+        }
+    if path == "/applications":
+        app = describe_application()
+        return 200, {
+            "applications": app.get("application_composition_descriptions", {}),
+            "dependency_graph": app.get("application_dependency_graph", {}),
+            "components": app.get("application_component_catalog", {}),
         }
     if path == "/capabilities":
         app = describe_application()

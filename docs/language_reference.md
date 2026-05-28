@@ -1013,6 +1013,35 @@ swarm SupportCrew {
 
 The compiler validates agent references and emits `ai_agents.py` with `AI_AGENTS`, `AI_AGENT_TEAMS`, lookup helpers, runtime aliases, and per-agent/per-team capabilities, configuration, rules, UI, and theme metadata. See [AI Agent Composition](./ai_agent_composition.md) for the executable contract.
 
+### Application Composition
+
+Applications are first-class composition units. Use `app`, `application`, or
+`composition` to assemble capabilities, AI agents, routes, screens, deployment
+metadata, and theme tokens into a larger executable application.
+
+```apg
+app EnterpriseERPPlatform {
+    description: "Composable ERP application shell";
+    capabilities: [PlatformAudit, EnterpriseFinance, EnterpriseOperations];
+    routes: ["/erp/finance", "/erp/operations", "/erp/operations/dashboard"];
+    components: {
+        finance_workbench: {capability: journal_entries, route: "/erp/finance"},
+        operations_workbench: {capability: executive_kpis, route: "/erp/operations"}
+    };
+    screens: {
+        ExecutiveHome: {route: "/erp", capability: EnterpriseOperations}
+    };
+    theme: {name: enterprise_theme, tokens: {accent: "#174EA6"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+}
+```
+
+The compiler emits `apg_application.py`, includes application composition
+metadata in generated manifests, exposes `GET /applications`, and validates
+local capability/agent references when the generated runtime catalogs are
+present. See [Application Composition](./application_composition.md) for the
+executable contract.
+
 ### Screen Composition
 
 Capabilities can declare first-class screens when generated applications need

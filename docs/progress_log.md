@@ -6025,3 +6025,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `54a31c7` (`Document and compile numbered APG examples`).
+
+### 2026-05-28 09:38 EAT
+
+Completed checkpoint:
+
+- Added first-class APG application composition AST support for `app`, `application`, and `composition` declarations.
+- Added compiler output for `apg_application.py` with application catalogs, component catalogs, dependency graphs, and composition validation.
+- Wired generated Python apps to expose application composition metadata through `describe_application()`, `component_manifest()`, `GET /applications`, package exports, and `validate_application()`.
+- Documented the application-composition surface and linked it from the documentation index and language reference.
+- Updated example 20 to declare an `app EnterpriseERPPlatform` shell and regenerated the checked-in numbered example outputs.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_examples_parseable.py tests/test_application_composition_runtime.py compiler/ast_builder.py compiler/code_generator.py compiler/semantic_analyzer.py`
+- `.venv/bin/pytest tests/test_application_composition_runtime.py tests/test_code_generator_executable_defaults.py tests/test_capability_composition_runtime.py tests/test_examples_parseable.py -q` -> 23 passed
+- `.venv/bin/python -c '...'` py-compiled 77 generated Python files under `examples/[0-9][0-9]*/output/`
+- `git diff --check`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.

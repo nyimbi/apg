@@ -18,7 +18,7 @@ from .ast_builder import (
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
 	UnaryExpression, MemberExpression, IndexExpression, ListExpression,
 	DictExpression,
-	AIAgentDeclaration, AgentTeamDeclaration, CapabilityDeclaration
+	AIAgentDeclaration, AgentTeamDeclaration, ApplicationDeclaration, CapabilityDeclaration
 )
 
 # Import composable template system
@@ -146,6 +146,7 @@ class PythonCodeGenerator:
 			# Generate application files
 			generated_files = engine.generate_application_files(context)
 			generated_files.update(self._generate_ai_agent_files(ast))
+			generated_files.update(self._generate_application_files(ast))
 			generated_files.update(self._generate_capability_files(ast))
 			
 			# Handle different output modes
@@ -179,6 +180,7 @@ class PythonCodeGenerator:
 			"smoke_test.py": self._generate_python_smoke_test(),
 		}
 		files.update(self._generate_ai_agent_files(ast))
+		files.update(self._generate_application_files(ast))
 		files.update(self._generate_capability_files(ast))
 		return files
 
@@ -237,7 +239,7 @@ def _optional_module(name: str) -> Optional[Any]:
         try:
             return importlib.import_module(f".{{name}}", __package__)
         except ImportError:
-            pass
+            package_import_failed = True
     try:
         return importlib.import_module(name)
     except ImportError:
@@ -245,6 +247,7 @@ def _optional_module(name: str) -> Optional[Any]:
 
 
 AI_AGENTS = _optional_module("ai_agents")
+APG_APPLICATIONS = _optional_module("apg_application")
 APG_CAPABILITIES = _optional_module("apg_capabilities")
 
 
@@ -520,6 +523,8 @@ def component_manifest() -> Dict[str, Any]:
         "entities": list_entities(),
         "ai_agents": app.get("ai_agents", []),
         "ai_agent_teams": app.get("ai_agent_teams", []),
+        "application_compositions": app.get("application_compositions", []),
+        "application_dependency_graph": app.get("application_dependency_graph", {{}}),
         "capabilities": app.get("capabilities", []),
         "ui_routes": app.get("ui_routes", {{}}),
         "streaming_processors": app.get("streaming_processors", {{}}),
@@ -678,6 +683,7 @@ def openapi_document() -> Dict[str, Any]:
         "/events": {{"get": _api_operation("Record mutation events", "Event log")}},
         "/auth": {{"get": _api_operation("Authentication status", "Authentication mode")}},
         "/metrics": {{"get": _api_operation("Application metrics", "Runtime metrics")}},
+        "/applications": {{"get": _api_operation("Application compositions", "Application composition catalog")}},
         "/self-test": {{"get": _api_operation("Application self-test", "Self-test report")}},
         "/theme.css": {{"get": _api_operation("Generated visual theme stylesheet", "CSS theme stylesheet")}},
         "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
@@ -778,6 +784,14 @@ def describe_application() -> Dict[str, Any]:
             name: AI_AGENTS.describe_team(name)
             for name in AI_AGENTS.list_agent_teams()
         }}
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "list_applications"):
+        description["application_compositions"] = APG_APPLICATIONS.list_applications()
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "describe_application_compositions"):
+        description["application_composition_descriptions"] = APG_APPLICATIONS.describe_application_compositions()
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "application_dependency_graph"):
+        description["application_dependency_graph"] = APG_APPLICATIONS.application_dependency_graph()
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "application_component_catalog"):
+        description["application_component_catalog"] = APG_APPLICATIONS.application_component_catalog()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities"):
         description["capabilities"] = APG_CAPABILITIES.list_capabilities()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capabilities"):
@@ -819,6 +833,19 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
             report,
             "ai_agent_runtimes",
             AI_AGENTS.validate_agent_runtimes(available_agent_runtimes),
+        )
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "validate_application_compositions"):
+        available_capabilities = APG_CAPABILITIES.list_capabilities() if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities") else []
+        available_agents = AI_AGENTS.list_agents() if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents") else []
+        available_teams = AI_AGENTS.list_agent_teams() if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agent_teams") else []
+        _record_validation(
+            report,
+            "application_compositions",
+            APG_APPLICATIONS.validate_application_compositions(
+                available_capabilities=available_capabilities,
+                available_agents=available_agents,
+                available_teams=available_teams,
+            ),
         )
     if APG_CAPABILITIES is not None:
         for check_name, function_name in (
@@ -1480,6 +1507,13 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, {{
             "agents": describe_application().get("ai_agent_descriptions", {{}}),
             "teams": describe_application().get("ai_agent_team_descriptions", {{}}),
+        }}
+    if path == "/applications":
+        app = describe_application()
+        return 200, {{
+            "applications": app.get("application_composition_descriptions", {{}}),
+            "dependency_graph": app.get("application_dependency_graph", {{}}),
+            "components": app.get("application_component_catalog", {{}}),
         }}
     if path == "/capabilities":
         app = describe_application()
@@ -2232,6 +2266,199 @@ def list_entities() -> list[Dict[str, Any]]:
 		if not capabilities:
 			return {}
 		return {"apg_capabilities.py": self._generate_capability_runtime(capabilities)}
+
+	def _generate_application_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Generate first-class application composition runtime files."""
+		applications = [entity for entity in ast.entities if isinstance(entity, ApplicationDeclaration)]
+		if not applications:
+			return {}
+		return {"apg_application.py": self._generate_application_runtime(applications)}
+
+	def _generate_application_runtime(self, applications: List[ApplicationDeclaration]) -> str:
+		"""Generate a dependency-free runtime manifest for APG application composition."""
+		application_specs = {
+			application.name: {
+				"description": application.description,
+				"capabilities": application.capabilities,
+				"agents": application.agents,
+				"agent_teams": application.agent_teams,
+				"components": application.components,
+				"screens": application.screens,
+				"routes": application.routes,
+				"workflows": application.workflows,
+				"policies": application.policies,
+				"configuration": application.configuration,
+				"theme": application.theme,
+				"runtime": application.runtime,
+				"integrations": application.integrations,
+				"deployments": application.deployments,
+			}
+			for application in applications
+		}
+		return f'''"""
+APG Application Composition Runtime
+===================================
+
+Generated from first-class APG app/application composition declarations.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Dict, List
+
+
+@dataclass(frozen=True)
+class ApplicationSpec:
+    name: str
+    description: str | None
+    capabilities: List[str]
+    agents: List[str]
+    agent_teams: List[str]
+    components: Any
+    screens: Any
+    routes: List[str]
+    workflows: List[str]
+    policies: Any
+    configuration: Dict[str, Any]
+    theme: Dict[str, Any]
+    runtime: Dict[str, Any]
+    integrations: Any
+    deployments: Any
+
+
+APPLICATION_DATA: Dict[str, Dict[str, Any]] = {application_specs!r}
+APPLICATIONS: Dict[str, ApplicationSpec] = {{
+    name: ApplicationSpec(name=name, **data)
+    for name, data in APPLICATION_DATA.items()
+}}
+
+
+def list_applications() -> List[str]:
+    return sorted(APPLICATIONS)
+
+
+def get_application(name: str) -> ApplicationSpec:
+    return APPLICATIONS[name]
+
+
+def describe_application_composition(name: str) -> Dict[str, Any]:
+    application = get_application(name)
+    return {{
+        "name": application.name,
+        "description": application.description,
+        "capabilities": list(application.capabilities),
+        "agents": list(application.agents),
+        "agent_teams": list(application.agent_teams),
+        "components": application.components,
+        "screens": application.screens,
+        "routes": list(application.routes),
+        "workflows": list(application.workflows),
+        "policies": application.policies,
+        "configuration": dict(application.configuration),
+        "theme": dict(application.theme),
+        "runtime": dict(application.runtime),
+        "integrations": application.integrations,
+        "deployments": application.deployments,
+    }}
+
+
+def describe_application_compositions() -> Dict[str, Dict[str, Any]]:
+    return {{
+        name: describe_application_composition(name)
+        for name in list_applications()
+    }}
+
+
+def _as_list(value: Any) -> List[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return list(value)
+    return [value]
+
+
+def application_component_catalog() -> Dict[str, Dict[str, Any]]:
+    catalog: Dict[str, Dict[str, Any]] = {{}}
+    for application in APPLICATIONS.values():
+        components = application.components
+        if isinstance(components, dict):
+            for component_name, component_spec in components.items():
+                component_id = f"{{application.name}}.{{component_name}}"
+                catalog[component_id] = {{
+                    "id": component_id,
+                    "application": application.name,
+                    "name": str(component_name),
+                    "spec": dict(component_spec) if isinstance(component_spec, dict) else {{"value": component_spec}},
+                }}
+        for route in application.routes:
+            component_id = f"{{application.name}}.route.{{route}}"
+            catalog[component_id] = {{
+                "id": component_id,
+                "application": application.name,
+                "name": str(route),
+                "kind": "route",
+                "spec": {{"route": route}},
+            }}
+    return catalog
+
+
+def application_dependency_graph() -> Dict[str, List[Dict[str, str]]]:
+    nodes: Dict[str, Dict[str, str]] = {{}}
+    edges: List[Dict[str, str]] = []
+
+    def node(node_id: str, kind: str, name: str) -> None:
+        nodes[node_id] = {{"id": node_id, "kind": kind, "name": name}}
+
+    def edge(source: str, target: str, relation: str) -> None:
+        edges.append({{"source": source, "target": target, "relation": relation}})
+
+    for application in APPLICATIONS.values():
+        app_id = f"application:{{application.name}}"
+        node(app_id, "application", application.name)
+        for capability in application.capabilities:
+            capability_id = f"capability:{{capability}}"
+            node(capability_id, "capability", str(capability))
+            edge(app_id, capability_id, "uses_capability")
+        for agent in application.agents:
+            agent_id = f"agent:{{agent}}"
+            node(agent_id, "agent", str(agent))
+            edge(app_id, agent_id, "uses_agent")
+        for team in application.agent_teams:
+            team_id = f"agent_team:{{team}}"
+            node(team_id, "agent_team", str(team))
+            edge(app_id, team_id, "uses_agent_team")
+        for route in application.routes:
+            route_id = f"route:{{route}}"
+            node(route_id, "route", str(route))
+            edge(app_id, route_id, "exposes_route")
+    return {{"nodes": sorted(nodes.values(), key=lambda item: item["id"]), "edges": edges}}
+
+
+def validate_application_compositions(
+    available_capabilities: List[str] | None = None,
+    available_agents: List[str] | None = None,
+    available_teams: List[str] | None = None,
+) -> Dict[str, List[str]]:
+    known_capabilities = set(available_capabilities or [])
+    known_agents = set(available_agents or [])
+    known_teams = set(available_teams or [])
+    errors: List[str] = []
+    warnings: List[str] = []
+    for application in APPLICATIONS.values():
+        if not application.capabilities and not application.components and not application.routes:
+            warnings.append(f"{{application.name}} does not compose capabilities, components, or routes")
+        for capability in application.capabilities:
+            if known_capabilities and capability not in known_capabilities:
+                errors.append(f"{{application.name}} references unknown capability {{capability}}")
+        for agent in application.agents:
+            if known_agents and agent not in known_agents:
+                errors.append(f"{{application.name}} references unknown agent {{agent}}")
+        for team in application.agent_teams:
+            if known_teams and team not in known_teams:
+                errors.append(f"{{application.name}} references unknown agent team {{team}}")
+    return {{"errors": errors, "warnings": warnings}}
+'''
 
 	def _generate_capability_runtime(self, capabilities: List[CapabilityDeclaration]) -> str:
 		"""Generate a dependency-free runtime manifest for APG capabilities."""
@@ -3622,7 +3849,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        validate_agent_runtimes,',
 			'    )',
 			'except ImportError:',
-			'    pass',
+			'    __all__ = list(__all__)',
 			'else:',
 			'    __all__.extend([',
 			'        "get_agent",',
@@ -3634,6 +3861,29 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        "list_agents",',
 			'        "list_teams",',
 			'        "validate_agent_runtimes",',
+			'    ])',
+			'',
+			'try:',
+			'    from .apg_application import (',
+			'        application_component_catalog,',
+			'        application_dependency_graph,',
+			'        describe_application_composition,',
+			'        describe_application_compositions,',
+			'        get_application,',
+			'        list_applications,',
+			'        validate_application_compositions,',
+			'    )',
+			'except ImportError:',
+			'    __all__ = list(__all__)',
+			'else:',
+			'    __all__.extend([',
+			'        "application_component_catalog",',
+			'        "application_dependency_graph",',
+			'        "describe_application_composition",',
+			'        "describe_application_compositions",',
+			'        "get_application",',
+			'        "list_applications",',
+			'        "validate_application_compositions",',
 			'    ])',
 			'',
 			'try:',
@@ -3658,7 +3908,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        ui_route_index,',
 			'    )',
 			'except ImportError:',
-			'    pass',
+			'    __all__ = list(__all__)',
 			'else:',
 			'    __all__.extend([',
 			'        "capability_dependency_graph",',

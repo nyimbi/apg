@@ -1,10 +1,11 @@
 # Enterprise ERP Platform
 
-Largest example: records plus finance and operations capabilities with screens, rules, themes, i18n, and streaming.
+Largest example: records plus an application composition shell, finance and operations capabilities, screens, rules, themes, i18n, and streaming.
 
 ## What This Example Demonstrates
 
 - Customer/item/order records
+- First-class `app` composition over ERP capabilities and routes
 - Finance and operations capabilities
 - Enterprise dashboard composition
 

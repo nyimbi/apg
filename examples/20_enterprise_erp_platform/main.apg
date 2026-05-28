@@ -5,6 +5,23 @@ module enterprise_erp_platform version 1.0.0 {
     description: "Executable APG ERP platform skeleton assembled from composable records and capabilities";
 }
 
+app EnterpriseERPPlatform {
+    description: "Composable ERP application shell that assembles finance, operations, and audit capabilities";
+    capabilities: [PlatformAudit, EnterpriseFinance, EnterpriseOperations];
+    routes: ["/erp/finance", "/erp/operations", "/erp/operations/dashboard"];
+    components: {
+        finance_workbench: {capability: journal_entries, route: "/erp/finance"},
+        operations_workbench: {capability: executive_kpis, route: "/erp/operations"},
+        audit_console: {capability: audit_events, route: "/erp/audit"}
+    };
+    screens: {
+        ExecutiveHome: {route: "/erp", capability: EnterpriseOperations, component: "ExecutiveHome"}
+    };
+    theme: {name: enterprise_theme, tokens: {accent: "#174EA6", surface: "#F8FAFC"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker};
+}
+
 table Customer {
     customer_number: str;
     legal_name: str;

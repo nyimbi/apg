@@ -65,6 +65,7 @@ Generated deployment artifacts:
 
 ## Entities
 
+- `EnterpriseERPPlatform`
 - `Customer`
 - `Item`
 - `SalesOrder`

@@ -50,7 +50,7 @@ try:
         validate_agent_runtimes,
     )
 except ImportError:
-    pass
+    __all__ = list(__all__)
 else:
     __all__.extend([
         "get_agent",
@@ -62,6 +62,29 @@ else:
         "list_agents",
         "list_teams",
         "validate_agent_runtimes",
+    ])
+
+try:
+    from .apg_application import (
+        application_component_catalog,
+        application_dependency_graph,
+        describe_application_composition,
+        describe_application_compositions,
+        get_application,
+        list_applications,
+        validate_application_compositions,
+    )
+except ImportError:
+    __all__ = list(__all__)
+else:
+    __all__.extend([
+        "application_component_catalog",
+        "application_dependency_graph",
+        "describe_application_composition",
+        "describe_application_compositions",
+        "get_application",
+        "list_applications",
+        "validate_application_compositions",
     ])
 
 try:
@@ -86,7 +109,7 @@ try:
         ui_route_index,
     )
 except ImportError:
-    pass
+    __all__ = list(__all__)
 else:
     __all__.extend([
         "capability_dependency_graph",

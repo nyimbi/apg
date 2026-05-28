@@ -1,0 +1,163 @@
+"""Regression coverage for first-class APG application composition."""
+
+from __future__ import annotations
+
+import json
+import importlib.util
+import sys
+import types
+
+from compiler.ast_builder import ASTBuilder, ApplicationDeclaration
+from compiler.compiler import APGCompiler
+from compiler.parser import APGParser
+
+
+APPLICATION_SOURCE = """
+module enterprise_suite version 1.0.0 {}
+
+app EnterpriseSuite {
+    description: "Composable ERP shell";
+    capabilities: [GeneralLedger];
+    routes: ["/finance", "/ops"];
+    components: {
+        ledger_workbench: {capability: ledger_service, route: "/finance"}
+    };
+    screens: {
+        Home: {route: "/", capability: GeneralLedger}
+    };
+    theme: {name: enterprise_theme, tokens: {accent: "#174EA6"}};
+    runtime: {target: python, deployment: container};
+}
+
+capability GeneralLedger {
+    contract: {
+        id: general_ledger,
+        provides: [ledger_service],
+        ui: {shell: python}
+    };
+}
+"""
+
+
+def test_application_declaration_parses_as_first_class_composition():
+    parse_result = APGParser().parse_string(APPLICATION_SOURCE, "application.apg")
+    assert parse_result["success"] is True
+
+    ast = ASTBuilder().build_ast(parse_result["parse_tree"], "application.apg")
+    applications = [
+        entity for entity in ast.entities
+        if isinstance(entity, ApplicationDeclaration)
+    ]
+
+    assert len(applications) == 1
+    application = applications[0]
+    assert application.name == "EnterpriseSuite"
+    assert application.description == "Composable ERP shell"
+    assert application.capabilities == ["GeneralLedger"]
+    assert application.routes == ["/finance", "/ops"]
+    assert application.components["ledger_workbench"]["route"] == "/finance"
+    assert application.theme["tokens"]["accent"] == "#174EA6"
+    assert application.runtime == {"target": "python", "deployment": "container"}
+
+
+def test_application_composition_compiles_to_executable_runtime_manifest():
+    result = APGCompiler().compile_string(APPLICATION_SOURCE, "application.apg")
+    assert result.success is True
+    assert "apg_application.py" in result.generated_files
+
+    namespace: dict[str, object] = {}
+    exec(
+        compile(result.generated_files["apg_application.py"], "apg_application.py", "exec"),
+        namespace,
+    )
+
+    assert namespace["list_applications"]() == ["EnterpriseSuite"]
+    description = namespace["describe_application_composition"]("EnterpriseSuite")
+    assert description["capabilities"] == ["GeneralLedger"]
+    assert description["routes"] == ["/finance", "/ops"]
+    assert namespace["application_component_catalog"]()["EnterpriseSuite.ledger_workbench"]["spec"] == {
+        "capability": "ledger_service",
+        "route": "/finance",
+    }
+    graph_edges = {
+        (edge["source"], edge["relation"], edge["target"])
+        for edge in namespace["application_dependency_graph"]()["edges"]
+    }
+    assert ("application:EnterpriseSuite", "uses_capability", "capability:GeneralLedger") in graph_edges
+    assert ("application:EnterpriseSuite", "exposes_route", "route:/finance") in graph_edges
+    assert namespace["validate_application_compositions"](
+        available_capabilities=["GeneralLedger"],
+    ) == {"errors": [], "warnings": []}
+    assert json.loads(json.dumps(description))["name"] == "EnterpriseSuite"
+
+
+def test_generated_app_manifest_includes_application_composition():
+    result = APGCompiler().compile_string(APPLICATION_SOURCE, "application.apg")
+    assert result.success is True
+
+    application_module = types.ModuleType("apg_application")
+    capabilities_module = types.ModuleType("apg_capabilities")
+    sys.modules["apg_application"] = application_module
+    sys.modules["apg_capabilities"] = capabilities_module
+    try:
+        exec(
+            compile(result.generated_files["apg_application.py"], "apg_application.py", "exec"),
+            application_module.__dict__,
+        )
+        exec(
+            compile(result.generated_files["apg_capabilities.py"], "apg_capabilities.py", "exec"),
+            capabilities_module.__dict__,
+        )
+
+        app = types.ModuleType("app")
+        exec(compile(result.generated_files["app.py"], "app.py", "exec"), app.__dict__)
+        manifest = app.describe_application()
+        component = app.component_manifest()
+        validation = app.validate_application()
+        applications_payload = app._route_payload("/applications")[1]
+    finally:
+        sys.modules.pop("apg_application", None)
+        sys.modules.pop("apg_capabilities", None)
+
+    assert manifest["application_compositions"] == ["EnterpriseSuite"]
+    assert manifest["application_composition_descriptions"]["EnterpriseSuite"]["routes"] == ["/finance", "/ops"]
+    assert component["application_compositions"] == ["EnterpriseSuite"]
+    assert component["application_dependency_graph"]["edges"]
+    assert validation["valid"] is True
+    assert validation["checks"]["application_compositions"] == {"errors": [], "warnings": []}
+    assert applications_payload["applications"]["EnterpriseSuite"]["capabilities"] == ["GeneralLedger"]
+
+
+def test_generated_package_reexports_application_composition_helpers(tmp_path):
+    result = APGCompiler().compile_string(APPLICATION_SOURCE, "application.apg")
+    assert result.success is True
+
+    package_dir = tmp_path / "enterprise_suite_generated"
+    package_dir.mkdir()
+    for filename, content in result.generated_files.items():
+        (package_dir / filename).write_text(content, encoding="utf-8")
+
+    spec = importlib.util.spec_from_file_location(
+        "enterprise_suite_generated",
+        package_dir / "__init__.py",
+        submodule_search_locations=[str(package_dir)],
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["enterprise_suite_generated"] = module
+    try:
+        spec.loader.exec_module(module)
+        applications = module.list_applications()
+        application = module.describe_application_composition("EnterpriseSuite")
+        graph = module.application_dependency_graph()
+    finally:
+        sys.modules.pop("enterprise_suite_generated", None)
+        for name in list(sys.modules):
+            if name.startswith("enterprise_suite_generated."):
+                sys.modules.pop(name, None)
+
+    assert applications == ["EnterpriseSuite"]
+    assert application["capabilities"] == ["GeneralLedger"]
+    assert graph["edges"]
+    assert "list_applications" in module.__all__
+    assert "application_dependency_graph" in module.__all__
+    assert "validate_application_compositions" in module.__all__

@@ -173,6 +173,25 @@ class CapabilityDeclaration(EntityDeclaration):
 
 
 @dataclass
+class ApplicationDeclaration(EntityDeclaration):
+	"""First-class APG application composition declaration"""
+	description: Optional[str] = None
+	capabilities: List[str] = field(default_factory=list)
+	agents: List[str] = field(default_factory=list)
+	agent_teams: List[str] = field(default_factory=list)
+	components: Any = field(default_factory=dict)
+	screens: Any = field(default_factory=dict)
+	routes: List[str] = field(default_factory=list)
+	workflows: List[str] = field(default_factory=list)
+	policies: Any = field(default_factory=dict)
+	configuration: Dict[str, Any] = field(default_factory=dict)
+	theme: Dict[str, Any] = field(default_factory=dict)
+	runtime: Dict[str, Any] = field(default_factory=dict)
+	integrations: Any = field(default_factory=dict)
+	deployments: Any = field(default_factory=dict)
+
+
+@dataclass
 class PropertyDeclaration(ASTNode):
 	"""Property/field declaration within an entity"""
 	name: str
@@ -488,6 +507,9 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		for kind, name, body in self._iter_source_entities(cleaned):
 			if kind == "module":
 				continue
+			if kind in {"app", "application", "composition"}:
+				module.entities.append(self._parse_source_application(kind, name, body, source_file))
+				continue
 			if kind == "capability":
 				module.entities.append(self._parse_source_capability(name, body, source_file))
 				continue
@@ -620,6 +642,38 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			i18n=_dict_value(props.get("i18n", props.get("localization"))),
 			streaming=_dict_value(props.get("streaming")),
 			screens=contract_value("screens", props.get("screens", {})),
+			source_file=source_file,
+		)
+
+	def _parse_source_application(
+		self,
+		kind: str,
+		name: str,
+		body: str,
+		source_file: Optional[str],
+	) -> ApplicationDeclaration:
+		"""Parse first-class application composition metadata from source text."""
+		from .ai_agent_composition import _dict_value, _optional_string, _parse_properties, _string_list
+
+		props = _parse_properties(body)
+		description = _optional_string(props.get("description"))
+		return ApplicationDeclaration(
+			entity_type=self._entity_type_for_source_kind(kind),
+			name=name,
+			description=description,
+			capabilities=_string_list(props.get("capabilities", props.get("capability"))),
+			agents=_string_list(props.get("agents", props.get("agent"))),
+			agent_teams=_string_list(props.get("agent_teams", props.get("teams"))),
+			components=props.get("components", {}),
+			screens=props.get("screens", {}),
+			routes=_string_list(props.get("routes", props.get("route"))),
+			workflows=_string_list(props.get("workflows", props.get("flows"))),
+			policies=props.get("policies", props.get("policy", {})),
+			configuration=_dict_value(props.get("config", props.get("configuration"))),
+			theme=_dict_value(props.get("theme")),
+			runtime=_dict_value(props.get("runtime")),
+			integrations=props.get("integrations", {}),
+			deployments=props.get("deployments", props.get("deployment", {})),
 			source_file=source_file,
 		)
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from compiler.compiler import compile_apg_file
@@ -67,5 +68,8 @@ def test_numbered_apg_examples_include_readmes_and_compiled_outputs():
 		)
 		if missing:
 			failures.append(f"{example_dir}: missing output files {missing}")
+		source_text = source.read_text(encoding="utf-8")
+		if re.search(r"\b(app|application|composition)\s+\w+\s*\{", source_text) and not (output_dir / "apg_application.py").is_file():
+			failures.append(f"{example_dir}: missing apg_application.py for application composition")
 
 	assert failures == []
