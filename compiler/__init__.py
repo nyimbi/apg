@@ -29,6 +29,7 @@ from .diagnostics import audit_diagnostic_fixtures, diagnostic_registry, explain
 from .drift import audit_drift_fixtures, build_drift_report, compare_semantic_models
 from .explain import build_explain_report
 from .graphs import audit_graph_fixtures
+from .linting import audit_lint_fixtures, lint_path
 from .semantic_model import audit_semantic_model_fixtures, build_semantic_model, build_semantic_model_from_module
 from .parser_golden import audit_parser_golden
 from .packager import build_package_report
@@ -57,6 +58,8 @@ __all__ = [
     'compare_semantic_models',
     'build_explain_report',
     'audit_graph_fixtures',
+    'audit_lint_fixtures',
+    'lint_path',
     'build_semantic_model',
     'build_semantic_model_from_module',
     'audit_semantic_model_fixtures',

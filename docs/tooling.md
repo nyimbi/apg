@@ -25,6 +25,10 @@ APG currently has an executable compiler path:
 - `apg lint <file-or-directory> --catalog <capability-root> --json` validates
   declared APG capabilities against executable capability contracts discovered
   from checked-in `capability_contract.py` files;
+- `apg lint --audit-fixtures --json` emits `apg.lint-fixture-audit.v1` by
+  checking checked-in lint fixtures for valid source, syntax diagnostics,
+  strict warning promotion, capability catalog validation, shared semantic-model
+  availability, and database-backed form diagnostics;
 - `apg validate <file> --target python --json` emits `apg.validate-report.v1`
   with lint results and generator-readiness metadata;
 - `apg model <file> --json` emits `apg.semantic-model.v1` with normalized
@@ -101,7 +105,7 @@ APG currently has an executable compiler path:
   fixtures across web, desktop, mobile, and container profiles;
 - `apg tooling audit --json` emits `apg.tooling-fixture-audit.v1` by running
   every checked-in compiler tooling fixture catalog as one CI-friendly gate:
-  parser-golden, diagnostics, formatter, drift, semantic model, graph,
+  parser-golden, diagnostics, lint, formatter, drift, semantic model, graph,
   language-server, natural-language planning, migrations, and release evidence;
 - `apg language-server <file> --check --json` emits
   `apg.language-server-check.v1` from the shared semantic model and formatter,
@@ -243,6 +247,7 @@ designers, and natural-language tools.
 | `compiler.explain` | Existing semantic explanation builder for symbols, diagnostics, and handlers. Extend it as the semantic model deepens. |
 | `compiler.code_generator` | Existing Python artifact generator. It remains the only compile target and should consume the normalized semantic model rather than ad hoc parse fragments. |
 | `compiler.diagnostics` | Existing diagnostic registry and fixture audit for APG code ranges, severities, related locations, fix IDs, and explanation text. |
+| `compiler.linting` | Existing lint report builder and lint fixture audit. Keep `apg lint` as a thin CLI wrapper over this module so validation, release gates, language tooling, and agents consume the same lint contract. |
 | `compiler.formatter` | Existing deterministic formatter for `.apg` source. Extend it toward full AST-aware formatting. |
 | `compiler.graphs` | Existing graph builders for ER, lookup, workflow, handler, capability, security, agent, package, and deployment graphs. |
 | `compiler.packager` | Existing package-profile builder over generated Python applications and release evidence. Extend it toward signed distribution bundles as packaging requirements deepen. |
@@ -811,14 +816,23 @@ when it directly strengthens compiler release evidence.
 apg lint app.apg
 apg lint app.apg --json
 apg lint src/apg --strict --catalog capabilities
+apg lint --audit-fixtures --json
 ```
 
-The lint command consumes `apg.semantic-model.v1` rather than maintaining a
-separate parser/analyzer path. With `--catalog`, it validates discovered
-`capability_contract.py` files and resolves every declared APG capability by
-capability name, contract `id`, and provided/required service keys. Unknown
-capabilities emit `APG0901` diagnostics in the normal `apg.lint-report.v1`
-payload, and catalog-shape failures emit `APG9000` diagnostics.
+The lint command is implemented in `compiler.linting` and consumes
+`apg.semantic-model.v1` rather than maintaining a separate parser/analyzer path.
+With `--catalog`, it validates discovered `capability_contract.py` files and
+resolves every declared APG capability by capability name, contract `id`, and
+provided/required service keys. Unknown capabilities emit `APG0901` diagnostics
+in the normal `apg.lint-report.v1` payload, and catalog-shape failures emit
+`APG9000` diagnostics.
+
+`apg lint --audit-fixtures --json` loads
+`tests/fixtures/lint/catalog.json` by default and emits
+`apg.lint-fixture-audit.v1`. The audit proves that lint still handles valid
+source, parser diagnostics, strict warning promotion, shared semantic-model
+availability, capability catalog validation, and database-backed form
+diagnostics before lint is trusted by larger compiler and release gates.
 
 Exit codes:
 
@@ -1081,7 +1095,7 @@ apg tooling audit --json
 
 The tooling audit emits `apg.tooling-fixture-audit.v1` and runs every
 checked-in compiler tooling fixture catalog through one command. It aggregates
-parser-golden, diagnostics, formatter, semantic drift, graph-suite,
+parser-golden, diagnostics, lint, formatter, semantic drift, graph-suite,
 language-server, natural-language planner, migration, and release-evidence
 fixture audits. Each surface reports its expected format, actual format,
 format match, summary, error count, and blocking-gap count. The aggregate exits
@@ -1446,6 +1460,7 @@ Tooling tests must be fixture-driven and deterministic.
 | Parser golden tests | Valid/invalid DSL examples for every grammar construct, enforced by `apg parser-golden --json` and the `apg.parser-golden-audit.v1` report. |
 | Semantic tests | Symbol table, lookup paths, handler targets, capability catalog binding, workflows, packages, deployments, database-backed form binding, and diagnostics, enforced by `apg model --audit-fixtures --json` and the `apg.semantic-model-fixture-audit.v1` report. |
 | Diagnostic golden tests | Every diagnostic code has at least one fixture and expected JSON output. |
+| Linter tests | Valid source, syntax errors, strict warnings, capability catalog checks, semantic-model availability, and database-backed form diagnostics, enforced by `apg lint --audit-fixtures --json` and the `apg.lint-fixture-audit.v1` report. |
 | Formatter tests | Idempotency, comment preservation, modifier ordering, stable output. |
 | CLI contract tests | Exit codes, JSON schemas, text summaries, bad arguments. |
 | LSP tests | Completion, hover, definition, references, rename, code actions, formatting, and source immutability, enforced by `apg language-server --audit-fixtures --json` and the `apg.language-server-fixture-audit.v1` report. |
@@ -1482,8 +1497,8 @@ When a new keyword, block, nested item, or syntax form is added to `spec/apg.g4`
 - Identify duplicate semantic logic.
 - Define JSON schemas for diagnostics and semantic model.
 - Add fixture directories and built-in fixture catalogs for parser-golden,
-  diagnostic-golden, formatter, semantic drift, graph, migration, and verifier
-  tests.
+  diagnostic-golden, linter, formatter, semantic drift, graph, migration, and
+  verifier tests.
 
 Exit criteria:
 
@@ -1491,6 +1506,7 @@ Exit criteria:
 - No new generator behavior required.
 - Tooling fixtures can run in CI, including `apg parser-golden --json`,
   `apg diagnostics --audit-fixtures --json`,
+  `apg lint --audit-fixtures --json`,
   `apg model --audit-fixtures --json`,
   `apg format --audit-fixtures --json`,
   `apg graph-suite --audit-fixtures --json`,
@@ -1528,8 +1544,8 @@ Exit criteria:
 Exit criteria:
 
 - All required diagnostic families have fixtures.
-- `apg lint --json`, `apg format --check`, and
-  `apg format --audit-fixtures --json` are stable.
+- `apg lint --json`, `apg lint --audit-fixtures --json`,
+  `apg format --check`, and `apg format --audit-fixtures --json` are stable.
 - Existing DSL release audit consumes the new reports.
 
 ### Phase 3: CLI And Graph Tooling

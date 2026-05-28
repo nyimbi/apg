@@ -9,6 +9,7 @@ from compiler.drift import audit_drift_fixtures
 from compiler.evidence_bundle import audit_release_evidence_fixtures
 from compiler.formatter import audit_formatter_fixtures
 from compiler.graphs import audit_graph_fixtures
+from compiler.linting import audit_lint_fixtures
 from compiler.migrations import audit_migration_fixtures
 from compiler.nl_plan import audit_nl_plan_fixtures
 from compiler.parser_golden import audit_parser_golden
@@ -63,6 +64,7 @@ def _fixture_audits() -> list[FixtureAudit]:
 	return [
 		("parser_golden", "apg.parser-golden-audit.v1", audit_parser_golden),
 		("diagnostics", "apg.diagnostic-audit.v1", audit_diagnostic_fixtures),
+		("lint", "apg.lint-fixture-audit.v1", audit_lint_fixtures),
 		("formatter", "apg.formatter-audit.v1", audit_formatter_fixtures),
 		("drift", "apg.drift-audit.v1", audit_drift_fixtures),
 		("semantic_model", "apg.semantic-model-fixture-audit.v1", audit_semantic_model_fixtures),

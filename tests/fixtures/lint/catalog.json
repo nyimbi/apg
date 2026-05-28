@@ -1,0 +1,74 @@
+{
+  "format": "apg.lint-fixture-catalog.v1",
+  "tags_required": [
+    "valid",
+    "syntax",
+    "strict",
+    "semantic_model",
+    "capability_catalog",
+    "database_backed_forms"
+  ],
+  "fixtures": [
+    {
+      "id": "valid",
+      "source": "valid.apg",
+      "tags": ["valid", "semantic_model"],
+      "expected_ok": true,
+      "semantic_model_available": true,
+      "diagnostic_codes": []
+    },
+    {
+      "id": "syntax_error",
+      "source": "syntax_error.apg",
+      "tags": ["syntax"],
+      "expected_ok": false,
+      "semantic_model_available": true,
+      "diagnostic_codes": ["APG0001"]
+    },
+    {
+      "id": "strict_warning",
+      "source": "relationship_warning.apg",
+      "tags": ["strict", "semantic_model"],
+      "strict": true,
+      "expected_ok": false,
+      "semantic_model_available": true,
+      "diagnostic_codes": ["APG0100"]
+    },
+    {
+      "id": "catalog_match",
+      "source": "capability.apg",
+      "catalog": "capability_catalog",
+      "tags": ["capability_catalog", "semantic_model"],
+      "expected_ok": true,
+      "semantic_model_available": true,
+      "diagnostic_codes": [],
+      "capability_catalog": {
+        "checked": true,
+        "ok": true,
+        "contract_count": 1
+      }
+    },
+    {
+      "id": "catalog_missing",
+      "source": "capability.apg",
+      "catalog": "missing_capability_catalog",
+      "tags": ["capability_catalog"],
+      "expected_ok": false,
+      "semantic_model_available": true,
+      "diagnostic_codes": ["APG0901"],
+      "capability_catalog": {
+        "checked": true,
+        "ok": false,
+        "contract_count": 1
+      }
+    },
+    {
+      "id": "invalid_database_backed_form",
+      "source": "invalid_form.apg",
+      "tags": ["database_backed_forms"],
+      "expected_ok": false,
+      "semantic_model_available": true,
+      "diagnostic_codes": ["APG0402"]
+    }
+  ]
+}

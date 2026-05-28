@@ -1,0 +1,10 @@
+module lint_valid version 1.0.0 {
+	description: "Valid lint fixture";
+}
+
+agent Planner {
+	role: "planner";
+	model: "openai:gpt-4.1-mini";
+	runtime: codex;
+	system: "Plan concrete work.";
+}

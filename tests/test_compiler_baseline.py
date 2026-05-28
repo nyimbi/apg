@@ -1472,6 +1472,30 @@ def test_cli_lint_directory_json_aggregates_apg_files_deterministically(tmp_path
 	assert report["diagnostics"][0]["file"] == str(second)
 
 
+def test_cli_lint_audits_fixture_catalog():
+	result = CliRunner().invoke(cli, ["lint", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.lint-fixture-audit.v1"
+	assert report["ok"] is True
+	assert report["missing_tags"] == []
+	assert report["blocking_gaps"] == []
+	assert report["summary"]["fixture_count"] >= 6
+	assert report["summary"]["failing_fixture_count"] == 0
+	assert {"valid", "syntax", "strict"}.issubset(report["tags_covered"])
+	assert {"semantic_model", "capability_catalog", "database_backed_forms"}.issubset(report["tags_covered"])
+	assert {fixture["id"] for fixture in report["fixtures"]} >= {
+		"valid",
+		"syntax_error",
+		"strict_warning",
+		"catalog_match",
+		"catalog_missing",
+		"invalid_database_backed_form",
+	}
+	assert all(fixture["format"] == "apg.lint-report.v1" for fixture in report["fixtures"])
+
+
 def test_cli_validate_json_reports_generator_readiness_without_generation(tmp_path):
 	source = tmp_path / "baseline.apg"
 	output = tmp_path / "generated"
@@ -2687,7 +2711,7 @@ def test_cli_tooling_audit_json_runs_all_fixture_catalogs():
 	report = json.loads(result.output)
 	assert report["format"] == "apg.tooling-fixture-audit.v1"
 	assert report["ok"] is True
-	assert report["surface_count"] == 10
+	assert report["surface_count"] == 11
 	assert report["summary"]["failing_surface_count"] == 0
 	assert report["summary"]["blocking_gap_count"] == 0
 	assert report["summary"]["error_count"] == 0
@@ -2695,6 +2719,7 @@ def test_cli_tooling_audit_json_runs_all_fixture_catalogs():
 	assert set(surfaces) == {
 		"parser_golden",
 		"diagnostics",
+		"lint",
 		"formatter",
 		"drift",
 		"semantic_model",
@@ -2706,6 +2731,7 @@ def test_cli_tooling_audit_json_runs_all_fixture_catalogs():
 	}
 	assert all(surface["ok"] and surface["format_ok"] for surface in surfaces.values())
 	assert surfaces["parser_golden"]["format"] == "apg.parser-golden-audit.v1"
+	assert surfaces["lint"]["format"] == "apg.lint-fixture-audit.v1"
 	assert surfaces["semantic_model"]["format"] == "apg.semantic-model-fixture-audit.v1"
 	assert surfaces["release_evidence"]["format"] == "apg.release-evidence-fixture-audit.v1"
 

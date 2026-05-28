@@ -1,0 +1,6 @@
+module lint_syntax version 1.0.0 {
+	description: "Broken lint fixture";
+}
+
+table Broken {
+	name: str;

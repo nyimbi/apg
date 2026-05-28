@@ -8099,3 +8099,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `9482682` (`Make semantic model behavior fixture-audited`).
+
+### 2026-05-28 23:18 EAT
+
+In progress:
+
+- Added `compiler.linting` as the shared lint report builder and fixture-audit module.
+- Kept `cli/lint_command.py` as a thin Click wrapper over `compiler.linting.lint_path()` and `compiler.linting.audit_lint_fixtures()`.
+- Added `apg lint --audit-fixtures --json`, emitting `apg.lint-fixture-audit.v1`.
+- Added checked-in lint fixtures covering valid APG source, parser diagnostics, strict warning promotion, shared semantic-model availability, capability catalog validation, and database-backed form diagnostics.
+- Wired the lint fixture audit into `apg tooling audit --json`, increasing the aggregate compiler tooling gate to 11 surfaces.
+- Updated `docs/tooling.md` so the executable baseline, current command list, test strategy, Phase 0 gate, and linter command contract include the lint fixture audit.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/linting.py cli/lint_command.py compiler/tooling_audit.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/apg lint --audit-fixtures --json` passed with 6 fixtures, 6 passing fixtures, all required tags covered, and 0 blocking gaps.
+- `.venv/bin/apg lint --audit-fixtures` passed in text mode.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_lint_audits_fixture_catalog tests/test_compiler_baseline.py::test_cli_tooling_audit_json_runs_all_fixture_catalogs -q` passed with 2 tests.
+- `.venv/bin/apg tooling audit --json` passed with 11 surfaces, 11 passing surfaces, 0 errors, and 0 blocking gaps.
+- `git diff --check -- compiler/linting.py cli/lint_command.py compiler/tooling_audit.py compiler/__init__.py tests/test_compiler_baseline.py tests/fixtures/lint docs/tooling.md docs/progress_log.md` passed.

@@ -1,0 +1,34 @@
+def get_capability_contract(tenant_id="default"):
+	return {
+		"capability": "customer_master",
+		"display_name": "Customer Master",
+		"configuration": {"tenant_id": tenant_id, "ui": {}, "theme": {}},
+		"configuration_schema": {
+			"type": "object",
+			"required": ["tenant_id", "ui", "theme"],
+			"properties": {
+				"tenant_id": {"type": "string"},
+				"ui": {"type": "object"},
+				"theme": {"type": "object"},
+			},
+		},
+		"rule_engine": {
+			"type": "deterministic",
+			"rules": [
+				{"name": "allow_default", "condition": {"tenant_context_present": True}, "effect": {"decision": "allow"}},
+			],
+		},
+		"ui": {
+			"requires_theme": True,
+			"shell": "apg_python",
+			"template_roots": ["templates/"],
+			"routes": [
+				{"name": "dashboard", "path": "/customer-master/dashboard", "component": "Dashboard", "permission": "customer_master:view"},
+			],
+		},
+		"theme": {
+			"name": "customer_master_theme",
+			"tokens": {"border.radius": "8px"},
+			"components": {"dashboard": {"density": "compact"}},
+		},
+	}

@@ -1,0 +1,11 @@
+module lint_capability version 1.0.0 {
+	description: "Capability lint fixture";
+}
+
+capability AuditLog {
+	contract: {
+		id: audit_log,
+		provides: [audit_events],
+		configuration: {retention_days: 365}
+	};
+}

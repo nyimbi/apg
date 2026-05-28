@@ -1,0 +1,12 @@
+module lint_invalid_form version 1.0.0 {
+	description: "Invalid form lint fixture";
+}
+
+table Customer {
+	name: str;
+}
+
+form CustomerForm {
+	name: str;
+	phone: str;
+}
