@@ -9,7 +9,6 @@ Copyright: © 2025 Datacraft
 
 import asyncio
 import hashlib
-import hmac
 import logging
 import secrets
 import base64
@@ -22,9 +21,8 @@ import json
 
 # Cryptography imports
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
 
 from .models import MQMessage
@@ -106,7 +104,7 @@ class QuantumKeyManager:
 		self.algorithm_keys: Dict[QuantumAlgorithm, List[str]] = defaultdict(list)
 		self.key_rotation_policy = timedelta(days=90)  # Rotate keys every 90 days
 		
-		# Simulated post-quantum algorithms (using classical crypto as placeholder)
+		# Executable local stand-ins for post-quantum algorithm contracts.
 		self.quantum_algorithms = {
 			QuantumAlgorithm.CRYSTALS_KYBER_512: self._kyber_operations,
 			QuantumAlgorithm.CRYSTALS_DILITHIUM_2: self._dilithium_operations,
@@ -200,10 +198,13 @@ class QuantumKeyManager:
 	
 	# Simulated post-quantum algorithm implementations
 	class _kyber_operations:
+		_ENVELOPE_PREFIX = b"APG-MQEB-KYBER-SIM-V1:"
+		_AEAD_AAD = b"apg.mqeb.kyber.sim.v1"
+		_OAEP_LABEL = b"apg-mqeb-kyber-sim-v1"
+
 		@staticmethod
 		async def generate_keypair() -> Tuple[bytes, bytes]:
-			"""Simulate Kyber key generation (placeholder implementation)"""
-			# In production, this would use actual Kyber implementation
+			"""Generate an executable local key-encapsulation stand-in for Kyber."""
 			private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 			public_key = private_key.public_key()
 			
@@ -221,35 +222,70 @@ class QuantumKeyManager:
 		
 		@staticmethod
 		async def encrypt(public_key: bytes, plaintext: bytes) -> bytes:
-			"""Simulate Kyber encryption"""
-			# Simplified AES encryption as placeholder
-			key = hashlib.sha256(public_key[:32]).digest()
-			iv = secrets.token_bytes(16)
-			cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
-			encryptor = cipher.encryptor()
-			
-			# Pad plaintext to AES block size
-			padding_length = 16 - (len(plaintext) % 16)
-			padded_plaintext = plaintext + bytes([padding_length] * padding_length)
-			
-			ciphertext = encryptor.update(padded_plaintext) + encryptor.finalize()
-			return iv + ciphertext
+			"""Encrypt bytes with a KEM-style envelope compatible with private-key decrypt."""
+			rsa_public_key = serialization.load_pem_public_key(public_key, backend=default_backend())
+			data_key = secrets.token_bytes(32)
+			nonce = secrets.token_bytes(12)
+			ciphertext = AESGCM(data_key).encrypt(
+				nonce,
+				plaintext,
+				QuantumKeyManager._kyber_operations._AEAD_AAD
+			)
+			wrapped_key = rsa_public_key.encrypt(
+				data_key,
+				padding.OAEP(
+					mgf=padding.MGF1(algorithm=hashes.SHA256()),
+					algorithm=hashes.SHA256(),
+					label=QuantumKeyManager._kyber_operations._OAEP_LABEL
+				)
+			)
+			envelope = {
+				"version": 1,
+				"algorithm": QuantumAlgorithm.CRYSTALS_KYBER_512.value,
+				"kem": "rsa-oaep-sha256",
+				"aead": "aes-256-gcm",
+				"wrapped_key": base64.b64encode(wrapped_key).decode("ascii"),
+				"nonce": base64.b64encode(nonce).decode("ascii"),
+				"ciphertext": base64.b64encode(ciphertext).decode("ascii"),
+			}
+			return QuantumKeyManager._kyber_operations._ENVELOPE_PREFIX + json.dumps(
+				envelope,
+				sort_keys=True,
+				separators=(",", ":")
+			).encode("utf-8")
 		
 		@staticmethod
 		async def decrypt(private_key: bytes, ciphertext: bytes) -> bytes:
-			"""Simulate Kyber decryption"""
-			iv = ciphertext[:16]
-			encrypted_data = ciphertext[16:]
-			
-			key = hashlib.sha256(private_key[:32]).digest()
-			cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
-			decryptor = cipher.decryptor()
-			
-			padded_plaintext = decryptor.update(encrypted_data) + decryptor.finalize()
-			
-			# Remove padding
-			padding_length = padded_plaintext[-1]
-			return padded_plaintext[:-padding_length]
+			"""Decrypt a KEM-style envelope created by ``encrypt``."""
+			if not ciphertext.startswith(QuantumKeyManager._kyber_operations._ENVELOPE_PREFIX):
+				raise ValueError("Unsupported Kyber simulation ciphertext envelope")
+
+			raw_envelope = ciphertext[len(QuantumKeyManager._kyber_operations._ENVELOPE_PREFIX):]
+			envelope = json.loads(raw_envelope.decode("utf-8"))
+			if envelope.get("version") != 1 or envelope.get("algorithm") != QuantumAlgorithm.CRYSTALS_KYBER_512.value:
+				raise ValueError("Unsupported Kyber simulation envelope metadata")
+
+			rsa_private_key = serialization.load_pem_private_key(
+				private_key,
+				password=None,
+				backend=default_backend()
+			)
+			wrapped_key = base64.b64decode(envelope["wrapped_key"])
+			nonce = base64.b64decode(envelope["nonce"])
+			encrypted_payload = base64.b64decode(envelope["ciphertext"])
+			data_key = rsa_private_key.decrypt(
+				wrapped_key,
+				padding.OAEP(
+					mgf=padding.MGF1(algorithm=hashes.SHA256()),
+					algorithm=hashes.SHA256(),
+					label=QuantumKeyManager._kyber_operations._OAEP_LABEL
+				)
+			)
+			return AESGCM(data_key).decrypt(
+				nonce,
+				encrypted_payload,
+				QuantumKeyManager._kyber_operations._AEAD_AAD
+			)
 	
 	class _dilithium_operations:
 		@staticmethod
@@ -463,8 +499,8 @@ class ZeroTrustMessageSecurity:
 			for pattern in suspicious_patterns:
 				if pattern in content:
 					threat_score += 0.3
-		except:
-			pass
+		except Exception as exc:
+			self.logger.debug(f"Unable to inspect message payload for threats: {exc}")
 		
 		# Unusual message size
 		if len(message.payload) > 10 * 1024 * 1024:  # 10MB

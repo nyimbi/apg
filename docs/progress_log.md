@@ -6293,3 +6293,20 @@ Battery-conscious verification:
 - `rg -n "raise NotImplementedError|TODO:|placeholder implementation|For now, placeholder" capabilities/common/mqeb/edge_computing.py tests/test_common_mqeb_edge_adapter_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/mqeb/edge_computing.py tests/test_common_mqeb_edge_adapter_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:18 EAT
+
+Completed checkpoint:
+
+- Made the MQEB quantum-security Kyber simulation executable for the public-key encrypt/private-key decrypt contract.
+- Replaced the broken prefix-derived AES-CBC path with a KEM-style envelope: RSA-OAEP wraps a random content key and AES-256-GCM encrypts the payload with authenticated data.
+- Added explicit envelope metadata and rejection of unsupported ciphertext formats, so decrypt failures are visible instead of returning corrupted plaintext.
+- Replaced a silent threat-inspection `pass` with debug logging.
+- Added focused top-level regression coverage for raw Kyber-compatible round trips and `QuantumSecurityEngine` message encryption/decryption.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mqeb/quantum_security.py tests/test_common_mqeb_quantum_security_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_mqeb_quantum_security_runtime.py -q` -> 2 passed, 10 pre-existing warnings
+- `rg -n "placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/mqeb/quantum_security.py tests/test_common_mqeb_quantum_security_runtime.py -S` -> no matches
+- Deferred broader pytest at the user's request to conserve battery.
