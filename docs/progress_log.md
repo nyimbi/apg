@@ -6846,3 +6846,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_composition_registry_mobile_sync.py -q` -> 5 passed, 2 pre-existing warnings
 - `git diff --check capabilities/composition/registry/mobile_service.py tests/test_composition_registry_mobile_sync.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:13 EAT
+
+Completed checkpoint:
+
+- Made industry template search reject invalid enum filters deterministically instead of silently broadening `size` or `compliance` searches to unrelated templates.
+- Added `validate_search_filters()` so API/UI callers can inspect invalid template filter diagnostics and accepted values before submitting searches.
+- Refactored template enum parsing into a shared helper so `industry`, `size`, and `compliance` filters follow the same behavior.
+- Added focused regression coverage for invalid filter diagnostics and valid size/compliance filtering.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/templates.py tests/test_composition_registry_templates.py`
+- `.venv/bin/python -m pytest tests/test_composition_registry_templates.py -q` -> 2 passed, 2 pre-existing warnings
+- `git diff --check capabilities/composition/registry/templates.py tests/test_composition_registry_templates.py`
+- Deferred broader pytest at the user's request to conserve battery.

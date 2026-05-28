@@ -672,6 +672,64 @@ class TemplateManager:
 			template for template in self.templates.values()
 			if compliance_framework in template.compliance_frameworks
 		]
+
+	def _enum_filter_values(self, enum_type: type[Enum]) -> list[str]:
+		"""Return the accepted string values for a template search enum."""
+		return [member.value for member in enum_type]
+
+	def _parse_search_enum(
+		self,
+		value: str,
+		enum_type: type[Enum],
+		field_name: str,
+	) -> tuple[Optional[Enum], Optional[dict[str, Any]]]:
+		"""Parse a user-provided search filter without broadening invalid input."""
+		normalized = value.strip().lower()
+		try:
+			return enum_type(normalized), None
+		except ValueError:
+			return None, {
+				"field": field_name,
+				"value": value,
+				"expected": self._enum_filter_values(enum_type),
+			}
+
+	def validate_search_filters(
+		self,
+		industry: Optional[str] = None,
+		size: Optional[str] = None,
+		compliance: Optional[str] = None,
+	) -> dict[str, Any]:
+		"""Validate template search filters and return parsed enum values."""
+		parsed: dict[str, Enum] = {}
+		errors: list[dict[str, Any]] = []
+
+		if industry:
+			industry_enum, error = self._parse_search_enum(industry, IndustryType, "industry")
+			if error:
+				errors.append(error)
+			else:
+				parsed["industry"] = industry_enum
+
+		if size:
+			size_enum, error = self._parse_search_enum(size, TemplateSize, "size")
+			if error:
+				errors.append(error)
+			else:
+				parsed["size"] = size_enum
+
+		if compliance:
+			compliance_enum, error = self._parse_search_enum(compliance, ComplianceFramework, "compliance")
+			if error:
+				errors.append(error)
+			else:
+				parsed["compliance"] = compliance_enum
+
+		return {
+			"valid": not errors,
+			"errors": errors,
+			"parsed": parsed,
+		}
 	
 	def search_templates(self, 
 						industry: Optional[str] = None,
@@ -680,28 +738,29 @@ class TemplateManager:
 						keyword: Optional[str] = None) -> List[IndustryTemplate]:
 		"""Search templates by various criteria."""
 		results = list(self.templates.values())
-		
-		if industry:
-			try:
-				industry_enum = IndustryType(industry.lower())
-				results = [t for t in results if t.industry_type == industry_enum]
-			except ValueError:
-				# Invalid industry type
-				return []
-		
-		if size:
-			try:
-				size_enum = TemplateSize(size.lower())
-				results = [t for t in results if t.template_size == size_enum]
-			except ValueError:
-				pass
-		
-		if compliance:
-			try:
-				compliance_enum = ComplianceFramework(compliance.lower())
-				results = [t for t in results if compliance_enum in t.compliance_frameworks]
-			except ValueError:
-				pass
+
+		filter_validation = self.validate_search_filters(
+			industry=industry,
+			size=size,
+			compliance=compliance,
+		)
+		if not filter_validation["valid"]:
+			logger.info(
+				"Invalid template search filters rejected: %s",
+				filter_validation["errors"],
+			)
+			return []
+
+		parsed_filters = filter_validation["parsed"]
+		if "industry" in parsed_filters:
+			results = [t for t in results if t.industry_type == parsed_filters["industry"]]
+
+		if "size" in parsed_filters:
+			results = [t for t in results if t.template_size == parsed_filters["size"]]
+
+		if "compliance" in parsed_filters:
+			compliance_enum = parsed_filters["compliance"]
+			results = [t for t in results if compliance_enum in t.compliance_frameworks]
 		
 		if keyword:
 			keyword_lower = keyword.lower()
