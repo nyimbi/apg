@@ -5024,4 +5024,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit/push.
+- Pushed commit `b429c93` (`Surface AI agents in generated app manifests`) to `origin/main`.
