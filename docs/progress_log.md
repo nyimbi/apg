@@ -5004,4 +5004,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit/push.
+- Pushed commit `23a9565` (`Materialize grammar-backed APG entities`) to `origin/main`.
