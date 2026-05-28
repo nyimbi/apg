@@ -1,0 +1,144 @@
+// Parser golden fixture: broad APG surface coverage for grammar release gates.
+
+module full_surface_contracts version 1.0.0 {
+    description: "Broad parser golden surface";
+}
+
+group AuditFields {
+    created_at: str;
+    updated_at: str;
+}
+
+enum OrderStatus {
+    draft;
+    approved;
+    shipped;
+}
+
+table Customer {
+    id: int pk;
+    customer_number: str unique required;
+    display_name: str = legal_name;
+    ...AuditFields;
+    directive: {index: [customer_number], unique: [customer_number]};
+}
+
+table SalesOrder {
+    id: int pk;
+    customer_id: int -> Customer.id many_to_one;
+    status: OrderStatus default draft;
+    total: decimal required;
+}
+
+view OrderWorkbench for SalesOrder {
+    Header: [customer_id, status, total];
+    CustomerLookup: {component: Lookup, bind: customer_id, x: 0, y: 0, w: 6, h: 1};
+    on Save -> ApproveOrder;
+}
+
+flow ApproveOrder {
+    state draft;
+    state approved;
+    transition draft -> approved when total >= 0;
+    timer draft after P2D -> approved;
+}
+
+role Clerk {
+    permissions: [order.read, order.submit];
+}
+
+permission SubmitOrder {
+    resource: SalesOrder;
+    action: submit;
+}
+
+rule PostingPolicy {
+    when: "total >= 0";
+    action: allow;
+}
+
+llm DefaultModel {
+    provider: openai;
+    model: "gpt-4.1-mini";
+}
+
+agent OrderAgent {
+    role: "order assistant";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    tools: [orders.submit];
+}
+
+capability OrderManagement {
+    contract: {
+        id: order_management,
+        provides: [orders_api],
+        requires: [customer_master],
+        exposes: [SubmitOrder],
+        connects: [{from: OrderApproved, to: PostJournal}],
+        configuration: {tenant_scoped: true},
+        api: {commands: [SubmitOrder], events: [OrderApproved]},
+        ui: {shell: python, routes: [{name: "Orders", path: "/orders", component: "OrderWorkbench"}]},
+        audit: {events: [OrderApproved]}
+    };
+}
+
+composition CommerceSuite {
+    includes: [OrderManagement];
+    requires: [customer_master];
+    exposes: [orders_api];
+    connects: [OrderApproved -> PostJournal];
+}
+
+deploy CommerceDeployment {
+    target: python;
+    unit: web;
+    scale: {min: 1, max: 3};
+    health: "/health";
+    check: "python app.py --self-test";
+    resource: {cpu: "500m", memory: "512Mi"};
+    env: {APG_ENV: "test"};
+}
+
+operation SubmitOrder {
+    input: SalesOrder;
+    output: OrderStatus;
+}
+
+security CommerceSecurity {
+    roles: [Clerk];
+    permissions: [SubmitOrder];
+}
+
+api OrdersApi {
+    endpoint: "/orders";
+    method: POST;
+}
+
+event OrderApproved {
+    payload: SalesOrder;
+}
+
+job OrderAging {
+    schedule: "daily";
+}
+
+report OrderSummary {
+    source: SalesOrder;
+}
+
+menu MainMenu {
+    items: [OrderWorkbench];
+}
+
+component OrderPanel {
+    permission: order.read;
+}
+
+package CommercePackage {
+    target: python;
+}
+
+test SubmitOrderTest {
+    scenario: "happy path";
+}

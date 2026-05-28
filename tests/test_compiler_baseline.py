@@ -1406,6 +1406,26 @@ def test_cli_release_text_summarizes_evidence(tmp_path):
 	assert "self-test=ok" in result.output
 
 
+def test_cli_parser_golden_json_audits_fixture_catalog():
+	result = CliRunner().invoke(cli, ["parser-golden", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.parser-golden-audit.v1"
+	assert report["ok"] is True
+	assert report["missing_constructs"] == []
+	assert report["blocking_gaps"] == []
+	assert report["summary"]["fixture_count"] >= 8
+	assert report["summary"]["invalid_fixture_count"] >= 4
+	assert "agents" in report["constructs_covered"]
+	assert "capabilities" in report["constructs_covered"]
+	assert "deployment_units" in report["constructs_covered"]
+	assert any(
+		fixture["expected_valid"] is False and fixture["actual_valid"] is False
+		for fixture in report["fixtures"]
+	)
+
+
 def test_checked_in_example_outputs_match_current_compiler():
 	examples = sorted((REPO_ROOT / "examples").glob("[0-9][0-9]_*/main.apg"))
 	assert len(examples) == 20

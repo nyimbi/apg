@@ -7511,3 +7511,22 @@ Battery-conscious verification:
 - `git diff --check tests/test_compiler_baseline.py docs/progress_log.md examples`
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler -q` -> 1 passed
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler tests/test_compiler_baseline.py::test_cli_release_json_emits_generated_application_evidence_without_output tests/test_compiler_baseline.py::test_cli_release_text_summarizes_evidence -q` -> 3 passed
+
+### 2026-05-28 19:28 EAT
+
+Completed checkpoint:
+
+- Added a checked-in parser golden fixture catalog under `tests/fixtures/parser_golden/`.
+- Added valid fixtures that cover the current required APG grammar construct list, including curated examples and a broad full-surface contract fixture.
+- Added invalid fixtures for unknown declarations, unbalanced braces, missing method return types, and missing semicolons.
+- Implemented `compiler.parser_golden.audit_parser_golden()` and the `apg parser-golden --json` CLI command emitting `apg.parser-golden-audit.v1`.
+- Updated the tooling specification so parser-golden is listed as an executable current command and the grammar change gate.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/parser_golden.py cli/parser_golden_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/apg parser-golden --json` -> emitted `apg.parser-golden-audit.v1` with 8/8 passing fixtures, 45/45 covered constructs, 0 blocking gaps
+- `.venv/bin/apg parser-golden` -> `APG parser-golden OK: 8/8 fixture(s), 45/45 construct(s)`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_parser_golden_json_audits_fixture_catalog -q` -> 1 passed
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_parser_golden_json_audits_fixture_catalog tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler -q` -> 2 passed
+- `git diff --check cli/parser_golden_command.py compiler/parser_golden.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py tests/fixtures/parser_golden docs/tooling.md docs/progress_log.md`

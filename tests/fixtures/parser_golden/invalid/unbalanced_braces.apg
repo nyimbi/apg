@@ -1,0 +1,2 @@
+module broken version 1.0.0 {
+    description: "Missing closing brace";

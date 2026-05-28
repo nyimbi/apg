@@ -1,0 +1,140 @@
+{
+  "format": "apg.parser-golden-catalog.v1",
+  "constructs_required": [
+    "application_options",
+    "table_fields",
+    "reusable_field_groups",
+    "spreads",
+    "derived_fields",
+    "modifiers",
+    "relationships",
+    "relationship_cardinality",
+    "table_directives",
+    "enums",
+    "views",
+    "component_placement",
+    "handlers",
+    "flows",
+    "workflow_directives",
+    "roles",
+    "permissions",
+    "rules",
+    "rule_expressions",
+    "llm_definitions",
+    "agents",
+    "capabilities",
+    "composition_include",
+    "composition_require",
+    "composition_expose",
+    "composition_connect",
+    "audit_blocks",
+    "deployment_units",
+    "deployment_scale",
+    "deployment_health",
+    "deployment_check",
+    "deployment_resource",
+    "deployment_env",
+    "deployment_directives",
+    "version_blocks",
+    "operations",
+    "security",
+    "apis",
+    "events",
+    "jobs",
+    "reports",
+    "menus",
+    "component_contracts",
+    "packages",
+    "tests"
+  ],
+  "fixtures": [
+    {
+      "id": "curated_minimal_records",
+      "path": "../../../examples/01_minimal_customer_records/main.apg",
+      "valid": true,
+      "constructs": ["version_blocks", "table_fields"]
+    },
+    {
+      "id": "curated_agent_runtimes",
+      "path": "../../../examples/07_multi_runtime_agent_team/main.apg",
+      "valid": true,
+      "constructs": ["agents", "llm_definitions", "flows", "rules", "rule_expressions"]
+    },
+    {
+      "id": "curated_enterprise_erp",
+      "path": "../../../examples/20_enterprise_erp_platform/main.apg",
+      "valid": true,
+      "constructs": [
+        "application_options",
+        "relationships",
+        "capabilities",
+        "composition_include",
+        "composition_require",
+        "component_placement",
+        "handlers",
+        "views",
+        "deployment_units",
+        "deployment_directives",
+        "audit_blocks"
+      ]
+    },
+    {
+      "id": "full_surface_contracts",
+      "path": "valid/full_surface_contracts.apg",
+      "valid": true,
+      "constructs": [
+        "reusable_field_groups",
+        "spreads",
+        "derived_fields",
+        "modifiers",
+        "relationship_cardinality",
+        "table_directives",
+        "enums",
+        "workflow_directives",
+        "roles",
+        "permissions",
+        "composition_expose",
+        "composition_connect",
+        "deployment_scale",
+        "deployment_health",
+        "deployment_check",
+        "deployment_resource",
+        "deployment_env",
+        "operations",
+        "security",
+        "apis",
+        "events",
+        "jobs",
+        "reports",
+        "menus",
+        "component_contracts",
+        "packages",
+        "tests"
+      ]
+    },
+    {
+      "id": "invalid_unknown_entity",
+      "path": "invalid/unknown_entity.apg",
+      "valid": false,
+      "constructs": ["syntax_errors"]
+    },
+    {
+      "id": "invalid_unbalanced_braces",
+      "path": "invalid/unbalanced_braces.apg",
+      "valid": false,
+      "constructs": ["syntax_errors"]
+    },
+    {
+      "id": "invalid_missing_return_type",
+      "path": "invalid/missing_return_type.apg",
+      "valid": false,
+      "constructs": ["syntax_errors"]
+    },
+    {
+      "id": "invalid_missing_semicolon",
+      "path": "invalid/missing_semicolon.apg",
+      "valid": false,
+      "constructs": ["syntax_errors"]
+    }
+  ]
+}

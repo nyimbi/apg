@@ -1,0 +1,9 @@
+module bad_method version 1.0.0 {
+    description: "Missing method return type";
+}
+
+agent BadAgent {
+    broken: () -> {
+        return true;
+    };
+}

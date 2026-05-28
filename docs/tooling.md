@@ -36,6 +36,9 @@ APG currently has an executable compiler path:
 - `apg release <file> --json` emits `apg.release-report.v1` by compiling to a
   temporary generated app, importing it, and running generated self-test,
   OpenAPI, component-manifest, route-dispatch, and semantic-model evidence;
+- `apg parser-golden --json` emits `apg.parser-golden-audit.v1` by running the
+  checked-in parser fixture catalog and proving required grammar constructs are
+  represented by passing valid fixtures;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -131,6 +134,7 @@ designers, and natural-language tools.
 | Module | Responsibility |
 | --- | --- |
 | `compiler.parser` | Existing ANTLR-backed parser wrapper over `spec/apg.g4`, `spec/apgLexer.py`, `spec/apgParser.py`, and `spec/apgVisitor.py`. |
+| `compiler.parser_golden` | Existing parser golden audit over checked-in fixtures. Keep it as the grammar release gate before changing `spec/apg.g4`. |
 | `compiler.ast_builder` | Existing parse-tree-to-AST conversion layer. Extend it until every first-class APG construct has a stable AST node or normalized metadata record. |
 | `compiler.semantic_analyzer` | Existing semantic analyzer. Extend it into the shared semantic model producer so CLI, LSP, generator, tests, and agents do not re-implement APG meaning. |
 | `compiler.semantic_model` | Existing semantic-model builder. Keep it as the canonical JSON producer for `apg.semantic-model.v1`. |
@@ -633,6 +637,7 @@ apg graph app.apg --kind er --format json
 apg graph app.apg --kind agent --format mermaid
 apg graph-suite app.apg --json
 apg release app.apg --json
+apg parser-golden --json
 apg validate
 apg run
 apg doctor
@@ -746,6 +751,19 @@ generated app with its sidecars, runs generated `self_test()`, validates
 OpenAPI/component-manifest/route-dispatch contracts, and proves that the
 compiled app exposes `apg.semantic-model.v1` through both artifact and runtime
 surfaces.
+
+### `apg parser-golden`
+
+```console
+apg parser-golden --json
+```
+
+Emits `apg.parser-golden-audit.v1`. The audit loads
+`tests/fixtures/parser_golden/catalog.json`, runs every valid and invalid
+fixture through the APG parser, reports actual-versus-expected validity, and
+fails when a required grammar construct is not covered by a passing valid
+fixture. This command is the grammar change gate: edits to `spec/apg.g4` should
+add or update fixture coverage in the same change.
 
 ### `apg explain`
 
@@ -1087,7 +1105,7 @@ Tooling tests must be fixture-driven and deterministic.
 
 ### Parser Golden Audit
 
-`apg parser-golden --json` is the executable gate for grammar coverage. It is intentionally independent of project files: the command runs the checked-in golden fixture catalog and fails when any valid fixture stops parsing, any invalid fixture starts parsing, or any required grammar construct is not represented by a valid fixture.
+`apg parser-golden --json` is the executable gate for grammar coverage. It runs the checked-in golden fixture catalog and fails when any valid fixture stops parsing, any invalid fixture starts parsing, or any required grammar construct is not represented by a valid fixture.
 
 The report contract is `apg.parser-golden-audit.v1`:
 

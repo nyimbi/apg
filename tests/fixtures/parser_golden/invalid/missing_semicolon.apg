@@ -1,0 +1,7 @@
+module bad_semicolon version 1.0.0 {
+    description: "Missing semicolon";
+}
+
+agent BadAgent {
+    name: str = "Bad"
+}
