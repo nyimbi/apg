@@ -5629,4 +5629,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push for the executable capability screen slice.
+- Pushed commit `f45fdfb` (`Serve declared capability screens`) to `origin/main`.
