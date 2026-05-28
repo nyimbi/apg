@@ -595,6 +595,15 @@ def openapi_document() -> Dict[str, Any]:
         paths["/configuration/resolve"] = {{"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True)}}
         paths["/configuration/validate"] = {{"post": _api_operation("Validate capability configuration", "Configuration validation", request_body=True)}}
         paths["/approval/plan"] = {{"post": _api_operation("Plan capability approvals", "Approval plan", request_body=True)}}
+    if AI_AGENTS is not None:
+        for agent_name in describe_application().get("ai_agents", []):
+            paths[f"/agents/{{agent_name}}/invoke"] = {{
+                "post": _api_operation(f"Invoke agent {{agent_name}}", "Agent invocation result", request_body=True),
+            }}
+        for team_name in describe_application().get("ai_agent_teams", []):
+            paths[f"/agent-teams/{{team_name}}/invoke"] = {{
+                "post": _api_operation(f"Invoke agent team {{team_name}}", "Agent team invocation result", request_body=True),
+            }}
     return {{
         "openapi": "3.1.0",
         "info": {{
@@ -1066,6 +1075,26 @@ def _approval_plan_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
         return 404, {{"error": "unknown_capability", "capability": str(capability_name)}}
 
 
+def _agent_invocation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    if AI_AGENTS is None:
+        return 404, {{"error": "agents_unavailable"}}
+    parts = [part for part in path.split("/") if part]
+    try:
+        if len(parts) == 3 and parts[0] == "agents" and parts[2] in {{"invoke", "run"}}:
+            invoker = getattr(AI_AGENTS, "invoke_agent", None)
+            if invoker is None:
+                return 404, {{"error": "agent_invocation_unavailable"}}
+            return 200, invoker(parts[1], payload)
+        if len(parts) == 3 and parts[0] in {{"agent-teams", "teams"}} and parts[2] in {{"invoke", "run"}}:
+            invoker = getattr(AI_AGENTS, "invoke_team", None)
+            if invoker is None:
+                return 404, {{"error": "team_invocation_unavailable"}}
+            return 200, invoker(parts[1], payload)
+    except KeyError as error:
+        return 404, {{"error": "unknown_agent_composition", "name": str(error).strip("'")}}
+    return 404, {{"error": "not_found", "path": path}}
+
+
 def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
     if route is not None and route.get("operation") == "import":
@@ -1213,6 +1242,12 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
 
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
+    if (
+        path.startswith("/agents/") and path.endswith(("/invoke", "/run"))
+    ) or (
+        (path.startswith("/agent-teams/") or path.startswith("/teams/")) and path.endswith(("/invoke", "/run"))
+    ):
+        return _agent_invocation_payload(path, payload)
     if path.startswith("/records/") or path.endswith("/records/import") or (
         path.startswith("/entities/") and path.endswith("/records")
     ):
@@ -2496,6 +2531,62 @@ def validate_agent_runtimes(available_runtimes: Optional[List[str]] = None) -> D
     return {{"errors": errors, "validated_agents": sorted(validated)}}
 
 
+def _invocation_input(payload: Optional[Dict[str, Any]]) -> Any:
+    if not isinstance(payload, dict):
+        return {{}}
+    if "input" in payload:
+        return payload["input"]
+    if "message" in payload:
+        return payload["message"]
+    return dict(payload)
+
+
+def invoke_agent(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    agent = get_agent(name)
+    runtime = canonical_runtime(agent.runtime)
+    runtime_spec = dict(AI_AGENT_RUNTIME_DATA[runtime])
+    requires_adapter = runtime != "local"
+    return {{
+        "agent": agent.name,
+        "role": agent.role,
+        "model": agent.model,
+        "runtime": runtime,
+        "runtime_spec": runtime_spec,
+        "status": "adapter_required" if requires_adapter else "completed",
+        "mode": "planned" if requires_adapter else "local",
+        "input": _invocation_input(payload),
+        "system": agent.system,
+        "capabilities": list(agent.capabilities),
+        "tools": list(agent.tools),
+        "configuration": dict(agent.configuration),
+        "handoffs": [dict(edge) for edge in agent.handoffs],
+        "output": {{
+            "message": (
+                f"{{agent.name}} is ready for a {{runtime}} adapter."
+                if requires_adapter
+                else f"{{agent.name}} handled the request locally."
+            ),
+            "requires_adapter": requires_adapter,
+        }},
+    }}
+
+
+def invoke_team(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    team = get_team(name)
+    invocations = [
+        invoke_agent(agent_name, payload)
+        for agent_name in team.agents
+    ]
+    return {{
+        "team": team.name,
+        "status": "planned" if any(item["output"]["requires_adapter"] for item in invocations) else "completed",
+        "policy": dict(team.policy),
+        "configuration": dict(team.configuration),
+        "flow": [dict(edge) for edge in team.flow],
+        "invocations": invocations,
+    }}
+
+
 def describe_team(name: str) -> Dict[str, Any]:
     team = get_team(name)
     return {{
@@ -2706,6 +2797,8 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    from .ai_agents import (',
 			'        get_agent,',
 			'        get_team,',
+			'        invoke_agent,',
+			'        invoke_team,',
 			'        list_agent_runtimes,',
 			'        list_agent_teams,',
 			'        list_agents,',
@@ -2718,6 +2811,8 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    __all__.extend([',
 			'        "get_agent",',
 			'        "get_team",',
+			'        "invoke_agent",',
+			'        "invoke_team",',
 			'        "list_agent_runtimes",',
 			'        "list_agent_teams",',
 			'        "list_agents",',

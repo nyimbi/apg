@@ -147,6 +147,19 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert namespace["validate_agent_runtimes"](["local"])["errors"] == [
         "Planner references unavailable runtime codex"
     ]
+    planner_invocation = namespace["invoke_agent"]("Planner", {"input": {"ticket": "late order"}})
+    assert planner_invocation["agent"] == "Planner"
+    assert planner_invocation["runtime"] == "codex"
+    assert planner_invocation["status"] == "adapter_required"
+    assert planner_invocation["input"] == {"ticket": "late order"}
+    assert planner_invocation["output"]["requires_adapter"] is True
+    writer_invocation = namespace["invoke_agent"]("Writer", {"message": "draft reply"})
+    assert writer_invocation["runtime"] == "local"
+    assert writer_invocation["status"] == "completed"
+    crew_invocation = namespace["invoke_team"]("SupportCrew", {"input": {"ticket": "late order"}})
+    assert crew_invocation["team"] == "SupportCrew"
+    assert crew_invocation["status"] == "planned"
+    assert [item["agent"] for item in crew_invocation["invocations"]] == ["Planner", "Writer"]
 
 
 def test_ai_agent_runtime_catalog_supports_fast_moving_agent_tools():

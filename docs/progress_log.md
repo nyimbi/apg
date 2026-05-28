@@ -5564,3 +5564,26 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `c3989b8` (`Expose generated app runtime metrics`) to `origin/main`.
+
+### 2026-05-28 07:26 EAT
+
+Completed checkpoint:
+
+- Added dependency-free AI agent invocation contracts to generated executable apps.
+- Generated `ai_agents.py` now exposes `invoke_agent()` and `invoke_team()`.
+- Agent invocations return runtime, model, input, configuration, tools, handoffs, and a clear `adapter_required` status for non-local runtimes such as Codex.
+- Team invocations plan each member invocation in declared team order.
+- Generated apps now accept `POST /agents/{name}/invoke` and `POST /agent-teams/{name}/invoke`.
+- Generated OpenAPI contracts advertise concrete agent and team invocation endpoints.
+- Generated packages reexport invocation helpers for Python consumers.
+- Added focused regression coverage for package-level invocation, HTTP invocation, OpenAPI exposure, local vs adapter-required runtime behavior, and team invocation planning.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py tests/test_ai_agent_composition.py -q` -> 22 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated AI-agent invocation slice.

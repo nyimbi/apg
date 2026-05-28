@@ -108,6 +108,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	try:
 		spec.loader.exec_module(module)
 		manifest = module.describe_application()
+		invocation = module.invoke_agent("Planner", {"input": {"task": "plan"}})
 	finally:
 		sys.modules.pop("generated_pkg", None)
 		for name in list(sys.modules):
@@ -122,6 +123,10 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.list_records("Planner") == []
 	assert module.list_agents() == ["Planner"]
 	assert manifest["ai_agents"] == ["Planner"]
+	assert invocation["agent"] == "Planner"
+	assert invocation["runtime"] == "codex"
+	assert invocation["status"] == "adapter_required"
+	assert invocation["input"] == {"task": "plan"}
 	assert module.auth_status()["mode"] == "open"
 	assert module.metrics_snapshot()["entity_count"] == 1
 	assert module.openapi_document()["openapi"] == "3.1.0"
@@ -132,6 +137,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "auth_status" in module.__all__
 	assert "describe_application" in module.__all__
 	assert "list_events" in module.__all__
+	assert "invoke_agent" in module.__all__
 	assert "metrics_snapshot" in module.__all__
 	assert "openapi_document" in module.__all__
 	assert "relationship_graph" in module.__all__
@@ -181,6 +187,16 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 			agents = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/validate", timeout=1) as response:
 			validation = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/openapi.json", timeout=1) as response:
+			openapi = json.loads(response.read().decode("utf-8"))
+		request = urllib.request.Request(
+			f"{base_url}/agents/Planner/invoke",
+			data=json.dumps({"input": {"ticket": "reset password"}}).encode("utf-8"),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		with urllib.request.urlopen(request, timeout=1) as response:
+			invocation = json.loads(response.read().decode("utf-8"))
 	finally:
 		process.terminate()
 		try:
@@ -193,6 +209,10 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	assert health["auth"]["mode"] == "open"
 	assert manifest["name"] == "baseline"
 	assert agents["agents"]["Planner"]["runtime"] == "codex"
+	assert invocation["agent"] == "Planner"
+	assert invocation["status"] == "adapter_required"
+	assert invocation["input"] == {"ticket": "reset password"}
+	assert "/agents/Planner/invoke" in openapi["paths"]
 	assert validation["valid"] is True
 
 
