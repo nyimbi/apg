@@ -6716,3 +6716,20 @@ Battery-conscious verification:
 - `rg -n "pass\\s*$" capabilities/composition/gateway/service_mesh_federation.py -S` -> no matches
 - `git diff --check capabilities/composition/gateway/service_mesh_federation.py tests/test_composition_gateway_federation_startup.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:29 EAT
+
+Completed checkpoint:
+
+- Replaced no-op CONF AI-model fallback adapter setters with observable dependency binding behavior.
+- The fallback adapter now records config-manager, GitOps-manager, and NLP-service attachments when the optional AI model adapter is unavailable.
+- Added `describe_runtime()` so generated applications can inspect fallback integration state during diagnostics.
+- Added focused runtime coverage for fallback adapter binding state and diagnostic output.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conf/service.py tests/test_common_conf_service_noop_adapter.py`
+- `.venv/bin/python -m pytest tests/test_common_conf_service_noop_adapter.py -q` -> 1 passed, 10 pre-existing warnings
+- `rg -n "def set_config_manager|def set_gitops_manager|def set_nlp_service|pass\\s*$" capabilities/common/conf/service.py -S` -> setter definitions only, no `pass` matches
+- `git diff --check capabilities/common/conf/service.py tests/test_common_conf_service_noop_adapter.py`
+- Deferred broader pytest at the user's request to conserve battery.

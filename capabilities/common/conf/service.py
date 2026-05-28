@@ -43,14 +43,40 @@ logger = logging.getLogger(__name__)
 class _NoopAIModelAdapter:
 	"""Null adapter used when optional AI model integration is unavailable."""
 
+	def __init__(self) -> None:
+		self.config_manager: Any = None
+		self.gitops_manager: Any = None
+		self.nlp_service: Any = None
+		self.bindings: List[Dict[str, Any]] = []
+
 	def set_config_manager(self, manager: Any) -> None:
-		pass
+		self.config_manager = manager
+		self._record_binding("config_manager", manager)
 
 	def set_gitops_manager(self, manager: Any) -> None:
-		pass
+		self.gitops_manager = manager
+		self._record_binding("gitops_manager", manager)
 
 	def set_nlp_service(self, service: Any) -> None:
-		pass
+		self.nlp_service = service
+		self._record_binding("nlp_service", service)
+
+	def describe_runtime(self) -> Dict[str, Any]:
+		"""Describe attached optional integrations for diagnostics."""
+		return {
+			"adapter": "noop",
+			"config_manager_attached": self.config_manager is not None,
+			"gitops_manager_attached": self.gitops_manager is not None,
+			"nlp_service_attached": self.nlp_service is not None,
+			"bindings": list(self.bindings),
+		}
+
+	def _record_binding(self, component: str, value: Any) -> None:
+		self.bindings.append({
+			"component": component,
+			"attached": value is not None,
+			"attached_at": datetime.utcnow().isoformat(),
+		})
 
 
 def _build_component(component_cls: Any, **kwargs: Any) -> Any:
