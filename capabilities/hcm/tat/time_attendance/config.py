@@ -281,7 +281,7 @@ class SecurityConfig:
 	
 	# CORS
 	cors_enabled: bool = os.getenv("TA_CORS_ENABLED", "true").lower() == "true"
-	cors_origins: List[str] = os.getenv("TA_CORS_ORIGINS", "*").split(",")
+	cors_origins: List[str] = field(default_factory=lambda: os.getenv("TA_CORS_ORIGINS", "*").split(","))
 	
 	# JWT
 	jwt_secret_key: str = os.getenv("TA_JWT_SECRET", "change-me-in-production")

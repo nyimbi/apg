@@ -103,6 +103,72 @@ def create_error_response(message: str, error_code: int = 400, details: Any = No
 	)
 
 
+def _pagination(total: int, page: int, per_page: int) -> Dict[str, int]:
+	"""Create pagination metadata."""
+	return {
+		"page": page,
+		"per_page": per_page,
+		"total": total,
+		"pages": (total + per_page - 1) // per_page if total > 0 else 0
+	}
+
+
+def _page_items(items: List[Any], page: int, per_page: int) -> List[Any]:
+	"""Return one page from an already-filtered list."""
+	start = (page - 1) * per_page
+	return items[start:start + per_page]
+
+
+def _time_entry_response(time_entry: Any) -> TimeEntryResponse:
+	"""Map a service time-entry model to an API response model."""
+	return TimeEntryResponse(
+		time_entry_id=time_entry.id,
+		employee_id=time_entry.employee_id,
+		entry_date=time_entry.entry_date,
+		clock_in=time_entry.clock_in,
+		clock_out=time_entry.clock_out,
+		total_hours=time_entry.total_hours,
+		regular_hours=time_entry.regular_hours,
+		overtime_hours=time_entry.overtime_hours,
+		entry_type=time_entry.entry_type,
+		status=time_entry.status,
+		fraud_score=time_entry.anomaly_score,
+		requires_approval=time_entry.requires_approval,
+		verification_confidence=time_entry.verification_confidence,
+	)
+
+
+def _remote_worker_response(remote_worker: Any) -> RemoteWorkerResponse:
+	"""Map a service remote-worker model to an API response model."""
+	return RemoteWorkerResponse(
+		remote_worker_id=remote_worker.id,
+		employee_id=remote_worker.employee_id,
+		workspace_id=remote_worker.workspace_id,
+		work_mode=remote_worker.work_mode,
+		current_activity=remote_worker.current_activity,
+		productivity_score=remote_worker.overall_productivity_score,
+		work_life_balance_score=remote_worker.work_life_balance_score,
+		active_hours_today=Decimal(str(remote_worker.home_office_setup.get("active_hours_today", 0))),
+		focus_time_blocks=len(remote_worker.focus_time_blocks),
+	)
+
+
+def _ai_agent_response(ai_agent: Any) -> AIAgentResponse:
+	"""Map a service AI-agent model to an API response model."""
+	return AIAgentResponse(
+		ai_agent_id=ai_agent.id,
+		agent_name=ai_agent.agent_name,
+		agent_type=ai_agent.agent_type,
+		capabilities=ai_agent.capabilities,
+		health_status=ai_agent.health_status,
+		performance_score=ai_agent.overall_performance_score,
+		cost_efficiency_score=ai_agent.cost_efficiency_score,
+		tasks_completed=ai_agent.tasks_completed,
+		total_operational_cost=ai_agent.total_operational_cost,
+		uptime_percentage=ai_agent.uptime_percentage,
+	)
+
+
 # Core Time Tracking Endpoints
 @router.post("/clock-in", response_model=SuccessResponse, status_code=201)
 async def clock_in(
@@ -214,22 +280,21 @@ async def get_time_entries(
 	- **per_page**: Number of items per page
 	"""
 	try:
-		# TODO: Implement actual database query
-		# This is a placeholder for the database implementation
-		
-		mock_data = []
-		total = 0
+		time_entries = await service.list_time_entries(
+			tenant_id=current_user["tenant_id"],
+			employee_id=employee_id,
+			start_date=start_date,
+			end_date=end_date,
+			status=status,
+		)
+		total = len(time_entries)
+		page_data = [_time_entry_response(entry) for entry in _page_items(time_entries, page, per_page)]
 		
 		return TimeEntriesListResponse(
 			success=True,
 			message="Time entries retrieved successfully",
-			data=mock_data,
-			pagination={
-				"page": page,
-				"per_page": per_page,
-				"total": total,
-				"pages": (total + per_page - 1) // per_page if total > 0 else 0
-			},
+			data=page_data,
+			pagination=_pagination(total, page, per_page),
 			timestamp=datetime.utcnow()
 		)
 		
@@ -340,28 +405,40 @@ async def get_remote_workers(
 	- **per_page**: Number of items per page
 	"""
 	try:
-		# TODO: Implement actual database query
-		mock_data = []
-		total = 0
+		remote_workers = await service.list_remote_workers(
+			tenant_id=current_user["tenant_id"],
+			department_id=department_id,
+			work_mode=work_mode,
+			active_only=active_only,
+		)
+		total = len(remote_workers)
+		page_data = [
+			_remote_worker_response(worker)
+			for worker in _page_items(remote_workers, page, per_page)
+		]
+		active_count = len([worker for worker in remote_workers if worker.is_actively_working])
+		average_productivity = (
+			sum(worker.overall_productivity_score for worker in remote_workers) / total
+			if total else 0.0
+		)
+		average_balance = (
+			sum(worker.work_life_balance_score for worker in remote_workers) / total
+			if total else 0.8
+		)
 		
 		summary = {
 			"total_remote_workers": total,
-			"active_count": 0,
-			"average_productivity": 0.0,
-			"average_work_life_balance": 0.8
+			"active_count": active_count,
+			"average_productivity": round(average_productivity, 4),
+			"average_work_life_balance": round(average_balance, 4)
 		}
 		
 		return RemoteWorkersListResponse(
 			success=True,
 			message="Remote workers retrieved successfully",
-			data=mock_data,
+			data=page_data,
 			summary=summary,
-			pagination={
-				"page": page,
-				"per_page": per_page,
-				"total": total,
-				"pages": (total + per_page - 1) // per_page if total > 0 else 0
-			},
+			pagination=_pagination(total, page, per_page),
 			timestamp=datetime.utcnow()
 		)
 		
@@ -468,29 +545,37 @@ async def get_ai_agents(
 	- **per_page**: Number of items per page
 	"""
 	try:
-		# TODO: Implement actual database query
-		mock_data = []
-		total = 0
+		ai_agents = await service.list_ai_agents(
+			tenant_id=current_user["tenant_id"],
+			agent_type=agent_type,
+			active_only=active_only,
+		)
+		total = len(ai_agents)
+		page_data = [_ai_agent_response(agent) for agent in _page_items(ai_agents, page, per_page)]
+		average_performance = (
+			sum(agent.overall_performance_score for agent in ai_agents) / total
+			if total else 0.0
+		)
+		total_operational_cost = sum(float(agent.total_operational_cost) for agent in ai_agents)
+		cost_efficiency_average = (
+			sum(agent.cost_efficiency_score for agent in ai_agents) / total
+			if total else 0.0
+		)
 		
 		summary = {
 			"total_ai_agents": total,
-			"active_count": 0,
-			"average_performance": 0.0,
-			"total_operational_cost": 0.0,
-			"cost_efficiency_average": 0.0
+			"active_count": len([agent for agent in ai_agents if agent.is_active]),
+			"average_performance": round(average_performance, 4),
+			"total_operational_cost": round(total_operational_cost, 6),
+			"cost_efficiency_average": round(cost_efficiency_average, 4)
 		}
 		
 		return AIAgentsListResponse(
 			success=True,
 			message="AI agents retrieved successfully",
-			data=mock_data,
+			data=page_data,
 			summary=summary,
-			pagination={
-				"page": page,
-				"per_page": per_page,
-				"total": total,
-				"pages": (total + per_page - 1) // per_page if total > 0 else 0
-			},
+			pagination=_pagination(total, page, per_page),
 			timestamp=datetime.utcnow()
 		)
 		
@@ -623,18 +708,23 @@ async def get_leave_requests(
 	- **per_page**: Number of items per page
 	"""
 	try:
-		# TODO: Implement actual database query
-		mock_data = []
-		total = 0
+		leave_requests = await service.list_leave_requests(
+			tenant_id=current_user["tenant_id"],
+			employee_id=employee_id,
+			status=status,
+			leave_type=leave_type,
+			start_date=start_date,
+			end_date=end_date,
+		)
+		total = len(leave_requests)
+		page_data = [
+			request.model_dump(mode="json")
+			for request in _page_items(leave_requests, page, per_page)
+		]
 		
 		return create_success_response({
-			"leave_requests": mock_data,
-			"pagination": {
-				"page": page,
-				"per_page": per_page,
-				"total": total,
-				"pages": (total + per_page - 1) // per_page if total > 0 else 0
-			}
+			"leave_requests": page_data,
+			"pagination": _pagination(total, page, per_page)
 		}, "Leave requests retrieved successfully")
 		
 	except Exception as e:
@@ -703,18 +793,22 @@ async def get_schedules(
 	Get work schedules with filtering and pagination
 	"""
 	try:
-		# TODO: Implement actual database query
-		mock_data = []
-		total = 0
+		schedules = await service.list_schedules(
+			tenant_id=current_user["tenant_id"],
+			employee_id=employee_id,
+			department_id=department_id,
+			status=status,
+			effective_date=effective_date,
+		)
+		total = len(schedules)
+		page_data = [
+			schedule.model_dump(mode="json")
+			for schedule in _page_items(schedules, page, per_page)
+		]
 		
 		return create_success_response({
-			"schedules": mock_data,
-			"pagination": {
-				"page": page,
-				"per_page": per_page,
-				"total": total,
-				"pages": (total + per_page - 1) // per_page if total > 0 else 0
-			}
+			"schedules": page_data,
+			"pagination": _pagination(total, page, per_page)
 		}, "Schedules retrieved successfully")
 		
 	except Exception as e:
@@ -835,14 +929,20 @@ async def bulk_update_time_entries(
 	- **update_reason**: Reason for bulk update
 	"""
 	try:
-		# TODO: Implement bulk update logic
+		result = await service.bulk_update_time_entries(
+			tenant_id=current_user["tenant_id"],
+			time_entry_ids=request.time_entry_ids,
+			updates=request.updates,
+			updated_by=current_user["user_id"],
+		)
 		response_data = {
-			"updated_count": len(request.time_entry_ids),
-			"failed_updates": [],
+			"updated_count": len(result["updated_ids"]),
+			"updated_ids": result["updated_ids"],
+			"failed_updates": result["failed_updates"],
 			"batch_id": f"bulk_update_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
 		}
 		
-		return create_success_response(response_data, f"Bulk update completed for {len(request.time_entry_ids)} entries")
+		return create_success_response(response_data, f"Bulk update completed for {len(result['updated_ids'])} entries")
 		
 	except Exception as e:
 		logger.error(f"Error in bulk update: {str(e)}")
@@ -859,19 +959,28 @@ async def bulk_approve_entries(
 	"""
 	Bulk approve multiple time entries or leave requests
 	
-	- **entry_ids**: List of entry IDs to approve
+	- **time_entry_ids**: List of entry IDs to approve or reject
 	- **entry_type**: Type of entries (time_entry, leave_request)
-	- **approval_notes**: Optional approval notes
+	- **comments**: Optional approval notes
 	"""
 	try:
-		# TODO: Implement bulk approval logic
+		result = await service.bulk_approve_entries(
+			tenant_id=current_user["tenant_id"],
+			entry_ids=request.time_entry_ids,
+			entry_type=request.entry_type,
+			approved_by=current_user["user_id"],
+			action=request.action,
+			approval_notes=request.comments,
+		)
 		response_data = {
-			"approved_count": len(request.entry_ids),
-			"failed_approvals": [],
+			"processed_count": len(result["processed_ids"]),
+			"processed_ids": result["processed_ids"],
+			"action": result["action"],
+			"failed_approvals": result["failed_approvals"],
 			"batch_id": f"bulk_approval_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
 		}
 		
-		return create_success_response(response_data, f"Bulk approval completed for {len(request.entry_ids)} entries")
+		return create_success_response(response_data, f"Bulk approval completed for {len(result['processed_ids'])} entries")
 		
 	except Exception as e:
 		logger.error(f"Error in bulk approval: {str(e)}")
@@ -944,32 +1053,11 @@ async def get_analytics_dashboard(
 	- Compliance status
 	"""
 	try:
-		# TODO: Implement dashboard data aggregation
-		dashboard_data = {
-			"summary": {
-				"total_employees": 0,
-				"active_today": 0,
-				"average_attendance_rate": 0.0,
-				"total_hours_today": 0.0,
-				"overtime_hours_today": 0.0
-			},
-			"trends": {
-				"attendance_trend": "stable",
-				"productivity_trend": "improving",
-				"cost_trend": "stable"
-			},
-			"alerts": {
-				"fraud_alerts": 0,
-				"compliance_violations": 0,
-				"schedule_conflicts": 0
-			},
-			"workforce_distribution": {
-				"office_workers": 0,
-				"remote_workers": 0,
-				"ai_agents": 0,
-				"hybrid_workers": 0
-			}
-		}
+		dashboard_data = await service.get_analytics_dashboard(
+			tenant_id=current_user["tenant_id"],
+			date_range_days=date_range_days,
+			department_id=department_id,
+		)
 		
 		return create_success_response(dashboard_data, "Analytics dashboard data retrieved successfully")
 		
@@ -1049,7 +1137,6 @@ async def get_configuration(
 
 
 # Exception handlers
-@router.exception_handler(ValidationError)
 async def validation_exception_handler(request, exc: ValidationError):
 	"""Handle Pydantic validation errors"""
 	return JSONResponse(
@@ -1062,7 +1149,6 @@ async def validation_exception_handler(request, exc: ValidationError):
 	)
 
 
-@router.exception_handler(ValueError)
 async def value_error_handler(request, exc: ValueError):
 	"""Handle value errors"""
 	return JSONResponse(
@@ -1093,6 +1179,8 @@ def create_app() -> FastAPI:
 	
 	# Include router
 	app.include_router(router)
+	app.add_exception_handler(ValidationError, validation_exception_handler)
+	app.add_exception_handler(ValueError, value_error_handler)
 	
 	return app
 

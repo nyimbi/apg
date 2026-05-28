@@ -665,7 +665,7 @@ class TAFraudDetection(TABaseModel):
 	
 	# Fraud classification
 	fraud_types: List[FraudType] = Field(..., description="Types of fraud detected")
-	severity_level: str = Field(..., regex="^(LOW|MEDIUM|HIGH|CRITICAL)$", description="Fraud severity")
+	severity_level: str = Field(..., pattern="^(LOW|MEDIUM|HIGH|CRITICAL)$", description="Fraud severity")
 	confidence_score: Annotated[float, AfterValidator(_validate_confidence_score)] = Field(
 		..., description="AI confidence in fraud detection"
 	)
@@ -694,7 +694,7 @@ class TAFraudDetection(TABaseModel):
 	
 	# Investigation status
 	investigation_status: str = Field(
-		default="OPEN", regex="^(OPEN|INVESTIGATING|RESOLVED|FALSE_POSITIVE)$",
+		default="OPEN", pattern="^(OPEN|INVESTIGATING|RESOLVED|FALSE_POSITIVE)$",
 		description="Investigation status"
 	)
 	investigator_id: Optional[str] = Field(None, description="Assigned investigator")
@@ -977,7 +977,7 @@ class TAComplianceRule(TABaseModel):
 	
 	# Violation handling
 	violation_severity: str = Field(
-		..., regex="^(INFO|WARNING|MINOR|MAJOR|CRITICAL)$", description="Violation severity level"
+		..., pattern="^(INFO|WARNING|MINOR|MAJOR|CRITICAL)$", description="Violation severity level"
 	)
 	auto_correction_enabled: bool = Field(default=False, description="Automatic correction enabled")
 	notification_required: bool = Field(default=True, description="Notification required for violations")
@@ -1219,7 +1219,7 @@ class TAAIAgent(TABaseModel):
 	# Status and health
 	is_active: bool = Field(default=True, description="Agent active status")
 	health_status: str = Field(
-		default="healthy", regex="^(healthy|degraded|error|maintenance)$",
+		default="healthy", pattern="^(healthy|degraded|error|maintenance)$",
 		description="Agent health status"
 	)
 	last_health_check: datetime = Field(

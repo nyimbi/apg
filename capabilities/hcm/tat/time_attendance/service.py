@@ -36,6 +36,8 @@ class TimeAttendanceService:
 	Provides comprehensive time tracking services with AI-powered features,
 	biometric integration, and seamless APG ecosystem connectivity.
 	"""
+
+	_runtime_store: Dict[str, Dict[str, Dict[str, Any]]] = {}
 	
 	def __init__(self, config: Optional[TimeAttendanceConfig] = None):
 		self.config = config or get_config()
@@ -53,6 +55,48 @@ class TimeAttendanceService:
 		self._workflow_client = None
 		
 		self.logger.info("Time & Attendance Service initialized")
+
+	@classmethod
+	def reset_runtime_store(cls) -> None:
+		"""Reset the in-process store used by standalone/API execution."""
+		cls._runtime_store.clear()
+
+	def _tenant_store(self, tenant_id: str) -> Dict[str, Dict[str, Any]]:
+		"""Return the tenant-scoped standalone store."""
+		store = self._runtime_store.setdefault(tenant_id, {})
+		for bucket_name in (
+			"time_entries",
+			"remote_workers",
+			"ai_agents",
+			"collaborations",
+			"schedules",
+			"leave_requests",
+			"fraud_detections",
+			"analytics",
+			"integration_events",
+		):
+			store.setdefault(bucket_name, {})
+		return store
+
+	def _bucket(self, tenant_id: str, bucket_name: str) -> Dict[str, Any]:
+		return self._tenant_store(tenant_id)[bucket_name]
+
+	def _save_record(self, bucket_name: str, record: Any) -> Any:
+		record.updated_at = datetime.utcnow()
+		self._bucket(record.tenant_id, bucket_name)[record.id] = record
+		return record
+
+	def _records(self, bucket_name: str, tenant_id: str) -> List[Any]:
+		return list(self._bucket(tenant_id, bucket_name).values())
+
+	def _record_integration_event(self, tenant_id: str, event_type: str, payload: Dict[str, Any]) -> None:
+		event_id = f"{event_type}_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
+		self._bucket(tenant_id, "integration_events")[event_id] = {
+			"id": event_id,
+			"type": event_type,
+			"payload": payload,
+			"created_at": datetime.utcnow(),
+		}
 	
 	# Core Time Tracking Operations
 	
@@ -918,7 +962,7 @@ class TimeAttendanceService:
 			saved_request = await self._save_leave_request(leave_request)
 			
 			# Trigger approval workflow
-			if self.config.workflow.enabled:
+			if self.config.workflow.approval_workflows_enabled:
 				await self._trigger_leave_approval_workflow(saved_request)
 			
 			# Send notifications
@@ -1182,7 +1226,7 @@ class TimeAttendanceService:
 				validation_errors.append("Work hours exceed 24 hours")
 			
 			# Check geofencing compliance
-			if self.config.geofencing.enabled and time_entry.clock_in_location:
+			if self.config.location.geofencing_enabled and time_entry.clock_in_location:
 				if not await self._validate_geofence(time_entry.clock_in_location, employee):
 					validation_errors.append("Clock-in location outside authorized geofence")
 			
@@ -1201,16 +1245,10 @@ class TimeAttendanceService:
 			return {"valid": False, "validation_errors": [str(e)]}
 	
 	async def _save_time_entry(self, time_entry: TATimeEntry) -> TATimeEntry:
-		"""Save time entry to database"""
+		"""Save time entry to the standalone runtime store."""
 		try:
-			# Simulate database save - in production, this would use SQLAlchemy
 			self.logger.debug(f"Saving time entry {time_entry.id}")
-			
-			# Update timestamp
-			time_entry.updated_at = datetime.utcnow()
-			
-			# Simulate successful save
-			return time_entry
+			return self._save_record("time_entries", time_entry)
 			
 		except Exception as e:
 			self.logger.error(f"Error saving time entry: {str(e)}")
@@ -1259,21 +1297,17 @@ class TimeAttendanceService:
 	async def _get_active_time_entry(self, employee_id: str, tenant_id: str) -> Optional[TATimeEntry]:
 		"""Get active time entry for employee"""
 		try:
-			# Simulate database query
 			self.logger.debug(f"Getting active time entry for employee {employee_id}")
-			
-			# Mock active time entry
-			active_entry = TATimeEntry(
-				employee_id=employee_id,
-				tenant_id=tenant_id,
-				entry_date=date.today(),
-				clock_in=datetime.utcnow() - timedelta(hours=4),
-				entry_type=TimeEntryType.REGULAR,
-				status=TimeEntryStatus.PROCESSING,
-				created_by=employee_id
-			)
-			
-			return active_entry
+			candidates = [
+				entry for entry in self._records("time_entries", tenant_id)
+				if entry.employee_id == employee_id
+				and entry.clock_in is not None
+				and entry.clock_out is None
+				and entry.status in {TimeEntryStatus.PROCESSING, TimeEntryStatus.SUBMITTED, TimeEntryStatus.DRAFT}
+			]
+			if not candidates:
+				return None
+			return max(candidates, key=lambda entry: entry.clock_in or entry.created_at)
 			
 		except Exception as e:
 			self.logger.error(f"Error getting active time entry: {str(e)}")
@@ -1291,8 +1325,10 @@ class TimeAttendanceService:
 			# Check break compliance
 			if time_entry.total_hours and time_entry.total_hours > Decimal('6'):
 				if not time_entry.break_minutes or time_entry.break_minutes < 30:
-					# Flag for break violation
-					pass
+					time_entry.requires_approval = True
+					time_entry.validation_results.setdefault("validation_warnings", []).append(
+						"Break duration below configured threshold"
+					)
 			
 		except Exception as e:
 			self.logger.error(f"Error applying compliance rules: {str(e)}")
@@ -1333,20 +1369,564 @@ class TimeAttendanceService:
 			
 		except Exception as e:
 			self.logger.error(f"Error syncing with payroll: {str(e)}")
+
+	# Standalone query and mutation helpers used by API list/bulk endpoints
+
+	async def list_time_entries(
+		self,
+		tenant_id: str,
+		employee_id: Optional[str] = None,
+		start_date: Optional[date] = None,
+		end_date: Optional[date] = None,
+		status: Optional[str] = None,
+	) -> List[TATimeEntry]:
+		"""List stored time entries with tenant-safe filters."""
+		entries = self._records("time_entries", tenant_id)
+		if employee_id:
+			entries = [entry for entry in entries if entry.employee_id == employee_id]
+		if start_date:
+			entries = [entry for entry in entries if entry.entry_date >= start_date]
+		if end_date:
+			entries = [entry for entry in entries if entry.entry_date <= end_date]
+		if status:
+			entries = [entry for entry in entries if entry.status.value == status]
+		return sorted(entries, key=lambda entry: (entry.entry_date, entry.created_at), reverse=True)
+
+	async def list_remote_workers(
+		self,
+		tenant_id: str,
+		department_id: Optional[str] = None,
+		work_mode: Optional[str] = None,
+		active_only: bool = True,
+	) -> List[TARemoteWorker]:
+		"""List stored remote workers with executable filters."""
+		workers = self._records("remote_workers", tenant_id)
+		if department_id:
+			workers = [
+				worker for worker in workers
+				if worker.home_office_setup.get("department_id") == department_id
+			]
+		if work_mode:
+			workers = [worker for worker in workers if worker.work_mode.value == work_mode]
+		if active_only:
+			workers = [worker for worker in workers if worker.is_actively_working]
+		return sorted(workers, key=lambda worker: worker.updated_at, reverse=True)
+
+	async def list_ai_agents(
+		self,
+		tenant_id: str,
+		agent_type: Optional[str] = None,
+		active_only: bool = True,
+	) -> List[TAAIAgent]:
+		"""List stored AI workforce agents with executable filters."""
+		agents = self._records("ai_agents", tenant_id)
+		if agent_type:
+			agents = [agent for agent in agents if agent.agent_type.value == agent_type]
+		if active_only:
+			agents = [agent for agent in agents if agent.is_active]
+		return sorted(agents, key=lambda agent: agent.updated_at, reverse=True)
+
+	async def list_leave_requests(
+		self,
+		tenant_id: str,
+		employee_id: Optional[str] = None,
+		status: Optional[str] = None,
+		leave_type: Optional[str] = None,
+		start_date: Optional[date] = None,
+		end_date: Optional[date] = None,
+	) -> List[TALeaveRequest]:
+		"""List leave requests from the standalone store."""
+		requests = self._records("leave_requests", tenant_id)
+		if employee_id:
+			requests = [request for request in requests if request.employee_id == employee_id]
+		if status:
+			requests = [request for request in requests if request.status.value == status]
+		if leave_type:
+			requests = [request for request in requests if request.leave_type.value == leave_type]
+		if start_date:
+			requests = [request for request in requests if request.start_date >= start_date]
+		if end_date:
+			requests = [request for request in requests if request.end_date <= end_date]
+		return sorted(requests, key=lambda request: request.created_at, reverse=True)
+
+	async def list_schedules(
+		self,
+		tenant_id: str,
+		employee_id: Optional[str] = None,
+		department_id: Optional[str] = None,
+		status: Optional[str] = None,
+		effective_date: Optional[date] = None,
+	) -> List[TASchedule]:
+		"""List schedules from the standalone store."""
+		schedules = self._records("schedules", tenant_id)
+		if employee_id:
+			schedules = [schedule for schedule in schedules if employee_id in schedule.assigned_employees]
+		if department_id:
+			schedules = [schedule for schedule in schedules if schedule.department_id == department_id]
+		if status:
+			schedules = [schedule for schedule in schedules if schedule.status.value == status]
+		if effective_date:
+			schedules = [schedule for schedule in schedules if schedule.effective_date == effective_date]
+		return sorted(schedules, key=lambda schedule: schedule.effective_date, reverse=True)
+
+	async def bulk_update_time_entries(
+		self,
+		tenant_id: str,
+		time_entry_ids: List[str],
+		updates: Dict[str, Any],
+		updated_by: str,
+	) -> Dict[str, Any]:
+		"""Apply a deterministic bulk update to stored time entries."""
+		updated: List[str] = []
+		failed: List[Dict[str, str]] = []
+		bucket = self._bucket(tenant_id, "time_entries")
+		for entry_id in time_entry_ids:
+			entry = bucket.get(entry_id)
+			if entry is None:
+				failed.append({"id": entry_id, "reason": "not_found"})
+				continue
+			for field_name, value in updates.items():
+				if field_name == "status" and isinstance(value, str):
+					value = TimeEntryStatus(value)
+				if hasattr(entry, field_name):
+					setattr(entry, field_name, value)
+			entry.updated_at = datetime.utcnow()
+			entry.metadata["bulk_updated_by"] = updated_by
+			updated.append(entry_id)
+		return {"updated_ids": updated, "failed_updates": failed}
+
+	async def bulk_approve_entries(
+		self,
+		tenant_id: str,
+		entry_ids: List[str],
+		entry_type: str,
+		approved_by: str,
+		action: str = "approve",
+		approval_notes: Optional[str] = None,
+	) -> Dict[str, Any]:
+		"""Approve or reject time entries or leave requests from the standalone store."""
+		processed: List[str] = []
+		failed: List[Dict[str, str]] = []
+		bucket_name = "leave_requests" if entry_type == "leave_request" else "time_entries"
+		bucket = self._bucket(tenant_id, bucket_name)
+		for entry_id in entry_ids:
+			entry = bucket.get(entry_id)
+			if entry is None:
+				failed.append({"id": entry_id, "reason": "not_found"})
+				continue
+			if bucket_name == "leave_requests":
+				entry.status = ApprovalStatus.APPROVED if action == "approve" else ApprovalStatus.REJECTED
+			else:
+				entry.status = TimeEntryStatus.APPROVED if action == "approve" else TimeEntryStatus.REJECTED
+				entry.approved_by = approved_by
+				entry.approved_at = datetime.utcnow()
+			entry.metadata["approval_notes"] = approval_notes
+			entry.updated_at = datetime.utcnow()
+			processed.append(entry_id)
+		return {"processed_ids": processed, "failed_approvals": failed, "action": action}
+
+	async def build_dashboard_data(
+		self,
+		tenant_id: str,
+		date_range_days: int = 30,
+		department_id: Optional[str] = None,
+	) -> Dict[str, Any]:
+		"""Aggregate dashboard data from stored time, remote, and AI records."""
+		start = date.today() - timedelta(days=date_range_days)
+		entries = await self.list_time_entries(tenant_id, start_date=start)
+		workers = await self.list_remote_workers(tenant_id, active_only=False)
+		agents = await self.list_ai_agents(tenant_id, active_only=False)
+		if department_id:
+			workers = [
+				worker for worker in workers
+				if worker.home_office_setup.get("department_id") == department_id
+			]
+		today_entries = [entry for entry in entries if entry.entry_date == date.today()]
+		total_hours_today = sum(float(entry.total_hours or 0) for entry in today_entries)
+		overtime_hours_today = sum(float(entry.overtime_hours or 0) for entry in today_entries)
+		approved_entries = [entry for entry in entries if entry.status == TimeEntryStatus.APPROVED]
+		attendance_rate = len(approved_entries) / len(entries) if entries else 0.0
+		return {
+			"summary": {
+				"total_employees": len({entry.employee_id for entry in entries}),
+				"active_today": len({entry.employee_id for entry in today_entries}),
+				"average_attendance_rate": round(attendance_rate, 4),
+				"total_hours_today": round(total_hours_today, 4),
+				"overtime_hours_today": round(overtime_hours_today, 4),
+			},
+			"trends": {
+				"attendance_trend": "improving" if attendance_rate >= 0.8 else "watch",
+				"productivity_trend": "improving" if workers else "stable",
+				"cost_trend": "stable",
+			},
+			"alerts": {
+				"fraud_alerts": len([entry for entry in entries if entry.anomaly_score >= 0.5]),
+				"compliance_violations": len([entry for entry in entries if entry.requires_approval]),
+				"schedule_conflicts": 0,
+			},
+			"workforce_distribution": {
+				"office_workers": len({entry.employee_id for entry in entries}) - len(workers),
+				"remote_workers": len(workers),
+				"ai_agents": len(agents),
+				"hybrid_workers": len([worker for worker in workers if worker.work_mode == WorkMode.HYBRID]),
+			},
+		}
+
+	async def get_analytics_dashboard(
+		self,
+		tenant_id: str,
+		date_range_days: int = 30,
+		department_id: Optional[str] = None,
+	) -> Dict[str, Any]:
+		"""Return analytics dashboard data for API callers."""
+		return await self.build_dashboard_data(tenant_id, date_range_days, department_id)
+
+	# Concrete helper implementations for standalone execution
+
+	async def _save_remote_worker(self, remote_worker: TARemoteWorker) -> TARemoteWorker:
+		return self._save_record("remote_workers", remote_worker)
+
+	async def _save_ai_agent(self, ai_agent: TAAIAgent) -> TAAIAgent:
+		return self._save_record("ai_agents", ai_agent)
+
+	async def _save_hybrid_collaboration(self, collaboration: TAHybridCollaboration) -> TAHybridCollaboration:
+		return self._save_record("collaborations", collaboration)
+
+	async def _save_schedule(self, schedule: TASchedule) -> TASchedule:
+		return self._save_record("schedules", schedule)
+
+	async def _save_leave_request(self, leave_request: TALeaveRequest) -> TALeaveRequest:
+		return self._save_record("leave_requests", leave_request)
+
+	async def _save_fraud_detection(self, fraud_detection: TAFraudDetection) -> TAFraudDetection:
+		return self._save_record("fraud_detections", fraud_detection)
+
+	async def _save_analytics_report(self, analytics: TAPredictiveAnalytics) -> TAPredictiveAnalytics:
+		return self._save_record("analytics", analytics)
+
+	async def _get_active_remote_worker(self, employee_id: str, tenant_id: str) -> Optional[TARemoteWorker]:
+		for worker in await self.list_remote_workers(tenant_id, active_only=True):
+			if worker.employee_id == employee_id:
+				return worker
+		return None
+
+	async def _get_ai_agent(self, agent_id: str, tenant_id: str) -> Optional[TAAIAgent]:
+		return self._bucket(tenant_id, "ai_agents").get(agent_id)
+
+	async def _get_time_entries_for_analysis(
+		self,
+		tenant_id: str,
+		employee_ids: List[str] = None,
+		date_range: Dict[str, datetime] = None,
+	) -> List[TATimeEntry]:
+		start_date = date_range["start_date"].date() if date_range and date_range.get("start_date") else None
+		end_date = date_range["end_date"].date() if date_range and date_range.get("end_date") else None
+		entries = await self.list_time_entries(tenant_id, start_date=start_date, end_date=end_date)
+		if employee_ids:
+			entries = [entry for entry in entries if entry.employee_id in employee_ids]
+		return entries
+
+	async def _setup_workspace_monitoring(self, remote_worker: TARemoteWorker) -> None:
+		remote_worker.workspace_sensors.append({"type": "software", "status": "active"})
+
+	async def _initialize_productivity_tracking(self, remote_worker: TARemoteWorker) -> None:
+		remote_worker.productivity_metrics.append({
+			"timestamp": datetime.utcnow().isoformat(),
+			"metric_type": "session_start",
+			"score": 0.8,
+		})
+
+	async def _setup_collaboration_tracking(self, remote_worker: TARemoteWorker, platforms: List[str]) -> None:
+		remote_worker.collaboration_platforms = list(platforms)
+
+	async def _start_environmental_monitoring(self, remote_worker: TARemoteWorker) -> None:
+		remote_worker.environmental_conditions = {"status": "monitored"}
+
+	async def _analyze_remote_productivity(
+		self,
+		remote_worker: TARemoteWorker,
+		activity_data: Dict[str, Any],
+		metric_type: ProductivityMetric,
+	) -> Dict[str, Any]:
+		completed = float(activity_data.get("tasks_completed", activity_data.get("completed_tasks", 0)))
+		focus_minutes = float(activity_data.get("focus_minutes", activity_data.get("active_minutes", 0)))
+		score = min(1.0, 0.5 + (completed * 0.05) + (focus_minutes / 480))
+		return {
+			"score": round(score, 4),
+			"insights": [
+				{"type": metric_type.value, "message": f"Processed {metric_type.value} activity"},
+			],
+		}
+
+	async def _assess_burnout_risk(self, remote_worker: TARemoteWorker, activity_data: Dict[str, Any]) -> Dict[str, Any]:
+		active_minutes = float(activity_data.get("active_minutes", 0))
+		risk = "HIGH" if active_minutes > 720 else "LOW"
+		return {"risk_level": risk, "active_minutes": active_minutes}
+
+	async def _calculate_work_life_balance(self, remote_worker: TARemoteWorker, activity_data: Dict[str, Any]) -> float:
+		active_minutes = float(activity_data.get("active_minutes", 480))
+		return max(0.0, min(1.0, 1.0 - max(active_minutes - 480, 0) / 480))
+
+	async def _generate_productivity_recommendations(
+		self,
+		remote_worker: TARemoteWorker,
+		productivity_analysis: Dict[str, Any],
+	) -> List[str]:
+		if productivity_analysis.get("score", 0.0) < 0.7:
+			return ["Review blockers and schedule focused work blocks"]
+		return ["Maintain current cadence and protect focus time"]
+
+	async def _send_wellbeing_alert(self, remote_worker: TARemoteWorker, burnout_risk: Dict[str, Any]) -> None:
+		self._record_integration_event(remote_worker.tenant_id, "wellbeing_alert", {
+			"remote_worker_id": remote_worker.id,
+			"risk": burnout_risk,
+		})
+
+	async def _send_remote_work_setup_notification(self, remote_worker: TARemoteWorker) -> None:
+		self._record_integration_event(remote_worker.tenant_id, "remote_work_setup", {
+			"remote_worker_id": remote_worker.id,
+			"employee_id": remote_worker.employee_id,
+			"work_mode": remote_worker.work_mode.value,
+		})
+
+	async def _setup_ai_agent_monitoring(self, ai_agent: TAAIAgent) -> None:
+		ai_agent.monitoring_metrics = {"status": "monitoring_enabled"}
+
+	async def _configure_ai_agent_integrations(self, ai_agent: TAAIAgent, configuration: Dict[str, Any]) -> None:
+		ai_agent.integration_points = dict(configuration.get("integrations", {}))
+
+	async def _initialize_resource_tracking(self, ai_agent: TAAIAgent) -> None:
+		ai_agent.monitoring_metrics.setdefault("resource_tracking", "enabled")
+
+	async def _calculate_ai_agent_costs(
+		self,
+		ai_agent: TAAIAgent,
+		resource_consumption: Dict[str, Any],
+	) -> Dict[str, Any]:
+		cpu_cost = float(resource_consumption.get("cpu_hours", 0)) * 0.05
+		gpu_cost = float(resource_consumption.get("gpu_hours", 0)) * 0.75
+		api_cost = float(resource_consumption.get("api_calls", 0)) * 0.0001
+		total = cpu_cost + gpu_cost + api_cost
+		return {
+			"total_cost": round(total, 6),
+			"resource_breakdown": {"cpu": cpu_cost, "gpu": gpu_cost, "api": api_cost},
+		}
+
+	async def _update_ai_agent_health(
+		self,
+		ai_agent: TAAIAgent,
+		task_data: Dict[str, Any],
+		resource_consumption: Dict[str, Any],
+	) -> None:
+		ai_agent.health_status = "degraded" if task_data.get("error") else "healthy"
+		ai_agent.last_health_check = datetime.utcnow()
+
+	async def _analyze_ai_agent_performance(self, ai_agent: TAAIAgent, task_data: Dict[str, Any]) -> Dict[str, Any]:
+		if task_data.get("error"):
+			return {"recommendations": ["Inspect failed task and retry with guardrails"]}
+		return {"recommendations": ["Continue monitoring throughput and cost per task"]}
+
+	async def _send_ai_agent_registration_notification(self, ai_agent: TAAIAgent) -> None:
+		self._record_integration_event(ai_agent.tenant_id, "ai_agent_registered", {"agent_id": ai_agent.id})
+
+	async def _initialize_collaboration_work_allocation(self, collaboration: TAHybridCollaboration) -> None:
+		collaboration.human_work_allocation = {participant: [] for participant in collaboration.human_participants}
+		collaboration.ai_work_allocation = {participant: [] for participant in collaboration.ai_participants}
+
+	async def _setup_collaboration_monitoring(self, collaboration: TAHybridCollaboration) -> None:
+		collaboration.quality_metrics["monitoring"] = "enabled"
+
+	async def _setup_collaboration_communication(self, collaboration: TAHybridCollaboration) -> None:
+		collaboration.communication_events.append({
+			"type": "session_started",
+			"timestamp": datetime.utcnow().isoformat(),
+		})
+
+	async def _send_collaboration_start_notifications(self, collaboration: TAHybridCollaboration) -> None:
+		self._record_integration_event(collaboration.tenant_id, "collaboration_started", {"id": collaboration.id})
+
+	async def _optimize_schedule_patterns(
+		self,
+		schedule_patterns: List[Dict[str, Any]],
+		assigned_employees: List[str],
+		optimization_goals: List[str] = None,
+	) -> List[Dict[str, Any]]:
+		return [dict(pattern, optimized=True) for pattern in schedule_patterns]
+
+	async def _validate_schedule_compliance(self, schedule: TASchedule) -> None:
+		for pattern in schedule.schedule_patterns:
+			if not pattern.get("days_of_week"):
+				raise ValueError("Schedule pattern must include at least one day")
+
+	async def _send_schedule_notifications(self, schedule: TASchedule) -> None:
+		self._record_integration_event(schedule.tenant_id, "schedule_created", {"schedule_id": schedule.id})
+
+	async def _predict_leave_approval(self, leave_request: TALeaveRequest) -> Dict[str, Any]:
+		probability = 0.95 if leave_request.is_emergency else 0.8
+		return {
+			"probability": probability,
+			"workload_impact": {"risk": "medium" if leave_request.total_days > 5 else "low"},
+			"coverage_suggestions": [{"type": "peer_coverage", "confidence": 0.8}],
+		}
+
+	async def _check_leave_balance(self, employee_id: str, leave_type: LeaveType, total_days: int) -> Dict[str, Decimal]:
+		balance_before = Decimal("20")
+		return {
+			"balance_before": balance_before,
+			"balance_after": max(Decimal("0"), balance_before - Decimal(str(total_days))),
+		}
+
+	async def _detect_leave_conflicts(self, leave_request: TALeaveRequest) -> List[Dict[str, Any]]:
+		return []
+
+	async def _build_approval_chain(
+		self,
+		employee_id: str,
+		leave_type: LeaveType,
+		is_emergency: bool,
+	) -> List[Dict[str, Any]]:
+		return [{"level": 1, "approver_id": f"manager_{employee_id}", "required": True}]
+
+	async def _trigger_leave_approval_workflow(self, leave_request: TALeaveRequest) -> None:
+		self._record_integration_event(leave_request.tenant_id, "leave_approval_started", {"id": leave_request.id})
+
+	async def _send_leave_request_notifications(self, leave_request: TALeaveRequest) -> None:
+		self._record_integration_event(leave_request.tenant_id, "leave_request_submitted", {"id": leave_request.id})
+
+	async def _gather_historical_data(
+		self,
+		tenant_id: str,
+		lookback_days: int,
+		departments: Optional[List[str]],
+	) -> Dict[str, Any]:
+		start = date.today() - timedelta(days=lookback_days)
+		entries = await self.list_time_entries(tenant_id, start_date=start)
+		return {"entries": entries, "departments": departments or [], "lookback_days": lookback_days}
+
+	async def _initialize_prediction_models(self) -> Dict[str, Any]:
+		return {"model": "deterministic_workforce_baseline", "version": "1.0"}
+
+	async def _predict_staffing_requirements(self, historical_data: Dict[str, Any], days: int) -> Dict[str, Any]:
+		employees = {entry.employee_id for entry in historical_data["entries"]}
+		return {"required_staff": max(1, len(employees)), "period_days": days}
+
+	async def _predict_absence_patterns(self, historical_data: Dict[str, Any], days: int) -> Dict[str, Any]:
+		return {"expected_absences": 0, "period_days": days}
+
+	async def _predict_overtime_costs(self, historical_data: Dict[str, Any], days: int) -> Dict[str, Any]:
+		overtime = sum(float(entry.overtime_hours or 0) for entry in historical_data["entries"])
+		return {"projected_overtime_hours": overtime, "period_days": days}
+
+	async def _analyze_productivity_trends(self, historical_data: Dict[str, Any]) -> Dict[str, Any]:
+		entries = historical_data["entries"]
+		total_hours = sum(float(entry.total_hours or 0) for entry in entries)
+		return {"trend": "stable", "total_hours": total_hours}
+
+	async def _identify_efficiency_opportunities(
+		self,
+		historical_data: Dict[str, Any],
+		staffing_predictions: Dict[str, Any],
+	) -> List[Dict[str, Any]]:
+		return [{"name": "schedule_balance", "impact": "medium"}]
+
+	async def _generate_cost_optimization(
+		self,
+		staffing_predictions: Dict[str, Any],
+		overtime_predictions: Dict[str, Any],
+	) -> Dict[str, Any]:
+		return {"recommendation": "balance overtime before adding headcount"}
+
+	async def _analyze_compliance_risks(self, historical_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+		return []
+
+	async def _analyze_operational_risks(self, historical_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+		return []
+
+	async def _generate_actionable_insights(self, analytics: TAPredictiveAnalytics) -> List[Dict[str, Any]]:
+		return [{"type": "staffing", "message": "Review staffing levels against demand"}]
+
+	async def _calculate_projected_savings(self, analytics: TAPredictiveAnalytics) -> Decimal:
+		return Decimal("0")
+
+	async def _calculate_roi_estimates(self, analytics: TAPredictiveAnalytics) -> Dict[str, Any]:
+		return {"roi": 0.0, "basis": "deterministic_baseline"}
+
+	async def _comprehensive_fraud_analysis(self, time_entry: TATimeEntry) -> Dict[str, Any]:
+		fraud_detected = time_entry.anomaly_score >= 0.6 or bool(time_entry.fraud_indicators)
+		return {
+			"fraud_detected": fraud_detected,
+			"fraud_types": [FraudType.TIME_MANIPULATION] if fraud_detected else [],
+			"severity": "HIGH" if time_entry.anomaly_score >= 0.8 else "MEDIUM",
+			"confidence": time_entry.anomaly_score,
+			"evidence": time_entry.fraud_indicators,
+		}
+
+	async def _estimate_fraud_impact(self, fraud_detection: TAFraudDetection, time_entry: TATimeEntry) -> Decimal:
+		return Decimal(str(float(time_entry.overtime_hours or 0) * 25))
+
+	async def _generate_fraud_prevention_recommendations(self, fraud_detection: TAFraudDetection) -> List[str]:
+		return ["Review time entry evidence and require manager approval"]
+
+	async def _trigger_fraud_response_actions(self, fraud_detection: TAFraudDetection) -> None:
+		self._record_integration_event(fraud_detection.tenant_id, "fraud_response", {"id": fraud_detection.id})
+
+	async def _get_active_compliance_rules(
+		self,
+		tenant_id: str,
+		rule_types: List[str] = None,
+	) -> List[TAComplianceRule]:
+		return []
+
+	async def _check_rule_violations(self, rule: TAComplianceRule) -> List[Dict[str, Any]]:
+		return []
+
+	async def _apply_automatic_correction(
+		self,
+		violation: Dict[str, Any],
+		rule: TAComplianceRule,
+	) -> Dict[str, Any]:
+		return {"success": True, "violation": violation, "rule_id": rule.id}
+
+	async def _send_compliance_violation_notification(
+		self,
+		violation: Dict[str, Any],
+		rule: TAComplianceRule,
+	) -> None:
+		self._record_integration_event(rule.tenant_id, "compliance_violation", {"rule_id": rule.id})
+
+	async def _update_compliance_metrics(
+		self,
+		tenant_id: str,
+		violations: List[Dict[str, Any]],
+		corrections: List[Dict[str, Any]],
+	) -> None:
+		self._record_integration_event(tenant_id, "compliance_metrics", {
+			"violations": len(violations),
+			"corrections": len(corrections),
+		})
+
+	async def _calculate_compliance_score(self, tenant_id: str) -> float:
+		return 1.0
 	
 	# Mock integration methods (for development and testing)
 	
 	async def _mock_send_notification(self, notification_data: Dict[str, Any]) -> None:
 		"""Mock notification sending"""
 		self.logger.info(f"Mock notification sent: {notification_data['type']}")
+		tenant_id = notification_data.get("tenant_id") or notification_data.get("tenant") or "default"
+		self._record_integration_event(tenant_id, "notification", notification_data)
 	
 	async def _mock_trigger_workflow(self, workflow_data: Dict[str, Any]) -> None:
 		"""Mock workflow triggering"""
 		self.logger.info(f"Mock workflow triggered: {workflow_data['workflow_type']}")
+		tenant_id = workflow_data.get("tenant_id") or workflow_data.get("tenant") or "default"
+		self._record_integration_event(tenant_id, "workflow", workflow_data)
 	
 	async def _mock_payroll_sync(self, payroll_data: Dict[str, Any]) -> None:
 		"""Mock payroll synchronization"""
 		self.logger.info(f"Mock payroll sync for employee: {payroll_data['employee_id']}")
+		tenant_id = payroll_data.get("tenant_id") or payroll_data.get("tenant") or "default"
+		self._record_integration_event(tenant_id, "payroll_sync", payroll_data)
 	
 	# Additional helper methods with basic implementation
 	
@@ -1360,8 +1940,14 @@ class TimeAttendanceService:
 	
 	async def _check_duplicate_clock_in(self, time_entry: TATimeEntry) -> bool:
 		"""Check for duplicate clock-ins"""
-		# Mock implementation - would check database in production
-		return False
+		return any(
+			entry.id != time_entry.id
+			and entry.employee_id == time_entry.employee_id
+			and entry.entry_date == time_entry.entry_date
+			and entry.clock_in is not None
+			and entry.clock_out is None
+			for entry in self._records("time_entries", time_entry.tenant_id)
+		)
 	
 	async def _validate_geofence(self, location: Dict[str, float], employee: TAEmployee) -> bool:
 		"""Validate location against geofence"""

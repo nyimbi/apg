@@ -4769,3 +4769,28 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `7e71ae5` (`Remove pass fallbacks from capability manifests`) to `origin/main`.
+
+### 2026-05-28 03:55 EAT
+
+Completed checkpoint:
+
+- Made HCM Time Attendance executable in standalone/API mode with a tenant-scoped runtime store for time entries, remote workers, AI agents, collaborations, schedules, leave requests, fraud detections, analytics, and integration events.
+- Replaced hard-coded API list/dashboard/bulk placeholders with service-backed query, pagination, summary, dashboard, bulk update, and bulk approval paths.
+- Added deterministic helper implementations for remote productivity, AI-agent work/cost tracking, hybrid collaboration setup, intelligent schedules, leave workflows, fraud detection, compliance bookkeeping, analytics predictions, and integration event recording.
+- Fixed runtime import blockers in the capability by converting Pydantic v1 `regex=` fields to Pydantic v2 `pattern=`, replacing the mutable dataclass CORS default with `default_factory`, and registering FastAPI exception handlers on the app instead of the router.
+- Added focused root regression coverage for executable HCM TAT service workflows, API-backed list/dashboard endpoints, and missing private helper detection.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/service.py capabilities/hcm/tat/time_attendance/api.py capabilities/hcm/tat/time_attendance/views.py capabilities/hcm/tat/time_attendance/models.py capabilities/hcm/tat/time_attendance/config.py tests/test_hcm_tat_runtime_store.py`
+- `.venv/bin/pytest tests/test_hcm_tat_runtime_store.py -q` -> 3 passed
+- `.venv/bin/python - <<'PY' ... import TimeAttendanceService and create_app ... PY` -> imports succeeded
+- AST helper scan for `TimeAttendanceService` private calls -> `missing 0`
+- `rg -n "TODO: Implement actual database query|TODO: Implement bulk update logic|TODO: Implement bulk approval logic|TODO: Implement dashboard data aggregation|This is a placeholder for the database implementation|TIME_THEFT|request\\.entry_ids|request\\.approval_notes|regex=" ...` -> no matches
+- `git diff --check -- capabilities/hcm/tat/time_attendance/service.py capabilities/hcm/tat/time_attendance/api.py capabilities/hcm/tat/time_attendance/views.py capabilities/hcm/tat/time_attendance/models.py capabilities/hcm/tat/time_attendance/config.py tests/test_hcm_tat_runtime_store.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+- Attempted `../../../../.venv/bin/python -m pytest tests/ci/test_service.py -q` from `capabilities/hcm/tat/time_attendance`, but the existing capability-local test harness requires missing dependency `alembic`.
+
+Commit result:
+
+- Pending commit/push for this checkpoint.

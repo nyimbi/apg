@@ -4,7 +4,7 @@ Time & Attendance Capability Views
 Pydantic v2 views and validation schemas for the revolutionary APG Time & Attendance
 capability API endpoints with comprehensive validation and response formatting.
 
-Copyright © 2025 Datacraft
+Copyright 2025 Datacraft
 Author: Nyimbi Odero
 Email: nyimbi@gmail.com
 """
@@ -136,7 +136,7 @@ class AIAgentRegistrationRequest(BaseModel):
 	
 	agent_name: str = Field(..., min_length=1, max_length=100, description="Agent name")
 	agent_type: AIAgentType = Field(..., description="Agent type")
-	capabilities: List[str] = Field(..., min_items=1, description="Agent capabilities")
+	capabilities: List[str] = Field(..., min_length=1, description="Agent capabilities")
 	configuration: Dict[str, Any] = Field(..., description="Agent configuration")
 	version: str = Field(default="1.0.0", max_length=50, description="Agent version")
 	environment: str = Field(default="production", max_length=100, description="Deployment environment")
@@ -179,8 +179,8 @@ class HybridCollaborationRequest(BaseModel):
 	
 	session_name: str = Field(..., min_length=1, max_length=200, description="Session name")
 	project_id: str = Field(..., min_length=1, max_length=36, description="Project identifier")
-	human_participants: List[str] = Field(..., min_items=1, description="Human participant IDs")
-	ai_participants: List[str] = Field(..., min_items=1, description="AI agent IDs")
+	human_participants: List[str] = Field(..., min_length=1, description="Human participant IDs")
+	ai_participants: List[str] = Field(..., min_length=1, description="AI agent IDs")
 	session_type: str = Field(default="collaborative_work", max_length=50, description="Session type")
 	planned_duration_minutes: int = Field(default=60, ge=1, le=480, description="Planned duration")
 	objectives: Optional[List[str]] = Field(None, description="Session objectives")
@@ -389,6 +389,17 @@ class ScheduleOptimizationRequest(BaseModel):
 	"""Schedule optimization request"""
 	model_config = ConfigDict(extra='forbid', validate_by_name=True)
 	
+	schedule_name: str = Field(default="AI Optimized Schedule", min_length=1, max_length=100, description="Schedule name")
+	schedule_patterns: List[Dict[str, Any]] = Field(
+		default_factory=lambda: [{
+			"days_of_week": [0, 1, 2, 3, 4],
+			"start_time": "09:00",
+			"end_time": "17:00"
+		}],
+		min_length=1,
+		description="Weekly schedule patterns"
+	)
+	assigned_employees: List[str] = Field(default_factory=list, description="Employee IDs to assign")
 	schedule_period_weeks: int = Field(default=4, ge=1, le=52, description="Schedule period in weeks")
 	department_ids: Optional[List[str]] = Field(None, description="Department IDs to include")
 	optimization_goals: List[str] = Field(
@@ -404,7 +415,7 @@ class BulkTimeEntryUpdate(BaseModel):
 	"""Bulk time entry update model"""
 	model_config = ConfigDict(extra='forbid', validate_by_name=True)
 	
-	time_entry_ids: List[str] = Field(..., min_items=1, max_items=100, description="Time entry IDs")
+	time_entry_ids: List[str] = Field(..., min_length=1, max_length=100, description="Time entry IDs")
 	updates: Dict[str, Any] = Field(..., description="Updates to apply")
 	approval_required: bool = Field(default=True, description="Require approval for changes")
 
@@ -413,8 +424,9 @@ class BulkApprovalRequest(BaseModel):
 	"""Bulk approval request model"""
 	model_config = ConfigDict(extra='forbid', validate_by_name=True)
 	
-	time_entry_ids: List[str] = Field(..., min_items=1, max_items=50, description="Time entry IDs")
-	action: str = Field(..., regex="^(approve|reject)$", description="Approval action")
+	time_entry_ids: List[str] = Field(..., min_length=1, max_length=50, description="Entry IDs")
+	entry_type: str = Field(default="time_entry", pattern="^(time_entry|leave_request)$", description="Entry type")
+	action: str = Field(..., pattern="^(approve|reject)$", description="Approval action")
 	comments: Optional[str] = Field(None, max_length=500, description="Approval comments")
 
 
