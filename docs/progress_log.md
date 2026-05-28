@@ -5882,3 +5882,21 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `3377108` (`Render generated UI form errors as HTML`) to `origin/main`.
+
+### 2026-05-28 08:34 EAT
+
+Completed checkpoint:
+
+- Aligned generated app runbooks with the executable browser behavior now produced by the compiler.
+- Generated READMEs now document opening `/ui`, dependency-free create/edit/delete flows, typed HTML controls, validation-error behavior, and `_revision` checks for browser edits/deletes.
+- Added focused regression assertions so both direct compilation and CLI compilation preserve the browser-UI runbook guidance.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 18 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.

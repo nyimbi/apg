@@ -104,6 +104,9 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "python app.py --self-test" in readme
 	assert "python smoke_test.py" in readme
 	assert "GET /component.json" in readme
+	assert "## Browser UI" in readme
+	assert "create, edit, delete, and validation-error flows" in readme
+	assert "_revision` checks" in readme
 	assert "docker build -t apg-generated-app ." in readme
 	assert "POST /agents/Planner/invoke" in readme
 	assert "component_manifest" in smoke_test
@@ -940,6 +943,7 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "GET /component.json" in readme
 	assert "Dockerfile" in readme
 	assert "GET /openapi.json" in readme
+	assert "Typed APG fields render as matching HTML controls" in readme
 	assert smoke.returncode == 0
 	assert json.loads(smoke.stdout)["passed"] is True
 	assert "Flask-AppBuilder" not in app
