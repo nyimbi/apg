@@ -968,9 +968,101 @@ class Revolutionary3DTopologyEngine:
 			'status_timestamp': datetime.utcnow().isoformat()
 		}
 
+
+class Topology3DEngine(Revolutionary3DTopologyEngine):
+	"""Compatibility API for generated apps and production validation callers."""
+
+	async def generate_3d_scene(self, topology: Dict[str, Any]) -> Dict[str, Any]:
+		"""Generate a compact 3D scene from service/connection topology data."""
+		topology_data = self._normalize_topology(topology)
+		result = await self.update_topology(topology_data)
+		if "error" in result:
+			return result
+
+		return {
+			"nodes": [node.to_dict() for node in self.nodes],
+			"edges": [edge.to_dict() for edge in self.edges],
+			"scene_config": result["scene_config"],
+			"topology_summary": result["topology_summary"],
+			"generation_time": result["generation_time"],
+			"timestamp": result["timestamp"],
+		}
+
+	async def optimize_for_vr(self, scene_data: Dict[str, Any]) -> Dict[str, Any]:
+		"""Return a VR-ready scene payload with bounded geometry metadata."""
+		nodes = scene_data.get("nodes", [])
+		edges = scene_data.get("edges", [])
+		optimized_scene = {
+			**scene_data,
+			"optimized": True,
+			"vr_options": {
+				"webxr_enabled": True,
+				"target_frame_rate": 72,
+				"max_visible_nodes": len(nodes),
+				"edge_instancing": len(edges) > 50,
+				"level_of_detail": "automatic" if len(nodes) > 50 else "full",
+			},
+			"optimization_summary": {
+				"node_count": len(nodes),
+				"edge_count": len(edges),
+				"instanced_edges": len(edges) > 50,
+			},
+			"optimized_at": datetime.utcnow().isoformat(),
+		}
+		return optimized_scene
+
+	def _normalize_topology(self, topology: Dict[str, Any]) -> Dict[str, Any]:
+		"""Normalize service/connection topology into engine node/edge input."""
+		if "nodes" in topology:
+			return topology
+
+		metrics = topology.get("metrics", {}) or {}
+		nodes = []
+		for service in topology.get("services", []):
+			service_metrics = metrics.get(service, {}) if isinstance(metrics, dict) else {}
+			nodes.append({
+				"id": service,
+				"type": service_metrics.get("type", "service"),
+				"health_status": service_metrics.get("health_status", "healthy"),
+				"metrics": {
+					"traffic_volume": service_metrics.get("traffic_volume", service_metrics.get("requests_per_second", 0.0)),
+					"cpu_usage": service_metrics.get("cpu_usage", 0.0),
+					"memory_usage": service_metrics.get("memory_usage", 0.0),
+					"error_rate": service_metrics.get("error_rate", 0.0),
+				},
+				"metadata": {"service_name": service},
+			})
+
+		edges = []
+		for index, connection in enumerate(topology.get("connections", [])):
+			edges.append({
+				"id": connection.get("id", f"edge-{index}"),
+				"source": connection.get("source"),
+				"target": connection.get("target"),
+				"type": connection.get("type", "http"),
+				"is_active": connection.get("is_active", True),
+				"metrics": {
+					"traffic_flow": connection.get("traffic_flow", connection.get("strength", 0.0) * 100),
+					"latency": connection.get("latency", 0.0),
+					"success_rate": connection.get("success_rate", 100.0),
+				},
+				"metadata": {
+					key: value
+					for key, value in connection.items()
+					if key not in {"id", "source", "target", "type", "is_active", "traffic_flow", "strength", "latency", "success_rate"}
+				},
+			})
+
+		return {
+			"nodes": nodes,
+			"edges": edges,
+			"scene_options": topology.get("scene_options", {}),
+		}
+
 # Export main classes
 __all__ = [
 	'Revolutionary3DTopologyEngine',
+	'Topology3DEngine',
 	'TopologyNode',
 	'TopologyEdge', 
 	'TopologyLayoutEngine',

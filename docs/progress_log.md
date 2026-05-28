@@ -6813,3 +6813,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_composition_gateway_ai_engine_offline_runtime.py -q` -> 2 passed, 4 pre-existing warnings
 - `git diff --check capabilities/composition/gateway/ai_engine.py capabilities/composition/gateway/service.py tests/test_composition_gateway_ai_engine_offline_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:01 EAT
+
+Completed checkpoint:
+
+- Restored the executable `Topology3DEngine` compatibility surface used by gateway production validation, examples, and generated applications.
+- Added `generate_3d_scene()` to normalize service/connection topology inputs into the existing 3D topology engine and return compact `nodes`, `edges`, scene config, and summary data.
+- Added `optimize_for_vr()` so generated topology scenes can produce VR-ready metadata without requiring browser/runtime-only checks.
+- Added focused runtime coverage for service/connection scene generation, imported compatibility name, and VR optimization output.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/topology_3d_engine.py tests/test_composition_gateway_topology_runtime.py`
+- `.venv/bin/python -m pytest tests/test_composition_gateway_topology_runtime.py -q` -> 2 passed, 4 pre-existing warnings
+- `.venv/bin/python - <<'PY' ... import Topology3DEngine ... PY` -> imported `Topology3DEngine`
+- `git diff --check capabilities/composition/gateway/topology_3d_engine.py tests/test_composition_gateway_topology_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
