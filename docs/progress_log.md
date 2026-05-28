@@ -6645,3 +6645,20 @@ Battery-conscious verification:
 - `rg -n "Placeholder for processing marketplace capability updates|Placeholder for processing marketplace template updates|pass\\s*$" capabilities/composition/registry/marketplace.py tests/test_composition_registry_marketplace_transport.py -S` -> no matches
 - `git diff --check capabilities/composition/registry/marketplace.py tests/test_composition_registry_marketplace_transport.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:06 EAT
+
+Completed checkpoint:
+
+- Replaced placeholder capability-search recommendation logic with deterministic, intent-aware ranking.
+- Added query term extraction, capability metadata term extraction, score breakdowns, matched terms, and concise recommendation reasons.
+- Recommendations now balance intent match, quality, popularity, usage, and complexity instead of only sorting by quality and popularity.
+- Added focused runtime coverage for intent-match ranking and quality fallback when no query is provided.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/service.py tests/test_composition_registry_service_recommendations.py`
+- `.venv/bin/python -m pytest tests/test_composition_registry_service_recommendations.py -q` -> 2 passed, 2 pre-existing warnings
+- `rg -n "Placeholder for AI recommendation logic" capabilities/composition/registry/service.py tests/test_composition_registry_service_recommendations.py -S` -> no matches
+- `git diff --check capabilities/composition/registry/service.py tests/test_composition_registry_service_recommendations.py`
+- Deferred broader pytest at the user's request to conserve battery.

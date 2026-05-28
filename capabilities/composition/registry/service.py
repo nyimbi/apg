@@ -11,6 +11,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 import asyncio
 import json
 import os
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -544,26 +545,86 @@ class CapabilityRegistryService:
 		search_results: List[Dict[str, Any]]
 	) -> List[Dict[str, Any]]:
 		"""Generate AI-powered capability recommendations."""
-		# Placeholder for AI recommendation logic
+		if not search_results:
+			return []
+
+		query_terms = self._recommendation_terms(query or "")
+		scored_capabilities = []
+		for capability in search_results:
+			text_terms = self._capability_terms(capability)
+			matched_terms = sorted(query_terms.intersection(text_terms))
+			quality_score = float(capability.get("quality_score") or 0.0)
+			popularity_score = float(capability.get("popularity_score") or 0.0)
+			usage_count = float(capability.get("usage_count") or 0.0)
+			complexity_score = float(capability.get("complexity_score") or 1.0)
+			usage_score = min(1.0, usage_count / 1000.0)
+			complexity_bonus = max(0.0, min(1.0, 1.0 - (complexity_score / 10.0)))
+			intent_score = (len(matched_terms) / max(len(query_terms), 1)) if query_terms else 0.0
+			keyword_terms = self._recommendation_terms(" ".join(capability.get("composition_keywords") or []))
+			keyword_bonus = 0.15 if matched_terms and keyword_terms.intersection(matched_terms) else 0.0
+			total_score = (
+				(intent_score * 0.40) +
+				(quality_score * 0.25) +
+				(popularity_score * 0.15) +
+				(usage_score * 0.10) +
+				(complexity_bonus * 0.10) +
+				keyword_bonus
+			)
+			scored_capabilities.append((total_score, matched_terms, capability, {
+				"intent_match": round(intent_score, 3),
+				"quality": round(quality_score, 3),
+				"popularity": round(popularity_score, 3),
+				"usage": round(usage_score, 3),
+				"complexity_bonus": round(complexity_bonus, 3),
+			}))
+
+		scored_capabilities.sort(key=lambda item: item[0], reverse=True)
 		recommendations = []
-		
-		if query and len(search_results) > 0:
-			# Simple recommendation based on popularity and quality
-			top_capabilities = sorted(
-				search_results,
-				key=lambda x: (x.get('quality_score', 0) + x.get('popularity_score', 0)),
-				reverse=True
-			)[:3]
-			
-			for cap in top_capabilities:
-				recommendations.append({
-					"capability_id": cap["capability_id"],
-					"capability_name": cap["capability_name"],
-					"recommendation_reason": "High quality and popularity score",
-					"confidence_score": 0.8
-				})
-		
+		for total_score, matched_terms, capability, breakdown in scored_capabilities[:5]:
+			recommendations.append({
+				"capability_id": capability["capability_id"],
+				"capability_name": capability["capability_name"],
+				"recommendation_reason": self._recommendation_reason(matched_terms, capability),
+				"confidence_score": round(max(0.2, min(0.98, total_score)), 3),
+				"matched_terms": matched_terms,
+				"score_breakdown": breakdown
+			})
+
 		return recommendations
+
+	def _recommendation_terms(self, text: str) -> Set[str]:
+		"""Extract stable search-intent terms from user text."""
+		stop_words = {
+			"a", "an", "and", "are", "as", "build", "for", "in", "me",
+			"need", "of", "on", "or", "the", "to", "with"
+		}
+		return {
+			term
+			for term in re.findall(r"[a-z0-9_]+", text.lower())
+			if len(term) > 2 and term not in stop_words
+		}
+
+	def _capability_terms(self, capability: Dict[str, Any]) -> Set[str]:
+		"""Extract searchable terms from capability metadata."""
+		values = [
+			capability.get("capability_name", ""),
+			capability.get("description", ""),
+			capability.get("category", ""),
+			capability.get("subcategory", ""),
+			" ".join(capability.get("composition_keywords") or []),
+			" ".join(capability.get("provides_services") or []),
+		]
+		return self._recommendation_terms(" ".join(str(value) for value in values if value))
+
+	def _recommendation_reason(self, matched_terms: List[str], capability: Dict[str, Any]) -> str:
+		"""Build a concise recommendation reason."""
+		if matched_terms:
+			return f"Matches requested intent terms: {', '.join(matched_terms[:5])}"
+		if float(capability.get("quality_score") or 0.0) >= 0.8:
+			return "High quality capability for this search result set"
+		if float(capability.get("popularity_score") or 0.0) >= 0.7:
+			return "Popular capability for this search result set"
+		return "Relevant capability from the filtered search result set"
 	
 	# =================================================================
 	# Composition Management and Validation
