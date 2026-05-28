@@ -6310,3 +6310,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_common_mqeb_quantum_security_runtime.py -q` -> 2 passed, 10 pre-existing warnings
 - `rg -n "placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/mqeb/quantum_security.py tests/test_common_mqeb_quantum_security_runtime.py -S` -> no matches
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 11:56 EAT
+
+Completed checkpoint:
+
+- Made the FREC privacy architecture stop returning literal placeholder bytes from homomorphic encryption, encrypted-domain computation, and protected-template generation paths.
+- Homomorphic helper failures now fail visibly through the caller instead of producing fake ciphertext or fake computation results.
+- Protected biometric template generation now has a deterministic PBKDF2 fallback keyed by tenant when vector protection cannot complete.
+- Added privacy metadata that lists concrete techniques applied for on-device, federated, homomorphic, and differential-private processing modes.
+- Added focused public API regression coverage for consent-gated homomorphic processing and on-device protected template generation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/frec/privacy_architecture.py tests/test_common_frec_privacy_architecture_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_frec_privacy_architecture_runtime.py -q` -> 2 passed, 10 pre-existing warnings
+- `rg -n "encrypted_data_placeholder|computation_result_placeholder|privacy_template_placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/frec/privacy_architecture.py tests/test_common_frec_privacy_architecture_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/frec/privacy_architecture.py tests/test_common_frec_privacy_architecture_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.

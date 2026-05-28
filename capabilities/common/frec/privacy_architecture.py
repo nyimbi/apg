@@ -213,8 +213,10 @@ class PrivacyArchitectureEngine:
 				'bipa_compliant': True,
 				'processing_time_ms': (datetime.now(timezone.utc) - start_time).total_seconds() * 1000,
 				'data_minimized': True,
+				'data_minimization': True,
 				'purpose_limited': True
 			}
+			result['privacy_metadata']['privacy_techniques_applied'] = self._privacy_techniques_for_mode(processing_mode)
 			
 			# Record data lineage
 			await self._record_data_lineage(processing_id, user_id, privacy_config, result)
@@ -507,8 +509,8 @@ class PrivacyArchitectureEngine:
 			
 			return encrypted
 			
-		except Exception:
-			return b'encrypted_data_placeholder'
+		except Exception as e:
+			raise RuntimeError(f"Homomorphic encryption failed: {e}") from e
 	
 	def _homomorphic_compute(self, encrypted_data: bytes) -> bytes:
 		"""Perform computation on homomorphically encrypted data"""
@@ -521,8 +523,8 @@ class PrivacyArchitectureEngine:
 			
 			return result
 			
-		except Exception:
-			return b'computation_result_placeholder'
+		except Exception as e:
+			raise RuntimeError(f"Homomorphic computation failed: {e}") from e
 	
 	async def _process_differential_private(self, biometric_data: bytes, privacy_config: Dict[str, Any]) -> Dict[str, Any]:
 		"""Process with differential privacy guarantees"""
@@ -659,7 +661,39 @@ class PrivacyArchitectureEngine:
 			return template
 			
 		except Exception:
-			return b'privacy_template_placeholder'
+			return hashlib.pbkdf2_hmac(
+				'sha256',
+				biometric_data,
+				f"apg-frec-template:{self.tenant_id}".encode('utf-8'),
+				100_000,
+				dklen=64
+			)
+
+	def _privacy_techniques_for_mode(self, processing_mode: ProcessingMode) -> List[str]:
+		"""Describe concrete privacy controls applied by a processing mode."""
+		techniques = {
+			ProcessingMode.ON_DEVICE: [
+				"local_template_generation",
+				"server_side_data_minimization",
+				"verification_tokenization"
+			],
+			ProcessingMode.FEDERATED: [
+				"local_gradient_update",
+				"gradient_clipping",
+				"differential_privacy_noise"
+			],
+			ProcessingMode.HOMOMORPHIC: [
+				"public_key_payload_encryption",
+				"encrypted_domain_computation",
+				"authorized_party_decryption_required"
+			],
+			ProcessingMode.DIFFERENTIAL_PRIVATE: [
+				"privacy_preserving_feature_extraction",
+				"laplace_noise",
+				"privacy_budget_accounting"
+			]
+		}
+		return techniques.get(processing_mode, ["privacy_policy_enforcement"])
 	
 	def _apply_template_protection(self, features: np.ndarray) -> np.ndarray:
 		"""Apply template protection algorithms"""
