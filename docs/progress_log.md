@@ -6198,4 +6198,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push.
+- Pushed commit `37c5408` (`Make gateway APG integration dependency-light`).
