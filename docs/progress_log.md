@@ -5823,3 +5823,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `f9fbf9b` (`Coerce generated form records to schema types`) to `origin/main`.
+
+### 2026-05-28 08:22 EAT
+
+Completed checkpoint:
+
+- Made generated entity screens behave more like executable applications instead of JSON-only forms.
+- Generated entity forms now post to UI routes that create records and redirect back to the entity screen.
+- Generated entity screens now render records as HTML tables while keeping expandable JSON for inspection.
+- Generated record rows now include UI delete forms with optimistic revision checks.
+- Added focused regression coverage for UI form create, redirected record rendering, UI delete, and post-delete record state.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 18 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.

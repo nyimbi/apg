@@ -412,7 +412,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert "/metrics" in ui_index
 	assert "/self-test" in ui_index
 	assert "/openapi.json" in ui_index
-	assert 'action="/entities/Customer/records"' in entity_ui
+	assert 'action="/ui/entities/Customer/records"' in entity_ui
 	assert "<pre>" in entity_ui
 	assert "asha@example.com" in entity_ui
 	assert openapi_content_type.startswith("application/json")
@@ -602,13 +602,26 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 			{"name": "Widget", "quantity": "7", "active": "true"}
 		).encode("utf-8")
 		request = urllib.request.Request(
-			f"{base_url}/entities/InventoryItem/records",
+			f"{base_url}/ui/entities/InventoryItem/records",
 			data=form_data,
 			headers={"Content-Type": "application/x-www-form-urlencoded"},
 			method="POST",
 		)
 		with urllib.request.urlopen(request, timeout=1) as response:
+			created_ui = response.read().decode("utf-8")
+		with urllib.request.urlopen(f"{base_url}/entities/InventoryItem/records/1", timeout=1) as response:
 			created = json.loads(response.read().decode("utf-8"))
+		delete_data = urllib.parse.urlencode({"expected_revision": "1"}).encode("utf-8")
+		delete_request = urllib.request.Request(
+			f"{base_url}/ui/entities/InventoryItem/records/1/delete",
+			data=delete_data,
+			headers={"Content-Type": "application/x-www-form-urlencoded"},
+			method="POST",
+		)
+		with urllib.request.urlopen(delete_request, timeout=1) as response:
+			deleted_ui = response.read().decode("utf-8")
+		with urllib.request.urlopen(f"{base_url}/entities/InventoryItem/records", timeout=1) as response:
+			records_after_delete = json.loads(response.read().decode("utf-8"))
 	finally:
 		process.terminate()
 		try:
@@ -620,7 +633,13 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 	assert 'name="quantity" type="number" step="1"' in entity_ui
 	assert 'type="hidden" name="active" value="false"' in entity_ui
 	assert 'type="checkbox" name="active" value="true"' in entity_ui
+	assert 'action="/ui/entities/InventoryItem/records"' in entity_ui
+	assert "<table>" in created_ui
+	assert "Widget" in created_ui
+	assert 'action="/ui/entities/InventoryItem/records/1/delete"' in created_ui
 	assert created["record"] == {"id": 1, "_revision": 1, "name": "Widget", "quantity": 7, "active": True}
+	assert "Widget" not in deleted_ui
+	assert records_after_delete["records"] == []
 
 
 def test_generated_python_app_supports_optimistic_record_revisions():

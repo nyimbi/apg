@@ -218,7 +218,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, Dict, Optional
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 
 MODULE_NAME = {module.name!r}
@@ -1057,6 +1057,38 @@ def _ui_field_input_html(field: Dict[str, Any]) -> str:
     return f'<label>{{safe_label}} <input name="{{safe_name}}" {{attributes}}></label><br>'
 
 
+def _ui_entity_location(entity_name: str) -> str:
+    return f"/ui/entities/{{quote(entity_name, safe='')}}"
+
+
+def _ui_records_table_html(entity_name: str) -> str:
+    records = list_records(entity_name)
+    if not records:
+        return "<p>No records yet.</p>"
+    field_names = [str(field["name"]) for field in _field_specs(entity_name)]
+    columns = ["id", "_revision"] + [
+        field_name for field_name in field_names if field_name not in {{"id", "_revision"}}
+    ]
+    header = "".join(f"<th>{{html.escape(column)}}</th>" for column in columns)
+    safe_entity = html.escape(entity_name, quote=True)
+    rows: list[str] = []
+    for record in records:
+        cells = "".join(
+            f"<td>{{html.escape(json.dumps(record.get(column)) if isinstance(record.get(column), (dict, list, bool)) else str(record.get(column, '')))}}</td>"
+            for column in columns
+        )
+        record_id = html.escape(str(record.get("id", "")), quote=True)
+        revision = html.escape(str(record.get("_revision", "")), quote=True)
+        action = (
+            f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}/delete">'
+            f'<input type="hidden" name="expected_revision" value="{{revision}}">'
+            '<button type="submit">Delete</button>'
+            '</form>'
+        )
+        rows.append(f"<tr>{{cells}}<td>{{action}}</td></tr>")
+    return f"<table><thead><tr>{{header}}<th>Actions</th></tr></thead><tbody>{{''.join(rows)}}</tbody></table>"
+
+
 def _ui_entity_html(entity_name: str) -> tuple[int, str]:
     entity = _entity_spec(entity_name)
     if entity is None:
@@ -1064,18 +1096,22 @@ def _ui_entity_html(entity_name: str) -> tuple[int, str]:
     safe_entity = html.escape(entity_name, quote=True)
     fields = _field_specs(entity_name) or [{{"name": "value", "type": "string", "required": True}}]
     inputs = "".join(_ui_field_input_html(field) for field in fields)
+    records_table = _ui_records_table_html(entity_name)
     records_json = html.escape(json.dumps(list_records(entity_name), indent=2, sort_keys=True))
     body = (
         f'<nav><a href="/ui">Application</a> | '
         f'<a href="/entities/{{safe_entity}}/records">Record JSON</a></nav>'
         f"<h1>{{html.escape(entity_name)}}</h1>"
         f"<p><code>{{html.escape(entity.get('type', 'entity'))}}</code></p>"
-        f'<form method="post" action="/entities/{{safe_entity}}/records">'
+        f'<form method="post" action="/ui/entities/{{safe_entity}}/records">'
         f"{{inputs}}"
         '<button type="submit">Create record</button>'
         "</form>"
         "<h2>Records</h2>"
+        f"{{records_table}}"
+        "<details><summary>Record JSON</summary>"
         f"<pre>{{records_json}}</pre>"
+        "</details>"
     )
     return 200, _html_page(entity_name, body)
 
@@ -1087,6 +1123,34 @@ def _ui_payload(path: str) -> tuple[int, str]:
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
         return _ui_entity_html(parts[2])
     return 404, _html_page("Not found", f"<h1>Not found</h1><p>{{html.escape(path)}}</p>")
+
+
+def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) == 4 and parts[0] == "ui" and parts[1] == "entities" and parts[3] == "records":
+        entity_name = parts[2]
+        status, response = _create_record_payload(f"/entities/{{entity_name}}/records", payload)
+        if status == 201:
+            return 303, {{"location": _ui_entity_location(entity_name)}}
+        return status, response
+    if (
+        len(parts) == 6
+        and parts[0] == "ui"
+        and parts[1] == "entities"
+        and parts[3] == "records"
+        and parts[5] == "delete"
+    ):
+        entity_name = parts[2]
+        record_id = parts[4]
+        delete_path = f"/entities/{{entity_name}}/records/{{record_id}}"
+        expected_revision = payload.get("expected_revision")
+        if expected_revision not in (None, ""):
+            delete_path = f"{{delete_path}}?expected_revision={{quote(str(expected_revision), safe='')}}"
+        status, response = _delete_record_payload(delete_path)
+        if status == 200:
+            return 303, {{"location": _ui_entity_location(entity_name)}}
+        return status, response
+    return 404, {{"error": "not_found", "path": path}}
 
 
 def _capability_screen(path: str) -> Dict[str, Any] | None:
@@ -1576,6 +1640,12 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_redirect(self, status: int, location: str) -> None:
+        self.send_response(status)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def _authorize_mutation(self) -> bool:
         if _authorized(self.headers):
             return True
@@ -1623,7 +1693,13 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
                 payload = json.loads(raw_body.decode("utf-8") or "{{}}")
             if not isinstance(payload, dict):
                 raise ValueError("JSON body must be an object")
-            status, response = _post_payload(path, payload)
+            if path.startswith("/ui/") and content_type == "application/x-www-form-urlencoded":
+                status, response = _ui_post_payload(path, payload)
+                if status in {{302, 303}}:
+                    self._send_redirect(status, str(response["location"]))
+                    return
+            else:
+                status, response = _post_payload(path, payload)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
             status, response = 400, {{"error": "invalid_json", "message": str(error)}}
         self._send_json(status, response)
