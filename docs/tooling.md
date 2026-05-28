@@ -20,8 +20,11 @@ APG currently has an executable compiler path:
 - source files use the `.apg` extension;
 - the installed command is `apg`;
 - the primary generation command is `apg compile <file> --output <dir>`;
-- `apg lint <file-or-directory> --json` emits `apg.lint-report.v1` without
-  writing generated code;
+- `apg lint <file-or-directory> --json` emits `apg.lint-report.v1` from the
+  shared semantic model without writing generated code;
+- `apg lint <file-or-directory> --catalog <capability-root> --json` validates
+  declared APG capabilities against executable capability contracts discovered
+  from checked-in `capability_contract.py` files;
 - `apg validate <file> --target python --json` emits `apg.validate-report.v1`
   with lint results and generator-readiness metadata;
 - `apg model <file> --json` emits `apg.semantic-model.v1` with normalized
@@ -795,8 +798,15 @@ when it directly strengthens compiler release evidence.
 ```console
 apg lint app.apg
 apg lint app.apg --json
-apg lint src/apg --strict --catalog docs/capability-catalog.json
+apg lint src/apg --strict --catalog capabilities
 ```
+
+The lint command consumes `apg.semantic-model.v1` rather than maintaining a
+separate parser/analyzer path. With `--catalog`, it validates discovered
+`capability_contract.py` files and resolves every declared APG capability by
+capability name, contract `id`, and provided/required service keys. Unknown
+capabilities emit `APG0901` diagnostics in the normal `apg.lint-report.v1`
+payload, and catalog-shape failures emit `APG9000` diagnostics.
 
 Exit codes:
 
@@ -1475,7 +1485,8 @@ Exit criteria:
 
 - CLI and tests can load the same semantic model.
 - Database-backed form field validation uses the shared model.
-- capability catalog validation uses the shared model.
+- capability catalog validation uses the shared model through
+  `apg lint --catalog`.
 
 ### Phase 2: Linter And Formatter
 

@@ -15,9 +15,10 @@ from typing import Any
 import click
 from rich.console import Console
 
-from compiler.ast_builder import ASTBuilder
-from compiler.parser import APGParser, APGSyntaxError
-from compiler.semantic_analyzer import SemanticAnalyzer, SemanticError
+from capabilities.capability_contract_registry import validate_contract_registry
+from compiler.parser import APGSyntaxError
+from compiler.semantic_analyzer import SemanticError
+from compiler.semantic_model import build_semantic_model
 
 
 console = Console()
@@ -91,41 +92,139 @@ def _diagnostic_from_error(
 	}
 
 
-def _lint_file(file_path: Path, strict: bool = False) -> dict[str, Any]:
-	parser = APGParser()
-	ast_builder = ASTBuilder()
-	analyzer = SemanticAnalyzer()
+def _lint_file(file_path: Path, strict: bool = False, catalog: Path | None = None) -> dict[str, Any]:
 	diagnostics: list[dict[str, Any]] = []
 	semantic_model_available = False
+	capability_catalog: dict[str, Any] = _empty_catalog_report(catalog)
 
 	try:
-		parse_result = parser.parse_file(str(file_path))
+		model = build_semantic_model(file_path)
+		semantic_model_available = model.get("format") == "apg.semantic-model.v1"
+		diagnostics.extend(_strict_diagnostics(model.get("diagnostics", []), strict))
+		if catalog is not None and semantic_model_available:
+			capability_catalog, catalog_diagnostics = _capability_catalog_report(file_path, model, catalog)
+			diagnostics.extend(catalog_diagnostics)
 	except Exception as error:
 		diagnostics.append(_diagnostic_from_error(error, file_path, "error"))
-		return _file_report(file_path, diagnostics, semantic_model_available, strict)
 
-	for error in parse_result.get("errors", []):
-		diagnostics.append(_diagnostic_from_error(error, file_path, "error"))
+	return _file_report(file_path, diagnostics, semantic_model_available, strict, capability_catalog)
 
-	if parse_result.get("success"):
-		try:
-			ast = parse_result.get("ast") or ast_builder.build_ast(
-				parse_result["parse_tree"],
-				str(file_path),
-			)
-			if ast is None:
-				raise RuntimeError("Failed to build AST")
-			semantic_model_available = True
-			semantic_result = analyzer.analyze(ast)
-			for error in semantic_result.get("errors", []):
-				diagnostics.append(_diagnostic_from_error(error, file_path, "error"))
-			for warning in semantic_result.get("warnings", []):
-				severity = "error" if strict else "warning"
-				diagnostics.append(_diagnostic_from_error(warning, file_path, severity))
-		except Exception as error:
-			diagnostics.append(_diagnostic_from_error(error, file_path, "error"))
 
-	return _file_report(file_path, diagnostics, semantic_model_available, strict)
+def _strict_diagnostics(diagnostics: list[dict[str, Any]], strict: bool) -> list[dict[str, Any]]:
+	if not strict:
+		return [dict(diagnostic) for diagnostic in diagnostics]
+	strict_diagnostics: list[dict[str, Any]] = []
+	for diagnostic in diagnostics:
+		updated = dict(diagnostic)
+		if updated.get("severity") == "warning":
+			updated["severity"] = "error"
+		strict_diagnostics.append(updated)
+	return strict_diagnostics
+
+
+def _empty_catalog_report(catalog: Path | None) -> dict[str, Any]:
+	return {
+		"checked": catalog is not None,
+		"ok": catalog is None,
+		"catalog": str(catalog) if catalog is not None else None,
+		"contract_count": 0,
+		"declared_capabilities": [],
+		"matched_capabilities": [],
+		"missing_capabilities": [],
+		"errors": [],
+	}
+
+
+def _capability_catalog_report(
+	file_path: Path,
+	model: dict[str, Any],
+	catalog: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+	validation = validate_contract_registry(catalog)
+	diagnostics: list[dict[str, Any]] = []
+	for error in validation["errors"]:
+		diagnostics.append(_catalog_diagnostic(
+			file_path,
+			code="APG9000",
+			title="Capability catalog error",
+			message=f"Capability catalog validation failed: {error}",
+			severity="error",
+		))
+
+	registry_keys = {_normalize_capability_key(capability) for capability in validation["capabilities"]}
+	declared = model.get("capabilities", {})
+	contracts = model.get("contracts", {})
+	matched: list[dict[str, Any]] = []
+	missing: list[dict[str, Any]] = []
+
+	if validation["valid"]:
+		for name, capability in declared.items():
+			candidates = _capability_candidate_keys(name, capability, contracts.get(name, {}))
+			matched_key = next((candidate for candidate in candidates if _normalize_capability_key(candidate) in registry_keys), None)
+			if matched_key is None:
+				missing_item = {"name": name, "candidates": candidates}
+				missing.append(missing_item)
+				diagnostics.append(_catalog_diagnostic(
+					file_path,
+					code="APG0901",
+					title="Unknown capability include",
+					message=(
+						f"Capability '{name}' does not resolve in catalog {catalog}; "
+						f"tried {', '.join(candidates)}."
+					),
+					severity="error",
+					symbol=model.get("symbols", {}).get(f"capability.{name}"),
+				))
+			else:
+				matched.append({"name": name, "matched_key": matched_key})
+
+	return {
+		"checked": True,
+		"ok": validation["valid"] and not missing,
+		"catalog": str(catalog),
+		"contract_count": validation["contract_count"],
+		"declared_capabilities": sorted(declared),
+		"matched_capabilities": matched,
+		"missing_capabilities": missing,
+		"errors": list(validation["errors"]),
+	}, diagnostics
+
+
+def _capability_candidate_keys(name: str, capability: dict[str, Any], contract: dict[str, Any]) -> list[str]:
+	candidates = [name]
+	for value in [contract.get("id"), contract.get("capability"), capability.get("name")]:
+		if isinstance(value, str) and value:
+			candidates.append(value)
+	for key in ["provides", "requires"]:
+		for item in capability.get(key, []):
+			candidates.append(str(item))
+	return list(dict.fromkeys(candidates))
+
+
+def _normalize_capability_key(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(".", "_")
+
+
+def _catalog_diagnostic(
+	file_path: Path,
+	code: str,
+	title: str,
+	message: str,
+	severity: str,
+	symbol: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+	range_payload = symbol.get("range") if symbol else _diagnostic_range(1, 0)
+	return {
+		"code": code,
+		"title": title,
+		"severity": severity,
+		"message": message,
+		"file": str(file_path),
+		"range": range_payload,
+		"related_locations": [],
+		"fixes": [],
+		"docs_url": "docs/tooling.md#apg-lint",
+	}
 
 
 def _severity_counts(diagnostics: list[dict[str, Any]]) -> dict[str, int]:
@@ -141,6 +240,7 @@ def _file_report(
 	diagnostics: list[dict[str, Any]],
 	semantic_model_available: bool,
 	strict: bool,
+	capability_catalog: dict[str, Any],
 ) -> dict[str, Any]:
 	counts = _severity_counts(diagnostics)
 	return {
@@ -152,6 +252,7 @@ def _file_report(
 		"diagnostics": diagnostics,
 		"fixes_available": any(diagnostic.get("fixes") for diagnostic in diagnostics),
 		"semantic_model_available": semantic_model_available,
+		"capability_catalog": capability_catalog,
 	}
 
 
@@ -165,9 +266,9 @@ def _source_files(path: Path) -> tuple[str, list[Path]]:
 	return "file", [path]
 
 
-def lint_path(path: Path, strict: bool = False) -> dict[str, Any]:
+def lint_path(path: Path, strict: bool = False, catalog: Path | None = None) -> dict[str, Any]:
 	source_mode, files = _source_files(path)
-	file_reports = [_lint_file(file_path, strict=strict) for file_path in files]
+	file_reports = [_lint_file(file_path, strict=strict, catalog=catalog) for file_path in files]
 	diagnostics = [
 		diagnostic
 		for file_report in file_reports
@@ -186,7 +287,40 @@ def lint_path(path: Path, strict: bool = False) -> dict[str, Any]:
 		"semantic_model_available": all(
 			file_report["semantic_model_available"] for file_report in file_reports
 		) if file_reports else False,
+		"capability_catalog": _aggregate_catalog_reports(file_reports, catalog),
 		"file_reports": file_reports,
+	}
+
+
+def _aggregate_catalog_reports(file_reports: list[dict[str, Any]], catalog: Path | None) -> dict[str, Any]:
+	if catalog is None:
+		return _empty_catalog_report(None)
+	reports = [file_report["capability_catalog"] for file_report in file_reports]
+	return {
+		"checked": True,
+		"ok": bool(reports) and all(report["ok"] for report in reports),
+		"catalog": str(catalog),
+		"contract_count": max((report["contract_count"] for report in reports), default=0),
+		"declared_capabilities": sorted({
+			capability
+			for report in reports
+			for capability in report["declared_capabilities"]
+		}),
+		"matched_capabilities": [
+			match
+			for report in reports
+			for match in report["matched_capabilities"]
+		],
+		"missing_capabilities": [
+			missing
+			for report in reports
+			for missing in report["missing_capabilities"]
+		],
+		"errors": [
+			error
+			for report in reports
+			for error in report["errors"]
+		],
 	}
 
 
@@ -213,12 +347,7 @@ def _print_text_report(report: dict[str, Any]) -> None:
 @click.argument("path", type=click.Path(path_type=Path))
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.lint-report.v1 JSON")
 @click.option("--strict", is_flag=True, help="Treat warnings as errors")
-@click.option(
-	"--catalog",
-	type=click.Path(path_type=Path),
-	default=None,
-	help="Reserved capability catalog path for future semantic checks",
-)
+@click.option("--catalog", type=click.Path(path_type=Path), default=None, help="Capability contract catalog root")
 def lint(path: Path, as_json: bool, strict: bool, catalog: Path | None) -> None:
 	"""Lint APG source without writing generated code."""
 	if catalog is not None and not catalog.exists():
@@ -226,7 +355,7 @@ def lint(path: Path, as_json: bool, strict: bool, catalog: Path | None) -> None:
 	if not path.exists():
 		raise click.ClickException(f"APG path not found: {path}")
 
-	report = lint_path(path, strict=strict)
+	report = lint_path(path, strict=strict, catalog=catalog)
 	if as_json:
 		click.echo(json.dumps(report, indent=2, sort_keys=True))
 	else:

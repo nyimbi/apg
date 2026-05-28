@@ -134,6 +134,62 @@ capability Billing {
 }
 """
 
+CAPABILITY_CATALOG_SOURCE = """
+module capability_basics version 1.0.0 {
+	description: "Small capability contract with a generated runtime manifest";
+}
+
+capability AuditLog {
+	contract: {
+		id: audit_log,
+		provides: [audit_events],
+		configuration: {retention_days: 365}
+	};
+	master_data: {entities: [audit_event]};
+}
+"""
+
+
+def write_capability_catalog(root: Path, capability_id: str = "customer_master") -> Path:
+	catalog_dir = root / "capabilities" / capability_id
+	catalog_dir.mkdir(parents=True)
+	(catalog_dir / "capability_contract.py").write_text(
+		f'''
+def get_capability_contract(tenant_id="default"):
+	return {{
+		"capability": "{capability_id}",
+		"display_name": "{capability_id.replace("_", " ").title()}",
+		"configuration": {{"tenant_id": tenant_id, "ui": {{}}, "theme": {{}}}},
+		"configuration_schema": {{
+			"type": "object",
+			"required": ["tenant_id", "ui", "theme"],
+			"properties": {{"tenant_id": {{"type": "string"}}, "ui": {{"type": "object"}}, "theme": {{"type": "object"}}}},
+		}},
+		"rule_engine": {{
+			"type": "deterministic",
+			"rules": [
+				{{"name": "allow_default", "condition": {{"tenant_context_present": True}}, "effect": {{"decision": "allow"}}}},
+			],
+		}},
+		"ui": {{
+			"requires_theme": True,
+			"shell": "apg_python",
+			"template_roots": ["templates/"],
+			"routes": [
+				{{"name": "dashboard", "path": "/{capability_id}/dashboard", "component": "Dashboard", "permission": "{capability_id}:view"}},
+			],
+		}},
+		"theme": {{
+			"name": "{capability_id}_theme",
+			"tokens": {{"border.radius": "8px"}},
+			"components": {{"dashboard": {{"density": "compact"}}}},
+		}},
+	}}
+''',
+		encoding="utf-8",
+	)
+	return root
+
 
 def test_documented_python_target_generates_executable_application_files():
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
@@ -1319,6 +1375,49 @@ def test_cli_lint_json_reports_valid_apg_file_without_generation(tmp_path):
 	assert report["diagnostics"] == []
 	assert report["semantic_model_available"] is True
 	assert not output.exists()
+
+
+def test_cli_lint_catalog_uses_shared_semantic_model_for_capability_resolution(tmp_path):
+	source = tmp_path / "capability.apg"
+	catalog = write_capability_catalog(tmp_path / "catalog", "audit_log")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["lint", str(source), "--catalog", str(catalog), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.lint-report.v1"
+	assert report["ok"] is True
+	assert report["semantic_model_available"] is True
+	assert report["capability_catalog"]["checked"] is True
+	assert report["capability_catalog"]["ok"] is True
+	assert report["capability_catalog"]["contract_count"] == 1
+	assert report["capability_catalog"]["declared_capabilities"] == ["AuditLog"]
+	assert report["capability_catalog"]["matched_capabilities"] == [
+		{"name": "AuditLog", "matched_key": "audit_log"}
+	]
+	assert report["diagnostics"] == []
+
+
+def test_cli_lint_catalog_reports_unknown_declared_capability(tmp_path):
+	source = tmp_path / "capability.apg"
+	catalog = write_capability_catalog(tmp_path / "catalog", "customer_master")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["lint", str(source), "--catalog", str(catalog), "--json"])
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["ok"] is False
+	assert report["capability_catalog"]["checked"] is True
+	assert report["capability_catalog"]["ok"] is False
+	assert report["capability_catalog"]["missing_capabilities"] == [
+		{"name": "AuditLog", "candidates": ["AuditLog", "audit_log", "audit_events"]}
+	]
+	assert report["severity_counts"]["error"] == 1
+	diagnostic_codes = [diagnostic["code"] for diagnostic in report["diagnostics"]]
+	assert diagnostic_codes == ["APG0901"]
+	assert "does not resolve in catalog" in report["diagnostics"][0]["message"]
 
 
 def test_cli_lint_directory_json_aggregates_apg_files_deterministically(tmp_path):

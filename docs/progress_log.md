@@ -8034,3 +8034,20 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `26aa422` (`Make tooling fixtures runnable as one gate`).
+
+### 2026-05-28 22:50 EAT
+
+In progress:
+
+- Started Phase 1 shared semantic-model closure after the aggregate tooling gate.
+- Reworked `apg lint` so it consumes `apg.semantic-model.v1` through `compiler.semantic_model.build_semantic_model()` instead of maintaining a separate parser/analyzer path.
+- Turned the previously reserved `--catalog` option into executable capability catalog validation over discovered `capability_contract.py` files.
+- `apg lint --catalog <capability-root> --json` now resolves declared APG capabilities by capability name, contract `id`, provided services, and required services, emitting APG0901 when the shared semantic model cannot resolve a declaration against the catalog.
+- Updated `docs/tooling.md` so Phase 1 capability catalog validation is documented as current executable behavior.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile cli/lint_command.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_lint_json_reports_valid_apg_file_without_generation tests/test_compiler_baseline.py::test_cli_lint_catalog_uses_shared_semantic_model_for_capability_resolution tests/test_compiler_baseline.py::test_cli_lint_catalog_reports_unknown_declared_capability tests/test_compiler_baseline.py::test_cli_lint_directory_json_aggregates_apg_files_deterministically -q` passed with 4 tests.
+- `.venv/bin/apg lint examples/08_basic_capability_contract/main.apg --json` passed with `apg.lint-report.v1`, `semantic_model_available=true`, and 0 diagnostics.
+- `git diff --check -- cli/lint_command.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
