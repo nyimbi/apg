@@ -41,6 +41,24 @@ db LedgerDB {
 """
 
 
+BROKEN_DATABASE_SOURCE = """
+db BrokenDB {
+    url: "postgresql://localhost:5432/broken";
+
+    schema accounting {
+        table journals {
+            id serial [pk]
+            account_id int [ref: > accounts.missing_id]
+        }
+
+        table accounts {
+            id serial [pk]
+        }
+    }
+}
+"""
+
+
 def test_source_database_builds_typed_ast_with_config_schema_and_indexes():
 	parse_result = APGParser().parse_string(DATABASE_SOURCE, "database.apg")
 	assert parse_result["success"] is True, parse_result["errors"]
@@ -190,3 +208,22 @@ def test_generated_readme_documents_database_runtime_surface():
 	assert "`GET /databases/{Database}/schemas`" in readme
 	assert "`GET /relationships`" in readme
 	assert "`LedgerDB` - 1 schema(s), 2 table(s)" in readme
+
+
+def test_generated_validation_rejects_broken_database_references():
+	parse_result = APGParser().parse_string(BROKEN_DATABASE_SOURCE, "broken_database.apg")
+	assert parse_result["success"] is True, parse_result["errors"]
+	ast = ASTBuilder().build_ast(parse_result["parse_tree"], "broken_database.apg")
+
+	files = PythonCodeGenerator(CodeGenConfig(use_composable_templates=False)).generate(ast)
+	namespace = {}
+	exec(files["app.py"], namespace)
+
+	validation = namespace["validate_application"]()
+
+	assert validation["valid"] is False
+	assert validation["checks"]["database_schemas"]["validated_databases"] == ["BrokenDB"]
+	assert validation["errors"] == [
+		"database_schemas: BrokenDB.accounting.journals.account_id references unknown column accounts.missing_id"
+	]
+	assert namespace["self_test"]()["passed"] is False

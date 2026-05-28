@@ -6959,3 +6959,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 5 passed
 - `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:48 EAT
+
+Completed checkpoint:
+
+- Added generated database schema validation so compiled APG applications check their own DBML contract during `validate_application()` and `self_test()`.
+- Generated validation now detects unresolved table/column references, unknown index columns, duplicate tables, duplicate columns, missing schemas, and tables without primary keys.
+- Added focused regression coverage proving a broken DBML reference makes generated validation fail with a concrete database schema error.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 6 passed
+- `.venv/bin/python -m pytest tests/test_parser.py::TestAPGParser::test_database_parsing tests/test_semantic_analyzer.py::TestSemanticAnalyzer::test_database_validation -q` -> 2 passed, 1 pre-existing warning
+- `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
+- Deferred broader pytest at the user's request to conserve battery.

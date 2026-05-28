@@ -877,6 +877,77 @@ def _record_validation(report: Dict[str, Any], name: str, validation: Dict[str, 
     report["warnings"].extend(f"{{name}}: {{warning}}" for warning in warnings)
 
 
+def validate_database_schema_contracts() -> Dict[str, Any]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    validated: list[str] = []
+    for database in list_databases():
+        database_name = str(database.get("name", "database"))
+        validated.append(database_name)
+        schemas = database.get("schemas", [])
+        if not schemas:
+            warnings.append(f"{{database_name}} does not declare schemas")
+            continue
+        table_index: Dict[str, Dict[str, Any]] = {{}}
+        for schema in schemas:
+            schema_name = str(schema.get("name", "default"))
+            seen_tables: set[str] = set()
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                if not table_name:
+                    errors.append(f"{{database_name}}.{{schema_name}} declares a table without a name")
+                    continue
+                table_key = table_name.lower()
+                qualified_key = f"{{schema_name}}.{{table_name}}".lower()
+                if table_key in seen_tables:
+                    errors.append(f"{{database_name}}.{{schema_name}} declares duplicate table {{table_name}}")
+                seen_tables.add(table_key)
+                table_index[table_key] = table
+                table_index[qualified_key] = table
+
+        for schema in schemas:
+            schema_name = str(schema.get("name", "default"))
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                columns = table.get("columns", [])
+                column_names = [str(column.get("name", "")) for column in columns if isinstance(column, dict)]
+                known_columns = {{column_name.lower() for column_name in column_names if column_name}}
+                if len(known_columns) != len([column_name for column_name in column_names if column_name]):
+                    errors.append(f"{{database_name}}.{{schema_name}}.{{table_name}} declares duplicate columns")
+                if columns and not any(bool(column.get("primary_key")) for column in columns if isinstance(column, dict)):
+                    warnings.append(f"{{database_name}}.{{schema_name}}.{{table_name}} does not declare a primary key")
+                for index in table.get("indexes", []):
+                    for indexed_column in index.get("columns", []):
+                        if str(indexed_column).lower() not in known_columns:
+                            errors.append(
+                                f"{{database_name}}.{{schema_name}}.{{table_name}} index references unknown column {{indexed_column}}"
+                            )
+                for column in columns:
+                    if not isinstance(column, dict):
+                        continue
+                    reference = column.get("reference")
+                    if not isinstance(reference, dict):
+                        continue
+                    target_table_name = str(reference.get("table", ""))
+                    target_column_name = str(reference.get("column", ""))
+                    target_table = table_index.get(target_table_name.lower()) or table_index.get(f"{{schema_name}}.{{target_table_name}}".lower())
+                    if target_table is None:
+                        errors.append(
+                            f"{{database_name}}.{{schema_name}}.{{table_name}}.{{column.get('name')}} references unknown table {{target_table_name}}"
+                        )
+                        continue
+                    target_columns = {{
+                        str(target_column.get("name", "")).lower()
+                        for target_column in target_table.get("columns", [])
+                        if isinstance(target_column, dict)
+                    }}
+                    if target_column_name.lower() not in target_columns:
+                        errors.append(
+                            f"{{database_name}}.{{schema_name}}.{{table_name}}.{{column.get('name')}} references unknown column {{target_table_name}}.{{target_column_name}}"
+                        )
+    return {{"errors": errors, "warnings": warnings, "validated_databases": sorted(validated)}}
+
+
 def validate_application(available_agent_runtimes: list[str] | None = None) -> Dict[str, Any]:
     report: Dict[str, Any] = {{
         "name": MODULE_NAME,
@@ -885,6 +956,7 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
         "warnings": [],
         "checks": {{}},
     }}
+    _record_validation(report, "database_schemas", validate_database_schema_contracts())
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
         _record_validation(
             report,
