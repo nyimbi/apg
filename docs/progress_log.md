@@ -7127,3 +7127,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated self-test reported `component_manifest.errors == []`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 16:44 EAT
+
+Completed checkpoint:
+
+- Added generated `validate_route_dispatch_contract()` support so compiled APG applications verify every documented OpenAPI method maps to an executable generated dispatcher target.
+- Wired route-dispatch validation into generated `validate_application()` and `self_test()` so route declaration drift fails generated health checks.
+- Re-exported the route-dispatch validator from generated packages and refreshed all 20 numbered example outputs.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_compiler_baseline.py::test_generated_python_app_serves_http_endpoints -q` -> 2 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated self-test reported `route_dispatch.errors == []` across 103 documented methods and 82 routes
+- Deferred broader pytest at the user's request to conserve battery.

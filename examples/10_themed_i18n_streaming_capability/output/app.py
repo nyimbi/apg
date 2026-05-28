@@ -352,6 +352,7 @@ def component_manifest() -> Dict[str, Any]:
                     "validate_application",
                     "validate_component_manifest_contract",
                     "validate_openapi_contract",
+                    "validate_route_dispatch_contract",
                     "validate_record",
                 ],
             },
@@ -1327,6 +1328,123 @@ def validate_openapi_contract() -> Dict[str, Any]:
     }
 
 
+def _route_dispatch_target(route: str, method: str) -> str | None:
+    method = method.lower()
+    route = route.rstrip("/") or "/"
+    if method == "get":
+        if route == "/theme.css":
+            return "theme_stylesheet"
+        if route == "/ui" or route.startswith("/ui/"):
+            return "_ui_payload"
+        if _capability_screen(route) is not None:
+            return "_capability_screen_payload"
+        if _application_screen(route) is not None:
+            return "_application_screen_payload"
+        if route in {
+            "/",
+            "/manifest",
+            "/application",
+            "/component.json",
+            "/health",
+            "/validate",
+            "/openapi.json",
+            "/entities",
+            "/databases",
+            "/databases/status",
+            "/auth",
+            "/events",
+            "/metrics",
+            "/self-test",
+            "/records",
+            "/relationships",
+            "/storage",
+            "/agents",
+            "/applications",
+            "/capabilities",
+            "/streaming",
+            "/routes",
+            "/composition",
+        }:
+            return "_route_payload"
+        if route.startswith("/databases/") and route.endswith("/schemas"):
+            return "_route_payload"
+        if route.startswith("/capabilities/") and route.endswith("/streaming"):
+            return "_route_payload"
+        if route.startswith("/entities/") and "/records" in route:
+            return "_records_payload_with_query"
+        return None
+    if method == "post":
+        if route.startswith("/agents/") and route.endswith(("/invoke", "/run")):
+            return "_agent_invocation_payload"
+        if (route.startswith("/agent-teams/") or route.startswith("/teams/")) and route.endswith(("/invoke", "/run")):
+            return "_agent_invocation_payload"
+        if route.startswith("/entities/") and (route.endswith("/records") or route.endswith("/records/import")):
+            return "_create_record_payload"
+        if route in {"/rules/evaluate", "/capabilities/rules/evaluate"} or (
+            route.startswith("/capabilities/") and route.endswith("/rules/evaluate")
+        ):
+            return "_rule_evaluation_payload"
+        if route in {"/configuration/resolve", "/capabilities/configuration/resolve"} or (
+            route.startswith("/capabilities/") and route.endswith("/configuration/resolve")
+        ):
+            return "_configuration_payload"
+        if route in {"/configuration/validate", "/capabilities/configuration/validate"} or (
+            route.startswith("/capabilities/") and route.endswith("/configuration/validate")
+        ):
+            return "_configuration_payload"
+        if route in {"/approval/plan", "/capabilities/approval/plan"} or (
+            route.startswith("/capabilities/") and route.endswith("/approval/plan")
+        ):
+            return "_approval_plan_payload"
+        return None
+    if method == "put":
+        if route.startswith("/entities/") and "/records/{id}" in route:
+            return "_update_record_payload"
+        return None
+    if method == "delete":
+        if route.startswith("/entities/") and "/records/{id}" in route:
+            return "_delete_record_payload"
+        return None
+    return None
+
+
+def validate_route_dispatch_contract() -> Dict[str, Any]:
+    document = openapi_document()
+    paths = document.get("paths", {})
+    errors: list[str] = []
+    warnings: list[str] = []
+    route_targets: Dict[str, list[Dict[str, str]]] = {}
+    method_count = 0
+    if not isinstance(paths, dict):
+        return {
+            "errors": ["OpenAPI paths must be an object before dispatch validation"],
+            "warnings": warnings,
+            "route_count": 0,
+            "method_count": 0,
+            "routes": route_targets,
+        }
+    for route, path_item in sorted(paths.items()):
+        if not isinstance(path_item, dict):
+            continue
+        for method in sorted(path_item):
+            method_name = str(method).lower()
+            if method_name not in {"get", "post", "put", "patch", "delete", "options", "head"}:
+                continue
+            method_count += 1
+            target = _route_dispatch_target(str(route), method_name)
+            if target is None:
+                errors.append(f"OpenAPI route {method_name.upper()} {route} has no generated dispatcher")
+                continue
+            route_targets.setdefault(str(route), []).append({"method": method_name.upper(), "target": target})
+    return {
+        "errors": errors,
+        "warnings": warnings,
+        "route_count": len(paths),
+        "method_count": method_count,
+        "routes": route_targets,
+    }
+
+
 def describe_application() -> Dict[str, Any]:
     description: Dict[str, Any] = {
         "name": MODULE_NAME,
@@ -1490,6 +1608,7 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
     }
     _record_validation(report, "openapi_contract", validate_openapi_contract())
     _record_validation(report, "component_manifest", validate_component_manifest_contract())
+    _record_validation(report, "route_dispatch", validate_route_dispatch_contract())
     _record_validation(report, "database_schemas", validate_database_schema_contracts())
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
         _record_validation(
