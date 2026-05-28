@@ -6991,3 +6991,17 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 6 passed
 - `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:57 EAT
+
+Completed checkpoint:
+
+- Added generated OpenAPI component schemas for database catalogs, schemas, tables, columns, indexes, references, validation reports, and status reports.
+- Wired `GET /databases`, `GET /databases/status`, and `GET /databases/{Database}/schemas` to typed JSON response schemas in generated OpenAPI output.
+- Extended the database compiler regression test to prove generated database routes now advertise concrete OpenAPI response contracts.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 6 passed
+- Deferred broader pytest at the user's request to conserve battery.

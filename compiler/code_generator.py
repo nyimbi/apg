@@ -730,15 +730,156 @@ def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
     return schema
 
 
+def _schema_ref(name: str) -> Dict[str, Any]:
+    return {{"$ref": f"#/components/schemas/{{name}}"}}
+
+
+def _database_openapi_schemas() -> Dict[str, Any]:
+    nullable_string = {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}}
+    return {{
+        "DatabaseReference": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "kind": {{"type": "string"}},
+                "relationship": {{"type": "string"}},
+                "table": {{"type": "string"}},
+                "column": {{"type": "string"}},
+                "target": {{"type": "string"}},
+            }},
+            "required": ["table", "column"],
+        }},
+        "DatabaseColumn": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "name": {{"type": "string"}},
+                "type": {{"type": "string"}},
+                "primary_key": {{"type": "boolean"}},
+                "nullable": {{"type": "boolean"}},
+                "default": {{
+                    "oneOf": [
+                        {{"type": "string"}},
+                        {{"type": "number"}},
+                        {{"type": "integer"}},
+                        {{"type": "boolean"}},
+                        {{"type": "null"}},
+                    ]
+                }},
+                "constraints": {{"type": "array", "items": {{"type": "string"}}}},
+                "reference": {{"oneOf": [_schema_ref("DatabaseReference"), {{"type": "null"}}]}},
+            }},
+            "required": ["name", "type", "primary_key", "nullable", "constraints"],
+        }},
+        "DatabaseIndex": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "name": nullable_string,
+                "columns": {{"type": "array", "items": {{"type": "string"}}}},
+                "unique": {{"type": "boolean"}},
+                "type": nullable_string,
+            }},
+            "required": ["columns", "unique"],
+        }},
+        "DatabaseTable": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "name": {{"type": "string"}},
+                "columns": {{"type": "array", "items": _schema_ref("DatabaseColumn")}},
+                "indexes": {{"type": "array", "items": _schema_ref("DatabaseIndex")}},
+            }},
+            "required": ["name", "columns", "indexes"],
+        }},
+        "DatabaseSchema": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "name": {{"type": "string"}},
+                "tables": {{"type": "array", "items": _schema_ref("DatabaseTable")}},
+            }},
+            "required": ["name", "tables"],
+        }},
+        "DatabaseCatalogEntry": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "name": {{"type": "string"}},
+                "type": {{"const": "database"}},
+                "properties": {{"type": "array", "items": {{"type": "string"}}}},
+                "connection_config": {{"type": "object", "additionalProperties": True}},
+                "schemas": {{"type": "array", "items": _schema_ref("DatabaseSchema")}},
+            }},
+            "required": ["name", "type", "schemas"],
+        }},
+        "DatabaseCatalog": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "databases": {{"type": "array", "items": _schema_ref("DatabaseCatalogEntry")}},
+            }},
+            "required": ["databases"],
+        }},
+        "DatabaseSchemaCatalog": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "database": {{"type": "string"}},
+                "schemas": {{"type": "array", "items": _schema_ref("DatabaseSchema")}},
+            }},
+            "required": ["database", "schemas"],
+        }},
+        "DatabaseValidation": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "errors": {{"type": "array", "items": {{"type": "string"}}}},
+                "warnings": {{"type": "array", "items": {{"type": "string"}}}},
+                "validated_databases": {{"type": "array", "items": {{"type": "string"}}}},
+            }},
+            "required": ["errors", "warnings", "validated_databases"],
+        }},
+        "DatabaseStatus": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "valid": {{"type": "boolean"}},
+                "database_count": {{"type": "integer"}},
+                "schema_count": {{"type": "integer"}},
+                "table_count": {{"type": "integer"}},
+                "reference_count": {{"type": "integer"}},
+                "validation": _schema_ref("DatabaseValidation"),
+            }},
+            "required": [
+                "valid",
+                "database_count",
+                "schema_count",
+                "table_count",
+                "reference_count",
+                "validation",
+            ],
+        }},
+    }}
+
+
 def _api_operation(
     summary: str,
     description: str,
     status: str = "200",
     request_body: bool = False,
+    response_schema: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
+    response: Dict[str, Any] = {{"description": description}}
+    if response_schema is not None:
+        response["content"] = {{
+            "application/json": {{
+                "schema": response_schema,
+            }}
+        }}
     operation: Dict[str, Any] = {{
         "summary": summary,
-        "responses": {{status: {{"description": description}}}},
+        "responses": {{status: response}},
     }}
     if request_body:
         operation["requestBody"] = {{"required": True}}
@@ -759,13 +900,13 @@ def openapi_document() -> Dict[str, Any]:
         "/self-test": {{"get": _api_operation("Application self-test", "Self-test report")}},
         "/theme.css": {{"get": _api_operation("Generated visual theme stylesheet", "CSS theme stylesheet")}},
         "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
-        "/databases": {{"get": _api_operation("Database catalog", "Database schema and connection metadata")}},
-        "/databases/status": {{"get": _api_operation("Database validation status", "Database schema validation and counts")}},
+        "/databases": {{"get": _api_operation("Database catalog", "Database schema and connection metadata", response_schema=_schema_ref("DatabaseCatalog"))}},
+        "/databases/status": {{"get": _api_operation("Database validation status", "Database schema validation and counts", response_schema=_schema_ref("DatabaseStatus"))}},
         "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph")}},
         "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
         "/ui": {{"get": _api_operation("Generated application UI", "HTML application index")}},
     }}
-    schemas: Dict[str, Any] = {{}}
+    schemas: Dict[str, Any] = _database_openapi_schemas()
     for entity in ENTITIES:
         entity_name = str(entity["name"])
         schema_name = f"{{entity_name}}Record"
@@ -797,7 +938,7 @@ def openapi_document() -> Dict[str, Any]:
         }}
         if entity.get("type") == "database":
             paths[f"/databases/{{entity_name}}/schemas"] = {{
-                "get": _api_operation(f"{{entity_name}} database schemas", "Database schema metadata"),
+                "get": _api_operation(f"{{entity_name}} database schemas", "Database schema metadata", response_schema=_schema_ref("DatabaseSchemaCatalog")),
             }}
     if APG_CAPABILITIES is not None:
         paths["/rules/evaluate"] = {{"post": _api_operation("Evaluate capability rules", "Rule decision", request_body=True)}}

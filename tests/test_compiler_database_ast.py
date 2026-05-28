@@ -203,6 +203,22 @@ def test_generated_python_exposes_database_catalog_routes_and_openapi():
 	assert "/databases" in openapi["paths"]
 	assert "/databases/status" in openapi["paths"]
 	assert "/databases/LedgerDB/schemas" in openapi["paths"]
+	schemas = openapi["components"]["schemas"]
+	assert schemas["DatabaseCatalog"]["properties"]["databases"]["items"] == {
+		"$ref": "#/components/schemas/DatabaseCatalogEntry"
+	}
+	assert schemas["DatabaseColumn"]["properties"]["reference"]["oneOf"][0] == {
+		"$ref": "#/components/schemas/DatabaseReference"
+	}
+	assert openapi["paths"]["/databases"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+		"$ref": "#/components/schemas/DatabaseCatalog"
+	}
+	assert openapi["paths"]["/databases/status"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+		"$ref": "#/components/schemas/DatabaseStatus"
+	}
+	assert openapi["paths"]["/databases/LedgerDB/schemas"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+		"$ref": "#/components/schemas/DatabaseSchemaCatalog"
+	}
 
 	metrics = namespace["metrics_snapshot"]()
 	assert metrics["database_status"]["table_count"] == 2
