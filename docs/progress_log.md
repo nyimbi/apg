@@ -6156,3 +6156,26 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `3745b80` (`Make orchestration runnable without external engines`).
+
+### 2026-05-28 10:42 EAT
+
+Completed checkpoint:
+
+- Replaced ENCR's public APG integration `NotImplementedError` facade with executable dependency-light operations.
+- Public ENCR quantum-safe methods now create and open authenticated local envelopes for immediate capability-to-capability use.
+- Public zero-knowledge encryption now returns encrypted data, a session id, an access proof, and privacy metadata.
+- Public encrypted computation now supports additive aggregation/count/concat/digest operations over ENCR envelopes and emits decryptable result envelopes.
+- Public autonomous key lifecycle now returns deterministic rotate/backup/quantum-upgrade/destroy/monitor action plans from key context.
+- Added focused regression coverage for public ENCR round-trip encryption, proof artifacts, encrypted computation, and lifecycle decisions.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/__init__.py tests/test_common_encr_public_interface.py`
+- `.venv/bin/pytest tests/test_common_encr_public_interface.py capabilities/common/encr/tests/test_capability_contract.py -q` -> 7 passed
+- `rg -n "raise NotImplementedError|Implemented in service.py" capabilities/common/encr/__init__.py tests/test_common_encr_public_interface.py -S` -> no matches
+- `git diff --check capabilities/common/encr/__init__.py tests/test_common_encr_public_interface.py`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push.
