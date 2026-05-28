@@ -7552,3 +7552,24 @@ Battery-conscious verification:
 - `.venv/bin/apg explain examples/20_enterprise_erp_platform/main.apg --handler OperationsDashboard.select --json` -> emitted `apg.explain-report.v1`
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers tests/test_compiler_baseline.py::test_cli_parser_golden_json_audits_fixture_catalog -q` -> 2 passed
 - `git diff --check compiler/explain.py cli/explain_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md`
+
+### 2026-05-28 19:35 EAT
+
+Completed checkpoint:
+
+- Implemented `compiler.packager.build_package_report()` as an `apg.package-report.v1` producer over generated Python apps and release evidence.
+- Added the `apg package` CLI command with `--target`, `--out`, and `--json`.
+- Package profiles now support `python`, `web`, `desktop`, `mobile`, and `container` as profiles layered over generated Python artifacts, not separate compiler targets.
+- Package output now writes generated app files, `package_manifest.json`, `release_report.json`, and profile-specific files such as `run_desktop.py`, `run_web.py`, `mobile_profile.json`, and `container_profile.json`.
+- Package reports include release evidence summaries, generated/profile artifact checks, and signing posture warnings for desktop/mobile development packages.
+- Updated the tooling specification so `apg package` is listed as an executable current command.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/packager.py cli/package_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_package_json_writes_executable_profile -q` -> 1 passed
+- `.venv/bin/apg package examples/05_single_support_agent/main.apg --target desktop --out /private/tmp/apg_package_smoke2 --json` -> emitted `apg.package-report.v1`
+- `.venv/bin/apg package examples/10_themed_i18n_streaming_capability/main.apg --target mobile --out /private/tmp/apg_package_verify` -> exited 0 with unsigned development signing warning
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_package_json_writes_executable_profile tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers tests/test_compiler_baseline.py::test_cli_release_json_emits_generated_application_evidence_without_output -q` -> 3 passed
+- `.venv/bin/apg package examples/05_single_support_agent/main.apg --target desktop --out /private/tmp/apg_package_final --json` -> emitted `apg.package-report.v1`
+- `git diff --check compiler/packager.py cli/package_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md`

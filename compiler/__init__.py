@@ -23,6 +23,7 @@ from .semantic_analyzer import SemanticAnalyzer
 from .explain import build_explain_report
 from .semantic_model import build_semantic_model, build_semantic_model_from_module
 from .parser_golden import audit_parser_golden
+from .packager import build_package_report
 from .release import build_release_report
 from .code_generator import CodeGenerator
 from .compiler import APGCompiler
@@ -35,6 +36,7 @@ __all__ = [
     'build_semantic_model',
     'build_semantic_model_from_module',
     'audit_parser_golden',
+    'build_package_report',
     'build_release_report',
     'CodeGenerator',
     'APGCompiler',

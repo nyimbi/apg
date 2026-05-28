@@ -41,6 +41,9 @@ APG currently has an executable compiler path:
   represented by passing valid fixtures;
 - `apg explain <file> --symbol|--diagnostic|--handler ... --json` emits
   `apg.explain-report.v1` from the same semantic model used by `apg model`;
+- `apg package <file> --target web|desktop|mobile|container --out <dir> --json`
+  emits `apg.package-report.v1`, writes a generated Python application package,
+  attaches release evidence, and adds profile-specific launch/manifest files;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -145,6 +148,7 @@ designers, and natural-language tools.
 | `compiler.diagnostics` | Planned diagnostic registry for APG code ranges, severities, related locations, and fix IDs. |
 | `compiler.formatter` | Existing deterministic formatter for `.apg` source. Extend it toward full AST-aware formatting. |
 | `compiler.graphs` | Existing graph builders for ER, lookup, workflow, handler, capability, security, agent, package, and deployment graphs. |
+| `compiler.packager` | Existing package-profile builder over generated Python applications and release evidence. Extend it toward signed distribution bundles as packaging requirements deepen. |
 | `compiler.migrations` | Planned semantic-model diff planner for database and capability ownership changes. |
 | `compiler.nl_plan` | Planned constrained natural-language-to-APG-patch planner. |
 | `compiler.release` | Existing release evidence builder for generated applications. Extend it toward capability package and deployment evidence. |
@@ -644,6 +648,9 @@ apg parser-golden --json
 apg explain app.apg --symbol table.Customer --json
 apg explain app.apg --diagnostic APG0100 --json
 apg explain app.apg --handler OperationsDashboard.select --json
+apg package app.apg --target web --out dist --json
+apg package app.apg --target desktop --out dist
+apg package app.apg --target mobile --out dist
 apg validate
 apg run
 apg doctor
@@ -797,6 +804,10 @@ apg package app.apg --target mobile --out dist
 
 Runs package validation, signing posture checks, release evidence generation,
 and target-specific smoke checks.
+The current executable contract emits `apg.package-report.v1` and writes a
+package directory containing generated Python artifacts, `package_manifest.json`,
+`release_report.json`, and profile-specific files such as `run_web.py`,
+`run_desktop.py`, `mobile_profile.json`, or `container_profile.json`.
 
 ### `apg capabilities`
 

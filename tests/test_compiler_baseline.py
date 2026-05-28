@@ -1466,6 +1466,45 @@ def test_cli_explain_json_covers_symbols_diagnostics_and_handlers():
 	assert handler_report["explanations"][0]["handler"]["handler"]["target"] == "FulfillmentTable"
 
 
+def test_cli_package_json_writes_executable_profile(tmp_path):
+	source = REPO_ROOT / "examples" / "05_single_support_agent" / "main.apg"
+	out_dir = tmp_path / "dist"
+
+	result = CliRunner().invoke(
+		cli,
+		["package", str(source), "--target", "desktop", "--out", str(out_dir), "--json"],
+	)
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	package_dir = Path(report["output_dir"])
+	assert report["format"] == "apg.package-report.v1"
+	assert report["ok"] is True
+	assert report["target"] == "desktop"
+	assert package_dir == out_dir / "support_agent-desktop"
+	assert report["manifest"]["format"] == "apg.package-manifest.v1"
+	assert report["manifest"]["base_target"] == "python"
+	assert report["manifest"]["entrypoints"]["run"] == "python run_desktop.py"
+	assert report["release"]["ok"] is True
+	assert report["checks"]["release_evidence_ok"] is True
+	assert "run_desktop.py" in report["files"]
+	assert "package_manifest.json" in report["files"]
+	assert "release_report.json" in report["files"]
+	assert "semantic_model.json" in report["files"]
+	assert (package_dir / "package_manifest.json").exists()
+	assert (package_dir / "release_report.json").exists()
+
+	self_test = subprocess.run(
+		[sys.executable, "app.py", "--self-test"],
+		cwd=package_dir,
+		text=True,
+		capture_output=True,
+		check=False,
+	)
+	assert self_test.returncode == 0, self_test.stderr
+	assert json.loads(self_test.stdout)["passed"] is True
+
+
 def test_checked_in_example_outputs_match_current_compiler():
 	examples = sorted((REPO_ROOT / "examples").glob("[0-9][0-9]_*/main.apg"))
 	assert len(examples) == 20
