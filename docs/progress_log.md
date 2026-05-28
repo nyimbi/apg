@@ -8095,3 +8095,7 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_model_audits_semantic_model_fixture_catalog tests/test_compiler_baseline.py::test_cli_tooling_audit_json_runs_all_fixture_catalogs -q` passed with 2 tests.
 - `.venv/bin/apg tooling audit --json` passed with 10 surfaces, 10 passing surfaces, 0 errors, and 0 blocking gaps.
 - `git diff --check -- compiler/semantic_model.py compiler/tooling_audit.py cli/model_command.py compiler/__init__.py tests/test_compiler_baseline.py tests/fixtures/semantic_model docs/tooling.md docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `9482682` (`Make semantic model behavior fixture-audited`).
