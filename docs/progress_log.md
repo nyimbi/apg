@@ -4768,4 +4768,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit/push for this checkpoint.
+- Pushed commit `7e71ae5` (`Remove pass fallbacks from capability manifests`) to `origin/main`.
