@@ -67,6 +67,9 @@ APG currently has an executable compiler path:
 - `apg language-server <file> --code-actions --json` emits
   `apg.language-server-code-actions.v1`, offering concrete APG DSL patches for
   supported diagnostics, including missing table and missing agent declarations;
+- `apg ide audit --json` emits `apg.ide-audit.v1`, proving the checked-in
+  VS Code extension is aligned with current APG CLI commands, python-only
+  compiler targeting, activation, contributed files, icons, and themes;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -688,6 +691,7 @@ apg language-server
 apg language-server app.apg --check --json
 apg language-server app.apg --rename Customer --to Account --json
 apg language-server app.apg --code-actions --json
+apg ide audit --json
 apg capabilities contracts --json
 apg capabilities validate-contracts --json
 ```
@@ -1002,6 +1006,13 @@ The VS Code extension should provide:
 - command palette actions for lint, format, graph, explain, compile, and
   package;
 - capability catalog browser.
+
+The current executable baseline includes `apg ide audit --json`, which emits
+`apg.ide-audit.v1` and verifies that the checked-in VS Code extension exposes
+the current APG command palette actions, uses `python` as the only compiler
+target, does not call legacy `apg build` or framework targets, and ships the
+contributed syntax, snippet, icon, and APG light/dark theme files referenced by
+the extension manifest.
 
 ### APG Studio / Monaco
 

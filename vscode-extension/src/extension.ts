@@ -13,7 +13,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { exec, spawn, ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 
 let client: LanguageClient | undefined;
@@ -111,6 +111,80 @@ function registerCommands(context: vscode.ExtensionContext) {
         
         await validateSyntax(editor.document.uri);
     });
+
+    const lintCommand = vscode.commands.registerCommand('apg.lint', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document.languageId !== 'apg') {
+            vscode.window.showErrorMessage('No APG file is currently open');
+            return;
+        }
+
+        await runAPGJsonCommand('Lint', editor.document.uri, ['lint', editor.document.uri.fsPath, '--json']);
+    });
+
+    const formatCommand = vscode.commands.registerCommand('apg.format', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document.languageId !== 'apg') {
+            vscode.window.showErrorMessage('No APG file is currently open');
+            return;
+        }
+
+        await runAPGTextCommand('Format', editor.document.uri, ['format', editor.document.uri.fsPath, '--write']);
+    });
+
+    const graphCommand = vscode.commands.registerCommand('apg.graph', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document.languageId !== 'apg') {
+            vscode.window.showErrorMessage('No APG file is currently open');
+            return;
+        }
+
+        await runAPGJsonCommand('Graph Suite', editor.document.uri, ['graph-suite', editor.document.uri.fsPath, '--json']);
+    });
+
+    const explainCommand = vscode.commands.registerCommand('apg.explain', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document.languageId !== 'apg') {
+            vscode.window.showErrorMessage('No APG file is currently open');
+            return;
+        }
+
+        const symbol = await vscode.window.showInputBox({
+            prompt: 'APG symbol, diagnostic code, or handler target to explain',
+            placeHolder: 'table.Customer, APG0100, or InvoiceForm.Save'
+        });
+        if (!symbol) {
+            return;
+        }
+
+        const queryFlag = /^APG\d{4}$/i.test(symbol) ? '--diagnostic' : '--symbol';
+        await runAPGJsonCommand('Explain', editor.document.uri, ['explain', editor.document.uri.fsPath, queryFlag, symbol, '--json']);
+    });
+
+    const packageCommand = vscode.commands.registerCommand('apg.package', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document.languageId !== 'apg') {
+            vscode.window.showErrorMessage('No APG file is currently open');
+            return;
+        }
+
+        const target = await vscode.window.showQuickPick(['web', 'desktop', 'mobile', 'container'], {
+            placeHolder: 'Select APG package profile'
+        });
+        if (!target) {
+            return;
+        }
+
+        const workspaceFolder = getWorkspaceFolder();
+        const outDir = workspaceFolder
+            ? path.join(workspaceFolder.uri.fsPath, 'dist', target)
+            : path.join(path.dirname(editor.document.uri.fsPath), 'dist', target);
+        await runAPGJsonCommand('Package', editor.document.uri, ['package', editor.document.uri.fsPath, '--target', target, '--out', outDir, '--json']);
+    });
+
+    const capabilitiesCommand = vscode.commands.registerCommand('apg.capabilities', async () => {
+        await runAPGWorkspaceJsonCommand('Capability Contracts', ['capabilities', 'contracts', '--json']);
+    });
     
     // Show preview
     const previewCommand = vscode.commands.registerCommand('apg.showPreview', async () => {
@@ -144,6 +218,12 @@ function registerCommands(context: vscode.ExtensionContext) {
         compileProjectCommand,
         runGeneratedCommand,
         validateCommand,
+        lintCommand,
+        formatCommand,
+        graphCommand,
+        explainCommand,
+        packageCommand,
+        capabilitiesCommand,
         previewCommand,
         createProjectCommand,
         restartLSCommand,
@@ -258,6 +338,68 @@ function setupFileWatchers(context: vscode.ExtensionContext) {
     context.subscriptions.push(configWatcher);
 }
 
+async function runAPGJsonCommand(label: string, uri: vscode.Uri, args: string[]): Promise<void> {
+    const stdout = await runAPGCommand(args, path.dirname(uri.fsPath), label);
+    await showJsonPreview(`${label} - ${path.basename(uri.fsPath)}`, stdout);
+}
+
+async function runAPGWorkspaceJsonCommand(label: string, args: string[]): Promise<void> {
+    const workspaceFolder = getWorkspaceFolder();
+    const cwd = workspaceFolder ? workspaceFolder.uri.fsPath : process.cwd();
+    const stdout = await runAPGCommand(args, cwd, label);
+    await showJsonPreview(label, stdout);
+}
+
+async function runAPGTextCommand(label: string, uri: vscode.Uri, args: string[]): Promise<void> {
+    await runAPGCommand(args, path.dirname(uri.fsPath), label);
+    vscode.window.showInformationMessage(`APG ${label.toLowerCase()} completed`);
+}
+
+function runAPGCommand(args: string[], cwd: string, label: string): Promise<string> {
+    outputChannel.show(true);
+    outputChannel.appendLine(`APG ${label}: apg ${args.join(' ')}`);
+
+    return new Promise((resolve, reject) => {
+        const child = spawn('apg', args, { cwd });
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout.on('data', (data) => {
+            const text = data.toString();
+            stdout += text;
+            outputChannel.append(text);
+        });
+        child.stderr.on('data', (data) => {
+            const text = data.toString();
+            stderr += text;
+            outputChannel.append(text);
+        });
+        child.on('error', (error) => {
+            updateStatusBar('error');
+            vscode.window.showErrorMessage(`APG ${label} failed: ${error.message}`);
+            reject(error);
+        });
+        child.on('close', (code) => {
+            if (code === 0) {
+                resolve(stdout);
+            } else {
+                updateStatusBar('error');
+                const message = stderr.trim() || stdout.trim() || `exit code ${code}`;
+                vscode.window.showErrorMessage(`APG ${label} failed: ${message}`);
+                reject(new Error(message));
+            }
+        });
+    });
+}
+
+async function showJsonPreview(title: string, jsonText: string): Promise<void> {
+    const document = await vscode.workspace.openTextDocument({
+        content: jsonText,
+        language: 'json'
+    });
+    await vscode.window.showTextDocument(document, vscode.ViewColumn.Beside);
+}
+
 /**
  * Compile a single APG file
  */
@@ -266,27 +408,12 @@ async function compileFile(uri: vscode.Uri): Promise<void> {
     outputChannel.appendLine(`Compiling APG file: ${uri.fsPath}`);
     
     updateStatusBar('compiling');
-    
-    return new Promise((resolve, reject) => {
-        const workspaceDir = path.dirname(uri.fsPath);
-        const command = `apg build --verbose`;
-        
-        exec(command, { cwd: workspaceDir }, (error, stdout, stderr) => {
-            if (error) {
-                outputChannel.appendLine(`Compilation failed: ${error.message}`);
-                outputChannel.appendLine(stderr);
-                updateStatusBar('error');
-                vscode.window.showErrorMessage(`APG compilation failed: ${error.message}`);
-                reject(error);
-            } else {
-                outputChannel.appendLine('Compilation successful!');
-                outputChannel.appendLine(stdout);
-                updateStatusBar('connected');
-                vscode.window.showInformationMessage('APG compilation completed successfully');
-                resolve();
-            }
-        });
-    });
+
+    const workspaceDir = path.dirname(uri.fsPath);
+    const outputDir = path.join(workspaceDir, 'generated');
+    await runAPGCommand(['compile', uri.fsPath, '--target', 'python', '--output', outputDir, '--verify'], workspaceDir, 'Compilation');
+    updateStatusBar('connected');
+    vscode.window.showInformationMessage('APG compilation completed successfully');
 }
 
 /**
@@ -298,29 +425,22 @@ async function compileProject(workspaceFolder: vscode.WorkspaceFolder): Promise<
     
     updateStatusBar('compiling');
     
-    return new Promise((resolve, reject) => {
-        const command = `apg build --verbose`;
-        
-        exec(command, { cwd: workspaceFolder.uri.fsPath }, (error, stdout, stderr) => {
-            if (error) {
-                outputChannel.appendLine(`Project compilation failed: ${error.message}`);
-                outputChannel.appendLine(stderr);
-                updateStatusBar('error');
-                vscode.window.showErrorMessage(`APG project compilation failed: ${error.message}`);
-                reject(error);
-            } else {
-                outputChannel.appendLine('Project compilation successful!');
-                outputChannel.appendLine(stdout);
-                updateStatusBar('connected');
-                vscode.window.showInformationMessage('APG project compilation completed successfully');
-                resolve();
-            }
-        });
-    });
+    const apgFiles = await vscode.workspace.findFiles('**/*.apg', '**/{generated,dist,node_modules,.venv}/**', 1);
+    if (apgFiles.length === 0) {
+        vscode.window.showErrorMessage('No APG source file found in the workspace');
+        updateStatusBar('error');
+        return;
+    }
+
+    const sourceFile = apgFiles[0].fsPath;
+    const outputDir = path.join(workspaceFolder.uri.fsPath, 'generated');
+    await runAPGCommand(['compile', sourceFile, '--target', 'python', '--output', outputDir, '--verify'], workspaceFolder.uri.fsPath, 'Project compilation');
+    updateStatusBar('connected');
+    vscode.window.showInformationMessage('APG project compilation completed successfully');
 }
 
 /**
- * Run the generated Flask-AppBuilder application
+ * Run the generated Python application
  */
 async function runGeneratedApp(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
     const generatedDir = path.join(workspaceFolder.uri.fsPath, 'generated');
@@ -366,25 +486,9 @@ async function runGeneratedApp(workspaceFolder: vscode.WorkspaceFolder): Promise
  */
 async function validateSyntax(uri: vscode.Uri): Promise<void> {
     outputChannel.appendLine(`Validating APG syntax: ${uri.fsPath}`);
-    
-    return new Promise((resolve, reject) => {
-        const workspaceDir = path.dirname(uri.fsPath);
-        const command = `apg validate`;
-        
-        exec(command, { cwd: workspaceDir }, (error, stdout, stderr) => {
-            if (error) {
-                outputChannel.appendLine(`Validation failed: ${error.message}`);
-                outputChannel.appendLine(stderr);
-                vscode.window.showErrorMessage(`APG validation failed: ${error.message}`);
-                reject(error);
-            } else {
-                outputChannel.appendLine('Validation successful!');
-                outputChannel.appendLine(stdout);
-                vscode.window.showInformationMessage('APG syntax validation passed');
-                resolve();
-            }
-        });
-    });
+
+    await runAPGJsonCommand('Validate', uri, ['validate', uri.fsPath, '--target', 'python', '--json']);
+    vscode.window.showInformationMessage('APG validation passed');
 }
 
 /**
@@ -437,30 +541,27 @@ async function createNewProject(): Promise<void> {
     }
     
     const projectPath = path.join(workspaceFolder.uri.fsPath, projectName);
-    
-    return new Promise((resolve, reject) => {
-        const command = `apg init ${projectName} --target flask-appbuilder`;
-        
-        exec(command, { cwd: workspaceFolder.uri.fsPath }, (error, stdout, stderr) => {
-            if (error) {
-                outputChannel.appendLine(`Project creation failed: ${error.message}`);
-                outputChannel.appendLine(stderr);
-                vscode.window.showErrorMessage(`Failed to create APG project: ${error.message}`);
-                reject(error);
-            } else {
-                outputChannel.appendLine(`APG project created successfully: ${projectPath}`);
-                outputChannel.appendLine(stdout);
-                vscode.window.showInformationMessage(
-                    `APG project '${projectName}' created successfully!`,
-                    'Open Project'
-                ).then((selection) => {
-                    if (selection === 'Open Project') {
-                        vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectPath));
-                    }
-                });
-                resolve();
-            }
-        });
+
+    await runAPGCommand([
+        'create',
+        'project',
+        '--name',
+        projectName,
+        '--template',
+        'basic_agent',
+        '--output',
+        projectPath,
+        '--no-interactive'
+    ], workspaceFolder.uri.fsPath, 'Project creation');
+
+    outputChannel.appendLine(`APG project created successfully: ${projectPath}`);
+    vscode.window.showInformationMessage(
+        `APG project '${projectName}' created successfully!`,
+        'Open Project'
+    ).then((selection) => {
+        if (selection === 'Open Project') {
+            vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectPath));
+        }
     });
 }
 
@@ -499,13 +600,43 @@ function showAPGMenu() {
         },
         {
             label: '$(play) Run Generated App',
-            description: 'Run the generated Flask-AppBuilder application',
+            description: 'Run the generated Python application',
             detail: 'Ctrl+F5'
         },
         {
             label: '$(check) Validate Syntax',
             description: 'Validate APG syntax',
             detail: 'Ctrl+Shift+V'
+        },
+        {
+            label: '$(warning) Lint Current File',
+            description: 'Run APG lint JSON contract',
+            detail: 'apg lint --json'
+        },
+        {
+            label: '$(symbol-keyword) Format Current File',
+            description: 'Apply deterministic APG formatting',
+            detail: 'apg format --write'
+        },
+        {
+            label: '$(type-hierarchy) Show Graph Suite',
+            description: 'Render APG graph evidence',
+            detail: 'apg graph-suite --json'
+        },
+        {
+            label: '$(info) Explain Symbol',
+            description: 'Explain an APG symbol, diagnostic, or handler',
+            detail: 'apg explain --json'
+        },
+        {
+            label: '$(package) Package Current File',
+            description: 'Build an APG package profile',
+            detail: 'apg package --json'
+        },
+        {
+            label: '$(library) Browse Capability Contracts',
+            description: 'Inspect executable APG capability contracts',
+            detail: 'apg capabilities contracts --json'
         },
         {
             label: '$(preview) Show Preview',
@@ -541,6 +672,24 @@ function showAPGMenu() {
                 break;
             case '$(check) Validate Syntax':
                 vscode.commands.executeCommand('apg.validateSyntax');
+                break;
+            case '$(warning) Lint Current File':
+                vscode.commands.executeCommand('apg.lint');
+                break;
+            case '$(symbol-keyword) Format Current File':
+                vscode.commands.executeCommand('apg.format');
+                break;
+            case '$(type-hierarchy) Show Graph Suite':
+                vscode.commands.executeCommand('apg.graph');
+                break;
+            case '$(info) Explain Symbol':
+                vscode.commands.executeCommand('apg.explain');
+                break;
+            case '$(package) Package Current File':
+                vscode.commands.executeCommand('apg.package');
+                break;
+            case '$(library) Browse Capability Contracts':
+                vscode.commands.executeCommand('apg.capabilities');
                 break;
             case '$(preview) Show Preview':
                 vscode.commands.executeCommand('apg.showPreview');

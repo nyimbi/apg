@@ -31,15 +31,15 @@ Full-featured language support for APG (Application Programming Generation) lang
 - Vector storage and AI/ML templates
 - Workflow and automation snippets
 
-### 🔧 **Build & Compilation**
-- One-click compilation to Flask-AppBuilder applications
-- Project-wide build support
+### 🔧 **Build & Tooling**
+- One-click compilation to executable Python application artifacts
+- Project-wide compile support through `apg compile --target python`
 - Real-time syntax validation
-- Integration with APG CLI tools
+- Lint, format, graph, explain, package, and capability-contract commands
 
 ### 🚀 **Development Workflow**
 - Create new APG projects directly from VS Code
-- Run generated Flask-AppBuilder applications
+- Run generated Python applications
 - Live preview of APG code
 - Integrated terminal for APG commands
 
@@ -112,11 +112,11 @@ agent HelloAgent {
 - Multiple database backends (PostgreSQL, MySQL, SQLite)
 
 ### Generated Applications
-- Professional Flask-AppBuilder web applications
+- Dependency-light Python application artifacts
 - Interactive dashboards and control panels
-- RESTful APIs with authentication
-- Database management interfaces
-- Real-time monitoring and logging
+- RESTful APIs with generated metadata
+- Component manifests, OpenAPI JSON, and semantic-model evidence
+- Generated self-tests and smoke-test entry points
 
 ## Commands
 
@@ -124,8 +124,14 @@ agent HelloAgent {
 |---------|----------|-------------|
 | APG: Compile Current File | Ctrl+Shift+B | Compile the active APG file |
 | APG: Compile Project | - | Build entire APG project |
-| APG: Run Generated App | Ctrl+F5 | Start the generated Flask app |
+| APG: Run Generated App | Ctrl+F5 | Start the generated Python app |
 | APG: Validate Syntax | Ctrl+Shift+V | Check APG file syntax |
+| APG: Lint Current File | - | Run `apg lint --json` |
+| APG: Format Current File | - | Run `apg format --write` |
+| APG: Show Graph Suite | - | Run `apg graph-suite --json` |
+| APG: Explain Current Symbol | - | Run `apg explain --json` |
+| APG: Package Current File | - | Run `apg package --json` |
+| APG: Browse Capability Contracts | - | Run `apg capabilities contracts --json` |
 | APG: Show Preview | - | Display APG code preview |
 | APG: Create New Project | - | Initialize new APG project |
 | APG: Restart Language Server | - | Restart the language server |
@@ -139,7 +145,7 @@ Configure the extension in VS Code settings:
     "apg.languageServer.enabled": true,
     "apg.languageServer.host": "127.0.0.1",
     "apg.languageServer.port": 2087,
-    "apg.compiler.target": "flask-appbuilder",
+    "apg.compiler.target": "python",
     "apg.compiler.outputDir": "generated",
     "apg.validation.enableRealTime": true,
     "apg.completion.enabled": true,

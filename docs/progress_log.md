@@ -7709,3 +7709,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile language_server/semantic_service.py cli/main.py tests/test_compiler_baseline.py`
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_language_service_code_actions_create_missing_table_patch tests/test_compiler_baseline.py::test_cli_language_server_code_actions_json_dry_runs_without_writing tests/test_compiler_baseline.py::test_cli_language_server_apply_code_action_writes_explicitly -q` -> 3 passed
 - `.venv/bin/apg language-server /private/tmp/apg_missing_type.apg --code-actions --json` -> emitted `apg.language-server-code-actions.v1` with `create-table-Customer` and no file write
+
+### 2026-05-28 20:44 EAT
+
+Completed checkpoint:
+
+- Started Phase 5 IDE integration hardening by aligning the checked-in VS Code extension with current APG CLI contracts.
+- Replaced legacy framework-target configuration with `python` as the only extension compiler target and removed stale `apg build` command usage.
+- Added VS Code command palette wiring for `apg lint`, `apg format`, `apg graph-suite`, `apg explain`, `apg package`, and `apg capabilities contracts`.
+- Added missing VS Code extension icon and APG light/dark theme contribution files so visual theming references in `package.json` are real assets.
+- Implemented `compiler.ide_integration.audit_vscode_extension()` and `apg ide audit --json`, emitting `apg.ide-audit.v1` to prevent IDE/CLI drift.
+- Updated the VS Code README and tooling specification so IDE support is documented as python-artifact tooling instead of Flask-AppBuilder generation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/ide_integration.py cli/ide_command.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_vscode_extension_audit_tracks_current_cli_contracts tests/test_compiler_baseline.py::test_cli_ide_audit_json_reports_vscode_contracts -q` -> 2 passed
+- `.venv/bin/apg ide audit --json` -> emitted `apg.ide-audit.v1` with 6/6 checks passing

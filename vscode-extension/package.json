@@ -32,7 +32,7 @@
     "digital-twins",
     "iot",
     "database",
-    "flask-appbuilder"
+    "python-artifacts"
   ],
   "activationEvents": [
     "onLanguage:apg"
@@ -102,9 +102,9 @@
         },
         "apg.compiler.target": {
           "type": "string",
-          "default": "flask-appbuilder",
+          "default": "python",
           "enum": [
-            "flask-appbuilder"
+            "python"
           ],
           "description": "APG compilation target"
         },
@@ -162,6 +162,36 @@
         "icon": "$(check)"
       },
       {
+        "command": "apg.lint",
+        "title": "APG: Lint Current File",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "apg.format",
+        "title": "APG: Format Current File",
+        "icon": "$(symbol-keyword)"
+      },
+      {
+        "command": "apg.graph",
+        "title": "APG: Show Graph Suite",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "apg.explain",
+        "title": "APG: Explain Current Symbol",
+        "icon": "$(info)"
+      },
+      {
+        "command": "apg.package",
+        "title": "APG: Package Current File",
+        "icon": "$(package)"
+      },
+      {
+        "command": "apg.capabilities",
+        "title": "APG: Browse Capability Contracts",
+        "icon": "$(library)"
+      },
+      {
         "command": "apg.showPreview",
         "title": "APG: Show Preview",
         "icon": "$(preview)"
@@ -197,6 +227,16 @@
           "group": "apg"
         },
         {
+          "command": "apg.lint",
+          "when": "resourceExtname == .apg",
+          "group": "apg"
+        },
+        {
+          "command": "apg.format",
+          "when": "resourceExtname == .apg",
+          "group": "apg"
+        },
+        {
           "command": "apg.compile",
           "when": "resourceExtname == .apg",
           "group": "apg"
@@ -223,6 +263,29 @@
         {
           "command": "apg.validateSyntax",
           "when": "resourceExtname == .apg"
+        },
+        {
+          "command": "apg.lint",
+          "when": "resourceExtname == .apg"
+        },
+        {
+          "command": "apg.format",
+          "when": "resourceExtname == .apg"
+        },
+        {
+          "command": "apg.graph",
+          "when": "resourceExtname == .apg"
+        },
+        {
+          "command": "apg.explain",
+          "when": "resourceExtname == .apg"
+        },
+        {
+          "command": "apg.package",
+          "when": "resourceExtname == .apg"
+        },
+        {
+          "command": "apg.capabilities"
         },
         {
           "command": "apg.showPreview",

@@ -20,6 +20,7 @@ from click.testing import CliRunner
 from cli.main import cli
 from compiler.code_generator import CodeGenerator
 from compiler.compiler import APGCompiler, compile_apg_string
+from compiler.ide_integration import audit_vscode_extension
 from compiler.semantic_analyzer import SemanticError
 from language_server.semantic_service import (
 	build_code_action_report,
@@ -2222,6 +2223,30 @@ table SalesOrder {
 	assert report["written"] is True
 	assert report["selected_action"]["id"] == "create-table-Customer"
 	assert "table Customer" in source.read_text(encoding="utf-8")
+
+
+def test_vscode_extension_audit_tracks_current_cli_contracts():
+	report = audit_vscode_extension(REPO_ROOT)
+
+	assert report["format"] == "apg.ide-audit.v1"
+	assert report["ok"] is True
+	assert report["summary"]["failing"] == 0
+	checks = {check["name"]: check for check in report["checks"]}
+	assert checks["required-commands"]["details"]["missing"] == []
+	assert checks["python-target-config"]["details"] == {"default": "python", "enum": ["python"]}
+	assert checks["contributed-files-exist"]["details"]["missing"] == []
+	assert checks["no-framework-target-drift"]["details"]["forbidden_fragments"] == []
+
+
+def test_cli_ide_audit_json_reports_vscode_contracts():
+	result = CliRunner().invoke(cli, ["ide", "audit", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.ide-audit.v1"
+	assert report["ok"] is True
+	assert report["surface"] == "vscode"
+	assert report["summary"]["check_count"] >= 6
 
 
 def test_framework_names_are_not_silent_compiler_target_aliases():

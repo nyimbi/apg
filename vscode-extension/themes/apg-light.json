@@ -1,0 +1,32 @@
+{
+  "name": "APG Light",
+  "type": "light",
+  "colors": {
+    "editor.background": "#ffffff",
+    "editor.foreground": "#111827",
+    "editorLineNumber.foreground": "#9ca3af",
+    "editorCursor.foreground": "#2563eb",
+    "activityBar.background": "#f8fafc",
+    "sideBar.background": "#ffffff",
+    "statusBar.background": "#2563eb",
+    "titleBar.activeBackground": "#f8fafc"
+  },
+  "tokenColors": [
+    {
+      "scope": ["keyword.control.apg", "keyword.declaration.apg"],
+      "settings": {"foreground": "#2563eb", "fontStyle": "bold"}
+    },
+    {
+      "scope": ["entity.name.type.apg", "entity.name.function.apg"],
+      "settings": {"foreground": "#b45309"}
+    },
+    {
+      "scope": ["string.quoted.apg"],
+      "settings": {"foreground": "#047857"}
+    },
+    {
+      "scope": ["comment.line.apg"],
+      "settings": {"foreground": "#6b7280", "fontStyle": "italic"}
+    }
+  ]
+}

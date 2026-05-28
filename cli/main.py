@@ -26,6 +26,7 @@ from cli.drift_command import drift
 from cli.explain_command import explain
 from cli.format_command import format_cmd
 from cli.graph_command import graph, graph_suite
+from cli.ide_command import ide
 from cli.lint_command import lint
 from cli.migrate_plan_command import migrate_plan
 from cli.model_command import model
@@ -61,6 +62,7 @@ cli.add_command(explain)
 cli.add_command(format_cmd)
 cli.add_command(graph)
 cli.add_command(graph_suite)
+cli.add_command(ide)
 cli.add_command(lint)
 cli.add_command(migrate_plan)
 cli.add_command(model)
