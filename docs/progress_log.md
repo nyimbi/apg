@@ -7951,3 +7951,24 @@ Battery-conscious verification:
 - `.venv/bin/apg migrate-plan --audit-fixtures` passed in text mode.
 - `.venv/bin/python -m py_compile compiler/migrations.py cli/migrate_plan_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_migrate_plan_json_detects_destructive_schema_and_ownership_changes tests/test_compiler_baseline.py::test_cli_migrate_plan_json_allows_additive_table_changes tests/test_compiler_baseline.py::test_cli_migrate_plan_audits_fixture_catalog -q` passed with 3 tests.
+
+Commit result:
+
+- Pushed commit `a0da46b` (`Make migration planning fixture-audited`).
+
+### 2026-05-28 22:22 EAT
+
+In progress:
+
+- Turned release/package/deployment verifier behavior into a checked-in fixture audit.
+- Added `apg evidence --audit-fixtures --json`, emitting `apg.release-evidence-fixture-audit.v1`.
+- Added a verifier fixture catalog that runs the full release evidence bundle over web, desktop, mobile, and container package profiles.
+- The audit now verifies release evidence, package creation, package verification, deployment verification, and side-effect-free capability publish planning for a first-class capability example.
+- Updated `docs/tooling.md` so the executable baseline, evidence CLI contract, test strategy, and Phase 0 fixture gate include the verifier fixture audit.
+
+Battery-conscious verification:
+
+- `.venv/bin/apg evidence --audit-fixtures --json` passed with 1 fixture, 4 target runs, all required targets covered, 0 missing tags, and 0 blocking gaps.
+- `.venv/bin/apg evidence --audit-fixtures` passed in text mode.
+- `.venv/bin/python -m py_compile compiler/evidence_bundle.py cli/evidence_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_evidence_json_builds_release_bundle tests/test_compiler_baseline.py::test_cli_evidence_audits_release_verifier_fixture_catalog -q` passed with 2 tests.

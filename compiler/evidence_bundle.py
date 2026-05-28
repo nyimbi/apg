@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +12,9 @@ from .deployment_verifier import build_deployment_verification_report
 from .package_verifier import build_package_verification_report
 from .packager import build_package_report
 from .release import build_release_report
+
+RELEASE_EVIDENCE_FIXTURE_AUDIT_FORMAT = "apg.release-evidence-fixture-audit.v1"
+DEFAULT_RELEASE_EVIDENCE_FIXTURE_CATALOG = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "verifiers" / "catalog.json"
 
 
 def build_release_evidence_bundle(
@@ -68,6 +73,152 @@ def build_release_evidence_bundle(
 		_collect_warnings("capability_publish", capability_publish, report)
 
 	return _finalize(report)
+
+
+def audit_release_evidence_fixtures(catalog_path: Path | None = None) -> dict[str, Any]:
+	"""Run the checked-in release/package/deployment verifier fixture catalog."""
+	catalog_file = Path(catalog_path or DEFAULT_RELEASE_EVIDENCE_FIXTURE_CATALOG)
+	catalog_root = catalog_file.parent
+	repo_root = Path(__file__).resolve().parents[1]
+	catalog = json.loads(catalog_file.read_text(encoding="utf-8"))
+	required_targets = sorted(str(target) for target in catalog.get("targets_required", []))
+	required_tags = sorted(str(tag) for tag in catalog.get("tags_required", []))
+	fixture_reports: list[dict[str, Any]] = []
+	blocking_gaps: list[dict[str, Any]] = []
+	covered_targets: set[str] = set()
+	covered_tags: set[str] = set()
+
+	with tempfile.TemporaryDirectory(prefix="apg_evidence_fixtures_") as temp_root:
+		temp_dir = Path(temp_root)
+		for fixture in catalog.get("fixtures", []):
+			report = _audit_release_evidence_fixture(catalog_root, repo_root, temp_dir, fixture)
+			fixture_reports.append(report)
+			if report["ok"]:
+				covered_targets.update(report["targets"])
+				covered_tags.update(report["tags"])
+			else:
+				blocking_gaps.append({
+					"id": report["id"],
+					"source": report["source"],
+					"errors": report["errors"],
+				})
+
+	missing_targets = sorted(set(required_targets).difference(covered_targets))
+	for target in missing_targets:
+		blocking_gaps.append({
+			"id": f"missing_target:{target}",
+			"source": str(catalog_file),
+			"errors": [f"required release evidence target {target!r} is not covered by a passing fixture"],
+		})
+
+	missing_tags = sorted(set(required_tags).difference(covered_tags))
+	for tag in missing_tags:
+		blocking_gaps.append({
+			"id": f"missing_tag:{tag}",
+			"source": str(catalog_file),
+			"errors": [f"required verifier fixture tag {tag!r} is not covered by a passing fixture"],
+		})
+
+	return {
+		"format": RELEASE_EVIDENCE_FIXTURE_AUDIT_FORMAT,
+		"ok": not blocking_gaps,
+		"fixture_catalog": str(catalog_file),
+		"targets_required": required_targets,
+		"targets_covered": sorted(covered_targets),
+		"missing_targets": missing_targets,
+		"tags_required": required_tags,
+		"tags_covered": sorted(covered_tags),
+		"missing_tags": missing_tags,
+		"fixtures": fixture_reports,
+		"summary": {
+			"fixture_count": len(fixture_reports),
+			"target_run_count": sum(len(report["targets"]) for report in fixture_reports),
+			"passing_fixture_count": sum(1 for report in fixture_reports if report["ok"]),
+			"failing_fixture_count": sum(1 for report in fixture_reports if not report["ok"]),
+			"blocking_gap_count": len(blocking_gaps),
+		},
+		"blocking_gaps": blocking_gaps,
+	}
+
+
+def _audit_release_evidence_fixture(
+	catalog_root: Path,
+	repo_root: Path,
+	temp_dir: Path,
+	fixture: dict[str, Any],
+) -> dict[str, Any]:
+	fixture_id = str(fixture["id"])
+	source = (catalog_root / str(fixture["source"])).resolve()
+	if not source.exists():
+		source = (repo_root / str(fixture["source"])).resolve()
+	targets = [str(target).lower() for target in fixture.get("targets", [])]
+	tags = sorted(str(tag) for tag in fixture.get("tags", []))
+	expected_checks = [str(check) for check in fixture.get("expected_checks", [])]
+	expected_capabilities = {str(capability) for capability in fixture.get("expected_capabilities", [])}
+	include_capability_publish = bool(fixture.get("include_capability_publish", True))
+	expected_ok = bool(fixture.get("expected_ok", True))
+	errors: list[str] = []
+	target_reports: list[dict[str, Any]] = []
+
+	for target in targets:
+		out_dir = temp_dir / fixture_id / target
+		try:
+			report = build_release_evidence_bundle(
+				source,
+				target=target,
+				out_dir=out_dir,
+				include_capability_publish=include_capability_publish,
+			)
+		except Exception as error:
+			errors.append(f"{target}: {error}")
+			continue
+
+		if bool(report.get("ok")) != expected_ok:
+			errors.append(f"{target}: expected ok={expected_ok}, got {report.get('ok')}")
+		if report.get("target") != target:
+			errors.append(f"{target}: bundle target mismatch")
+		for check in expected_checks:
+			if report.get("checks", {}).get(check) is not True:
+				errors.append(f"{target}: expected check {check} to pass")
+		if report.get("release", {}).get("format") != "apg.release-report.v1":
+			errors.append(f"{target}: release report format mismatch")
+		if report.get("package", {}).get("format") != "apg.package-report.v1":
+			errors.append(f"{target}: package report format mismatch")
+		if report.get("package_verification", {}).get("format") != "apg.package-verification-report.v1":
+			errors.append(f"{target}: package verification format mismatch")
+		if report.get("deployment_verification", {}).get("format") != "apg.deployment-verification-report.v1":
+			errors.append(f"{target}: deployment verification format mismatch")
+		if report.get("package_verification", {}).get("profile") != target:
+			errors.append(f"{target}: package verification profile mismatch")
+
+		capability_publish = report.get("capability_publish", {})
+		if include_capability_publish:
+			if capability_publish.get("format") != "apg.capability-publish-report.v1":
+				errors.append(f"{target}: capability publish format mismatch")
+			if capability_publish.get("side_effect_free") is not True:
+				errors.append(f"{target}: capability publish plan is not side-effect-free")
+			actual_capabilities = {str(capability) for capability in capability_publish.get("capabilities", [])}
+			if not expected_capabilities.issubset(actual_capabilities):
+				errors.append(f"{target}: capability publish plan missing {sorted(expected_capabilities - actual_capabilities)}")
+
+		target_reports.append({
+			"target": target,
+			"ok": bool(report.get("ok")),
+			"checks": report.get("checks", {}),
+			"package_profile": report.get("package_verification", {}).get("profile"),
+			"capability_publish_side_effect_free": capability_publish.get("side_effect_free"),
+			"warnings": report.get("warnings", []),
+		})
+
+	return {
+		"id": fixture_id,
+		"source": str(source),
+		"targets": targets,
+		"tags": tags,
+		"target_reports": target_reports,
+		"ok": not errors,
+		"errors": errors,
+	}
 
 
 def _release_summary(report: dict[str, Any]) -> dict[str, Any]:

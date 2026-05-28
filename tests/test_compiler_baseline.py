@@ -1798,6 +1798,27 @@ def test_cli_evidence_json_builds_release_bundle(tmp_path):
 	assert Path(report["package"]["output_dir"]).exists()
 
 
+def test_cli_evidence_audits_release_verifier_fixture_catalog():
+	result = CliRunner().invoke(cli, ["evidence", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.release-evidence-fixture-audit.v1"
+	assert report["ok"] is True
+	assert report["missing_targets"] == []
+	assert report["missing_tags"] == []
+	assert report["blocking_gaps"] == []
+	assert report["targets_covered"] == ["container", "desktop", "mobile", "web"]
+	assert report["summary"]["fixture_count"] >= 1
+	assert report["summary"]["target_run_count"] >= 4
+	assert {"release_evidence", "package_verification", "deployment_verification"}.issubset(report["tags_covered"])
+	fixture = report["fixtures"][0]
+	assert fixture["ok"] is True
+	assert {target["target"] for target in fixture["target_reports"]} == {"web", "desktop", "mobile", "container"}
+	assert all(target["ok"] for target in fixture["target_reports"])
+	assert all(target["capability_publish_side_effect_free"] is True for target in fixture["target_reports"])
+
+
 def test_cli_nl_plan_json_proposes_valid_credit_memo_dsl_diff_without_writing(tmp_path):
 	source = tmp_path / "finance.apg"
 	output = tmp_path / "generated"

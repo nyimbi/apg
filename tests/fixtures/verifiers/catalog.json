@@ -1,0 +1,43 @@
+{
+  "format": "apg.release-evidence-fixture-catalog.v1",
+  "targets_required": ["web", "desktop", "mobile", "container"],
+  "tags_required": [
+    "release_evidence",
+    "package_profiles",
+    "package_verification",
+    "deployment_verification",
+    "capability_publish_plan",
+    "web",
+    "desktop",
+    "mobile",
+    "container"
+  ],
+  "fixtures": [
+    {
+      "id": "capability_basics_all_profiles",
+      "source": "../../../examples/08_basic_capability_contract/main.apg",
+      "targets": ["web", "desktop", "mobile", "container"],
+      "expected_ok": true,
+      "include_capability_publish": true,
+      "expected_capabilities": ["AuditLog"],
+      "expected_checks": [
+        "release_ok",
+        "package_ok",
+        "package_verification_ok",
+        "deployment_verification_ok",
+        "capability_publish_plan_ok"
+      ],
+      "tags": [
+        "release_evidence",
+        "package_profiles",
+        "package_verification",
+        "deployment_verification",
+        "capability_publish_plan",
+        "web",
+        "desktop",
+        "mobile",
+        "container"
+      ]
+    }
+  ]
+}

@@ -8,12 +8,14 @@ from pathlib import Path
 
 import click
 
-from compiler.evidence_bundle import build_release_evidence_bundle
+from compiler.evidence_bundle import audit_release_evidence_fixtures, build_release_evidence_bundle
 from compiler.packager import SUPPORTED_PACKAGE_TARGETS
 
 
 @click.command(name="evidence")
-@click.argument("source_file", type=click.Path(path_type=Path))
+@click.argument("source_file", required=False, type=click.Path(path_type=Path))
+@click.option("--audit-fixtures", is_flag=True, help="Audit checked-in release evidence verifier fixtures")
+@click.option("--fixtures", type=click.Path(path_type=Path), default=None, help="Release evidence fixture catalog path")
 @click.option(
 	"--target",
 	default="web",
@@ -27,8 +29,36 @@ from compiler.packager import SUPPORTED_PACKAGE_TARGETS
 	help="Skip side-effect-free capability publish planning",
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.release-evidence-bundle.v1 JSON")
-def evidence(source_file: Path, target: str, out_dir: Path, skip_capability_publish: bool, as_json: bool) -> None:
+def evidence(
+	source_file: Path | None,
+	audit_fixtures: bool,
+	fixtures: Path | None,
+	target: str,
+	out_dir: Path,
+	skip_capability_publish: bool,
+	as_json: bool,
+) -> None:
 	"""Build package and verifier evidence for an APG application."""
+	if audit_fixtures:
+		if source_file is not None or skip_capability_publish:
+			raise click.ClickException("--audit-fixtures cannot be combined with a source file or --skip-capability-publish")
+		report = audit_release_evidence_fixtures(fixtures)
+		if as_json:
+			click.echo(json.dumps(report, indent=2, sort_keys=True))
+		else:
+			summary = report["summary"]
+			status = "OK" if report["ok"] else "FAILED"
+			click.echo(
+				f"APG evidence fixtures {status}: "
+				f"{summary['passing_fixture_count']}/{summary['fixture_count']} fixtures, "
+				f"{summary['target_run_count']} target runs, "
+				f"{summary['blocking_gap_count']} blocking gaps"
+			)
+		if not report["ok"]:
+			raise click.exceptions.Exit(1)
+		return
+	if source_file is None:
+		raise click.ClickException("Specify an APG source file or use --audit-fixtures")
 	if not source_file.exists():
 		raise click.ClickException(f"APG source file not found: {source_file}")
 	if not source_file.is_file():

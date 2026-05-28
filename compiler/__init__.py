@@ -22,7 +22,7 @@ from .ast_builder import ASTBuilder
 from .baseline import build_compiler_baseline_report
 from .capability_publish import build_capability_publish_report
 from .deployment_verifier import build_deployment_verification_report
-from .evidence_bundle import build_release_evidence_bundle
+from .evidence_bundle import audit_release_evidence_fixtures, build_release_evidence_bundle
 from .package_verifier import build_package_verification_report
 from .semantic_analyzer import SemanticAnalyzer
 from .diagnostics import audit_diagnostic_fixtures, diagnostic_registry, explain_diagnostic
@@ -44,6 +44,7 @@ __all__ = [
     'build_compiler_baseline_report',
     'build_capability_publish_report',
     'build_deployment_verification_report',
+    'audit_release_evidence_fixtures',
     'build_release_evidence_bundle',
     'build_package_verification_report',
     'SemanticAnalyzer',

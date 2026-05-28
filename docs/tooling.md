@@ -84,6 +84,9 @@ APG currently has an executable compiler path:
   emits `apg.release-evidence-bundle.v1` by running release evidence, package
   creation, package verification, deployment verification, and side-effect-free
   capability publish planning as one reviewable bundle;
+- `apg evidence --audit-fixtures --json` emits
+  `apg.release-evidence-fixture-audit.v1` by running checked-in verifier
+  fixtures across web, desktop, mobile, and container profiles;
 - `apg language-server <file> --check --json` emits
   `apg.language-server-check.v1` from the shared semantic model and formatter,
   proving editor-facing diagnostics, completions, definitions, references,
@@ -746,6 +749,7 @@ apg package app.apg --target mobile --out dist
 apg package-verify dist/app-mobile --json
 apg deployment verify dist/app-container --json
 apg evidence app.apg --target web --out dist/evidence --json
+apg evidence --audit-fixtures --json
 apg validate
 apg run
 apg doctor
@@ -999,6 +1003,7 @@ requires the deployment graph to be connected and explainable.
 
 ```console
 apg evidence app.apg --target web --out dist/evidence --json
+apg evidence --audit-fixtures --json
 ```
 
 The evidence command emits `apg.release-evidence-bundle.v1`. It builds a
@@ -1007,6 +1012,13 @@ runs deployment verification, and emits side-effect-free capability publish
 planning when the package contains capabilities. This is the preferred release
 review payload because it preserves each lower-level verifier report while
 summarizing whether the full evidence chain is green.
+
+`--audit-fixtures` loads `tests/fixtures/verifiers/catalog.json` and emits
+`apg.release-evidence-fixture-audit.v1`. The audit fails when any required
+package target is not covered by a passing fixture, release/package/deployment
+verifier formats drift, package profile checks fail, capability publish planning
+stops being side-effect-free, or a required verifier behavior tag lacks a
+passing fixture.
 
 ### `apg capabilities`
 
@@ -1354,7 +1366,7 @@ Tooling tests must be fixture-driven and deterministic.
 | Graph tests | ER, lookup, workflow, handler, capability, security, agent, package, deployment graph output, enforced by `apg graph-suite --audit-fixtures --json` and the `apg.graph-fixture-audit.v1` report. |
 | Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios, enforced by `apg migrate-plan --audit-fixtures --json` and the `apg.migration-fixture-audit.v1` report. |
 | Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, rejected unsafe plans. |
-| Verifier tests | Web/mobile/desktop/capability/deployment release evidence contracts. |
+| Verifier tests | Web/mobile/desktop/capability/deployment release evidence contracts, enforced by `apg evidence --audit-fixtures --json` and the `apg.release-evidence-fixture-audit.v1` report. |
 | Drift tests | CLI, LSP, IDE, generator, and tests consume the same semantic model. |
 
 ### Parser Golden Audit
@@ -1394,7 +1406,8 @@ Exit criteria:
   `apg diagnostics --audit-fixtures --json`,
   `apg format --audit-fixtures --json`,
   `apg graph-suite --audit-fixtures --json`,
-  `apg migrate-plan --audit-fixtures --json`, and `apg drift <file> --json`.
+  `apg migrate-plan --audit-fixtures --json`,
+  `apg evidence --audit-fixtures --json`, and `apg drift <file> --json`.
 
 ### Phase 1: Shared Semantic Model MVP
 
