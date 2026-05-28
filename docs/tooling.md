@@ -69,6 +69,10 @@ APG currently has an executable compiler path:
   entrypoint, checking runtime self-test/component-manifest/semantic-model
   evidence, proving deployment artifacts, health checks, environment names,
   secret hygiene, resource hints, and deployment topology;
+- `apg evidence <file> --target web|desktop|mobile|container --out <dir> --json`
+  emits `apg.release-evidence-bundle.v1` by running release evidence, package
+  creation, package verification, deployment verification, and side-effect-free
+  capability publish planning as one reviewable bundle;
 - `apg language-server <file> --check --json` emits
   `apg.language-server-check.v1` from the shared semantic model and formatter,
   proving editor-facing diagnostics, completions, definitions, references,
@@ -717,6 +721,7 @@ apg package app.apg --target desktop --out dist
 apg package app.apg --target mobile --out dist
 apg package-verify dist/app-mobile --json
 apg deployment verify dist/app-container --json
+apg evidence app.apg --target web --out dist/evidence --json
 apg validate
 apg run
 apg doctor
@@ -947,6 +952,19 @@ generated app directory or packaged app directory. It imports the generated
 model, validates deployment artifacts and commands, checks named environment
 variables, rejects literal secret values, verifies Docker/resource hints, and
 requires the deployment graph to be connected and explainable.
+
+### `apg evidence`
+
+```console
+apg evidence app.apg --target web --out dist/evidence --json
+```
+
+The evidence command emits `apg.release-evidence-bundle.v1`. It builds a
+package profile, attaches `apg.release-report.v1`, runs package verification,
+runs deployment verification, and emits side-effect-free capability publish
+planning when the package contains capabilities. This is the preferred release
+review payload because it preserves each lower-level verifier report while
+summarizing whether the full evidence chain is green.
 
 ### `apg capabilities`
 

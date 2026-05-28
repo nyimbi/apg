@@ -1768,6 +1768,36 @@ def test_cli_package_verify_reports_mobile_profile_evidence(tmp_path):
 	}
 
 
+def test_cli_evidence_json_builds_release_bundle(tmp_path):
+	source = REPO_ROOT / "examples" / "08_basic_capability_contract" / "main.apg"
+	out_dir = tmp_path / "evidence"
+
+	result = CliRunner().invoke(
+		cli,
+		["evidence", str(source), "--target", "web", "--out", str(out_dir), "--json"],
+	)
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.release-evidence-bundle.v1"
+	assert report["ok"] is True
+	assert report["checks"] == {
+		"release_ok": True,
+		"package_ok": True,
+		"package_verification_ok": True,
+		"deployment_verification_ok": True,
+		"capability_publish_plan_ok": True,
+	}
+	assert report["release"]["format"] == "apg.release-report.v1"
+	assert report["package"]["format"] == "apg.package-report.v1"
+	assert report["package_verification"]["format"] == "apg.package-verification-report.v1"
+	assert report["deployment_verification"]["format"] == "apg.deployment-verification-report.v1"
+	assert report["capability_publish"]["format"] == "apg.capability-publish-report.v1"
+	assert report["capability_publish"]["side_effect_free"] is True
+	assert report["capability_publish"]["capabilities"] == ["AuditLog"]
+	assert Path(report["package"]["output_dir"]).exists()
+
+
 def test_cli_nl_plan_json_proposes_valid_credit_memo_dsl_diff_without_writing(tmp_path):
 	source = tmp_path / "finance.apg"
 	output = tmp_path / "generated"

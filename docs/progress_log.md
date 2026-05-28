@@ -7868,3 +7868,24 @@ Battery-conscious verification:
 - `.venv/bin/apg package examples/16_hr_payroll_operations/main.apg --target mobile --out /private/tmp/apg_package_verify_smoke --json` passed and wrote a verified mobile package.
 - `.venv/bin/apg package-verify /private/tmp/apg_package_verify_smoke/hr_payroll_operations-mobile` passed with all mobile profile checks green.
 - `git diff --check -- compiler/package_verifier.py cli/package_verify_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `83a749b` (`Make package profile verification executable`).
+
+### 2026-05-28 21:51 EAT
+
+In progress:
+
+- Added a full release evidence bundle command so lower-level release/package/deployment/capability evidence can be reviewed as one machine-readable payload.
+- Added `compiler.evidence_bundle.build_release_evidence_bundle()` and `apg evidence <file> --target <profile> --out <dir> --json`.
+- Evidence bundles now run release evidence, package creation, package verification, deployment verification, and side-effect-free capability publish planning.
+- Updated `docs/tooling.md` so `apg.release-evidence-bundle.v1` is documented as a current executable contract.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/evidence_bundle.py cli/evidence_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_evidence_json_builds_release_bundle -q` passed with 1 test.
+- `.venv/bin/apg evidence examples/08_basic_capability_contract/main.apg --target web --out /private/tmp/apg_evidence_bundle_smoke --json` passed with release, package, package verification, deployment verification, and capability publish-plan checks all green.
+- `.venv/bin/apg evidence examples/08_basic_capability_contract/main.apg --target web --out /private/tmp/apg_evidence_bundle_smoke` passed in text mode with all checks green.
+- `git diff --check -- compiler/evidence_bundle.py cli/evidence_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.

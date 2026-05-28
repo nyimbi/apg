@@ -25,6 +25,7 @@ from cli.compile_command import compile_cmd
 from cli.deployment_command import deployment
 from cli.diagnostics_command import diagnostics
 from cli.drift_command import drift
+from cli.evidence_command import evidence
 from cli.explain_command import explain
 from cli.format_command import format_cmd
 from cli.graph_command import graph, graph_suite
@@ -64,6 +65,7 @@ cli.add_command(compile_cmd, name='compile')
 cli.add_command(deployment)
 cli.add_command(diagnostics)
 cli.add_command(drift)
+cli.add_command(evidence)
 cli.add_command(explain)
 cli.add_command(format_cmd)
 cli.add_command(graph)
