@@ -7065,3 +7065,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_python_app_serves_entity_record_endpoints tests/test_compiler_baseline.py::test_generated_python_app_validates_records_from_entity_fields -q` -> 2 passed
 - `git diff --check -- compiler/code_generator.py tests/test_compiler_baseline.py docs/progress_log.md`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 16:18 EAT
+
+Completed checkpoint:
+
+- Added generated OpenAPI component schemas for AI agent invocation, capability rule evaluation, configuration resolution/validation, approval planning, and ByteWax streaming contracts.
+- Generated OpenAPI now advertises capability-scoped operation routes such as `POST /capabilities/{Capability}/rules/evaluate`, configuration resolve/validate, and approval planning instead of only documenting the generic routes.
+- Added focused regression coverage proving AI agent/team invocation routes and capability operation routes expose typed JSON request/response contracts.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/python -m pytest tests/test_ai_agent_composition.py::test_generated_app_manifest_includes_ai_agents_and_teams tests/test_capability_composition_runtime.py::test_generated_app_executes_capability_operations_over_http -q` -> 2 passed
+- `git diff --check -- compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py docs/progress_log.md`
+- Deferred broader pytest at the user's request to conserve battery.

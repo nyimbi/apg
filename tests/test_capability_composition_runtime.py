@@ -587,6 +587,22 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
     assert "/streaming" in openapi["paths"]
     assert "/theme.css" in openapi["paths"]
     assert "/capabilities/GeneralLedger/streaming" in openapi["paths"]
+    assert "/capabilities/GeneralLedger/rules/evaluate" in openapi["paths"]
+    assert "/capabilities/GeneralLedger/configuration/resolve" in openapi["paths"]
+    assert "/capabilities/GeneralLedger/configuration/validate" in openapi["paths"]
+    assert "/capabilities/GeneralLedger/approval/plan" in openapi["paths"]
+    assert openapi["paths"]["/streaming"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/StreamingTopology"
+    }
+    assert openapi["paths"]["/capabilities/GeneralLedger/rules/evaluate"]["post"]["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/RuleEvaluationRequest"
+    }
+    assert openapi["paths"]["/capabilities/GeneralLedger/configuration/resolve"]["post"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/CapabilityConfigurationResponse"
+    }
+    assert openapi["paths"]["/capabilities/GeneralLedger/approval/plan"]["post"]["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ApprovalPlanRequest"
+    }
     assert streaming["processor"] == "bytewax"
     assert streaming["processors"] == {"bytewax": ["GeneralLedger"]}
     assert streaming["states"] == {"ledger_posting_state": ["GeneralLedger"]}

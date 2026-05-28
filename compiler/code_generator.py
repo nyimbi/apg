@@ -1021,6 +1021,111 @@ def _database_openapi_schemas() -> Dict[str, Any]:
             }},
             "required": ["routes"],
         }},
+        "AgentInvocationRequest": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "message": {{"type": "string"}},
+                "payload": generic_object,
+                "context": generic_object,
+            }},
+        }},
+        "AgentInvocationResponse": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "agent": {{"type": "string"}},
+                "team": {{"type": "string"}},
+                "runtime": {{"type": "string"}},
+                "status": {{"type": "string"}},
+                "result": {{"oneOf": [generic_object, {{"type": "string"}}, {{"type": "null"}}]}},
+                "payload": generic_object,
+            }},
+        }},
+        "RuleEvaluationRequest": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "capability": {{"type": "string"}},
+                "capability_name": {{"type": "string"}},
+                "context": generic_object,
+            }},
+            "required": ["context"],
+        }},
+        "RuleEvaluationResult": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "decision": {{"type": "string"}},
+                "matched_rules": {{"type": "array", "items": {{"type": "string"}}}},
+                "actions": {{"type": "array", "items": generic_object}},
+                "context": generic_object,
+            }},
+        }},
+        "CapabilityConfigurationRequest": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "capability": {{"type": "string"}},
+                "capability_name": {{"type": "string"}},
+                "configuration": generic_object,
+                "overrides": generic_object,
+            }},
+        }},
+        "CapabilityConfigurationResponse": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "capability": {{"type": "string"}},
+                "configuration": generic_object,
+                "errors": {{"type": "array", "items": {{"type": "string"}}}},
+                "warnings": {{"type": "array", "items": {{"type": "string"}}}},
+            }},
+        }},
+        "ApprovalPlanRequest": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "capability": {{"type": "string"}},
+                "capability_name": {{"type": "string"}},
+                "context": generic_object,
+            }},
+            "required": ["context"],
+        }},
+        "ApprovalPlanResponse": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "capability": {{"type": "string"}},
+                "required": {{"type": "boolean"}},
+                "levels": {{"type": "integer"}},
+                "approvers": {{"type": "array", "items": {{"type": "string"}}}},
+                "thresholds": generic_object,
+                "segregation_of_duties": {{"type": "boolean"}},
+                "escalation": {{"oneOf": [{{"type": "string"}}, generic_object, {{"type": "null"}}]}},
+            }},
+        }},
+        "StreamingTopology": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "processor": {{"type": "string"}},
+                "processors": {{"type": "object", "additionalProperties": {{"type": "array", "items": {{"type": "string"}}}}}},
+                "states": {{"type": "object", "additionalProperties": {{"type": "array", "items": {{"type": "string"}}}}}},
+                "streams": {{"type": "object", "additionalProperties": generic_object}},
+            }},
+            "required": ["processor", "processors", "states", "streams"],
+        }},
+        "CapabilityStreamingContract": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "processor": {{"type": "string"}},
+                "state": {{"type": "string"}},
+                "input": generic_object,
+                "output": generic_object,
+            }},
+        }},
         "EventRecord": {{
             "type": "object",
             "additionalProperties": True,
@@ -1281,15 +1386,27 @@ def openapi_document() -> Dict[str, Any]:
                 "get": _api_operation(f"{{entity_name}} database schemas", "Database schema metadata", response_schema=_schema_ref("DatabaseSchemaCatalog")),
             }}
     if APG_CAPABILITIES is not None:
-        paths["/rules/evaluate"] = {{"post": _api_operation("Evaluate capability rules", "Rule decision", request_body=True)}}
-        paths["/configuration/resolve"] = {{"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True)}}
-        paths["/configuration/validate"] = {{"post": _api_operation("Validate capability configuration", "Configuration validation", request_body=True)}}
-        paths["/approval/plan"] = {{"post": _api_operation("Plan capability approvals", "Approval plan", request_body=True)}}
-        paths["/streaming"] = {{"get": _api_operation("Streaming topology", "ByteWax streaming topology")}}
+        paths["/rules/evaluate"] = {{"post": _api_operation("Evaluate capability rules", "Rule decision", request_body=True, request_schema=_schema_ref("RuleEvaluationRequest"), response_schema=_schema_ref("RuleEvaluationResult"))}}
+        paths["/configuration/resolve"] = {{"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True, request_schema=_schema_ref("CapabilityConfigurationRequest"), response_schema=_schema_ref("CapabilityConfigurationResponse"))}}
+        paths["/configuration/validate"] = {{"post": _api_operation("Validate capability configuration", "Configuration validation", request_body=True, request_schema=_schema_ref("CapabilityConfigurationRequest"), response_schema=_schema_ref("CapabilityConfigurationResponse"))}}
+        paths["/approval/plan"] = {{"post": _api_operation("Plan capability approvals", "Approval plan", request_body=True, request_schema=_schema_ref("ApprovalPlanRequest"), response_schema=_schema_ref("ApprovalPlanResponse"))}}
+        paths["/streaming"] = {{"get": _api_operation("Streaming topology", "ByteWax streaming topology", response_schema=_schema_ref("StreamingTopology"))}}
         if hasattr(APG_CAPABILITIES, "list_capabilities"):
             for capability_name in APG_CAPABILITIES.list_capabilities():
                 paths[f"/capabilities/{{capability_name}}/streaming"] = {{
-                    "get": _api_operation(f"{{capability_name}} streaming contract", "Capability streaming contract"),
+                    "get": _api_operation(f"{{capability_name}} streaming contract", "Capability streaming contract", response_schema=_schema_ref("CapabilityStreamingContract")),
+                }}
+                paths[f"/capabilities/{{capability_name}}/rules/evaluate"] = {{
+                    "post": _api_operation(f"Evaluate {{capability_name}} rules", "Rule decision", request_body=True, request_schema=_schema_ref("RuleEvaluationRequest"), response_schema=_schema_ref("RuleEvaluationResult")),
+                }}
+                paths[f"/capabilities/{{capability_name}}/configuration/resolve"] = {{
+                    "post": _api_operation(f"Resolve {{capability_name}} configuration", "Resolved configuration", request_body=True, request_schema=_schema_ref("CapabilityConfigurationRequest"), response_schema=_schema_ref("CapabilityConfigurationResponse")),
+                }}
+                paths[f"/capabilities/{{capability_name}}/configuration/validate"] = {{
+                    "post": _api_operation(f"Validate {{capability_name}} configuration", "Configuration validation", request_body=True, request_schema=_schema_ref("CapabilityConfigurationRequest"), response_schema=_schema_ref("CapabilityConfigurationResponse")),
+                }}
+                paths[f"/capabilities/{{capability_name}}/approval/plan"] = {{
+                    "post": _api_operation(f"Plan {{capability_name}} approvals", "Approval plan", request_body=True, request_schema=_schema_ref("ApprovalPlanRequest"), response_schema=_schema_ref("ApprovalPlanResponse")),
                 }}
         route_index = getattr(APG_CAPABILITIES, "ui_route_index", None)
         if route_index is not None:
@@ -1298,11 +1415,11 @@ def openapi_document() -> Dict[str, Any]:
     if AI_AGENTS is not None:
         for agent_name in describe_application().get("ai_agents", []):
             paths[f"/agents/{{agent_name}}/invoke"] = {{
-                "post": _api_operation(f"Invoke agent {{agent_name}}", "Agent invocation result", request_body=True),
+                "post": _api_operation(f"Invoke agent {{agent_name}}", "Agent invocation result", request_body=True, request_schema=_schema_ref("AgentInvocationRequest"), response_schema=_schema_ref("AgentInvocationResponse")),
             }}
         for team_name in describe_application().get("ai_agent_teams", []):
             paths[f"/agent-teams/{{team_name}}/invoke"] = {{
-                "post": _api_operation(f"Invoke agent team {{team_name}}", "Agent team invocation result", request_body=True),
+                "post": _api_operation(f"Invoke agent team {{team_name}}", "Agent team invocation result", request_body=True, request_schema=_schema_ref("AgentInvocationRequest"), response_schema=_schema_ref("AgentInvocationResponse")),
             }}
     if APG_APPLICATIONS is not None:
         route_index = getattr(APG_APPLICATIONS, "application_route_index", None)

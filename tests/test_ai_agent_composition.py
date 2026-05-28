@@ -227,6 +227,7 @@ def test_generated_app_manifest_includes_ai_agents_and_teams():
         manifest = app.describe_application()
         validation = app.validate_application()
         restricted_validation = app.validate_application(["local"])
+        openapi = app.openapi_document()
     finally:
         sys.modules.pop("ai_agents", None)
 
@@ -245,6 +246,15 @@ def test_generated_app_manifest_includes_ai_agents_and_teams():
         "ai_agent_runtimes: Planner references unavailable runtime codex"
     ]
     assert json.loads(json.dumps(validation))["name"] == "support"
+    assert openapi["paths"]["/agents/Planner/invoke"]["post"]["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/AgentInvocationRequest"
+    }
+    assert openapi["paths"]["/agents/Planner/invoke"]["post"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/AgentInvocationResponse"
+    }
+    assert openapi["paths"]["/agent-teams/SupportCrew/invoke"]["post"]["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/AgentInvocationRequest"
+    }
 
 
 def test_generated_ui_exposes_agent_invocation_console():
