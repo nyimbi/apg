@@ -5284,4 +5284,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push for the generated record API slice.
+- Pushed commit `0b4f738` (`Serve generated app records immediately`) to `origin/main`.
