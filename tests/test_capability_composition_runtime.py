@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import re
 import sys
 import types
@@ -211,6 +212,14 @@ def test_capability_declaration_generates_runtime_manifest():
     ]
     assert json.loads(json.dumps(capability_description))["name"] == "GeneralLedger"
     assert namespace["capabilities_by_erp_module"]()["general_ledger"][0].name == "GeneralLedger"
+    assert namespace["capability_names_by_erp_module"]() == {
+        "accounts_payable": ["GeneralLedger"],
+        "finance": ["GeneralLedger"],
+        "general_ledger": ["GeneralLedger"],
+    }
+    grouped_descriptions = namespace["describe_capabilities_by_erp_module"]()
+    assert grouped_descriptions["finance"][0]["name"] == "GeneralLedger"
+    assert json.loads(json.dumps(grouped_descriptions))["general_ledger"][0]["name"] == "GeneralLedger"
     assert namespace["provided_services"]()["journal_entries"] == ["GeneralLedger"]
 
     assert namespace["capability_configuration"]("GeneralLedger") == {
@@ -380,7 +389,39 @@ def test_generated_app_manifest_includes_capability_descriptions():
         "currency": "KES",
         "fiscal_calendar": "monthly",
     }
+    assert manifest["capability_descriptions_by_erp_module"]["finance"][0]["name"] == "GeneralLedger"
     assert json.loads(json.dumps(manifest))["capability_descriptions"]["GeneralLedger"]["name"] == "GeneralLedger"
+
+
+def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
+    result = APGCompiler().compile_string(CAPABILITY_SOURCE, "erp_ops.apg")
+    assert result.success is True
+
+    package_dir = tmp_path / "erp_ops_generated"
+    package_dir.mkdir()
+    for filename, content in result.generated_files.items():
+        (package_dir / filename).write_text(content, encoding="utf-8")
+
+    spec = importlib.util.spec_from_file_location(
+        "erp_ops_generated",
+        package_dir / "__init__.py",
+        submodule_search_locations=[str(package_dir)],
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["erp_ops_generated"] = module
+    try:
+        spec.loader.exec_module(module)
+        grouped = module.describe_capabilities_by_erp_module()
+    finally:
+        sys.modules.pop("erp_ops_generated", None)
+        for name in list(sys.modules):
+            if name.startswith("erp_ops_generated."):
+                sys.modules.pop(name, None)
+
+    assert grouped["finance"][0]["name"] == "GeneralLedger"
+    assert module.capability_names_by_erp_module()["general_ledger"] == ["GeneralLedger"]
+    assert "describe_capabilities_by_erp_module" in module.__all__
+    assert json.loads(json.dumps(grouped))["accounts_payable"][0]["name"] == "GeneralLedger"
 
 
 def test_capability_dependency_planning_uses_provides_requires_contracts():

@@ -5108,3 +5108,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `114683c` (`Enrich generated app manifests`) to `origin/main`.
+
+### 2026-05-28 05:33 EAT
+
+In-progress checkpoint:
+
+- Added generated capability runtime helpers for JSON-safe ERP-module grouping while preserving the typed `capabilities_by_erp_module()` accessor.
+- Generated `capability_names_by_erp_module()` returns sorted capability names per ERP module.
+- Generated `describe_capabilities_by_erp_module()` returns serializable capability description dictionaries per ERP module.
+- Enriched generated `app.py` manifests with `capability_descriptions_by_erp_module` when `apg_capabilities.py` provides it.
+- Reexported the grouped capability helpers from generated package `__init__.py`.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 7 passed
+- Direct generated app manifest smoke -> `capability_descriptions_by_erp_module["general_ledger"][0]["name"]` returned `GeneralLedger` and JSON round-trip preserved grouped data.
+- `git diff --check -- compiler/code_generator.py tests/test_capability_composition_runtime.py docs/progress_log.md` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending.

@@ -253,6 +253,8 @@ def describe_application() -> Dict[str, Any]:
         description["capabilities"] = APG_CAPABILITIES.list_capabilities()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capabilities"):
         description["capability_descriptions"] = APG_CAPABILITIES.describe_capabilities()
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capabilities_by_erp_module"):
+        description["capability_descriptions_by_erp_module"] = APG_CAPABILITIES.describe_capabilities_by_erp_module()
     return description
 
 
@@ -431,6 +433,20 @@ def capabilities_by_erp_module() -> Dict[str, List[CapabilitySpec]]:
         for module_name in capability.erp_modules:
             grouped.setdefault(module_name, []).append(capability)
     return grouped
+
+
+def capability_names_by_erp_module() -> Dict[str, List[str]]:
+    return {{
+        module_name: sorted(capability.name for capability in capabilities)
+        for module_name, capabilities in sorted(capabilities_by_erp_module().items())
+    }}
+
+
+def describe_capabilities_by_erp_module() -> Dict[str, List[Dict[str, Any]]]:
+    return {{
+        module_name: [describe_capability(name) for name in capability_names]
+        for module_name, capability_names in capability_names_by_erp_module().items()
+    }}
 
 
 def provided_services() -> Dict[str, List[str]]:
@@ -1607,7 +1623,9 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'try:',
 			'    from .apg_capabilities import (',
 			'        describe_capabilities,',
+			'        describe_capabilities_by_erp_module,',
 			'        describe_capability,',
+			'        capability_names_by_erp_module,',
 			'        get_capability,',
 			'        list_capabilities,',
 			'    )',
@@ -1616,7 +1634,9 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'else:',
 			'    __all__.extend([',
 			'        "describe_capabilities",',
+			'        "describe_capabilities_by_erp_module",',
 			'        "describe_capability",',
+			'        "capability_names_by_erp_module",',
 			'        "get_capability",',
 			'        "list_capabilities",',
 			'    ])',
