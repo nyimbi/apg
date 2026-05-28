@@ -10,7 +10,9 @@ from .semantic_model import build_semantic_model
 
 
 MIGRATION_PLAN_FORMAT = "apg.migration-plan.v1"
+MIGRATION_FIXTURE_AUDIT_FORMAT = "apg.migration-fixture-audit.v1"
 SUPPORTED_MIGRATION_BACKENDS = ("postgresql", "mysql", "sqlite", "compatible")
+DEFAULT_MIGRATION_FIXTURE_CATALOG = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "migrations" / "catalog.json"
 
 
 def build_migration_plan(
@@ -56,6 +58,133 @@ def build_migration_plan(
 		"summary": _summary(changes),
 		"diagnostics": diagnostics,
 	}
+
+
+def audit_migration_fixtures(catalog_path: Path | None = None) -> dict[str, Any]:
+	"""Run the checked-in migration planner fixture catalog."""
+	catalog_file = Path(catalog_path or DEFAULT_MIGRATION_FIXTURE_CATALOG)
+	catalog_root = catalog_file.parent
+	catalog = json.loads(catalog_file.read_text(encoding="utf-8"))
+	required_tags = sorted(str(tag) for tag in catalog.get("tags_required", []))
+	fixture_reports: list[dict[str, Any]] = []
+	blocking_gaps: list[dict[str, Any]] = []
+	covered_tags: set[str] = set()
+
+	for fixture in catalog.get("fixtures", []):
+		report = _audit_migration_fixture(catalog_root, fixture)
+		fixture_reports.append(report)
+		if report["ok"]:
+			covered_tags.update(report["tags"])
+		else:
+			blocking_gaps.append({
+				"id": report["id"],
+				"previous": report["previous"],
+				"current": report["current"],
+				"errors": report["errors"],
+			})
+
+	missing_tags = sorted(set(required_tags).difference(covered_tags))
+	for tag in missing_tags:
+		blocking_gaps.append({
+			"id": f"missing_tag:{tag}",
+			"previous": str(catalog_file),
+			"current": str(catalog_file),
+			"errors": [f"required migration fixture tag {tag!r} is not covered by a passing fixture"],
+		})
+
+	return {
+		"format": MIGRATION_FIXTURE_AUDIT_FORMAT,
+		"ok": not blocking_gaps,
+		"fixture_catalog": str(catalog_file),
+		"tags_required": required_tags,
+		"tags_covered": sorted(covered_tags),
+		"missing_tags": missing_tags,
+		"fixtures": fixture_reports,
+		"summary": {
+			"fixture_count": len(fixture_reports),
+			"passing_fixture_count": sum(1 for report in fixture_reports if report["ok"]),
+			"failing_fixture_count": sum(1 for report in fixture_reports if not report["ok"]),
+			"blocking_gap_count": len(blocking_gaps),
+		},
+		"blocking_gaps": blocking_gaps,
+	}
+
+
+def _audit_migration_fixture(catalog_root: Path, fixture: dict[str, Any]) -> dict[str, Any]:
+	fixture_id = str(fixture["id"])
+	previous = (catalog_root / str(fixture["previous"])).resolve()
+	current = (catalog_root / str(fixture["current"])).resolve()
+	backend = str(fixture.get("backend", "postgresql"))
+	rename_hints = {str(key): str(value) for key, value in dict(fixture.get("rename_hints", {})).items()}
+	tags = sorted(str(tag) for tag in fixture.get("tags", []))
+	errors: list[str] = []
+	report: dict[str, Any] | None = None
+
+	try:
+		report = build_migration_plan(previous, current, backend=backend, rename_hints=rename_hints)
+	except Exception as error:
+		errors.append(str(error))
+
+	if report is None:
+		return {
+			"id": fixture_id,
+			"previous": str(previous),
+			"current": str(current),
+			"backend": backend,
+			"tags": tags,
+			"change_kinds": [],
+			"diagnostic_codes": [],
+			"ok": False,
+			"errors": errors,
+		}
+
+	_expected_bool(fixture, report, "ok", errors)
+	_expected_bool(fixture, report, "destructive", errors)
+	_expected_bool(fixture, report, "requires_approval", errors)
+
+	changes = {
+		(str(change.get("kind")), str(change.get("symbol"))): change
+		for change in report.get("changes", [])
+	}
+	for expected_change in fixture.get("expected_changes", []):
+		kind = str(expected_change.get("kind"))
+		symbol = str(expected_change.get("symbol"))
+		change = changes.get((kind, symbol))
+		if change is None:
+			errors.append(f"missing change {kind} {symbol}")
+			continue
+		for key, expected_value in expected_change.items():
+			if key in {"kind", "symbol"}:
+				continue
+			if change.get(key) != expected_value:
+				errors.append(f"change {kind} {symbol} expected {key}={expected_value!r}, got {change.get(key)!r}")
+
+	diagnostic_codes = {str(diagnostic.get("code")) for diagnostic in report.get("diagnostics", [])}
+	for code in fixture.get("expected_diagnostics", []):
+		if str(code) not in diagnostic_codes:
+			errors.append(f"missing diagnostic {code}")
+
+	return {
+		"id": fixture_id,
+		"previous": str(previous),
+		"current": str(current),
+		"backend": backend,
+		"tags": tags,
+		"change_kinds": sorted({str(change.get("kind")) for change in report.get("changes", [])}),
+		"diagnostic_codes": sorted(diagnostic_codes),
+		"ok": not errors,
+		"errors": errors,
+	}
+
+
+def _expected_bool(fixture: dict[str, Any], report: dict[str, Any], key: str, errors: list[str]) -> None:
+	expected_key = f"expected_{key}"
+	if expected_key not in fixture:
+		return
+	expected_value = bool(fixture[expected_key])
+	actual_value = bool(report.get(key))
+	if actual_value != expected_value:
+		errors.append(f"expected {key}={expected_value}, got {actual_value}")
 
 
 def _load_model(value: Path | dict[str, Any]) -> dict[str, Any]:

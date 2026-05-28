@@ -7931,3 +7931,23 @@ Battery-conscious verification:
 - `.venv/bin/apg graph-suite --audit-fixtures` passed in text mode.
 - `.venv/bin/python -m py_compile compiler/graphs.py cli/graph_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_graph_json_emits_entity_relationship_graph tests/test_compiler_baseline.py::test_cli_graph_infers_conventional_foreign_key_edges tests/test_compiler_baseline.py::test_cli_graph_mermaid_and_dot_outputs_are_renderable tests/test_compiler_baseline.py::test_cli_graph_suite_json_emits_all_supported_renderings tests/test_compiler_baseline.py::test_cli_graph_suite_text_summarizes_graph_counts tests/test_compiler_baseline.py::test_cli_graph_suite_audits_fixture_catalog -q` passed with 6 tests.
+
+Commit result:
+
+- Pushed commit `c2a8308` (`Make graph contracts fixture-audited`).
+
+### 2026-05-28 22:16 EAT
+
+In progress:
+
+- Turned migration planning behavior into a checked-in fixture audit.
+- Added `apg migrate-plan --audit-fixtures --json`, emitting `apg.migration-fixture-audit.v1`.
+- Added migration fixtures for destructive schema review, required-field backfill, type-change diagnostics, capability table ownership transfer, and non-destructive additive table changes.
+- Updated `docs/tooling.md` so the executable baseline, migration CLI contract, test strategy, and Phase 0 fixture gate include the migration fixture audit.
+
+Battery-conscious verification:
+
+- `.venv/bin/apg migrate-plan --audit-fixtures --json` passed with 2 fixtures, 2 passing fixtures, 0 missing tags, and 0 blocking gaps.
+- `.venv/bin/apg migrate-plan --audit-fixtures` passed in text mode.
+- `.venv/bin/python -m py_compile compiler/migrations.py cli/migrate_plan_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_migrate_plan_json_detects_destructive_schema_and_ownership_changes tests/test_compiler_baseline.py::test_cli_migrate_plan_json_allows_additive_table_changes tests/test_compiler_baseline.py::test_cli_migrate_plan_audits_fixture_catalog -q` passed with 3 tests.

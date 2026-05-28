@@ -1910,6 +1910,24 @@ def test_cli_migrate_plan_json_allows_additive_table_changes(tmp_path):
 	assert report["changes"][0]["symbol"] == "table.Note"
 
 
+def test_cli_migrate_plan_audits_fixture_catalog():
+	result = CliRunner().invoke(cli, ["migrate-plan", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.migration-fixture-audit.v1"
+	assert report["ok"] is True
+	assert report["missing_tags"] == []
+	assert report["blocking_gaps"] == []
+	assert report["summary"]["fixture_count"] >= 2
+	assert report["summary"]["failing_fixture_count"] == 0
+	assert {"add_table", "drop_field", "type_change", "ownership_transfer"}.issubset(report["tags_covered"])
+	destructive = next(fixture for fixture in report["fixtures"] if fixture["id"] == "customer_destructive_review")
+	assert {"APG1101", "APG1103", "APG1104", "APG1106"}.issubset(destructive["diagnostic_codes"])
+	additive = next(fixture for fixture in report["fixtures"] if fixture["id"] == "additive_note_table")
+	assert additive["change_kinds"] == ["add_table"]
+
+
 def test_checked_in_example_outputs_match_current_compiler():
 	examples = sorted((REPO_ROOT / "examples").glob("[0-9][0-9]_*/main.apg"))
 	assert len(examples) == 20

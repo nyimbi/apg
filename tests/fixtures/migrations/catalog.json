@@ -1,0 +1,76 @@
+{
+  "format": "apg.migration-fixture-catalog.v1",
+  "tags_required": [
+    "add_table",
+    "add_field",
+    "drop_field",
+    "type_change",
+    "backfill_required",
+    "ownership_transfer",
+    "destructive_review",
+    "non_destructive_additive"
+  ],
+  "fixtures": [
+    {
+      "id": "customer_destructive_review",
+      "previous": "customer_destructive_review/previous.apg",
+      "current": "customer_destructive_review/current.apg",
+      "backend": "postgresql",
+      "expected_ok": false,
+      "expected_destructive": true,
+      "expected_requires_approval": true,
+      "expected_diagnostics": ["APG1101", "APG1103", "APG1104", "APG1106"],
+      "expected_changes": [
+        {
+          "kind": "add_table",
+          "symbol": "table.Invoice"
+        },
+        {
+          "kind": "add_field",
+          "symbol": "field.Customer.email",
+          "requires_backfill": true
+        },
+        {
+          "kind": "drop_field",
+          "symbol": "field.Customer.legacy_code",
+          "destructive": true
+        },
+        {
+          "kind": "type_change",
+          "symbol": "field.Customer.age",
+          "destructive": true
+        },
+        {
+          "kind": "capability_ownership_transfer",
+          "symbol": "table.Customer",
+          "requires_approval": true
+        }
+      ],
+      "tags": [
+        "add_table",
+        "add_field",
+        "drop_field",
+        "type_change",
+        "backfill_required",
+        "ownership_transfer",
+        "destructive_review"
+      ]
+    },
+    {
+      "id": "additive_note_table",
+      "previous": "additive_note_table/previous.apg",
+      "current": "additive_note_table/current.apg",
+      "backend": "mysql",
+      "expected_ok": true,
+      "expected_destructive": false,
+      "expected_requires_approval": false,
+      "expected_changes": [
+        {
+          "kind": "add_table",
+          "symbol": "table.Note"
+        }
+      ],
+      "tags": ["add_table", "non_destructive_additive"]
+    }
+  ]
+}

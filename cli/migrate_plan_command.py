@@ -8,7 +8,7 @@ from pathlib import Path
 
 import click
 
-from compiler.migrations import SUPPORTED_MIGRATION_BACKENDS, build_migration_plan
+from compiler.migrations import SUPPORTED_MIGRATION_BACKENDS, audit_migration_fixtures, build_migration_plan
 
 
 def _parse_rename_hint(_ctx: click.Context, _param: click.Parameter, values: tuple[str, ...]) -> dict[str, str]:
@@ -26,8 +26,10 @@ def _parse_rename_hint(_ctx: click.Context, _param: click.Parameter, values: tup
 
 
 @click.command(name="migrate-plan")
-@click.argument("previous", type=click.Path(path_type=Path))
-@click.argument("current", type=click.Path(path_type=Path))
+@click.argument("previous", required=False, type=click.Path(path_type=Path))
+@click.argument("current", required=False, type=click.Path(path_type=Path))
+@click.option("--audit-fixtures", is_flag=True, help="Audit checked-in migration planner fixtures")
+@click.option("--fixtures", type=click.Path(path_type=Path), default=None, help="Migration fixture catalog path")
 @click.option(
 	"--backend",
 	default="postgresql",
@@ -41,8 +43,35 @@ def _parse_rename_hint(_ctx: click.Context, _param: click.Parameter, values: tup
 	help="Confirm a rename candidate as OLD=NEW, for example table.Customer=Client",
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.migration-plan.v1 JSON")
-def migrate_plan(previous: Path, current: Path, backend: str, rename_hint: dict[str, str], as_json: bool) -> None:
+def migrate_plan(
+	previous: Path | None,
+	current: Path | None,
+	audit_fixtures: bool,
+	fixtures: Path | None,
+	backend: str,
+	rename_hint: dict[str, str],
+	as_json: bool,
+) -> None:
 	"""Compare previous/current APG sources or semantic-model JSON files."""
+	if audit_fixtures:
+		if previous is not None or current is not None or rename_hint:
+			raise click.ClickException("--audit-fixtures cannot be combined with migration inputs or --rename-hint")
+		report = audit_migration_fixtures(fixtures)
+		if as_json:
+			click.echo(json.dumps(report, indent=2, sort_keys=True))
+		else:
+			summary = report["summary"]
+			status = "OK" if report["ok"] else "FAILED"
+			click.echo(
+				f"APG migration fixtures {status}: "
+				f"{summary['passing_fixture_count']}/{summary['fixture_count']} passing, "
+				f"{summary['blocking_gap_count']} blocking gaps"
+			)
+		if not report["ok"]:
+			raise click.exceptions.Exit(1)
+		return
+	if previous is None or current is None:
+		raise click.ClickException("Specify previous/current migration inputs or use --audit-fixtures")
 	for path in (previous, current):
 		if not path.exists():
 			raise click.ClickException(f"Migration input not found: {path}")

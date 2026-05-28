@@ -1,0 +1,22 @@
+module migration_current version 1.0.0 {
+  description: "Migration current";
+}
+
+table Customer {
+  name: str;
+  email: str;
+  age: float;
+}
+
+table Invoice {
+  customer_id: int;
+  total: float;
+}
+
+capability Billing {
+  contract: {
+    id: billing,
+    provides: [invoice_generation],
+    configuration: {owned_tables: [Customer, Invoice]}
+  };
+}

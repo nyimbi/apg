@@ -1,0 +1,8 @@
+module additive_previous version 1.0.0 {
+  description: "Additive migration previous";
+}
+
+table Customer {
+  name: str;
+  email: str;
+}

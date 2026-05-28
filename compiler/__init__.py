@@ -34,7 +34,7 @@ from .parser_golden import audit_parser_golden
 from .packager import build_package_report
 from .release import build_release_report
 from .nl_plan import build_nl_plan
-from .migrations import build_migration_plan
+from .migrations import audit_migration_fixtures, build_migration_plan
 from .code_generator import CodeGenerator
 from .compiler import APGCompiler
 
@@ -61,6 +61,7 @@ __all__ = [
     'build_package_report',
     'build_release_report',
     'build_nl_plan',
+    'audit_migration_fixtures',
     'build_migration_plan',
     'CodeGenerator',
     'APGCompiler',

@@ -1,0 +1,12 @@
+module additive_current version 1.0.0 {
+  description: "Additive migration current";
+}
+
+table Customer {
+  name: str;
+  email: str;
+}
+
+table Note {
+  body: str;
+}

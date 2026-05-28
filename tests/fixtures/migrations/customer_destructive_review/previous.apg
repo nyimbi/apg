@@ -1,0 +1,17 @@
+module migration_previous version 1.0.0 {
+  description: "Migration previous";
+}
+
+table Customer {
+  name: str;
+  age: int;
+  legacy_code: bool;
+}
+
+capability CustomerMaster {
+  contract: {
+    id: customer_master,
+    provides: [customer_master],
+    configuration: {owned_tables: [Customer]}
+  };
+}

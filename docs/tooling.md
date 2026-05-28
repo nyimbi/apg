@@ -64,6 +64,10 @@ APG currently has an executable compiler path:
 - `apg migrate-plan <previous> <current> --json` emits
   `apg.migration-plan.v1` for semantic-model database and capability ownership
   changes;
+- `apg migrate-plan --audit-fixtures --json` emits
+  `apg.migration-fixture-audit.v1` by checking destructive and additive
+  migration fixture pairs against expected changes, diagnostics, approval
+  flags, and backfill requirements;
 - `apg package <file> --target web|desktop|mobile|container --out <dir> --json`
   emits `apg.package-report.v1`, writes a generated Python application package,
   attaches release evidence, and adds profile-specific launch/manifest files;
@@ -735,6 +739,7 @@ apg drift app.apg --json
 apg drift --audit-fixtures --json
 apg nl-plan app.apg --prompt "Add credit memos to accounts receivable" --json
 apg migrate-plan previous.apg current.apg --backend postgresql --json
+apg migrate-plan --audit-fixtures --json
 apg package app.apg --target web --out dist --json
 apg package app.apg --target desktop --out dist
 apg package app.apg --target mobile --out dist
@@ -933,6 +938,7 @@ gate for CI.
 ```console
 apg migrate-plan previous.apg current.apg --backend postgresql --json
 apg migrate-plan previous-model.json current-model.json --backend mysql --json
+apg migrate-plan --audit-fixtures --json
 ```
 
 Emits `apg.migration-plan.v1` by comparing previous and current semantic
@@ -943,6 +949,12 @@ changes, index and directive changes, required-field backfill requirements, and
 capability table ownership transfers. Destructive changes set
 `destructive=true`, `requires_approval=true`, emit `APG1101`/related
 diagnostics, and exit non-zero until explicitly reviewed.
+
+`--audit-fixtures` loads `tests/fixtures/migrations/catalog.json` and emits
+`apg.migration-fixture-audit.v1`. The audit fails when a previous/current
+fixture pair no longer produces expected change records, destructive or
+approval flags drift, required diagnostics disappear, or a required migration
+behavior tag lacks a passing fixture.
 
 ### `apg doctor`
 
@@ -1340,7 +1352,7 @@ Tooling tests must be fixture-driven and deterministic.
 | CLI contract tests | Exit codes, JSON schemas, text summaries, bad arguments. |
 | LSP tests | Completion, hover, definition, references, rename, code actions, formatting. |
 | Graph tests | ER, lookup, workflow, handler, capability, security, agent, package, deployment graph output, enforced by `apg graph-suite --audit-fixtures --json` and the `apg.graph-fixture-audit.v1` report. |
-| Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios. |
+| Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios, enforced by `apg migrate-plan --audit-fixtures --json` and the `apg.migration-fixture-audit.v1` report. |
 | Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, rejected unsafe plans. |
 | Verifier tests | Web/mobile/desktop/capability/deployment release evidence contracts. |
 | Drift tests | CLI, LSP, IDE, generator, and tests consume the same semantic model. |
@@ -1381,7 +1393,8 @@ Exit criteria:
 - Tooling fixtures can run in CI, including `apg parser-golden --json`,
   `apg diagnostics --audit-fixtures --json`,
   `apg format --audit-fixtures --json`,
-  `apg graph-suite --audit-fixtures --json`, and `apg drift <file> --json`.
+  `apg graph-suite --audit-fixtures --json`,
+  `apg migrate-plan --audit-fixtures --json`, and `apg drift <file> --json`.
 
 ### Phase 1: Shared Semantic Model MVP
 
