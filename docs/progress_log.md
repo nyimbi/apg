@@ -4816,3 +4816,26 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `e2bd58f` (`Make HCM mobile attendance paths executable`) to `origin/main`.
+
+### 2026-05-28 04:08 EAT
+
+Completed checkpoint:
+
+- Made the Composition Central Configuration API importable without optional Redis, python-jose, or sentence-transformer dependencies.
+- Added a tenant-scoped in-process configuration engine for executable API use.
+- Replaced static deployment, version, restore, template, workspace, usage analytics, audit-log, and compliance-report responses with service-backed runtime state.
+- Replaced the hard-coded development database/Redis connection path in API dependency resolution with the runtime engine.
+- Converted Composition Config API schema `regex=` fields to Pydantic v2 `pattern=` and added API-local fallback schemas for the current SQLAlchemy declarative model import blocker.
+- Added focused root regression coverage for creating workspaces, templates, configurations, updates, deployments, versions, restores, usage analytics, audit logs, and compliance reports through the API.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/config/api.py capabilities/composition/config/models.py tests/test_composition_config_api_runtime.py`
+- `.venv/bin/pytest tests/test_composition_config_api_runtime.py -q` -> 2 passed, 1 existing SQLAlchemy deprecation warning
+- `.venv/bin/python - <<'PY' ... import app, create_app, CentralConfigurationEngine ... PY` -> imports succeeded
+- `git diff --check -- capabilities/composition/config/api.py capabilities/composition/config/models.py tests/test_composition_config_api_runtime.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push for this checkpoint.

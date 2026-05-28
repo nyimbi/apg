@@ -716,7 +716,7 @@ class ConfigurationCreate(BaseModel):
 	
 	name: str = Field(..., min_length=1, max_length=255)
 	description: Optional[str] = Field(None, max_length=2000)
-	key_path: str = Field(..., regex=r'^/[\w\-/.]+$')
+	key_path: str = Field(..., pattern=r'^/[\w\-/.]+$')
 	value: Dict[str, Any] = Field(...)
 	schema_definition: Optional[Dict[str, Any]] = None
 	default_value: Optional[Dict[str, Any]] = None
@@ -787,7 +787,7 @@ class WorkspaceCreate(BaseModel):
 	
 	name: str = Field(..., min_length=1, max_length=100)
 	description: Optional[str] = Field(None, max_length=2000)
-	slug: str = Field(..., regex=r'^[a-z0-9-]+$', min_length=1, max_length=100)
+	slug: str = Field(..., pattern=r'^[a-z0-9-]+$', min_length=1, max_length=100)
 	settings: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -795,9 +795,9 @@ class UserCreate(BaseModel):
 	"""Pydantic model for user creation."""
 	model_config = ConfigDict(extra='forbid', validate_assignment=True)
 	
-	email: str = Field(..., regex=r'^[^@]+@[^@]+\.[^@]+$')
+	email: str = Field(..., pattern=r'^[^@]+@[^@]+\.[^@]+$')
 	name: str = Field(..., min_length=1, max_length=255)
-	username: str = Field(..., regex=r'^[a-zA-Z0-9_-]+$', min_length=1, max_length=100)
+	username: str = Field(..., pattern=r'^[a-zA-Z0-9_-]+$', min_length=1, max_length=100)
 	password: Optional[str] = Field(None, min_length=8)
 	timezone: str = Field(default="UTC")
 	preferences: Dict[str, Any] = Field(default_factory=dict)
