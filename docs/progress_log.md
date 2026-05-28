@@ -7236,3 +7236,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated OpenAPI now reports `SelfTestChecks` in referenced schemas and 56 component schemas
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 17:32 EAT
+
+Completed checkpoint:
+
+- Strengthened generated OpenAPI validation so every schema `required` entry must be a declared property.
+- Added a focused regression that corrupts a generated `SelfTestChecks` schema in memory and verifies the generated validator rejects it.
+- Refreshed all 20 numbered example outputs so their generated validators enforce the stricter schema contract.
+
+Battery-conscious verification:
+
+- Regenerated `examples/[01-20]*/output` with the compiler after the validator change.
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_openapi_contract_rejects_required_fields_missing_from_schema tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated OpenAPI validation still reports zero errors with the stricter required-property check
+- Deferred broader pytest at the user's request to conserve battery.

@@ -1590,6 +1590,23 @@ def validate_openapi_contract() -> Dict[str, Any]:
     if not isinstance(schemas, dict):
         errors.append("OpenAPI document components.schemas must be an object")
         schemas = {{}}
+    for schema_name, schema in sorted(schemas.items()):
+        if not isinstance(schema, dict):
+            errors.append(f"OpenAPI schema {{schema_name}} must be an object")
+            continue
+        properties = schema.get("properties", {{}})
+        required = schema.get("required", [])
+        if required and not isinstance(required, list):
+            errors.append(f"OpenAPI schema {{schema_name}} required must be an array")
+            continue
+        if required and not isinstance(properties, dict):
+            errors.append(f"OpenAPI schema {{schema_name}} declares required fields without object properties")
+            continue
+        for field_name in required:
+            if not isinstance(field_name, str):
+                errors.append(f"OpenAPI schema {{schema_name}} required field names must be strings")
+            elif field_name not in properties:
+                errors.append(f"OpenAPI schema {{schema_name}} requires missing property {{field_name}}")
     for route, path_item in sorted(paths.items()):
         if not isinstance(path_item, dict):
             errors.append(f"OpenAPI path {{route}} must be an object")

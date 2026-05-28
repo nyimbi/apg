@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import os
@@ -232,6 +233,27 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "list_records" in module.__all__
 	assert "list_agents" in module.__all__
 	assert "runtime_adapter_environment_keys" in module.__all__
+
+
+def test_generated_openapi_contract_rejects_required_fields_missing_from_schema():
+	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
+	assert result.success is True
+
+	namespace: dict[str, object] = {"__name__": "generated_app"}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+	original_openapi_document = namespace["openapi_document"]
+
+	def broken_openapi_document():
+		document = copy.deepcopy(original_openapi_document())
+		document["components"]["schemas"]["SelfTestChecks"]["required"].append("missing_field")
+		return document
+
+	namespace["openapi_document"] = broken_openapi_document
+	contract = namespace["validate_openapi_contract"]()
+
+	assert contract["errors"] == [
+		"OpenAPI schema SelfTestChecks requires missing property missing_field"
+	]
 
 
 def test_generated_python_app_serves_http_endpoints(tmp_path):
