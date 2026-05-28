@@ -6414,3 +6414,22 @@ Battery-conscious verification:
 - `rg -n "XOR|placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/conf/quantum_security_layer.py tests/test_common_conf_quantum_security_layer_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/conf/quantum_security_layer.py tests/test_common_conf_quantum_security_layer_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:39 EAT
+
+Completed checkpoint:
+
+- Made the ENCR service zero-knowledge engine produce authenticated, decryptable threshold encryption envelopes instead of unrelated random ciphertext.
+- Added XOR-split threshold key shares with HMAC share verification, share commitments, and AES-GCM envelope authentication.
+- Replaced always-true zero-knowledge proof verification with proof/session expiry, tenant, user, response, and proof-data validation.
+- Added focused runtime coverage for threshold round trips, tampered-share rejection, and proof tenant rejection.
+- Left `PostQuantumCryptographicEngine.encrypt()` unchanged per current user direction.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/service.py tests/test_common_encr_service_zero_knowledge_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_encr_service_zero_knowledge_runtime.py -q` -> 3 passed, 10 pre-existing warnings
+- `.venv/bin/python -m pytest tests/test_common_encr_service_zero_knowledge_runtime.py tests/test_common_encr_public_interface.py -q` -> 7 passed, 10 pre-existing warnings
+- `rg -n "Mock implementation - would use key derivation functions|return True  # Mock verification|encrypted_data = secrets\\.token_bytes\\(len\\(data\\) \\+ 32\\)|threshold_shares = \\[secrets\\.token_bytes\\(32\\)" capabilities/common/encr/service.py tests/test_common_encr_service_zero_knowledge_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/encr/service.py tests/test_common_encr_service_zero_knowledge_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
