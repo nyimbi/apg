@@ -4924,3 +4924,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `3e52160` (`Make HCM monitoring alert delivery executable`) to `origin/main`.
+
+### 2026-05-28 04:37 EAT
+
+Completed checkpoint:
+
+- Made HCM Time Attendance WebSocket dashboard generation service-backed.
+- Added an injectable `TimeAttendanceService` provider on `WebSocketManager` with a runtime-store fallback for standalone execution.
+- Replaced fixed overview, remote-work, and AI-agent dashboard counts with tenant-scoped time-entry, remote-worker, and AI-agent records.
+- Extended focused HCM TAT regression coverage to verify seeded runtime data appears in all three WebSocket dashboard payloads.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/websocket.py tests/test_hcm_tat_runtime_store.py`
+- `.venv/bin/pytest tests/test_hcm_tat_runtime_store.py -q` -> 10 passed
+- `rg -n "For now, return mock data structure|This would integrate with the service layer|active_employees\\\": 150|total_remote_workers\\\": 45|total_agents\\\": 12|tasks_completed_today\\\": 1250" capabilities/hcm/tat/time_attendance/websocket.py` -> no matches
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit for this checkpoint.

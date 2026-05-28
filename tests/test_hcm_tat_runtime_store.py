@@ -40,6 +40,7 @@ from capabilities.hcm.tat.time_attendance.reporting import (
 	ReportType,
 )
 from capabilities.hcm.tat.time_attendance.service import TimeAttendanceService
+from capabilities.hcm.tat.time_attendance.websocket import WebSocketManager
 
 
 def _run(coro):
@@ -327,6 +328,29 @@ def test_alert_manager_records_configured_notification_channels():
 	assert list(manager.notification_history)[0]["channel"] == "websocket"
 	assert list(manager.notification_history)[1]["channel"] == "email"
 	assert list(manager.notification_history)[1]["status"] == "queued"
+
+
+def test_websocket_dashboard_data_uses_service_runtime_store():
+	TimeAttendanceService.reset_runtime_store()
+	service = TimeAttendanceService()
+	_run(_seed_runtime(service, tenant_id="tenant_websocket"))
+	manager = WebSocketManager()
+	manager.set_service(service)
+
+	overview = _run(manager._generate_dashboard_data("overview", "tenant_websocket", "admin"))
+	remote_work = _run(manager._generate_dashboard_data("remote_work", "tenant_websocket", "admin"))
+	ai_agents = _run(manager._generate_dashboard_data("ai_agents", "tenant_websocket", "admin"))
+
+	assert overview["active_employees"] == 1
+	assert overview["remote_workers"] == 1
+	assert overview["ai_agents_active"] == 1
+	assert overview["recent_activities"][0]["employee_id"] == "emp_001"
+	assert remote_work["total_remote_workers"] == 1
+	assert remote_work["active_sessions"] == 1
+	assert remote_work["top_performers"][0]["employee_id"] == "emp_001"
+	assert ai_agents["total_agents"] == 1
+	assert ai_agents["active_agents"] == 1
+	assert ai_agents["tasks_completed_today"] == 1
 
 
 def test_time_attendance_service_has_no_missing_private_helper_calls():

@@ -12,7 +12,7 @@ Email: nyimbi@gmail.com
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from typing import Dict, List, Set, Any, Optional
 from uuid import uuid4
 from dataclasses import dataclass, asdict
@@ -75,9 +75,24 @@ class WebSocketManager:
 		self.channel_subscribers: Dict[str, Set[str]] = {}  # channel -> client_ids
 		self.heartbeat_interval = 30  # seconds
 		self.cleanup_interval = 300   # seconds
+		self.service = None
 		self._running = False
 		
 		logger.info("WebSocket manager initialized")
+
+	def set_service(self, service: Any) -> None:
+		"""Attach a TimeAttendanceService-compatible provider for dashboard data."""
+		self.service = service
+
+	def clear_service(self) -> None:
+		"""Clear the attached dashboard service provider."""
+		self.service = None
+
+	def _dashboard_service(self) -> Any:
+		if self.service is not None:
+			return self.service
+		from .service import TimeAttendanceService
+		return TimeAttendanceService()
 	
 	async def start_background_tasks(self):
 		"""Start background maintenance tasks"""
@@ -523,8 +538,12 @@ class WebSocketManager:
 		user_id: str
 	) -> Dict[str, Any]:
 		"""Generate real-time dashboard data"""
-		# This would integrate with the service layer to get real data
-		# For now, return mock data structure
+		service = self._dashboard_service()
+		today = date.today()
+		time_entries = await service.list_time_entries(tenant_id)
+		today_entries = await service.list_time_entries(tenant_id, start_date=today, end_date=today)
+		remote_workers = await service.list_remote_workers(tenant_id, active_only=False)
+		ai_agents = await service.list_ai_agents(tenant_id, active_only=False)
 		
 		base_data = {
 			"tenant_id": tenant_id,
@@ -533,41 +552,81 @@ class WebSocketManager:
 		}
 		
 		if dashboard_type == "overview":
+			employee_ids = {entry.employee_id for entry in time_entries}
+			employee_ids.update(worker.employee_id for worker in remote_workers)
+			clocked_in_now = len([entry for entry in time_entries if entry.clock_in and not entry.clock_out])
+			fraud_alerts_today = len([
+				entry for entry in today_entries
+				if entry.anomaly_score >= 0.5 or entry.fraud_indicators
+			])
+			productivity_scores = [worker.overall_productivity_score for worker in remote_workers if worker.productivity_metrics]
+			recent_activities = [
+				{
+					"type": "time_entry",
+					"entity_id": entry.id,
+					"employee_id": entry.employee_id,
+					"status": entry.status.value,
+					"timestamp": entry.updated_at.isoformat(),
+				}
+				for entry in sorted(time_entries, key=lambda item: item.updated_at, reverse=True)[:10]
+			]
 			return {
 				**base_data,
-				"active_employees": 150,
-				"clocked_in_now": 89,
-				"remote_workers": 45,
-				"ai_agents_active": 12,
-				"fraud_alerts_today": 3,
-				"productivity_average": 0.85,
-				"recent_activities": []
+				"active_employees": len(employee_ids),
+				"clocked_in_now": clocked_in_now,
+				"remote_workers": len(remote_workers),
+				"ai_agents_active": len([agent for agent in ai_agents if agent.is_active]),
+				"fraud_alerts_today": fraud_alerts_today,
+				"productivity_average": round(sum(productivity_scores) / len(productivity_scores), 4) if productivity_scores else 0.0,
+				"recent_activities": recent_activities
 			}
 		elif dashboard_type == "remote_work":
+			active_workers = [worker for worker in remote_workers if worker.is_actively_working]
+			productivity_scores = [worker.overall_productivity_score for worker in remote_workers if worker.productivity_metrics]
+			top_performers = [
+				{
+					"employee_id": worker.employee_id,
+					"productivity_score": round(worker.overall_productivity_score, 4),
+					"work_mode": worker.work_mode.value,
+				}
+				for worker in sorted(remote_workers, key=lambda item: item.overall_productivity_score, reverse=True)[:5]
+			]
+			productivity_trends = [
+				{
+					"employee_id": worker.employee_id,
+					"points": [
+						{
+							"timestamp": metric.get("timestamp"),
+							"score": metric.get("score", 0.0),
+						}
+						for metric in worker.productivity_metrics[-10:]
+					],
+				}
+				for worker in remote_workers
+			]
 			return {
 				**base_data,
-				"total_remote_workers": 45,
-				"active_sessions": 32,
-				"average_productivity": 0.87,
-				"burnout_risk_count": 2,
-				"top_performers": [],
-				"productivity_trends": []
+				"total_remote_workers": len(remote_workers),
+				"active_sessions": len(active_workers),
+				"average_productivity": round(sum(productivity_scores) / len(productivity_scores), 4) if productivity_scores else 0.0,
+				"burnout_risk_count": len([worker for worker in remote_workers if worker.burnout_risk_indicators]),
+				"top_performers": top_performers,
+				"productivity_trends": productivity_trends
 			}
 		elif dashboard_type == "ai_agents":
+			active_agents = [agent for agent in ai_agents if agent.is_active]
+			agent_type_counts: Dict[str, int] = {}
+			for agent in ai_agents:
+				agent_type_counts[agent.agent_type.value] = agent_type_counts.get(agent.agent_type.value, 0) + 1
 			return {
 				**base_data,
-				"total_agents": 12,
-				"active_agents": 12,
-				"tasks_completed_today": 1250,
-				"total_cost_today": 125.50,
-				"average_performance": 0.94,
-				"cost_efficiency": 0.91,
-				"agent_types": {
-					"conversational_ai": 5,
-					"automation_bot": 4,
-					"analytics_agent": 2,
-					"code_assistant": 1
-				}
+				"total_agents": len(ai_agents),
+				"active_agents": len(active_agents),
+				"tasks_completed_today": sum(agent.tasks_completed for agent in ai_agents),
+				"total_cost_today": round(sum(float(agent.total_operational_cost) for agent in ai_agents), 4),
+				"average_performance": round(sum(agent.overall_performance_score for agent in ai_agents) / len(ai_agents), 4) if ai_agents else 0.0,
+				"cost_efficiency": round(sum(agent.cost_efficiency_score for agent in ai_agents) / len(ai_agents), 4) if ai_agents else 0.0,
+				"agent_types": agent_type_counts
 			}
 		
 		return base_data
