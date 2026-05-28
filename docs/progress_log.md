@@ -7035,3 +7035,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 9 passed
 - `git diff --check -- compiler/code_generator.py tests/test_compiler_database_ast.py docs/progress_log.md`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 16:08 EAT
+
+Completed checkpoint:
+
+- Added generated OpenAPI request-body schemas for record create, update, and import routes.
+- Added generated OpenAPI response schemas for record list, fetch, create, update, delete, export, and import routes.
+- Added per-entity `RecordPatch` schemas so update requests can be partial while create requests still advertise required APG fields.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_python_app_validates_records_from_entity_fields -q` -> 1 passed
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_python_app_serves_entity_record_endpoints -q` -> 1 passed
+- Deferred broader pytest at the user's request to conserve battery.

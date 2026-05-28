@@ -706,7 +706,7 @@ def _revision_conflict(existing: Dict[str, Any], expected_revision: int | None) 
     }}
 
 
-def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
+def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, Any]:
     fields = _field_specs(str(entity["name"]))
     if not fields:
         return {{"type": "object", "additionalProperties": True}}
@@ -718,7 +718,7 @@ def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
     for field in fields:
         field_name = str(field["name"])
         schema_properties[field_name] = {{"type": _json_schema_type(str(field.get("type", "any")))}}
-        if field.get("required", True):
+        if not partial and field.get("required", True):
             required_fields.append(field_name)
     schema: Dict[str, Any] = {{
         "type": "object",
@@ -734,9 +734,118 @@ def _schema_ref(name: str) -> Dict[str, Any]:
     return {{"$ref": f"#/components/schemas/{{name}}"}}
 
 
+def _json_media(schema: Dict[str, Any]) -> Dict[str, Any]:
+    return {{"application/json": {{"schema": schema}}}}
+
+
+def _record_body_schema(schema_name: str) -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {{
+            "record": _schema_ref(schema_name),
+        }},
+        "required": ["record"],
+    }}
+
+
+def _record_import_body_schema(schema_name: str) -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {{
+            "records": {{"type": "array", "items": _schema_ref(schema_name)}},
+        }},
+        "required": ["records"],
+    }}
+
+
+def _record_list_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {{
+            "entity": {{"type": "string"}},
+            "records": {{"type": "array", "items": _schema_ref(schema_name)}},
+            "count": {{"type": "integer"}},
+            "total": {{"type": "integer"}},
+            "filters": {{"type": "object", "additionalProperties": {{"type": "string"}}}},
+            "sort": {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}},
+            "order": {{"type": "string"}},
+        }},
+        "required": ["entity", "records", "count"],
+    }}
+
+
+def _record_item_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {{
+            "entity": {{"type": "string"}},
+            "record": _schema_ref(schema_name),
+        }},
+        "required": ["entity", "record"],
+    }}
+
+
+def _record_mutation_response_schema(schema_name: str, record_key: str = "record") -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {{
+            record_key: _schema_ref(schema_name),
+            "event": _schema_ref("EventRecord"),
+        }},
+        "required": [record_key],
+    }}
+
+
+def _record_export_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {{
+            "entity": {{"type": "string"}},
+            "records": {{"type": "array", "items": _schema_ref(schema_name)}},
+            "count": {{"type": "integer"}},
+        }},
+        "required": ["entity", "records", "count"],
+    }}
+
+
+def _record_import_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {{
+            "entity": {{"type": "string"}},
+            "imported": {{"type": "array", "items": _schema_ref(schema_name)}},
+            "errors": {{"type": "array", "items": {{"type": "object", "additionalProperties": True}}}},
+            "events": {{"type": "array", "items": _schema_ref("EventRecord")}},
+            "count": {{"type": "integer"}},
+            "failed": {{"type": "integer"}},
+        }},
+        "required": ["entity", "imported", "errors", "count", "failed"],
+    }}
+
+
 def _database_openapi_schemas() -> Dict[str, Any]:
     nullable_string = {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}}
     return {{
+        "EventRecord": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "id": {{"type": "integer"}},
+                "entity": {{"type": "string"}},
+                "action": {{"type": "string"}},
+                "record_id": {{"oneOf": [{{"type": "integer"}}, {{"type": "string"}}, {{"type": "null"}}]}},
+                "before": {{"oneOf": [{{"type": "object", "additionalProperties": True}}, {{"type": "null"}}]}},
+                "after": {{"oneOf": [{{"type": "object", "additionalProperties": True}}, {{"type": "null"}}]}},
+            }},
+            "required": ["id", "entity", "action"],
+        }},
         "DatabaseReference": {{
             "type": "object",
             "additionalProperties": False,
@@ -869,21 +978,20 @@ def _api_operation(
     description: str,
     status: str = "200",
     request_body: bool = False,
+    request_schema: Dict[str, Any] | None = None,
     response_schema: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     response: Dict[str, Any] = {{"description": description}}
     if response_schema is not None:
-        response["content"] = {{
-            "application/json": {{
-                "schema": response_schema,
-            }}
-        }}
+        response["content"] = _json_media(response_schema)
     operation: Dict[str, Any] = {{
         "summary": summary,
         "responses": {{status: response}},
     }}
     if request_body:
         operation["requestBody"] = {{"required": True}}
+        if request_schema is not None:
+            operation["requestBody"]["content"] = _json_media(request_schema)
     return operation
 
 
@@ -912,10 +1020,23 @@ def openapi_document() -> Dict[str, Any]:
     for entity in ENTITIES:
         entity_name = str(entity["name"])
         schema_name = f"{{entity_name}}Record"
+        patch_schema_name = f"{{entity_name}}RecordPatch"
         schemas[schema_name] = _record_schema(entity)
+        schemas[patch_schema_name] = _record_schema(entity, partial=True)
         paths[f"/entities/{{entity_name}}/records"] = {{
-            "get": _api_operation(f"List {{entity_name}} records", "Record list"),
-            "post": _api_operation(f"Create {{entity_name}} record", "Created record", status="201", request_body=True),
+            "get": _api_operation(
+                f"List {{entity_name}} records",
+                "Record list",
+                response_schema=_record_list_response_schema(schema_name),
+            ),
+            "post": _api_operation(
+                f"Create {{entity_name}} record",
+                "Created record",
+                status="201",
+                request_body=True,
+                request_schema=_record_body_schema(schema_name),
+                response_schema=_record_mutation_response_schema(schema_name),
+            ),
         }}
         paths[f"/entities/{{entity_name}}/records"]["get"]["parameters"] = [
             {{"name": "filter.<field>", "in": "query", "required": False, "description": "Exact field filter"}},
@@ -925,15 +1046,39 @@ def openapi_document() -> Dict[str, Any]:
             {{"name": "offset", "in": "query", "required": False, "description": "Records to skip"}},
         ]
         paths[f"/entities/{{entity_name}}/records/export"] = {{
-            "get": _api_operation(f"Export {{entity_name}} records", "Record export"),
+            "get": _api_operation(
+                f"Export {{entity_name}} records",
+                "Record export",
+                response_schema=_record_export_response_schema(schema_name),
+            ),
         }}
         paths[f"/entities/{{entity_name}}/records/import"] = {{
-            "post": _api_operation(f"Import {{entity_name}} records", "Record import", request_body=True),
+            "post": _api_operation(
+                f"Import {{entity_name}} records",
+                "Record import",
+                request_body=True,
+                request_schema=_record_import_body_schema(schema_name),
+                response_schema=_record_import_response_schema(schema_name),
+            ),
         }}
         paths[f"/entities/{{entity_name}}/records/{{{{id}}}}"] = {{
-            "get": _api_operation(f"Fetch {{entity_name}} record", "Record"),
-            "put": _api_operation(f"Update {{entity_name}} record", "Updated record", request_body=True),
-            "delete": _api_operation(f"Delete {{entity_name}} record", "Deleted record"),
+            "get": _api_operation(
+                f"Fetch {{entity_name}} record",
+                "Record",
+                response_schema=_record_item_response_schema(schema_name),
+            ),
+            "put": _api_operation(
+                f"Update {{entity_name}} record",
+                "Updated record",
+                request_body=True,
+                request_schema=_record_body_schema(patch_schema_name),
+                response_schema=_record_mutation_response_schema(schema_name),
+            ),
+            "delete": _api_operation(
+                f"Delete {{entity_name}} record",
+                "Deleted record",
+                response_schema=_record_mutation_response_schema(schema_name, record_key="deleted"),
+            ),
         }}
         paths[f"/ui/entities/{{entity_name}}"] = {{
             "get": _api_operation(f"Generated {{entity_name}} UI", "HTML entity screen"),

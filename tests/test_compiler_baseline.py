@@ -540,6 +540,53 @@ def test_generated_python_app_validates_records_from_entity_fields():
 		},
 		"required": ["name", "quantity", "active"],
 	}
+	openapi = namespace["openapi_document"]()
+	assert openapi["components"]["schemas"]["InventoryItemRecordPatch"] == {
+		"type": "object",
+		"additionalProperties": True,
+		"properties": {
+			"id": {"oneOf": [{"type": "integer"}, {"type": "string"}]},
+			"_revision": {"type": "integer"},
+			"name": {"type": "string"},
+			"quantity": {"type": "integer"},
+			"active": {"type": "boolean"},
+		},
+	}
+	record_collection = openapi["paths"]["/entities/InventoryItem/records"]
+	assert record_collection["get"]["responses"]["200"]["content"]["application/json"]["schema"]["properties"]["records"] == {
+		"type": "array",
+		"items": {"$ref": "#/components/schemas/InventoryItemRecord"},
+	}
+	assert record_collection["post"]["requestBody"]["content"]["application/json"]["schema"] == {
+		"type": "object",
+		"additionalProperties": False,
+		"properties": {"record": {"$ref": "#/components/schemas/InventoryItemRecord"}},
+		"required": ["record"],
+	}
+	assert record_collection["post"]["responses"]["201"]["content"]["application/json"]["schema"]["properties"]["record"] == {
+		"$ref": "#/components/schemas/InventoryItemRecord"
+	}
+	record_item = openapi["paths"]["/entities/InventoryItem/records/{id}"]
+	assert record_item["put"]["requestBody"]["content"]["application/json"]["schema"] == {
+		"type": "object",
+		"additionalProperties": False,
+		"properties": {"record": {"$ref": "#/components/schemas/InventoryItemRecordPatch"}},
+		"required": ["record"],
+	}
+	assert record_item["delete"]["responses"]["200"]["content"]["application/json"]["schema"]["properties"]["deleted"] == {
+		"$ref": "#/components/schemas/InventoryItemRecord"
+	}
+	assert openapi["paths"]["/entities/InventoryItem/records/import"]["post"]["requestBody"]["content"]["application/json"]["schema"] == {
+		"type": "object",
+		"additionalProperties": False,
+		"properties": {
+			"records": {
+				"type": "array",
+				"items": {"$ref": "#/components/schemas/InventoryItemRecord"},
+			}
+		},
+		"required": ["records"],
+	}
 	assert namespace["coerce_record_types"](
 		"InventoryItem",
 		{"name": "Widget", "quantity": "5", "active": "true"},
