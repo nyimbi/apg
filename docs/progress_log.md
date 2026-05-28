@@ -5586,4 +5586,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push for the generated AI-agent invocation slice.
+- Pushed commit `bf07627` (`Make generated AI agents invocable`) to `origin/main`.
