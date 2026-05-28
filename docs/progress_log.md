@@ -8399,3 +8399,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py` passed with 106 tests.
 - `.venv/bin/python -m cli.main compile examples/01_minimal_customer_records/main.apg --output /private/tmp/apg-compiler-serviceability-01 --verbose --verify` generated 9 files and passed generated self-test plus smoke test.
 - `.venv/bin/apg compile examples/05_single_support_agent/main.apg --output /private/tmp/apg-compiler-serviceability-agent --verify` generated 10 files, including `ai_agents.py`, and passed generated self-test plus smoke test.
+
+### 2026-05-29 01:25 EAT
+
+Executable REGY cache metrics slice:
+
+- Replaced the fixed REGY `0.75` cache hit-rate placeholder with observed cache hit/miss counters shared by discovery and health-cache lookups.
+- Valid cache hits now increment `cache_hits`; missing or expired entries increment `cache_misses`, and expired discovery entries are evicted before reporting a miss.
+- Added focused regression coverage for empty cache metrics, discovery cache hits/misses, expired discovery eviction, and health cache contribution to the same hit-rate calculation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/regy/service.py tests/test_common_regy_cache_metrics.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_common_regy_cache_metrics.py` passed with 3 tests.
+- `.venv/bin/python -m pytest -q capabilities/common/regy/tests/test_service.py::TestServiceRegistryService::test_registry_statistics` passed with 1 test.
+- `rg -n "75% hit rate placeholder|cache hit rate \\(simplified\\)|actual cache hit/miss counters" capabilities/common/regy/service.py tests/test_common_regy_cache_metrics.py` found no stale REGY cache placeholder text.
+- `git diff --check -- capabilities/common/regy/service.py tests/test_common_regy_cache_metrics.py` passed.

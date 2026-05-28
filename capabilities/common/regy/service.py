@@ -103,6 +103,8 @@ class ServiceRegistryService:
 		self.total_registrations = 0
 		self.total_discoveries = 0
 		self.total_health_checks = 0
+		self.cache_hits = 0
+		self.cache_misses = 0
 		self.start_time = datetime.now(timezone.utc)
 		self.startup_time = self.start_time
 		self.cache_manager = self.discovery_cache
@@ -887,10 +889,12 @@ class ServiceRegistryService:
 		if cache_key in self.discovery_cache:
 			result, cached_time = self.discovery_cache[cache_key]
 			if datetime.now(timezone.utc) - cached_time < timedelta(seconds=self.cache_ttl_seconds):
+				self.cache_hits += 1
 				result.cached_result = True
 				return result
 			else:
 				del self.discovery_cache[cache_key]
+		self.cache_misses += 1
 		return None
 	
 	def _cache_discovery_result(self, cache_key: str, result: ServiceDiscoveryResult) -> None:
@@ -907,9 +911,11 @@ class ServiceRegistryService:
 		if cache_key in self.health_cache:
 			health_status, cached_time = self.health_cache[cache_key]
 			if datetime.now(timezone.utc) - cached_time < timedelta(seconds=60):  # 1 minute TTL for health
+				self.cache_hits += 1
 				return health_status
 			else:
 				del self.health_cache[cache_key]
+		self.cache_misses += 1
 		return None
 	
 	def _cache_health_status(self, service_id: str, health_status: ServiceHealthStatus) -> None:
@@ -979,9 +985,11 @@ class ServiceRegistryService:
 		}
 	
 	def _calculate_cache_hit_rate(self) -> float:
-		"""Calculate cache hit rate (simplified)."""
-		# In production, this would be based on actual cache hit/miss counters
-		return 0.75  # 75% hit rate placeholder
+		"""Calculate cache hit rate from observed cache lookups."""
+		total_cache_lookups = self.cache_hits + self.cache_misses
+		if total_cache_lookups == 0:
+			return 0.0
+		return self.cache_hits / total_cache_lookups
 	
 	# Logging Methods - APG CLAUDE.md standard
 	def _log_initialization_start(self) -> None:
