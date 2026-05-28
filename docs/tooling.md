@@ -60,6 +60,10 @@ APG currently has an executable compiler path:
   proving editor-facing diagnostics, completions, definitions, references,
   document symbols, code-action availability, and formatting without starting
   a long-running LSP process;
+- `apg language-server <file> --rename <symbol> --to <new-name> --json` emits
+  `apg.language-server-rename.v1`, dry-runs safe semantic renames by default,
+  rejects ambiguous/conflicting symbols, skips comments and string literals,
+  and requires explicit `--write` before mutating source;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -679,6 +683,7 @@ apg run
 apg doctor
 apg language-server
 apg language-server app.apg --check --json
+apg language-server app.apg --rename Customer --to Account --json
 apg capabilities contracts --json
 apg capabilities validate-contracts --json
 ```
@@ -915,12 +920,16 @@ formatter, and graph builders as the CLI.
 
 The current executable baseline includes a dependency-light semantic service
 in `language_server.semantic_service` and the check command
-`apg language-server <file> --check --json`. That check emits
-`apg.language-server-check.v1`, reuses `apg.semantic-model.v1`, and proves the
-editor-facing surfaces that do not require a running pygls process: diagnostics,
-context completions, hover/definition data, references, document symbols,
-code-action suggestions, and shared formatting. The long-running TCP/stdio LSP
-server should remain a thin transport adapter over that service.
+`apg language-server <file> --check --json`, plus the semantic rename command
+`apg language-server <file> --rename <symbol> --to <new-name> --json`. The
+check emits `apg.language-server-check.v1`, reuses `apg.semantic-model.v1`,
+and proves the editor-facing surfaces that do not require a running pygls
+process: diagnostics, context completions, hover/definition data, references,
+document symbols, code-action suggestions, and shared formatting. Rename emits
+`apg.language-server-rename.v1`, uses the same semantic symbol table, rejects
+ambiguous or conflicting edits, skips comments and string literals, and stays
+side-effect-free unless `--write` is explicitly passed. The long-running
+TCP/stdio LSP server should remain a thin transport adapter over that service.
 
 ### Capabilities
 

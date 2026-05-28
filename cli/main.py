@@ -160,9 +160,28 @@ def doctor():
 @click.option('--port', '-p', default=2087, help='Language server port')
 @click.option('--host', '-h', default='127.0.0.1', help='Language server host')
 @click.option("--check", is_flag=True, help="Run a dependency-light language-service check for one APG file")
+@click.option("--rename", "rename_symbol", help="Plan a semantic rename for the given symbol")
+@click.option("--to", "rename_target", help="New symbol name for --rename")
+@click.option("--kind", "rename_kind", help="Optional symbol kind discriminator for --rename")
+@click.option("--write", "write_rename", is_flag=True, help="Apply a successful --rename plan to SOURCE_FILE")
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.language-server-check.v1 JSON with --check")
-def language_server(source_file: Path | None, port: int, host: str, check: bool, as_json: bool):
+def language_server(
+	source_file: Path | None,
+	port: int,
+	host: str,
+	check: bool,
+	rename_symbol: str | None,
+	rename_target: str | None,
+	rename_kind: str | None,
+	write_rename: bool,
+	as_json: bool,
+):
 	"""Start APG Language Server for IDE integration or check one APG file."""
+	if check and rename_symbol:
+		raise click.ClickException("--check and --rename cannot be combined")
+	if write_rename and not rename_symbol:
+		raise click.ClickException("--write is only valid with --rename")
+
 	if check:
 		if source_file is None:
 			raise click.ClickException("--check requires SOURCE_FILE")
@@ -186,8 +205,41 @@ def language_server(source_file: Path | None, port: int, host: str, check: bool,
 			raise click.exceptions.Exit(1)
 		return
 
+	if rename_symbol:
+		if source_file is None:
+			raise click.ClickException("--rename requires SOURCE_FILE")
+		if not rename_target:
+			raise click.ClickException("--rename requires --to NEW_NAME")
+		if not source_file.exists():
+			raise click.ClickException(f"APG source file not found: {source_file}")
+		if not source_file.is_file():
+			raise click.ClickException(f"APG language-server --rename expects a file: {source_file}")
+		from language_server.semantic_service import build_language_server_rename
+		report = build_language_server_rename(
+			source_file,
+			rename_symbol,
+			rename_target,
+			kind=rename_kind,
+			write=write_rename,
+		)
+		if as_json:
+			click.echo(json.dumps(report, indent=2, sort_keys=True))
+		else:
+			status = "OK" if report["ok"] else "FAILED"
+			action = "written" if report.get("written") else "planned"
+			click.echo(
+				f"APG language-server rename {status}: {rename_symbol} -> {rename_target}, "
+				f"{report['replacement_count']} replacement(s), {action}"
+			)
+			if report.get("errors"):
+				for error in report["errors"]:
+					click.echo(f"  - {error}")
+		if not report["ok"]:
+			raise click.exceptions.Exit(1)
+		return
+
 	if source_file is not None:
-		raise click.ClickException("SOURCE_FILE is only accepted with --check")
+		raise click.ClickException("SOURCE_FILE is only accepted with --check or --rename")
 
 	console.print(f"[blue]Starting APG Language Server on {host}:{port}[/blue]")
 	

@@ -8,6 +8,7 @@ server can all consume the same semantic snapshot.
 from __future__ import annotations
 
 import re
+from difflib import unified_diff
 from pathlib import Path
 from typing import Any
 
@@ -56,6 +57,8 @@ AGENT_COMPLETIONS = [
 	("handoff", "Property", "Agent handoff rule", "handoff ${1:TargetAgent} when \"${2:condition}\";"),
 ]
 
+IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
 
 def build_language_service_snapshot(source: str, source_name: str | Path = "<memory>") -> dict[str, Any]:
 	"""Build an IDE-ready snapshot from APG source text."""
@@ -98,6 +101,7 @@ def build_language_service_snapshot(source: str, source_name: str | Path = "<mem
 			"textDocument/definition",
 			"textDocument/references",
 			"textDocument/documentSymbol",
+			"textDocument/rename",
 			"textDocument/codeAction",
 			"textDocument/formatting",
 			"workspace/symbol",
@@ -132,6 +136,25 @@ def build_language_server_check(path: Path) -> dict[str, Any]:
 	return report
 
 
+def build_language_server_rename(
+	path: Path,
+	symbol_name: str,
+	new_name: str,
+	kind: str | None = None,
+	write: bool = False,
+) -> dict[str, Any]:
+	"""Build and optionally apply an APG rename report for one source file."""
+	source = path.read_text(encoding="utf-8")
+	report = build_rename_plan(source, symbol_name, new_name, path, kind=kind)
+	report["written"] = False
+	if write and report["ok"] and report["changed"]:
+		path.write_text(str(report["new_source"]), encoding="utf-8")
+		report["written"] = True
+	if not write:
+		report.pop("new_source", None)
+	return report
+
+
 def completion_items(
 	model: dict[str, Any],
 	source: str = "",
@@ -158,6 +181,86 @@ def completion_items(
 			items.append(_completion(str(provided), "Interface", f"Provided by capability {capability_name}", str(provided)))
 
 	return _dedupe_completions(items)
+
+
+def workspace_symbols(model: dict[str, Any], query: str = "") -> list[dict[str, Any]]:
+	"""Search declarations by name, kind, and id for workspace-symbol features."""
+	normalized = query.lower()
+	matches = []
+	for symbol in _sorted_symbols(model):
+		haystack = " ".join([
+			str(symbol.get("id", "")),
+			str(symbol.get("kind", "")),
+			str(symbol.get("name", "")),
+		]).lower()
+		if normalized and normalized not in haystack:
+			continue
+		matches.append({
+			"id": symbol["id"],
+			"name": symbol["name"],
+			"kind": symbol["kind"],
+			"file": symbol["file"],
+			"range": symbol["range"],
+		})
+	return matches
+
+
+def build_rename_plan(
+	source: str,
+	symbol_name: str,
+	new_name: str,
+	source_name: str | Path = "<memory>",
+	kind: str | None = None,
+) -> dict[str, Any]:
+	"""Plan a safe APG rename against the shared semantic model."""
+	snapshot = build_language_service_snapshot(source, source_name)
+	model = snapshot["semantic_model"]
+	matches = _matching_symbols(model, symbol_name, kind)
+	errors: list[str] = []
+
+	if not IDENTIFIER_PATTERN.fullmatch(new_name):
+		errors.append(f"New name is not a valid APG identifier: {new_name}")
+	if not matches:
+		errors.append(f"Symbol not found: {symbol_name}")
+	if len(matches) > 1:
+		errors.append(f"Rename is ambiguous for {symbol_name}; pass --kind or choose a fully qualified symbol name.")
+
+	selected = matches[0] if len(matches) == 1 else None
+	conflict = _rename_conflict(model, selected, new_name) if selected else None
+	if conflict:
+		errors.append(f"Rename target conflicts with existing symbol: {conflict['id']}")
+
+	old_token = _rename_token(selected, symbol_name) if selected else symbol_name
+	reference_locations = references(source, old_token, source_name) if selected else []
+	new_source = source
+	replacement_count = 0
+	if selected and not errors:
+		new_source, replacement_count = _replace_identifier_outside_strings_comments(source, old_token, new_name)
+		if replacement_count == 0:
+			errors.append(f"No source references found for symbol: {symbol_name}")
+
+	ok = not errors
+	return {
+		"format": "apg.language-server-rename.v1",
+		"ok": ok,
+		"file": str(source_name),
+		"symbol": symbol_name,
+		"new_name": new_name,
+		"kind": kind,
+		"selected_symbol": selected,
+		"candidates": [
+			{"id": symbol["id"], "kind": symbol["kind"], "name": symbol["name"], "file": symbol["file"]}
+			for symbol in matches
+		],
+		"errors": errors,
+		"changed": ok and new_source != source,
+		"replacement_count": replacement_count if ok else 0,
+		"references": reference_locations if ok else [],
+		"requires_review": _rename_requires_review(selected) if ok else False,
+		"review_reasons": _rename_review_reasons(selected) if ok else [],
+		"diff": _unified_source_diff(source, new_source, str(source_name)) if ok and new_source != source else "",
+		"new_source": new_source,
+	}
 
 
 def hover(model: dict[str, Any], word: str) -> dict[str, Any] | None:
@@ -193,17 +296,15 @@ def references(source: str, word: str, source_name: str | Path = "<memory>") -> 
 	"""Find whole-word references in source text."""
 	if not word:
 		return []
-	pattern = re.compile(rf"\b{re.escape(word)}\b")
 	locations: list[dict[str, Any]] = []
-	for line_number, line in enumerate(source.splitlines()):
-		for match in pattern.finditer(line):
-			locations.append({
-				"file": str(source_name),
-				"range": {
-					"start": {"line": line_number, "character": match.start()},
-					"end": {"line": line_number, "character": match.end()},
-				},
-			})
+	for line_number, start, end in _identifier_occurrences(source, word):
+		locations.append({
+			"file": str(source_name),
+			"range": {
+				"start": {"line": line_number, "character": start},
+				"end": {"line": line_number, "character": end},
+			},
+		})
 	return locations
 
 
@@ -375,6 +476,157 @@ def _find_symbol(model: dict[str, Any], word: str) -> dict[str, Any] | None:
 		if symbol.get("name") == word or str(symbol.get("name", "")).split(".")[-1] == word:
 			return symbol
 	return None
+
+
+def _matching_symbols(model: dict[str, Any], symbol_name: str, kind: str | None = None) -> list[dict[str, Any]]:
+	matches = []
+	for symbol in _sorted_symbols(model):
+		if kind and symbol.get("kind") != kind:
+			continue
+		name = str(symbol.get("name", ""))
+		symbol_id = str(symbol.get("id", ""))
+		if symbol_name in {name, symbol_id} or name.split(".")[-1] == symbol_name:
+			matches.append(symbol)
+	return matches
+
+
+def _rename_conflict(model: dict[str, Any], selected: dict[str, Any] | None, new_name: str) -> dict[str, Any] | None:
+	if not selected:
+		return None
+	selected_kind = selected["kind"]
+	selected_name = selected["name"]
+	target_name = new_name
+	if selected_kind == "field" and "." in selected_name:
+		target_name = f"{selected_name.rsplit('.', 1)[0]}.{new_name}"
+	for symbol in _sorted_symbols(model):
+		if symbol["id"] == selected["id"]:
+			continue
+		if symbol["kind"] == selected_kind and symbol["name"] == target_name:
+			return symbol
+	return None
+
+
+def _rename_token(selected: dict[str, Any] | None, fallback: str) -> str:
+	if not selected:
+		return fallback
+	return str(selected.get("name", fallback)).split(".")[-1]
+
+
+def _rename_requires_review(selected: dict[str, Any] | None) -> bool:
+	return bool(selected and selected.get("kind") in {"table", "field", "capability", "app", "agent"})
+
+
+def _rename_review_reasons(selected: dict[str, Any] | None) -> list[str]:
+	if not selected:
+		return []
+	kind = str(selected.get("kind"))
+	if kind == "table":
+		return ["table renames can affect database migrations and generated APIs"]
+	if kind == "field":
+		return ["field renames can affect database migrations, forms, lookups, and generated APIs"]
+	if kind == "capability":
+		return ["capability renames can affect composition contracts and package manifests"]
+	if kind == "agent":
+		return ["agent renames can affect agent teams, handoffs, permissions, and generated runtime hooks"]
+	if kind == "app":
+		return ["application renames can affect package metadata and release evidence"]
+	return []
+
+
+def _identifier_occurrences(source: str, word: str) -> list[tuple[int, int, int]]:
+	occurrences: list[tuple[int, int, int]] = []
+	for line_number, line in enumerate(source.splitlines()):
+		quote: str | None = None
+		escaped = False
+		index = 0
+		while index < len(line):
+			char = line[index]
+			next_char = line[index + 1] if index + 1 < len(line) else ""
+			if quote is None and char == "/" and next_char == "/":
+				break
+			if quote is not None:
+				if escaped:
+					escaped = False
+				elif char == "\\":
+					escaped = True
+				elif char == quote:
+					quote = None
+				index += 1
+				continue
+			if char in {'"', "'"}:
+				quote = char
+				index += 1
+				continue
+			end = index + len(word)
+			if line.startswith(word, index) and _identifier_boundary(line, index, end):
+				occurrences.append((line_number, index, end))
+				index = end
+				continue
+			index += 1
+	return occurrences
+
+
+def _replace_identifier_outside_strings_comments(source: str, old: str, new: str) -> tuple[str, int]:
+	lines = source.splitlines(keepends=True)
+	rewritten_lines: list[str] = []
+	replacement_count = 0
+	for line in lines:
+		quote: str | None = None
+		escaped = False
+		index = 0
+		rewritten: list[str] = []
+		while index < len(line):
+			char = line[index]
+			next_char = line[index + 1] if index + 1 < len(line) else ""
+			if quote is None and char == "/" and next_char == "/":
+				rewritten.append(line[index:])
+				index = len(line)
+				break
+			if quote is not None:
+				rewritten.append(char)
+				if escaped:
+					escaped = False
+				elif char == "\\":
+					escaped = True
+				elif char == quote:
+					quote = None
+				index += 1
+				continue
+			if char in {'"', "'"}:
+				quote = char
+				rewritten.append(char)
+				index += 1
+				continue
+			end = index + len(old)
+			if line.startswith(old, index) and _identifier_boundary(line, index, end):
+				rewritten.append(new)
+				replacement_count += 1
+				index = end
+				continue
+			rewritten.append(char)
+			index += 1
+		rewritten_lines.append("".join(rewritten))
+	return "".join(rewritten_lines), replacement_count
+
+
+def _identifier_boundary(line: str, start: int, end: int) -> bool:
+	before = line[start - 1] if start > 0 else ""
+	after = line[end] if end < len(line) else ""
+	return not _is_identifier_char(before) and not _is_identifier_char(after)
+
+
+def _is_identifier_char(char: str) -> bool:
+	return bool(char) and (char.isalnum() or char == "_")
+
+
+def _unified_source_diff(source: str, new_source: str, source_name: str) -> str:
+	return "\n".join(unified_diff(
+		source.splitlines(),
+		new_source.splitlines(),
+		fromfile=source_name,
+		tofile=source_name,
+		lineterm="",
+	)) + "\n"
 
 
 def _symbol_location(symbol: dict[str, Any]) -> dict[str, Any]:

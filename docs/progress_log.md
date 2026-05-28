@@ -7677,3 +7677,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile language_server/semantic_service.py language_server/server.py cli/main.py tests/test_compiler_baseline.py`
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_language_service_uses_shared_semantic_model_for_editor_features tests/test_compiler_baseline.py::test_language_service_proposes_code_actions_for_invalid_source tests/test_compiler_baseline.py::test_cli_language_server_check_json_uses_shared_semantic_model -q` -> 3 passed
 - `.venv/bin/apg language-server examples/05_single_support_agent/main.apg --check --json` -> emitted `apg.language-server-check.v1` with `apg.semantic-model.v1`, 17 completions, 3 document symbols, and 0 diagnostics
+
+### 2026-05-28 20:29 EAT
+
+Completed checkpoint:
+
+- Extended `language_server.semantic_service` with semantic workspace-symbol search and safe rename planning over the shared semantic model.
+- Added `apg language-server <file> --rename <symbol> --to <new-name> --json`, emitting `apg.language-server-rename.v1`.
+- Rename is dry-run by default, emits a unified source diff, reports replacement ranges, flags schema/capability/agent rename review reasons, rejects ambiguous or conflicting symbols, and only writes source with explicit `--write`.
+- Rename replacement now skips comments and string literals so descriptive prose is not silently rewritten as code.
+- Updated the tooling specification so Phase 4 rename is documented as an executable current contract.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile language_server/semantic_service.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_language_service_rename_plan_updates_symbol_references_without_writing tests/test_compiler_baseline.py::test_language_service_rename_blocks_ambiguous_field_symbols tests/test_compiler_baseline.py::test_cli_language_server_rename_json_dry_runs_without_writing -q` -> 3 passed
+- `.venv/bin/apg language-server examples/02_customer_orders_relationship/main.apg --rename Customer --to Account --json` -> emitted `apg.language-server-rename.v1`, skipped the quoted description, planned 1 source replacement, and did not write the file

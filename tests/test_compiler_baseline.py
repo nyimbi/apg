@@ -22,11 +22,13 @@ from compiler.code_generator import CodeGenerator
 from compiler.compiler import APGCompiler, compile_apg_string
 from compiler.semantic_analyzer import SemanticError
 from language_server.semantic_service import (
+	build_rename_plan,
 	build_language_service_snapshot,
 	code_actions,
 	definition,
 	hover,
 	references,
+	workspace_symbols,
 )
 
 
@@ -2057,6 +2059,83 @@ def test_cli_language_server_check_json_uses_shared_semantic_model(tmp_path):
 	assert report["document_symbol_count"] >= 3
 	assert "textDocument/completion" in report["capabilities"]
 	assert "textDocument/codeAction" in report["capabilities"]
+
+
+def test_language_service_rename_plan_updates_symbol_references_without_writing(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+	snapshot = build_language_service_snapshot(source.read_text(encoding="utf-8"), source)
+
+	plan = build_rename_plan(source.read_text(encoding="utf-8"), "Customer", "Account", source)
+
+	assert plan["format"] == "apg.language-server-rename.v1"
+	assert plan["ok"] is True
+	assert plan["changed"] is True
+	assert plan["replacement_count"] == 2
+	assert plan["requires_review"] is True
+	assert "table renames can affect database migrations" in plan["review_reasons"][0]
+	assert "table Account" in plan["new_source"]
+	assert "customer: Account;" in plan["new_source"]
+	assert "--- " in plan["diff"]
+	assert source.read_text(encoding="utf-8") == RELATIONSHIP_APP_SOURCE
+	assert {symbol["name"] for symbol in workspace_symbols(snapshot["semantic_model"], "customer")} >= {
+		"Customer",
+		"SalesOrder.customer",
+	}
+
+
+def test_language_service_rename_blocks_ambiguous_field_symbols(tmp_path):
+	source = tmp_path / "ambiguous.apg"
+	source.write_text(
+		"""
+module ambiguous version 1.0.0 {
+	description: "Ambiguous rename";
+}
+
+table Customer {
+	name: str;
+}
+
+table Product {
+	name: str;
+}
+""",
+		encoding="utf-8",
+	)
+
+	plan = build_rename_plan(source.read_text(encoding="utf-8"), "name", "label", source)
+
+	assert plan["ok"] is False
+	assert plan["changed"] is False
+	assert "ambiguous" in plan["errors"][0].lower()
+	assert {candidate["id"] for candidate in plan["candidates"]} == {
+		"field.Customer.name",
+		"field.Product.name",
+	}
+
+
+def test_cli_language_server_rename_json_dry_runs_without_writing(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, [
+		"language-server",
+		str(source),
+		"--rename",
+		"Customer",
+		"--to",
+		"Account",
+		"--json",
+	])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.language-server-rename.v1"
+	assert report["ok"] is True
+	assert report["written"] is False
+	assert report["replacement_count"] == 2
+	assert "new_source" not in report
+	assert source.read_text(encoding="utf-8") == RELATIONSHIP_APP_SOURCE
 
 
 def test_framework_names_are_not_silent_compiler_target_aliases():
