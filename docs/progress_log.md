@@ -7185,3 +7185,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 17:07 EAT
+
+Completed checkpoint:
+
+- Added generated capability health helpers so each compiled capability can report one executable view of configuration validation, rule evaluation, approvals, UI routes, theme tokens, ByteWax streaming, master data, languages, and composable components.
+- Added generated HTTP routes `GET /capabilities/health` and `GET /capabilities/{Capability}/health`, plus OpenAPI schemas for `CapabilityHealth` and `CapabilityHealthReport`.
+- Re-exported capability health helpers from generated packages and refreshed the numbered example outputs.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/python -m pytest tests/test_capability_composition_runtime.py::test_capability_declaration_generates_runtime_manifest tests/test_capability_composition_runtime.py::test_generated_app_executes_capability_operations_over_http tests/test_capability_composition_runtime.py::test_generated_package_reexports_grouped_capability_descriptions -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated app now reports 86 routes and 107 documented methods
+- Deferred broader pytest at the user's request to conserve battery.

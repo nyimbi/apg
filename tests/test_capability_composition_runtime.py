@@ -318,6 +318,21 @@ def test_capability_declaration_generates_runtime_manifest():
     assert namespace["streaming_processor_index"]() == {"bytewax": ["GeneralLedger"]}
     assert namespace["streaming_state_index"]() == {"ledger_posting_state": ["GeneralLedger"]}
     assert namespace["validate_streaming_contracts"]() == {"errors": [], "warnings": []}
+    health = namespace["capability_health"]("GeneralLedger")
+    health_report = namespace["capability_health_report"]()
+    assert health["healthy"] is True
+    assert health["status"] == "ok"
+    assert health["configuration"]["errors"] == []
+    assert health["rules"]["names"] == ["posting_period_open", "balanced_journal"]
+    assert health["approvals"]["approvers"] == ["controller", "cfo"]
+    assert health["ui"]["route_index"]["/finance/gl/journals"]["component"] == "JournalScreen"
+    assert health["theme"]["tokens"]["accent"] == "#126E82"
+    assert health["streaming"]["processor"] == "bytewax"
+    assert health["master_data"] == ["account", "cost_center"]
+    assert health["languages"] == ["en", "sw", "ha", "yo", "zu"]
+    assert health["components"]["posting"]["capability"] == "journal_entries"
+    assert health_report["healthy"] is True
+    assert health_report["capabilities"]["GeneralLedger"]["status"] == "ok"
 
     rule_names = [rule["name"] for rule in namespace["capability_rules"]("GeneralLedger")]
     assert rule_names == ["posting_period_open", "balanced_journal"]
@@ -506,6 +521,10 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
             streaming = json.loads(response.read().decode("utf-8"))
         with urllib.request.urlopen(f"{base_url}/capabilities/GeneralLedger/streaming", timeout=1) as response:
             capability_streaming = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(f"{base_url}/capabilities/GeneralLedger/health", timeout=1) as response:
+            capability_health = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(f"{base_url}/capabilities/health", timeout=1) as response:
+            capability_health_report = json.loads(response.read().decode("utf-8"))
 
         request = urllib.request.Request(
             f"{base_url}/capabilities/GeneralLedger/rules/evaluate",
@@ -587,12 +606,20 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
     assert "/streaming" in openapi["paths"]
     assert "/theme.css" in openapi["paths"]
     assert "/capabilities/GeneralLedger/streaming" in openapi["paths"]
+    assert "/capabilities/GeneralLedger/health" in openapi["paths"]
+    assert "/capabilities/health" in openapi["paths"]
     assert "/capabilities/GeneralLedger/rules/evaluate" in openapi["paths"]
     assert "/capabilities/GeneralLedger/configuration/resolve" in openapi["paths"]
     assert "/capabilities/GeneralLedger/configuration/validate" in openapi["paths"]
     assert "/capabilities/GeneralLedger/approval/plan" in openapi["paths"]
     assert openapi["paths"]["/streaming"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/StreamingTopology"
+    }
+    assert openapi["paths"]["/capabilities/health"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/CapabilityHealthReport"
+    }
+    assert openapi["paths"]["/capabilities/GeneralLedger/health"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/CapabilityHealth"
     }
     assert openapi["paths"]["/capabilities/GeneralLedger/rules/evaluate"]["post"]["requestBody"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/RuleEvaluationRequest"
@@ -609,6 +636,11 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
     assert streaming["streams"]["GeneralLedger"]["state"] == "ledger_posting_state"
     assert capability_streaming["processor"] == "bytewax"
     assert capability_streaming["state"] == "ledger_posting_state"
+    assert capability_health["healthy"] is True
+    assert capability_health["status"] == "ok"
+    assert capability_health["rules"]["names"] == ["posting_period_open", "balanced_journal"]
+    assert capability_health_report["healthy"] is True
+    assert capability_health_report["capabilities"]["GeneralLedger"]["streaming"]["processor"] == "bytewax"
     assert resolved_config == {
         "capability": "GeneralLedger",
         "configuration": {"currency": "USD", "fiscal_calendar": "monthly"},
@@ -648,6 +680,7 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
         validation = module.validate_application()
         screens = module.capability_screens("GeneralLedger")
         theme = module.capability_theme("GeneralLedger")
+        health = module.capability_health("GeneralLedger")
     finally:
         sys.modules.pop("erp_ops_generated", None)
         for name in list(sys.modules):
@@ -665,12 +698,16 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert module.ui_route_index()["/finance/gl/journals"]["component"] == "JournalScreen"
     assert screens[0]["component"] == "JournalScreen"
     assert theme["tokens"]["accent"] == "#126E82"
+    assert health["healthy"] is True
+    assert health["status"] == "ok"
     assert module.theme_token("GeneralLedger", "accent") == "#126E82"
     assert len(module.african_language_codes()) >= 40
     assert "sw" in module.supported_language_codes()
     assert validation["valid"] is True
     assert "african_language_codes" in module.__all__
     assert "capability_screens" in module.__all__
+    assert "capability_health" in module.__all__
+    assert "capability_health_report" in module.__all__
     assert "capability_streaming" in module.__all__
     assert "capability_theme" in module.__all__
     assert "describe_capabilities_by_erp_module" in module.__all__

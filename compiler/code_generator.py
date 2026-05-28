@@ -1025,6 +1025,38 @@ def _database_openapi_schemas() -> Dict[str, Any]:
             }},
             "required": ["capabilities", "by_erp_module", "dependency_graph", "load_order"],
         }},
+        "CapabilityHealth": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "capability": {{"type": "string"}},
+                "status": {{"type": "string"}},
+                "healthy": {{"type": "boolean"}},
+                "errors": {{"type": "array", "items": {{"type": "string"}}}},
+                "warnings": {{"type": "array", "items": {{"type": "string"}}}},
+                "configuration": generic_object,
+                "rules": generic_object,
+                "approvals": generic_object,
+                "ui": generic_object,
+                "theme": generic_object,
+                "streaming": generic_object,
+                "master_data": {{"type": "array", "items": {{"type": "string"}}}},
+                "languages": {{"type": "array", "items": {{"type": "string"}}}},
+                "components": generic_object,
+            }},
+            "required": ["capability", "status", "healthy", "errors", "warnings"],
+        }},
+        "CapabilityHealthReport": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "healthy": {{"type": "boolean"}},
+                "errors": {{"type": "array", "items": {{"type": "string"}}}},
+                "warnings": {{"type": "array", "items": {{"type": "string"}}}},
+                "capabilities": {{"type": "object", "additionalProperties": _schema_ref("CapabilityHealth")}},
+            }},
+            "required": ["healthy", "errors", "warnings", "capabilities"],
+        }},
         "RouteCatalog": {{
             "type": "object",
             "additionalProperties": False,
@@ -1321,6 +1353,7 @@ def openapi_document() -> Dict[str, Any]:
         "/storage": {{"get": _api_operation("Record storage status", "Storage status", response_schema=_schema_ref("StorageStatus"))}},
         "/agents": {{"get": _api_operation("Agent catalog", "AI agent and team catalog", response_schema=_schema_ref("AgentCatalog"))}},
         "/capabilities": {{"get": _api_operation("Capability catalog", "Capability catalog", response_schema=_schema_ref("CapabilityCatalog"))}},
+        "/capabilities/health": {{"get": _api_operation("Capability health report", "Capability health report", response_schema=_schema_ref("CapabilityHealthReport"))}},
         "/routes": {{"get": _api_operation("Generated UI route catalog", "UI route catalog", response_schema=_schema_ref("RouteCatalog"))}},
         "/composition": {{"get": _api_operation("Composition graph", "Composition graph", response_schema=_schema_ref("RelationshipGraph"))}},
         "/ui": {{"get": _api_operation("Generated application UI", "HTML application index")}},
@@ -1407,6 +1440,9 @@ def openapi_document() -> Dict[str, Any]:
             for capability_name in APG_CAPABILITIES.list_capabilities():
                 paths[f"/capabilities/{{capability_name}}/streaming"] = {{
                     "get": _api_operation(f"{{capability_name}} streaming contract", "Capability streaming contract", response_schema=_schema_ref("CapabilityStreamingContract")),
+                }}
+                paths[f"/capabilities/{{capability_name}}/health"] = {{
+                    "get": _api_operation(f"{{capability_name}} health", "Capability health", response_schema=_schema_ref("CapabilityHealth")),
                 }}
                 paths[f"/capabilities/{{capability_name}}/rules/evaluate"] = {{
                     "post": _api_operation(f"Evaluate {{capability_name}} rules", "Rule decision", request_body=True, request_schema=_schema_ref("RuleEvaluationRequest"), response_schema=_schema_ref("RuleEvaluationResult")),
@@ -1612,6 +1648,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
         if route.startswith("/databases/") and route.endswith("/schemas"):
             return "_route_payload"
         if route.startswith("/capabilities/") and route.endswith("/streaming"):
+            return "_route_payload"
+        if route.startswith("/capabilities/") and route.endswith("/health"):
             return "_route_payload"
         if route.startswith("/entities/") and "/records" in route:
             return "_records_payload_with_query"
@@ -2897,6 +2935,21 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
             "dependency_graph": app.get("capability_dependency_graph", {{}}),
             "load_order": app.get("capability_load_order", {{}}),
         }}
+    if path == "/capabilities/health":
+        if APG_CAPABILITIES is None or not hasattr(APG_CAPABILITIES, "capability_health_report"):
+            return 404, {{"error": "capability_health_unavailable"}}
+        health = APG_CAPABILITIES.capability_health_report()
+        return (200 if health.get("healthy") else 422), health
+    if path.startswith("/capabilities/") and path.endswith("/health"):
+        if APG_CAPABILITIES is None or not hasattr(APG_CAPABILITIES, "capability_health"):
+            return 404, {{"error": "capability_health_unavailable"}}
+        parts = [part for part in path.split("/") if part]
+        if len(parts) == 3:
+            try:
+                health = APG_CAPABILITIES.capability_health(parts[1])
+            except KeyError:
+                return 404, {{"error": "unknown_capability", "capability": parts[1]}}
+            return (200 if health.get("healthy") else 422), health
     if path == "/streaming":
         return _streaming_payload()
     if path.startswith("/capabilities/") and path.endswith("/streaming"):
@@ -4479,6 +4532,105 @@ def validate_streaming_contracts() -> Dict[str, List[str]]:
     return {{"errors": errors, "warnings": warnings}}
 
 
+def capability_health(capability_name: str) -> Dict[str, Any]:
+    capability = get_capability(capability_name)
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    configuration = validate_capability_configuration(capability_name)
+    errors.extend(configuration.get("errors", []))
+    warnings.extend(configuration.get("warnings", []))
+
+    languages = capability_languages(capability_name)
+    default_language = capability.i18n.get("default_language")
+    fallback_language = capability.i18n.get("fallback_language")
+    if not languages:
+        warnings.append(f"{{capability.name}} does not declare supported languages")
+    for language in languages:
+        if language not in SUPPORTED_LANGUAGE_CODES:
+            errors.append(f"{{capability.name}} unsupported language code {{language}}")
+    if default_language and default_language not in SUPPORTED_LANGUAGE_CODES:
+        errors.append(f"{{capability.name}} unknown default language {{default_language}}")
+    if fallback_language and fallback_language not in SUPPORTED_LANGUAGE_CODES:
+        errors.append(f"{{capability.name}} unknown fallback language {{fallback_language}}")
+    if default_language and default_language not in languages:
+        errors.append(f"{{capability.name}} default language {{default_language}} is not supported")
+    if fallback_language and fallback_language not in languages:
+        errors.append(f"{{capability.name}} fallback language {{fallback_language}} is not supported")
+
+    rules = capability_rules(capability_name)
+    if not rules:
+        warnings.append(f"{{capability.name}} does not declare capability rules")
+    screens = capability_screens(capability_name)
+    if not screens:
+        warnings.append(f"{{capability.name}} does not declare UI screens")
+    components = capability_components(capability_name)
+    if not components:
+        warnings.append(f"{{capability.name}} does not declare composable components")
+    master_data = master_data_entities(capability_name)
+    if not master_data:
+        warnings.append(f"{{capability.name}} does not declare master data entities")
+
+    stream = capability_streaming(capability_name)
+    processor = str(stream.get("processor") or "")
+    if processor not in {{"bytewax", "bytewax_streams"}}:
+        errors.append(f"{{capability.name}} uses unsupported stream processor {{processor}}")
+    if not stream.get("state"):
+        warnings.append(f"{{capability.name}} does not declare streaming state")
+
+    health = {{
+        "capability": capability.name,
+        "status": "error" if errors else "warning" if warnings else "ok",
+        "healthy": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "configuration": configuration,
+        "rules": {{
+            "count": len(rules),
+            "names": [str(rule.get("name")) for rule in rules],
+            "sample_evaluation": evaluate_capability_rules(capability_name, {{}}),
+        }},
+        "approvals": approval_plan(capability_name, {{}}),
+        "ui": {{
+            "screens": screens,
+            "route_index": {{
+                route: screen
+                for route, screen in ui_route_index().items()
+                if screen.get("capability") == capability.name
+            }},
+        }},
+        "theme": capability_theme(capability_name),
+        "streaming": stream,
+        "master_data": master_data,
+        "languages": languages,
+        "components": components,
+    }}
+    return health
+
+
+def capability_health_report() -> Dict[str, Any]:
+    capabilities = {{
+        capability_name: capability_health(capability_name)
+        for capability_name in list_capabilities()
+    }}
+    errors = [
+        f"{{capability_name}}: {{error}}"
+        for capability_name, health in capabilities.items()
+        for error in health.get("errors", [])
+    ]
+    warnings = [
+        f"{{capability_name}}: {{warning}}"
+        for capability_name, health in capabilities.items()
+        for warning in health.get("warnings", [])
+    ]
+    return {{
+        "healthy": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "capabilities": capabilities,
+    }}
+
+
 def _deep_merge(target: Dict[str, Any], source: Dict[str, Any]) -> None:
     for key, value in source.items():
         if isinstance(value, dict) and isinstance(target.get(key), dict):
@@ -5515,6 +5667,8 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'try:',
 			'    from .apg_capabilities import (',
 			'        capability_dependency_graph,',
+			'        capability_health,',
+			'        capability_health_report,',
 			'        capability_load_order,',
 			'        capability_screens,',
 			'        capability_streaming,',
@@ -5538,6 +5692,8 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'else:',
 			'    __all__.extend([',
 			'        "capability_dependency_graph",',
+			'        "capability_health",',
+			'        "capability_health_report",',
 			'        "capability_load_order",',
 			'        "capability_screens",',
 			'        "capability_streaming",',

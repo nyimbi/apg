@@ -524,6 +524,105 @@ def validate_streaming_contracts() -> Dict[str, List[str]]:
     return {"errors": errors, "warnings": warnings}
 
 
+def capability_health(capability_name: str) -> Dict[str, Any]:
+    capability = get_capability(capability_name)
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    configuration = validate_capability_configuration(capability_name)
+    errors.extend(configuration.get("errors", []))
+    warnings.extend(configuration.get("warnings", []))
+
+    languages = capability_languages(capability_name)
+    default_language = capability.i18n.get("default_language")
+    fallback_language = capability.i18n.get("fallback_language")
+    if not languages:
+        warnings.append(f"{capability.name} does not declare supported languages")
+    for language in languages:
+        if language not in SUPPORTED_LANGUAGE_CODES:
+            errors.append(f"{capability.name} unsupported language code {language}")
+    if default_language and default_language not in SUPPORTED_LANGUAGE_CODES:
+        errors.append(f"{capability.name} unknown default language {default_language}")
+    if fallback_language and fallback_language not in SUPPORTED_LANGUAGE_CODES:
+        errors.append(f"{capability.name} unknown fallback language {fallback_language}")
+    if default_language and default_language not in languages:
+        errors.append(f"{capability.name} default language {default_language} is not supported")
+    if fallback_language and fallback_language not in languages:
+        errors.append(f"{capability.name} fallback language {fallback_language} is not supported")
+
+    rules = capability_rules(capability_name)
+    if not rules:
+        warnings.append(f"{capability.name} does not declare capability rules")
+    screens = capability_screens(capability_name)
+    if not screens:
+        warnings.append(f"{capability.name} does not declare UI screens")
+    components = capability_components(capability_name)
+    if not components:
+        warnings.append(f"{capability.name} does not declare composable components")
+    master_data = master_data_entities(capability_name)
+    if not master_data:
+        warnings.append(f"{capability.name} does not declare master data entities")
+
+    stream = capability_streaming(capability_name)
+    processor = str(stream.get("processor") or "")
+    if processor not in {"bytewax", "bytewax_streams"}:
+        errors.append(f"{capability.name} uses unsupported stream processor {processor}")
+    if not stream.get("state"):
+        warnings.append(f"{capability.name} does not declare streaming state")
+
+    health = {
+        "capability": capability.name,
+        "status": "error" if errors else "warning" if warnings else "ok",
+        "healthy": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "configuration": configuration,
+        "rules": {
+            "count": len(rules),
+            "names": [str(rule.get("name")) for rule in rules],
+            "sample_evaluation": evaluate_capability_rules(capability_name, {}),
+        },
+        "approvals": approval_plan(capability_name, {}),
+        "ui": {
+            "screens": screens,
+            "route_index": {
+                route: screen
+                for route, screen in ui_route_index().items()
+                if screen.get("capability") == capability.name
+            },
+        },
+        "theme": capability_theme(capability_name),
+        "streaming": stream,
+        "master_data": master_data,
+        "languages": languages,
+        "components": components,
+    }
+    return health
+
+
+def capability_health_report() -> Dict[str, Any]:
+    capabilities = {
+        capability_name: capability_health(capability_name)
+        for capability_name in list_capabilities()
+    }
+    errors = [
+        f"{capability_name}: {error}"
+        for capability_name, health in capabilities.items()
+        for error in health.get("errors", [])
+    ]
+    warnings = [
+        f"{capability_name}: {warning}"
+        for capability_name, health in capabilities.items()
+        for warning in health.get("warnings", [])
+    ]
+    return {
+        "healthy": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "capabilities": capabilities,
+    }
+
+
 def _deep_merge(target: Dict[str, Any], source: Dict[str, Any]) -> None:
     for key, value in source.items():
         if isinstance(value, dict) and isinstance(target.get(key), dict):

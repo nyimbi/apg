@@ -99,6 +99,8 @@ else:
 try:
     from .apg_capabilities import (
         capability_dependency_graph,
+        capability_health,
+        capability_health_report,
         capability_load_order,
         capability_screens,
         capability_streaming,
@@ -122,6 +124,8 @@ except ImportError:
 else:
     __all__.extend([
         "capability_dependency_graph",
+        "capability_health",
+        "capability_health_report",
         "capability_load_order",
         "capability_screens",
         "capability_streaming",

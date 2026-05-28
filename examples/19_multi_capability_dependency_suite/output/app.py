@@ -782,6 +782,38 @@ def _database_openapi_schemas() -> Dict[str, Any]:
             },
             "required": ["capabilities", "by_erp_module", "dependency_graph", "load_order"],
         },
+        "CapabilityHealth": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "capability": {"type": "string"},
+                "status": {"type": "string"},
+                "healthy": {"type": "boolean"},
+                "errors": {"type": "array", "items": {"type": "string"}},
+                "warnings": {"type": "array", "items": {"type": "string"}},
+                "configuration": generic_object,
+                "rules": generic_object,
+                "approvals": generic_object,
+                "ui": generic_object,
+                "theme": generic_object,
+                "streaming": generic_object,
+                "master_data": {"type": "array", "items": {"type": "string"}},
+                "languages": {"type": "array", "items": {"type": "string"}},
+                "components": generic_object,
+            },
+            "required": ["capability", "status", "healthy", "errors", "warnings"],
+        },
+        "CapabilityHealthReport": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "healthy": {"type": "boolean"},
+                "errors": {"type": "array", "items": {"type": "string"}},
+                "warnings": {"type": "array", "items": {"type": "string"}},
+                "capabilities": {"type": "object", "additionalProperties": _schema_ref("CapabilityHealth")},
+            },
+            "required": ["healthy", "errors", "warnings", "capabilities"],
+        },
         "RouteCatalog": {
             "type": "object",
             "additionalProperties": False,
@@ -1078,6 +1110,7 @@ def openapi_document() -> Dict[str, Any]:
         "/storage": {"get": _api_operation("Record storage status", "Storage status", response_schema=_schema_ref("StorageStatus"))},
         "/agents": {"get": _api_operation("Agent catalog", "AI agent and team catalog", response_schema=_schema_ref("AgentCatalog"))},
         "/capabilities": {"get": _api_operation("Capability catalog", "Capability catalog", response_schema=_schema_ref("CapabilityCatalog"))},
+        "/capabilities/health": {"get": _api_operation("Capability health report", "Capability health report", response_schema=_schema_ref("CapabilityHealthReport"))},
         "/routes": {"get": _api_operation("Generated UI route catalog", "UI route catalog", response_schema=_schema_ref("RouteCatalog"))},
         "/composition": {"get": _api_operation("Composition graph", "Composition graph", response_schema=_schema_ref("RelationshipGraph"))},
         "/ui": {"get": _api_operation("Generated application UI", "HTML application index")},
@@ -1164,6 +1197,9 @@ def openapi_document() -> Dict[str, Any]:
             for capability_name in APG_CAPABILITIES.list_capabilities():
                 paths[f"/capabilities/{capability_name}/streaming"] = {
                     "get": _api_operation(f"{capability_name} streaming contract", "Capability streaming contract", response_schema=_schema_ref("CapabilityStreamingContract")),
+                }
+                paths[f"/capabilities/{capability_name}/health"] = {
+                    "get": _api_operation(f"{capability_name} health", "Capability health", response_schema=_schema_ref("CapabilityHealth")),
                 }
                 paths[f"/capabilities/{capability_name}/rules/evaluate"] = {
                     "post": _api_operation(f"Evaluate {capability_name} rules", "Rule decision", request_body=True, request_schema=_schema_ref("RuleEvaluationRequest"), response_schema=_schema_ref("RuleEvaluationResult")),
@@ -1369,6 +1405,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
         if route.startswith("/databases/") and route.endswith("/schemas"):
             return "_route_payload"
         if route.startswith("/capabilities/") and route.endswith("/streaming"):
+            return "_route_payload"
+        if route.startswith("/capabilities/") and route.endswith("/health"):
             return "_route_payload"
         if route.startswith("/entities/") and "/records" in route:
             return "_records_payload_with_query"
@@ -2654,6 +2692,21 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
             "dependency_graph": app.get("capability_dependency_graph", {}),
             "load_order": app.get("capability_load_order", {}),
         }
+    if path == "/capabilities/health":
+        if APG_CAPABILITIES is None or not hasattr(APG_CAPABILITIES, "capability_health_report"):
+            return 404, {"error": "capability_health_unavailable"}
+        health = APG_CAPABILITIES.capability_health_report()
+        return (200 if health.get("healthy") else 422), health
+    if path.startswith("/capabilities/") and path.endswith("/health"):
+        if APG_CAPABILITIES is None or not hasattr(APG_CAPABILITIES, "capability_health"):
+            return 404, {"error": "capability_health_unavailable"}
+        parts = [part for part in path.split("/") if part]
+        if len(parts) == 3:
+            try:
+                health = APG_CAPABILITIES.capability_health(parts[1])
+            except KeyError:
+                return 404, {"error": "unknown_capability", "capability": parts[1]}
+            return (200 if health.get("healthy") else 422), health
     if path == "/streaming":
         return _streaming_payload()
     if path.startswith("/capabilities/") and path.endswith("/streaming"):
