@@ -402,6 +402,29 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
     return status
 
 
+def metrics_snapshot() -> Dict[str, Any]:
+    record_counts = {{
+        entity_name: len(RECORD_STORE[entity_name])
+        for entity_name in sorted(ENTITY_NAMES)
+    }}
+    event_counts: Dict[str, int] = {{}}
+    for event in EVENT_LOG:
+        action = str(event.get("action", "unknown"))
+        event_counts[action] = event_counts.get(action, 0) + 1
+    return {{
+        "name": MODULE_NAME,
+        "version": MODULE_VERSION,
+        "entity_count": len(ENTITIES),
+        "record_counts": record_counts,
+        "total_records": sum(record_counts.values()),
+        "event_count": len(EVENT_LOG),
+        "event_counts": event_counts,
+        "relationship_count": len(relationship_graph()["edges"]),
+        "storage": storage_status(),
+        "auth": auth_status(),
+    }}
+
+
 def auth_status() -> Dict[str, Any]:
     return {{
         "mode": "api_key" if os.environ.get("APG_API_KEY") else "open",
@@ -531,6 +554,7 @@ def openapi_document() -> Dict[str, Any]:
         "/validate": {{"get": _api_operation("Application validation", "Validation report")}},
         "/events": {{"get": _api_operation("Record mutation events", "Event log")}},
         "/auth": {{"get": _api_operation("Authentication status", "Authentication mode")}},
+        "/metrics": {{"get": _api_operation("Application metrics", "Runtime metrics")}},
         "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
         "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph")}},
         "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
@@ -811,6 +835,7 @@ def _ui_index_html() -> str:
         f"<p>{{html.escape(MODULE_DESCRIPTION or 'Generated APG application')}}</p>"
         '<nav><a href="/manifest">Manifest JSON</a> | '
         '<a href="/events">Events</a> | '
+        '<a href="/metrics">Metrics</a> | '
         '<a href="/records">Record JSON</a> | '
         '<a href="/relationships">Relationships</a> | '
         '<a href="/openapi.json">API Contract</a></nav>'
@@ -940,6 +965,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, auth_status()
     if path == "/events":
         return 200, {{"events": list_events()}}
+    if path == "/metrics":
+        return 200, metrics_snapshot()
     if path == "/records" or path.startswith("/records/") or (
         path.startswith("/entities/") and "/records" in path
     ):
@@ -2657,7 +2684,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import auth_status, describe_application, list_entities, list_events, list_records, main, openapi_document, relationship_graph, storage_status, validate_application, validate_record',
+			'from .app import auth_status, describe_application, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, relationship_graph, storage_status, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
@@ -2667,6 +2694,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    "list_events",',
 			'    "list_records",',
 			'    "main",',
+			'    "metrics_snapshot",',
 			'    "openapi_document",',
 			'    "relationship_graph",',
 			'    "storage_status",',

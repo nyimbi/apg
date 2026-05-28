@@ -5542,3 +5542,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `b97ab3e` (`Add generated record revisions`) to `origin/main`.
+
+### 2026-05-28 07:21 EAT
+
+Completed checkpoint:
+
+- Added generated runtime metrics for executable apps.
+- Generated apps now expose `GET /metrics`.
+- Metrics include entity count, per-entity record counts, total records, event count, event counts by action, relationship count, storage mode, and auth mode.
+- Generated `/ui` links to metrics.
+- Generated `/openapi.json` advertises the metrics endpoint.
+- Generated packages now reexport `metrics_snapshot()` for Python consumers.
+- Added focused regression coverage for package-level metrics, HTTP metrics, UI link exposure, OpenAPI exposure, record counts, event counts, storage/auth metadata, and total record counts.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 17 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated metrics slice.

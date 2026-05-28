@@ -123,6 +123,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.list_agents() == ["Planner"]
 	assert manifest["ai_agents"] == ["Planner"]
 	assert module.auth_status()["mode"] == "open"
+	assert module.metrics_snapshot()["entity_count"] == 1
 	assert module.openapi_document()["openapi"] == "3.1.0"
 	assert module.relationship_graph()["nodes"][0]["id"] == "Planner"
 	assert module.storage_status()["mode"] == "memory"
@@ -131,6 +132,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "auth_status" in module.__all__
 	assert "describe_application" in module.__all__
 	assert "list_events" in module.__all__
+	assert "metrics_snapshot" in module.__all__
 	assert "openapi_document" in module.__all__
 	assert "relationship_graph" in module.__all__
 	assert "storage_status" in module.__all__
@@ -316,6 +318,8 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 			imported = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/events", timeout=1) as response:
 			events = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/metrics", timeout=1) as response:
+			metrics = json.loads(response.read().decode("utf-8"))
 	finally:
 		process.terminate()
 		try:
@@ -335,6 +339,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert ui_content_type.startswith("text/html")
 	assert "/ui/entities/Customer" in ui_index
 	assert "/events" in ui_index
+	assert "/metrics" in ui_index
 	assert "/openapi.json" in ui_index
 	assert 'action="/entities/Customer/records"' in entity_ui
 	assert "<pre>" in entity_ui
@@ -344,6 +349,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert openapi["info"]["title"] == "customer_ops"
 	assert "/auth" in openapi["paths"]
 	assert "/events" in openapi["paths"]
+	assert "/metrics" in openapi["paths"]
 	assert "ApiKeyAuth" in openapi["components"]["securitySchemes"]
 	assert "/entities/Customer/records" in openapi["paths"]
 	assert "/entities/Customer/records/{id}" in openapi["paths"]
@@ -391,6 +397,12 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert "/entities/Customer/records/import" in openapi["paths"]
 	assert [event["action"] for event in events["events"]] == ["create", "update", "delete", "create", "create", "import"]
 	assert events["events"][-1]["after"] == imported["imported"][0]
+	assert metrics["entity_count"] == 1
+	assert metrics["record_counts"] == {"Customer": 3}
+	assert metrics["total_records"] == 3
+	assert metrics["event_count"] == 6
+	assert metrics["event_counts"] == {"create": 3, "delete": 1, "import": 1, "update": 1}
+	assert metrics["auth"]["mode"] == "open"
 
 
 def test_generated_python_app_exposes_relationship_graph_from_fields(tmp_path):
