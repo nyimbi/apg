@@ -21,6 +21,8 @@ APG currently has an executable compiler path:
   writing generated code;
 - `apg validate <file> --target python --json` emits `apg.validate-report.v1`
   with lint results and generator-readiness metadata;
+- `apg format <file> --check|--write|--json` emits `apg.format-result.v1`
+  and applies deterministic APG whitespace formatting;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -582,6 +584,8 @@ apg compile app.apg --output generated/app --verify
 apg compile app.apg --target python --output generated/app
 apg lint app.apg --json
 apg lint src/apg --strict --json
+apg format app.apg --check
+apg format app.apg --write
 apg validate
 apg run
 apg doctor

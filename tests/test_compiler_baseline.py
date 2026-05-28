@@ -1298,6 +1298,56 @@ def test_cli_validate_rejects_non_python_target_with_apg0802(tmp_path):
 	assert "must be 'python'" in report["diagnostics"][-1]["message"]
 
 
+def test_cli_format_json_formats_source_without_writing(tmp_path):
+	source = tmp_path / "messy.apg"
+	source.write_text(
+		'module messy version 1.0.0 {\n\tdescription: "Messy";   \n}\n'
+		'agent Planner {\n\trole: "planner";\n}\n',
+		encoding="utf-8",
+	)
+
+	result = CliRunner().invoke(cli, ["format", str(source), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.format-result.v1"
+	assert report["changed"] is True
+	assert report["idempotent"] is True
+	assert report["written"] is False
+	assert report["text"] == (
+		'module messy version 1.0.0 {\n'
+		'  description: "Messy";\n'
+		'}\n'
+		'\n'
+		'agent Planner {\n'
+		'  role: "planner";\n'
+		'}\n'
+	)
+	assert "\t" in source.read_text(encoding="utf-8")
+
+
+def test_cli_format_check_and_write_are_idempotent(tmp_path):
+	source = tmp_path / "messy.apg"
+	source.write_text('module messy version 1.0.0 {\n\tname: str;\n}\n', encoding="utf-8")
+
+	check_result = CliRunner().invoke(cli, ["format", str(source), "--check"])
+	assert check_result.exit_code == 1
+	assert "would change" in check_result.output
+
+	write_result = CliRunner().invoke(cli, ["format", str(source), "--write"])
+	assert write_result.exit_code == 0, write_result.output
+	assert "formatted" in write_result.output
+	assert source.read_text(encoding="utf-8") == (
+		"module messy version 1.0.0 {\n"
+		"  name: str;\n"
+		"}\n"
+	)
+
+	second_check = CliRunner().invoke(cli, ["format", str(source), "--check"])
+	assert second_check.exit_code == 0, second_check.output
+	assert "already formatted" in second_check.output
+
+
 def test_cli_init_describes_python_artifact_flow():
 	runner = CliRunner()
 	with runner.isolated_filesystem():

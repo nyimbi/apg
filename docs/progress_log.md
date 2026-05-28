@@ -7371,3 +7371,19 @@ Battery-conscious verification:
 - `.venv/bin/apg validate examples/01_minimal_customer_records/main.apg --json` -> exited 0 and emitted `apg.validate-report.v1`
 - `.venv/bin/apg validate examples/01_minimal_customer_records/main.apg --target django --json` -> exited 1 with `APG0802`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 18:19 EAT
+
+Completed checkpoint:
+
+- Added a shared `compiler.formatter` module for deterministic APG source formatting.
+- Added an executable `apg format` command with `--check`, `--write`, and `--json` modes.
+- Implemented `apg.format-result.v1` JSON output with changed/idempotent diagnostics and optional formatted text.
+- Registered `apg format` in the main Click CLI and updated the tooling specification so formatting is part of APG's executable baseline.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/formatter.py cli/format_command.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_format_json_formats_source_without_writing tests/test_compiler_baseline.py::test_cli_format_check_and_write_are_idempotent tests/test_compiler_baseline.py::test_cli_lint_json_reports_valid_apg_file_without_generation -q` -> 3 passed
+- `.venv/bin/apg format examples/01_minimal_customer_records/main.apg --json` -> exited 0 and emitted idempotent `apg.format-result.v1`
+- Deferred broader pytest at the user's request to conserve battery.
