@@ -7338,3 +7338,19 @@ Battery-conscious verification:
 
 - Documentation-only slice; no code tests run.
 - `rg` scan confirmed no copied AppGen/AppGen-X/PBC/AGX terminology remains in `docs/tooling.md`.
+
+### 2026-05-28 18:08 EAT
+
+Completed checkpoint:
+
+- Added an executable `apg lint` Click command that lints one `.apg` file or recursively lints a directory of `.apg` files.
+- Implemented deterministic `apg.lint-report.v1` JSON output with per-file reports, severity counts, diagnostics, source mode, strict mode, and semantic-model availability.
+- Kept lint dependency-light by reusing the existing APG parser, AST builder, and semantic analyzer without writing generated application files.
+- Updated the tooling specification so `apg lint` is listed in APG's current executable baseline.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile cli/lint_command.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_lint_json_reports_valid_apg_file_without_generation tests/test_compiler_baseline.py::test_cli_lint_directory_json_aggregates_apg_files_deterministically tests/test_compiler_baseline.py::test_python_is_the_only_advertised_compiler_target -q` -> 3 passed
+- `.venv/bin/apg lint examples/01_minimal_customer_records/main.apg --json` -> exited 0 and emitted `apg.lint-report.v1`
+- Deferred broader pytest at the user's request to conserve battery.

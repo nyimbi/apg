@@ -19,6 +19,7 @@ sys.path.insert(0, str(apg_root))
 
 from cli.create_project import create
 from cli.compile_command import compile_cmd
+from cli.lint_command import lint
 from cli.run_command import run
 from cli.validate_command import validate
 
@@ -40,6 +41,7 @@ def cli():
 # Add subcommands
 cli.add_command(create)
 cli.add_command(compile_cmd, name='compile')
+cli.add_command(lint)
 cli.add_command(run)
 cli.add_command(validate)
 

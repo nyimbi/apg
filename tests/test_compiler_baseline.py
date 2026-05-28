@@ -1220,6 +1220,46 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "route_dispatch" in smoke_test
 
 
+def test_cli_lint_json_reports_valid_apg_file_without_generation(tmp_path):
+	source = tmp_path / "baseline.apg"
+	output = tmp_path / "generated"
+	source.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["lint", str(source), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.lint-report.v1"
+	assert report["ok"] is True
+	assert report["source_mode"] == "file"
+	assert report["files"] == [str(source)]
+	assert report["severity_counts"] == {"error": 0, "warning": 0, "info": 0, "hint": 0}
+	assert report["diagnostics"] == []
+	assert report["semantic_model_available"] is True
+	assert not output.exists()
+
+
+def test_cli_lint_directory_json_aggregates_apg_files_deterministically(tmp_path):
+	first = tmp_path / "01_valid.apg"
+	second = tmp_path / "02_invalid.apg"
+	first.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")
+	second.write_text("invalid_entity Broken {", encoding="utf-8")
+	(tmp_path / "ignored.txt").write_text("invalid_entity Ignored {", encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["lint", str(tmp_path), "--json"])
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.lint-report.v1"
+	assert report["ok"] is False
+	assert report["source_mode"] == "directory"
+	assert report["files"] == [str(first), str(second)]
+	assert report["severity_counts"]["error"] >= 1
+	assert [file_report["file"] for file_report in report["file_reports"]] == [str(first), str(second)]
+	assert report["diagnostics"][0]["code"] == "APG0001"
+	assert report["diagnostics"][0]["file"] == str(second)
+
+
 def test_cli_init_describes_python_artifact_flow():
 	runner = CliRunner()
 	with runner.isolated_filesystem():

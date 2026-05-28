@@ -17,6 +17,8 @@ APG currently has an executable compiler path:
 - source files use the `.apg` extension;
 - the installed command is `apg`;
 - the primary generation command is `apg compile <file> --output <dir>`;
+- `apg lint <file-or-directory> --json` emits `apg.lint-report.v1` without
+  writing generated code;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -576,6 +578,8 @@ These commands are executable today and should remain compatible:
 ```console
 apg compile app.apg --output generated/app --verify
 apg compile app.apg --target python --output generated/app
+apg lint app.apg --json
+apg lint src/apg --strict --json
 apg validate
 apg run
 apg doctor
