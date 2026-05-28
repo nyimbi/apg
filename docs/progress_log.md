@@ -7020,3 +7020,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 8 passed
 - `.venv/bin/python -m pytest tests/test_parser.py::TestAPGParser::test_database_parsing tests/test_semantic_analyzer.py::TestSemanticAnalyzer::test_database_validation -q` -> 2 passed, 1 pre-existing warning
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 16:03 EAT
+
+Completed checkpoint:
+
+- Added a generated `/ui/databases` screen so compiled APG applications expose database status, schema links, and table summaries through the generated HTML UI.
+- Linked the database screen from the generated application index and OpenAPI path list.
+- Added focused regression coverage proving the generated UI surfaces `LedgerDB`, status, schema JSON links, and declared table names.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 9 passed
+- `git diff --check -- compiler/code_generator.py tests/test_compiler_database_ast.py docs/progress_log.md`
+- Deferred broader pytest at the user's request to conserve battery.

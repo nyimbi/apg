@@ -906,6 +906,7 @@ def openapi_document() -> Dict[str, Any]:
         "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph")}},
         "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
         "/ui": {{"get": _api_operation("Generated application UI", "HTML application index")}},
+        "/ui/databases": {{"get": _api_operation("Generated database catalog UI", "HTML database catalog")}},
     }}
     schemas: Dict[str, Any] = _database_openapi_schemas()
     for entity in ENTITIES:
@@ -1473,6 +1474,13 @@ def _ui_index_html() -> str:
     )
     if not entity_links:
         entity_links = "<li>No APG entities declared.</li>"
+    database_links = "".join(
+        f'<li><a href="/ui/databases">{{html.escape(database["name"])}}</a> '
+        f'<code>{{len(database.get("schemas", []))}} schema(s)</code></li>'
+        for database in app.get("databases", [])
+    )
+    if not database_links:
+        database_links = "<li>No databases declared.</li>"
     application_route_links = "".join(
         f'<li><a href="{{html.escape(route, quote=True)}}">{{html.escape(route)}}</a> '
         f'<code>{{html.escape(str(screen.get("application", "application")))}}</code></li>'
@@ -1517,6 +1525,7 @@ def _ui_index_html() -> str:
         '<a href="/metrics">Metrics</a> | '
         '<a href="/self-test">Self-Test</a> | '
         '<a href="/records">Record JSON</a> | '
+        '<a href="/ui/databases">Databases</a> | '
         '<a href="/relationships">Relationships</a> | '
         '<a href="/openapi.json">API Contract</a></nav>'
         "<h2>Application Routes</h2>"
@@ -1525,6 +1534,8 @@ def _ui_index_html() -> str:
         f"<ul>{{capability_route_links}}</ul>"
         "<h2>Entities</h2>"
         f"<ul>{{entity_links}}</ul>"
+        "<h2>Databases</h2>"
+        f"<ul>{{database_links}}</ul>"
         "<h2>Capabilities</h2>"
         f"<ul>{{capability_links}}</ul>"
         "<h2>AI Agents</h2>"
@@ -1533,6 +1544,49 @@ def _ui_index_html() -> str:
         f"<ul>{{team_links}}</ul>"
     )
     return _html_page(MODULE_NAME, body)
+
+
+def _ui_database_catalog_html() -> tuple[int, str]:
+    status = database_status()
+    status_code = 200 if status["valid"] else 422
+    status_label = "valid" if status["valid"] else "invalid"
+    database_items: list[str] = []
+    for database in list_databases():
+        database_name = str(database.get("name", "database"))
+        schema_rows: list[str] = []
+        for schema in database.get("schemas", []):
+            schema_name = str(schema.get("name", "default"))
+            table_names = ", ".join(
+                html.escape(str(table.get("name", "table")))
+                for table in schema.get("tables", [])
+            ) or "no tables"
+            schema_rows.append(
+                f"<li><strong>{{html.escape(schema_name)}}</strong>: {{table_names}}</li>"
+            )
+        schemas_html = "".join(schema_rows) or "<li>No schemas declared.</li>"
+        database_items.append(
+            f"<section><h2>{{html.escape(database_name)}}</h2>"
+            f'<p><a href="/databases/{{html.escape(database_name, quote=True)}}/schemas">'
+            "Schema JSON</a></p>"
+            f"<ul>{{schemas_html}}</ul></section>"
+        )
+    databases_html = "".join(database_items) or "<p>No databases declared.</p>"
+    validation_html = html.escape(json.dumps(status["validation"], indent=2, sort_keys=True))
+    body = (
+        "<h1>Databases</h1>"
+        f"<p>Status: <strong>{{html.escape(status_label)}}</strong>; "
+        f"{{status['database_count']}} database(s), "
+        f"{{status['schema_count']}} schema(s), "
+        f"{{status['table_count']}} table(s), "
+        f"{{status['reference_count']}} reference(s).</p>"
+        '<nav><a href="/ui">Application UI</a> | '
+        '<a href="/databases">Database JSON</a> | '
+        '<a href="/databases/status">Status JSON</a> | '
+        '<a href="/relationships">Relationships</a></nav>'
+        f"{{databases_html}}"
+        f"<h2>Validation</h2><pre>{{validation_html}}</pre>"
+    )
+    return status_code, _html_page("Databases", body)
 
 
 def _ui_field_input_html(field: Dict[str, Any]) -> str:
@@ -1744,6 +1798,8 @@ def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[i
     parts = [part for part in path.split("/") if part]
     if parts == ["ui"]:
         return 200, _ui_index_html()
+    if parts == ["ui", "databases"]:
+        return _ui_database_catalog_html()
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
         return _ui_entity_html(parts[2], query=query)
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "agents":

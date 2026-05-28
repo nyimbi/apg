@@ -266,6 +266,28 @@ def test_generated_python_exposes_database_catalog_routes_and_openapi():
 	assert metrics["database_status"]["table_count"] == 2
 
 
+def test_generated_ui_surfaces_database_catalog_status_and_schema_links():
+	parse_result = APGParser().parse_string(DATABASE_SOURCE, "database.apg")
+	ast = ASTBuilder().build_ast(parse_result["parse_tree"], "database.apg")
+
+	files = PythonCodeGenerator(CodeGenConfig(use_composable_templates=False)).generate(ast)
+	namespace = {}
+	exec(files["app.py"], namespace)
+
+	status, index_html = namespace["_ui_payload"]("/ui")
+	assert status == 200
+	assert "/ui/databases" in index_html
+	assert "LedgerDB" in index_html
+
+	status, database_html = namespace["_ui_payload"]("/ui/databases")
+	assert status == 200
+	assert "Status: <strong>valid</strong>" in database_html
+	assert "/databases/LedgerDB/schemas" in database_html
+	assert "accounting" in database_html
+	assert "journals" in database_html
+	assert "accounts" in database_html
+
+
 def test_generated_readme_documents_database_runtime_surface():
 	parse_result = APGParser().parse_string(DATABASE_SOURCE, "database.apg")
 	ast = ASTBuilder().build_ast(parse_result["parse_tree"], "database.apg")
