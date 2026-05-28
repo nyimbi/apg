@@ -5005,3 +5005,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `23a9565` (`Materialize grammar-backed APG entities`) to `origin/main`.
+
+### 2026-05-28 05:05 EAT
+
+Completed checkpoint:
+
+- Made generated first-class AI-agent runtimes expose `list_agents()`, `list_agent_teams()`, and `list_teams()` helpers.
+- Wired generated `app.py` manifests to include both `ai_agents` and `ai_agent_teams` when `ai_agents.py` is present.
+- Added focused regression coverage so generated Python application metadata does not hide compiled AI agents and teams.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_ai_agent_composition.py`
+- `.venv/bin/pytest tests/test_ai_agent_composition.py -q` -> 5 passed
+- Direct compile smoke check for the support AI-agent sample -> generated app manifest includes `['Planner', 'Writer']` and `['SupportCrew']`
+- `git diff --check -- compiler/code_generator.py tests/test_ai_agent_composition.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push.

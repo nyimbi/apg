@@ -232,6 +232,8 @@ def describe_application() -> Dict[str, Any]:
     }}
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents"):
         description["ai_agents"] = AI_AGENTS.list_agents()
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agent_teams"):
+        description["ai_agent_teams"] = AI_AGENTS.list_agent_teams()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities"):
         description["capabilities"] = APG_CAPABILITIES.list_capabilities()
     return description
@@ -1250,6 +1252,18 @@ def get_agent(name: str) -> AIAgentSpec:
 
 def get_team(name: str) -> AgentTeamSpec:
     return AI_AGENT_TEAMS[name]
+
+
+def list_agents() -> List[str]:
+    return sorted(AI_AGENTS)
+
+
+def list_agent_teams() -> List[str]:
+    return sorted(AI_AGENT_TEAMS)
+
+
+def list_teams() -> List[str]:
+    return list_agent_teams()
 
 
 def list_agent_runtimes(include_aliases: bool = False) -> List[str]:

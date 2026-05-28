@@ -2,6 +2,9 @@
 First-class AI agent composition tests.
 """
 
+import sys
+import types
+
 from compiler.ast_builder import AIAgentDeclaration, AgentTeamDeclaration
 from compiler.compiler import APGCompiler
 from compiler.parser import APGParser
@@ -126,6 +129,9 @@ def test_ai_agent_composition_generates_runtime_manifest():
     namespace = {}
     exec(compile(runtime, "ai_agents.py", "exec"), namespace)
 
+    assert namespace["list_agents"]() == ["Planner", "Writer"]
+    assert namespace["list_agent_teams"]() == ["SupportCrew"]
+    assert namespace["list_teams"]() == ["SupportCrew"]
     assert "codex" in namespace["list_agent_runtimes"]()
     assert namespace["canonical_runtime"]("claude") == "claude_code"
     assert namespace["describe_team"]("SupportCrew")["capabilities"] == ["support_response"]
@@ -184,3 +190,23 @@ def test_ai_agent_runtime_catalog_supports_fast_moving_agent_tools():
     assert namespace["canonical_runtime"]("open_code") == "opencode"
     assert namespace["canonical_runtime"]("pi") == "pi"
     assert set(namespace["agents_by_runtime"]()) >= {"codex", "claude_code", "opencode", "pi"}
+
+
+def test_generated_app_manifest_includes_ai_agents_and_teams():
+    result = APGCompiler().compile_string(AI_AGENT_SOURCE, "support.apg")
+
+    assert result.success is True
+
+    ai_agents = types.ModuleType("ai_agents")
+    sys.modules["ai_agents"] = ai_agents
+    try:
+        exec(compile(result.generated_files["ai_agents.py"], "ai_agents.py", "exec"), ai_agents.__dict__)
+
+        app = types.ModuleType("app")
+        exec(compile(result.generated_files["app.py"], "app.py", "exec"), app.__dict__)
+        manifest = app.describe_application()
+    finally:
+        sys.modules.pop("ai_agents", None)
+
+    assert manifest["ai_agents"] == ["Planner", "Writer"]
+    assert manifest["ai_agent_teams"] == ["SupportCrew"]
