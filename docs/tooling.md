@@ -36,6 +36,10 @@ APG currently has an executable compiler path:
   `apg.graph.v1` data or renderable graph text;
 - `apg graph-suite <file> --json` emits `apg.graph-suite-report.v1` with
   every supported graph rendered as JSON, Mermaid, and DOT;
+- `apg graph-suite --audit-fixtures --json` emits
+  `apg.graph-fixture-audit.v1` by checking graph fixture coverage for required
+  graph kinds, JSON contracts, Mermaid/DOT rendering, ER relationships, agent
+  teams, and capability dependencies;
 - `apg release <file> --json` emits `apg.release-report.v1` by compiling to a
   temporary generated app, importing it, and running generated self-test,
   OpenAPI, component-manifest, route-dispatch, and semantic-model evidence;
@@ -720,6 +724,7 @@ apg format --audit-fixtures --json
 apg graph app.apg --kind er --format json
 apg graph app.apg --kind agent --format mermaid
 apg graph-suite app.apg --json
+apg graph-suite --audit-fixtures --json
 apg release app.apg --json
 apg parser-golden --json
 apg diagnostics --audit-fixtures --json
@@ -828,6 +833,7 @@ apg graph app.apg --kind capability --format dot
 
 ```console
 apg graph-suite app.apg --json
+apg graph-suite --audit-fixtures --json
 ```
 
 Emits `apg.graph-suite-report.v1` release evidence for every required graph
@@ -835,6 +841,12 @@ kind and renders each graph as JSON, Mermaid, and DOT. This command is the
 preferred CI and IDE health check because it proves that graph previews,
 documentation diagrams, release evidence, and downstream graph tooling all use
 the same semantic model.
+
+`--audit-fixtures` loads `tests/fixtures/graphs/catalog.json` and emits
+`apg.graph-fixture-audit.v1`. The audit fails when any fixture stops emitting a
+required graph kind, a JSON/Mermaid/DOT rendering contract drifts, required ER
+relationship, agent-team, or capability-dependency nodes/edges disappear, or a
+required graph behavior tag lacks a passing fixture.
 
 Supported graph kinds:
 
@@ -1327,7 +1339,7 @@ Tooling tests must be fixture-driven and deterministic.
 | Formatter tests | Idempotency, comment preservation, modifier ordering, stable output. |
 | CLI contract tests | Exit codes, JSON schemas, text summaries, bad arguments. |
 | LSP tests | Completion, hover, definition, references, rename, code actions, formatting. |
-| Graph tests | ER, lookup, workflow, handler, capability, security, agent, package, deployment graph output. |
+| Graph tests | ER, lookup, workflow, handler, capability, security, agent, package, deployment graph output, enforced by `apg graph-suite --audit-fixtures --json` and the `apg.graph-fixture-audit.v1` report. |
 | Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios. |
 | Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, rejected unsafe plans. |
 | Verifier tests | Web/mobile/desktop/capability/deployment release evidence contracts. |
@@ -1368,7 +1380,8 @@ Exit criteria:
 - No new generator behavior required.
 - Tooling fixtures can run in CI, including `apg parser-golden --json`,
   `apg diagnostics --audit-fixtures --json`,
-  `apg format --audit-fixtures --json`, and `apg drift <file> --json`.
+  `apg format --audit-fixtures --json`,
+  `apg graph-suite --audit-fixtures --json`, and `apg drift <file> --json`.
 
 ### Phase 1: Shared Semantic Model MVP
 

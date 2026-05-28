@@ -1,0 +1,111 @@
+{
+  "format": "apg.graph-fixture-catalog.v1",
+  "graph_kinds_required": [
+    "er",
+    "lookup",
+    "workflow",
+    "handler",
+    "capability",
+    "security",
+    "agent",
+    "deployment",
+    "package"
+  ],
+  "tags_required": [
+    "er_relationships",
+    "agent_team",
+    "capability_dependencies",
+    "mermaid_rendering",
+    "dot_rendering"
+  ],
+  "fixtures": [
+    {
+      "id": "customer_orders_er",
+      "source": "../../../examples/02_customer_orders_relationship/main.apg",
+      "tags": ["er_relationships", "mermaid_rendering", "dot_rendering"],
+      "expectations": {
+        "er": {
+          "min_nodes": 8,
+          "min_edges": 7,
+          "nodes": [
+            "entity:Customer",
+            "entity:SalesOrder",
+            "field:SalesOrder.customer_id"
+          ],
+          "edges": [
+            {
+              "source": "field:SalesOrder.customer_id",
+              "target": "entity:Customer",
+              "kind": "inferred_reference"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "multi_runtime_agent_team",
+      "source": "../../../examples/07_multi_runtime_agent_team/main.apg",
+      "tags": ["agent_team", "mermaid_rendering", "dot_rendering"],
+      "expectations": {
+        "agent": {
+          "min_nodes": 4,
+          "min_edges": 3,
+          "nodes": [
+            "team:DeliverySwarm",
+            "agent:Researcher",
+            "agent:Coder",
+            "agent:LocalReviewer"
+          ],
+          "edges": [
+            {
+              "source": "team:DeliverySwarm",
+              "target": "agent:Researcher",
+              "kind": "contains_agent"
+            },
+            {
+              "source": "team:DeliverySwarm",
+              "target": "agent:Coder",
+              "kind": "contains_agent"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "capability_dependency_suite",
+      "source": "../../../examples/19_multi_capability_dependency_suite/main.apg",
+      "tags": ["capability_dependencies", "mermaid_rendering", "dot_rendering"],
+      "expectations": {
+        "capability": {
+          "min_nodes": 7,
+          "min_edges": 6,
+          "nodes": [
+            "capability:AuditEvents",
+            "capability:CustomerMaster",
+            "capability:OrderManagement",
+            "capability:Billing",
+            "capability:audit_events",
+            "capability:customer_master"
+          ],
+          "edges": [
+            {
+              "source": "capability:CustomerMaster",
+              "target": "capability:audit_events",
+              "kind": "requires"
+            },
+            {
+              "source": "capability:OrderManagement",
+              "target": "capability:customer_master",
+              "kind": "requires"
+            },
+            {
+              "source": "capability:Billing",
+              "target": "capability:sales_orders",
+              "kind": "requires"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

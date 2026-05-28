@@ -7911,3 +7911,23 @@ Battery-conscious verification:
 - `.venv/bin/apg format --audit-fixtures` passed in text mode.
 - `.venv/bin/python -m py_compile compiler/formatter.py cli/format_command.py tests/test_compiler_baseline.py` passed.
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_format_json_formats_source_without_writing tests/test_compiler_baseline.py::test_cli_format_check_and_write_are_idempotent tests/test_compiler_baseline.py::test_cli_format_audits_fixture_catalog -q` passed with 3 tests.
+
+Commit result:
+
+- Pushed commit `bab218f` (`Make formatter contract executable`).
+
+### 2026-05-28 22:10 EAT
+
+In progress:
+
+- Turned graph-suite behavior into a checked-in fixture audit.
+- Added `apg graph-suite --audit-fixtures --json`, emitting `apg.graph-fixture-audit.v1`.
+- Added a graph fixture catalog covering ER relationship inference, multi-runtime agent-team containment, capability dependency edges, and Mermaid/DOT rendering contracts.
+- Updated `docs/tooling.md` so the executable baseline, graph-suite CLI contract, test strategy, and Phase 0 fixture gate include the graph fixture audit.
+
+Battery-conscious verification:
+
+- `.venv/bin/apg graph-suite --audit-fixtures --json` passed with 3 fixtures, all required graph kinds observed, 0 missing tags, and 0 blocking gaps.
+- `.venv/bin/apg graph-suite --audit-fixtures` passed in text mode.
+- `.venv/bin/python -m py_compile compiler/graphs.py cli/graph_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_graph_json_emits_entity_relationship_graph tests/test_compiler_baseline.py::test_cli_graph_infers_conventional_foreign_key_edges tests/test_compiler_baseline.py::test_cli_graph_mermaid_and_dot_outputs_are_renderable tests/test_compiler_baseline.py::test_cli_graph_suite_json_emits_all_supported_renderings tests/test_compiler_baseline.py::test_cli_graph_suite_text_summarizes_graph_counts tests/test_compiler_baseline.py::test_cli_graph_suite_audits_fixture_catalog -q` passed with 6 tests.

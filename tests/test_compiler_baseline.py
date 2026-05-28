@@ -2108,6 +2108,25 @@ def test_cli_graph_suite_text_summarizes_graph_counts(tmp_path):
 	assert "agent:" in result.output
 
 
+def test_cli_graph_suite_audits_fixture_catalog():
+	result = CliRunner().invoke(cli, ["graph-suite", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.graph-fixture-audit.v1"
+	assert report["ok"] is True
+	assert report["missing_graph_kinds"] == []
+	assert report["missing_tags"] == []
+	assert report["blocking_gaps"] == []
+	assert report["summary"]["fixture_count"] >= 3
+	assert report["summary"]["failing_fixture_count"] == 0
+	assert "er" in report["graph_kinds_observed"]
+	assert "agent" in report["graph_kinds_observed"]
+	assert "capability" in report["graph_kinds_observed"]
+	assert {"er_relationships", "agent_team", "capability_dependencies"}.issubset(report["tags_covered"])
+	assert all(fixture["graph_kinds"] == report["graph_kinds_required"] for fixture in report["fixtures"])
+
+
 def test_cli_init_describes_python_artifact_flow():
 	runner = CliRunner()
 	with runner.isolated_filesystem():

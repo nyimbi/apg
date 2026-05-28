@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,8 @@ SUPPORTED_GRAPH_KINDS = (
 	"deployment",
 	"package",
 )
+GRAPH_FIXTURE_AUDIT_FORMAT = "apg.graph-fixture-audit.v1"
+DEFAULT_GRAPH_FIXTURE_CATALOG = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "graphs" / "catalog.json"
 
 
 @dataclass(frozen=True)
@@ -137,6 +140,157 @@ def build_graph_suite(path: Path) -> dict[str, Any]:
 			}
 			for kind, rendered in graphs.items()
 		},
+	}
+
+
+def audit_graph_fixtures(catalog_path: Path | None = None) -> dict[str, Any]:
+	"""Run the checked-in graph-suite fixture catalog."""
+	catalog_file = Path(catalog_path or DEFAULT_GRAPH_FIXTURE_CATALOG)
+	catalog_root = catalog_file.parent
+	catalog = json.loads(catalog_file.read_text(encoding="utf-8"))
+	required_graph_kinds = sorted(str(kind) for kind in catalog.get("graph_kinds_required", SUPPORTED_GRAPH_KINDS))
+	required_tags = sorted(str(tag) for tag in catalog.get("tags_required", []))
+	fixture_reports: list[dict[str, Any]] = []
+	blocking_gaps: list[dict[str, Any]] = []
+	observed_graph_kinds: set[str] = set()
+	covered_tags: set[str] = set()
+
+	for fixture in catalog.get("fixtures", []):
+		report = _audit_graph_fixture(catalog_root, fixture, required_graph_kinds)
+		fixture_reports.append(report)
+		observed_graph_kinds.update(report["graph_kinds"])
+		if report["ok"]:
+			covered_tags.update(report["tags"])
+		else:
+			blocking_gaps.append({
+				"id": report["id"],
+				"source": report["source"],
+				"errors": report["errors"],
+			})
+
+	missing_tags = sorted(set(required_tags).difference(covered_tags))
+	for tag in missing_tags:
+		blocking_gaps.append({
+			"id": f"missing_tag:{tag}",
+			"source": str(catalog_file),
+			"errors": [f"required graph fixture tag {tag!r} is not covered by a passing fixture"],
+		})
+
+	missing_graph_kinds = sorted(set(required_graph_kinds).difference(observed_graph_kinds))
+	for kind in missing_graph_kinds:
+		blocking_gaps.append({
+			"id": f"missing_graph_kind:{kind}",
+			"source": str(catalog_file),
+			"errors": [f"required graph kind {kind!r} was not emitted by any graph-suite fixture"],
+		})
+
+	return {
+		"format": GRAPH_FIXTURE_AUDIT_FORMAT,
+		"ok": not blocking_gaps,
+		"fixture_catalog": str(catalog_file),
+		"graph_kinds_required": required_graph_kinds,
+		"graph_kinds_observed": sorted(observed_graph_kinds),
+		"missing_graph_kinds": missing_graph_kinds,
+		"tags_required": required_tags,
+		"tags_covered": sorted(covered_tags),
+		"missing_tags": missing_tags,
+		"fixtures": fixture_reports,
+		"summary": {
+			"fixture_count": len(fixture_reports),
+			"passing_fixture_count": sum(1 for report in fixture_reports if report["ok"]),
+			"failing_fixture_count": sum(1 for report in fixture_reports if not report["ok"]),
+			"blocking_gap_count": len(blocking_gaps),
+		},
+		"blocking_gaps": blocking_gaps,
+	}
+
+
+def _audit_graph_fixture(
+	catalog_root: Path,
+	fixture: dict[str, Any],
+	required_graph_kinds: list[str],
+) -> dict[str, Any]:
+	fixture_id = str(fixture["id"])
+	source = (catalog_root / str(fixture["source"])).resolve()
+	tags = sorted(str(tag) for tag in fixture.get("tags", []))
+	errors: list[str] = []
+	report: dict[str, Any] | None = None
+
+	try:
+		report = build_graph_suite(source)
+	except Exception as error:
+		errors.append(str(error))
+
+	if report is None:
+		return {
+			"id": fixture_id,
+			"source": str(source),
+			"tags": tags,
+			"graph_kinds": [],
+			"expectations_checked": [],
+			"ok": False,
+			"errors": errors,
+		}
+
+	graphs = report.get("graphs", {})
+	graph_kinds = sorted(str(kind) for kind in report.get("graph_kinds", []))
+	for kind in required_graph_kinds:
+		if kind not in graphs:
+			errors.append(f"missing graph kind {kind!r}")
+			continue
+		graph_report = graphs[kind]
+		json_graph = graph_report.get("json", {})
+		if json_graph.get("format") != "apg.graph.v1":
+			errors.append(f"{kind} graph JSON format mismatch")
+		if json_graph.get("kind") != kind:
+			errors.append(f"{kind} graph JSON kind mismatch")
+		mermaid = str(graph_report.get("mermaid", ""))
+		dot = str(graph_report.get("dot", ""))
+		if not mermaid.startswith("graph TD\n"):
+			errors.append(f"{kind} Mermaid rendering does not start with graph TD")
+		if not dot.startswith(f"digraph {kind} "):
+			errors.append(f"{kind} DOT rendering does not start with digraph {kind}")
+
+	expectations_checked: list[str] = []
+	for kind, expectation in dict(fixture.get("expectations", {})).items():
+		kind = str(kind)
+		graph = graphs.get(kind, {}).get("json", {})
+		nodes = {str(node.get("id")) for node in graph.get("nodes", [])}
+		edges = {
+			(
+				str(edge.get("source")),
+				str(edge.get("target")),
+				str(edge.get("kind")),
+			)
+			for edge in graph.get("edges", [])
+		}
+		min_nodes = int(expectation.get("min_nodes", 0))
+		min_edges = int(expectation.get("min_edges", 0))
+		if len(nodes) < min_nodes:
+			errors.append(f"{kind} expected at least {min_nodes} nodes, got {len(nodes)}")
+		if len(edges) < min_edges:
+			errors.append(f"{kind} expected at least {min_edges} edges, got {len(edges)}")
+		for node_id in expectation.get("nodes", []):
+			if str(node_id) not in nodes:
+				errors.append(f"{kind} missing node {node_id}")
+		for expected_edge in expectation.get("edges", []):
+			edge_key = (
+				str(expected_edge.get("source")),
+				str(expected_edge.get("target")),
+				str(expected_edge.get("kind")),
+			)
+			if edge_key not in edges:
+				errors.append(f"{kind} missing edge {edge_key[0]} -> {edge_key[1]} ({edge_key[2]})")
+		expectations_checked.append(kind)
+
+	return {
+		"id": fixture_id,
+		"source": str(source),
+		"tags": tags,
+		"graph_kinds": graph_kinds,
+		"expectations_checked": sorted(expectations_checked),
+		"ok": not errors,
+		"errors": errors,
 	}
 
 
