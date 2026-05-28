@@ -66,6 +66,8 @@ try:
     from .apg_application import (
         application_component_catalog,
         application_dependency_graph,
+        application_route_index,
+        application_screens,
         describe_application_composition,
         describe_application_compositions,
         get_application,
@@ -78,6 +80,8 @@ else:
     __all__.extend([
         "application_component_catalog",
         "application_dependency_graph",
+        "application_route_index",
+        "application_screens",
         "describe_application_composition",
         "describe_application_compositions",
         "get_application",

@@ -32,12 +32,18 @@ the composition through:
 - `describe_application()["application_composition_descriptions"]`
 - `component_manifest()["application_compositions"]`
 - `GET /applications`
+- HTML route rendering for declared `screens` and `routes`
 - `validate_application()["checks"]["application_compositions"]`
 - package helpers such as `list_applications()`,
-  `application_dependency_graph()`, and
-  `validate_application_compositions()`
+  `application_dependency_graph()`, `application_route_index()`,
+  `application_screens()`, and `validate_application_compositions()`
 
 Application validation checks references against generated capability and agent
 runtime catalogs when those catalogs are present. Missing references become
 validation errors; external references remain valid when no local catalog is
 available.
+
+Application screens are executable in the generated standard-library Python app.
+If an `app` declares `screens: {Home: {route: "/erp"}}`, `GET /erp` returns an
+HTML composition page. Plain `routes: ["/finance"]` entries are also indexed and
+rendered when no capability screen owns that route.

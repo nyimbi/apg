@@ -6047,3 +6047,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `12dba51` (`Make APG applications explicitly composable`).
+
+### 2026-05-28 09:54 EAT
+
+Completed checkpoint:
+
+- Extended generated `apg_application.py` runtimes with `application_screens()` and `application_route_index()`.
+- Wired generated Python apps to expose application route metadata in manifests/OpenAPI and render declared application screens/routes as HTML.
+- Regenerated numbered example outputs so checked-in generated apps match the new route renderer and package exports.
+- Updated application-composition docs and language reference to describe executable application routes.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_application_composition_runtime.py tests/test_examples_parseable.py`
+- `.venv/bin/pytest tests/test_application_composition_runtime.py tests/test_code_generator_executable_defaults.py tests/test_capability_composition_runtime.py tests/test_examples_parseable.py -q` -> 23 passed
+- `.venv/bin/python -c '...'` py-compiled 77 generated Python files under `examples/[0-9][0-9]*/output/`
+- `git diff --check`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.

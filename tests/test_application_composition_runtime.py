@@ -79,12 +79,16 @@ def test_application_composition_compiles_to_executable_runtime_manifest():
         "capability": "ledger_service",
         "route": "/finance",
     }
+    assert namespace["application_screens"]("EnterpriseSuite")[0]["route"] == "/"
+    assert namespace["application_route_index"]()["/"]["name"] == "Home"
+    assert namespace["application_route_index"]()["/finance"]["application"] == "EnterpriseSuite"
     graph_edges = {
         (edge["source"], edge["relation"], edge["target"])
         for edge in namespace["application_dependency_graph"]()["edges"]
     }
     assert ("application:EnterpriseSuite", "uses_capability", "capability:GeneralLedger") in graph_edges
     assert ("application:EnterpriseSuite", "exposes_route", "route:/finance") in graph_edges
+    assert ("application_screen:EnterpriseSuite.Home", "mounted_at", "route:/") in graph_edges
     assert namespace["validate_application_compositions"](
         available_capabilities=["GeneralLedger"],
     ) == {"errors": [], "warnings": []}
@@ -115,17 +119,28 @@ def test_generated_app_manifest_includes_application_composition():
         component = app.component_manifest()
         validation = app.validate_application()
         applications_payload = app._route_payload("/applications")[1]
+        app_screen = app._application_screen("/")
+        app_screen_status, app_screen_html = app._application_screen_payload("/")
+        openapi = app.openapi_document()
     finally:
         sys.modules.pop("apg_application", None)
         sys.modules.pop("apg_capabilities", None)
 
     assert manifest["application_compositions"] == ["EnterpriseSuite"]
     assert manifest["application_composition_descriptions"]["EnterpriseSuite"]["routes"] == ["/finance", "/ops"]
+    assert manifest["application_routes"]["/"]["name"] == "Home"
     assert component["application_compositions"] == ["EnterpriseSuite"]
     assert component["application_dependency_graph"]["edges"]
+    assert component["application_routes"]["/finance"]["application"] == "EnterpriseSuite"
     assert validation["valid"] is True
     assert validation["checks"]["application_compositions"] == {"errors": [], "warnings": []}
     assert applications_payload["applications"]["EnterpriseSuite"]["capabilities"] == ["GeneralLedger"]
+    assert app_screen["application"] == "EnterpriseSuite"
+    assert app_screen_status == 200
+    assert "EnterpriseSuite" in app_screen_html
+    assert "GeneralLedger" in app_screen_html
+    assert "/" in openapi["paths"]
+    assert "/finance" in openapi["paths"]
 
 
 def test_generated_package_reexports_application_composition_helpers(tmp_path):
@@ -149,6 +164,7 @@ def test_generated_package_reexports_application_composition_helpers(tmp_path):
         applications = module.list_applications()
         application = module.describe_application_composition("EnterpriseSuite")
         graph = module.application_dependency_graph()
+        routes = module.application_route_index()
     finally:
         sys.modules.pop("enterprise_suite_generated", None)
         for name in list(sys.modules):
@@ -158,6 +174,9 @@ def test_generated_package_reexports_application_composition_helpers(tmp_path):
     assert applications == ["EnterpriseSuite"]
     assert application["capabilities"] == ["GeneralLedger"]
     assert graph["edges"]
+    assert routes["/"]["name"] == "Home"
     assert "list_applications" in module.__all__
     assert "application_dependency_graph" in module.__all__
+    assert "application_route_index" in module.__all__
+    assert "application_screens" in module.__all__
     assert "validate_application_compositions" in module.__all__

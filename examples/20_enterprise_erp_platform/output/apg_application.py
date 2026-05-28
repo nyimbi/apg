@@ -106,6 +106,72 @@ def application_component_catalog() -> Dict[str, Dict[str, Any]]:
     return catalog
 
 
+def _normalize_application_screen(application: ApplicationSpec, name: str, spec: Any) -> Dict[str, Any]:
+    screen_spec = dict(spec) if isinstance(spec, dict) else {"component": spec or name}
+    route = screen_spec.get("route", screen_spec.get("path", ""))
+    return {
+        "id": f"{application.name}.{name}",
+        "application": application.name,
+        "name": name,
+        "route": route,
+        "path": route,
+        "component": screen_spec.get("component", name),
+        "capability": screen_spec.get("capability"),
+        "capabilities": list(application.capabilities),
+        "agents": list(application.agents),
+        "agent_teams": list(application.agent_teams),
+        "theme": screen_spec.get("theme", application.theme.get("name")),
+        "spec": screen_spec,
+    }
+
+
+def application_screens(application_name: str) -> List[Dict[str, Any]]:
+    application = get_application(application_name)
+    screens: List[Dict[str, Any]] = []
+    if isinstance(application.screens, dict):
+        for name, spec in application.screens.items():
+            screens.append(_normalize_application_screen(application, str(name), spec))
+    elif isinstance(application.screens, list):
+        for index, item in enumerate(application.screens):
+            if isinstance(item, dict):
+                name = str(item.get("name") or item.get("id") or item.get("component") or f"screen_{index + 1}")
+                screens.append(_normalize_application_screen(application, name, item))
+            else:
+                name = str(item)
+                screens.append(_normalize_application_screen(application, name, {"component": name}))
+
+    known_routes = {str(screen.get("route") or screen.get("path") or "") for screen in screens}
+    for index, route in enumerate(application.routes):
+        route_text = str(route)
+        if route_text in known_routes:
+            continue
+        screens.append({
+            "id": f"{application.name}.route_{index + 1}",
+            "application": application.name,
+            "name": route_text,
+            "route": route_text,
+            "path": route_text,
+            "component": route_text,
+            "capability": None,
+            "capabilities": list(application.capabilities),
+            "agents": list(application.agents),
+            "agent_teams": list(application.agent_teams),
+            "theme": application.theme.get("name"),
+            "spec": {"route": route_text},
+        })
+    return screens
+
+
+def application_route_index() -> Dict[str, Dict[str, Any]]:
+    routes: Dict[str, Dict[str, Any]] = {}
+    for application in APPLICATIONS.values():
+        for screen in application_screens(application.name):
+            route = screen.get("route") or screen.get("path")
+            if route:
+                routes[str(route)] = screen
+    return routes
+
+
 def application_dependency_graph() -> Dict[str, List[Dict[str, str]]]:
     nodes: Dict[str, Dict[str, str]] = {}
     edges: List[Dict[str, str]] = []
@@ -135,6 +201,15 @@ def application_dependency_graph() -> Dict[str, List[Dict[str, str]]]:
             route_id = f"route:{route}"
             node(route_id, "route", str(route))
             edge(app_id, route_id, "exposes_route")
+        for screen in application_screens(application.name):
+            screen_id = f"application_screen:{screen['id']}"
+            node(screen_id, "application_screen", str(screen["name"]))
+            edge(app_id, screen_id, "has_screen")
+            route = screen.get("route") or screen.get("path")
+            if route:
+                route_id = f"route:{route}"
+                node(route_id, "route", str(route))
+                edge(screen_id, route_id, "mounted_at")
     return {"nodes": sorted(nodes.values(), key=lambda item: item["id"]), "edges": edges}
 
 

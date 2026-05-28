@@ -320,6 +320,7 @@ def component_manifest() -> Dict[str, Any]:
         "ai_agent_teams": app.get("ai_agent_teams", []),
         "application_compositions": app.get("application_compositions", []),
         "application_dependency_graph": app.get("application_dependency_graph", {}),
+        "application_routes": app.get("application_routes", {}),
         "capabilities": app.get("capabilities", []),
         "ui_routes": app.get("ui_routes", {}),
         "streaming_processors": app.get("streaming_processors", {}),
@@ -540,6 +541,11 @@ def openapi_document() -> Dict[str, Any]:
             paths[f"/agent-teams/{team_name}/invoke"] = {
                 "post": _api_operation(f"Invoke agent team {team_name}", "Agent team invocation result", request_body=True),
             }
+    if APG_APPLICATIONS is not None:
+        route_index = getattr(APG_APPLICATIONS, "application_route_index", None)
+        if route_index is not None:
+            for route in sorted(route_index()):
+                paths[str(route)] = {"get": _api_operation(f"Application route {route}", "Generated application composition screen")}
     return {
         "openapi": "3.1.0",
         "info": {
@@ -587,6 +593,8 @@ def describe_application() -> Dict[str, Any]:
         description["application_dependency_graph"] = APG_APPLICATIONS.application_dependency_graph()
     if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "application_component_catalog"):
         description["application_component_catalog"] = APG_APPLICATIONS.application_component_catalog()
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "application_route_index"):
+        description["application_routes"] = APG_APPLICATIONS.application_route_index()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities"):
         description["capabilities"] = APG_CAPABILITIES.list_capabilities()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capabilities"):
@@ -1199,6 +1207,43 @@ def _capability_screen_payload(path: str) -> tuple[int, str]:
     return 200, _capability_screen_html(screen)
 
 
+def _application_screen(path: str) -> Dict[str, Any] | None:
+    if APG_APPLICATIONS is None or not hasattr(APG_APPLICATIONS, "application_route_index"):
+        return None
+    routes = APG_APPLICATIONS.application_route_index()
+    screen = routes.get(path)
+    return dict(screen) if isinstance(screen, dict) else None
+
+
+def _application_screen_html(screen: Dict[str, Any]) -> str:
+    title = str(screen.get("name") or screen.get("component") or "Application route")
+    application = str(screen.get("application") or "")
+    route = str(screen.get("route") or screen.get("path") or "")
+    capabilities = html.escape(json.dumps(screen.get("capabilities", []), indent=2, sort_keys=True))
+    agents = html.escape(json.dumps(screen.get("agents", []), indent=2, sort_keys=True))
+    component = html.escape(json.dumps(screen.get("component"), indent=2, sort_keys=True))
+    body = (
+        '<nav><a href="/ui">Application</a> | '
+        '<a href="/applications">Applications</a> | '
+        '<a href="/routes">Routes</a> | '
+        '<a href="/composition">Composition</a></nav>'
+        f"<h1>{html.escape(title)}</h1>"
+        f"<p><strong>Application:</strong> {html.escape(application)}</p>"
+        f"<p><strong>Route:</strong> {html.escape(route)}</p>"
+        f"<h2>Capabilities</h2><pre>{capabilities}</pre>"
+        f"<h2>Agents</h2><pre>{agents}</pre>"
+        f"<h2>Component</h2><pre>{component}</pre>"
+    )
+    return _html_page(title, body)
+
+
+def _application_screen_payload(path: str) -> tuple[int, str]:
+    screen = _application_screen(path)
+    if screen is None:
+        return 404, _html_page("Not found", f"<h1>Not found</h1><p>{html.escape(path)}</p>")
+    return 200, _application_screen_html(screen)
+
+
 def _record_route(path: str) -> Dict[str, str | None] | None:
     parts = [part for part in path.split("/") if part]
     if parts == ["records"]:
@@ -1680,6 +1725,10 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
             content_type = "text/html; charset=utf-8"
         elif _capability_screen(path) is not None:
             status, html_payload = _capability_screen_payload(path)
+            body = html_payload.encode("utf-8")
+            content_type = "text/html; charset=utf-8"
+        elif _application_screen(path) is not None:
+            status, html_payload = _application_screen_payload(path)
             body = html_payload.encode("utf-8")
             content_type = "text/html; charset=utf-8"
         else:

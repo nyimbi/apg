@@ -525,6 +525,7 @@ def component_manifest() -> Dict[str, Any]:
         "ai_agent_teams": app.get("ai_agent_teams", []),
         "application_compositions": app.get("application_compositions", []),
         "application_dependency_graph": app.get("application_dependency_graph", {{}}),
+        "application_routes": app.get("application_routes", {{}}),
         "capabilities": app.get("capabilities", []),
         "ui_routes": app.get("ui_routes", {{}}),
         "streaming_processors": app.get("streaming_processors", {{}}),
@@ -745,6 +746,11 @@ def openapi_document() -> Dict[str, Any]:
             paths[f"/agent-teams/{{team_name}}/invoke"] = {{
                 "post": _api_operation(f"Invoke agent team {{team_name}}", "Agent team invocation result", request_body=True),
             }}
+    if APG_APPLICATIONS is not None:
+        route_index = getattr(APG_APPLICATIONS, "application_route_index", None)
+        if route_index is not None:
+            for route in sorted(route_index()):
+                paths[str(route)] = {{"get": _api_operation(f"Application route {{route}}", "Generated application composition screen")}}
     return {{
         "openapi": "3.1.0",
         "info": {{
@@ -792,6 +798,8 @@ def describe_application() -> Dict[str, Any]:
         description["application_dependency_graph"] = APG_APPLICATIONS.application_dependency_graph()
     if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "application_component_catalog"):
         description["application_component_catalog"] = APG_APPLICATIONS.application_component_catalog()
+    if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "application_route_index"):
+        description["application_routes"] = APG_APPLICATIONS.application_route_index()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities"):
         description["capabilities"] = APG_CAPABILITIES.list_capabilities()
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capabilities"):
@@ -1404,6 +1412,43 @@ def _capability_screen_payload(path: str) -> tuple[int, str]:
     return 200, _capability_screen_html(screen)
 
 
+def _application_screen(path: str) -> Dict[str, Any] | None:
+    if APG_APPLICATIONS is None or not hasattr(APG_APPLICATIONS, "application_route_index"):
+        return None
+    routes = APG_APPLICATIONS.application_route_index()
+    screen = routes.get(path)
+    return dict(screen) if isinstance(screen, dict) else None
+
+
+def _application_screen_html(screen: Dict[str, Any]) -> str:
+    title = str(screen.get("name") or screen.get("component") or "Application route")
+    application = str(screen.get("application") or "")
+    route = str(screen.get("route") or screen.get("path") or "")
+    capabilities = html.escape(json.dumps(screen.get("capabilities", []), indent=2, sort_keys=True))
+    agents = html.escape(json.dumps(screen.get("agents", []), indent=2, sort_keys=True))
+    component = html.escape(json.dumps(screen.get("component"), indent=2, sort_keys=True))
+    body = (
+        '<nav><a href="/ui">Application</a> | '
+        '<a href="/applications">Applications</a> | '
+        '<a href="/routes">Routes</a> | '
+        '<a href="/composition">Composition</a></nav>'
+        f"<h1>{{html.escape(title)}}</h1>"
+        f"<p><strong>Application:</strong> {{html.escape(application)}}</p>"
+        f"<p><strong>Route:</strong> {{html.escape(route)}}</p>"
+        f"<h2>Capabilities</h2><pre>{{capabilities}}</pre>"
+        f"<h2>Agents</h2><pre>{{agents}}</pre>"
+        f"<h2>Component</h2><pre>{{component}}</pre>"
+    )
+    return _html_page(title, body)
+
+
+def _application_screen_payload(path: str) -> tuple[int, str]:
+    screen = _application_screen(path)
+    if screen is None:
+        return 404, _html_page("Not found", f"<h1>Not found</h1><p>{{html.escape(path)}}</p>")
+    return 200, _application_screen_html(screen)
+
+
 def _record_route(path: str) -> Dict[str, str | None] | None:
     parts = [part for part in path.split("/") if part]
     if parts == ["records"]:
@@ -1885,6 +1930,10 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
             content_type = "text/html; charset=utf-8"
         elif _capability_screen(path) is not None:
             status, html_payload = _capability_screen_payload(path)
+            body = html_payload.encode("utf-8")
+            content_type = "text/html; charset=utf-8"
+        elif _application_screen(path) is not None:
+            status, html_payload = _application_screen_payload(path)
             body = html_payload.encode("utf-8")
             content_type = "text/html; charset=utf-8"
         else:
@@ -2403,6 +2452,72 @@ def application_component_catalog() -> Dict[str, Dict[str, Any]]:
     return catalog
 
 
+def _normalize_application_screen(application: ApplicationSpec, name: str, spec: Any) -> Dict[str, Any]:
+    screen_spec = dict(spec) if isinstance(spec, dict) else {{"component": spec or name}}
+    route = screen_spec.get("route", screen_spec.get("path", ""))
+    return {{
+        "id": f"{{application.name}}.{{name}}",
+        "application": application.name,
+        "name": name,
+        "route": route,
+        "path": route,
+        "component": screen_spec.get("component", name),
+        "capability": screen_spec.get("capability"),
+        "capabilities": list(application.capabilities),
+        "agents": list(application.agents),
+        "agent_teams": list(application.agent_teams),
+        "theme": screen_spec.get("theme", application.theme.get("name")),
+        "spec": screen_spec,
+    }}
+
+
+def application_screens(application_name: str) -> List[Dict[str, Any]]:
+    application = get_application(application_name)
+    screens: List[Dict[str, Any]] = []
+    if isinstance(application.screens, dict):
+        for name, spec in application.screens.items():
+            screens.append(_normalize_application_screen(application, str(name), spec))
+    elif isinstance(application.screens, list):
+        for index, item in enumerate(application.screens):
+            if isinstance(item, dict):
+                name = str(item.get("name") or item.get("id") or item.get("component") or f"screen_{{index + 1}}")
+                screens.append(_normalize_application_screen(application, name, item))
+            else:
+                name = str(item)
+                screens.append(_normalize_application_screen(application, name, {{"component": name}}))
+
+    known_routes = {{str(screen.get("route") or screen.get("path") or "") for screen in screens}}
+    for index, route in enumerate(application.routes):
+        route_text = str(route)
+        if route_text in known_routes:
+            continue
+        screens.append({{
+            "id": f"{{application.name}}.route_{{index + 1}}",
+            "application": application.name,
+            "name": route_text,
+            "route": route_text,
+            "path": route_text,
+            "component": route_text,
+            "capability": None,
+            "capabilities": list(application.capabilities),
+            "agents": list(application.agents),
+            "agent_teams": list(application.agent_teams),
+            "theme": application.theme.get("name"),
+            "spec": {{"route": route_text}},
+        }})
+    return screens
+
+
+def application_route_index() -> Dict[str, Dict[str, Any]]:
+    routes: Dict[str, Dict[str, Any]] = {{}}
+    for application in APPLICATIONS.values():
+        for screen in application_screens(application.name):
+            route = screen.get("route") or screen.get("path")
+            if route:
+                routes[str(route)] = screen
+    return routes
+
+
 def application_dependency_graph() -> Dict[str, List[Dict[str, str]]]:
     nodes: Dict[str, Dict[str, str]] = {{}}
     edges: List[Dict[str, str]] = []
@@ -2432,6 +2547,15 @@ def application_dependency_graph() -> Dict[str, List[Dict[str, str]]]:
             route_id = f"route:{{route}}"
             node(route_id, "route", str(route))
             edge(app_id, route_id, "exposes_route")
+        for screen in application_screens(application.name):
+            screen_id = f"application_screen:{{screen['id']}}"
+            node(screen_id, "application_screen", str(screen["name"]))
+            edge(app_id, screen_id, "has_screen")
+            route = screen.get("route") or screen.get("path")
+            if route:
+                route_id = f"route:{{route}}"
+                node(route_id, "route", str(route))
+                edge(screen_id, route_id, "mounted_at")
     return {{"nodes": sorted(nodes.values(), key=lambda item: item["id"]), "edges": edges}}
 
 
@@ -3867,6 +3991,8 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    from .apg_application import (',
 			'        application_component_catalog,',
 			'        application_dependency_graph,',
+			'        application_route_index,',
+			'        application_screens,',
 			'        describe_application_composition,',
 			'        describe_application_compositions,',
 			'        get_application,',
@@ -3879,6 +4005,8 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    __all__.extend([',
 			'        "application_component_catalog",',
 			'        "application_dependency_graph",',
+			'        "application_route_index",',
+			'        "application_screens",',
 			'        "describe_application_composition",',
 			'        "describe_application_compositions",',
 			'        "get_application",',
