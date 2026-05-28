@@ -6005,3 +6005,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `84b4818` (`Route root runtime outputs to archive paths`) to `origin/main`.
+
+### 2026-05-28 09:16 EAT
+
+Completed checkpoint:
+
+- Added a `README.md` to each of the 20 numbered APG example directories.
+- Each example README explains what the example demonstrates, lists source/output files, shows the compile command, and shows how to self-test/run the generated app.
+- Compiled each numbered `main.apg` into an `output/` directory inside that example directory.
+- Extended the numbered-example regression so every example must keep its README and core generated output artifacts.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_examples_parseable.py`
+- `.venv/bin/pytest tests/test_examples_parseable.py -q` -> 3 passed
+- `.venv/bin/python -c '...'` py-compiled 76 generated Python files under `examples/[0-9][0-9]*/output/`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.

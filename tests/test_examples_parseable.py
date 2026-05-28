@@ -38,3 +38,34 @@ def test_numbered_apg_examples_parse_and_compile():
 			failures.append(f"{source}: compile failed: {compile_result.errors}")
 
 	assert failures == []
+
+
+def test_numbered_apg_examples_include_readmes_and_compiled_outputs():
+	required_output_files = {
+		".dockerignore",
+		".env.example",
+		"Dockerfile",
+		"__init__.py",
+		"app.py",
+		"README.md",
+		"requirements.txt",
+		"smoke_test.py",
+	}
+	failures: list[str] = []
+
+	for source in numbered_example_sources():
+		example_dir = source.parent
+		if not (example_dir / "README.md").is_file():
+			failures.append(f"{example_dir}: missing README.md")
+		output_dir = example_dir / "output"
+		if not output_dir.is_dir():
+			failures.append(f"{example_dir}: missing output directory")
+			continue
+		missing = sorted(
+			filename for filename in required_output_files
+			if not (output_dir / filename).is_file()
+		)
+		if missing:
+			failures.append(f"{example_dir}: missing output files {missing}")
+
+	assert failures == []
