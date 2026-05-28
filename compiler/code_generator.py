@@ -617,6 +617,12 @@ def openapi_document() -> Dict[str, Any]:
         paths["/configuration/resolve"] = {{"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True)}}
         paths["/configuration/validate"] = {{"post": _api_operation("Validate capability configuration", "Configuration validation", request_body=True)}}
         paths["/approval/plan"] = {{"post": _api_operation("Plan capability approvals", "Approval plan", request_body=True)}}
+        paths["/streaming"] = {{"get": _api_operation("Streaming topology", "ByteWax streaming topology")}}
+        if hasattr(APG_CAPABILITIES, "list_capabilities"):
+            for capability_name in APG_CAPABILITIES.list_capabilities():
+                paths[f"/capabilities/{{capability_name}}/streaming"] = {{
+                    "get": _api_operation(f"{{capability_name}} streaming contract", "Capability streaming contract"),
+                }}
         route_index = getattr(APG_CAPABILITIES, "ui_route_index", None)
         if route_index is not None:
             for route in sorted(route_index()):
@@ -1074,6 +1080,12 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
             "dependency_graph": app.get("capability_dependency_graph", {{}}),
             "load_order": app.get("capability_load_order", {{}}),
         }}
+    if path == "/streaming":
+        return _streaming_payload()
+    if path.startswith("/capabilities/") and path.endswith("/streaming"):
+        parts = [part for part in path.split("/") if part]
+        if len(parts) == 3:
+            return _capability_streaming_payload(parts[1])
     if path == "/routes":
         return 200, {{"routes": describe_application().get("ui_routes", {{}})}}
     if path == "/composition":
@@ -1150,6 +1162,32 @@ def _approval_plan_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
         return 200, APG_CAPABILITIES.approval_plan(str(capability_name), context)
     except KeyError:
         return 404, {{"error": "unknown_capability", "capability": str(capability_name)}}
+
+
+def _streaming_payload() -> tuple[int, Dict[str, Any]]:
+    if APG_CAPABILITIES is None:
+        return 404, {{"error": "capabilities_unavailable"}}
+    processor_index = getattr(APG_CAPABILITIES, "streaming_processor_index", lambda: {{}})()
+    state_index = getattr(APG_CAPABILITIES, "streaming_state_index", lambda: {{}})()
+    streams: Dict[str, Any] = {{}}
+    if hasattr(APG_CAPABILITIES, "list_capabilities") and hasattr(APG_CAPABILITIES, "capability_streaming"):
+        for capability_name in APG_CAPABILITIES.list_capabilities():
+            streams[capability_name] = APG_CAPABILITIES.capability_streaming(capability_name)
+    return 200, {{
+        "processor": "bytewax",
+        "processors": processor_index,
+        "states": state_index,
+        "streams": streams,
+    }}
+
+
+def _capability_streaming_payload(capability_name: str) -> tuple[int, Dict[str, Any]]:
+    if APG_CAPABILITIES is None or not hasattr(APG_CAPABILITIES, "capability_streaming"):
+        return 404, {{"error": "capability_streaming_unavailable"}}
+    try:
+        return 200, APG_CAPABILITIES.capability_streaming(capability_name)
+    except KeyError:
+        return 404, {{"error": "unknown_capability", "capability": capability_name}}
 
 
 def _agent_invocation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
@@ -1565,6 +1603,8 @@ if __name__ == "__main__":
 				"Capability operations:",
 				"",
 				"- `GET /capabilities` - capability catalog and dependency graph",
+				"- `GET /streaming` - ByteWax streaming topology",
+				"- `GET /capabilities/{Capability}/streaming` - capability streaming contract",
 				"- `POST /capabilities/{Capability}/rules/evaluate` - evaluate capability rules",
 				"- `POST /capabilities/{Capability}/configuration/resolve` - resolve configuration",
 				"- `POST /capabilities/{Capability}/configuration/validate` - validate configuration",
@@ -3054,6 +3094,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        capability_dependency_graph,',
 			'        capability_load_order,',
 			'        capability_screens,',
+			'        capability_streaming,',
 			'        capability_theme,',
 			'        describe_capabilities,',
 			'        describe_capabilities_by_erp_module,',
@@ -3064,6 +3105,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        get_capability,',
 			'        list_capabilities,',
 			'        streaming_processor_index,',
+			'        streaming_state_index,',
 			'        supported_language_codes,',
 			'        theme_token,',
 			'        ui_route_index,',
@@ -3075,6 +3117,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        "capability_dependency_graph",',
 			'        "capability_load_order",',
 			'        "capability_screens",',
+			'        "capability_streaming",',
 			'        "capability_theme",',
 			'        "describe_capabilities",',
 			'        "describe_capabilities_by_erp_module",',
@@ -3085,6 +3128,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        "get_capability",',
 			'        "list_capabilities",',
 			'        "streaming_processor_index",',
+			'        "streaming_state_index",',
 			'        "supported_language_codes",',
 			'        "theme_token",',
 			'        "ui_route_index",',

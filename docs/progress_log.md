@@ -5674,3 +5674,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `ac55ff3` (`Validate generated capability language codes`) to `origin/main`.
+
+### 2026-05-28 07:44 EAT
+
+Completed checkpoint:
+
+- Added generated streaming topology surfaces for capability runtimes.
+- Generated apps now expose `GET /streaming` with ByteWax processor indexes, stream state indexes, and per-capability stream contracts.
+- Generated apps now expose `GET /capabilities/{Capability}/streaming`.
+- Generated OpenAPI contracts now advertise streaming topology endpoints.
+- Generated packages now reexport `capability_streaming()` and `streaming_state_index()`.
+- Generated READMEs now document ByteWax streaming topology endpoints.
+- Added focused regression coverage for HTTP streaming topology, per-capability streaming contracts, OpenAPI exposure, package exports, and generated runbook documentation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 10 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated streaming topology slice.

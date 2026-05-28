@@ -213,6 +213,7 @@ def test_capability_declaration_generates_runtime_manifest():
     assert "'supported_languages': ['en', 'sw', 'ha', 'yo', 'zu']" in runtime
     assert "'processor': 'bytewax'" in runtime
     assert "`GeneralLedger` - provides journal_entries, chart_of_accounts, financial_periods" in readme
+    assert "GET /streaming" in readme
     assert "POST /capabilities/{Capability}/rules/evaluate" in readme
     assert "GET /finance/gl/journals" in readme
 
@@ -496,6 +497,10 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
             screen_html = response.read().decode("utf-8")
         with urllib.request.urlopen(f"{base_url}/openapi.json", timeout=1) as response:
             openapi = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(f"{base_url}/streaming", timeout=1) as response:
+            streaming = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(f"{base_url}/capabilities/GeneralLedger/streaming", timeout=1) as response:
+            capability_streaming = json.loads(response.read().decode("utf-8"))
 
         request = urllib.request.Request(
             f"{base_url}/capabilities/GeneralLedger/rules/evaluate",
@@ -564,6 +569,14 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
     assert "finance_ops" in screen_html
     assert "#126E82" in screen_html
     assert "/finance/gl/journals" in openapi["paths"]
+    assert "/streaming" in openapi["paths"]
+    assert "/capabilities/GeneralLedger/streaming" in openapi["paths"]
+    assert streaming["processor"] == "bytewax"
+    assert streaming["processors"] == {"bytewax": ["GeneralLedger"]}
+    assert streaming["states"] == {"ledger_posting_state": ["GeneralLedger"]}
+    assert streaming["streams"]["GeneralLedger"]["state"] == "ledger_posting_state"
+    assert capability_streaming["processor"] == "bytewax"
+    assert capability_streaming["state"] == "ledger_posting_state"
     assert resolved_config == {
         "capability": "GeneralLedger",
         "configuration": {"currency": "USD", "fiscal_calendar": "monthly"},
@@ -611,7 +624,9 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert grouped["finance"][0]["name"] == "GeneralLedger"
     assert module.capability_names_by_erp_module()["general_ledger"] == ["GeneralLedger"]
     assert module.capability_dependency_graph() == {"GeneralLedger": []}
+    assert module.capability_streaming("GeneralLedger")["processor"] == "bytewax"
     assert module.streaming_processor_index() == {"bytewax": ["GeneralLedger"]}
+    assert module.streaming_state_index() == {"ledger_posting_state": ["GeneralLedger"]}
     assert module.ui_route_index()["/finance/gl/journals"]["component"] == "JournalScreen"
     assert screens[0]["component"] == "JournalScreen"
     assert theme["tokens"]["accent"] == "#126E82"
@@ -621,10 +636,12 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert validation["valid"] is True
     assert "african_language_codes" in module.__all__
     assert "capability_screens" in module.__all__
+    assert "capability_streaming" in module.__all__
     assert "capability_theme" in module.__all__
     assert "describe_capabilities_by_erp_module" in module.__all__
     assert "composition_graph" in module.__all__
     assert "supported_language_codes" in module.__all__
+    assert "streaming_state_index" in module.__all__
     assert "theme_token" in module.__all__
     assert "validate_application" in module.__all__
     assert json.loads(json.dumps(grouped))["accounts_payable"][0]["name"] == "GeneralLedger"
