@@ -1550,15 +1550,35 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
         if artifact not in artifacts:
             errors.append(f"component manifest deployment is missing artifact {{artifact}}")
     commands = deployment.get("commands", {{}}) if isinstance(deployment, dict) else {{}}
-    for command_name in ["run", "describe", "validate", "self_test", "smoke_test"]:
-        if command_name not in commands:
+    expected_commands = {{
+        "run": "python app.py",
+        "describe": "python app.py --describe",
+        "validate": "python app.py --validate",
+        "self_test": "python app.py --self-test",
+        "smoke_test": "python smoke_test.py",
+    }}
+    if not isinstance(commands, dict):
+        errors.append("component manifest deployment commands must be an object")
+        commands = {{}}
+    for command_name, expected_command in expected_commands.items():
+        actual_command = commands.get(command_name)
+        if actual_command is None:
             errors.append(f"component manifest deployment is missing command {{command_name}}")
+        elif actual_command != expected_command:
+            errors.append(
+                f"component manifest deployment command {{command_name}} must be {{expected_command!r}}"
+            )
+    environment = deployment.get("environment", []) if isinstance(deployment, dict) else []
+    expected_environment = ["APG_HOST", "APG_PORT", "APG_DATA_FILE", "APG_API_KEY", "APG_DEBUG"]
+    if environment != expected_environment:
+        errors.append("component manifest deployment environment does not match generated runtime variables")
     return {{
         "errors": errors,
         "warnings": warnings,
         "http_path_count": len(http_paths),
         "python_exports": sorted(export_names),
         "artifact_count": len(artifacts),
+        "command_count": len(commands),
     }}
 
 

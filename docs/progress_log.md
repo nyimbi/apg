@@ -7253,3 +7253,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated OpenAPI validation still reports zero errors with the stricter required-property check
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 17:37 EAT
+
+Completed checkpoint:
+
+- Strengthened generated component manifest validation so deployment commands must match the generated executable entrypoints exactly.
+- Added validation for the generated runtime environment key list in component manifests.
+- Added a focused regression that corrupts generated deployment command and environment metadata and verifies the generated validator rejects the drift.
+- Refreshed all 20 numbered example outputs so their generated component manifest validators enforce the stricter deployment contract.
+
+Battery-conscious verification:
+
+- Regenerated `examples/[01-20]*/output` with the compiler after the component manifest validator change.
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_component_manifest_contract_rejects_invalid_deployment_commands tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated component manifest validation now reports `command_count: 5`
+- Deferred broader pytest at the user's request to conserve battery.

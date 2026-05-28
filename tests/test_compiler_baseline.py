@@ -256,6 +256,27 @@ def test_generated_openapi_contract_rejects_required_fields_missing_from_schema(
 	]
 
 
+def test_generated_component_manifest_contract_rejects_invalid_deployment_commands():
+	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
+	assert result.success is True
+
+	namespace: dict[str, object] = {"__name__": "generated_app"}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+	original_component_manifest = namespace["component_manifest"]
+
+	def broken_component_manifest():
+		manifest = copy.deepcopy(original_component_manifest())
+		manifest["deployment"]["commands"]["self_test"] = "python app.py"
+		manifest["deployment"]["environment"].remove("APG_DEBUG")
+		return manifest
+
+	namespace["component_manifest"] = broken_component_manifest
+	contract = namespace["validate_component_manifest_contract"]()
+
+	assert "component manifest deployment command self_test must be 'python app.py --self-test'" in contract["errors"]
+	assert "component manifest deployment environment does not match generated runtime variables" in contract["errors"]
+
+
 def test_generated_python_app_serves_http_endpoints(tmp_path):
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
 	package_dir = tmp_path / "generated_app"
