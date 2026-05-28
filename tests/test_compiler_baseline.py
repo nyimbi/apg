@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from click.testing import CliRunner
@@ -160,9 +161,11 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.openapi_document()["openapi"] == "3.1.0"
 	assert module.relationship_graph()["nodes"][0]["id"] == "Planner"
 	assert module.storage_status()["mode"] == "memory"
+	assert module.coerce_record_types("Planner", {"x": "1"}) == {"x": "1"}
 	assert module.validate_record("Planner", {})["valid"] is True
 	assert module.validate_application()["valid"] is True
 	assert "auth_status" in module.__all__
+	assert "coerce_record_types" in module.__all__
 	assert "component_manifest" in module.__all__
 	assert "describe_application" in module.__all__
 	assert "list_events" in module.__all__
@@ -525,6 +528,10 @@ def test_generated_python_app_validates_records_from_entity_fields():
 		},
 		"required": ["name", "quantity", "active"],
 	}
+	assert namespace["coerce_record_types"](
+		"InventoryItem",
+		{"name": "Widget", "quantity": "5", "active": "true"},
+	) == {"name": "Widget", "quantity": 5, "active": True}
 
 	status, invalid = namespace["_post_payload"](
 		"/entities/InventoryItem/records",
@@ -550,10 +557,70 @@ def test_generated_python_app_validates_records_from_entity_fields():
 
 	status, invalid_update = namespace["_put_payload"](
 		"/entities/InventoryItem/records/1",
-		{"record": {"active": "yes"}},
+		{"record": {"active": "maybe"}},
 	)
 	assert status == 422
 	assert invalid_update["errors"] == ["active must be boolean"]
+
+
+def test_generated_python_app_coerces_typed_form_records(tmp_path):
+	result = compile_apg_string(TYPED_DATA_APP_SOURCE)
+	package_dir = tmp_path / "generated_typed_form_app"
+	package_dir.mkdir()
+	for filename, content in result.generated_files.items():
+		(package_dir / filename).write_text(content, encoding="utf-8")
+
+	with socket.socket() as sock:
+		sock.bind(("127.0.0.1", 0))
+		port = sock.getsockname()[1]
+
+	process = subprocess.Popen(
+		[sys.executable, "app.py", "--host", "127.0.0.1", "--port", str(port)],
+		cwd=package_dir,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE,
+		text=True,
+	)
+	try:
+		base_url = f"http://127.0.0.1:{port}"
+		for _attempt in range(30):
+			try:
+				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
+					json.loads(response.read().decode("utf-8"))
+				break
+			except OSError:
+				if process.poll() is not None:
+					stdout, stderr = process.communicate(timeout=1)
+					raise AssertionError(f"generated app exited early\nstdout={stdout}\nstderr={stderr}")
+				time.sleep(0.05)
+		else:
+			raise AssertionError("generated typed form app did not answer /health")
+
+		with urllib.request.urlopen(f"{base_url}/ui/entities/InventoryItem", timeout=1) as response:
+			entity_ui = response.read().decode("utf-8")
+		form_data = urllib.parse.urlencode(
+			{"name": "Widget", "quantity": "7", "active": "true"}
+		).encode("utf-8")
+		request = urllib.request.Request(
+			f"{base_url}/entities/InventoryItem/records",
+			data=form_data,
+			headers={"Content-Type": "application/x-www-form-urlencoded"},
+			method="POST",
+		)
+		with urllib.request.urlopen(request, timeout=1) as response:
+			created = json.loads(response.read().decode("utf-8"))
+	finally:
+		process.terminate()
+		try:
+			process.wait(timeout=2)
+		except subprocess.TimeoutExpired:
+			process.kill()
+			process.wait(timeout=2)
+
+	assert 'name="quantity" type="number" step="1"' in entity_ui
+	assert 'type="hidden" name="active" value="false"' in entity_ui
+	assert 'type="checkbox" name="active" value="true"' in entity_ui
+	assert created["record"] == {"id": 1, "_revision": 1, "name": "Widget", "quantity": 7, "active": True}
 
 
 def test_generated_python_app_supports_optimistic_record_revisions():

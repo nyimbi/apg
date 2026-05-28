@@ -921,6 +921,41 @@ def _value_matches_type(value: Any, apg_type: str) -> bool:
     return True
 
 
+def _coerce_value_for_type(value: Any, apg_type: str) -> Any:
+    if not isinstance(value, str):
+        return value
+    expected = _json_schema_type(apg_type)
+    if expected == "integer":
+        try:
+            return int(value.strip())
+        except ValueError:
+            return value
+    if expected == "number":
+        try:
+            return float(value.strip())
+        except ValueError:
+            return value
+    if expected == "boolean":
+        normalized = value.strip().lower()
+        if normalized in {{"true", "1", "yes", "on"}}:
+            return True
+        if normalized in {{"false", "0", "no", "off"}}:
+            return False
+    return value
+
+
+def coerce_record_types(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    coerced = dict(record)
+    for field in _field_specs(entity_name):
+        field_name = str(field["name"])
+        if field_name in coerced:
+            coerced[field_name] = _coerce_value_for_type(
+                coerced[field_name],
+                str(field.get("type", "any")),
+            )
+    return coerced
+
+
 def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = False) -> Dict[str, Any]:
     errors: list[str] = []
     fields = _field_specs(entity_name)
@@ -1002,17 +1037,33 @@ def _ui_index_html() -> str:
     return _html_page(MODULE_NAME, body)
 
 
+def _ui_field_input_html(field: Dict[str, Any]) -> str:
+    field_name = str(field["name"])
+    safe_name = html.escape(field_name, quote=True)
+    safe_label = html.escape(field_name)
+    expected = _json_schema_type(str(field.get("type", "any")))
+    if expected == "boolean":
+        return (
+            f'<input type="hidden" name="{{safe_name}}" value="false">'
+            f'<label>{{safe_label}} '
+            f'<input type="checkbox" name="{{safe_name}}" value="true"></label><br>'
+        )
+    if expected == "integer":
+        attributes = 'type="number" step="1"'
+    elif expected == "number":
+        attributes = 'type="number" step="any"'
+    else:
+        attributes = 'type="text"'
+    return f'<label>{{safe_label}} <input name="{{safe_name}}" {{attributes}}></label><br>'
+
+
 def _ui_entity_html(entity_name: str) -> tuple[int, str]:
     entity = _entity_spec(entity_name)
     if entity is None:
         return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
     safe_entity = html.escape(entity_name, quote=True)
     fields = _field_specs(entity_name) or [{{"name": "value", "type": "string", "required": True}}]
-    inputs = "".join(
-        f'<label>{{html.escape(str(field["name"]))}} '
-        f'<input name="{{html.escape(str(field["name"]), quote=True)}}"></label><br>'
-        for field in fields
-    )
+    inputs = "".join(_ui_field_input_html(field) for field in fields)
     records_json = html.escape(json.dumps(list_records(entity_name), indent=2, sort_keys=True))
     body = (
         f'<nav><a href="/ui">Application</a> | '
@@ -1339,7 +1390,7 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     raw_record = payload.get("record", payload)
     if not isinstance(raw_record, dict):
         return 400, {{"error": "record_must_be_object"}}
-    record = dict(raw_record)
+    record = coerce_record_types(entity_name, dict(raw_record))
     validation = validate_record(entity_name, record)
     if not validation["valid"]:
         return 422, {{"error": "record_validation_failed", **validation}}
@@ -1375,7 +1426,7 @@ def _import_records_payload(entity_name: str, payload: Dict[str, Any]) -> tuple[
         if not isinstance(raw_record, dict):
             errors.append({{"index": index, "errors": ["record must be object"]}})
             continue
-        record = dict(raw_record)
+        record = coerce_record_types(entity_name, dict(raw_record))
         validation = validate_record(entity_name, record)
         if not validation["valid"]:
             errors.append({{"index": index, "errors": validation["errors"]}})
@@ -1414,7 +1465,8 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     raw_record = payload.get("record", payload)
     if not isinstance(raw_record, dict):
         return 400, {{"error": "record_must_be_object"}}
-    validation = validate_record(entity_name, dict(raw_record), partial=True)
+    record_update = coerce_record_types(entity_name, dict(raw_record))
+    validation = validate_record(entity_name, record_update, partial=True)
     if not validation["valid"]:
         return 422, {{"error": "record_validation_failed", **validation}}
     for index, existing in enumerate(RECORD_STORE[entity_name]):
@@ -1423,7 +1475,7 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
             if conflict is not None:
                 return 409, conflict
             updated = dict(existing)
-            updated.update(dict(raw_record))
+            updated.update(record_update)
             updated["id"] = existing.get("id")
             updated["_revision"] = int(existing.get("_revision", 1)) + 1
             RECORD_STORE[entity_name][index] = updated
@@ -3259,11 +3311,12 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import auth_status, component_manifest, describe_application, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, relationship_graph, self_test, storage_status, validate_application, validate_record',
+			'from .app import auth_status, coerce_record_types, component_manifest, describe_application, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, relationship_graph, self_test, storage_status, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
 			'    "auth_status",',
+			'    "coerce_record_types",',
 			'    "component_manifest",',
 			'    "describe_application",',
 			'    "list_entities",',

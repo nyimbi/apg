@@ -5802,3 +5802,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `25fe951` (`Apply generated capability themes to UI`) to `origin/main`.
+
+### 2026-05-28 08:18 EAT
+
+Completed checkpoint:
+
+- Made generated HTML forms usable for typed APG records.
+- Generated apps now coerce record payload values through entity field metadata before create, import, and update validation.
+- Form and JSON record payloads now convert integer, number, and boolean strings conservatively while leaving invalid values for validation to reject.
+- Generated entity screens now render numeric inputs for integer/number fields and hidden-plus-checkbox controls for boolean fields.
+- Generated packages now export `coerce_record_types()` for application code that wants the same schema-aware coercion.
+- Added focused regression coverage for real HTTP form submission into a generated typed entity app.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 18 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.
