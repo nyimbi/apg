@@ -61,6 +61,10 @@ APG currently has an executable compiler path:
   runtime `semantic_model()` agree;
 - `apg nl-plan <file> --prompt ... --json` emits `apg.nl-plan.v1` with a
   linted APG DSL patch proposal before code generation;
+- `apg nl-plan --audit-fixtures --json` emits
+  `apg.nl-plan-fixture-audit.v1` by checking bounded natural-language planning
+  fixtures for domain features, tables, capabilities, agents, rejected prompts,
+  lint integration, migration previews, and source immutability;
 - `apg migrate-plan <previous> <current> --json` emits
   `apg.migration-plan.v1` for semantic-model database and capability ownership
   changes;
@@ -741,6 +745,7 @@ apg explain app.apg --handler OperationsDashboard.select --json
 apg drift app.apg --json
 apg drift --audit-fixtures --json
 apg nl-plan app.apg --prompt "Add credit memos to accounts receivable" --json
+apg nl-plan --audit-fixtures --json
 apg migrate-plan previous.apg current.apg --backend postgresql --json
 apg migrate-plan --audit-fixtures --json
 apg package app.apg --target web --out dist --json
@@ -1040,6 +1045,7 @@ an implicit CLI side effect.
 
 ```console
 apg nl-plan app.apg --prompt "Add credit memos to accounts receivable" --json
+apg nl-plan --audit-fixtures --json
 ```
 
 Produces `apg.nl-plan.v1`: a proposed append-only DSL diff, candidate lint
@@ -1048,6 +1054,12 @@ and does not write generated application code. The current constrained planner
 recognizes bounded requests to add tables, capabilities, AI agents, and the
 credit-memo domain feature, then rejects unrepresentable prompts with `APG1201`
 instead of free-form rewriting.
+
+`--audit-fixtures` loads `tests/fixtures/nl_plan/catalog.json` and emits
+`apg.nl-plan-fixture-audit.v1`. The audit fails when a bounded prompt stops
+producing the expected intent, affected symbols, linted DSL patch, migration
+preview, or test plan, when an unrepresentable prompt stops returning `APG1201`,
+or when the planner mutates a source fixture.
 
 ## Language Server Specification
 
@@ -1365,7 +1377,7 @@ Tooling tests must be fixture-driven and deterministic.
 | LSP tests | Completion, hover, definition, references, rename, code actions, formatting. |
 | Graph tests | ER, lookup, workflow, handler, capability, security, agent, package, deployment graph output, enforced by `apg graph-suite --audit-fixtures --json` and the `apg.graph-fixture-audit.v1` report. |
 | Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios, enforced by `apg migrate-plan --audit-fixtures --json` and the `apg.migration-fixture-audit.v1` report. |
-| Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, rejected unsafe plans. |
+| Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, migration previews, source immutability, and rejected unsafe plans, enforced by `apg nl-plan --audit-fixtures --json` and the `apg.nl-plan-fixture-audit.v1` report. |
 | Verifier tests | Web/mobile/desktop/capability/deployment release evidence contracts, enforced by `apg evidence --audit-fixtures --json` and the `apg.release-evidence-fixture-audit.v1` report. |
 | Drift tests | CLI, LSP, IDE, generator, and tests consume the same semantic model. |
 
@@ -1406,6 +1418,7 @@ Exit criteria:
   `apg diagnostics --audit-fixtures --json`,
   `apg format --audit-fixtures --json`,
   `apg graph-suite --audit-fixtures --json`,
+  `apg nl-plan --audit-fixtures --json`,
   `apg migrate-plan --audit-fixtures --json`,
   `apg evidence --audit-fixtures --json`, and `apg drift <file> --json`.
 

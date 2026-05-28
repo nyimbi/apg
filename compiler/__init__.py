@@ -33,7 +33,7 @@ from .semantic_model import build_semantic_model, build_semantic_model_from_modu
 from .parser_golden import audit_parser_golden
 from .packager import build_package_report
 from .release import build_release_report
-from .nl_plan import build_nl_plan
+from .nl_plan import audit_nl_plan_fixtures, build_nl_plan
 from .migrations import audit_migration_fixtures, build_migration_plan
 from .code_generator import CodeGenerator
 from .compiler import APGCompiler
@@ -61,6 +61,7 @@ __all__ = [
     'audit_parser_golden',
     'build_package_report',
     'build_release_report',
+    'audit_nl_plan_fixtures',
     'build_nl_plan',
     'audit_migration_fixtures',
     'build_migration_plan',

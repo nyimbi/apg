@@ -7972,3 +7972,24 @@ Battery-conscious verification:
 - `.venv/bin/apg evidence --audit-fixtures` passed in text mode.
 - `.venv/bin/python -m py_compile compiler/evidence_bundle.py cli/evidence_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_evidence_json_builds_release_bundle tests/test_compiler_baseline.py::test_cli_evidence_audits_release_verifier_fixture_catalog -q` passed with 2 tests.
+
+Commit result:
+
+- Pushed commit `bc66c68` (`Make release verifier evidence fixture-audited`).
+
+### 2026-05-28 22:27 EAT
+
+In progress:
+
+- Turned natural-language planning behavior into a checked-in fixture audit.
+- Added `apg nl-plan --audit-fixtures --json`, emitting `apg.nl-plan-fixture-audit.v1`.
+- Added NL planner fixtures for the credit-memo domain feature, table creation, capability creation, AI agent creation, and rejection of an unbounded style prompt.
+- The audit verifies intent classification, affected symbols, linted patch generation, migration-preview change kinds, test-plan phases, APG1201 diagnostics for rejected prompts, and source immutability.
+- Updated `docs/tooling.md` so the executable baseline, nl-plan CLI contract, test strategy, and Phase 0 fixture gate include the NL planner fixture audit.
+
+Battery-conscious verification:
+
+- `.venv/bin/apg nl-plan --audit-fixtures --json` passed with 5 fixtures, 5 passing fixtures, 0 missing tags, and 0 blocking gaps.
+- `.venv/bin/apg nl-plan --audit-fixtures` passed in text mode.
+- `.venv/bin/python -m py_compile compiler/nl_plan.py cli/nl_plan_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_nl_plan_json_proposes_valid_credit_memo_dsl_diff_without_writing tests/test_compiler_baseline.py::test_cli_nl_plan_rejects_unrepresentable_prompt tests/test_compiler_baseline.py::test_cli_nl_plan_audits_fixture_catalog -q` passed with 3 tests.

@@ -9,6 +9,7 @@ plan. It does not mutate the source file or generate application output.
 from __future__ import annotations
 
 import difflib
+import json
 import re
 import tempfile
 from dataclasses import dataclass
@@ -22,6 +23,8 @@ from .semantic_analyzer import SemanticAnalyzer, SemanticError
 
 NL_PLAN_FORMAT = "apg.nl-plan.v1"
 MIGRATION_PREVIEW_FORMAT = "apg.migration-preview.v1"
+NL_PLAN_FIXTURE_AUDIT_FORMAT = "apg.nl-plan-fixture-audit.v1"
+DEFAULT_NL_PLAN_FIXTURE_CATALOG = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "nl_plan" / "catalog.json"
 
 
 @dataclass(frozen=True)
@@ -79,6 +82,141 @@ def build_nl_plan(source_file: Path, prompt: str) -> dict[str, Any]:
 		warnings=warnings,
 		ok=ok,
 	)
+
+
+def audit_nl_plan_fixtures(catalog_path: Path | None = None) -> dict[str, Any]:
+	"""Run the checked-in natural-language planning fixture catalog."""
+	catalog_file = Path(catalog_path or DEFAULT_NL_PLAN_FIXTURE_CATALOG)
+	catalog_root = catalog_file.parent
+	repo_root = Path(__file__).resolve().parents[1]
+	catalog = json.loads(catalog_file.read_text(encoding="utf-8"))
+	required_tags = sorted(str(tag) for tag in catalog.get("tags_required", []))
+	fixture_reports: list[dict[str, Any]] = []
+	blocking_gaps: list[dict[str, Any]] = []
+	covered_tags: set[str] = set()
+
+	for fixture in catalog.get("fixtures", []):
+		report = _audit_nl_plan_fixture(catalog_root, repo_root, fixture)
+		fixture_reports.append(report)
+		if report["ok"]:
+			covered_tags.update(report["tags"])
+		else:
+			blocking_gaps.append({
+				"id": report["id"],
+				"source": report["source"],
+				"prompt": report["prompt"],
+				"errors": report["errors"],
+			})
+
+	missing_tags = sorted(set(required_tags).difference(covered_tags))
+	for tag in missing_tags:
+		blocking_gaps.append({
+			"id": f"missing_tag:{tag}",
+			"source": str(catalog_file),
+			"prompt": "",
+			"errors": [f"required natural-language planner fixture tag {tag!r} is not covered by a passing fixture"],
+		})
+
+	return {
+		"format": NL_PLAN_FIXTURE_AUDIT_FORMAT,
+		"ok": not blocking_gaps,
+		"fixture_catalog": str(catalog_file),
+		"tags_required": required_tags,
+		"tags_covered": sorted(covered_tags),
+		"missing_tags": missing_tags,
+		"fixtures": fixture_reports,
+		"summary": {
+			"fixture_count": len(fixture_reports),
+			"passing_fixture_count": sum(1 for report in fixture_reports if report["ok"]),
+			"failing_fixture_count": sum(1 for report in fixture_reports if not report["ok"]),
+			"blocking_gap_count": len(blocking_gaps),
+		},
+		"blocking_gaps": blocking_gaps,
+	}
+
+
+def _audit_nl_plan_fixture(catalog_root: Path, repo_root: Path, fixture: dict[str, Any]) -> dict[str, Any]:
+	fixture_id = str(fixture["id"])
+	source = (catalog_root / str(fixture["source"])).resolve()
+	if not source.exists():
+		source = (repo_root / str(fixture["source"])).resolve()
+	prompt = str(fixture.get("prompt", ""))
+	tags = sorted(str(tag) for tag in fixture.get("tags", []))
+	errors: list[str] = []
+	report: dict[str, Any] | None = None
+
+	before_text = source.read_text(encoding="utf-8") if source.exists() else ""
+	try:
+		report = build_nl_plan(source, prompt)
+	except Exception as error:
+		errors.append(str(error))
+
+	if report is None:
+		return {
+			"id": fixture_id,
+			"source": str(source),
+			"prompt": prompt,
+			"tags": tags,
+			"intent": "",
+			"affected_symbols": [],
+			"diagnostic_codes": [],
+			"migration_change_kinds": [],
+			"ok": False,
+			"errors": errors,
+		}
+
+	if source.exists() and source.read_text(encoding="utf-8") != before_text:
+		errors.append("nl-plan mutated the source fixture")
+	_expected_bool(fixture, report, "ok", errors)
+	for key in ("intent", "confidence"):
+		expected_key = f"expected_{key}"
+		if expected_key in fixture and report.get(key) != fixture[expected_key]:
+			errors.append(f"expected {key}={fixture[expected_key]!r}, got {report.get(key)!r}")
+	if "expected_affected_symbols" in fixture:
+		expected_symbols = [str(symbol) for symbol in fixture["expected_affected_symbols"]]
+		if report.get("affected_symbols") != expected_symbols:
+			errors.append(f"expected affected_symbols={expected_symbols!r}, got {report.get('affected_symbols')!r}")
+
+	migration_changes = report.get("migration_preview", {}).get("changes", [])
+	migration_change_kinds = sorted({str(change.get("kind")) for change in migration_changes})
+	for kind in fixture.get("expected_migration_change_kinds", []):
+		if str(kind) not in migration_change_kinds:
+			errors.append(f"missing migration change kind {kind}")
+
+	diagnostic_codes = {str(diagnostic.get("code")) for diagnostic in report.get("lint", {}).get("diagnostics", [])}
+	for code in fixture.get("expected_diagnostics", []):
+		if str(code) not in diagnostic_codes:
+			errors.append(f"missing diagnostic {code}")
+
+	if fixture.get("expect_patch") is True and not report.get("dsl_patch"):
+		errors.append("expected a non-empty DSL patch")
+	if fixture.get("expect_patch") is False and report.get("dsl_patch"):
+		errors.append("expected an empty DSL patch")
+	if fixture.get("expect_test_plan") is True and [step.get("phase") for step in report.get("test_plan", [])] != ["lint", "validate", "compile", "release"]:
+		errors.append("expected lint/validate/compile/release test plan")
+
+	return {
+		"id": fixture_id,
+		"source": str(source),
+		"prompt": prompt,
+		"tags": tags,
+		"intent": report.get("intent"),
+		"affected_symbols": report.get("affected_symbols", []),
+		"diagnostic_codes": sorted(diagnostic_codes),
+		"migration_change_kinds": migration_change_kinds,
+		"ok": not errors,
+		"errors": errors,
+	}
+
+
+def _expected_bool(fixture: dict[str, Any], report: dict[str, Any], key: str, errors: list[str]) -> None:
+	expected_key = f"expected_{key}"
+	if expected_key not in fixture:
+		return
+	expected_value = bool(fixture[expected_key])
+	actual_value = bool(report.get(key))
+	if actual_value != expected_value:
+		errors.append(f"expected {key}={expected_value}, got {actual_value}")
 
 
 def _report(

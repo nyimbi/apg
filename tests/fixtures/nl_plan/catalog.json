@@ -1,0 +1,74 @@
+{
+  "format": "apg.nl-plan-fixture-catalog.v1",
+  "tags_required": [
+    "domain_feature",
+    "add_table",
+    "add_capability",
+    "add_agent",
+    "unrepresentable",
+    "lint_integration",
+    "migration_preview",
+    "source_immutability"
+  ],
+  "fixtures": [
+    {
+      "id": "credit_memo_domain_feature",
+      "source": "base.apg",
+      "prompt": "Add credit memos to accounts receivable",
+      "expected_ok": true,
+      "expected_intent": "domain_feature",
+      "expected_confidence": "high",
+      "expected_affected_symbols": ["table.CreditMemo", "capability.CreditMemoManagement"],
+      "expected_migration_change_kinds": ["add_table", "add_capability"],
+      "expect_patch": true,
+      "expect_test_plan": true,
+      "tags": ["domain_feature", "lint_integration", "migration_preview", "source_immutability"]
+    },
+    {
+      "id": "add_risk_table",
+      "source": "base.apg",
+      "prompt": "Add customer risk table",
+      "expected_ok": true,
+      "expected_intent": "add_table",
+      "expected_affected_symbols": ["table.CustomerRisk"],
+      "expected_migration_change_kinds": ["add_table"],
+      "expect_patch": true,
+      "expect_test_plan": true,
+      "tags": ["add_table", "lint_integration", "migration_preview", "source_immutability"]
+    },
+    {
+      "id": "add_returns_capability",
+      "source": "base.apg",
+      "prompt": "Add returns capability",
+      "expected_ok": true,
+      "expected_intent": "add_capability",
+      "expected_affected_symbols": ["capability.Returns"],
+      "expected_migration_change_kinds": ["add_capability"],
+      "expect_patch": true,
+      "expect_test_plan": true,
+      "tags": ["add_capability", "lint_integration", "migration_preview", "source_immutability"]
+    },
+    {
+      "id": "add_claims_agent",
+      "source": "base.apg",
+      "prompt": "Add claims assistant agent",
+      "expected_ok": true,
+      "expected_intent": "add_agent",
+      "expected_affected_symbols": ["agent.ClaimsAgent"],
+      "expected_migration_change_kinds": ["add_agent"],
+      "expect_patch": true,
+      "expect_test_plan": true,
+      "tags": ["add_agent", "lint_integration", "migration_preview", "source_immutability"]
+    },
+    {
+      "id": "reject_unbounded_style_prompt",
+      "source": "base.apg",
+      "prompt": "make it delightful and scalable",
+      "expected_ok": false,
+      "expected_intent": "unrepresentable",
+      "expected_diagnostics": ["APG1201"],
+      "expect_patch": false,
+      "tags": ["unrepresentable", "source_immutability"]
+    }
+  ]
+}

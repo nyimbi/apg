@@ -1,0 +1,8 @@
+module nl_plan_base version 1.0.0 {
+  description: "Base source for natural-language planner fixtures";
+}
+
+table Customer {
+  name: str;
+  email: str;
+}

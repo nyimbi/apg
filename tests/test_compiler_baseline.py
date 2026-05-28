@@ -1871,6 +1871,25 @@ def test_cli_nl_plan_rejects_unrepresentable_prompt(tmp_path):
 	assert report["migration_preview"]["changes"] == []
 
 
+def test_cli_nl_plan_audits_fixture_catalog():
+	result = CliRunner().invoke(cli, ["nl-plan", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.nl-plan-fixture-audit.v1"
+	assert report["ok"] is True
+	assert report["missing_tags"] == []
+	assert report["blocking_gaps"] == []
+	assert report["summary"]["fixture_count"] >= 5
+	assert report["summary"]["failing_fixture_count"] == 0
+	assert {"domain_feature", "add_table", "add_capability", "add_agent", "unrepresentable"}.issubset(report["tags_covered"])
+	assert {"lint_integration", "migration_preview", "source_immutability"}.issubset(report["tags_covered"])
+	intents = {fixture["intent"] for fixture in report["fixtures"]}
+	assert {"domain_feature", "add_table", "add_capability", "add_agent", "unrepresentable"}.issubset(intents)
+	rejected = next(fixture for fixture in report["fixtures"] if fixture["id"] == "reject_unbounded_style_prompt")
+	assert rejected["diagnostic_codes"] == ["APG1201"]
+
+
 def test_cli_migrate_plan_json_detects_destructive_schema_and_ownership_changes(tmp_path):
 	previous = tmp_path / "previous.apg"
 	current = tmp_path / "current.apg"
