@@ -1348,6 +1348,66 @@ def test_cli_format_check_and_write_are_idempotent(tmp_path):
 	assert "already formatted" in second_check.output
 
 
+def test_cli_graph_json_emits_entity_relationship_graph(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["graph", str(source), "--kind", "er", "--format", "json"])
+
+	assert result.exit_code == 0, result.output
+	graph = json.loads(result.output)
+	assert graph["format"] == "apg.graph.v1"
+	assert graph["kind"] == "er"
+	node_ids = {node["id"] for node in graph["nodes"]}
+	edge_keys = {(edge["source"], edge["target"], edge["kind"]) for edge in graph["edges"]}
+	assert "entity:Customer" in node_ids
+	assert "entity:SalesOrder" in node_ids
+	assert "field:SalesOrder.customer" in node_ids
+	assert ("field:SalesOrder.customer", "entity:Customer", "references") in edge_keys
+
+
+def test_cli_graph_infers_conventional_foreign_key_edges(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(
+		"""
+module sales version 1.0.0 {
+	description: "Sales";
+}
+
+table Customer {
+	name: str;
+}
+
+table SalesOrder {
+	customer_id: int;
+}
+""",
+		encoding="utf-8",
+	)
+
+	result = CliRunner().invoke(cli, ["graph", str(source), "--kind", "er", "--format", "json"])
+
+	assert result.exit_code == 0, result.output
+	graph = json.loads(result.output)
+	edge_keys = {(edge["source"], edge["target"], edge["kind"]) for edge in graph["edges"]}
+	assert ("field:SalesOrder.customer_id", "entity:Customer", "inferred_reference") in edge_keys
+
+
+def test_cli_graph_mermaid_and_dot_outputs_are_renderable(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	mermaid = CliRunner().invoke(cli, ["graph", str(source), "--kind", "er", "--format", "mermaid"])
+	dot = CliRunner().invoke(cli, ["graph", str(source), "--kind", "er", "--format", "dot"])
+
+	assert mermaid.exit_code == 0, mermaid.output
+	assert mermaid.output.startswith("graph TD")
+	assert "SalesOrder.customer: Customer" in mermaid.output
+	assert dot.exit_code == 0, dot.output
+	assert dot.output.startswith("digraph er")
+	assert '"field:SalesOrder.customer" -> "entity:Customer"' in dot.output
+
+
 def test_cli_init_describes_python_artifact_flow():
 	runner = CliRunner()
 	with runner.isolated_filesystem():

@@ -23,6 +23,8 @@ APG currently has an executable compiler path:
   with lint results and generator-readiness metadata;
 - `apg format <file> --check|--write|--json` emits `apg.format-result.v1`
   and applies deterministic APG whitespace formatting;
+- `apg graph <file> --kind er --format json|mermaid|dot` emits
+  `apg.graph.v1` data or renderable graph text;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -586,6 +588,8 @@ apg lint app.apg --json
 apg lint src/apg --strict --json
 apg format app.apg --check
 apg format app.apg --write
+apg graph app.apg --kind er --format json
+apg graph app.apg --kind agent --format mermaid
 apg validate
 apg run
 apg doctor

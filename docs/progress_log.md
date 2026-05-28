@@ -7387,3 +7387,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_format_json_formats_source_without_writing tests/test_compiler_baseline.py::test_cli_format_check_and_write_are_idempotent tests/test_compiler_baseline.py::test_cli_lint_json_reports_valid_apg_file_without_generation -q` -> 3 passed
 - `.venv/bin/apg format examples/01_minimal_customer_records/main.apg --json` -> exited 0 and emitted idempotent `apg.format-result.v1`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 18:25 EAT
+
+Completed checkpoint:
+
+- Added a shared `compiler.graphs` module that parses APG source and builds deterministic graph nodes and edges.
+- Added an executable `apg graph` command with JSON, Mermaid, and DOT output formats.
+- Implemented `apg.graph.v1` JSON output for graph consumers and renderable text output for documentation/diagram tooling.
+- Added initial graph extraction for entity relationship, agent, capability, and generic APG declaration graphs.
+- Updated the tooling specification so `apg graph` is part of APG's executable baseline.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/graphs.py cli/graph_command.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_graph_json_emits_entity_relationship_graph tests/test_compiler_baseline.py::test_cli_graph_infers_conventional_foreign_key_edges tests/test_compiler_baseline.py::test_cli_graph_mermaid_and_dot_outputs_are_renderable -q` -> 3 passed
+- `.venv/bin/apg graph examples/02_customer_orders_relationship/main.apg --kind er --format json` -> exited 0 and emitted `apg.graph.v1` with an inferred `customer_id -> Customer` edge
+- Deferred broader pytest at the user's request to conserve battery.
