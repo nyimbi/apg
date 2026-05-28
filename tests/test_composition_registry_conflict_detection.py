@@ -115,3 +115,16 @@ async def test_composition_engine_detects_configuration_conflicts() -> None:
 	assert conflicts[0].severity == ConflictSeverity.MEDIUM
 	assert conflicts[0].conflicting_capabilities == ["billing", "payments"]
 	assert conflicts[0].auto_resolvable is False
+
+
+@pytest.mark.asyncio
+async def test_composition_engine_rejects_empty_composition_without_database_query() -> None:
+	engine = IntelligentCompositionEngine(_FakeSession([]), "tenant-1234", "user-1")
+
+	result = await engine.validate_composition([])
+
+	assert result.is_valid is False
+	assert result.validation_score == 0.0
+	assert result.conflicts[0].conflict_type == "empty_composition"
+	assert result.cost_analysis["cost_per_capability"] == 0.0
+	assert result.deployment_strategy["phases"] == []

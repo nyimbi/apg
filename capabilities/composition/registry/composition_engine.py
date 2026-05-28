@@ -972,6 +972,9 @@ class IntelligentCompositionEngine:
 			print(self._log_composition_operation("validate_composition",
 				f"Validating {len(capability_ids)} capabilities"))
 
+			if not capability_ids:
+				return self._empty_composition_validation_result()
+
 			# Detect conflicts
 			conflicts = await self.detect_conflicts(capability_ids)
 
@@ -1077,7 +1080,7 @@ class IntelligentCompositionEngine:
 				"memory_cost": round(memory_cost, 2),
 				"cpu_cost": round(cpu_cost, 2)
 			},
-			"cost_per_capability": round(total_monthly_cost / len(capability_ids), 2),
+			"cost_per_capability": round(total_monthly_cost / len(capability_ids), 2) if capability_ids else 0.0,
 			"optimization_potential": 0.15  # 15% potential savings
 		}
 
@@ -1115,6 +1118,53 @@ class IntelligentCompositionEngine:
 		}
 
 		return strategy
+
+	def _empty_composition_validation_result(self) -> CompositionValidationResult:
+		"""Return a deterministic validation result for an empty composition."""
+		conflict = ConflictReport(
+			conflict_id=uuid7str(),
+			severity=ConflictSeverity.HIGH,
+			conflicting_capabilities=[],
+			conflict_type="empty_composition",
+			description="A composition must include at least one capability",
+			resolution_options=[
+				{
+					"option": "add_capability",
+					"description": "Select one or more capabilities before validating or deploying the composition",
+					"automated": False
+				}
+			],
+			auto_resolvable=False
+		)
+		performance_impact = PerformanceImpact(
+			memory_usage_mb=0.0,
+			cpu_usage_pct=0.0,
+			network_bandwidth_mbps=0.0,
+			disk_io_ops=0,
+			startup_time_ms=0.0,
+			response_time_ms=0.0,
+			scalability_score=1.0
+		)
+		return CompositionValidationResult(
+			is_valid=False,
+			validation_score=0.0,
+			conflicts=[conflict],
+			recommendations=[],
+			performance_impact=performance_impact,
+			cost_analysis={
+				"monthly_cost_usd": 0.0,
+				"cost_breakdown": {"base_cost": 0.0, "memory_cost": 0.0, "cpu_cost": 0.0},
+				"cost_per_capability": 0.0,
+				"optimization_potential": 0.0
+			},
+			deployment_strategy={
+				"deployment_type": "none",
+				"phases": [],
+				"rollback_strategy": "not_applicable",
+				"health_checks_enabled": False,
+				"conflicts_to_resolve": 1
+			}
+		)
 
 
 # Service Factory

@@ -6780,3 +6780,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_composition_gateway_grpc_runtime_fallback.py -q` -> 2 passed, 4 pre-existing warnings
 - `git diff --check capabilities/composition/gateway/grpc_protocol_support.py tests/test_composition_gateway_grpc_runtime_fallback.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:49 EAT
+
+Completed checkpoint:
+
+- Made composition validation reject an empty capability list deterministically before touching database-dependent analysis.
+- Empty compositions now return a structured high-severity `empty_composition` conflict, zero cost, no deployment phases, and an explicit invalid validation result.
+- Cost analysis now handles empty capability lists without division by zero.
+- Added focused runtime coverage for empty composition validation semantics.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/composition_engine.py tests/test_composition_registry_conflict_detection.py`
+- `.venv/bin/python -m pytest tests/test_composition_registry_conflict_detection.py -q` -> 3 passed, 2 pre-existing warnings
+- Deferred broader pytest at the user's request to conserve battery.
