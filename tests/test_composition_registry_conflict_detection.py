@@ -5,6 +5,7 @@ import pytest
 from capabilities.composition.registry.composition_engine import (
 	ConflictSeverity,
 	IntelligentCompositionEngine,
+	PerformanceImpact,
 )
 
 
@@ -128,3 +129,32 @@ async def test_composition_engine_rejects_empty_composition_without_database_que
 	assert result.conflicts[0].conflict_type == "empty_composition"
 	assert result.cost_analysis["cost_per_capability"] == 0.0
 	assert result.deployment_strategy["phases"] == []
+
+
+@pytest.mark.asyncio
+async def test_composition_engine_cost_analysis_uses_resource_impact() -> None:
+	engine = IntelligentCompositionEngine(_FakeSession([]), "tenant-1234", "user-1")
+
+	cost = await engine._generate_cost_analysis(
+		["orders", "payments"],
+		PerformanceImpact(
+			memory_usage_mb=1024,
+			cpu_usage_pct=25,
+			network_bandwidth_mbps=10,
+			disk_io_ops=100,
+			startup_time_ms=500,
+			response_time_ms=120,
+			scalability_score=0.9,
+		),
+	)
+
+	assert cost == {
+		"monthly_cost_usd": 27.5,
+		"cost_breakdown": {
+			"base_cost": 20.0,
+			"memory_cost": 5.0,
+			"cpu_cost": 2.5,
+		},
+		"cost_per_capability": 13.75,
+		"optimization_potential": 0.15,
+	}

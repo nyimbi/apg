@@ -85,3 +85,11 @@ async def test_capability_recommendations_fall_back_to_quality_without_query():
 	assert recommendations[0]["capability_id"] == "cap-high"
 	assert recommendations[0]["recommendation_reason"] == "High quality capability for this search result set"
 	assert recommendations[0]["matched_terms"] == []
+
+
+def test_registry_recommendation_sources_do_not_label_runtime_paths_placeholder():
+	service_source = open("capabilities/composition/registry/service.py", encoding="utf-8").read()
+	engine_source = open("capabilities/composition/registry/composition_engine.py", encoding="utf-8").read()
+
+	assert "Generate AI recommendations (placeholder)" not in service_source
+	assert "Generate cost analysis (placeholder)" not in engine_source

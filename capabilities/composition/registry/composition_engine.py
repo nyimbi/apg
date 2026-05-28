@@ -994,7 +994,7 @@ class IntelligentCompositionEngine:
 			# Determine if composition is valid
 			is_valid = len([c for c in conflicts if c.severity in [ConflictSeverity.HIGH, ConflictSeverity.CRITICAL]]) == 0
 
-			# Generate cost analysis (placeholder)
+			# Generate deterministic deployment cost analysis from composition size and resource impact.
 			cost_analysis = await self._generate_cost_analysis(capability_ids, performance_impact)
 
 			# Generate deployment strategy

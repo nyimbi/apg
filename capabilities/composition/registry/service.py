@@ -544,7 +544,7 @@ class CapabilityRegistryService:
 				}
 				capabilities_data.append(cap_dict)
 			
-			# Generate AI recommendations (placeholder)
+			# Rank deterministic recommendations from capability metadata and search intent.
 			recommendations = await self._generate_capability_recommendations(
 				query, capabilities_data
 			)

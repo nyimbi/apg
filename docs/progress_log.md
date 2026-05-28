@@ -8281,3 +8281,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `4bb5673` (`Make gateway production posture explicit`).
+
+### 2026-05-29 00:43 EAT
+
+In progress:
+
+- Removed stale placeholder wording from composition registry recommendation and cost-analysis runtime paths.
+- Kept capability search recommendations tied to deterministic capability metadata and search intent.
+- Added regression coverage for composition cost analysis from resource impact inputs.
+- Added source-level coverage so the registry recommendation/cost paths are not relabeled as placeholder implementations.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/service.py capabilities/composition/registry/composition_engine.py tests/test_composition_registry_service_recommendations.py tests/test_composition_registry_conflict_detection.py` passed.
+- `.venv/bin/python -m pytest tests/test_composition_registry_service_recommendations.py tests/test_composition_registry_conflict_detection.py -q` passed with 7 tests.
+- `rg -n "Generate AI recommendations \\(placeholder\\)|Generate cost analysis \\(placeholder\\)" capabilities/composition/registry -g '*.py'` found no stale placeholder labels in registry runtime code.
+- `git diff --check -- capabilities/composition/registry/service.py capabilities/composition/registry/composition_engine.py tests/test_composition_registry_service_recommendations.py tests/test_composition_registry_conflict_detection.py` passed.
+
+Commit result:
+
+- Pending.
