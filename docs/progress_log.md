@@ -8528,3 +8528,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q tests/test_common_cach_dashboard_metrics.py` passed with 6 tests.
 - `rg -n "Sample data for demonstration|Additional helper methods \\(simplified implementations\\)|Additional simplified implementations|1500000|1305000|195000|2025-08-09|cache_size_mb': 4096|35\\.2|67\\.8|Predicted Cache Load|Geographic Traffic Distribution|Sample throughput data|Sample latency data" capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py` found no stale CACH dashboard sample literals.
 - `git diff --check -- capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py docs/progress_log.md` passed.
+
+### 2026-05-29 02:19 EAT
+
+Executable CONN query performance slice:
+
+- Replaced `optimize_query_performance()` fake query metadata with a real execution surface.
+- Query optimization now accepts inline executors, supports registered named executors, can use existing SQLAlchemy pools when configured, and reports an honest `not_executed` response when no executor or pool is available.
+- Query cache keys are deterministic JSON/SHA-256 keys over query, params, executor route, and pool route, so reordered params hit the same cache entry.
+- Cache hits now return `cached: True` and fresh cache-hit metadata instead of replaying the original uncached response.
+- Added capability-local focused coverage for async inline execution, sync registered execution, stable param cache keys, cache-hit behavior, SQLAlchemy pool execution, and no-executor reporting.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conn/performance.py capabilities/common/conn/tests/test_query_performance.py` passed.
+- `.venv/bin/python -m pytest -q capabilities/common/conn/tests/test_query_performance.py` passed with 4 tests.
+- `rg -n "This is a placeholder - would integrate with actual database|would integrate with actual database|hash\\(str\\(params\\)|query \\+ str\\(params" capabilities/common/conn/performance.py capabilities/common/conn/tests/test_query_performance.py` found no stale CONN query placeholder text or unstable query-cache construction.

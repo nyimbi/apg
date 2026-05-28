@@ -14,7 +14,7 @@ import json
 import pickle
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Union, Callable, TypeVar, Generic
+from typing import Dict, Any, List, Optional, Union, Callable, TypeVar, Generic, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps, lru_cache
@@ -37,6 +37,7 @@ except ImportError:
 
 # SQLAlchemy imports for connection pooling
 try:
+    from sqlalchemy import text
     from sqlalchemy.pool import QueuePool, StaticPool, NullPool
     from sqlalchemy.engine import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -681,8 +682,12 @@ class PerformanceOptimizer:
             'cache_hits': 0,
             'cache_misses': 0,
             'async_tasks': 0,
-            'connection_pool_usage': 0
+            'connection_pool_usage': 0,
+            'query_executions': 0,
+            'query_failures': 0,
+            'query_skips': 0
         }
+        self.query_executors: Dict[str, Callable[[str, Optional[Dict[str, Any]]], Any]] = {}
 
     async def initialize(self):
         """Initialize performance components"""
@@ -828,6 +833,128 @@ class PerformanceOptimizer:
 
         return results
 
+    def register_query_executor(
+        self,
+        name: str,
+        executor: Callable[[str, Optional[Dict[str, Any]]], Any]
+    ) -> None:
+        """Register a callable used by query optimization to execute real queries."""
+        if not name:
+            raise ValueError("Query executor name is required")
+        if not callable(executor):
+            raise ValueError("Query executor must be callable")
+
+        self.query_executors[name] = executor
+
+    def unregister_query_executor(self, name: str) -> bool:
+        """Remove a registered query executor."""
+        return self.query_executors.pop(name, None) is not None
+
+    def _normalize_query_params(self, params: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Return a stable mapping for query parameters."""
+        return dict(params or {})
+
+    def _make_query_cache_key(
+        self,
+        query: str,
+        params: Optional[Dict[str, Any]],
+        executor_name: str,
+        pool_name: Optional[str]
+    ) -> str:
+        """Build a deterministic cache key for query, params, and execution route."""
+        payload = {
+            'query': query,
+            'params': self._normalize_query_params(params),
+            'executor_name': executor_name,
+            'pool_name': pool_name
+        }
+        encoded = json.dumps(payload, sort_keys=True, default=str, separators=(',', ':'))
+        return f"query:{hashlib.sha256(encoded.encode()).hexdigest()}"
+
+    def _resolve_query_executor(
+        self,
+        executor: Optional[Callable[[str, Optional[Dict[str, Any]]], Any]],
+        executor_name: str
+    ) -> Tuple[str, Optional[Callable[[str, Optional[Dict[str, Any]]], Any]], Optional[str]]:
+        """Resolve an inline or registered executor for query execution."""
+        if executor is not None:
+            if not callable(executor):
+                return "inline", None, "Inline query executor is not callable"
+            return "inline", executor, None
+
+        if executor_name in self.query_executors:
+            return executor_name, self.query_executors[executor_name], None
+
+        if executor_name != "default":
+            return executor_name, None, f"Query executor '{executor_name}' is not registered"
+
+        return executor_name, None, "No query executor registered"
+
+    async def _execute_query_with_executor(
+        self,
+        executor: Callable[[str, Optional[Dict[str, Any]]], Any],
+        query: str,
+        params: Optional[Dict[str, Any]]
+    ) -> Any:
+        """Execute a query through a caller-provided async or sync executor."""
+        if asyncio.iscoroutinefunction(executor):
+            return await executor(query, params)
+        return await self.task_manager.run_in_thread(executor, query, params)
+
+    async def _execute_query_with_pool(
+        self,
+        query: str,
+        params: Optional[Dict[str, Any]],
+        pool_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """Execute a SQLAlchemy-backed query through an existing named pool."""
+        if not SQLALCHEMY_AVAILABLE:
+            return None
+        if pool_name not in self.connection_pool_manager.pools:
+            return None
+
+        return await self.task_manager.run_in_thread(
+            self._execute_query_with_pool_sync,
+            query,
+            params,
+            pool_name
+        )
+
+    def _execute_query_with_pool_sync(
+        self,
+        query: str,
+        params: Optional[Dict[str, Any]],
+        pool_name: str
+    ) -> Dict[str, Any]:
+        """Synchronous SQLAlchemy query execution used from the worker thread pool."""
+        session_factory = self.connection_pool_manager.pools[pool_name]
+        session = session_factory()
+        try:
+            result = session.execute(text(query), params or {})
+            if getattr(result, "returns_rows", False):
+                rows = [dict(row._mapping) for row in result]
+                return {"rows": rows, "row_count": len(rows)}
+
+            session.commit()
+            return {"row_count": getattr(result, "rowcount", 0)}
+        finally:
+            session.close()
+
+    def _result_row_count(self, result: Any) -> Optional[int]:
+        """Infer row count from common executor result shapes."""
+        if isinstance(result, list):
+            return len(result)
+        if isinstance(result, tuple):
+            return len(result)
+        if isinstance(result, dict):
+            if isinstance(result.get("rows"), list):
+                return len(result["rows"])
+            if "row_count" in result:
+                return result["row_count"]
+            if "rowcount" in result:
+                return result["rowcount"]
+        return None
+
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get comprehensive performance statistics"""
         return {
@@ -861,6 +988,19 @@ def batch_process(batch_size: int = None):
     return global_performance_optimizer.batch_process(batch_size)
 
 
+def register_query_executor(
+    name: str,
+    executor: Callable[[str, Optional[Dict[str, Any]]], Any]
+) -> None:
+    """Register a global query executor used by optimize_query_performance."""
+    global_performance_optimizer.register_query_executor(name, executor)
+
+
+def unregister_query_executor(name: str) -> bool:
+    """Unregister a global query executor."""
+    return global_performance_optimizer.unregister_query_executor(name)
+
+
 async def get_performance_stats() -> Dict[str, Any]:
     """Get global performance statistics"""
     return global_performance_optimizer.get_performance_stats()
@@ -868,28 +1008,96 @@ async def get_performance_stats() -> Dict[str, Any]:
 
 # Performance monitoring integration
 @monitor_performance("performance_optimization")
-async def optimize_query_performance(query: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+async def optimize_query_performance(
+    query: str,
+    params: Dict[str, Any] = None,
+    *,
+    executor: Callable[[str, Optional[Dict[str, Any]]], Any] = None,
+    executor_name: str = "default",
+    pool_name: Optional[str] = None,
+    cache_ttl: int = 300
+) -> Dict[str, Any]:
     """Optimize database query performance with caching and connection pooling"""
 
-    # Generate cache key for query
-    cache_key = f"query:{hashlib.md5((query + str(params or {})).encode()).hexdigest()}"
+    optimizer = global_performance_optimizer
+    normalized_params = optimizer._normalize_query_params(params)
+    executor_label, resolved_executor, executor_error = optimizer._resolve_query_executor(executor, executor_name)
+    cache_key = optimizer._make_query_cache_key(query, normalized_params, executor_label, pool_name)
 
     # Try cache first
-    cached_result = await global_performance_optimizer.cache_manager.get(cache_key)
-    if cached_result:
-        return cached_result
+    cached_result = await optimizer.cache_manager.get(cache_key)
+    if cached_result is not None:
+        optimizer._performance_metrics['cache_hits'] += 1
+        if isinstance(cached_result, dict):
+            response = dict(cached_result)
+            response['cached'] = True
+            response['cache_hit_at'] = datetime.now(timezone.utc).isoformat()
+            return response
+        return {
+            'query': query,
+            'params': normalized_params,
+            'executed_at': datetime.now(timezone.utc).isoformat(),
+            'cached': True,
+            'executed': True,
+            'execution_strategy': 'cache',
+            'result': cached_result
+        }
 
-    # Execute query with connection pooling
-    # This is a placeholder - would integrate with actual database
+    optimizer._performance_metrics['cache_misses'] += 1
+    started_at = time.perf_counter()
+
+    result_payload = None
+    execution_strategy = None
+
+    try:
+        if resolved_executor is not None:
+            execution_strategy = f"executor:{executor_label}"
+            result_payload = await optimizer._execute_query_with_executor(
+                resolved_executor,
+                query,
+                normalized_params
+            )
+        elif pool_name:
+            result_payload = await optimizer._execute_query_with_pool(query, normalized_params, pool_name)
+            if result_payload is not None:
+                execution_strategy = f"pool:{pool_name}"
+    except Exception:
+        optimizer._performance_metrics['query_failures'] += 1
+        raise
+
+    if execution_strategy is None:
+        optimizer._performance_metrics['query_skips'] += 1
+        reason = executor_error
+        if pool_name:
+            reason = f"SQLAlchemy pool '{pool_name}' is not available"
+        return {
+            'query': query,
+            'params': normalized_params,
+            'executed_at': datetime.now(timezone.utc).isoformat(),
+            'cached': False,
+            'executed': False,
+            'status': 'not_executed',
+            'execution_strategy': 'unavailable',
+            'reason': reason
+        }
+
+    duration_ms = round((time.perf_counter() - started_at) * 1000, 3)
     result = {
         'query': query,
-        'params': params,
+        'params': normalized_params,
         'executed_at': datetime.now(timezone.utc).isoformat(),
-        'cached': False
+        'cached': False,
+        'executed': True,
+        'execution_strategy': execution_strategy,
+        'duration_ms': duration_ms,
+        'row_count': optimizer._result_row_count(result_payload),
+        'result': result_payload
     }
+    optimizer._performance_metrics['query_executions'] += 1
 
     # Cache result
-    await global_performance_optimizer.cache_manager.set(cache_key, result, ttl=300)
+    if cache_ttl and cache_ttl > 0:
+        await optimizer.cache_manager.set(cache_key, result, ttl=cache_ttl)
 
     return result
 
