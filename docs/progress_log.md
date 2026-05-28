@@ -5652,3 +5652,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `1743bb0` (`Generate executable app runbooks`) to `origin/main`.
+
+### 2026-05-28 07:41 EAT
+
+Completed checkpoint:
+
+- Added generated capability runtime language-code registries.
+- Generated `apg_capabilities.py` now exposes `supported_language_codes()` and `african_language_codes()`.
+- Generated capability runtimes now include more than 40 African language codes in executable validation metadata.
+- `validate_capability_i18n()` now rejects unknown supported, default, and fallback language codes instead of treating arbitrary strings as valid localization targets.
+- Generated packages now reexport the language-code helper APIs.
+- Added focused regression coverage for African language-code exposure, supported-code inclusion, package exports, and invalid i18n validation errors.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 10 passed
+- `.venv/bin/pytest tests/test_apg_language_contract.py capabilities/common/nlpc/test_language_codes.py -q` -> 10 passed, 14 warnings
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated i18n language-code validation slice.

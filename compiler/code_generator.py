@@ -1713,6 +1713,19 @@ class CapabilitySpec:
 
 
 CAPABILITY_DATA: Dict[str, Dict[str, Any]] = {capability_specs!r}
+AFRICAN_LANGUAGE_CODES = {{
+    "af", "ak", "am", "ar", "bm", "bem", "ber", "bin", "din", "dyu",
+    "ee", "ff", "fon", "gaa", "ha", "ig", "kab", "kam", "ki", "kln",
+    "kg", "kj", "kmb", "kr", "lg", "ln", "loz", "lu", "lua", "mg",
+    "mos", "nd", "nr", "nso", "ny", "om", "rn", "rw", "sg", "sn",
+    "so", "ss", "st", "sw", "ti", "tn", "ts", "tum", "tw", "ve",
+    "wo", "xh", "yo", "zu",
+}}
+CORE_LANGUAGE_CODES = {{
+    "auto", "en", "es", "fr", "de", "it", "pt", "nl", "pl", "tr",
+    "ru", "zh", "ja", "ko", "hi", "ur", "id", "ms",
+}}
+SUPPORTED_LANGUAGE_CODES = CORE_LANGUAGE_CODES | AFRICAN_LANGUAGE_CODES
 CAPABILITIES: Dict[str, CapabilitySpec] = {{
     name: CapabilitySpec(name=name, **data)
     for name, data in CAPABILITY_DATA.items()
@@ -1756,6 +1769,14 @@ def describe_capabilities() -> Dict[str, Dict[str, Any]]:
         name: describe_capability(name)
         for name in list_capabilities()
     }}
+
+
+def supported_language_codes() -> List[str]:
+    return sorted(SUPPORTED_LANGUAGE_CODES)
+
+
+def african_language_codes() -> List[str]:
+    return sorted(AFRICAN_LANGUAGE_CODES)
 
 
 def capabilities_by_erp_module() -> Dict[str, List[CapabilitySpec]]:
@@ -2111,8 +2132,15 @@ def validate_capability_i18n() -> Dict[str, List[str]]:
         if not supported:
             warnings.append(f"{{capability.name}} does not declare supported languages")
             continue
+        for language in supported:
+            if language not in SUPPORTED_LANGUAGE_CODES:
+                errors.append(f"{{capability.name}} unsupported language code {{language}}")
         default_language = capability.i18n.get("default_language")
         fallback_language = capability.i18n.get("fallback_language")
+        if default_language and default_language not in SUPPORTED_LANGUAGE_CODES:
+            errors.append(f"{{capability.name}} unknown default language {{default_language}}")
+        if fallback_language and fallback_language not in SUPPORTED_LANGUAGE_CODES:
+            errors.append(f"{{capability.name}} unknown fallback language {{fallback_language}}")
         if default_language and default_language not in supported:
             errors.append(f"{{capability.name}} default language {{default_language}} is not supported")
         if fallback_language and fallback_language not in supported:
@@ -3030,11 +3058,13 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        describe_capabilities,',
 			'        describe_capabilities_by_erp_module,',
 			'        describe_capability,',
+			'        african_language_codes,',
 			'        capability_names_by_erp_module,',
 			'        composition_graph,',
 			'        get_capability,',
 			'        list_capabilities,',
 			'        streaming_processor_index,',
+			'        supported_language_codes,',
 			'        theme_token,',
 			'        ui_route_index,',
 			'    )',
@@ -3049,11 +3079,13 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        "describe_capabilities",',
 			'        "describe_capabilities_by_erp_module",',
 			'        "describe_capability",',
+			'        "african_language_codes",',
 			'        "capability_names_by_erp_module",',
 			'        "composition_graph",',
 			'        "get_capability",',
 			'        "list_capabilities",',
 			'        "streaming_processor_index",',
+			'        "supported_language_codes",',
 			'        "theme_token",',
 			'        "ui_route_index",',
 			'    ])',

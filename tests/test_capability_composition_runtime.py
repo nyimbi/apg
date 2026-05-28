@@ -99,6 +99,20 @@ capability OperationsWorkbench {
 """
 
 
+INVALID_I18N_SOURCE = """
+capability InvalidLocalization {
+    contract: {
+        id: invalid_localization,
+        provides: [localized_ui],
+        configuration: {tenant_scoped: true}
+    };
+    i18n: {supported_languages: [en, "zz"], default_language: "zz", fallback_language: "qq"};
+    master_data: {entities: [translation]};
+    streaming: {processor: bytewax, state: invalid_i18n_state};
+}
+"""
+
+
 def test_capability_declaration_parses_to_first_class_ast():
     parse_result = APGParser().parse_string(CAPABILITY_SOURCE, "erp_ops.apg")
     assert parse_result["success"] is True, parse_result["errors"]
@@ -288,6 +302,9 @@ def test_capability_declaration_generates_runtime_manifest():
     assert namespace["resolve_language"]("GeneralLedger", "sw") == "sw"
     assert namespace["resolve_language"]("GeneralLedger", "fr") == "en"
     assert namespace["validate_capability_i18n"]() == {"errors": [], "warnings": []}
+    assert len(namespace["african_language_codes"]()) >= 40
+    assert {"ha", "ig", "sw", "yo", "zu"} <= set(namespace["african_language_codes"]())
+    assert set(namespace["african_language_codes"]()) <= set(namespace["supported_language_codes"]())
     assert namespace["capability_streaming"]("GeneralLedger") == {
         "capability": "GeneralLedger",
         "processor": "bytewax",
@@ -599,11 +616,15 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert screens[0]["component"] == "JournalScreen"
     assert theme["tokens"]["accent"] == "#126E82"
     assert module.theme_token("GeneralLedger", "accent") == "#126E82"
+    assert len(module.african_language_codes()) >= 40
+    assert "sw" in module.supported_language_codes()
     assert validation["valid"] is True
+    assert "african_language_codes" in module.__all__
     assert "capability_screens" in module.__all__
     assert "capability_theme" in module.__all__
     assert "describe_capabilities_by_erp_module" in module.__all__
     assert "composition_graph" in module.__all__
+    assert "supported_language_codes" in module.__all__
     assert "theme_token" in module.__all__
     assert "validate_application" in module.__all__
     assert json.loads(json.dumps(grouped))["accounts_payable"][0]["name"] == "GeneralLedger"
@@ -633,3 +654,21 @@ def test_capability_dependency_planning_uses_provides_requires_contracts():
         "unresolved": {},
     }
     assert namespace["validate_capability_dependencies"]() == {"errors": [], "warnings": []}
+
+
+def test_generated_capability_i18n_rejects_unknown_language_codes():
+    result = APGCompiler().compile_string(INVALID_I18N_SOURCE, "invalid_i18n.apg")
+
+    assert result.success is True
+
+    namespace = {}
+    exec(compile(result.generated_files["apg_capabilities.py"], "apg_capabilities.py", "exec"), namespace)
+
+    validation = namespace["validate_capability_i18n"]()
+    assert validation["warnings"] == []
+    assert validation["errors"] == [
+        "InvalidLocalization unsupported language code zz",
+        "InvalidLocalization unknown default language zz",
+        "InvalidLocalization unknown fallback language qq",
+        "InvalidLocalization fallback language qq is not supported",
+    ]
