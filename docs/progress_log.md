@@ -6830,3 +6830,19 @@ Battery-conscious verification:
 - `.venv/bin/python - <<'PY' ... import Topology3DEngine ... PY` -> imported `Topology3DEngine`
 - `git diff --check capabilities/composition/gateway/topology_3d_engine.py tests/test_composition_gateway_topology_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:07 EAT
+
+Completed checkpoint:
+
+- Prevented mobile/offline registry sync from deleting cached capabilities and compositions when no online registry service is configured.
+- Offline sync attempts now return explicit preserved-cache status with current offline counts instead of silently falling through to empty sync feeds.
+- Added sync-safe readers for existing offline capability and composition records so internal fetch helpers can preserve local cache contents when online services are unavailable.
+- Added focused regression coverage proving forced sync without an online service preserves cached mobile capability data.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/mobile_service.py tests/test_composition_registry_mobile_sync.py`
+- `.venv/bin/python -m pytest tests/test_composition_registry_mobile_sync.py -q` -> 5 passed, 2 pre-existing warnings
+- `git diff --check capabilities/composition/registry/mobile_service.py tests/test_composition_registry_mobile_sync.py`
+- Deferred broader pytest at the user's request to conserve battery.

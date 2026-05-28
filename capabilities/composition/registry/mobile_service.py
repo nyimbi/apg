@@ -627,8 +627,10 @@ class MobileOfflineService:
 		force_full_sync: bool = False
 	) -> Dict[str, Any]:
 		"""Sync data from online service to offline storage."""
-		if not self.is_online or not self.cr_service:
-			return {"success": False, "message": "Offline mode"}
+		if not self.is_online:
+			return await self._offline_sync_status("Offline mode")
+		if not self.cr_service:
+			return await self._offline_sync_status("No online registry service configured")
 
 		try:
 			sync_start = datetime.utcnow()
@@ -664,6 +666,31 @@ class MobileOfflineService:
 				"message": f"Sync failed: {str(e)}"
 			}
 
+	async def _offline_sync_status(self, message: str) -> Dict[str, Any]:
+		"""Return sync status without modifying offline cache contents."""
+		conn = sqlite3.connect(self.offline_db_path)
+		cursor = conn.cursor()
+		cursor.execute("SELECT COUNT(*) FROM offline_capabilities")
+		capabilities_count = cursor.fetchone()[0]
+		cursor.execute("SELECT COUNT(*) FROM offline_compositions")
+		compositions_count = cursor.fetchone()[0]
+		cursor.execute("SELECT COUNT(*) FROM offline_actions WHERE status = 'pending'")
+		pending_actions = cursor.fetchone()[0]
+		conn.close()
+
+		return {
+			"success": False,
+			"offline_preserved": True,
+			"message": message,
+			"capabilities_synced": 0,
+			"compositions_synced": 0,
+			"offline_counts": {
+				"capabilities": capabilities_count,
+				"compositions": compositions_count,
+				"pending_actions": pending_actions,
+			},
+		}
+
 	async def _full_sync_capabilities(self) -> int:
 		"""Perform full sync of capabilities."""
 		capabilities = await self._fetch_online_capabilities()
@@ -687,7 +714,7 @@ class MobileOfflineService:
 	async def _fetch_online_capabilities(self, since: Optional[datetime] = None) -> List[Any]:
 		"""Fetch capabilities from the configured online registry service."""
 		if not self.cr_service:
-			return []
+			return await self._read_offline_capability_records(since)
 
 		if hasattr(self.cr_service, "search_capabilities"):
 			result = await self.cr_service.search_capabilities(limit=1000, offset=0)
@@ -706,7 +733,7 @@ class MobileOfflineService:
 	async def _fetch_online_compositions(self, since: Optional[datetime] = None) -> List[Any]:
 		"""Fetch compositions from the configured online registry service."""
 		if not self.cr_service:
-			return []
+			return await self._read_offline_composition_records(since)
 
 		if hasattr(self.cr_service, "search_compositions"):
 			result = await self.cr_service.search_compositions({"limit": 1000, "offset": 0})
@@ -728,6 +755,65 @@ class MobileOfflineService:
 			composition for composition in list(compositions or [])
 			if self._record_updated_since(composition, since)
 		]
+
+	async def _read_offline_capability_records(self, since: Optional[datetime] = None) -> List[Dict[str, Any]]:
+		"""Read existing offline capabilities as sync-safe records."""
+		conn = sqlite3.connect(self.offline_db_path)
+		cursor = conn.cursor()
+		cursor.execute("""
+			SELECT data_json, capability_id, code, name, description, category,
+				   version, quality_score, status, last_sync
+			FROM offline_capabilities
+		""")
+		rows = cursor.fetchall()
+		conn.close()
+
+		records: List[Dict[str, Any]] = []
+		for row in rows:
+			data = json.loads(row[0]) if row[0] else {}
+			data.update({
+				"capability_id": data.get("capability_id", row[1]),
+				"capability_code": data.get("capability_code", row[2]),
+				"capability_name": data.get("capability_name", row[3]),
+				"description": data.get("description", row[4] or ""),
+				"category": data.get("category", row[5]),
+				"version": data.get("version", row[6]),
+				"quality_score": data.get("quality_score", row[7]),
+				"status": data.get("status", row[8]),
+				"last_sync": data.get("last_sync", row[9]),
+			})
+			if self._record_updated_since(data, since):
+				records.append(data)
+		return records
+
+	async def _read_offline_composition_records(self, since: Optional[datetime] = None) -> List[Dict[str, Any]]:
+		"""Read existing offline compositions as sync-safe records."""
+		conn = sqlite3.connect(self.offline_db_path)
+		cursor = conn.cursor()
+		cursor.execute("""
+			SELECT data_json, composition_id, name, description, type,
+				   capability_count, validation_score, is_offline_ready, last_sync
+			FROM offline_compositions
+		""")
+		rows = cursor.fetchall()
+		conn.close()
+
+		records: List[Dict[str, Any]] = []
+		for row in rows:
+			data = json.loads(row[0]) if row[0] else {}
+			data.update({
+				"composition_id": data.get("composition_id", row[1]),
+				"name": data.get("name", row[2]),
+				"description": data.get("description", row[3] or ""),
+				"type": data.get("type", row[4]),
+				"capability_count": data.get("capability_count", row[5]),
+				"validation_score": data.get("validation_score", row[6]),
+				"is_offline_ready": data.get("is_offline_ready", bool(row[7])),
+				"last_sync": data.get("last_sync", row[8]),
+			})
+			if self._record_updated_since(data, since):
+				records.append(data)
+		return records
 
 	async def _store_synced_capabilities(self, capabilities: List[Any], full_sync: bool) -> int:
 		"""Persist synced capabilities to offline storage."""

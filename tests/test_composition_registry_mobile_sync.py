@@ -154,6 +154,34 @@ async def test_mobile_incremental_sync_upserts_only_changed_online_records(tmp_p
 
 
 @pytest.mark.asyncio
+async def test_mobile_sync_without_online_service_preserves_offline_cache(tmp_path):
+	service = MobileOfflineService(
+		tenant_id="tenant-a",
+		offline_db_path=str(tmp_path / "offline.db"),
+	)
+	await service._store_synced_capabilities([
+		{
+			"capability_id": "cap-offline",
+			"capability_code": "OFFLINE",
+			"capability_name": "Offline Capability",
+			"description": "Cached capability",
+			"category": "common",
+			"version": "1.0.0",
+			"quality_score": 0.8,
+			"status": "active",
+		}
+	], full_sync=True)
+
+	result = await service.sync_from_online(force_full_sync=True)
+
+	assert result["success"] is False
+	assert result["offline_preserved"] is True
+	assert result["offline_counts"]["capabilities"] == 1
+	capabilities = await service.get_mobile_capabilities(limit=10)
+	assert [cap.capability_id for cap in capabilities] == ["cap-offline"]
+
+
+@pytest.mark.asyncio
 async def test_mobile_offline_composition_action_calls_online_registry_and_completes(tmp_path):
 	registry = _CompositionWriter()
 	service = MobileOfflineService(
