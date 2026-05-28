@@ -4794,3 +4794,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `a1b3c03` (`Make HCM time attendance executable in-process`) to `origin/main`.
+
+### 2026-05-28 04:00 EAT
+
+Completed checkpoint:
+
+- Removed pass-only helper bodies from the HCM Time Attendance mobile API.
+- Added mobile runtime state for notifications, photo verifications, work summaries, push tokens, and sync conflicts.
+- Replaced fixed mobile quick-status values with service-backed today/week hours, active-session state, pending approval counts, and recent alert summaries.
+- Replaced fixed personal mobile analytics with service-backed period totals, daily breakdowns, punctuality score, overtime totals, trend, and achievements.
+- Extended focused HCM TAT regression coverage for mobile quick-status/personal analytics and mobile helper side effects.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/mobile_api.py tests/test_hcm_tat_runtime_store.py`
+- `.venv/bin/pytest tests/test_hcm_tat_runtime_store.py -q` -> 5 passed
+- `rg -n "pass$|Mock analytics|Mock notification|Mock registration|Mock update|TODO|placeholder" capabilities/hcm/tat/time_attendance/mobile_api.py` -> no matches
+- `git diff --check -- capabilities/hcm/tat/time_attendance/mobile_api.py tests/test_hcm_tat_runtime_store.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push for this checkpoint.

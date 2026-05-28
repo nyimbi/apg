@@ -3,9 +3,20 @@ import asyncio
 from datetime import date, timedelta
 from pathlib import Path
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from capabilities.hcm.tat.time_attendance.api import create_app, get_current_user, get_service
+from capabilities.hcm.tat.time_attendance.mobile_api import (
+	_mobile_runtime_state,
+	_process_photo_verification,
+	_process_work_summary,
+	_register_push_token,
+	_send_mobile_notification,
+	get_mobile_service,
+	get_mobile_user,
+	mobile_router,
+)
 from capabilities.hcm.tat.time_attendance.models import (
 	AIAgentType,
 	LeaveType,
@@ -145,6 +156,51 @@ def test_time_attendance_api_lists_are_service_backed():
 	assert ai_agents.json()["summary"]["total_ai_agents"] == 1
 	assert dashboard.status_code == 200
 	assert dashboard.json()["data"]["workforce_distribution"]["ai_agents"] == 1
+
+
+def test_mobile_api_status_and_analytics_are_service_backed():
+	TimeAttendanceService.reset_runtime_store()
+	service = TimeAttendanceService()
+	_run(_seed_runtime(service))
+
+	app = FastAPI()
+	app.include_router(mobile_router)
+	app.dependency_overrides[get_mobile_user] = lambda: {
+		"user_id": "admin",
+		"tenant_id": "tenant_tat",
+		"employee_id": "emp_001",
+		"device_id": "device_001",
+		"roles": ["employee"],
+	}
+	app.dependency_overrides[get_mobile_service] = lambda: service
+	client = TestClient(app)
+
+	status = client.get("/api/mobile/human_capital_management/time_attendance/quick-status")
+	analytics = client.get("/api/mobile/human_capital_management/time_attendance/analytics/personal")
+
+	assert status.status_code == 200
+	assert status.json()["today_total_hours"] > 0
+	assert status.json()["week_total_hours"] >= status.json()["today_total_hours"]
+	assert analytics.status_code == 200
+	assert analytics.json()["total_hours"] == status.json()["week_total_hours"]
+	assert len(analytics.json()["daily_breakdown"]) == 7
+
+
+def test_mobile_runtime_helpers_record_side_effects():
+	_mobile_runtime_state["notifications"].clear()
+	_mobile_runtime_state["photo_verifications"].clear()
+	_mobile_runtime_state["work_summaries"].clear()
+	_mobile_runtime_state["push_tokens"].clear()
+
+	_run(_send_mobile_notification("device_001", "Clock", "ok", {"type": "clock"}))
+	_run(_process_photo_verification("encoded-photo", "emp_001", "entry_001"))
+	_run(_process_work_summary("Closed tickets", "entry_001", 5))
+	_run(_register_push_token("user_001", "device_001", "token", "ios", {"clock": True}))
+
+	assert _mobile_runtime_state["notifications"]["device_001"][0]["title"] == "Clock"
+	assert _mobile_runtime_state["photo_verifications"]["entry_001"]["verified"] is True
+	assert _mobile_runtime_state["work_summaries"]["entry_001"]["productivity_rating"] == 5
+	assert _mobile_runtime_state["push_tokens"]["device_001"]["platform"] == "ios"
 
 
 def test_time_attendance_service_has_no_missing_private_helper_calls():
