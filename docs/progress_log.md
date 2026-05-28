@@ -4965,3 +4965,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `d3339a8` (`Make HCM compliance rules executable`) to `origin/main`.
+
+### 2026-05-28 04:57 EAT
+
+Completed checkpoint:
+
+- Fixed the APG parser compatibility validator so top-level declaration recognition follows the `entity_type` keywords in `spec/apg.g4`.
+- Kept legacy declaration spellings accepted while allowing current first-class entities such as `twin`, `screen`, `app`, `flow`, and `agent_runtime`.
+- Added focused parser contract coverage so valid grammar-backed entity declarations are not rejected as "No APG declarations found".
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/parser.py tests/test_apg_language_contract.py`
+- `.venv/bin/pytest tests/test_apg_language_contract.py -q` -> 8 passed
+- Direct parser smoke check for `twin`, `screen`, `app`, `flow`, and `agent_runtime` -> all parsed successfully
+- `git diff --check -- compiler/parser.py tests/test_apg_language_contract.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push.

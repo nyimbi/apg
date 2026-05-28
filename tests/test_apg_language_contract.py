@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from compiler.parser import APGParser
+
 
 GRAMMAR = Path(__file__).resolve().parents[1] / "spec" / "apg.g4"
 
@@ -37,6 +39,23 @@ def test_grammar_promotes_composable_capabilities_to_first_class_entities():
 		"theme_contract_block",
 	]:
 		assert re.search(rf"^{rule_name}\b", GRAMMAR.read_text(encoding="utf-8"), flags=re.MULTILINE)
+
+
+def test_parser_accepts_first_class_entity_keywords_from_grammar():
+	parser = APGParser()
+	for source in [
+		'twin Machine { sync: opc; }',
+		'screen Dashboard { route: "/"; }',
+		'app ERP { }',
+		'flow Fulfillment { }',
+		'agent_runtime CodexRuntime { runner: codex; }',
+	]:
+		result = parser.parse_string(source, "<entity-keyword>")
+		assert result["success"] is True, (source, [str(error) for error in result["errors"]])
+
+	result = parser.parse_string("invalid_entity Broken { }", "<invalid>")
+	assert result["success"] is False
+	assert any("Unknown entity declaration" in str(error) for error in result["errors"])
 
 
 def test_grammar_supports_rapid_erp_component_and_rule_composition():

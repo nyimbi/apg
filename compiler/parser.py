@@ -81,6 +81,7 @@ class APGParser:
 		self.error_listener = APGErrorListener()
 		self._last_parse_tree = None
 		self._last_tokens = None
+		self._declaration_keyword_cache: Optional[set[str]] = None
 	
 	def parse_file(self, file_path: str) -> Dict[str, Any]:
 		"""
@@ -195,7 +196,12 @@ class APGParser:
 			return []
 
 		errors: List[APGSyntaxError] = []
-		if not re.search(r"\b(module|agent|capability|digital_twin|workflow|db)\b", source_code):
+		declaration_keywords = self._source_declaration_keywords()
+		declaration_pattern = r"\b(?:" + "|".join(
+			re.escape(keyword)
+			for keyword in sorted(declaration_keywords, key=len, reverse=True)
+		) + r")\b"
+		if not re.search(declaration_pattern, source_code):
 			errors.append(APGSyntaxError("No APG declarations found", 1, 0, source_name))
 
 		if source_code.count("{") != source_code.count("}"):
@@ -215,6 +221,34 @@ class APGParser:
 				errors.append(APGSyntaxError("Missing semicolon", index, len(line), source_name))
 
 		return errors
+
+	def _source_declaration_keywords(self) -> set[str]:
+		"""Return grammar-backed top-level declaration keywords."""
+		if self._declaration_keyword_cache is not None:
+			return set(self._declaration_keyword_cache)
+
+		keywords = {
+			"module",
+			"import",
+			"from",
+			"include",
+			"export",
+			# Legacy spellings remain accepted by the compatibility validator.
+			"digital_twin",
+			"workflow",
+			"database",
+		}
+		grammar_path = Path(__file__).resolve().parent.parent / "spec" / "apg.g4"
+		try:
+			grammar = grammar_path.read_text(encoding="utf-8")
+			match = re.search(r"^entity_type\s*\n\s*:(.*?)\n\s*;", grammar, flags=re.MULTILINE | re.DOTALL)
+			if match:
+				keywords.update(re.findall(r"'([^']+)'", match.group(1)))
+		except OSError:
+			keywords.update({"agent", "capability", "db", "twin", "screen", "app", "flow"})
+
+		self._declaration_keyword_cache = set(keywords)
+		return set(keywords)
 	
 	def get_parse_errors(self) -> List[APGSyntaxError]:
 		"""Get all parsing errors from the last parse operation"""
