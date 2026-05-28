@@ -150,7 +150,7 @@ designers, and natural-language tools.
 | `compiler.graphs` | Existing graph builders for ER, lookup, workflow, handler, capability, security, agent, package, and deployment graphs. |
 | `compiler.packager` | Existing package-profile builder over generated Python applications and release evidence. Extend it toward signed distribution bundles as packaging requirements deepen. |
 | `compiler.migrations` | Planned semantic-model diff planner for database and capability ownership changes. |
-| `compiler.nl_plan` | Planned constrained natural-language-to-APG-patch planner. |
+| `compiler.nl_plan` | Existing constrained natural-language-to-APG-patch planner. It emits reviewable append-only DSL diffs, candidate lint, migration previews, and test plans without writing generated code. |
 | `compiler.release` | Existing release evidence builder for generated applications. Extend it toward capability package and deployment evidence. |
 | `language_server.server` | Existing LSP entry point. It should move from direct parser/analyzer calls to the shared semantic model. |
 | `cli.*` | Existing Click CLI entry points. Add stable JSON/text contracts for new lint, format, graph, explain, package, and planning commands. |
@@ -648,6 +648,7 @@ apg parser-golden --json
 apg explain app.apg --symbol table.Customer --json
 apg explain app.apg --diagnostic APG0100 --json
 apg explain app.apg --handler OperationsDashboard.select --json
+apg nl-plan app.apg --prompt "Add credit memos to accounts receivable" --json
 apg package app.apg --target web --out dist --json
 apg package app.apg --target desktop --out dist
 apg package app.apg --target mobile --out dist
@@ -831,8 +832,12 @@ implicit CLI side effect.
 apg nl-plan app.apg --prompt "Add credit memos to accounts receivable" --json
 ```
 
-Produces a proposed DSL diff, lint report, migration preview, and test plan. It
-must not write generated code unless the DSL diff validates.
+Produces `apg.nl-plan.v1`: a proposed append-only DSL diff, candidate lint
+report, migration preview, and test plan. It does not mutate the source file
+and does not write generated application code. The current constrained planner
+recognizes bounded requests to add tables, capabilities, AI agents, and the
+credit-memo domain feature, then rejects unrepresentable prompts with `APG1201`
+instead of free-form rewriting.
 
 ## Language Server Specification
 

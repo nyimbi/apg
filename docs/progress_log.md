@@ -7573,3 +7573,22 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_package_json_writes_executable_profile tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers tests/test_compiler_baseline.py::test_cli_release_json_emits_generated_application_evidence_without_output -q` -> 3 passed
 - `.venv/bin/apg package examples/05_single_support_agent/main.apg --target desktop --out /private/tmp/apg_package_final --json` -> emitted `apg.package-report.v1`
 - `git diff --check compiler/packager.py cli/package_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md`
+
+### 2026-05-28 19:47 EAT
+
+Completed checkpoint:
+
+- Implemented `compiler.nl_plan.build_nl_plan()` as a deterministic constrained natural-language planner.
+- Added the `apg nl-plan` CLI command emitting `apg.nl-plan.v1` without mutating source files or writing generated application output.
+- Planner now classifies bounded requests for tables, capabilities, AI agents, and the credit-memo domain feature.
+- Credit-memo planning emits an append-only APG table plus capability contract with configuration, rules, rule-engine metadata, UI route, and theme tokens.
+- Candidate DSL patches are validated through the parser, AST builder, and semantic analyzer before the report is marked `ok`.
+- Unrepresentable prompts are rejected with `APG1201` instead of being free-form rewritten.
+- Updated the tooling specification so `compiler.nl_plan` and `apg nl-plan` are documented as executable current contracts.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/nl_plan.py cli/nl_plan_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_nl_plan_json_proposes_valid_credit_memo_dsl_diff_without_writing tests/test_compiler_baseline.py::test_cli_nl_plan_rejects_unrepresentable_prompt -q` -> 2 passed
+- `.venv/bin/apg nl-plan examples/12_finance_general_ledger/main.apg --prompt "Add credit memos to accounts receivable" --json` -> emitted `apg.nl-plan.v1` with a valid candidate lint report
+- `.venv/bin/apg nl-plan examples/12_finance_general_ledger/main.apg --prompt "make it delightful and scalable" --json` -> exited 1 with `APG1201`

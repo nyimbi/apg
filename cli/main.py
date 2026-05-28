@@ -24,6 +24,7 @@ from cli.format_command import format_cmd
 from cli.graph_command import graph, graph_suite
 from cli.lint_command import lint
 from cli.model_command import model
+from cli.nl_plan_command import nl_plan
 from cli.package_command import package
 from cli.parser_golden_command import parser_golden
 from cli.release_command import release
@@ -54,6 +55,7 @@ cli.add_command(graph)
 cli.add_command(graph_suite)
 cli.add_command(lint)
 cli.add_command(model)
+cli.add_command(nl_plan)
 cli.add_command(package)
 cli.add_command(parser_golden)
 cli.add_command(release)

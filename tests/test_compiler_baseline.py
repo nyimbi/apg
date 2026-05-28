@@ -1505,6 +1505,58 @@ def test_cli_package_json_writes_executable_profile(tmp_path):
 	assert json.loads(self_test.stdout)["passed"] is True
 
 
+def test_cli_nl_plan_json_proposes_valid_credit_memo_dsl_diff_without_writing(tmp_path):
+	source = tmp_path / "finance.apg"
+	output = tmp_path / "generated"
+	original = DATA_APP_SOURCE
+	source.write_text(original, encoding="utf-8")
+
+	result = CliRunner().invoke(
+		cli,
+		["nl-plan", str(source), "--prompt", "Add credit memos to accounts receivable", "--json"],
+	)
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.nl-plan.v1"
+	assert report["ok"] is True
+	assert report["intent"] == "domain_feature"
+	assert report["confidence"] == "high"
+	assert "CreditMemo" in report["append_text"]
+	assert "CreditMemoManagement" in report["dsl_patch"]
+	assert report["affected_symbols"] == ["table.CreditMemo", "capability.CreditMemoManagement"]
+	assert report["lint"]["format"] == "apg.lint-report.v1"
+	assert report["lint"]["ok"] is True
+	assert report["migration_preview"]["format"] == "apg.migration-preview.v1"
+	assert report["migration_preview"]["destructive"] is False
+	assert {change["kind"] for change in report["migration_preview"]["changes"]} == {
+		"add_capability",
+		"add_table",
+	}
+	assert [step["phase"] for step in report["test_plan"]] == ["lint", "validate", "compile", "release"]
+	assert source.read_text(encoding="utf-8") == original
+	assert not output.exists()
+
+
+def test_cli_nl_plan_rejects_unrepresentable_prompt(tmp_path):
+	source = tmp_path / "finance.apg"
+	source.write_text(DATA_APP_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(
+		cli,
+		["nl-plan", str(source), "--prompt", "make it delightful and scalable", "--json"],
+	)
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.nl-plan.v1"
+	assert report["ok"] is False
+	assert report["intent"] == "unrepresentable"
+	assert report["dsl_patch"] == ""
+	assert report["lint"]["diagnostics"][0]["code"] == "APG1201"
+	assert report["migration_preview"]["changes"] == []
+
+
 def test_checked_in_example_outputs_match_current_compiler():
 	examples = sorted((REPO_ROOT / "examples").glob("[0-9][0-9]_*/main.apg"))
 	assert len(examples) == 20
