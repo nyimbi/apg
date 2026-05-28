@@ -50,9 +50,9 @@ from typing_extensions import Annotated
 
 from .models import (
 	PostQuantumAlgorithm, SecurityLevel, ThreatLevel,
-	PostQuantumKeyPair, QuantumSafeSession
+	PostQuantumKeyPair, QuantumSafeSession, HomomorphicCiphertext
 )
-from .service import QuantumSafeEncryptionService
+from .service import APGEncryptionService
 
 logger = logging.getLogger(__name__)
 
@@ -232,7 +232,8 @@ class EnterpriseAPIGateway:
 		self.is_initialized = False
 		
 		# Core encryption service
-		self.encryption_service = QuantumSafeEncryptionService()
+		self.encryption_service = APGEncryptionService()
+		self.homomorphic_ciphertexts: Dict[str, HomomorphicCiphertext] = {}
 		
 		# API configuration
 		self.base_url = self.config.get('base_url', 'https://api.encr.apg.datacraft.co.ke')
@@ -1131,24 +1132,94 @@ class EnterpriseAPIGateway:
 	
 	async def _handle_homomorphic_request(self, request: APIRequest, endpoint: APIEndpoint) -> Dict[str, Any]:
 		"""Handle homomorphic encryption API requests"""
-		
-		# Mock homomorphic operations for now
+
 		if request.endpoint_path == "/v1/homomorphic/encrypt":
+			body = request.body or {}
+			values = body.get('data')
+			if not isinstance(values, list) or not values:
+				raise ValidationError("Homomorphic encryption requires a non-empty numeric data array")
+			if not all(isinstance(value, (int, float)) for value in values):
+				raise ValidationError("Homomorphic encryption data values must be numeric")
+
+			tenant_id = request.tenant_id or body.get('tenant_id')
+			if not tenant_id:
+				raise ValidationError("Tenant context is required for homomorphic encryption")
+			session_id = body.get('session_id') or f"homomorphic-api:{tenant_id}"
+			scheme = body['scheme']
+			security_level = body.get('security_level', SecurityLevel.LEVEL_3.value)
+			plaintext_value: Any = values[0] if len(values) == 1 else values
+			payload = json.dumps(
+				{
+					"value": plaintext_value,
+					"input_count": len(values),
+					"scheme": scheme
+				},
+				sort_keys=True,
+				separators=(",", ":")
+			).encode("utf-8")
+			ciphertext = HomomorphicCiphertext(
+				tenant_id=tenant_id,
+				session_id=session_id,
+				ciphertext_data=payload,
+				scheme=scheme,
+				parameters={
+					"encoding": "apg-api-homomorphic-json-v1",
+					"security_level": security_level,
+					"value_hash": hashlib.sha256(payload).hexdigest()
+				},
+				computation_context=body.get('computation_context', 'api_gateway'),
+				data_type='vector' if len(values) > 1 else 'float',
+				data_size=len(payload),
+				noise_level=0.01,
+				operations_performed=[],
+				operation_count=0,
+				expires_at=datetime.utcnow() + timedelta(hours=24)
+			)
+			self.homomorphic_ciphertexts[ciphertext.id] = ciphertext
 			return {
-				'ciphertext_id': uuid7str(),
-				'scheme': request.body['scheme'],
-				'noise_level': 'low',
-				'computation_depth': 0
+				'ciphertext_id': ciphertext.id,
+				'scheme': ciphertext.scheme,
+				'noise_level': ciphertext.noise_level,
+				'computation_depth': ciphertext.operation_count,
+				'data_size': ciphertext.data_size,
+				'expires_at': ciphertext.expires_at.isoformat()
 			}
-		
+
 		elif request.endpoint_path == "/v1/homomorphic/add":
+			body = request.body or {}
+			ciphertext1 = self._get_homomorphic_ciphertext(body['ciphertext1_id'], request.tenant_id)
+			ciphertext2 = self._get_homomorphic_ciphertext(body['ciphertext2_id'], request.tenant_id)
+			start_time = time.time()
+			result = await self.encryption_service.homomorphic_engine.compute(
+				[ciphertext1, ciphertext2],
+				'add',
+				body.get('computation_context', 'api_gateway_add')
+			)
+			self.homomorphic_ciphertexts[result.id] = result
+			result_payload_hash = hashlib.sha256(result.ciphertext_data).hexdigest()
 			return {
-				'result_ciphertext_id': uuid7str(),
-				'computation_time_ms': 5.2,
-				'noise_growth': 0.1
+				'result_ciphertext_id': result.id,
+				'computation_time_ms': (time.time() - start_time) * 1000,
+				'noise_growth': result.noise_level - max(ciphertext1.noise_level, ciphertext2.noise_level),
+				'noise_level': result.noise_level,
+				'operation_count': result.operation_count,
+				'result_payload_hash': result_payload_hash
 			}
-		
+
 		raise APIGatewayError(f"Unknown homomorphic endpoint: {request.endpoint_path}")
+
+	def _get_homomorphic_ciphertext(
+		self,
+		ciphertext_id: str,
+		tenant_id: str | None
+	) -> HomomorphicCiphertext:
+		"""Retrieve a tenant-scoped homomorphic ciphertext for API computation"""
+		if ciphertext_id not in self.homomorphic_ciphertexts:
+			raise ValidationError(f"Unknown homomorphic ciphertext: {ciphertext_id}")
+		ciphertext = self.homomorphic_ciphertexts[ciphertext_id]
+		if tenant_id and ciphertext.tenant_id != tenant_id:
+			raise AuthorizationError("Homomorphic ciphertext tenant mismatch")
+		return ciphertext
 	
 	async def _handle_mpc_request(self, request: APIRequest, endpoint: APIEndpoint) -> Dict[str, Any]:
 		"""Handle multi-party computation API requests"""

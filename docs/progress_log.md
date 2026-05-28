@@ -6451,3 +6451,23 @@ Battery-conscious verification:
 - `rg -n "result_data = secrets\\.token_bytes\\(1024\\)|Mock computation result|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/encr/service.py tests/test_common_encr_service_homomorphic_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/encr/service.py tests/test_common_encr_service_homomorphic_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:51 EAT
+
+Completed checkpoint:
+
+- Fixed the ENCR API gateway import path so `EnterpriseAPIGateway` is importable at runtime.
+- Replaced homomorphic API endpoint mock responses with tenant-scoped in-memory ciphertext storage.
+- `/v1/homomorphic/encrypt` now validates numeric payloads and creates executable homomorphic ciphertext records.
+- `/v1/homomorphic/add` now retrieves stored ciphertexts, enforces tenant ownership, delegates deterministic computation to the ENCR homomorphic engine, and stores the result ciphertext.
+- Added focused API gateway regression coverage for encrypt/add execution and invalid payload rejection.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/api_gateway.py tests/test_common_encr_api_gateway_homomorphic_runtime.py`
+- `.venv/bin/python -c 'import capabilities.common.encr.api_gateway as m; print(m.EnterpriseAPIGateway.__name__)'` -> `EnterpriseAPIGateway`
+- `.venv/bin/python -m pytest tests/test_common_encr_api_gateway_homomorphic_runtime.py -q` -> 2 passed, 10 pre-existing warnings
+- `.venv/bin/python -m pytest tests/test_common_encr_api_gateway_homomorphic_runtime.py tests/test_common_encr_service_homomorphic_runtime.py tests/test_common_encr_public_interface.py -q` -> 9 passed, 10 pre-existing warnings
+- `rg -n "Mock homomorphic operations for now|ciphertext_id': uuid7str\\(\\)|result_ciphertext_id': uuid7str\\(\\)|computation_time_ms': 5\\.2|noise_growth': 0\\.1" capabilities/common/encr/api_gateway.py tests/test_common_encr_api_gateway_homomorphic_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/encr/api_gateway.py tests/test_common_encr_api_gateway_homomorphic_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
