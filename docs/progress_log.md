@@ -6523,3 +6523,22 @@ Battery-conscious verification:
 - `rg -n "Placeholder for HCL conversion|# HCL representation" capabilities/common/conf/models.py tests/test_common_conf_models_hcl_export.py -S` -> no matches
 - `git diff --check capabilities/common/conf/models.py tests/test_common_conf_models_hcl_export.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 13:25 EAT
+
+Completed checkpoint:
+
+- Extended the CONF universal abstraction layer beyond VM-only provider translation.
+- Added executable AWS translations for storage, load balancer, serverless function, and container resources.
+- Added executable Azure translations for database, storage, Kubernetes, and container resources.
+- Added executable GCP translations for database, storage, Kubernetes, container, and serverless resources.
+- Tightened provider validation so unsupported resource types and unsupported feature requirements produce explicit validation errors.
+- Added focused runtime coverage for storage, database, and container translation across AWS, Azure, and GCP.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conf/universal_abstraction.py tests/test_common_conf_universal_abstraction_translations.py`
+- `.venv/bin/python -m pytest tests/test_common_conf_universal_abstraction_translations.py -q` -> 3 passed, 10 pre-existing warnings
+- `rg -n "pass\\s*# Implementation for|return \\{\\}\\s*$|return \\[\\]\\s*$" capabilities/common/conf/universal_abstraction.py tests/test_common_conf_universal_abstraction_translations.py -S` -> no matches
+- `git diff --check capabilities/common/conf/universal_abstraction.py tests/test_common_conf_universal_abstraction_translations.py`
+- Deferred broader pytest at the user's request to conserve battery.
