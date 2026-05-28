@@ -6328,3 +6328,22 @@ Battery-conscious verification:
 - `rg -n "encrypted_data_placeholder|computation_result_placeholder|privacy_template_placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/frec/privacy_architecture.py tests/test_common_frec_privacy_architecture_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/frec/privacy_architecture.py tests/test_common_frec_privacy_architecture_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:04 EAT
+
+Completed checkpoint:
+
+- Made CACH quantum-security threat analysis and adaptive policy paths executable instead of returning zero/empty placeholder results.
+- Access anomaly scoring now accounts for unusual hours, threat-intel IPs, authentication strength, failed/denied attempts, repeated attempts, large responses, and sensitive cache keys.
+- Cache-entry analysis now detects unencrypted sensitive data, unencrypted quantum-safe entries, possible cache enumeration, and oversized entries with scored severities.
+- Adaptive policy generation now produces and applies concrete threshold/action changes, creates threat-specific policies for novel threats, and estimates risk reduction from applied adaptations.
+- Quantum transition readiness now reflects actual key state, hybrid deployment, covered key purposes, expired keys, and threat level.
+- Added focused public API regression coverage for threat analysis/adaptation and quantum-transition readiness.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/cach/quantum_security.py tests/test_common_cach_quantum_security_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_cach_quantum_security_runtime.py -q` -> 2 passed, 10 pre-existing warnings
+- `rg -n "Placeholder|placeholder|raise NotImplementedError|not implemented|pass\\s*(#.*)?$" capabilities/common/cach/quantum_security.py tests/test_common_cach_quantum_security_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/cach/quantum_security.py tests/test_common_cach_quantum_security_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
