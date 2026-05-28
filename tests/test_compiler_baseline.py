@@ -22,6 +22,7 @@ from compiler.code_generator import CodeGenerator
 from compiler.compiler import APGCompiler, compile_apg_string
 from compiler.ide_integration import audit_vscode_extension
 from compiler.semantic_analyzer import SemanticError
+from compiler.studio import build_studio_edit_plan, build_studio_snapshot
 from language_server.semantic_service import (
 	build_code_action_report,
 	build_rename_plan,
@@ -2247,6 +2248,86 @@ def test_cli_ide_audit_json_reports_vscode_contracts():
 	assert report["ok"] is True
 	assert report["surface"] == "vscode"
 	assert report["summary"]["check_count"] >= 6
+
+
+def test_studio_snapshot_projects_dsl_into_designer_panels(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	report = build_studio_snapshot(source)
+
+	assert report["format"] == "apg.studio-snapshot.v1"
+	assert report["ok"] is True
+	assert report["semantic_model_format"] == "apg.semantic-model.v1"
+	assert report["round_trip"]["invalid_visual_edits_are_rejected"] is True
+	assert {table["name"] for table in report["panels"]["database_designer"]["tables"]} == {
+		"Customer",
+		"SalesOrder",
+	}
+	assert {form["name"] for form in report["panels"]["form_designer"]["forms"]} >= {
+		"CustomerForm",
+		"SalesOrderForm",
+	}
+	assert "add_field" in report["round_trip"]["supported_edit_operations"]
+
+
+def test_studio_visual_edit_plan_adds_field_without_writing(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	report = build_studio_edit_plan(
+		source,
+		{"operation": "add_field", "table": "Customer", "name": "phone", "type": "str"},
+	)
+
+	assert report["format"] == "apg.studio-edit-plan.v1"
+	assert report["ok"] is True
+	assert report["changed"] is True
+	assert report["written"] is False
+	assert "phone: str;" in report["new_source"]
+	assert "form/database designer edit changes schema" in report["review_reasons"][0]
+	assert "phone: str;" not in source.read_text(encoding="utf-8")
+
+
+def test_studio_visual_edit_rejects_unknown_table(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	report = build_studio_edit_plan(
+		source,
+		{"operation": "add_field", "table": "Missing", "name": "phone", "type": "str"},
+	)
+
+	assert report["ok"] is False
+	assert report["changed"] is False
+	assert report["errors"] == ["Cannot add field to unknown table: Missing"]
+
+
+def test_cli_studio_snapshot_and_plan_edit_json(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	snapshot_result = CliRunner().invoke(cli, ["studio", "snapshot", str(source), "--json"])
+	edit_result = CliRunner().invoke(cli, [
+		"studio",
+		"plan-edit",
+		str(source),
+		"--edit-json",
+		json.dumps({"operation": "add_field", "table": "Customer", "name": "phone", "type": "str"}),
+		"--json",
+	])
+
+	assert snapshot_result.exit_code == 0, snapshot_result.output
+	snapshot = json.loads(snapshot_result.output)
+	assert snapshot["format"] == "apg.studio-snapshot.v1"
+	assert snapshot["panels"]["database_designer"]["tables"]
+	assert edit_result.exit_code == 0, edit_result.output
+	edit = json.loads(edit_result.output)
+	assert edit["format"] == "apg.studio-edit-plan.v1"
+	assert edit["ok"] is True
+	assert edit["written"] is False
+	assert "new_source" not in edit
+	assert "phone: str;" not in source.read_text(encoding="utf-8")
 
 
 def test_framework_names_are_not_silent_compiler_target_aliases():

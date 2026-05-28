@@ -7726,3 +7726,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile compiler/ide_integration.py cli/ide_command.py cli/main.py tests/test_compiler_baseline.py`
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_vscode_extension_audit_tracks_current_cli_contracts tests/test_compiler_baseline.py::test_cli_ide_audit_json_reports_vscode_contracts -q` -> 2 passed
 - `.venv/bin/apg ide audit --json` -> emitted `apg.ide-audit.v1` with 6/6 checks passing
+
+### 2026-05-28 20:50 EAT
+
+Completed checkpoint:
+
+- Added `compiler.studio` as the dependency-light APG Studio/visual-designer round-trip service over `apg.semantic-model.v1`.
+- Added `apg studio snapshot <file> --json`, emitting `apg.studio-snapshot.v1` with DSL editor, component palette, database, form, workflow, capability composition, package/deployment, and graph/explain panels.
+- Added `apg studio plan-edit <file> --edit-json ... --json`, emitting `apg.studio-edit-plan.v1` with reviewable APG DSL diffs for visual edits.
+- Supported visual edit operations now include `add_table`, `add_field`, `add_agent`, `add_capability`, and `add_screen`.
+- Invalid visual edits, such as adding a field to an unknown table, are rejected before any write; valid writes require explicit `--write`.
+- Updated the tooling specification so APG Studio/Monaco round-trip behavior is documented as an executable current contract.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/studio.py cli/studio_command.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_studio_snapshot_projects_dsl_into_designer_panels tests/test_compiler_baseline.py::test_studio_visual_edit_plan_adds_field_without_writing tests/test_compiler_baseline.py::test_studio_visual_edit_rejects_unknown_table tests/test_compiler_baseline.py::test_cli_studio_snapshot_and_plan_edit_json -q` -> 4 passed
+- `.venv/bin/apg studio snapshot examples/02_customer_orders_relationship/main.apg --json` -> emitted `apg.studio-snapshot.v1`
+- `.venv/bin/apg studio plan-edit examples/02_customer_orders_relationship/main.apg --edit-json '{"operation":"add_field","table":"Customer","name":"phone","type":"str"}' --json` -> emitted `apg.studio-edit-plan.v1` with a dry-run field-add diff and no file write

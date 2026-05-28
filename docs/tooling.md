@@ -70,6 +70,14 @@ APG currently has an executable compiler path:
 - `apg ide audit --json` emits `apg.ide-audit.v1`, proving the checked-in
   VS Code extension is aligned with current APG CLI commands, python-only
   compiler targeting, activation, contributed files, icons, and themes;
+- `apg studio snapshot <file> --json` emits `apg.studio-snapshot.v1` and
+  projects APG DSL into Studio designer panels for the DSL editor, component
+  palette, database, forms, workflows, capabilities, packages, deployment, and
+  graph/explain surfaces;
+- `apg studio plan-edit <file> --edit-json ... --json` emits
+  `apg.studio-edit-plan.v1`, turning supported visual designer edits into
+  reviewable APG DSL diffs while rejecting invalid edits that cannot resolve
+  through the semantic model;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -692,6 +700,8 @@ apg language-server app.apg --check --json
 apg language-server app.apg --rename Customer --to Account --json
 apg language-server app.apg --code-actions --json
 apg ide audit --json
+apg studio snapshot app.apg --json
+apg studio plan-edit app.apg --edit-json '{"operation":"add_field","table":"Customer","name":"phone","type":"str"}' --json
 apg capabilities contracts --json
 apg capabilities validate-contracts --json
 ```
@@ -1034,6 +1044,15 @@ Required Studio surfaces:
 
 Visual designers must never create state that cannot round-trip through the
 DSL semantic model.
+
+The current executable baseline includes `apg studio snapshot <file> --json`
+and `apg studio plan-edit <file> --edit-json ... --json`. Snapshot emits
+`apg.studio-snapshot.v1` from the same semantic model as the compiler and
+language server. Plan-edit emits `apg.studio-edit-plan.v1`, supports visual
+operations for adding tables, fields, agents, capabilities, and screens, and
+rejects edits such as adding a field to an unknown table before any file write.
+Writes require explicit `--write`; dry-run mode returns a reviewable DSL diff
+and omits direct mutation.
 
 ## Graph Tooling
 
