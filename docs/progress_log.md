@@ -4683,3 +4683,27 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `2e44d47` (`Make legacy CRM subpackages importable standalone`) to `origin/main`.
+
+### 2026-05-28 03:09 EAT
+
+Completed checkpoint:
+
+- Extended `spec/apg.g4` with a first-class screen composition contract.
+- Added `screens:` and `screen:` entity members so APG authors can declare screens without hiding them inside generic UI object fields.
+- Added screen members for routes, layouts, contained/composed elements, data bindings, actions, events, permissions, rules, themes, and explicit relationships between composed elements.
+- Allowed `ui` contracts to include `screens:` directly, preserving terse but readable application declarations.
+- Reworded the old undefined-rule placeholder section as reusable domain-specific grammar fragments.
+- Added grammar contract coverage for screen composition and relationship fields.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_apg_language_contract.py`
+- `.venv/bin/pytest tests/test_apg_language_contract.py -q` -> 7 passed
+- `.venv/bin/pytest tests/test_compiler_baseline.py tests/test_apg_language_contract.py tests/test_parser.py tests/test_semantic_analyzer.py tests/test_ai_agent_composition.py -q` -> 49 passed, 1 existing warning
+- `rg -n "UNDEFINED RULE STUBS|Placeholder definitions|placeholder implementations" spec/apg.g4 tests/test_apg_language_contract.py` -> no matches
+- `git diff --check -- spec/apg.g4 tests/test_apg_language_contract.py` -> no issues
+- Parser regeneration deferred because `antlr4` is not installed in this checkout and broad verification is being conserved for battery.
+
+Commit result:
+
+- Pending commit/push for this checkpoint.

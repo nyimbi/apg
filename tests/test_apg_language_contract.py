@@ -148,6 +148,47 @@ def test_grammar_advertises_python_not_framework_targets():
 		assert framework not in ui_shell
 
 
+def test_grammar_supports_screen_composition_and_relationships():
+	text = GRAMMAR.read_text(encoding="utf-8")
+	entity_member = _rule_body("entity_member")
+	ui_member = _rule_body("ui_contract_member")
+	screen_member = _rule_body("screen_contract_member")
+	screen_relationship_member = _rule_body("screen_relationship_member")
+
+	assert "screen_contract_block" in entity_member
+	assert "'screens'" in ui_member
+
+	for rule_name in [
+		"screen_contract_block",
+		"screen_set",
+		"screen_binding",
+		"screen_contract",
+		"screen_element_list",
+		"screen_event_list",
+		"screen_relationship_list",
+		"screen_relation_edge",
+	]:
+		assert re.search(rf"^{rule_name}\b", text, flags=re.MULTILINE)
+
+	for field in [
+		"'route'",
+		"'layout'",
+		"'contains'",
+		"'composes'",
+		"'binds'",
+		"'actions'",
+		"'events'",
+		"'relationships'",
+		"'permissions'",
+		"'rules'",
+		"'theme'",
+	]:
+		assert field in screen_member
+
+	for field in ["'from'", "'to'", "'via'", "'type'", "'when'"]:
+		assert field in screen_relationship_member
+
+
 def test_grammar_includes_broad_african_language_codes():
 	language_code = _rule_body("language_code")
 	codes = set(re.findall(r"'([a-z]{2,3})'", language_code))

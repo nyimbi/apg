@@ -200,6 +200,7 @@ entity_member
     | erp_component_block
     | agent_composition_block
     | rule_engine_block
+    | screen_contract_block
     | ui_contract_block
     | theme_contract_block
     | stream_runtime_block
@@ -597,8 +598,117 @@ ui_contract_member
     | 'view_module' ':' contract_scalar contract_separator?
     | 'api_prefix' ':' contract_scalar contract_separator?
     | 'routes' ':' ui_route_list contract_separator?
+    | 'screens' ':' screen_set contract_separator?
     | 'components' ':' contract_object contract_separator?
     | 'requires_theme' ':' BOOLEAN contract_separator?
+    | IDENTIFIER ':' contract_value contract_separator?
+    ;
+
+screen_contract_block
+    : 'screens' ':' screen_set contract_separator?
+    | 'screen' ':' screen_contract contract_separator?
+    ;
+
+screen_set
+    : reference_list
+    | '{' screen_binding* '}'
+    ;
+
+screen_binding
+    : screen_key ':' screen_contract contract_separator?
+    | screen_key ':' 'screen' '{' screen_contract_member* '}' contract_separator?
+    ;
+
+screen_key
+    : IDENTIFIER
+    | STRING
+    ;
+
+screen_contract
+    : '{' screen_contract_member* '}'
+    ;
+
+screen_contract_member
+    : 'route' ':' contract_scalar contract_separator?
+    | 'title' ':' contract_scalar contract_separator?
+    | 'layout' ':' screen_layout contract_separator?
+    | 'contains' ':' screen_element_list contract_separator?
+    | 'composes' ':' screen_element_list contract_separator?
+    | 'binds' ':' reference_list contract_separator?
+    | 'actions' ':' reference_list contract_separator?
+    | 'events' ':' screen_event_list contract_separator?
+    | 'relationships' ':' screen_relationship_list contract_separator?
+    | 'requires' ':' reference_list contract_separator?
+    | 'permissions' ':' permission_contract contract_separator?
+    | 'rules' ':' rule_list contract_separator?
+    | 'ui' ':' ui_contract contract_separator?
+    | 'theme' ':' theme_contract contract_separator?
+    | IDENTIFIER ':' contract_value contract_separator?
+    ;
+
+screen_layout
+    : 'stack' | 'grid' | 'tabs' | 'split' | 'wizard' | 'dashboard' | 'form'
+    | IDENTIFIER | STRING
+    ;
+
+screen_element_list
+    : '[' (screen_element_ref (',' screen_element_ref)*)? ']'
+    ;
+
+screen_element_ref
+    : contract_scalar
+    | '{' screen_element_member* '}'
+    ;
+
+screen_element_member
+    : 'id' ':' contract_scalar contract_separator?
+    | 'type' ':' contract_scalar contract_separator?
+    | 'component' ':' contract_scalar contract_separator?
+    | 'slot' ':' contract_scalar contract_separator?
+    | 'binds' ':' reference_list contract_separator?
+    | 'rules' ':' rule_list contract_separator?
+    | IDENTIFIER ':' contract_value contract_separator?
+    ;
+
+screen_event_list
+    : '[' (screen_event (',' screen_event)*)? ']'
+    ;
+
+screen_event
+    : '{' screen_event_member* '}'
+    ;
+
+screen_event_member
+    : 'on' ':' contract_scalar contract_separator?
+    | 'do' ':' contract_value contract_separator?
+    | 'target' ':' contract_scalar contract_separator?
+    | 'when' ':' contract_value contract_separator?
+    | IDENTIFIER ':' contract_value contract_separator?
+    ;
+
+screen_relationship_list
+    : '[' (screen_relationship (',' screen_relationship)*)? ']'
+    ;
+
+screen_relationship
+    : screen_relation_edge
+    | '{' screen_relationship_member* '}'
+    ;
+
+screen_relation_edge
+    : IDENTIFIER '->' IDENTIFIER screen_relation_modifier*
+    ;
+
+screen_relation_modifier
+    : '[' IDENTIFIER ':' contract_value ']'
+    ;
+
+screen_relationship_member
+    : 'from' ':' contract_scalar contract_separator?
+    | 'to' ':' contract_scalar contract_separator?
+    | 'via' ':' contract_scalar contract_separator?
+    | 'type' ':' contract_scalar contract_separator?
+    | 'when' ':' contract_value contract_separator?
     | IDENTIFIER ':' contract_value contract_separator?
     ;
 
@@ -1396,11 +1506,12 @@ variable_declaration
     ;
 
 // ========================================
-// UNDEFINED RULE STUBS
-// Placeholder definitions for undefined rules to make grammar compilable
+// REUSABLE DOMAIN-SPECIFIC GRAMMAR FRAGMENTS
+// These fragments keep specialized capability configuration terse while
+// still accepting structured objects where richer contracts are needed.
 // ========================================
 
-// Configuration specifications - placeholder implementations
+// Configuration specifications
 ab_testing_config: IDENTIFIER | STRING | '{' config_property* '}' ;
 access_policy_specification: IDENTIFIER | STRING | '{' policy_property* '}' ;
 aggregation_specification: IDENTIFIER | STRING | '{' agg_property* '}' ;
