@@ -6135,3 +6135,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `aec4eba` (`Make event stream processors executable`).
+
+### 2026-05-28 10:35 EAT
+
+Completed checkpoint:
+
+- Made the workflow-orchestration service importable in dependency-light APG virtual environments.
+- Added stdlib/local fallbacks for optional Redis, Prefect, Celery, APScheduler, and structlog runtime SDKs.
+- Fixed workflow status coverage so execution can use pending, in-progress, and timeout states without enum errors.
+- Added a focused native workflow regression proving a Python task executes to completion without Prefect, Celery, Airflow, Redis server, or scheduler dependencies.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/orchestration/service.py tests/test_composition_orchestration_service_minimal.py`
+- `.venv/bin/pytest tests/test_composition_orchestration_service_minimal.py -q` -> 2 passed
+- `.venv/bin/python -c 'import capabilities.composition.orchestration.service as svc; assert svc.WorkflowStatus.PENDING.value == "pending"'`
+- `git diff --check capabilities/composition/orchestration/service.py tests/test_composition_orchestration_service_minimal.py`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push.
