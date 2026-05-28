@@ -60,6 +60,11 @@ APG currently has an executable compiler path:
 - `apg package <file> --target web|desktop|mobile|container --out <dir> --json`
   emits `apg.package-report.v1`, writes a generated Python application package,
   attaches release evidence, and adds profile-specific launch/manifest files;
+- `apg deployment verify <generated-or-package-dir> --json` emits
+  `apg.deployment-verification-report.v1` by loading the generated package
+  entrypoint, checking runtime self-test/component-manifest/semantic-model
+  evidence, proving deployment artifacts, health checks, environment names,
+  secret hygiene, resource hints, and deployment topology;
 - `apg language-server <file> --check --json` emits
   `apg.language-server-check.v1` from the shared semantic model and formatter,
   proving editor-facing diagnostics, completions, definitions, references,
@@ -706,6 +711,7 @@ apg migrate-plan previous.apg current.apg --backend postgresql --json
 apg package app.apg --target web --out dist --json
 apg package app.apg --target desktop --out dist
 apg package app.apg --target mobile --out dist
+apg deployment verify dist/app-container --json
 apg validate
 apg run
 apg doctor
@@ -916,6 +922,20 @@ The current executable contract emits `apg.package-report.v1` and writes a
 package directory containing generated Python artifacts, `package_manifest.json`,
 `release_report.json`, and profile-specific files such as `run_web.py`,
 `run_desktop.py`, `mobile_profile.json`, or `container_profile.json`.
+
+### `apg deployment`
+
+```console
+apg deployment verify generated/app --json
+apg deployment verify dist/app-container --json
+```
+
+The deployment verifier emits `apg.deployment-verification-report.v1` for a
+generated app directory or packaged app directory. It imports the generated
+`app.py`, runs runtime self-test, reads the component manifest and semantic
+model, validates deployment artifacts and commands, checks named environment
+variables, rejects literal secret values, verifies Docker/resource hints, and
+requires the deployment graph to be connected and explainable.
 
 ### `apg capabilities`
 

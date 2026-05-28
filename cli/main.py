@@ -22,6 +22,7 @@ from cli.capabilities_command import capabilities
 from cli.baseline_command import baseline
 from cli.create_project import create
 from cli.compile_command import compile_cmd
+from cli.deployment_command import deployment
 from cli.diagnostics_command import diagnostics
 from cli.drift_command import drift
 from cli.explain_command import explain
@@ -59,6 +60,7 @@ cli.add_command(capabilities)
 cli.add_command(baseline)
 cli.add_command(create)
 cli.add_command(compile_cmd, name='compile')
+cli.add_command(deployment)
 cli.add_command(diagnostics)
 cli.add_command(drift)
 cli.add_command(explain)

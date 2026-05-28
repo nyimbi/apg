@@ -7825,3 +7825,25 @@ Battery-conscious verification:
 - `.venv/bin/apg package examples/08_basic_capability_contract/main.apg --target web --out /private/tmp/apg_capability_publish_smoke --json` passed and wrote a verified package.
 - `.venv/bin/apg capabilities publish-plan /private/tmp/apg_capability_publish_smoke/capability_basics-web` passed with 1 capability and 1 catalog patch op.
 - `git diff --check -- compiler/capability_publish.py cli/capabilities_command.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `5e63c14` (`Make capability publish planning executable`).
+
+### 2026-05-28 21:39 EAT
+
+In progress:
+
+- Promoted deployment verifier tooling from the package/release roadmap into an executable command.
+- Added `compiler.deployment_verifier.build_deployment_verification_report()` and `apg deployment verify <generated-or-package-dir> --json`.
+- Deployment verification now imports generated `app.py`, runs runtime self-test, reads component manifest and semantic model evidence, checks deployment artifacts, health commands, environment variable names, secret-value hygiene, Docker/resource hints, and connected deployment topology.
+- Updated `docs/tooling.md` so deployment verification is documented as a current executable contract.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/deployment_verifier.py cli/deployment_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_deployment_verify_reports_package_evidence -q` passed with 1 test.
+- `.venv/bin/apg deployment verify examples/20_enterprise_erp_platform/output` passed with all six deployment checks green.
+- `.venv/bin/apg package examples/10_themed_i18n_streaming_capability/main.apg --target container --out /private/tmp/apg_deployment_verify_smoke --json` passed and wrote a verified package.
+- `.venv/bin/apg deployment verify /private/tmp/apg_deployment_verify_smoke/localized_streaming_capability-container` passed with all six deployment checks green.
+- `git diff --check -- compiler/deployment_verifier.py cli/deployment_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.

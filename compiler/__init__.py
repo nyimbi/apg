@@ -21,6 +21,7 @@ from .parser import APGParser
 from .ast_builder import ASTBuilder
 from .baseline import build_compiler_baseline_report
 from .capability_publish import build_capability_publish_report
+from .deployment_verifier import build_deployment_verification_report
 from .semantic_analyzer import SemanticAnalyzer
 from .diagnostics import audit_diagnostic_fixtures, diagnostic_registry, explain_diagnostic
 from .drift import audit_drift_fixtures, build_drift_report, compare_semantic_models
@@ -39,6 +40,7 @@ __all__ = [
     'ASTBuilder',
     'build_compiler_baseline_report',
     'build_capability_publish_report',
+    'build_deployment_verification_report',
     'SemanticAnalyzer',
     'audit_diagnostic_fixtures',
     'diagnostic_registry',
