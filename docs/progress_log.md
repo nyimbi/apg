@@ -8529,6 +8529,22 @@ Battery-conscious verification:
 - `rg -n "Sample data for demonstration|Additional helper methods \\(simplified implementations\\)|Additional simplified implementations|1500000|1305000|195000|2025-08-09|cache_size_mb': 4096|35\\.2|67\\.8|Predicted Cache Load|Geographic Traffic Distribution|Sample throughput data|Sample latency data" capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py` found no stale CACH dashboard sample literals.
 - `git diff --check -- capabilities/common/cach/dashboard.py tests/test_common_cach_dashboard_metrics.py docs/progress_log.md` passed.
 
+### 2026-05-29 02:50 EAT
+
+Compiler serviceability checkpoint:
+
+- Verified the installed Click CLI entrypoint reaches the active compiler surface with `apg version`.
+- Verified `apg compile examples/01_minimal_customer_records/main.apg --output /private/tmp/apg-compiler-smoke --verify` generated a dependency-light Python app and passed both generated self-test and smoke test.
+- Verified the numbered example corpus remains a usable compiler baseline: 20/20 examples passed compile-verify, lint, semantic-model, graph-suite, validate, and release checks.
+- Confirmed the active compiler target remains Python-only and the example baseline covers records, agents, capabilities, screens, visual theming, i18n, ByteWax streaming, workflows, and application composition.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg version` passed and reported APG 1.0.0, language specification v11, target Python.
+- `./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /private/tmp/apg-compiler-smoke --verify` passed with 9 generated files, generated self-test, and generated smoke test.
+- `./.venv/bin/python -m pytest -q tests/test_examples_parseable.py` passed with 6 tests.
+- `./.venv/bin/apg baseline examples --json` passed with `ok: true`, 20 passed examples, 0 failed examples, and all high-level baseline checks true.
+
 ### 2026-05-29 02:19 EAT
 
 Executable CONN query performance slice:
