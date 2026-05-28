@@ -6611,3 +6611,20 @@ Battery-conscious verification:
 - `rg -n "Placeholder for resource conflict detection|Placeholder for configuration conflict detection" capabilities/composition/registry/composition_engine.py tests/test_composition_registry_conflict_detection.py -S` -> no matches
 - `git diff --check capabilities/composition/registry/composition_engine.py tests/test_composition_registry_conflict_detection.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 13:57 EAT
+
+Completed checkpoint:
+
+- Replaced the composition dependency validator resource-conflict placeholder with executable metadata-driven checks.
+- Added duplicate detection for API routes, network ports, service names, filesystem paths, queues, event topics, and conflicting environment variable defaults.
+- Added structured `conflicts_found` entries alongside validation errors so callers can surface actionable resource conflicts in composition UIs and rule engines.
+- Added focused runtime coverage for top-level resource conflicts, sub-capability resources, and wildcard route conflicts.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/validator.py tests/test_composition_registry_validator_resource_conflicts.py`
+- `.venv/bin/python -m pytest tests/test_composition_registry_validator_resource_conflicts.py -q` -> 2 passed, 2 pre-existing warnings
+- `rg -n "placeholder|pass\\s*$|TODO" capabilities/composition/registry/validator.py tests/test_composition_registry_validator_resource_conflicts.py -S` -> no matches
+- `git diff --check capabilities/composition/registry/validator.py tests/test_composition_registry_validator_resource_conflicts.py`
+- Deferred broader pytest at the user's request to conserve battery.
