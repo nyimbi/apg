@@ -1,14 +1,17 @@
 # APG DSL Tooling Specification
 
-APG needs a complete DSL tooling stack, not just a grammar. The platform
-must make authoring, reviewing, generating, packaging, and evolving applications
-safe across the CLI, IDE, language server, visual designers, generated apps,
-and agent workflows.
+APG needs a complete DSL tooling stack, not just a grammar. The immediate
+priority remains bedding down the compiler and generated Python application
+baseline. This document defines the next workstream once that compiler baseline
+is stable: authoring, reviewing, generating, packaging, and evolving APG
+applications safely across the CLI, IDE, language server, visual designers,
+generated apps, and agent workflows.
 
-This document is the implementation specification for that tooling. It keeps the
-language surface generic while making the surrounding tooling strong enough for
-enterprise application generation, capability composition, database-backed form design,
-workflow design, agentic-system design, and natural-language evolution.
+This is an APG-specific implementation specification, not a copied generic
+tooling wish list. It keeps the language surface generic while making the
+surrounding tooling strong enough for enterprise application generation,
+capability composition, database-backed form design, workflow design,
+agentic-system design, and natural-language evolution.
 
 ## Current Executable Baseline
 
@@ -30,6 +33,9 @@ APG currently has an executable compiler path:
   `apg.graph.v1` data or renderable graph text;
 - `apg graph-suite <file> --json` emits `apg.graph-suite-report.v1` with
   every supported graph rendered as JSON, Mermaid, and DOT;
+- `apg release <file> --json` emits `apg.release-report.v1` by compiling to a
+  temporary generated app, importing it, and running generated self-test,
+  OpenAPI, component-manifest, route-dispatch, and semantic-model evidence;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -44,6 +50,33 @@ APG currently has an executable compiler path:
 The sections below define where the tooling needs to go. When a command is not
 implemented yet, the command name is the desired stable contract, not a claim
 that it is already available.
+
+## Compiler Bed-Down Gate
+
+Do not treat this tooling roadmap as a reason to drift away from compiler
+stabilization. The next major task begins when the APG compiler can reliably
+produce executable Python applications and release evidence from representative
+DSL examples.
+
+The compiler baseline is bedded down when:
+
+- `apg compile <file> --target python --output <dir> --verify` is reliable on
+  the curated examples that represent records, screens, workflows, agents,
+  capabilities, composition, theming, i18n, and ByteWax streaming metadata;
+- generated applications expose stable `--self-test`, `--describe`,
+  `--validate`, OpenAPI, component manifest, route dispatch, and
+  `apg.semantic-model.v1` surfaces;
+- `apg lint`, `apg validate`, `apg model`, `apg graph-suite`, and
+  `apg release` agree on parser, semantic-model, and diagnostic meaning;
+- `python` remains the only compiler target, with desktop/mobile/web/deployment
+  concerns expressed as packaging profiles over generated Python artifacts;
+- unsupported framework target names such as Flask-AppBuilder or Django are not
+  advertised as compile targets;
+- generated artifacts are deterministic enough that regression tests can compare
+  larger chunks without excessive battery or compute cost.
+
+After that gate, this document becomes the ordered implementation backlog for
+the APG tooling workstream.
 
 ## Goals
 
@@ -100,13 +133,14 @@ designers, and natural-language tools.
 | `compiler.parser` | Existing ANTLR-backed parser wrapper over `spec/apg.g4`, `spec/apgLexer.py`, `spec/apgParser.py`, and `spec/apgVisitor.py`. |
 | `compiler.ast_builder` | Existing parse-tree-to-AST conversion layer. Extend it until every first-class APG construct has a stable AST node or normalized metadata record. |
 | `compiler.semantic_analyzer` | Existing semantic analyzer. Extend it into the shared semantic model producer so CLI, LSP, generator, tests, and agents do not re-implement APG meaning. |
+| `compiler.semantic_model` | Existing semantic-model builder. Keep it as the canonical JSON producer for `apg.semantic-model.v1`. |
 | `compiler.code_generator` | Existing Python artifact generator. It remains the only compile target and should consume the normalized semantic model rather than ad hoc parse fragments. |
-| `compiler.diagnostics` | New diagnostic registry for APG code ranges, severities, related locations, and fix IDs. |
-| `compiler.formatter` | New deterministic formatter for `.apg` source. |
-| `compiler.graphs` | New graph builders for ER, lookup, workflow, handler, capability, security, agent, package, and deployment graphs. |
-| `compiler.migrations` | New semantic-model diff planner for database and capability ownership changes. |
-| `compiler.nl_plan` | New constrained natural-language-to-APG-patch planner. |
-| `compiler.release` | New release evidence and drift checks for generated applications and capability packages. |
+| `compiler.diagnostics` | Planned diagnostic registry for APG code ranges, severities, related locations, and fix IDs. |
+| `compiler.formatter` | Existing deterministic formatter for `.apg` source. Extend it toward full AST-aware formatting. |
+| `compiler.graphs` | Existing graph builders for ER, lookup, workflow, handler, capability, security, agent, package, and deployment graphs. |
+| `compiler.migrations` | Planned semantic-model diff planner for database and capability ownership changes. |
+| `compiler.nl_plan` | Planned constrained natural-language-to-APG-patch planner. |
+| `compiler.release` | Existing release evidence builder for generated applications. Extend it toward capability package and deployment evidence. |
 | `language_server.server` | Existing LSP entry point. It should move from direct parser/analyzer calls to the shared semantic model. |
 | `cli.*` | Existing Click CLI entry points. Add stable JSON/text contracts for new lint, format, graph, explain, package, and planning commands. |
 
@@ -577,14 +611,15 @@ and relationship arrows.
 
 ## CLI Contracts
 
-The installed command should keep the current executable `apg compile` path
-stable while adding tooling subcommands around the same parser and semantic
-model. Existing helper commands may remain as aliases if they call the same
-contracts.
+The installed command must keep the current executable `apg compile` path
+stable. New tooling subcommands should sit around the same parser and semantic
+model rather than inventing side channels. Existing helper commands may remain
+as aliases if they call the same contracts.
 
 ### Current Commands
 
-These commands are executable today and should remain compatible:
+These commands are executable in this repository today and should remain
+compatible:
 
 ```console
 apg compile app.apg --output generated/app --verify
@@ -597,6 +632,7 @@ apg format app.apg --write
 apg graph app.apg --kind er --format json
 apg graph app.apg --kind agent --format mermaid
 apg graph-suite app.apg --json
+apg release app.apg --json
 apg validate
 apg run
 apg doctor
@@ -608,6 +644,11 @@ python cli.py capabilities validate-contracts
 `python` is the only compiler target. Desktop, mobile, web, and deployment
 packaging are profiles layered on generated Python application artifacts; they
 are not separate compile targets.
+
+Commands below this point are either current executable contracts or reserved
+contracts for the post-compiler tooling workstream. If a command is not wired
+into `cli/main.py` yet, implement it only after the compiler bed-down gate or
+when it directly strengthens compiler release evidence.
 
 ### `apg lint`
 
@@ -692,6 +733,19 @@ Supported graph kinds:
 - `agent`
 - `deployment`
 - `package`
+
+### `apg release`
+
+```console
+apg release app.apg --json
+```
+
+Emits `apg.release-report.v1` without writing project output. The verifier
+compiles the APG source into a temporary generated application, imports the
+generated app with its sidecars, runs generated `self_test()`, validates
+OpenAPI/component-manifest/route-dispatch contracts, and proves that the
+compiled app exposes `apg.semantic-model.v1` through both artifact and runtime
+surfaces.
 
 ### `apg explain`
 

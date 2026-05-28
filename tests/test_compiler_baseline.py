@@ -1364,6 +1364,45 @@ def test_cli_model_text_summarizes_agent_semantics(tmp_path):
 	assert "1 agent(s)" in result.output
 
 
+def test_cli_release_json_emits_generated_application_evidence_without_output(tmp_path):
+	source = tmp_path / "agent.apg"
+	output = tmp_path / "generated"
+	source.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["release", str(source), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.release-report.v1"
+	assert report["ok"] is True
+	assert report["source"] == str(source)
+	assert report["target"] == "python"
+	assert report["generated"]["semantic_model_artifact"] is True
+	assert "semantic_model.json" in report["generated"]["files"]
+	assert report["evidence"]["self_test"]["passed"] is True
+	assert report["evidence"]["self_test"]["status"] == "ok"
+	assert report["evidence"]["self_test"]["route_count"] >= 1
+	assert report["evidence"]["semantic_model"]["format"] == "apg.semantic-model.v1"
+	assert report["evidence"]["semantic_model"]["agent_count"] == 1
+	assert report["evidence"]["component_manifest"]["semantic_model"] == "/semantic-model.json"
+	assert report["evidence"]["contracts"]["component_manifest"]["errors"] == []
+	assert report["evidence"]["contracts"]["openapi"]["errors"] == []
+	assert report["evidence"]["contracts"]["route_dispatch"]["errors"] == []
+	assert not output.exists()
+
+
+def test_cli_release_text_summarizes_evidence(tmp_path):
+	source = tmp_path / "agent.apg"
+	source.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["release", str(source)])
+
+	assert result.exit_code == 0, result.output
+	assert "APG release OK" in result.output
+	assert "artifact(s)" in result.output
+	assert "self-test=ok" in result.output
+
+
 def test_cli_format_json_formats_source_without_writing(tmp_path):
 	source = tmp_path / "messy.apg"
 	source.write_text(

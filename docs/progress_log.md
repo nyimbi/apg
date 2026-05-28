@@ -7458,3 +7458,37 @@ Battery-conscious verification:
 - `.venv/bin/python /private/tmp/apg_semantic_model_smoke/app.py --semantic-model` -> exited 0 and printed `apg.semantic-model.v1`
 - `/Users/nyimbiodero/src/pjs/apg/.venv/bin/python smoke_test.py` from `/private/tmp/apg_semantic_model_smoke` -> passed with `/semantic-model.json` in route-dispatch validation
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 19:02 EAT
+
+Completed checkpoint:
+
+- Added `compiler.release` as an executable generated-application release evidence builder.
+- Added `apg release <file> --json` emitting `apg.release-report.v1`.
+- The release verifier compiles source to a temporary generated app, imports the generated app with sidecars, runs generated self-test, validates OpenAPI/component-manifest/route-dispatch contracts, and verifies `apg.semantic-model.v1` exposure.
+- Registered the release command in the installed `apg` CLI and updated the tooling specification current command baseline.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/release.py cli/release_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_release_json_emits_generated_application_evidence_without_output tests/test_compiler_baseline.py::test_cli_release_text_summarizes_evidence -q` -> 2 passed
+- `.venv/bin/apg release examples/05_single_support_agent/main.apg --json` -> exited 0 and emitted `apg.release-report.v1` with generated self-test, OpenAPI, component manifest, route dispatch, and semantic-model evidence
+- `.venv/bin/apg release examples/08_basic_capability_contract/main.apg` -> exited 0 and summarized release evidence with `self-test=ok`
+- Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 19:18 EAT
+
+Completed checkpoint:
+
+- Adapted `docs/tooling.md` to make it APG-specific instead of a borrowed generic tooling roadmap.
+- Reframed the document as the next workstream after the compiler and generated Python application baseline are bedded down.
+- Added an explicit compiler bed-down gate covering compile/verify, generated app runtime surfaces, lint/validate/model/graph/release agreement, single `python` target policy, and deterministic generated artifacts.
+- Updated module status language so existing APG modules (`compiler.semantic_model`, `compiler.formatter`, `compiler.graphs`, `compiler.release`) are distinguished from planned modules (`compiler.diagnostics`, `compiler.migrations`, `compiler.nl_plan`).
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/release.py cli/release_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `git diff --check compiler/release.py cli/release_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_release_json_emits_generated_application_evidence_without_output tests/test_compiler_baseline.py::test_cli_release_text_summarizes_evidence -q` -> 2 passed
+- `.venv/bin/apg release examples/05_single_support_agent/main.apg --json` -> exited 0 and emitted `apg.release-report.v1`
+- `.venv/bin/apg release examples/08_basic_capability_contract/main.apg` -> exited 0 and summarized release evidence with `self-test=ok`
