@@ -5609,3 +5609,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `7e98101` (`Give generated apps a self-test contract`) to `origin/main`.
+
+### 2026-05-28 07:34 EAT
+
+Completed checkpoint:
+
+- Made declared capability screens executable in generated apps.
+- Generated apps now serve APG capability UI routes, including declared routes such as `/finance/gl/journals`, as dependency-free HTML screen shells.
+- Capability screen shells render capability name, component, theme, actions, relationships, and resolved theme tokens.
+- Generated OpenAPI contracts now advertise declared capability screen routes.
+- Generated packages now reexport `capability_screens()`, `capability_theme()`, and `theme_token()` for Python consumers.
+- Added focused regression coverage for HTTP screen rendering, OpenAPI route exposure, and package-level UI/theme helpers.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 9 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the executable capability screen slice.

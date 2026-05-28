@@ -470,6 +470,12 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
         else:
             raise AssertionError("generated app did not answer /health")
 
+        with urllib.request.urlopen(f"{base_url}/finance/gl/journals", timeout=1) as response:
+            screen_content_type = response.headers["Content-Type"]
+            screen_html = response.read().decode("utf-8")
+        with urllib.request.urlopen(f"{base_url}/openapi.json", timeout=1) as response:
+            openapi = json.loads(response.read().decode("utf-8"))
+
         request = urllib.request.Request(
             f"{base_url}/capabilities/GeneralLedger/rules/evaluate",
             data=json.dumps({
@@ -531,6 +537,12 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
     assert denied["matched_rules"] == ["balanced_journal"]
     assert allowed["decision"] == "allow"
     assert allowed["matched_rules"] == []
+    assert screen_content_type.startswith("text/html")
+    assert "GeneralLedger" in screen_html
+    assert "JournalScreen" in screen_html
+    assert "finance_ops" in screen_html
+    assert "#126E82" in screen_html
+    assert "/finance/gl/journals" in openapi["paths"]
     assert resolved_config == {
         "capability": "GeneralLedger",
         "configuration": {"currency": "USD", "fiscal_calendar": "monthly"},
@@ -567,6 +579,8 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
         spec.loader.exec_module(module)
         grouped = module.describe_capabilities_by_erp_module()
         validation = module.validate_application()
+        screens = module.capability_screens("GeneralLedger")
+        theme = module.capability_theme("GeneralLedger")
     finally:
         sys.modules.pop("erp_ops_generated", None)
         for name in list(sys.modules):
@@ -578,9 +592,15 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert module.capability_dependency_graph() == {"GeneralLedger": []}
     assert module.streaming_processor_index() == {"bytewax": ["GeneralLedger"]}
     assert module.ui_route_index()["/finance/gl/journals"]["component"] == "JournalScreen"
+    assert screens[0]["component"] == "JournalScreen"
+    assert theme["tokens"]["accent"] == "#126E82"
+    assert module.theme_token("GeneralLedger", "accent") == "#126E82"
     assert validation["valid"] is True
+    assert "capability_screens" in module.__all__
+    assert "capability_theme" in module.__all__
     assert "describe_capabilities_by_erp_module" in module.__all__
     assert "composition_graph" in module.__all__
+    assert "theme_token" in module.__all__
     assert "validate_application" in module.__all__
     assert json.loads(json.dumps(grouped))["accounts_payable"][0]["name"] == "GeneralLedger"
 

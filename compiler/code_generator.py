@@ -616,6 +616,10 @@ def openapi_document() -> Dict[str, Any]:
         paths["/configuration/resolve"] = {{"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True)}}
         paths["/configuration/validate"] = {{"post": _api_operation("Validate capability configuration", "Configuration validation", request_body=True)}}
         paths["/approval/plan"] = {{"post": _api_operation("Plan capability approvals", "Approval plan", request_body=True)}}
+        route_index = getattr(APG_CAPABILITIES, "ui_route_index", None)
+        if route_index is not None:
+            for route in sorted(route_index()):
+                paths[str(route)] = {{"get": _api_operation(f"Capability screen {{route}}", "Generated capability screen")}}
     if AI_AGENTS is not None:
         for agent_name in describe_application().get("ai_agents", []):
             paths[f"/agents/{{agent_name}}/invoke"] = {{
@@ -910,6 +914,53 @@ def _ui_payload(path: str) -> tuple[int, str]:
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
         return _ui_entity_html(parts[2])
     return 404, _html_page("Not found", f"<h1>Not found</h1><p>{{html.escape(path)}}</p>")
+
+
+def _capability_screen(path: str) -> Dict[str, Any] | None:
+    if APG_CAPABILITIES is None or not hasattr(APG_CAPABILITIES, "ui_route_index"):
+        return None
+    routes = APG_CAPABILITIES.ui_route_index()
+    screen = routes.get(path)
+    return dict(screen) if isinstance(screen, dict) else None
+
+
+def _capability_screen_html(screen: Dict[str, Any]) -> str:
+    title = str(screen.get("name") or screen.get("component") or "Capability screen")
+    capability = str(screen.get("capability") or "")
+    component = str(screen.get("component") or title)
+    theme_name = str(screen.get("theme") or "")
+    theme_tokens: Dict[str, Any] = {{}}
+    if capability and APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_theme"):
+        try:
+            theme_tokens = APG_CAPABILITIES.capability_theme(capability).get("tokens", {{}})
+        except KeyError:
+            theme_tokens = {{}}
+    actions = "".join(
+        f"<li>{{html.escape(str(action))}}</li>"
+        for action in screen.get("actions", [])
+    ) or "<li>No actions declared.</li>"
+    relationships = html.escape(json.dumps(screen.get("relationships", []), indent=2, sort_keys=True))
+    tokens = html.escape(json.dumps(theme_tokens, indent=2, sort_keys=True))
+    body = (
+        '<nav><a href="/ui">Application</a> | '
+        '<a href="/routes">Routes</a> | '
+        '<a href="/composition">Composition</a></nav>'
+        f"<h1>{{html.escape(title)}}</h1>"
+        f"<p><strong>Capability:</strong> {{html.escape(capability)}}</p>"
+        f"<p><strong>Component:</strong> {{html.escape(component)}}</p>"
+        f"<p><strong>Theme:</strong> {{html.escape(theme_name)}}</p>"
+        f"<h2>Actions</h2><ul>{{actions}}</ul>"
+        f"<h2>Relationships</h2><pre>{{relationships}}</pre>"
+        f"<h2>Theme Tokens</h2><pre>{{tokens}}</pre>"
+    )
+    return _html_page(title, body)
+
+
+def _capability_screen_payload(path: str) -> tuple[int, str]:
+    screen = _capability_screen(path)
+    if screen is None:
+        return 404, _html_page("Not found", f"<h1>Not found</h1><p>{{html.escape(path)}}</p>")
+    return 200, _capability_screen_html(screen)
 
 
 def _record_route(path: str) -> Dict[str, str | None] | None:
@@ -1329,6 +1380,10 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
         query = parse_qs(raw_query, keep_blank_values=True)
         if path == "/ui" or path.startswith("/ui/"):
             status, html_payload = _ui_payload(path)
+            body = html_payload.encode("utf-8")
+            content_type = "text/html; charset=utf-8"
+        elif _capability_screen(path) is not None:
+            status, html_payload = _capability_screen_payload(path)
             body = html_payload.encode("utf-8")
             content_type = "text/html; charset=utf-8"
         else:
@@ -2853,6 +2908,8 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    from .apg_capabilities import (',
 			'        capability_dependency_graph,',
 			'        capability_load_order,',
+			'        capability_screens,',
+			'        capability_theme,',
 			'        describe_capabilities,',
 			'        describe_capabilities_by_erp_module,',
 			'        describe_capability,',
@@ -2861,6 +2918,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        get_capability,',
 			'        list_capabilities,',
 			'        streaming_processor_index,',
+			'        theme_token,',
 			'        ui_route_index,',
 			'    )',
 			'except ImportError:',
@@ -2869,6 +2927,8 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    __all__.extend([',
 			'        "capability_dependency_graph",',
 			'        "capability_load_order",',
+			'        "capability_screens",',
+			'        "capability_theme",',
 			'        "describe_capabilities",',
 			'        "describe_capabilities_by_erp_module",',
 			'        "describe_capability",',
@@ -2877,6 +2937,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        "get_capability",',
 			'        "list_capabilities",',
 			'        "streaming_processor_index",',
+			'        "theme_token",',
 			'        "ui_route_index",',
 			'    ])',
 		])
