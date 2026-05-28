@@ -502,17 +502,16 @@ class CacheDashboardView(BaseView):
 
 	def _create_performance_chart(self) -> str:
 		"""Create performance chart as JSON"""
-
-		# Sample data for demonstration
-		timestamps = [datetime.utcnow() - timedelta(minutes=i) for i in range(60, 0, -1)]
-		hit_rates = [0.85 + 0.1 * (0.5 - abs(i - 30) / 60) for i in range(60)]
-		latencies = [3.0 + 2.0 * (abs(i - 30) / 30) for i in range(60)]
+		points = self._performance_points()
+		timestamps = [point["timestamp"] for point in points]
+		hit_rates = [point["hit_rate"] for point in points]
+		latencies = [point["average_latency_ms"] for point in points]
 
 		fig = go.Figure()
 
 		# Hit rate trace
 		fig.add_trace(go.Scatter(
-			x=[ts.isoformat() for ts in timestamps],
+			x=timestamps,
 			y=hit_rates,
 			mode='lines',
 			name='Hit Rate',
@@ -522,7 +521,7 @@ class CacheDashboardView(BaseView):
 
 		# Latency trace (secondary y-axis)
 		fig.add_trace(go.Scatter(
-			x=[ts.isoformat() for ts in timestamps],
+			x=timestamps,
 			y=latencies,
 			mode='lines',
 			name='Avg Latency (ms)',
@@ -568,10 +567,16 @@ class CacheDashboardView(BaseView):
 
 	def _create_latency_histogram(self) -> str:
 		"""Create latency distribution histogram"""
-
-		# Sample latency data
-		latencies = [1.2, 1.5, 2.1, 2.3, 2.8, 3.2, 3.5, 4.1, 4.8, 5.2,
-					6.1, 7.2, 8.3, 9.1, 10.2, 12.3, 15.1, 18.2, 22.1, 25.3] * 50
+		latencies = [
+			latency
+			for point in self._performance_points()
+			for latency in (
+				point.get("p50_latency_ms", 0.0),
+				point.get("p95_latency_ms", 0.0),
+				point.get("p99_latency_ms", 0.0),
+			)
+			if latency
+		]
 
 		fig = go.Figure(data=[go.Histogram(
 			x=latencies,
@@ -591,13 +596,12 @@ class CacheDashboardView(BaseView):
 
 	def _create_throughput_timeline(self) -> str:
 		"""Create throughput timeline chart"""
-
-		# Sample throughput data
-		timestamps = [datetime.utcnow() - timedelta(hours=i) for i in range(24, 0, -1)]
-		throughput = [2000 + 500 * abs(12 - (i % 24)) / 12 for i in range(24)]
+		points = self._performance_points()
+		timestamps = [point["timestamp"] for point in points]
+		throughput = [point["operations_per_second"] for point in points]
 
 		fig = go.Figure(data=[go.Scatter(
-			x=[ts.isoformat() for ts in timestamps],
+			x=timestamps,
 			y=throughput,
 			mode='lines+markers',
 			name='QPS',
@@ -616,9 +620,9 @@ class CacheDashboardView(BaseView):
 
 	def _create_access_pattern_chart(self) -> str:
 		"""Create access pattern analysis chart"""
-
-		patterns = ['Sequential', 'Random', 'Temporal', 'Geographic']
-		frequencies = [35, 45, 15, 5]
+		pattern_counts = self._access_pattern_counts()
+		patterns = list(pattern_counts.keys())
+		frequencies = list(pattern_counts.values())
 
 		fig = go.Figure(data=[go.Bar(
 			x=patterns,
@@ -636,36 +640,33 @@ class CacheDashboardView(BaseView):
 
 	def _create_predictive_analytics_chart(self) -> str:
 		"""Create predictive analytics chart"""
-
-		# Future predictions
-		timestamps = [datetime.utcnow() + timedelta(hours=i) for i in range(0, 24, 2)]
-		predicted_load = [2200, 2400, 2100, 1900, 1700, 1600, 1800, 2000, 2300, 2600, 2500, 2200]
+		predictions = self._prefetch_prediction_points()
 
 		fig = go.Figure(data=[go.Scatter(
-			x=[ts.isoformat() for ts in timestamps],
-			y=predicted_load,
+			x=[point["key"] for point in predictions],
+			y=[point["probability"] for point in predictions],
 			mode='lines+markers',
-			name='Predicted Load',
+			name='Prefetch Probability',
 			line=dict(color='#F24236', width=3, dash='dash'),
 			marker=dict(size=8)
 		)])
 
 		fig.update_layout(
-			title='Predicted Cache Load (Next 24 Hours)',
-			xaxis_title='Time',
-			yaxis_title='Predicted QPS'
+			title='Predicted Prefetch Candidates',
+			xaxis_title='Cache Key',
+			yaxis_title='Probability'
 		)
 
 		return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
 	def _create_efficiency_trends_chart(self) -> str:
 		"""Create efficiency trends chart"""
-
-		days = list(range(1, 31))
-		efficiency = [85 + 10 * (0.5 - abs(i - 15) / 30) for i in days]
+		points = self._performance_points()
+		timestamps = [point["timestamp"] for point in points]
+		efficiency = [point["hit_rate"] * 100 for point in points]
 
 		fig = go.Figure(data=[go.Scatter(
-			x=days,
+			x=timestamps,
 			y=efficiency,
 			mode='lines',
 			name='Cache Efficiency',
@@ -674,19 +675,19 @@ class CacheDashboardView(BaseView):
 		)])
 
 		fig.update_layout(
-			title='Cache Efficiency Trends (30 Days)',
-			xaxis_title='Day',
+			title='Cache Efficiency Trends',
+			xaxis_title='Time',
 			yaxis_title='Efficiency (%)',
-			yaxis=dict(range=[70, 100])
+			yaxis=dict(range=[0, 100])
 		)
 
 		return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
 	def _create_geo_distribution_chart(self) -> str:
-		"""Create geographic distribution chart"""
-
-		regions = ['US-East', 'US-West', 'EU-West', 'Asia-Pacific', 'Other']
-		traffic = [40, 25, 20, 10, 5]
+		"""Create namespace distribution chart"""
+		namespace_counts = self._namespace_distribution()
+		regions = list(namespace_counts.keys())
+		traffic = list(namespace_counts.values())
 
 		fig = go.Figure(data=[go.Bar(
 			x=regions,
@@ -695,93 +696,147 @@ class CacheDashboardView(BaseView):
 		)])
 
 		fig.update_layout(
-			title='Geographic Traffic Distribution',
-			xaxis_title='Region',
-			yaxis_title='Traffic (%)'
+			title='Cache Namespace Distribution',
+			xaxis_title='Namespace',
+			yaxis_title='Entries'
 		)
 
 		return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
-	# Additional helper methods (simplified implementations)
-
 	def _get_system_health_status(self) -> Dict[str, Any]:
 		"""Get system health status"""
+		service = self._get_cache_service()
+		if service is None:
+			return {
+				'overall_health': 'Unavailable',
+				'services_status': {
+					'cache_service': 'Unavailable',
+					'ai_engine': 'Unavailable',
+					'monitoring': 'Unavailable',
+					'security': 'Unavailable'
+				},
+				'resource_usage': {'cpu': 0.0, 'memory': 0.0, 'disk': 0.0, 'network': 0.0}
+			}
+		metrics = getattr(service, "_metrics", None)
+		config = getattr(service, "config", None)
+		error_rate = self._call_metric_rate(metrics, "error_rate", 0.0) if metrics else 0.0
+		memory = float(getattr(metrics, "memory_utilization_percent", 0.0) or 0.0) if metrics else 0.0
+		cluster_health = [
+			bool(cluster.is_healthy()) if hasattr(cluster, "is_healthy") else bool(getattr(cluster, "healthy", True))
+			for cluster in (getattr(service, "_clusters", {}) or {}).values()
+		]
+		clusters_ok = all(cluster_health) if cluster_health else True
+		running = bool(getattr(service, "running", False))
+		overall_health = 'Healthy' if running and clusters_ok and memory < 90 and error_rate < 0.05 else 'Degraded'
 		return {
-			'overall_health': 'Healthy',
+			'overall_health': overall_health,
 			'services_status': {
-				'cache_service': 'Running',
-				'ai_engine': 'Running',
-				'monitoring': 'Running',
-				'security': 'Running'
+				'cache_service': 'Running' if running else 'Stopped',
+				'ai_engine': 'Enabled' if bool(getattr(config, "ai_optimization_enabled", False)) else 'Disabled',
+				'monitoring': 'Enabled' if bool(getattr(config, "metrics_enabled", False)) else 'Disabled',
+				'security': 'Enabled' if bool(getattr(config, "encryption_enabled", False)) else 'Disabled'
 			},
 			'resource_usage': {
-				'cpu': 35.2,
-				'memory': 67.8,
-				'disk': 23.1,
-				'network': 45.6
+				'cpu': float(getattr(metrics, "cpu_usage_percent", 0.0) or 0.0) if metrics else 0.0,
+				'memory': memory,
+				'disk': 0.0,
+				'network': float(getattr(metrics, "bytes_per_second", 0.0) or 0.0) if metrics else 0.0
 			}
 		}
 
 	def _get_recent_alerts(self) -> List[Dict[str, Any]]:
 		"""Get recent system alerts"""
-		return [
-			{
-				'timestamp': '2025-08-09T10:25:00Z',
-				'level': 'WARNING',
-				'message': 'L1 cache utilization above 90%',
-				'resolved': False
-			},
-			{
-				'timestamp': '2025-08-09T10:20:00Z',
-				'level': 'INFO',
-				'message': 'Automatic tier optimization completed',
-				'resolved': True
-			}
-		]
+		service = self._get_cache_service()
+		if service is None:
+			return []
+		metrics = getattr(service, "_metrics", None)
+		if metrics is None:
+			return []
+		timestamp = self._format_timestamp(getattr(metrics, "timestamp", None))
+		alerts: List[Dict[str, Any]] = []
+		memory = float(getattr(metrics, "memory_utilization_percent", 0.0) or 0.0)
+		error_rate = self._call_metric_rate(metrics, "error_rate", 0.0)
+		hit_rate = self._call_metric_rate(metrics, "hit_rate", 0.0)
+		if memory >= 90:
+			alerts.append({'timestamp': timestamp, 'level': 'CRITICAL', 'message': 'Cache memory utilization above 90%', 'resolved': False})
+		if error_rate >= 0.05:
+			alerts.append({'timestamp': timestamp, 'level': 'WARNING', 'message': 'Cache error rate above 5%', 'resolved': False})
+		if hit_rate and hit_rate < 0.8:
+			alerts.append({'timestamp': timestamp, 'level': 'INFO', 'message': 'Cache hit rate below 80%', 'resolved': False})
+		return alerts
 
 	def _get_optimization_recommendations(self) -> List[Dict[str, Any]]:
 		"""Get optimization recommendations"""
-		return [
-			{
+		service = self._get_cache_service()
+		if service is None:
+			return []
+		recommendations: List[Dict[str, Any]] = []
+		for result in getattr(service, "_ai_optimization_results", [])[-5:]:
+			confidence = float(getattr(result, "confidence_score", 0.0) or 0.0)
+			for item in getattr(result, "recommendations", []) or []:
+				recommendations.append({
+					'type': str(item.get('type', 'Optimization')),
+					'title': str(item.get('title', item.get('type', 'Optimization recommendation'))),
+					'description': str(item.get('description', '')),
+					'impact': str(item.get('impact', 'medium')).title(),
+					'confidence': confidence
+				})
+		if recommendations:
+			return recommendations
+		metrics = getattr(service, "_metrics", None)
+		if metrics and self._call_metric_rate(metrics, "hit_rate", 0.0) < 0.8:
+			recommendations.append({
 				'type': 'Performance',
-				'title': 'Increase L1 cache size',
-				'description': 'L1 tier is at 90% capacity. Consider increasing size by 25%.',
-				'impact': 'High',
-				'confidence': 0.92
-			},
-			{
-				'type': 'Cost',
-				'title': 'Optimize L3 tier allocation',
-				'description': 'L3 tier is underutilized. Reduce allocation by 15% to save costs.',
+				'title': 'Increase effective cache coverage',
+				'description': 'Observed hit rate is below 80%; review TTLs, key coverage, and cache size.',
 				'impact': 'Medium',
-				'confidence': 0.78
-			}
-		]
+				'confidence': 0.7
+			})
+		return recommendations
 
 	def _get_analytics_data(self) -> Dict[str, Any]:
 		"""Get analytics data"""
+		service = self._get_cache_service()
+		metrics = getattr(service, "_metrics", None) if service is not None else None
+		total_requests = int(getattr(metrics, "total_operations", 0) or 0) if metrics else 0
+		cache_hits = int(getattr(metrics, "cache_hits", 0) or 0) if metrics else 0
+		cache_misses = int(getattr(metrics, "cache_misses", 0) or 0) if metrics else 0
+		bytes_served = sum(
+			int(getattr(entry, "size_bytes", 0) or 0)
+			for entry in (getattr(service, "_cache_store", {}) or {}).values()
+		) if service is not None else 0
 		return {
 			'summary': {
-				'total_requests': 1500000,
-				'cache_hits': 1305000,
-				'cache_misses': 195000,
-				'data_served_gb': 250.5
+				'total_requests': total_requests,
+				'cache_hits': cache_hits,
+				'cache_misses': cache_misses,
+				'data_served_gb': bytes_served / (1024 ** 3)
 			},
 			'trends': {
-				'hit_rate_trend': '+2.3%',
-				'latency_trend': '-8.5%',
-				'throughput_trend': '+15.2%'
+				'hit_rate_trend': self._trend_text("hit_rate"),
+				'latency_trend': self._trend_text("average_latency_ms", lower_is_better=True),
+				'throughput_trend': self._trend_text("operations_per_second")
 			}
 		}
 
 	def _get_current_configuration(self) -> Dict[str, Any]:
 		"""Get current configuration"""
+		service = self._get_cache_service()
+		config = getattr(service, "config", None) if service is not None else None
+		if config is None:
+			return {
+				'cache_size_mb': 0,
+				'eviction_policy': 'unknown',
+				'tier_distribution': {},
+				'security_level': 'unknown',
+				'monitoring_enabled': False
+			}
 		return {
-			'cache_size_mb': 4096,
-			'eviction_policy': 'LRU',
-			'tier_distribution': {'L1': 0.2, 'L2': 0.3, 'L3': 0.4, 'EDGE': 0.1},
-			'security_level': 'HIGH',
-			'monitoring_enabled': True
+			'cache_size_mb': int(getattr(config, "max_memory_mb", 0) or 0),
+			'eviction_policy': str(getattr(config, "eviction_policy", "adaptive")),
+			'tier_distribution': self._get_dashboard_metrics().tier_distribution,
+			'security_level': str(getattr(config, "security_level", "unknown")),
+			'monitoring_enabled': bool(getattr(config, "metrics_enabled", False))
 		}
 
 	def _get_configuration_recommendations(self) -> List[Dict[str, Any]]:
@@ -803,15 +858,123 @@ class CacheDashboardView(BaseView):
 			{'name': 'Analytics Workload', 'description': 'Optimized for large data analytics workloads'}
 		]
 
-	# Additional simplified implementations
-	def _get_optimization_status(self) -> Dict[str, Any]: return {'status': 'Active', 'last_run': '2025-08-09T10:00:00Z'}
-	def _get_ai_optimization_recommendations(self) -> List[Dict[str, Any]]: return []
-	def _get_performance_predictions(self) -> Dict[str, Any]: return {}
-	def _get_monitoring_data(self) -> Dict[str, Any]: return {}
-	def _get_alert_rules(self) -> List[Dict[str, Any]]: return []
-	def _get_system_metrics(self) -> Dict[str, Any]: return {}
-	def _apply_configuration(self, config_data: Dict[str, Any]) -> bool: return True
-	def _run_optimization(self, optimization_type: str) -> Dict[str, Any]: return {'status': 'completed'}
+	def _get_optimization_status(self) -> Dict[str, Any]:
+		service = self._get_cache_service()
+		results = getattr(service, "_ai_optimization_results", []) if service is not None else []
+		last_result = results[-1] if results else None
+		return {
+			'status': 'Active' if bool(getattr(getattr(service, "config", None), "ai_optimization_enabled", False)) else 'Disabled',
+			'last_run': self._format_timestamp(getattr(last_result, "timestamp", None)) if last_result else None
+		}
+
+	def _get_ai_optimization_recommendations(self) -> List[Dict[str, Any]]:
+		return self._get_optimization_recommendations()
+
+	def _get_performance_predictions(self) -> Dict[str, Any]:
+		return {'prefetch_candidates': self._prefetch_prediction_points()}
+
+	def _get_monitoring_data(self) -> Dict[str, Any]:
+		return {'metrics': self._get_dashboard_metrics(), 'history': self._performance_points()}
+
+	def _get_alert_rules(self) -> List[Dict[str, Any]]:
+		service = self._get_cache_service()
+		clusters = getattr(service, "_clusters", {}) if service is not None else {}
+		rules: List[Dict[str, Any]] = []
+		for cluster in clusters.values():
+			for name, threshold in (getattr(cluster, "alert_thresholds", {}) or {}).items():
+				rules.append({'cluster': getattr(cluster, 'name', getattr(cluster, 'cluster_id', 'unknown')), 'metric': name, 'threshold': threshold})
+		return rules
+
+	def _get_system_metrics(self) -> Dict[str, Any]:
+		metrics = self._get_dashboard_metrics()
+		return {
+			'total_entries': metrics.total_entries,
+			'hit_rate': metrics.hit_rate,
+			'miss_rate': metrics.miss_rate,
+			'throughput_qps': metrics.throughput_qps,
+			'memory_usage_mb': metrics.memory_usage_mb,
+			'cpu_usage_percent': metrics.cpu_usage_percent
+		}
+
+	def _apply_configuration(self, config_data: Dict[str, Any]) -> bool:
+		service = self._get_cache_service()
+		config = getattr(service, "config", None) if service is not None else None
+		if config is None:
+			return False
+		for key, value in (config_data or {}).items():
+			if hasattr(config, key):
+				setattr(config, key, value)
+		return True
+
+	def _run_optimization(self, optimization_type: str) -> Dict[str, Any]:
+		service = self._get_cache_service()
+		if service is None:
+			return {'status': 'unavailable', 'type': optimization_type}
+		return {
+			'status': 'queued' if bool(getattr(getattr(service, "config", None), "ai_optimization_enabled", False)) else 'disabled',
+			'type': optimization_type,
+			'pending_recommendations': len(self._get_optimization_recommendations())
+		}
+
+	def _performance_points(self) -> List[Dict[str, Any]]:
+		"""Return performance points from service history or current metrics."""
+		service = self._get_cache_service()
+		if service is None:
+			return []
+		history = list(getattr(service, "_performance_history", []) or [])
+		if not history and getattr(service, "_metrics", None) is not None:
+			history = [getattr(service, "_metrics")]
+		return [self._metric_point(metric) for metric in history[-100:]]
+
+	def _metric_point(self, metric: Any) -> Dict[str, Any]:
+		return {
+			"timestamp": self._format_timestamp(getattr(metric, "timestamp", None)),
+			"hit_rate": self._call_metric_rate(metric, "hit_rate", 0.0),
+			"memory_utilization": float(getattr(metric, "memory_utilization_percent", 0.0) or 0.0),
+			"operations_per_second": float(getattr(metric, "operations_per_second", 0.0) or 0.0),
+			"average_latency_ms": float(getattr(metric, "average_latency_ms", 0.0) or 0.0),
+			"p50_latency_ms": float(getattr(metric, "p50_latency_ms", 0.0) or 0.0),
+			"p95_latency_ms": float(getattr(metric, "p95_latency_ms", 0.0) or 0.0),
+			"p99_latency_ms": float(getattr(metric, "p99_latency_ms", 0.0) or 0.0),
+		}
+
+	def _access_pattern_counts(self) -> Dict[str, int]:
+		service = self._get_cache_service()
+		counts: Dict[str, int] = {}
+		for entry in (getattr(service, "_cache_store", {}) or {}).values() if service is not None else []:
+			pattern = getattr(entry, "access_pattern", "unknown")
+			label = getattr(pattern, "value", str(pattern)).replace("_", " ").title()
+			counts[label] = counts.get(label, 0) + 1
+		return counts
+
+	def _prefetch_prediction_points(self) -> List[Dict[str, Any]]:
+		service = self._get_cache_service()
+		predictions = getattr(service, "_prefetch_predictions", {}) if service is not None else {}
+		return [
+			{"key": key, "probability": float(probability)}
+			for key, probability in sorted(predictions.items(), key=lambda item: item[1], reverse=True)[:20]
+		]
+
+	def _namespace_distribution(self) -> Dict[str, int]:
+		service = self._get_cache_service()
+		counts: Dict[str, int] = {}
+		for entry in (getattr(service, "_cache_store", {}) or {}).values() if service is not None else []:
+			namespace = str(getattr(entry, "namespace", "default"))
+			counts[namespace] = counts.get(namespace, 0) + 1
+		return counts
+
+	def _trend_text(self, metric_name: str, lower_is_better: bool = False) -> str:
+		points = self._performance_points()
+		if len(points) < 2:
+			return "0.0%"
+		start = float(points[0].get(metric_name, 0.0) or 0.0)
+		end = float(points[-1].get(metric_name, 0.0) or 0.0)
+		if start == 0:
+			return "0.0%"
+		change = ((end - start) / start) * 100
+		if lower_is_better:
+			change *= -1
+		return f"{change:+.1f}%"
 
 
 # Export main components
