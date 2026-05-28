@@ -7271,3 +7271,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated component manifest validation now reports `command_count: 5`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 17:42 EAT
+
+Completed checkpoint:
+
+- Strengthened generated component manifest validation so advertised deployment artifacts must exist next to generated `app.py` when the generated app runs from disk.
+- Kept in-memory compiler tests practical by skipping the filesystem artifact check only when generated code has no `__file__`.
+- Added a focused regression that deletes a generated `README.md` artifact and verifies the generated validator reports the missing file.
+- Refreshed all 20 numbered example outputs so their generated validators enforce artifact existence.
+
+Battery-conscious verification:
+
+- Regenerated `examples/[01-20]*/output` with the compiler after the artifact-existence validator change.
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_component_manifest_contract_rejects_missing_artifact_files tests/test_compiler_baseline.py::test_generated_component_manifest_contract_rejects_invalid_deployment_commands tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated component manifest validation reports zero errors with artifact existence checks enabled
+- Deferred broader pytest at the user's request to conserve battery.

@@ -1303,9 +1303,14 @@ def validate_component_manifest_contract() -> Dict[str, Any]:
         errors.append("component manifest theme interface must point to /theme.css")
     deployment = manifest.get("deployment", {})
     artifacts = set(deployment.get("artifacts", [])) if isinstance(deployment, dict) else set()
-    for artifact in ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]:
+    expected_artifacts = ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]
+    artifact_root = Path(__file__).resolve().parent if "__file__" in globals() else None
+    for artifact in expected_artifacts:
         if artifact not in artifacts:
             errors.append(f"component manifest deployment is missing artifact {artifact}")
+            continue
+        if artifact_root is not None and not (artifact_root / artifact).exists():
+            errors.append(f"component manifest deployment artifact {artifact} does not exist")
     commands = deployment.get("commands", {}) if isinstance(deployment, dict) else {}
     expected_commands = {
         "run": "python app.py",

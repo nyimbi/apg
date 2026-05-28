@@ -277,6 +277,27 @@ def test_generated_component_manifest_contract_rejects_invalid_deployment_comman
 	assert "component manifest deployment environment does not match generated runtime variables" in contract["errors"]
 
 
+def test_generated_component_manifest_contract_rejects_missing_artifact_files(tmp_path):
+	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
+	assert result.success is True
+
+	package_dir = tmp_path / "generated_app"
+	package_dir.mkdir()
+	for filename, content in result.generated_files.items():
+		(package_dir / filename).write_text(content, encoding="utf-8")
+	(package_dir / "README.md").unlink()
+
+	spec = importlib.util.spec_from_file_location("generated_app", package_dir / "app.py")
+	module = importlib.util.module_from_spec(spec)
+	try:
+		spec.loader.exec_module(module)
+		contract = module.validate_component_manifest_contract()
+	finally:
+		sys.modules.pop("generated_app", None)
+
+	assert "component manifest deployment artifact README.md does not exist" in contract["errors"]
+
+
 def test_generated_python_app_serves_http_endpoints(tmp_path):
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
 	package_dir = tmp_path / "generated_app"
