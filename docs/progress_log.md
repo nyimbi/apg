@@ -7005,3 +7005,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_database_ast.py`
 - `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 6 passed
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 16:00 EAT
+
+Completed checkpoint:
+
+- Extended DBML reference parsing from `table.column` to optional `schema.table.column` targets.
+- Generated database validation now resolves schema-qualified references and rejects ambiguous unqualified references when the same table exists in multiple schemas.
+- Generated relationship graphs now point schema-qualified database references at the correct table node instead of relying on last-table-name-wins behavior.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/ast_builder.py compiler/code_generator.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 8 passed
+- `.venv/bin/python -m pytest tests/test_parser.py::TestAPGParser::test_database_parsing tests/test_semantic_analyzer.py::TestSemanticAnalyzer::test_database_validation -q` -> 2 passed, 1 pre-existing warning
+- Deferred broader pytest at the user's request to conserve battery.

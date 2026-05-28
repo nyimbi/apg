@@ -59,6 +59,48 @@ db BrokenDB {
 """
 
 
+SCHEMA_QUALIFIED_DATABASE_SOURCE = """
+db MultiSchemaDB {
+    schema sales {
+        table orders {
+            id serial [pk]
+            account_id int [ref: > accounting.accounts.id]
+        }
+    }
+
+    schema accounting {
+        table accounts {
+            id serial [pk]
+        }
+    }
+}
+"""
+
+
+AMBIGUOUS_DATABASE_SOURCE = """
+db AmbiguousDB {
+    schema sales {
+        table accounts {
+            id serial [pk]
+        }
+    }
+
+    schema accounting {
+        table accounts {
+            id serial [pk]
+        }
+    }
+
+    schema operations {
+        table journals {
+            id serial [pk]
+            account_id int [ref: > accounts.id]
+        }
+    }
+}
+"""
+
+
 def test_source_database_builds_typed_ast_with_config_schema_and_indexes():
 	parse_result = APGParser().parse_string(DATABASE_SOURCE, "database.apg")
 	assert parse_result["success"] is True, parse_result["errors"]
@@ -262,4 +304,49 @@ def test_generated_validation_rejects_broken_database_references():
 	assert payload["valid"] is False
 	assert payload["validation"]["errors"] == [
 		"BrokenDB.accounting.journals.account_id references unknown column accounts.missing_id"
+	]
+
+
+def test_schema_qualified_database_references_validate_and_graph_correctly():
+	parse_result = APGParser().parse_string(SCHEMA_QUALIFIED_DATABASE_SOURCE, "multi_schema_database.apg")
+	assert parse_result["success"] is True, parse_result["errors"]
+	ast = ASTBuilder().build_ast(parse_result["parse_tree"], "multi_schema_database.apg")
+
+	files = PythonCodeGenerator(CodeGenConfig(use_composable_templates=False)).generate(ast)
+	namespace = {}
+	exec(files["app.py"], namespace)
+
+	reference = namespace["list_databases"]()[0]["schemas"][0]["tables"][0]["columns"][1]["reference"]
+	assert reference == {
+		"kind": ">",
+		"relationship": "many_to_one",
+		"table": "accounts",
+		"column": "id",
+		"target": "accounting.accounts.id",
+		"schema": "accounting",
+	}
+	assert namespace["validate_application"]()["valid"] is True
+	assert {
+		"from": "MultiSchemaDB.sales.orders",
+		"to": "MultiSchemaDB.accounting.accounts",
+		"field": "account_id",
+		"relationship": "many_to_one",
+		"target_column": "id",
+	} in namespace["relationship_graph"]()["edges"]
+
+
+def test_generated_validation_rejects_ambiguous_unqualified_database_references():
+	parse_result = APGParser().parse_string(AMBIGUOUS_DATABASE_SOURCE, "ambiguous_database.apg")
+	assert parse_result["success"] is True, parse_result["errors"]
+	ast = ASTBuilder().build_ast(parse_result["parse_tree"], "ambiguous_database.apg")
+
+	files = PythonCodeGenerator(CodeGenConfig(use_composable_templates=False)).generate(ast)
+	namespace = {}
+	exec(files["app.py"], namespace)
+
+	validation = namespace["validate_application"]()
+
+	assert validation["valid"] is False
+	assert validation["errors"] == [
+		"database_schemas: AmbiguousDB.operations.journals.account_id references ambiguous table accounts; use schema-qualified target"
 	]

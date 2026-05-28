@@ -1029,13 +1029,13 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		"""Extract a DBML column reference option."""
 		for option in options:
 			match = re.match(
-				r"ref\s*:\s*(?P<kind><>|>|<|-)\s*(?P<table>[^\W\d]\w*)\.(?P<column>[^\W\d]\w*)$",
+				r"ref\s*:\s*(?P<kind><>|>|<|-)\s*(?:(?P<schema>[^\W\d]\w*)\.)?(?P<table>[^\W\d]\w*)\.(?P<column>[^\W\d]\w*)$",
 				option,
 				flags=re.UNICODE,
 			)
 			if not match:
 				continue
-			return {
+			reference = {
 				"kind": match.group("kind"),
 				"relationship": {
 					">": "many_to_one",
@@ -1045,8 +1045,15 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				}.get(match.group("kind"), "references"),
 				"table": match.group("table"),
 				"column": match.group("column"),
-				"target": f"{match.group('table')}.{match.group('column')}",
+				"target": (
+					f"{match.group('schema')}.{match.group('table')}.{match.group('column')}"
+					if match.group("schema")
+					else f"{match.group('table')}.{match.group('column')}"
+				),
 			}
+			if match.group("schema"):
+				reference["schema"] = match.group("schema")
+			return reference
 		return None
 
 	def _parse_source_parameters(self, params: str, source_file: Optional[str]) -> List[Parameter]:

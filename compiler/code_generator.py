@@ -743,6 +743,7 @@ def _database_openapi_schemas() -> Dict[str, Any]:
             "properties": {{
                 "kind": {{"type": "string"}},
                 "relationship": {{"type": "string"}},
+                "schema": {{"type": "string"}},
                 "table": {{"type": "string"}},
                 "column": {{"type": "string"}},
                 "target": {{"type": "string"}},
@@ -1058,9 +1059,14 @@ def validate_database_schema_contracts() -> Dict[str, Any]:
         if not schemas:
             warnings.append(f"{{database_name}} does not declare schemas")
             continue
-        table_index: Dict[str, Dict[str, Any]] = {{}}
+        table_index: Dict[str, list[Dict[str, Any]]] = {{}}
+        seen_schemas: set[str] = set()
         for schema in schemas:
             schema_name = str(schema.get("name", "default"))
+            schema_key = schema_name.lower()
+            if schema_key in seen_schemas:
+                errors.append(f"{{database_name}} declares duplicate schema {{schema_name}}")
+            seen_schemas.add(schema_key)
             seen_tables: set[str] = set()
             for table in schema.get("tables", []):
                 table_name = str(table.get("name", ""))
@@ -1072,8 +1078,8 @@ def validate_database_schema_contracts() -> Dict[str, Any]:
                 if table_key in seen_tables:
                     errors.append(f"{{database_name}}.{{schema_name}} declares duplicate table {{table_name}}")
                 seen_tables.add(table_key)
-                table_index[table_key] = table
-                table_index[qualified_key] = table
+                table_index.setdefault(table_key, []).append(table)
+                table_index.setdefault(qualified_key, []).append(table)
 
         for schema in schemas:
             schema_name = str(schema.get("name", "default"))
@@ -1100,12 +1106,29 @@ def validate_database_schema_contracts() -> Dict[str, Any]:
                         continue
                     target_table_name = str(reference.get("table", ""))
                     target_column_name = str(reference.get("column", ""))
-                    target_table = table_index.get(target_table_name.lower()) or table_index.get(f"{{schema_name}}.{{target_table_name}}".lower())
-                    if target_table is None:
+                    target_schema_name = str(reference.get("schema", ""))
+                    target_label = (
+                        f"{{target_schema_name}}.{{target_table_name}}"
+                        if target_schema_name
+                        else target_table_name
+                    )
+                    if target_schema_name:
+                        candidates = table_index.get(f"{{target_schema_name}}.{{target_table_name}}".lower(), [])
+                    else:
+                        candidates = table_index.get(f"{{schema_name}}.{{target_table_name}}".lower(), [])
+                        if not candidates:
+                            candidates = table_index.get(target_table_name.lower(), [])
+                    if not candidates:
                         errors.append(
-                            f"{{database_name}}.{{schema_name}}.{{table_name}}.{{column.get('name')}} references unknown table {{target_table_name}}"
+                            f"{{database_name}}.{{schema_name}}.{{table_name}}.{{column.get('name')}} references unknown table {{target_label}}"
                         )
                         continue
+                    if len(candidates) > 1:
+                        errors.append(
+                            f"{{database_name}}.{{schema_name}}.{{table_name}}.{{column.get('name')}} references ambiguous table {{target_label}}; use schema-qualified target"
+                        )
+                        continue
+                    target_table = candidates[0]
                     target_columns = {{
                         str(target_column.get("name", "")).lower()
                         for target_column in target_table.get("columns", [])
@@ -1113,7 +1136,7 @@ def validate_database_schema_contracts() -> Dict[str, Any]:
                     }}
                     if target_column_name.lower() not in target_columns:
                         errors.append(
-                            f"{{database_name}}.{{schema_name}}.{{table_name}}.{{column.get('name')}} references unknown column {{target_table_name}}.{{target_column_name}}"
+                            f"{{database_name}}.{{schema_name}}.{{table_name}}.{{column.get('name')}} references unknown column {{target_label}}.{{target_column_name}}"
                         )
     return {{"errors": errors, "warnings": warnings, "validated_databases": sorted(validated)}}
 
@@ -1342,7 +1365,7 @@ def relationship_graph() -> Dict[str, Any]:
         {{"id": str(entity["name"]), "name": str(entity["name"]), "type": str(entity["type"])}}
         for entity in ENTITIES
     ]
-    table_nodes_by_name: Dict[str, str] = {{}}
+    table_nodes_by_name: Dict[str, list[str]] = {{}}
     for entity in ENTITIES:
         database_name = str(entity["name"])
         for schema in entity.get("schemas", []):
@@ -1359,8 +1382,8 @@ def relationship_graph() -> Dict[str, Any]:
                     "database": database_name,
                     "schema": schema_name,
                 }})
-                table_nodes_by_name[table_name.lower()] = node_id
-                table_nodes_by_name[f"{{schema_name}}.{{table_name}}".lower()] = node_id
+                table_nodes_by_name.setdefault(table_name.lower(), []).append(node_id)
+                table_nodes_by_name.setdefault(f"{{schema_name}}.{{table_name}}".lower(), []).append(node_id)
     entity_names = {{str(entity["name"]) for entity in ENTITIES}}
     entity_names_by_lower = {{name.lower(): name for name in entity_names}}
     edges: list[Dict[str, Any]] = []
@@ -1388,7 +1411,14 @@ def relationship_graph() -> Dict[str, Any]:
                     if not isinstance(reference, dict):
                         continue
                     target_table = str(reference.get("table", ""))
-                    target = table_nodes_by_name.get(target_table.lower())
+                    target_schema = str(reference.get("schema", ""))
+                    if target_schema:
+                        targets = table_nodes_by_name.get(f"{{target_schema}}.{{target_table}}".lower(), [])
+                    else:
+                        targets = table_nodes_by_name.get(f"{{schema_name}}.{{target_table}}".lower(), [])
+                        if not targets:
+                            targets = table_nodes_by_name.get(target_table.lower(), [])
+                    target = targets[0] if len(targets) == 1 else None
                     if not target:
                         continue
                     edge_key = (
