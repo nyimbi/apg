@@ -7530,3 +7530,25 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_parser_golden_json_audits_fixture_catalog -q` -> 1 passed
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_parser_golden_json_audits_fixture_catalog tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler -q` -> 2 passed
 - `git diff --check cli/parser_golden_command.py compiler/parser_golden.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py tests/fixtures/parser_golden docs/tooling.md docs/progress_log.md`
+
+### 2026-05-28 19:29 EAT
+
+Completed checkpoint:
+
+- Implemented `compiler.explain.build_explain_report()` as an `apg.explain-report.v1` producer over the existing semantic model.
+- Added the `apg explain` CLI command with `--symbol`, `--diagnostic`, `--handler`, and `--json` modes.
+- Symbol explanations now return semantic-model symbol details plus related table, field, capability, app, or agent-team context.
+- Diagnostic explanations now return matching diagnostics plus a built-in diagnostic explanation registry for current stable codes.
+- Handler explanations now resolve view handlers and capability-screen events, including screen relationships for composed UI surfaces.
+- Updated the tooling specification so `apg explain` is listed as an executable current command.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/explain.py cli/explain_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/apg explain examples/20_enterprise_erp_platform/main.apg --symbol capability.EnterpriseFinance --json` -> emitted `apg.explain-report.v1`
+- `.venv/bin/apg explain examples/20_enterprise_erp_platform/main.apg --diagnostic APG0100 --json` -> emitted `apg.explain-report.v1`
+- `.venv/bin/apg explain examples/20_enterprise_erp_platform/main.apg --handler OperationsDashboard.select` -> resolved `EnterpriseOperations.OperationsDashboard`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers -q` -> 1 passed
+- `.venv/bin/apg explain examples/20_enterprise_erp_platform/main.apg --handler OperationsDashboard.select --json` -> emitted `apg.explain-report.v1`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers tests/test_compiler_baseline.py::test_cli_parser_golden_json_audits_fixture_catalog -q` -> 2 passed
+- `git diff --check compiler/explain.py cli/explain_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md`

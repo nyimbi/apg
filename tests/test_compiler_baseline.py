@@ -1426,6 +1426,46 @@ def test_cli_parser_golden_json_audits_fixture_catalog():
 	)
 
 
+def test_cli_explain_json_covers_symbols_diagnostics_and_handlers():
+	source = REPO_ROOT / "examples" / "20_enterprise_erp_platform" / "main.apg"
+
+	symbol_result = CliRunner().invoke(
+		cli,
+		["explain", str(source), "--symbol", "capability.EnterpriseFinance", "--json"],
+	)
+	assert symbol_result.exit_code == 0, symbol_result.output
+	symbol_report = json.loads(symbol_result.output)
+	assert symbol_report["format"] == "apg.explain-report.v1"
+	assert symbol_report["ok"] is True
+	assert symbol_report["explanations"][0]["symbol"]["id"] == "capability.EnterpriseFinance"
+	assert symbol_report["explanations"][0]["related"]["provides"] == [
+		"journal_entries",
+		"invoice_generation",
+		"payment_allocation",
+	]
+
+	diagnostic_result = CliRunner().invoke(
+		cli,
+		["explain", str(source), "--diagnostic", "APG0100", "--json"],
+	)
+	assert diagnostic_result.exit_code == 0, diagnostic_result.output
+	diagnostic_report = json.loads(diagnostic_result.output)
+	assert diagnostic_report["ok"] is True
+	assert diagnostic_report["explanations"][0]["code"] == "APG0100"
+	assert diagnostic_report["explanations"][0]["match_count"] >= 1
+	assert diagnostic_report["explanations"][0]["registry"]["title"] == "Semantic warning"
+
+	handler_result = CliRunner().invoke(
+		cli,
+		["explain", str(source), "--handler", "OperationsDashboard.select", "--json"],
+	)
+	assert handler_result.exit_code == 0, handler_result.output
+	handler_report = json.loads(handler_result.output)
+	assert handler_report["ok"] is True
+	assert handler_report["explanations"][0]["handler"]["screen"] == "OperationsDashboard"
+	assert handler_report["explanations"][0]["handler"]["handler"]["target"] == "FulfillmentTable"
+
+
 def test_checked_in_example_outputs_match_current_compiler():
 	examples = sorted((REPO_ROOT / "examples").glob("[0-9][0-9]_*/main.apg"))
 	assert len(examples) == 20

@@ -39,6 +39,8 @@ APG currently has an executable compiler path:
 - `apg parser-golden --json` emits `apg.parser-golden-audit.v1` by running the
   checked-in parser fixture catalog and proving required grammar constructs are
   represented by passing valid fixtures;
+- `apg explain <file> --symbol|--diagnostic|--handler ... --json` emits
+  `apg.explain-report.v1` from the same semantic model used by `apg model`;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -138,6 +140,7 @@ designers, and natural-language tools.
 | `compiler.ast_builder` | Existing parse-tree-to-AST conversion layer. Extend it until every first-class APG construct has a stable AST node or normalized metadata record. |
 | `compiler.semantic_analyzer` | Existing semantic analyzer. Extend it into the shared semantic model producer so CLI, LSP, generator, tests, and agents do not re-implement APG meaning. |
 | `compiler.semantic_model` | Existing semantic-model builder. Keep it as the canonical JSON producer for `apg.semantic-model.v1`. |
+| `compiler.explain` | Existing semantic explanation builder for symbols, diagnostics, and handlers. Extend it as the semantic model deepens. |
 | `compiler.code_generator` | Existing Python artifact generator. It remains the only compile target and should consume the normalized semantic model rather than ad hoc parse fragments. |
 | `compiler.diagnostics` | Planned diagnostic registry for APG code ranges, severities, related locations, and fix IDs. |
 | `compiler.formatter` | Existing deterministic formatter for `.apg` source. Extend it toward full AST-aware formatting. |
@@ -638,6 +641,9 @@ apg graph app.apg --kind agent --format mermaid
 apg graph-suite app.apg --json
 apg release app.apg --json
 apg parser-golden --json
+apg explain app.apg --symbol table.Customer --json
+apg explain app.apg --diagnostic APG0100 --json
+apg explain app.apg --handler OperationsDashboard.select --json
 apg validate
 apg run
 apg doctor
@@ -774,6 +780,8 @@ apg explain app.apg --handler InvoiceForm.Save
 ```
 
 Explain output should be human-readable by default and JSON with `--json`.
+The current executable contract emits `apg.explain-report.v1`, reuses
+`apg.semantic-model.v1`, and supports symbol, diagnostic, and handler queries.
 
 ### `apg doctor`
 
