@@ -6662,3 +6662,21 @@ Battery-conscious verification:
 - `rg -n "Placeholder for AI recommendation logic" capabilities/composition/registry/service.py tests/test_composition_registry_service_recommendations.py -S` -> no matches
 - `git diff --check capabilities/composition/registry/service.py tests/test_composition_registry_service_recommendations.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:13 EAT
+
+Completed checkpoint:
+
+- Replaced gateway API route, load-balancer, and policy list placeholders with executable tenant-scoped runtime state.
+- Gateway API route creation and traffic-split updates now preserve route data for listing and UI inspection.
+- Load-balancer and policy creation now return durable runtime records instead of timestamp-only IDs.
+- Health-check requests now record queued/completed/skipped/failed execution state and call the available ASM health executor when present.
+- Added focused runtime coverage for gateway API runtime-state storage, filtering, enum serialization, and placeholder removal.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/api.py tests/test_composition_gateway_api_runtime_state.py`
+- `.venv/bin/python -m pytest tests/test_composition_gateway_api_runtime_state.py -q` -> 3 passed
+- `rg -n "routes = \\[\\]|load_balancers = \\[\\]|policies = \\[\\]|Implementation would trigger health check|Placeholder" capabilities/composition/gateway/api.py -S` -> no matches
+- `git diff --check capabilities/composition/gateway/api.py tests/test_composition_gateway_api_runtime_state.py`
+- Deferred broader pytest at the user's request to conserve battery.

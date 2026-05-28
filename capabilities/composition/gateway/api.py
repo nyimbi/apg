@@ -64,7 +64,7 @@ from .context import get_current_user_id_from_request, get_tenant_id_from_reques
 class APIResponse(BaseModel):
 	"""Standard API response model."""
 	model_config = ConfigDict(extra='forbid')
-	
+
 	success: bool
 	message: str
 	data: Optional[Dict[str, Any]] = None
@@ -74,7 +74,7 @@ class APIResponse(BaseModel):
 class PaginatedResponse(BaseModel):
 	"""Paginated response model."""
 	model_config = ConfigDict(extra='forbid')
-	
+
 	items: List[Dict[str, Any]]
 	total: int
 	page: int
@@ -86,35 +86,35 @@ class PaginatedResponse(BaseModel):
 class ServiceRegistrationRequest(BaseModel):
 	"""Service registration request model."""
 	model_config = ConfigDict(extra='forbid')
-	
+
 	service_config: ServiceConfig
 	endpoints: List[EndpointConfig]
 
 class RouteCreationRequest(BaseModel):
 	"""Route creation request model."""
 	model_config = ConfigDict(extra='forbid')
-	
+
 	route_config: RouteConfig
 	service_id: Optional[str] = None
 
 class TrafficSplitRequest(BaseModel):
 	"""Traffic splitting request model."""
 	model_config = ConfigDict(extra='forbid')
-	
+
 	route_id: str
 	destination_services: List[Dict[str, Any]]
 
 class HealthCheckRequest(BaseModel):
 	"""Health check request model."""
 	model_config = ConfigDict(extra='forbid')
-	
+
 	service_ids: Optional[List[str]] = None
 	force_check: bool = False
 
 class MetricsQueryRequest(BaseModel):
 	"""Metrics query request model."""
 	model_config = ConfigDict(extra='forbid')
-	
+
 	service_ids: Optional[List[str]] = None
 	metric_names: Optional[List[str]] = None
 	start_time: Optional[datetime] = None
@@ -124,7 +124,7 @@ class MetricsQueryRequest(BaseModel):
 class WebSocketMessage(BaseModel):
 	"""WebSocket message model."""
 	model_config = ConfigDict(extra='forbid')
-	
+
 	type: str
 	action: Optional[str] = None
 	data: Optional[Dict[str, Any]] = None
@@ -136,61 +136,61 @@ class WebSocketMessage(BaseModel):
 
 class ConnectionManager:
 	"""Manages WebSocket connections for real-time updates."""
-	
+
 	def __init__(self):
 		self.active_connections: Dict[str, List[WebSocket]] = {}
 		self.connection_metadata: Dict[WebSocket, Dict[str, Any]] = {}
-	
+
 	async def connect(self, websocket: WebSocket, tenant_id: str, connection_type: str = "monitoring"):
 		"""Connect a new WebSocket client."""
 		await websocket.accept()
-		
+
 		if tenant_id not in self.active_connections:
 			self.active_connections[tenant_id] = []
-		
+
 		self.active_connections[tenant_id].append(websocket)
 		self.connection_metadata[websocket] = {
 			"tenant_id": tenant_id,
 			"connection_type": connection_type,
 			"connected_at": datetime.now(timezone.utc)
 		}
-	
+
 	def disconnect(self, websocket: WebSocket):
 		"""Disconnect a WebSocket client."""
 		if websocket in self.connection_metadata:
 			tenant_id = self.connection_metadata[websocket]["tenant_id"]
-			
+
 			if tenant_id in self.active_connections:
 				self.active_connections[tenant_id].remove(websocket)
-				
+
 				if not self.active_connections[tenant_id]:
 					del self.active_connections[tenant_id]
-			
+
 			del self.connection_metadata[websocket]
-	
+
 	async def send_personal_message(self, message: Dict[str, Any], websocket: WebSocket):
 		"""Send message to specific WebSocket."""
 		try:
 			await websocket.send_text(json.dumps(message, default=str))
 		except:
 			self.disconnect(websocket)
-	
+
 	async def broadcast_to_tenant(self, message: Dict[str, Any], tenant_id: str):
 		"""Broadcast message to all connections for a tenant."""
 		if tenant_id not in self.active_connections:
 			return
-		
+
 		disconnected = []
 		for websocket in self.active_connections[tenant_id]:
 			try:
 				await websocket.send_text(json.dumps(message, default=str))
 			except:
 				disconnected.append(websocket)
-		
+
 		# Clean up disconnected sockets
 		for websocket in disconnected:
 			self.disconnect(websocket)
-	
+
 	async def broadcast_to_all(self, message: Dict[str, Any]):
 		"""Broadcast message to all connected clients."""
 		for tenant_id in list(self.active_connections.keys()):
@@ -202,18 +202,120 @@ class ConnectionManager:
 
 # Global connection manager
 connection_manager = ConnectionManager()
+gateway_runtime_state: Dict[str, Dict[str, Dict[str, Any]]] = {}
+
+def _tenant_runtime_state(tenant_id: str) -> Dict[str, Dict[str, Any]]:
+	"""Return mutable gateway API runtime state for a tenant."""
+	if tenant_id not in gateway_runtime_state:
+		gateway_runtime_state[tenant_id] = {
+			"routes": {},
+			"load_balancers": {},
+			"policies": {},
+			"health_checks": {}
+		}
+	return gateway_runtime_state[tenant_id]
+
+def _jsonable(value: Any) -> Any:
+	"""Convert pydantic models, enums, and dataclasses into API-safe values."""
+	if hasattr(value, "model_dump"):
+		return _jsonable(value.model_dump())
+	if hasattr(value, "value"):
+		return value.value
+	if isinstance(value, dict):
+		return {str(key): _jsonable(item) for key, item in value.items()}
+	if isinstance(value, list):
+		return [_jsonable(item) for item in value]
+	if isinstance(value, tuple):
+		return [_jsonable(item) for item in value]
+	if isinstance(value, datetime):
+		return value.isoformat()
+	return value
+
+def _store_runtime_item(
+	tenant_id: str,
+	collection: str,
+	item_id: str,
+	payload: Dict[str, Any],
+	user_id: Optional[str] = None
+) -> Dict[str, Any]:
+	"""Store or update a runtime gateway item."""
+	now = datetime.now(timezone.utc).isoformat()
+	state = _tenant_runtime_state(tenant_id)[collection]
+	existing = dict(state.get(item_id, {}))
+	item = {
+		**existing,
+		**_jsonable(payload),
+		"id": item_id,
+		"tenant_id": tenant_id,
+		"updated_at": now,
+	}
+	if user_id:
+		item["updated_by"] = user_id
+	if "created_at" not in item:
+		item["created_at"] = now
+	if user_id and "created_by" not in item:
+		item["created_by"] = user_id
+	state[item_id] = item
+	return item
+
+def _list_runtime_items(
+	tenant_id: str,
+	collection: str,
+	page: int = 1,
+	per_page: int = 100,
+	**filters: Any
+) -> Dict[str, Any]:
+	"""List runtime gateway items with simple filtering and pagination."""
+	items = list(_tenant_runtime_state(tenant_id)[collection].values())
+	for key, expected in filters.items():
+		if expected is None:
+			continue
+		expected_value = _jsonable(expected)
+		items = [item for item in items if item.get(key) == expected_value]
+	items.sort(key=lambda item: (item.get("priority", 1000), item.get("created_at", "")))
+	total = len(items)
+	start = max(page - 1, 0) * per_page
+	end = start + per_page
+	return {
+		"items": items[start:end],
+		"total": total,
+		"page": page,
+		"per_page": per_page,
+		"has_next": end < total,
+		"has_prev": page > 1,
+	}
+
+def _record_runtime_health_check(
+	tenant_id: str,
+	service_id: str,
+	status: str,
+	details: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+	"""Record health-check execution state for API visibility."""
+	check_id = f"{service_id}:{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+	return _store_runtime_item(
+		tenant_id,
+		"health_checks",
+		check_id,
+		{
+			"health_check_id": check_id,
+			"service_id": service_id,
+			"status": status,
+			"details": details or {}
+		}
+	)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 	"""Application lifespan manager."""
 	# Startup
 	print("🚀 Starting APG API Service Mesh API...")
-	
+
 	# Initialize background tasks
 	asyncio.create_task(monitoring_broadcast_task())
-	
+
 	yield
-	
+
 	# Shutdown
 	print("🛑 Shutting down APG API Service Mesh API...")
 
@@ -314,19 +416,19 @@ async def register_service(
 			tenant_id=tenant_id,
 			created_by=user_id
 		)
-		
+
 		# Broadcast service registration event
 		await connection_manager.broadcast_to_tenant({
 			"type": "service_registered",
 			"data": {"service_id": service_id, "service_name": request.service_config.service_name}
 		}, tenant_id)
-		
+
 		return APIResponse(
 			success=True,
 			message="Service registered successfully",
 			data={"service_id": service_id}
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -349,7 +451,7 @@ async def list_services(
 			health_status=health_status,
 			tenant_id=tenant_id
 		)
-		
+
 		# Convert to dictionaries for JSON response
 		service_dicts = []
 		for service in services:
@@ -365,13 +467,13 @@ async def list_services(
 				"last_health_check": service.last_health_check
 			}
 			service_dicts.append(service_dict)
-		
+
 		# Apply pagination
 		total = len(service_dicts)
 		start = (page - 1) * per_page
 		end = start + per_page
 		items = service_dicts[start:end]
-		
+
 		return PaginatedResponse(
 			items=items,
 			total=total,
@@ -381,7 +483,7 @@ async def list_services(
 			has_next=end < total,
 			has_prev=page > 1
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
@@ -394,10 +496,10 @@ async def get_service(
 	"""Get detailed service information."""
 	try:
 		service = await asm_service.service_registry.get_service_by_id(service_id, tenant_id)
-		
+
 		if not service:
 			raise HTTPException(status_code=404, detail="Service not found")
-		
+
 		service_data = {
 			"service_id": service.service_id,
 			"service_name": service.service_name,
@@ -409,13 +511,13 @@ async def get_service(
 			"metadata": service.metadata,
 			"last_health_check": service.last_health_check
 		}
-		
+
 		return APIResponse(
 			success=True,
 			message="Service retrieved successfully",
 			data=service_data
 		)
-		
+
 	except HTTPException:
 		raise
 	except Exception as e:
@@ -431,18 +533,18 @@ async def update_service_status(
 	"""Update service status."""
 	try:
 		await asm_service.service_registry.update_service_status(service_id, status, tenant_id)
-		
+
 		# Broadcast status update
 		await connection_manager.broadcast_to_tenant({
 			"type": "service_status_updated",
 			"data": {"service_id": service_id, "status": status.value}
 		}, tenant_id)
-		
+
 		return APIResponse(
 			success=True,
 			message="Service status updated successfully"
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
@@ -458,18 +560,18 @@ async def deregister_service(
 		await asm_service.service_registry.update_service_status(
 			service_id, ServiceStatus.DEREGISTERING, tenant_id
 		)
-		
+
 		# Broadcast deregistration event
 		await connection_manager.broadcast_to_tenant({
 			"type": "service_deregistered",
 			"data": {"service_id": service_id}
 		}, tenant_id)
-		
+
 		return APIResponse(
 			success=True,
 			message="Service deregistration initiated"
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
@@ -491,19 +593,30 @@ async def create_route(
 			tenant_id=tenant_id,
 			created_by=user_id
 		)
-		
+		route_data = _store_runtime_item(
+			tenant_id,
+			"routes",
+			route_id,
+			{
+				"route_id": route_id,
+				**request.route_config.model_dump(),
+				"service_id": request.service_id
+			},
+			user_id
+		)
+
 		# Broadcast route creation event
 		await connection_manager.broadcast_to_tenant({
 			"type": "route_created",
 			"data": {"route_id": route_id, "route_name": request.route_config.route_name}
 		}, tenant_id)
-		
+
 		return APIResponse(
 			success=True,
 			message="Route created successfully",
-			data={"route_id": route_id}
+			data={"route_id": route_id, "route": route_data}
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -516,15 +629,21 @@ async def list_routes(
 ):
 	"""List traffic routing rules."""
 	try:
-		# Implementation would query routes from database
-		routes = []  # Placeholder
-		
+		routes_page = _list_runtime_items(tenant_id, "routes", page=page, per_page=per_page)
+
 		return APIResponse(
 			success=True,
 			message="Routes retrieved successfully",
-			data={"routes": routes}
+			data={
+				"routes": routes_page["items"],
+				"total": routes_page["total"],
+				"page": routes_page["page"],
+				"per_page": routes_page["per_page"],
+				"has_next": routes_page["has_next"],
+				"has_prev": routes_page["has_prev"],
+			}
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
@@ -544,18 +663,28 @@ async def update_traffic_split(
 			tenant_id=tenant_id,
 			updated_by=user_id
 		)
-		
+		_store_runtime_item(
+			tenant_id,
+			"routes",
+			route_id,
+			{
+				"route_id": route_id,
+				"destination_services": request.destination_services
+			},
+			user_id
+		)
+
 		# Broadcast traffic split update
 		await connection_manager.broadcast_to_tenant({
 			"type": "traffic_split_updated",
 			"data": {"route_id": route_id, "destinations": len(request.destination_services)}
 		}, tenant_id)
-		
+
 		return APIResponse(
 			success=True,
 			message="Traffic split updated successfully"
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -567,19 +696,29 @@ async def update_traffic_split(
 async def create_load_balancer(
 	config: LoadBalancerConfig,
 	asm_service: ASMService = Depends(get_asm_service),
-	tenant_id: str = Depends(get_tenant_id)
+	tenant_id: str = Depends(get_tenant_id),
+	user_id: str = Depends(get_user_id)
 ):
 	"""Create a new load balancer configuration."""
 	try:
-		# Implementation would create load balancer
-		lb_id = "lb_" + str(int(datetime.now().timestamp()))
-		
+		lb_id = "lb_" + uuid7str()
+		load_balancer = _store_runtime_item(
+			tenant_id,
+			"load_balancers",
+			lb_id,
+			{
+				"load_balancer_id": lb_id,
+				**config.model_dump()
+			},
+			user_id
+		)
+
 		return APIResponse(
 			success=True,
 			message="Load balancer created successfully",
-			data={"load_balancer_id": lb_id}
+			data={"load_balancer_id": lb_id, "load_balancer": load_balancer}
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -590,15 +729,14 @@ async def list_load_balancers(
 ):
 	"""List load balancer configurations."""
 	try:
-		# Implementation would query load balancers
-		load_balancers = []  # Placeholder
-		
+		load_balancers = _list_runtime_items(tenant_id, "load_balancers")
+
 		return APIResponse(
 			success=True,
 			message="Load balancers retrieved successfully",
-			data={"load_balancers": load_balancers}
+			data={"load_balancers": load_balancers["items"], "total": load_balancers["total"]}
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
@@ -610,19 +748,29 @@ async def list_load_balancers(
 async def create_policy(
 	config: PolicyConfig,
 	asm_service: ASMService = Depends(get_asm_service),
-	tenant_id: str = Depends(get_tenant_id)
+	tenant_id: str = Depends(get_tenant_id),
+	user_id: str = Depends(get_user_id)
 ):
 	"""Create a new traffic or security policy."""
 	try:
-		# Implementation would create policy
-		policy_id = "pol_" + str(int(datetime.now().timestamp()))
-		
+		policy_id = "pol_" + uuid7str()
+		policy = _store_runtime_item(
+			tenant_id,
+			"policies",
+			policy_id,
+			{
+				"policy_id": policy_id,
+				**config.model_dump()
+			},
+			user_id
+		)
+
 		return APIResponse(
 			success=True,
 			message="Policy created successfully",
-			data={"policy_id": policy_id}
+			data={"policy_id": policy_id, "policy": policy}
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
 
@@ -634,15 +782,14 @@ async def list_policies(
 ):
 	"""List traffic and security policies."""
 	try:
-		# Implementation would query policies
-		policies = []  # Placeholder
-		
+		policies = _list_runtime_items(tenant_id, "policies", policy_type=policy_type)
+
 		return APIResponse(
 			success=True,
 			message="Policies retrieved successfully",
-			data={"policies": policies}
+			data={"policies": policies["items"], "total": policies["total"]}
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
@@ -662,24 +809,43 @@ async def trigger_health_check(
 		# Add background task for health checks
 		if request.service_ids:
 			for service_id in request.service_ids:
+				_record_runtime_health_check(
+					tenant_id,
+					service_id,
+					"queued",
+					{"force_check": request.force_check}
+				)
 				background_tasks.add_task(
 					trigger_service_health_check, service_id, asm_service, tenant_id
 				)
-		
+
 		return APIResponse(
 			success=True,
 			message="Health checks initiated"
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
 async def trigger_service_health_check(service_id: str, asm_service: ASMService, tenant_id: str):
 	"""Background task for service health check."""
 	try:
-		# Implementation would trigger health check
-		pass
+		health_monitor = getattr(asm_service, "health_monitor", None)
+		if health_monitor and hasattr(health_monitor, "_check_service_health"):
+			await health_monitor._check_service_health(service_id)
+			status = "completed"
+			details = {"method": "health_monitor._check_service_health"}
+		elif health_monitor and hasattr(health_monitor, "check_service_health"):
+			await health_monitor.check_service_health(service_id)
+			status = "completed"
+			details = {"method": "health_monitor.check_service_health"}
+		else:
+			status = "skipped"
+			details = {"reason": "ASM service does not expose a health-check executor"}
+
+		_record_runtime_health_check(tenant_id, service_id, status, details)
 	except Exception as e:
+		_record_runtime_health_check(tenant_id, service_id, "failed", {"error": str(e)})
 		print(f"Health check failed for service {service_id}: {e}")
 
 @api_app.get("/api/health", response_model=APIResponse, tags=["Health & Monitoring"])
@@ -690,13 +856,13 @@ async def get_mesh_health(
 	"""Get overall service mesh health status."""
 	try:
 		health_status = await asm_service.get_mesh_status(tenant_id)
-		
+
 		return APIResponse(
 			success=True,
 			message="Health status retrieved successfully",
 			data=health_status
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
@@ -713,13 +879,13 @@ async def query_metrics(
 			tenant_id=tenant_id,
 			hours=1  # Default to last hour
 		)
-		
+
 		return APIResponse(
 			success=True,
 			message="Metrics retrieved successfully",
 			data={"metrics": metrics}
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
@@ -731,13 +897,13 @@ async def get_service_topology(
 	"""Get service dependency topology."""
 	try:
 		topology = await asm_service.get_service_topology(tenant_id)
-		
+
 		return APIResponse(
 			success=True,
 			message="Topology retrieved successfully",
 			data=topology
 		)
-		
+
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
@@ -749,13 +915,13 @@ async def get_service_topology(
 async def websocket_monitoring(websocket: WebSocket, tenant_id: str = "default"):
 	"""WebSocket endpoint for real-time monitoring updates."""
 	await connection_manager.connect(websocket, tenant_id, "monitoring")
-	
+
 	try:
 		while True:
 			# Receive messages from client
 			data = await websocket.receive_text()
 			message = json.loads(data)
-			
+
 			# Handle client messages
 			if message.get("action") == "start_monitoring":
 				await websocket.send_text(json.dumps({
@@ -767,7 +933,7 @@ async def websocket_monitoring(websocket: WebSocket, tenant_id: str = "default")
 					"type": "monitoring_stopped",
 					"message": "Real-time monitoring deactivated"
 				}))
-			
+
 	except WebSocketDisconnect:
 		connection_manager.disconnect(websocket)
 
@@ -775,7 +941,7 @@ async def websocket_monitoring(websocket: WebSocket, tenant_id: str = "default")
 async def websocket_alerts(websocket: WebSocket, tenant_id: str = "default"):
 	"""WebSocket endpoint for real-time alert notifications."""
 	await connection_manager.connect(websocket, tenant_id, "alerts")
-	
+
 	try:
 		while True:
 			# Keep connection alive
@@ -784,7 +950,7 @@ async def websocket_alerts(websocket: WebSocket, tenant_id: str = "default"):
 				"type": "ping",
 				"timestamp": datetime.now(timezone.utc).isoformat()
 			}))
-			
+
 	except WebSocketDisconnect:
 		connection_manager.disconnect(websocket)
 
@@ -813,7 +979,7 @@ async def monitoring_broadcast_task():
 								"health_status": "healthy"
 							},
 							{
-								"service_id": "svc_002", 
+								"service_id": "svc_002",
 								"service_name": "payment-service",
 								"service_version": "v2.1.0",
 								"health_status": "healthy"
@@ -844,13 +1010,13 @@ async def monitoring_broadcast_task():
 					]
 				}
 			}
-			
+
 			# Broadcast to all monitoring connections
 			await connection_manager.broadcast_to_all(monitoring_data)
-			
+
 			# Wait 5 seconds before next broadcast
 			await asyncio.sleep(5)
-			
+
 		except Exception as e:
 			print(f"Error in monitoring broadcast: {e}")
 			await asyncio.sleep(10)
@@ -871,7 +1037,7 @@ async def get_api_info():
 			"description": "Intelligent API orchestration and service mesh networking",
 			"capabilities": [
 				"service_discovery",
-				"load_balancing", 
+				"load_balancing",
 				"traffic_routing",
 				"health_monitoring",
 				"metrics_collection",
