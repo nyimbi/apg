@@ -5025,3 +5025,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `b429c93` (`Surface AI agents in generated app manifests`) to `origin/main`.
+
+### 2026-05-28 05:10 EAT
+
+Completed checkpoint:
+
+- Fixed generated `__init__.py` so dependency-free Python outputs import real generated modules instead of a non-existent module named after the APG module.
+- Made generated `app.py` discover sibling runtime manifests through package-relative imports when imported as a package, while preserving script execution behavior.
+- Added focused package-import regression coverage so generated packages expose `describe_application()`, `list_entities()`, and generated AI-agent helpers.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 10 passed
+- Direct package import smoke check for generated files -> imported generated package and returned `['Planner']` from both `list_agents()` and `describe_application()["ai_agents"]`
+- `git diff --check -- compiler/code_generator.py tests/test_compiler_baseline.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push.

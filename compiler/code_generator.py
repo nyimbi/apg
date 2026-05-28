@@ -209,6 +209,11 @@ ENTITIES = {entity_specs!r}
 
 
 def _optional_module(name: str) -> Optional[Any]:
+    if __package__:
+        try:
+            return importlib.import_module(f".{{name}}", __package__)
+        except ImportError:
+            pass
     try:
         return importlib.import_module(name)
     except ImportError:
@@ -1479,7 +1484,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			return "None"
 	
 	def _generate_package_init(self, module: ModuleDeclaration) -> str:
-		"""Generate package __init__.py file"""
+		"""Generate package __init__.py file."""
 		lines = [
 			'"""',
 			f'{module.name} - APG Generated Package',
@@ -1498,21 +1503,45 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'# Import generated entities'
-		])
-		
-		for entity in module.entities:
-			lines.append(f"from .{module.name} import {entity.name}")
-		
-		lines.extend([
+			'from .app import describe_application, list_entities, main',
 			'',
 			'__all__ = [',
+			'    "__version__",',
+			'    "describe_application",',
+			'    "list_entities",',
+			'    "main",',
+			']',
+			'',
+			'try:',
+			'    from .ai_agents import (',
+			'        get_agent,',
+			'        get_team,',
+			'        list_agent_runtimes,',
+			'        list_agent_teams,',
+			'        list_agents,',
+			'        list_teams,',
+			'        validate_agent_runtimes,',
+			'    )',
+			'except ImportError:',
+			'    pass',
+			'else:',
+			'    __all__.extend([',
+			'        "get_agent",',
+			'        "get_team",',
+			'        "list_agent_runtimes",',
+			'        "list_agent_teams",',
+			'        "list_agents",',
+			'        "list_teams",',
+			'        "validate_agent_runtimes",',
+			'    ])',
+			'',
+			'try:',
+			'    from .apg_capabilities import get_capability, list_capabilities',
+			'except ImportError:',
+			'    pass',
+			'else:',
+			'    __all__.extend(["get_capability", "list_capabilities"])',
 		])
-		
-		for entity in module.entities:
-			lines.append(f'    "{entity.name}",')
-		
-		lines.append(']')
 		
 		return '\n'.join(lines)
 	

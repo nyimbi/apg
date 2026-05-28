@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 
 from click.testing import CliRunner
 
@@ -39,6 +41,39 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "flask_appbuilder" not in app
 	assert "django" not in app.lower()
 	compile(app, "app.py", "exec")
+
+
+def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path):
+	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
+	package_dir = tmp_path / "generated_pkg"
+	package_dir.mkdir()
+	for filename, content in result.generated_files.items():
+		(package_dir / filename).write_text(content, encoding="utf-8")
+
+	spec = importlib.util.spec_from_file_location(
+		"generated_pkg",
+		package_dir / "__init__.py",
+		submodule_search_locations=[str(package_dir)],
+	)
+	module = importlib.util.module_from_spec(spec)
+	sys.modules["generated_pkg"] = module
+	try:
+		spec.loader.exec_module(module)
+		manifest = module.describe_application()
+	finally:
+		sys.modules.pop("generated_pkg", None)
+		for name in list(sys.modules):
+			if name.startswith("generated_pkg."):
+				sys.modules.pop(name, None)
+
+	assert module.__version__ == "1.0.0"
+	assert module.list_entities() == [
+		{"name": "Planner", "type": "ai_agent", "properties": [], "methods": []}
+	]
+	assert module.list_agents() == ["Planner"]
+	assert manifest["ai_agents"] == ["Planner"]
+	assert "describe_application" in module.__all__
+	assert "list_agents" in module.__all__
 
 
 def test_cli_compile_default_target_writes_generated_application(tmp_path):
