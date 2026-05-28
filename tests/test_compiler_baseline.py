@@ -56,6 +56,22 @@ table InventoryItem {
 }
 """
 
+RELATIONSHIP_APP_SOURCE = """
+module sales_ops version 1.0.0 {
+	description: "Sales operations";
+}
+
+table Customer {
+	name: str;
+}
+
+table SalesOrder {
+	customer_id: int;
+	customer: Customer;
+	total: float;
+}
+"""
+
 
 def test_documented_python_target_generates_executable_application_files():
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
@@ -106,11 +122,13 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.list_agents() == ["Planner"]
 	assert manifest["ai_agents"] == ["Planner"]
 	assert module.openapi_document()["openapi"] == "3.1.0"
+	assert module.relationship_graph()["nodes"][0]["id"] == "Planner"
 	assert module.storage_status()["mode"] == "memory"
 	assert module.validate_record("Planner", {})["valid"] is True
 	assert module.validate_application()["valid"] is True
 	assert "describe_application" in module.__all__
 	assert "openapi_document" in module.__all__
+	assert "relationship_graph" in module.__all__
 	assert "storage_status" in module.__all__
 	assert "validate_application" in module.__all__
 	assert "validate_record" in module.__all__
@@ -293,6 +311,30 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert missing_payload["error"] == "record_not_found"
 	assert empty_list["records"] == []
 	assert form_created["record"] == {"id": 2, "name": "Kofi", "email": "kofi@example.com"}
+
+
+def test_generated_python_app_exposes_relationship_graph_from_fields(tmp_path):
+	result = compile_apg_string(RELATIONSHIP_APP_SOURCE)
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	graph = namespace["relationship_graph"]()
+	assert {"id": "Customer", "name": "Customer", "type": "entity"} in graph["nodes"]
+	assert {"id": "SalesOrder", "name": "SalesOrder", "type": "entity"} in graph["nodes"]
+	assert {
+		"from": "SalesOrder",
+		"to": "Customer",
+		"field": "customer_id",
+		"relationship": "references",
+	} in graph["edges"]
+	assert {
+		"from": "SalesOrder",
+		"to": "Customer",
+		"field": "customer",
+		"relationship": "typed_as",
+	} in graph["edges"]
+	assert "/relationships" in namespace["openapi_document"]()["paths"]
+	assert namespace["_route_payload"]("/relationships") == (200, graph)
 
 
 def test_generated_python_app_validates_records_from_entity_fields():

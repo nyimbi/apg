@@ -5399,3 +5399,27 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `fc99e34` (`Validate generated app records from APG fields`) to `origin/main`.
+
+### 2026-05-28 06:46 EAT
+
+Completed checkpoint:
+
+- Added generated entity relationship graph support for executable apps.
+- Generated apps infer relationship edges from:
+  - reference-shaped fields such as `customer_id`.
+  - fields typed as another APG entity such as `customer: Customer`.
+- Generated apps now expose `GET /relationships`.
+- Generated `/ui` links to the relationship graph.
+- Generated `/openapi.json` advertises the relationship endpoint.
+- Generated packages now reexport `relationship_graph()` for Python consumers.
+- Added focused regression coverage for generated relationship nodes, inferred field-reference edges, typed-entity edges, API contract exposure, and route payload output.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 15 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated relationship graph slice.

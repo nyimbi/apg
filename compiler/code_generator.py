@@ -381,6 +381,7 @@ def openapi_document() -> Dict[str, Any]:
         "/manifest": {{"get": _api_operation("Application manifest", "APG manifest")}},
         "/validate": {{"get": _api_operation("Application validation", "Validation report")}},
         "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
+        "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph")}},
         "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
         "/ui": {{"get": _api_operation("Generated application UI", "HTML application index")}},
     }}
@@ -588,6 +589,44 @@ def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = Fa
     }}
 
 
+def relationship_graph() -> Dict[str, Any]:
+    nodes = [
+        {{"id": str(entity["name"]), "name": str(entity["name"]), "type": str(entity["type"])}}
+        for entity in ENTITIES
+    ]
+    entity_names = {{str(entity["name"]) for entity in ENTITIES}}
+    entity_names_by_lower = {{name.lower(): name for name in entity_names}}
+    edges: list[Dict[str, Any]] = []
+    seen_edges: set[tuple[str, str, str, str]] = set()
+    for entity in ENTITIES:
+        source = str(entity["name"])
+        for field in _field_specs(source):
+            field_name = str(field["name"])
+            field_type = str(field.get("type", ""))
+            target = None
+            relationship = "references"
+            if field_type in entity_names:
+                target = field_type
+                relationship = "typed_as"
+            elif field_type.lower() in entity_names_by_lower:
+                target = entity_names_by_lower[field_type.lower()]
+                relationship = "typed_as"
+            elif field_name.endswith("_id"):
+                candidate = field_name[:-3]
+                target = entity_names_by_lower.get(candidate.lower())
+            if target and target != source:
+                edge_key = (source, target, field_name, relationship)
+                if edge_key not in seen_edges:
+                    edges.append({{
+                        "from": source,
+                        "to": target,
+                        "field": field_name,
+                        "relationship": relationship,
+                    }})
+                    seen_edges.add(edge_key)
+    return {{"nodes": nodes, "edges": edges}}
+
+
 def _ui_index_html() -> str:
     links = "".join(
         f'<li><a href="/ui/entities/{{html.escape(entity["name"], quote=True)}}">'
@@ -602,6 +641,7 @@ def _ui_index_html() -> str:
         f"<p>{{html.escape(MODULE_DESCRIPTION or 'Generated APG application')}}</p>"
         '<nav><a href="/manifest">Manifest JSON</a> | '
         '<a href="/records">Record JSON</a> | '
+        '<a href="/relationships">Relationships</a> | '
         '<a href="/openapi.json">API Contract</a></nav>'
         "<h2>Entities</h2>"
         f"<ul>{{links}}</ul>"
@@ -713,6 +753,8 @@ def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
         path.startswith("/entities/") and "/records" in path
     ):
         return _records_payload(path)
+    if path == "/relationships":
+        return 200, relationship_graph()
     if path == "/storage":
         return 200, storage_status(include_records=True)
     if path == "/agents":
@@ -2351,7 +2393,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import describe_application, list_entities, list_records, main, openapi_document, storage_status, validate_application, validate_record',
+			'from .app import describe_application, list_entities, list_records, main, openapi_document, relationship_graph, storage_status, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
@@ -2360,6 +2402,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    "list_records",',
 			'    "main",',
 			'    "openapi_document",',
+			'    "relationship_graph",',
 			'    "storage_status",',
 			'    "validate_application",',
 			'    "validate_record",',
