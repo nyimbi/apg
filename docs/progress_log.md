@@ -7095,3 +7095,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated self-test reported `passed: true`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 16:31 EAT
+
+Completed checkpoint:
+
+- Added generated `validate_openapi_contract()` support so compiled APG applications validate their own OpenAPI paths, operations, and internal schema references.
+- Wired OpenAPI contract validation into generated `validate_application()` and `self_test()` so dangling `$ref` entries fail generated app health checks instead of remaining latent.
+- Re-exported the OpenAPI validator from generated packages and refreshed all 20 numbered example outputs to include the new validation surface.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_compiler_baseline.py::test_generated_python_app_serves_http_endpoints -q` -> 2 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated self-test reported `openapi_contract.errors == []`
+- Deferred broader pytest at the user's request to conserve battery.

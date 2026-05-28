@@ -336,6 +336,7 @@ def component_manifest() -> Dict[str, Any]:
                     "list_records",
                     "query_records",
                     "validate_application",
+                    "validate_openapi_contract",
                     "validate_record",
                     "update_record",
                     "self_test",
@@ -1201,6 +1202,66 @@ def openapi_document() -> Dict[str, Any]:
     }
 
 
+def _walk_openapi_refs(value: Any, path: str = "$") -> list[tuple[str, str]]:
+    refs: list[tuple[str, str]] = []
+    if isinstance(value, dict):
+        raw_ref = value.get("$ref")
+        if isinstance(raw_ref, str):
+            refs.append((path + ".$ref", raw_ref))
+        for key, child in value.items():
+            if key == "$ref":
+                continue
+            refs.extend(_walk_openapi_refs(child, f"{path}.{key}"))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            refs.extend(_walk_openapi_refs(child, f"{path}[{index}]"))
+    return refs
+
+
+def validate_openapi_contract() -> Dict[str, Any]:
+    document = openapi_document()
+    errors: list[str] = []
+    warnings: list[str] = []
+    paths = document.get("paths", {})
+    schemas = document.get("components", {}).get("schemas", {})
+    if not isinstance(paths, dict) or not paths:
+        errors.append("OpenAPI document does not declare paths")
+        paths = {}
+    if not isinstance(schemas, dict):
+        errors.append("OpenAPI document components.schemas must be an object")
+        schemas = {}
+    for route, path_item in sorted(paths.items()):
+        if not isinstance(path_item, dict):
+            errors.append(f"OpenAPI path {route} must be an object")
+            continue
+        for method, operation in sorted(path_item.items()):
+            if method.lower() not in {"get", "post", "put", "patch", "delete", "options", "head"}:
+                continue
+            if not isinstance(operation, dict):
+                errors.append(f"OpenAPI operation {method.upper()} {route} must be an object")
+                continue
+            responses = operation.get("responses")
+            if not isinstance(responses, dict) or not responses:
+                errors.append(f"OpenAPI operation {method.upper()} {route} does not declare responses")
+    referenced_schemas: set[str] = set()
+    for ref_path, ref in _walk_openapi_refs(document):
+        prefix = "#/components/schemas/"
+        if not ref.startswith(prefix):
+            errors.append(f"OpenAPI reference {ref} at {ref_path} is not an internal component schema reference")
+            continue
+        schema_name = ref[len(prefix):]
+        referenced_schemas.add(schema_name)
+        if schema_name not in schemas:
+            errors.append(f"OpenAPI reference {ref} at {ref_path} does not resolve")
+    return {
+        "errors": sorted(errors),
+        "warnings": warnings,
+        "path_count": len(paths),
+        "schema_count": len(schemas),
+        "referenced_schemas": sorted(referenced_schemas),
+    }
+
+
 def describe_application() -> Dict[str, Any]:
     description: Dict[str, Any] = {
         "name": MODULE_NAME,
@@ -1362,6 +1423,7 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
         "warnings": [],
         "checks": {},
     }
+    _record_validation(report, "openapi_contract", validate_openapi_contract())
     _record_validation(report, "database_schemas", validate_database_schema_contracts())
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
         _record_validation(
