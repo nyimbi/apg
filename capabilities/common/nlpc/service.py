@@ -125,13 +125,14 @@ except ImportError:
 try:
 	from textblob import TextBlob
 	TEXTBLOB_AVAILABLE = True
-except ImportError:
+except Exception:
+	TextBlob = None
 	TEXTBLOB_AVAILABLE = False
 
 try:
 	import gensim
 	GENSIM_AVAILABLE = True
-except ImportError:
+except Exception:
 	GENSIM_AVAILABLE = False
 
 try:
@@ -139,7 +140,7 @@ try:
 	from sklearn.metrics.pairwise import cosine_similarity
 	import numpy as np
 	SKLEARN_AVAILABLE = True
-except ImportError:
+except Exception:
 	SKLEARN_AVAILABLE = False
 
 # APG and local imports
@@ -358,7 +359,8 @@ class NLPCoreService:
 		
 		results = []
 		
-		for task in request.tasks:
+		for requested_task in request.tasks:
+			task = self._coerce_task(requested_task)
 			self._log_processing_start(task, document.document_id)
 			start_time = time.time()
 			
@@ -377,14 +379,14 @@ class NLPCoreService:
 					processing_time=processing_time,
 					result_data=result,
 					model_version=result.get('model_version', '1.0'),
-					model_type=ModelType(result.get('model_type', ModelType.CUSTOM.value))
+					model_type=self._coerce_model_type(result.get('model_type', ModelType.CUSTOM.value))
 				)
 				
 				results.append(processing_result)
 				self._log_processing_complete(task, processing_time)
 				
 				# Update performance metrics
-				self._update_performance_metrics(task, processing_time)
+				self._record_task_performance_metric(task, processing_time)
 				
 			except Exception as e:
 				processing_time = time.time() - start_time
@@ -427,7 +429,7 @@ class NLPCoreService:
 			Task result data
 		"""
 		text = document.content
-		language = document.language or LanguageCode.AUTO_DETECT
+		language = self._coerce_language(document.language or LanguageCode.AUTO_DETECT)
 		
 		# Route to appropriate processor based on task
 		task_processors = {
@@ -435,17 +437,32 @@ class NLPCoreService:
 			NLPTask.SENTENCE_SEGMENTATION: self._segment_sentences,
 			NLPTask.LANGUAGE_DETECTION: self._detect_language,
 			NLPTask.POS_TAGGING: self._pos_tag,
+			NLPTask.PART_OF_SPEECH_TAGGING: self._pos_tag,
 			NLPTask.NER: self._named_entity_recognition,
+			NLPTask.NAMED_ENTITY_RECOGNITION: self._named_entity_recognition,
+			NLPTask.ENTITY_EXTRACTION: self._named_entity_recognition,
 			NLPTask.DEPENDENCY_PARSING: self._dependency_parse,
+			NLPTask.CONSTITUENCY_PARSING: self._constituency_parse,
 			NLPTask.SENTIMENT_ANALYSIS: self._sentiment_analysis,
 			NLPTask.EMOTION_DETECTION: self._emotion_detection,
+			NLPTask.INTENT_CLASSIFICATION: self._intent_classification,
 			NLPTask.TOPIC_MODELING: self._topic_modeling,
 			NLPTask.SEMANTIC_SIMILARITY: self._semantic_similarity,
+			NLPTask.TEXT_SIMILARITY: self._semantic_similarity,
 			NLPTask.TEXT_SUMMARIZATION: self._text_summarization,
+			NLPTask.RELATION_EXTRACTION: self._relation_extraction,
+			NLPTask.COREFERENCE_RESOLUTION: self._coreference_resolution,
+			NLPTask.TEMPORAL_EXTRACTION: self._temporal_extraction,
+			NLPTask.EVENT_EXTRACTION: self._event_extraction,
+			NLPTask.QUESTION_ANSWERING: self._question_answering,
+			NLPTask.TEXT_GENERATION: self._text_generation,
+			NLPTask.TEXT_TRANSLATION: self._text_translation,
 			NLPTask.KEYWORD_EXTRACTION: self._keyword_extraction,
 			NLPTask.TEXT_CLASSIFICATION: self._text_classification,
 			NLPTask.PII_DETECTION: self._pii_detection,
-			NLPTask.TEXT_NORMALIZATION: self._text_normalization
+			NLPTask.ENTITY_LINKING: self._entity_linking,
+			NLPTask.TEXT_NORMALIZATION: self._text_normalization,
+			NLPTask.TEXT_CLUSTERING: self._text_clustering
 		}
 		
 		processor = task_processors.get(task)
@@ -453,13 +470,44 @@ class NLPCoreService:
 			raise NotImplementedError(f"Task {task.value} not implemented")
 		
 		# Call processor with appropriate parameters
-		if task in [NLPTask.TOPIC_MODELING, NLPTask.SEMANTIC_SIMILARITY, 
-					NLPTask.TEXT_SUMMARIZATION, NLPTask.TEXT_CLASSIFICATION]:
+		if task in [
+			NLPTask.TOPIC_MODELING,
+			NLPTask.SEMANTIC_SIMILARITY,
+			NLPTask.TEXT_SIMILARITY,
+			NLPTask.TEXT_SUMMARIZATION,
+			NLPTask.TEXT_CLASSIFICATION,
+			NLPTask.INTENT_CLASSIFICATION,
+			NLPTask.QUESTION_ANSWERING,
+			NLPTask.TEXT_GENERATION,
+			NLPTask.TEXT_TRANSLATION,
+			NLPTask.TEXT_CLUSTERING,
+		]:
 			return await processor(text, parameters)
 		elif task == NLPTask.LANGUAGE_DETECTION:
 			return await processor(text)
 		else:
 			return await processor(text, language)
+
+	def _coerce_task(self, task: Union[NLPTask, str]) -> NLPTask:
+		"""Normalize Pydantic enum-value strings to NLPTask members."""
+		if isinstance(task, NLPTask):
+			return task
+		return NLPTask(str(task))
+
+	def _coerce_language(self, language: Union[LanguageCode, str]) -> LanguageCode:
+		"""Normalize Pydantic enum-value strings to LanguageCode members."""
+		if isinstance(language, LanguageCode):
+			return language
+		return LanguageCode(str(language))
+
+	def _coerce_model_type(self, model_type: Union[ModelType, str]) -> ModelType:
+		"""Normalize processor model labels to the public ModelType enum."""
+		if isinstance(model_type, ModelType):
+			return model_type
+		try:
+			return ModelType(str(model_type))
+		except ValueError:
+			return ModelType.CUSTOM
 	
 	async def _tokenize_text(self, text: str, language: LanguageCode) -> Dict[str, Any]:
 		"""Tokenize text using available libraries."""
@@ -1217,8 +1265,296 @@ class NLPCoreService:
 			'confidence': 0.85,
 			'model_version': '1.0'
 		}
+
+	async def _constituency_parse(self, text: str, language: LanguageCode) -> Dict[str, Any]:
+		"""Build a lightweight constituency-style parse tree."""
+		sentences = self._split_sentences(text)
+		parse_trees = []
+		for index, sentence in enumerate(sentences):
+			tokens = self._word_tokens(sentence)
+			parse_trees.append({
+				"sentence_index": index,
+				"label": "S",
+				"text": sentence,
+				"children": [
+					{"label": "TOKEN", "text": token, "index": token_index}
+					for token_index, token in enumerate(tokens)
+				],
+			})
+
+		return {
+			"parse_trees": parse_trees,
+			"sentence_count": len(parse_trees),
+			"model_type": "rule_based_constituency",
+			"confidence": 0.55 if parse_trees else 0.0,
+			"model_version": "1.0",
+		}
+
+	async def _intent_classification(self, text: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+		"""Classify text intent with explicit labels or rule-based defaults."""
+		intents = parameters.get("intents") or parameters.get("categories") or [
+			"question",
+			"request",
+			"complaint",
+			"informational",
+		]
+		classification = await self._text_classification(text, {"categories": intents})
+		intent = classification["predicted_category"]
+		if "?" in text and "question" in intents:
+			intent = "question"
+			classification["confidence"] = max(classification["confidence"], 0.75)
+
+		return {
+			"intent": intent,
+			"confidence": classification["confidence"],
+			"intents": intents,
+			"model_type": "rule_based_intent",
+			"model_version": "1.0",
+		}
+
+	async def _relation_extraction(self, text: str, language: LanguageCode) -> Dict[str, Any]:
+		"""Extract simple subject-relation-object candidates."""
+		entity_result = await self._named_entity_recognition(text, language)
+		entities = entity_result.get("entities", [])
+		relations = []
+		relation_words = {"works", "uses", "owns", "paid", "supports", "manages", "created", "joined", "visited"}
+
+		for left, right in zip(entities, entities[1:]):
+			between = text[left["end"]:right["start"]].strip()
+			words = [word.lower() for word in self._word_tokens(between)]
+			predicate = next((word for word in words if word in relation_words), "related_to")
+			relations.append({
+				"subject": left["text"],
+				"predicate": predicate,
+				"object": right["text"],
+				"evidence": between,
+				"confidence": 0.55 if predicate == "related_to" else 0.7,
+			})
+
+		return {
+			"relations": relations,
+			"relation_count": len(relations),
+			"model_type": "rule_based_relation_extraction",
+			"confidence": 0.6 if relations else 0.35,
+			"model_version": "1.0",
+		}
+
+	async def _coreference_resolution(self, text: str, language: LanguageCode) -> Dict[str, Any]:
+		"""Resolve basic pronoun references to recent named mentions."""
+		pronouns = {"he", "she", "they", "them", "him", "her", "it", "its", "their"}
+		mentions = [
+			{"text": match.group(), "start": match.start(), "end": match.end()}
+			for match in re.finditer(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", text)
+		]
+		chains = []
+		if mentions:
+			for pronoun_match in re.finditer(r"\b(he|she|they|them|him|her|it|its|their)\b", text, re.IGNORECASE):
+				previous_mentions = [mention for mention in mentions if mention["end"] <= pronoun_match.start()]
+				if previous_mentions and pronoun_match.group().lower() in pronouns:
+					antecedent = previous_mentions[-1]
+					chains.append({
+						"antecedent": antecedent["text"],
+						"mention": pronoun_match.group(),
+						"mention_start": pronoun_match.start(),
+						"mention_end": pronoun_match.end(),
+						"confidence": 0.5,
+					})
+
+		return {
+			"coreference_chains": chains,
+			"chain_count": len(chains),
+			"model_type": "rule_based_coreference",
+			"confidence": 0.5 if chains else 0.25,
+			"model_version": "1.0",
+		}
+
+	async def _temporal_extraction(self, text: str, language: LanguageCode) -> Dict[str, Any]:
+		"""Extract date, time, and relative temporal expressions."""
+		patterns = {
+			"iso_date": r"\b\d{4}-\d{2}-\d{2}\b",
+			"slash_date": r"\b\d{1,2}/\d{1,2}/\d{2,4}\b",
+			"month_date": r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{1,2}(?:,\s+\d{4})?\b",
+			"relative": r"\b(?:today|tomorrow|yesterday|next\s+\w+|last\s+\w+|in\s+\d+\s+\w+)\b",
+			"time": r"\b\d{1,2}:\d{2}(?:\s?[AP]M)?\b",
+		}
+		expressions = []
+		for expression_type, pattern in patterns.items():
+			for match in re.finditer(pattern, text, re.IGNORECASE):
+				expressions.append({
+					"text": match.group(),
+					"type": expression_type,
+					"start": match.start(),
+					"end": match.end(),
+					"confidence": 0.8,
+				})
+		expressions.sort(key=lambda item: item["start"])
+
+		return {
+			"temporal_expressions": expressions,
+			"temporal_count": len(expressions),
+			"model_type": "regex_temporal",
+			"confidence": 0.75 if expressions else 0.4,
+			"model_version": "1.0",
+		}
+
+	async def _event_extraction(self, text: str, language: LanguageCode) -> Dict[str, Any]:
+		"""Extract event candidates from trigger words and sentence context."""
+		triggers = {
+			"created", "updated", "deleted", "approved", "rejected", "paid", "shipped",
+			"delivered", "failed", "started", "stopped", "completed", "signed", "joined",
+		}
+		events = []
+		for sentence_index, sentence in enumerate(self._split_sentences(text)):
+			words = [word.lower() for word in self._word_tokens(sentence)]
+			matched = sorted(set(words) & triggers)
+			for trigger in matched:
+				events.append({
+					"trigger": trigger,
+					"sentence": sentence,
+					"sentence_index": sentence_index,
+					"confidence": 0.65,
+				})
+
+		return {
+			"events": events,
+			"event_count": len(events),
+			"model_type": "rule_based_event_extraction",
+			"confidence": 0.65 if events else 0.35,
+			"model_version": "1.0",
+		}
+
+	async def _question_answering(self, text: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+		"""Answer a question by selecting the highest-overlap sentence."""
+		question = str(parameters.get("question") or parameters.get("query") or "").strip()
+		if not question:
+			return {
+				"answer": "",
+				"confidence": 0.0,
+				"model_type": "rule_based_qa",
+				"model_version": "1.0",
+				"error": "No question provided",
+			}
+
+		question_terms = self._content_word_set(question)
+		best_sentence = ""
+		best_score = 0.0
+		for sentence in self._split_sentences(text):
+			sentence_terms = self._content_word_set(sentence)
+			if not question_terms or not sentence_terms:
+				continue
+			score = len(question_terms & sentence_terms) / len(question_terms | sentence_terms)
+			if score > best_score:
+				best_sentence = sentence
+				best_score = score
+
+		return {
+			"question": question,
+			"answer": best_sentence,
+			"confidence": min(0.8, best_score + 0.25) if best_sentence else 0.0,
+			"model_type": "rule_based_qa",
+			"model_version": "1.0",
+		}
+
+	async def _text_generation(self, text: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+		"""Generate deterministic text from a prompt and optional style."""
+		prompt = str(parameters.get("prompt") or text).strip()
+		prefix = str(parameters.get("prefix") or "").strip()
+		max_sentences = int(parameters.get("max_sentences", 2))
+		source_sentences = self._split_sentences(prompt)[:max(1, max_sentences)]
+		generated_text = " ".join(source_sentences)
+		if prefix:
+			generated_text = f"{prefix} {generated_text}".strip()
+
+		return {
+			"generated_text": generated_text,
+			"prompt": prompt,
+			"model_type": "template_generation",
+			"confidence": 0.55,
+			"model_version": "1.0",
+		}
+
+	async def _text_translation(self, text: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+		"""Return an explicit identity translation when no translation backend is configured."""
+		target_language = str(parameters.get("target_language") or parameters.get("target") or "en")
+		source_language = str(parameters.get("source_language") or parameters.get("source") or "auto")
+		return {
+			"translated_text": text,
+			"source_language": source_language,
+			"target_language": target_language,
+			"translation_status": "identity_fallback",
+			"model_type": "identity_translation",
+			"confidence": 0.4 if source_language != target_language else 0.95,
+			"model_version": "1.0",
+		}
+
+	async def _entity_linking(self, text: str, language: LanguageCode) -> Dict[str, Any]:
+		"""Link detected entities to stable deterministic local identifiers."""
+		entity_result = await self._named_entity_recognition(text, language)
+		linked_entities = []
+		for entity in entity_result.get("entities", []):
+			entity_id = hashlib.sha256(f"{entity['label']}:{entity['text'].lower()}".encode("utf-8")).hexdigest()[:16]
+			linked_entities.append({
+				**entity,
+				"entity_id": entity_id,
+				"knowledge_base": "local",
+				"canonical_name": entity["text"].strip(),
+				"link_confidence": entity.get("confidence", 0.5),
+			})
+
+		return {
+			"linked_entities": linked_entities,
+			"entity_count": len(linked_entities),
+			"model_type": "deterministic_entity_linking",
+			"confidence": 0.65 if linked_entities else 0.35,
+			"model_version": "1.0",
+		}
+
+	async def _text_clustering(self, text: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+		"""Cluster sentences by dominant content words."""
+		sentences = self._split_sentences(text)
+		max_clusters = max(1, int(parameters.get("max_clusters", 3)))
+		clusters: Dict[str, List[str]] = {}
+		for sentence in sentences:
+			terms = sorted(self._content_word_set(sentence))
+			key = terms[0] if terms else "misc"
+			if len(clusters) >= max_clusters and key not in clusters:
+				key = "misc"
+			clusters.setdefault(key, []).append(sentence)
+
+		cluster_payload = [
+			{"cluster_id": index, "label": label, "items": items, "size": len(items)}
+			for index, (label, items) in enumerate(sorted(clusters.items()))
+		]
+		return {
+			"clusters": cluster_payload,
+			"cluster_count": len(cluster_payload),
+			"model_type": "rule_based_sentence_clustering",
+			"confidence": 0.55 if cluster_payload else 0.0,
+			"model_version": "1.0",
+		}
+
+	def _split_sentences(self, text: str) -> List[str]:
+		"""Split text into non-empty sentence-like spans."""
+		return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", text) if sentence.strip()]
+
+	def _word_tokens(self, text: str) -> List[str]:
+		"""Extract simple word tokens."""
+		return re.findall(r"\b[\w'-]+\b", text)
+
+	def _content_word_set(self, text: str) -> set[str]:
+		"""Return lower-case content words for matching and clustering."""
+		stop_words = {
+			"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+			"of", "with", "by", "is", "are", "was", "were", "be", "been", "what",
+			"who", "when", "where", "why", "how", "did", "does", "do",
+		}
+		return {
+			token.lower()
+			for token in self._word_tokens(text)
+			if len(token) > 2 and token.lower() not in stop_words
+		}
 	
-	def _update_performance_metrics(self, task: NLPTask, processing_time: float) -> None:
+	def _record_task_performance_metric(self, task: NLPTask, processing_time: float) -> None:
 		"""Update performance metrics for a task."""
 		if task.value not in self._performance_metrics:
 			self._performance_metrics[task.value] = []

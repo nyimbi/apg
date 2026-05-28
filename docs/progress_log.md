@@ -8350,3 +8350,20 @@ Battery-conscious verification:
 - `rg -n "regex=" capabilities/composition/orchestration -g '*.py'` found no remaining Pydantic/FastAPI regex keyword usage.
 - `rg -n "For now, return a placeholder|GCS upload operation would be implemented here|would be implemented here" capabilities/composition/orchestration/connectors/cloud_connector.py tests/test_orchestration_cloud_connector_gcp_upload.py` found no stale GCP upload placeholder text.
 - `git diff --check --` for the connector/runtime slice passed.
+
+### 2026-05-29 01:09 EAT
+
+Executable NLPC task-dispatch slice:
+
+- Extended `NLPCoreService` task dispatch so every currently declared `NLPTask` has an executable processor path instead of falling into the unimplemented-task failure branch.
+- Added deterministic fallback processors for constituency parsing, intent classification, relation extraction, coreference, temporal extraction, event extraction, question answering, text generation, identity translation, entity linking, and sentence clustering.
+- Normalized Pydantic enum-value strings at the service boundary for task and language inputs, and preserved processor-specific `model_type` labels in `result_data` while coercing the typed `ProcessingResult.model_type` field to the public enum.
+- Hardened optional TextBlob/Gensim/sklearn backend detection so unusable optional backends are treated as unavailable instead of preventing NLPC service import.
+- Added regression coverage that iterates all declared `NLPTask.__members__` and requires completed structured results.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/nlpc/service.py tests/test_common_nlpc_core_task_dispatch.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_common_nlpc_core_task_dispatch.py` passed with 2 tests.
+- `.venv/bin/python -m pytest -q tests/test_common_nlpc_core_task_dispatch.py capabilities/common/nlpc/test_language_codes.py` passed with 4 tests.
+- `git diff --check -- capabilities/common/nlpc/service.py tests/test_common_nlpc_core_task_dispatch.py` passed.
