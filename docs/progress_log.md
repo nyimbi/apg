@@ -8072,3 +8072,7 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile compiler/semantic_model.py cli/lint_command.py tests/test_compiler_baseline.py` passed.
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_lint_json_reports_valid_apg_file_without_generation tests/test_compiler_baseline.py::test_cli_lint_catalog_uses_shared_semantic_model_for_capability_resolution tests/test_compiler_baseline.py::test_cli_lint_catalog_reports_unknown_declared_capability tests/test_compiler_baseline.py::test_cli_lint_directory_json_aggregates_apg_files_deterministically tests/test_compiler_baseline.py::test_cli_model_json_emits_semantic_model_without_generation tests/test_compiler_baseline.py::test_cli_model_json_validates_database_backed_form_bindings tests/test_compiler_baseline.py::test_cli_model_json_rejects_unknown_database_backed_form_field -q` passed with 7 tests.
 - `git diff --check -- compiler/semantic_model.py cli/lint_command.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `0f1ad29` (`Validate database-backed forms in the semantic model`).
