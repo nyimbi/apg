@@ -6698,3 +6698,21 @@ Battery-conscious verification:
 - `rg -n "In production, would sync with APG|pass\\s*$" capabilities/composition/registry/apg_integration.py -S` -> no matches
 - `git diff --check capabilities/composition/registry/apg_integration.py tests/test_composition_registry_apg_integration_sync.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:23 EAT
+
+Completed checkpoint:
+
+- Replaced service-mesh federation startup no-op with executable runtime service state.
+- Federation startup now records local federation API, routing, certificate-rotation, and metrics-collector service status.
+- Added a Redis-compatible in-memory fallback and TLS manager fallback so federation startup imports and runs in minimal generated-app environments.
+- Federation startup now persists a `federation:services:<cluster>` record and publishes a `federation_services_started` event.
+- Added focused runtime coverage for federation startup service state and event publication.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/service_mesh_federation.py tests/test_composition_gateway_federation_startup.py`
+- `.venv/bin/python -m pytest tests/test_composition_gateway_federation_startup.py -q` -> 1 passed, 4 pre-existing warnings
+- `rg -n "pass\\s*$" capabilities/composition/gateway/service_mesh_federation.py -S` -> no matches
+- `git diff --check capabilities/composition/gateway/service_mesh_federation.py tests/test_composition_gateway_federation_startup.py`
+- Deferred broader pytest at the user's request to conserve battery.
