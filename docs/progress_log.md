@@ -8051,3 +8051,7 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_lint_json_reports_valid_apg_file_without_generation tests/test_compiler_baseline.py::test_cli_lint_catalog_uses_shared_semantic_model_for_capability_resolution tests/test_compiler_baseline.py::test_cli_lint_catalog_reports_unknown_declared_capability tests/test_compiler_baseline.py::test_cli_lint_directory_json_aggregates_apg_files_deterministically -q` passed with 4 tests.
 - `.venv/bin/apg lint examples/08_basic_capability_contract/main.apg --json` passed with `apg.lint-report.v1`, `semantic_model_available=true`, and 0 diagnostics.
 - `git diff --check -- cli/lint_command.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `da0f457` (`Validate capability catalogs through lint`).
