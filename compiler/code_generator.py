@@ -176,6 +176,7 @@ class PythonCodeGenerator:
 			"Dockerfile": self._generate_python_dockerfile(ast),
 			"README.md": self._generate_python_readme(ast),
 			"requirements.txt": self._generate_python_requirements(),
+			"smoke_test.py": self._generate_python_smoke_test(),
 		}
 		files.update(self._generate_ai_agent_files(ast))
 		files.update(self._generate_capability_files(ast))
@@ -492,12 +493,14 @@ def component_manifest() -> Dict[str, Any]:
                 "Dockerfile",
                 ".dockerignore",
                 ".env.example",
+                "smoke_test.py",
             ],
             "commands": {{
                 "run": "python app.py",
                 "describe": "python app.py --describe",
                 "validate": "python app.py --validate",
                 "self_test": "python app.py --self-test",
+                "smoke_test": "python smoke_test.py",
             }},
             "environment": ["APG_HOST", "APG_PORT", "APG_DATA_FILE", "APG_API_KEY", "APG_DEBUG"],
         }},
@@ -631,6 +634,7 @@ def openapi_document() -> Dict[str, Any]:
         "/health": {{"get": _api_operation("Application health", "Health report")}},
         "/component.json": {{"get": _api_operation("Composable component manifest", "APG component manifest")}},
         "/manifest": {{"get": _api_operation("Application manifest", "APG manifest")}},
+        "/openapi.json": {{"get": _api_operation("OpenAPI contract", "OpenAPI 3.1 contract")}},
         "/validate": {{"get": _api_operation("Application validation", "Validation report")}},
         "/events": {{"get": _api_operation("Record mutation events", "Event log")}},
         "/auth": {{"get": _api_operation("Authentication status", "Authentication mode")}},
@@ -1637,6 +1641,35 @@ APG_PORT=8080
 APG_DEBUG=0
 """
 
+	def _generate_python_smoke_test(self) -> str:
+		"""Generate a standalone smoke test for generated app artifacts."""
+		return '''"""Standalone smoke test for an APG generated Python application."""
+
+from __future__ import annotations
+
+import json
+
+import app
+
+
+def main() -> int:
+    report = app.self_test()
+    print(json.dumps(report, indent=2, sort_keys=True))
+    if not report["passed"]:
+        return 1
+    component = app.component_manifest()
+    required_routes = {"/health", "/self-test", "/component.json", "/openapi.json"}
+    missing_routes = sorted(required_routes.difference(component["interfaces"]["http"]["paths"]))
+    if missing_routes:
+        print(json.dumps({"missing_routes": missing_routes}, indent=2, sort_keys=True))
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
+
 	def _generate_python_readme(self, module: ModuleDeclaration) -> str:
 		"""Generate a runbook for the dependency-free Python target."""
 		agents = [entity for entity in module.entities if isinstance(entity, AIAgentDeclaration)]
@@ -1662,6 +1695,7 @@ APG_DEBUG=0
 			"",
 			"```bash",
 			"python app.py --self-test",
+			"python smoke_test.py",
 			"python app.py --describe",
 			"python app.py --validate",
 			"```",
@@ -1701,6 +1735,7 @@ APG_DEBUG=0
 			"- `Dockerfile` - standard-library Python container entrypoint",
 			"- `.dockerignore` - container build exclusions",
 			"- `.env.example` - documented runtime environment variables",
+			"- `smoke_test.py` - standalone generated app smoke test",
 		]
 
 		if entities:

@@ -5759,3 +5759,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `fa8f8af` (`Fail generated CLI health checks on invalid apps`) to `origin/main`.
+
+### 2026-05-28 08:03 EAT
+
+Completed checkpoint:
+
+- Added standalone generated app smoke-test artifacts.
+- Generated outputs now include `smoke_test.py`.
+- Generated component manifests list `smoke_test.py` as a deployment artifact and `python smoke_test.py` as a deployment command.
+- Generated READMEs now document `python smoke_test.py` and list the smoke-test artifact.
+- Smoke tests execute generated `self_test()`, verify required component routes, and return nonzero when generated validation fails.
+- Added focused regression coverage for generated smoke-test syntax, successful CLI-compiled smoke-test execution, failing invalid-app smoke-test execution, and `/openapi.json` route inclusion in component manifests.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py -q` -> 28 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated smoke-test artifact slice.

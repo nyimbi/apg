@@ -734,3 +734,15 @@ def test_generated_app_cli_fails_when_validation_or_self_test_fails(tmp_path):
     assert self_test.returncode == 1
     assert self_test_report["passed"] is False
     assert self_test_report["checks"]["validation"]["valid"] is False
+
+    smoke = subprocess.run(
+        [sys.executable, "smoke_test.py"],
+        cwd=app_dir,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    smoke_report = json.loads(smoke.stdout)
+
+    assert smoke.returncode == 1
+    assert smoke_report["passed"] is False

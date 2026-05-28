@@ -84,10 +84,12 @@ def test_documented_python_target_generates_executable_application_files():
 	assert ".env.example" in result.generated_files
 	assert "Dockerfile" in result.generated_files
 	assert "README.md" in result.generated_files
+	assert "smoke_test.py" in result.generated_files
 	app = result.generated_files["app.py"]
 	dockerfile = result.generated_files["Dockerfile"]
 	env_example = result.generated_files[".env.example"]
 	readme = result.generated_files["README.md"]
+	smoke_test = result.generated_files["smoke_test.py"]
 	assert "APG Python Application" in app
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in app
@@ -99,10 +101,13 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "python app.py --self-test" in dockerfile
 	assert "APG_PORT=8080" in env_example
 	assert "python app.py --self-test" in readme
+	assert "python smoke_test.py" in readme
 	assert "GET /component.json" in readme
 	assert "docker build -t apg-generated-app ." in readme
 	assert "POST /agents/Planner/invoke" in readme
+	assert "component_manifest" in smoke_test
 	compile(app, "app.py", "exec")
+	compile(smoke_test, "smoke_test.py", "exec")
 
 
 def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path):
@@ -240,6 +245,7 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	assert component["kind"] == "apg.application"
 	assert component["deployment"]["commands"]["self_test"] == "python app.py --self-test"
 	assert "/agents/Planner/invoke" in component["interfaces"]["http"]["paths"]
+	assert "/openapi.json" in component["interfaces"]["http"]["paths"]
 	assert agents["agents"]["Planner"]["runtime"] == "codex"
 	assert invocation["agent"] == "Planner"
 	assert invocation["status"] == "adapter_required"
@@ -776,19 +782,30 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert (output / ".dockerignore").exists()
 	assert (output / ".env.example").exists()
 	assert (output / "README.md").exists()
+	assert (output / "smoke_test.py").exists()
 	app = (output / "app.py").read_text(encoding="utf-8")
 	dockerfile = (output / "Dockerfile").read_text(encoding="utf-8")
 	env_example = (output / ".env.example").read_text(encoding="utf-8")
 	readme = (output / "README.md").read_text(encoding="utf-8")
 	requirements = (output / "requirements.txt").read_text(encoding="utf-8")
+	smoke = subprocess.run(
+		[sys.executable, "smoke_test.py"],
+		cwd=output,
+		check=False,
+		capture_output=True,
+		text=True,
+	)
 	assert "APG Python Application" in app
 	assert "HTTPServer" in app
 	assert "HEALTHCHECK" in dockerfile
 	assert "APG_HOST=127.0.0.1" in env_example
 	assert "python app.py --self-test" in readme
+	assert "python smoke_test.py" in readme
 	assert "GET /component.json" in readme
 	assert "Dockerfile" in readme
 	assert "GET /openapi.json" in readme
+	assert smoke.returncode == 0
+	assert json.loads(smoke.stdout)["passed"] is True
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in requirements
 	assert "standard library" in requirements
