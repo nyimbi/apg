@@ -8333,3 +8333,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile tests/test_compiler_baseline.py` passed.
 - `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers` passed with 1 test.
 - `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_examples_parseable.py` passed with 92 tests.
+
+### 2026-05-29 00:59 EAT
+
+Executable orchestration connector slice:
+
+- Replaced the GCP storage upload placeholder with a real `bucket(...).blob(...).upload_from_string(...)` path that handles text and bytes payloads and returns upload metadata.
+- Added dependency-light regression coverage for GCP upload behavior using fake storage clients and SDK stubs, including lazy storage-client initialization.
+- Fixed Pydantic v2 compatibility for orchestration connector/designer/management models by replacing removed `regex=` field constraints with `pattern=`.
+- Updated FastAPI query constraints in orchestration API search parameters to use `pattern=`.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/orchestration/connectors/base_connector.py capabilities/composition/orchestration/connectors/cloud_connector.py capabilities/composition/orchestration/connectors/file_connector.py capabilities/composition/orchestration/connectors/rest_connector.py capabilities/composition/orchestration/connectors/database_connector.py capabilities/composition/orchestration/management/workflow_manager.py capabilities/composition/orchestration/designer/component_library.py capabilities/composition/orchestration/designer/designer_service.py capabilities/composition/orchestration/designer/canvas_engine.py capabilities/composition/orchestration/api.py tests/test_orchestration_cloud_connector_gcp_upload.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_orchestration_cloud_connector_gcp_upload.py` passed with 2 tests.
+- `rg -n "regex=" capabilities/composition/orchestration -g '*.py'` found no remaining Pydantic/FastAPI regex keyword usage.
+- `rg -n "For now, return a placeholder|GCS upload operation would be implemented here|would be implemented here" capabilities/composition/orchestration/connectors/cloud_connector.py tests/test_orchestration_cloud_connector_gcp_upload.py` found no stale GCP upload placeholder text.
+- `git diff --check --` for the connector/runtime slice passed.

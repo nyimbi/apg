@@ -78,7 +78,7 @@ class ConnectorConfiguration(BaseModel):
 	user_id: str = Field(..., description="User who configured the connector")
 	tags: Dict[str, str] = Field(default_factory=dict)
 	custom_headers: Dict[str, str] = Field(default_factory=dict)
-	environment: str = Field(default="production", regex="^(development|staging|production)$")
+	environment: str = Field(default="production", pattern="^(development|staging|production)$")
 	created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 	updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

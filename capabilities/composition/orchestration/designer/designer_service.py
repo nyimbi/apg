@@ -54,10 +54,10 @@ class DesignerConfiguration(BaseModel):
 	collaboration_timeout: int = Field(default=300, ge=60, le=3600, description="Collaboration session timeout")
 	
 	# UI preferences
-	theme: str = Field(default="light", regex="^(light|dark|auto)$", description="UI theme")
+	theme: str = Field(default="light", pattern="^(light|dark|auto)$", description="UI theme")
 	minimap_enabled: bool = Field(default=True, description="Show minimap")
-	property_panel_position: str = Field(default="right", regex="^(left|right|bottom)$", description="Property panel position")
-	component_panel_position: str = Field(default="left", regex="^(left|right|top)$", description="Component panel position")
+	property_panel_position: str = Field(default="right", pattern="^(left|right|bottom)$", description="Property panel position")
+	component_panel_position: str = Field(default="left", pattern="^(left|right|top)$", description="Component panel position")
 	
 	# Advanced features
 	enable_ai_suggestions: bool = Field(default=True, description="Enable AI-powered suggestions")

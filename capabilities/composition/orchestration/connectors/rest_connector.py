@@ -28,7 +28,7 @@ class RESTConfiguration(ConnectorConfiguration):
 	"""Configuration for REST API connector."""
 	
 	base_url: HttpUrl = Field(..., description="Base URL for REST API")
-	authentication_type: str = Field(default="none", regex="^(none|basic|bearer|oauth2|api_key)$")
+	authentication_type: str = Field(default="none", pattern="^(none|basic|bearer|oauth2|api_key)$")
 	username: Optional[str] = Field(default=None)
 	password: Optional[str] = Field(default=None)
 	api_key: Optional[str] = Field(default=None)
@@ -52,7 +52,7 @@ class GraphQLConfiguration(ConnectorConfiguration):
 	"""Configuration for GraphQL connector."""
 	
 	endpoint_url: HttpUrl = Field(..., description="GraphQL endpoint URL")
-	authentication_type: str = Field(default="none", regex="^(none|basic|bearer|oauth2|api_key)$")
+	authentication_type: str = Field(default="none", pattern="^(none|basic|bearer|oauth2|api_key)$")
 	username: Optional[str] = Field(default=None)
 	password: Optional[str] = Field(default=None)
 	api_key: Optional[str] = Field(default=None)

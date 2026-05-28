@@ -41,14 +41,14 @@ class FileSystemConfiguration(ConnectorConfiguration):
 	
 	base_path: str = Field(..., description="Base directory path")
 	create_base_path: bool = Field(default=True, description="Create base path if it doesn't exist")
-	permissions: str = Field(default="755", regex="^[0-7]{3}$")
+	permissions: str = Field(default="755", pattern="^[0-7]{3}$")
 	enable_compression: bool = Field(default=False)
-	compression_format: str = Field(default="gzip", regex="^(gzip|zip)$")
+	compression_format: str = Field(default="gzip", pattern="^(gzip|zip)$")
 	max_file_size_mb: int = Field(default=100, ge=1, le=10000)
 	allowed_extensions: List[str] = Field(default_factory=list)
 	blocked_extensions: List[str] = Field(default_factory=lambda: [".exe", ".bat", ".sh", ".cmd"])
 	enable_versioning: bool = Field(default=False)
-	checksum_algorithm: str = Field(default="sha256", regex="^(md5|sha1|sha256|sha512)$")
+	checksum_algorithm: str = Field(default="sha256", pattern="^(md5|sha1|sha256|sha512)$")
 
 class FTPConfiguration(ConnectorConfiguration):
 	"""FTP/FTPS configuration."""
@@ -62,7 +62,7 @@ class FTPConfiguration(ConnectorConfiguration):
 	encoding: str = Field(default="utf-8")
 	timeout: int = Field(default=30, ge=1, le=300)
 	base_path: str = Field(default="/", description="Base directory on FTP server")
-	transfer_mode: str = Field(default="binary", regex="^(binary|ascii)$")
+	transfer_mode: str = Field(default="binary", pattern="^(binary|ascii)$")
 
 class SFTPConfiguration(ConnectorConfiguration):
 	"""SFTP configuration."""
@@ -90,8 +90,8 @@ class S3Configuration(ConnectorConfiguration):
 	use_ssl: bool = Field(default=True)
 	verify_ssl: bool = Field(default=True)
 	prefix: str = Field(default="", description="Key prefix for all objects")
-	server_side_encryption: Optional[str] = Field(default=None, regex="^(AES256|aws:kms)$")
-	storage_class: str = Field(default="STANDARD", regex="^(STANDARD|REDUCED_REDUNDANCY|STANDARD_IA|ONEZONE_IA|INTELLIGENT_TIERING|GLACIER|DEEP_ARCHIVE)$")
+	server_side_encryption: Optional[str] = Field(default=None, pattern="^(AES256|aws:kms)$")
+	storage_class: str = Field(default="STANDARD", pattern="^(STANDARD|REDUCED_REDUNDANCY|STANDARD_IA|ONEZONE_IA|INTELLIGENT_TIERING|GLACIER|DEEP_ARCHIVE)$")
 	multipart_threshold: int = Field(default=64, ge=5, le=5000, description="Multipart upload threshold (MB)")
 	max_concurrency: int = Field(default=10, ge=1, le=100)
 

@@ -76,7 +76,7 @@ class ComponentDefinition(BaseModel):
 	properties: List[ComponentProperty] = Field(default_factory=list, description="Configurable properties")
 	
 	# Behavior
-	execution_type: str = Field(default="sync", regex="^(sync|async|stream)$", description="Execution type")
+	execution_type: str = Field(default="sync", pattern="^(sync|async|stream)$", description="Execution type")
 	timeout: Optional[int] = Field(default=None, ge=1, description="Execution timeout in seconds")
 	retries: int = Field(default=0, ge=0, le=10, description="Number of retries")
 	

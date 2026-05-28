@@ -69,8 +69,8 @@ class WorkflowSearchFilter(BaseModel):
 	category: Optional[str] = Field(default=None)
 	limit: int = Field(default=100, ge=1, le=1000)
 	offset: int = Field(default=0, ge=0)
-	sort_by: str = Field(default="updated_at", regex="^(name|created_at|updated_at|status|priority)$")
-	sort_order: str = Field(default="desc", regex="^(asc|desc)$")
+	sort_by: str = Field(default="updated_at", pattern="^(name|created_at|updated_at|status|priority)$")
+	sort_order: str = Field(default="desc", pattern="^(asc|desc)$")
 
 class WorkflowValidationResult(BaseModel):
 	"""Result of workflow validation."""

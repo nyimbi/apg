@@ -446,16 +446,27 @@ class GCPConnector(BaseConnector):
 	
 	async def storage_upload_blob(self, bucket_name: str, blob_name: str, data: Union[str, bytes], content_type: Optional[str] = None) -> Dict[str, Any]:
 		"""Upload blob to Google Cloud Storage."""
-		params = {
+		if "storage" not in self.clients:
+			await self._initialize_service_client("storage")
+
+		storage_client = self.clients["storage"]
+		bucket = storage_client.bucket(bucket_name)
+		blob = bucket.blob(blob_name)
+		upload_payload = data.encode("utf-8") if isinstance(data, str) else data
+		blob.upload_from_string(upload_payload, content_type=content_type)
+
+		return {
+			"bucket": bucket_name,
+			"blob": blob_name,
+			"content_type": content_type,
+			"size_bytes": len(upload_payload),
+			"generation": getattr(blob, "generation", None),
+			"md5_hash": getattr(blob, "md5_hash", None),
+			"public_url": getattr(blob, "public_url", None),
+			"uploaded_at": datetime.now(timezone.utc).isoformat(),
 			"service": "storage",
-			"method": "bucket",
-			"kwargs": {"bucket_name": bucket_name}
+			"method": "upload_from_string",
 		}
-		
-		# This would need to be implemented as a custom operation
-		# since GCS operations are more complex than a simple method call
-		# For now, return a placeholder
-		return {"message": "GCS upload operation would be implemented here"}
 
 # Export cloud connector classes
 __all__ = [

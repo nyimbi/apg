@@ -64,7 +64,7 @@ class CanvasConnection(BaseModel):
 	# Visual properties
 	color: str = Field(default="#7f8c8d", description="Connection color")
 	width: float = Field(default=2.0, ge=1.0, le=10.0, description="Connection width")
-	style: str = Field(default="solid", regex="^(solid|dashed|dotted)$", description="Connection style")
+	style: str = Field(default="solid", pattern="^(solid|dashed|dotted)$", description="Connection style")
 	
 	# Path data for custom routing
 	path_points: List[Dict[str, float]] = Field(default_factory=list, description="Custom path points")
