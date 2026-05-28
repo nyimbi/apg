@@ -382,6 +382,37 @@ def get_capability(name: str) -> CapabilitySpec:
     return CAPABILITIES[name]
 
 
+def describe_capability(name: str) -> Dict[str, Any]:
+    capability = get_capability(name)
+    return {{
+        "name": capability.name,
+        "contract": dict(capability.contract),
+        "provides": list(capability.provides),
+        "requires": list(capability.requires),
+        "configuration": dict(capability.configuration),
+        "rules": [dict(rule) for rule in capability.rules],
+        "rule_engine": dict(capability.rule_engine),
+        "ui": dict(capability.ui),
+        "theme": dict(capability.theme),
+        "runtime": dict(capability.runtime),
+        "erp_modules": list(capability.erp_modules),
+        "components": capability.components,
+        "business_rules": [dict(rule) for rule in capability.business_rules],
+        "approvals": capability.approvals,
+        "master_data": capability.master_data,
+        "i18n": dict(capability.i18n),
+        "streaming": dict(capability.streaming),
+        "screens": capability.screens,
+    }}
+
+
+def describe_capabilities() -> Dict[str, Dict[str, Any]]:
+    return {{
+        name: describe_capability(name)
+        for name in list_capabilities()
+    }}
+
+
 def capabilities_by_erp_module() -> Dict[str, List[CapabilitySpec]]:
     grouped: Dict[str, List[CapabilitySpec]] = {{}}
     for capability in CAPABILITIES.values():
@@ -1562,11 +1593,21 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    ])',
 			'',
 			'try:',
-			'    from .apg_capabilities import get_capability, list_capabilities',
+			'    from .apg_capabilities import (',
+			'        describe_capabilities,',
+			'        describe_capability,',
+			'        get_capability,',
+			'        list_capabilities,',
+			'    )',
 			'except ImportError:',
 			'    pass',
 			'else:',
-			'    __all__.extend(["get_capability", "list_capabilities"])',
+			'    __all__.extend([',
+			'        "describe_capabilities",',
+			'        "describe_capability",',
+			'        "get_capability",',
+			'        "list_capabilities",',
+			'    ])',
 		])
 		
 		return '\n'.join(lines)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 
 from compiler.ast_builder import ASTBuilder, CapabilityDeclaration
@@ -196,6 +197,17 @@ def test_capability_declaration_generates_runtime_manifest():
     assert namespace["list_capabilities"]() == ["GeneralLedger"]
     capability = namespace["get_capability"]("GeneralLedger")
     assert capability.provides == ["journal_entries", "chart_of_accounts", "financial_periods"]
+    capability_description = namespace["describe_capability"]("GeneralLedger")
+    assert capability_description["name"] == "GeneralLedger"
+    assert capability_description["provides"] == ["journal_entries", "chart_of_accounts", "financial_periods"]
+    assert capability_description["configuration"] == {"currency": "KES", "fiscal_calendar": "monthly"}
+    assert capability_description["theme"]["tokens"]["accent"] == "#126E82"
+    assert namespace["describe_capabilities"]()["GeneralLedger"]["erp_modules"] == [
+        "finance",
+        "general_ledger",
+        "accounts_payable",
+    ]
+    assert json.loads(json.dumps(capability_description))["name"] == "GeneralLedger"
     assert namespace["capabilities_by_erp_module"]()["general_ledger"][0].name == "GeneralLedger"
     assert namespace["provided_services"]()["journal_entries"] == ["GeneralLedger"]
 

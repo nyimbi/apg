@@ -5066,3 +5066,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `2b76f5d` (`Serialize generated AI agent descriptions`) to `origin/main`.
+
+### 2026-05-28 05:19 EAT
+
+Completed checkpoint:
+
+- Made generated capability runtimes expose serializable `describe_capability()` and `describe_capabilities()` helpers.
+- Preserved typed `get_capability()` access while adding plain dictionary metadata for generated application/package consumers.
+- Reexported generated capability description helpers from generated package `__init__.py` when `apg_capabilities.py` is present.
+- Added focused regression coverage proving generated capability descriptions can round-trip through JSON.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 5 passed
+- Direct serialization smoke check for generated `describe_capability("GeneralLedger")` -> JSON round-trip preserved theme accent `#126E82`
+- `git diff --check -- compiler/code_generator.py tests/test_capability_composition_runtime.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push.
