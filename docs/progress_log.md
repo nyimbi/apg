@@ -6928,3 +6928,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_parser.py::TestAPGParser::test_database_parsing tests/test_semantic_analyzer.py::TestSemanticAnalyzer::test_database_validation -q` -> 2 passed, 1 pre-existing warning
 - `git diff --check compiler/ast_builder.py compiler/code_generator.py tests/test_compiler_database_ast.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:40 EAT
+
+Completed checkpoint:
+
+- Added a generated database catalog runtime API so compiled APG applications expose database schemas directly instead of only through generic entity metadata.
+- Generated applications now provide `list_databases()`, include `databases` in `describe_application()` and `component_manifest()`, and serve `/databases` plus `/databases/{Database}/schemas`.
+- Generated OpenAPI now advertises database catalog and per-database schema endpoints.
+- Added focused regression coverage for generated database catalog functions, routes, unknown-database handling, and OpenAPI paths.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 4 passed
+- `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
+- Deferred broader pytest at the user's request to conserve battery.

@@ -293,6 +293,10 @@ def list_entities() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES]
 
 
+def list_databases() -> list[Dict[str, Any]]:
+    return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+
+
 def list_records(entity_name: str | None = None) -> Dict[str, list[Dict[str, Any]]] | list[Dict[str, Any]]:
     if entity_name is None:
         return {{
@@ -559,6 +563,7 @@ def component_manifest() -> Dict[str, Any]:
             "theme": "/theme.css",
         }},
         "entities": list_entities(),
+        "databases": list_databases(),
         "ai_agents": app.get("ai_agents", []),
         "ai_agent_teams": app.get("ai_agent_teams", []),
         "application_compositions": app.get("application_compositions", []),
@@ -726,6 +731,7 @@ def openapi_document() -> Dict[str, Any]:
         "/self-test": {{"get": _api_operation("Application self-test", "Self-test report")}},
         "/theme.css": {{"get": _api_operation("Generated visual theme stylesheet", "CSS theme stylesheet")}},
         "/records": {{"get": _api_operation("All entity records", "Records by entity")}},
+        "/databases": {{"get": _api_operation("Database catalog", "Database schema and connection metadata")}},
         "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph")}},
         "/storage": {{"get": _api_operation("Record storage status", "Storage status")}},
         "/ui": {{"get": _api_operation("Generated application UI", "HTML application index")}},
@@ -760,6 +766,10 @@ def openapi_document() -> Dict[str, Any]:
         paths[f"/ui/entities/{{entity_name}}"] = {{
             "get": _api_operation(f"Generated {{entity_name}} UI", "HTML entity screen"),
         }}
+        if entity.get("type") == "database":
+            paths[f"/databases/{{entity_name}}/schemas"] = {{
+                "get": _api_operation(f"{{entity_name}} database schemas", "Database schema metadata"),
+            }}
     if APG_CAPABILITIES is not None:
         paths["/rules/evaluate"] = {{"post": _api_operation("Evaluate capability rules", "Rule decision", request_body=True)}}
         paths["/configuration/resolve"] = {{"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True)}}
@@ -813,6 +823,7 @@ def describe_application() -> Dict[str, Any]:
         "version": MODULE_VERSION,
         "description": MODULE_DESCRIPTION,
         "entities": list_entities(),
+        "databases": list_databases(),
     }}
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents"):
         description["ai_agents"] = AI_AGENTS.list_agents()
@@ -1805,6 +1816,17 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, openapi_document()
     if path == "/entities":
         return 200, {{"entities": list_entities()}}
+    if path == "/databases":
+        return 200, {{"databases": list_databases()}}
+    if path.startswith("/databases/") and path.endswith("/schemas"):
+        database_name = path.strip("/").split("/")[1]
+        for database in list_databases():
+            if str(database.get("name")) == database_name:
+                return 200, {{
+                    "database": database_name,
+                    "schemas": database.get("schemas", []),
+                }}
+        return 404, {{"error": "unknown_database", "database": database_name}}
     if path == "/auth":
         return 200, auth_status()
     if path == "/events":
@@ -4203,7 +4225,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import auth_status, coerce_record_types, component_manifest, create_record, delete_record, describe_application, get_record, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, self_test, storage_status, update_record, validate_application, validate_record',
+			'from .app import auth_status, coerce_record_types, component_manifest, create_record, delete_record, describe_application, get_record, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, self_test, storage_status, update_record, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
@@ -4214,6 +4236,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    "delete_record",',
 			'    "describe_application",',
 			'    "get_record",',
+			'    "list_databases",',
 			'    "list_entities",',
 			'    "list_events",',
 			'    "list_records",',

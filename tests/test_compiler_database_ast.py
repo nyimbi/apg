@@ -148,3 +148,31 @@ def test_generated_python_metadata_preserves_database_schema_details():
 		"relationship": "many_to_one",
 		"target_column": "id",
 	} in relationship_edges
+
+
+def test_generated_python_exposes_database_catalog_routes_and_openapi():
+	parse_result = APGParser().parse_string(DATABASE_SOURCE, "database.apg")
+	ast = ASTBuilder().build_ast(parse_result["parse_tree"], "database.apg")
+
+	files = PythonCodeGenerator(CodeGenConfig(use_composable_templates=False)).generate(ast)
+	namespace = {}
+	exec(files["app.py"], namespace)
+
+	assert namespace["list_databases"]()[0]["name"] == "LedgerDB"
+	assert namespace["describe_application"]()["databases"][0]["name"] == "LedgerDB"
+
+	status, payload = namespace["_route_payload"]("/databases")
+	assert status == 200
+	assert payload["databases"][0]["schemas"][0]["name"] == "accounting"
+
+	status, payload = namespace["_route_payload"]("/databases/LedgerDB/schemas")
+	assert status == 200
+	assert payload["schemas"][0]["tables"][0]["name"] == "journals"
+
+	status, payload = namespace["_route_payload"]("/databases/Missing/schemas")
+	assert status == 404
+	assert payload == {"error": "unknown_database", "database": "Missing"}
+
+	openapi = namespace["openapi_document"]()
+	assert "/databases" in openapi["paths"]
+	assert "/databases/LedgerDB/schemas" in openapi["paths"]
