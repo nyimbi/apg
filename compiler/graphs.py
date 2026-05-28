@@ -377,10 +377,28 @@ def _entity_relationship_graph(module: ModuleDeclaration, path: Path) -> APGGrap
 						)
 						edges.append(GraphEdge(table_id, column_id, "owns_column", "column"))
 						if column.reference:
-							target = f"table:{column.reference.split('.', 1)[0]}"
-							edges.append(GraphEdge(column_id, target, "references", "references"))
+							target_table = _database_reference_table(column.reference)
+							if target_table:
+								edges.append(
+									GraphEdge(
+										column_id,
+										f"table:{target_table}",
+										"references",
+										"references",
+										{"target_column": column.reference.get("column", "")},
+									)
+								)
 
 	return APGGraph("er", str(path), _sorted_nodes(nodes), _sorted_edges(edges))
+
+
+def _database_reference_table(reference: dict[str, str] | str) -> str:
+	"""Return the referenced table from current or legacy column reference shapes."""
+	if isinstance(reference, dict):
+		return str(reference.get("table", ""))
+	if isinstance(reference, str):
+		return reference.split(".", 1)[0]
+	return ""
 
 
 def _agent_graph(module: ModuleDeclaration, path: Path) -> APGGraph:

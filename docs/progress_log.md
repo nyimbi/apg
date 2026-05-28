@@ -8462,3 +8462,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q tests/test_common_colb_chat_messages.py` passed with 2 tests.
 - `rg -n "For now, return mock data|In real implementation, would fetch from database|User 1|User 2|How can I help with this form" capabilities/common/colb/service.py tests/test_common_colb_chat_messages.py` found no stale COLB chat mock text.
 - `git diff --check -- capabilities/common/colb/models.py capabilities/common/colb/service.py tests/test_common_colb_chat_messages.py` passed.
+
+### 2026-05-29 01:53 EAT
+
+Compiler serviceability baseline repair:
+
+- Confirmed the focused compiler baseline initially failed: 94 tests passed and 7 database code-generation tests failed.
+- Root cause was `compiler/graphs.py` assuming database column references were legacy strings while the current AST carries structured reference dictionaries.
+- Updated entity relationship graph generation to read the current structured database reference shape while retaining compatibility with legacy string references.
+- Confirmed the documented Python compiler target can compile and verify a representative example through the Click CLI.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/*.py cli/*.py` passed.
+- `.venv/bin/python -m py_compile compiler/graphs.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_compiler_database_ast.py` passed with 9 tests.
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_compiler_database_ast.py tests/test_examples_parseable.py` passed with 101 tests.
+- `.venv/bin/python cli/main.py compile examples/01_minimal_customer_records/main.apg --output /private/tmp/apg_compiler_probe --verify` generated 9 files and passed generated self-test plus smoke test.
