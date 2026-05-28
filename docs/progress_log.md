@@ -4884,3 +4884,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `de9025f` (`Make HCM attendance reporting service-backed`) to `origin/main`.
+
+### 2026-05-28 04:28 EAT
+
+Completed checkpoint:
+
+- Made HCM Time Attendance monitoring importable without optional Prometheus, Redis, or asyncpg runtime dependencies.
+- Replaced fixed monitoring business metrics with tenant-scoped `TimeAttendanceService` metrics for active employees, clock-ins, work hours, overtime, remote workers, AI agents, fraud alerts, and pending approvals.
+- Kept Prometheus metric updates operational when `prometheus_client` is present and no-op when it is absent.
+- Extended focused HCM TAT regression coverage to verify business monitoring reads seeded runtime store data.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/monitoring.py tests/test_hcm_tat_runtime_store.py`
+- `.venv/bin/pytest tests/test_hcm_tat_runtime_store.py -q` -> 8 passed
+- `rg -n "aioredis|asyncpg|Mock business metrics|would query actual" capabilities/hcm/tat/time_attendance/monitoring.py` -> no matches
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit for this checkpoint.

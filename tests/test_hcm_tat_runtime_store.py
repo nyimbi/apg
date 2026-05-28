@@ -20,6 +20,7 @@ from capabilities.hcm.tat.time_attendance.mobile_api import (
 	get_mobile_user,
 	mobile_router,
 )
+from capabilities.hcm.tat.time_attendance.monitoring import BusinessMetricsMonitor
 from capabilities.hcm.tat.time_attendance.models import (
 	AIAgentType,
 	LeaveType,
@@ -280,6 +281,24 @@ def test_reporting_generator_uses_service_runtime_store():
 	assert ai_agents["success"] is True
 	assert ai_agents["data"]["report_data"]["summary"]["total_agents"] == 1
 	assert ai_agents["data"]["report_data"]["summary"]["total_tasks_completed"] == 1
+
+
+def test_business_monitoring_uses_service_runtime_store():
+	TimeAttendanceService.reset_runtime_store()
+	service = TimeAttendanceService()
+	_run(_seed_runtime(service, tenant_id="tenant_monitoring"))
+	monitor = BusinessMetricsMonitor(service)
+
+	metrics = _run(monitor.collect_business_metrics("tenant_monitoring"))
+	health = _run(monitor.generate_health_report("tenant_monitoring"))
+
+	assert metrics["active_employees"] == 1
+	assert metrics["clock_in_rate_today"] == 1.0
+	assert metrics["remote_workers_active"] == 1
+	assert metrics["ai_agents_active"] == 1
+	assert metrics["approval_pending_count"] >= 1
+	assert health["tenant_id"] == "tenant_monitoring"
+	assert health["business_metrics"]["active_employees"] == 1
 
 
 def test_time_attendance_service_has_no_missing_private_helper_calls():
