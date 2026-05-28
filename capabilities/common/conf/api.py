@@ -9,10 +9,45 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 import asyncio
+import hashlib
 from typing import Dict, Any, Optional, List
 from datetime import datetime
-from flask import Flask, request, jsonify, g
-from flask_restful import Api, Resource
+from flask import Flask, abort, current_app, request, jsonify, g
+try:
+	from flask_restful import Api, Resource
+except ImportError:
+	class Resource:
+		"""Minimal flask_restful-compatible base when optional dependency is absent"""
+		pass
+
+	class Api:
+		"""Small Flask route registrar compatible with the subset used here"""
+
+		def __init__(self, app: Flask):
+			self.app = app
+
+		def add_resource(self, resource_cls, *routes: str):
+			methods = [
+				method.upper()
+				for method in ("get", "post", "put", "patch", "delete")
+				if hasattr(resource_cls, method)
+			]
+
+			def dispatch(**kwargs):
+				resource = resource_cls()
+				handler = getattr(resource, request.method.lower(), None)
+				if handler is None:
+					abort(405)
+				return current_app.ensure_sync(handler)(**kwargs)
+
+			endpoint_base = resource_cls.__name__
+			for index, route in enumerate(routes):
+				self.app.add_url_rule(
+					route,
+					endpoint=f"{endpoint_base}_{index}",
+					view_func=dispatch,
+					methods=methods or ["GET"],
+				)
 from functools import wraps
 import logging
 from uuid_extensions import uuid7str
@@ -65,11 +100,88 @@ class NaturalLanguageRequest(BaseModel):
 
 
 # API Decorators
+def _api_response(success: bool, message: str, status_code: int, errors: Optional[List[str]] = None):
+	"""Build a standard JSON API error response"""
+	return jsonify(APIResponse(
+		success=success,
+		message=message,
+		errors=errors or []
+	).model_dump()), status_code
+
+
+def _configured_api_keys() -> Dict[str, Dict[str, Any]]:
+	"""Return configured API keys keyed by token value"""
+	configured = current_app.config.get("APG_CONF_API_KEYS", {})
+	if isinstance(configured, dict):
+		return {
+			key: value if isinstance(value, dict) else {"user_id": str(value)}
+			for key, value in configured.items()
+		}
+	if isinstance(configured, list):
+		return {str(key): {"user_id": "api-key"} for key in configured}
+	return {}
+
+
+def _permissions_from_header(value: Optional[str]) -> set[str]:
+	"""Parse comma-separated permission header values"""
+	if not value:
+		return set()
+	return {
+		item.strip()
+		for item in value.split(",")
+		if item.strip()
+	}
+
+
+def _principal_from_request() -> Optional[Dict[str, Any]]:
+	"""Resolve an authenticated API principal from request headers"""
+	api_key = request.headers.get("X-API-Key")
+	configured_keys = _configured_api_keys()
+	if api_key and api_key in configured_keys:
+		config = configured_keys[api_key]
+		return {
+			"user_id": config.get("user_id", "api-key"),
+			"tenant_id": request.headers.get("X-Tenant-ID") or config.get("tenant_id"),
+			"permissions": set(config.get("permissions", [])) | _permissions_from_header(request.headers.get("X-APG-Permissions")),
+			"auth_method": "api_key"
+		}
+
+	user_id = request.headers.get("X-User-ID") or request.headers.get("X-APG-User")
+	authorization = request.headers.get("Authorization", "")
+	if authorization.startswith("Bearer "):
+		token = authorization.removeprefix("Bearer ").strip()
+		if token:
+			user_id = user_id or f"token:{hashlib.sha256(token.encode()).hexdigest()[:12]}"
+
+	if not user_id:
+		return None
+
+	return {
+		"user_id": user_id,
+		"tenant_id": request.headers.get("X-Tenant-ID") or request.headers.get("X-APG-Tenant"),
+		"permissions": _permissions_from_header(request.headers.get("X-APG-Permissions")),
+		"auth_method": "bearer" if authorization.startswith("Bearer ") else "header"
+	}
+
+
 def require_auth(f):
 	"""Decorator for API endpoints requiring authentication"""
 	@wraps(f)
 	async def decorated_function(*args, **kwargs):
-		# Placeholder for authentication logic
+		if current_app.config.get("APG_CONF_AUTH_DISABLED", False):
+			g.current_user = {
+				"user_id": "auth-disabled",
+				"tenant_id": request.headers.get("X-Tenant-ID"),
+				"permissions": {"*"},
+				"auth_method": "disabled"
+			}
+			return await f(*args, **kwargs)
+
+		principal = _principal_from_request()
+		if not principal:
+			return _api_response(False, "Authentication required", 401, ["Missing or invalid authentication headers"])
+
+		g.current_user = principal
 		return await f(*args, **kwargs)
 	return decorated_function
 
@@ -79,7 +191,19 @@ def require_permission(permission: str):
 	def decorator(f):
 		@wraps(f)
 		async def decorated_function(*args, **kwargs):
-			# Placeholder for permission checking
+			principal = getattr(g, "current_user", None)
+			if not principal:
+				principal = _principal_from_request()
+				if principal:
+					g.current_user = principal
+
+			if not principal:
+				return _api_response(False, "Authentication required", 401, ["Missing authenticated principal"])
+
+			permissions = principal.get("permissions", set())
+			if "*" not in permissions and permission not in permissions:
+				return _api_response(False, "Permission denied", 403, [f"Missing permission: {permission}"])
+
 			return await f(*args, **kwargs)
 		return decorated_function
 	return decorator

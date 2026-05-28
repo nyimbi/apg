@@ -6542,3 +6542,21 @@ Battery-conscious verification:
 - `rg -n "pass\\s*# Implementation for|return \\{\\}\\s*$|return \\[\\]\\s*$" capabilities/common/conf/universal_abstraction.py tests/test_common_conf_universal_abstraction_translations.py -S` -> no matches
 - `git diff --check capabilities/common/conf/universal_abstraction.py tests/test_common_conf_universal_abstraction_translations.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 13:32 EAT
+
+Completed checkpoint:
+
+- Replaced no-op CONF API authentication and permission decorators with executable request-context enforcement.
+- Added API-key, bearer-token, and user-header principal extraction with tenant propagation.
+- Added explicit permission checks with standard APG API error responses for missing authentication and denied permissions.
+- Added a minimal `flask_restful` compatibility fallback so the CONF API remains importable and route-registerable when the optional dependency is absent.
+- Added focused runtime coverage for missing authentication, configured API-key authentication, permission denial, and permission success.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conf/api.py tests/test_common_conf_api_auth_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_conf_api_auth_runtime.py -q` -> 3 passed, 10 pre-existing warnings
+- `rg -n "Placeholder for authentication logic|Placeholder for permission checking" capabilities/common/conf/api.py tests/test_common_conf_api_auth_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/conf/api.py tests/test_common_conf_api_auth_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
