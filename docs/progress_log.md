@@ -7404,3 +7404,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_graph_json_emits_entity_relationship_graph tests/test_compiler_baseline.py::test_cli_graph_infers_conventional_foreign_key_edges tests/test_compiler_baseline.py::test_cli_graph_mermaid_and_dot_outputs_are_renderable -q` -> 3 passed
 - `.venv/bin/apg graph examples/02_customer_orders_relationship/main.apg --kind er --format json` -> exited 0 and emitted `apg.graph.v1` with an inferred `customer_id -> Customer` edge
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 18:31 EAT
+
+Completed checkpoint:
+
+- Added shared graph-suite construction on top of `compiler.graphs`.
+- Added an executable `apg graph-suite` command that emits all supported APG graph kinds in one report.
+- Implemented `apg.graph-suite-report.v1` JSON output with per-kind JSON, Mermaid, DOT, and node/edge summaries.
+- Added text summary output for quick CLI review and updated the tooling specification baseline.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/graphs.py cli/graph_command.py cli/main.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_graph_suite_json_emits_all_supported_renderings tests/test_compiler_baseline.py::test_cli_graph_suite_text_summarizes_graph_counts tests/test_compiler_baseline.py::test_cli_graph_json_emits_entity_relationship_graph -q` -> 3 passed
+- `.venv/bin/apg graph-suite examples/02_customer_orders_relationship/main.apg --json` -> exited 0 and emitted `apg.graph-suite-report.v1`
+- `.venv/bin/apg graph-suite examples/02_customer_orders_relationship/main.apg` -> exited 0 and printed per-kind node/edge counts
+- Deferred broader pytest at the user's request to conserve battery.

@@ -25,6 +25,8 @@ APG currently has an executable compiler path:
   and applies deterministic APG whitespace formatting;
 - `apg graph <file> --kind er --format json|mermaid|dot` emits
   `apg.graph.v1` data or renderable graph text;
+- `apg graph-suite <file> --json` emits `apg.graph-suite-report.v1` with
+  every supported graph rendered as JSON, Mermaid, and DOT;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
   package exports, OpenAPI metadata, component manifests, smoke tests, and
@@ -590,6 +592,7 @@ apg format app.apg --check
 apg format app.apg --write
 apg graph app.apg --kind er --format json
 apg graph app.apg --kind agent --format mermaid
+apg graph-suite app.apg --json
 apg validate
 apg run
 apg doctor

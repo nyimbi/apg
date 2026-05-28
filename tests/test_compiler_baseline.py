@@ -1408,6 +1408,46 @@ def test_cli_graph_mermaid_and_dot_outputs_are_renderable(tmp_path):
 	assert '"field:SalesOrder.customer" -> "entity:Customer"' in dot.output
 
 
+def test_cli_graph_suite_json_emits_all_supported_renderings(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["graph-suite", str(source), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.graph-suite-report.v1"
+	assert report["ok"] is True
+	assert report["graph_kinds"] == [
+		"er",
+		"lookup",
+		"workflow",
+		"handler",
+		"capability",
+		"security",
+		"agent",
+		"deployment",
+		"package",
+	]
+	assert report["graphs"]["er"]["json"]["format"] == "apg.graph.v1"
+	assert report["graphs"]["er"]["mermaid"].startswith("graph TD")
+	assert report["graphs"]["er"]["dot"].startswith("digraph er")
+	assert report["summary"]["er"]["nodes"] >= 3
+	assert report["summary"]["er"]["edges"] >= 1
+
+
+def test_cli_graph_suite_text_summarizes_graph_counts(tmp_path):
+	source = tmp_path / "sales.apg"
+	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["graph-suite", str(source)])
+
+	assert result.exit_code == 0, result.output
+	assert "APG graph-suite OK" in result.output
+	assert "er:" in result.output
+	assert "agent:" in result.output
+
+
 def test_cli_init_describes_python_artifact_flow():
 	runner = CliRunner()
 	with runner.isolated_filesystem():

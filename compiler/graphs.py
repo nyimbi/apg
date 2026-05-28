@@ -20,6 +20,19 @@ from compiler.ast_builder import (
 from compiler.parser import APGParser
 
 
+SUPPORTED_GRAPH_KINDS = (
+	"er",
+	"lookup",
+	"workflow",
+	"handler",
+	"capability",
+	"security",
+	"agent",
+	"deployment",
+	"package",
+)
+
+
 @dataclass(frozen=True)
 class GraphNode:
 	id: str
@@ -85,6 +98,10 @@ def parse_apg_module(path: Path) -> ModuleDeclaration:
 
 def build_graph(path: Path, kind: str) -> APGGraph:
 	module = parse_apg_module(path)
+	return build_graph_from_module(module, path, kind)
+
+
+def build_graph_from_module(module: ModuleDeclaration, path: Path, kind: str) -> APGGraph:
 	normalized = kind.lower().replace("_", "-")
 	if normalized in {"er", "entity-relationship"}:
 		return _entity_relationship_graph(module, path)
@@ -95,6 +112,32 @@ def build_graph(path: Path, kind: str) -> APGGraph:
 	if normalized in {"handler", "workflow", "lookup", "security", "deployment", "package"}:
 		return _generic_entity_graph(module, path, normalized)
 	raise ValueError(f"Unsupported graph kind: {kind}")
+
+
+def build_graph_suite(path: Path) -> dict[str, Any]:
+	module = parse_apg_module(path)
+	graphs: dict[str, dict[str, Any]] = {}
+	for kind in SUPPORTED_GRAPH_KINDS:
+		graph = build_graph_from_module(module, path, kind)
+		graphs[kind] = {
+			"json": graph.to_dict(),
+			"mermaid": render_mermaid(graph),
+			"dot": render_dot(graph),
+		}
+	return {
+		"format": "apg.graph-suite-report.v1",
+		"ok": True,
+		"source": str(path),
+		"graph_kinds": list(SUPPORTED_GRAPH_KINDS),
+		"graphs": graphs,
+		"summary": {
+			kind: {
+				"nodes": len(rendered["json"]["nodes"]),
+				"edges": len(rendered["json"]["edges"]),
+			}
+			for kind, rendered in graphs.items()
+		},
+	}
 
 
 def render_mermaid(graph: APGGraph) -> str:
