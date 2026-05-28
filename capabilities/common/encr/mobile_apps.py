@@ -402,6 +402,7 @@ class MobileAppManager:
 		self.devices: Dict[str, MobileDevice] = {}
 		self.apps: Dict[str, MobileApp] = {}
 		self.operations: List[MobileEncryptionOperation] = []
+		self._app_symmetric_keys: Dict[str, bytes] = {}
 	
 	async def register_device(
 		self, 
@@ -556,35 +557,22 @@ class MobileAppManager:
 		try:
 			if device.platform == MobilePlatform.IOS:
 				if operation_type == "encrypt":
-					# Use iOS Secure Enclave if available
 					if device.has_secure_enclave:
 						key_result = await self.ios_integration.generate_secure_enclave_key(
 							key_tag=f"encryption_key_{uuid7str()}"
 						)
 						secure_element_used = True
-						
-						# Mock encryption with Secure Enclave
-						encrypted_data = hashlib.sha256(data + key_result["key_id"].encode()).digest()
-						result = {
-							"encrypted_data": base64.b64encode(encrypted_data).decode(),
-							"key_reference": key_result["keychain_ref"],
-							"algorithm": algorithm
-						}
+						result = self._encrypt_mobile_payload(app, device, data, algorithm)
+						result["key_reference"] = key_result["keychain_ref"]
 					else:
-						# Software-only encryption
-						encrypted_data = hashlib.sha256(data + secrets.token_bytes(16)).digest()
-						result = {
-							"encrypted_data": base64.b64encode(encrypted_data).decode(),
-							"algorithm": algorithm
-						}
+						result = self._encrypt_mobile_payload(app, device, data, algorithm)
 				
 				elif operation_type == "decrypt":
-					# Mock decryption operation
 					if app.biometric_enabled and device.supported_biometrics:
 						biometric_result = await self.ios_integration._simulate_biometric_auth()
 						biometric_verified = biometric_result["success"]
 					
-					decrypted_data = b"mock_decrypted_data"
+					decrypted_data = self._decrypt_mobile_payload(app, device, data)
 					result = {
 						"decrypted_data": base64.b64encode(decrypted_data).decode(),
 						"algorithm": algorithm,
@@ -593,39 +581,63 @@ class MobileAppManager:
 			
 			elif device.platform == MobilePlatform.ANDROID:
 				if operation_type == "encrypt":
-					# Use Android Keystore if available
 					if device.has_hardware_keystore:
 						keystore_result = await self.android_integration.generate_keystore_key(
 							key_alias=f"encryption_key_{uuid7str()}"
 						)
 						secure_element_used = True
-						
-						# Mock encryption with Android Keystore
 						encryption_result = await self.android_integration.encrypt_with_keystore(
 							key_alias=keystore_result["key_alias"],
 							plaintext=data
 						)
-						result = encryption_result
-					else:
-						# Software-only encryption
-						encrypted_data = hashlib.sha256(data + secrets.token_bytes(16)).digest()
 						result = {
-							"encrypted_data": base64.b64encode(encrypted_data).decode(),
-							"algorithm": algorithm
+							"encrypted_data": base64.b64encode(
+								json.dumps({
+									"envelope_version": 1,
+									"platform": device.platform.value,
+									"provider": "android_keystore",
+									"algorithm": encryption_result["algorithm"],
+									"key_alias": encryption_result["key_alias"],
+									"ciphertext": encryption_result["ciphertext"],
+									"iv": encryption_result["iv"],
+								}, sort_keys=True).encode("utf-8")
+							).decode(),
+							"ciphertext": encryption_result["ciphertext"],
+							"iv": encryption_result["iv"],
+							"key_alias": encryption_result["key_alias"],
+							"algorithm": encryption_result["algorithm"]
 						}
+					else:
+						result = self._encrypt_mobile_payload(app, device, data, algorithm)
 				
 				elif operation_type == "decrypt":
-					# Mock decryption operation
 					if app.biometric_enabled and device.supported_biometrics:
 						biometric_result = await self.android_integration._simulate_biometric_auth()
 						biometric_verified = biometric_result["success"]
 					
-					decrypted_data = b"mock_decrypted_data"
+					envelope = self._decode_mobile_envelope(data)
+					if envelope.get("provider") == "android_keystore":
+						decryption_result = await self.android_integration.decrypt_with_keystore(
+							key_alias=envelope["key_alias"],
+							ciphertext=envelope["ciphertext"],
+							iv=envelope["iv"]
+						)
+						if "error" in decryption_result:
+							raise ValueError(decryption_result["error"])
+						decrypted_data = base64.b64decode(decryption_result["plaintext"])
+					else:
+						decrypted_data = self._decrypt_mobile_payload(app, device, data)
 					result = {
 						"decrypted_data": base64.b64encode(decrypted_data).decode(),
 						"algorithm": algorithm,
 						"biometric_verified": biometric_verified
 					}
+
+			else:
+				raise ValueError(f"Unsupported mobile platform: {device.platform.value}")
+
+			if not result:
+				raise ValueError(f"Unsupported mobile encryption operation: {operation_type}")
 		
 		except Exception as e:
 			success = False
@@ -669,6 +681,71 @@ class MobileAppManager:
 			},
 			"error": error_message
 		}
+
+	def _get_app_key(self, app: MobileApp) -> bytes:
+		"""Get or create an app-scoped symmetric key for local mobile execution."""
+		key = self._app_symmetric_keys.get(app.id)
+		if key is None:
+			bit_length = 256 if app.encryption_strength in {"quantum_safe", "standard"} else 128
+			key = AESGCM.generate_key(bit_length=bit_length)
+			self._app_symmetric_keys[app.id] = key
+		return key
+
+	def _mobile_aad(self, app: MobileApp, device: MobileDevice, algorithm: str) -> bytes:
+		"""Build authenticated metadata for manager-level mobile envelopes."""
+		return json.dumps({
+			"tenant_id": self.tenant_id,
+			"app_id": app.id,
+			"device_id": device.id,
+			"platform": device.platform.value,
+			"algorithm": algorithm,
+		}, sort_keys=True).encode("utf-8")
+
+	def _encrypt_mobile_payload(
+		self,
+		app: MobileApp,
+		device: MobileDevice,
+		plaintext: bytes,
+		algorithm: str
+	) -> Dict[str, Any]:
+		"""Encrypt manager-level mobile data into a decryptable envelope."""
+		nonce = secrets.token_bytes(12)
+		aad = self._mobile_aad(app, device, algorithm)
+		ciphertext = AESGCM(self._get_app_key(app)).encrypt(nonce, plaintext, aad)
+		envelope = {
+			"envelope_version": 1,
+			"platform": device.platform.value,
+			"provider": "mobile_app_manager",
+			"algorithm": algorithm,
+			"ciphertext": base64.b64encode(ciphertext).decode(),
+			"iv": base64.b64encode(nonce).decode(),
+		}
+		return {
+			"encrypted_data": base64.b64encode(json.dumps(envelope, sort_keys=True).encode("utf-8")).decode(),
+			"ciphertext": envelope["ciphertext"],
+			"iv": envelope["iv"],
+			"algorithm": algorithm
+		}
+
+	def _decrypt_mobile_payload(self, app: MobileApp, device: MobileDevice, encrypted_data: bytes) -> bytes:
+		"""Decrypt a manager-level mobile envelope."""
+		envelope = self._decode_mobile_envelope(encrypted_data)
+		if envelope.get("provider") != "mobile_app_manager":
+			raise ValueError(f"Unsupported mobile encryption provider: {envelope.get('provider')}")
+		algorithm = envelope.get("algorithm", app.encryption_strength)
+		return AESGCM(self._get_app_key(app)).decrypt(
+			base64.b64decode(envelope["iv"]),
+			base64.b64decode(envelope["ciphertext"]),
+			self._mobile_aad(app, device, algorithm)
+		)
+
+	def _decode_mobile_envelope(self, encrypted_data: bytes) -> Dict[str, Any]:
+		"""Decode an encrypted mobile operation envelope from bytes."""
+		try:
+			raw = base64.b64decode(encrypted_data)
+			return json.loads(raw.decode("utf-8"))
+		except Exception as exc:
+			raise ValueError("Mobile decrypt expects encrypted_data returned by an encrypt operation") from exc
 	
 	async def sync_with_cloud(self, app_id: str) -> Dict[str, Any]:
 		"""Synchronize mobile app data with cloud backend"""

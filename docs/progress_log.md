@@ -6365,3 +6365,21 @@ Battery-conscious verification:
 - `rg -n "decrypted_data_placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:17 EAT
+
+Completed checkpoint:
+
+- Made the ENCR cross-platform mobile app manager encrypt/decrypt executable instead of returning fixed `mock_decrypted_data`.
+- Manager-level iOS and software-backed Android operations now use app-scoped AES-GCM envelopes with tenant, app, device, platform, and algorithm authenticated metadata.
+- Hardware-backed Android manager operations now package Android Keystore ciphertext/IV/key-alias metadata into a decryptable envelope and delegate decryption back through the keystore.
+- Unsupported platforms and unsupported operation types now fail visibly instead of returning an empty successful result.
+- Added focused regression coverage for Android hardware-backed manager round trips and iOS software manager round trips.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_encr_mobile_apps_runtime.py -q` -> 4 passed, 11 pre-existing warnings
+- `rg -n "mock_decrypted_data|decrypted_data_placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.

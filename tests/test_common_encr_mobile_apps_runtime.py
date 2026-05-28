@@ -2,7 +2,12 @@ import base64
 
 import pytest
 
-from capabilities.common.encr.mobile_apps import AndroidKeystoreConfig, AndroidNativeIntegration
+from capabilities.common.encr.mobile_apps import (
+	AndroidKeystoreConfig,
+	AndroidNativeIntegration,
+	MobileAppManager,
+	MobilePlatform,
+)
 
 
 @pytest.mark.asyncio
@@ -40,3 +45,45 @@ async def test_android_keystore_rejects_tampered_ciphertext():
 	)
 
 	assert result == {"error": "Ciphertext authentication failed", "key_alias": key["key_alias"]}
+
+
+@pytest.mark.asyncio
+async def test_mobile_app_manager_android_hardware_encrypt_decrypt_round_trip():
+	manager = MobileAppManager("tenant_runtime")
+	device = await manager.register_device(
+		MobilePlatform.ANDROID,
+		{"model": "Pixel Runtime", "os_version": "15", "has_strongbox": True},
+	)
+	app = await manager.install_app(device.id, {"version": "1.0.0"})
+
+	encrypted = await manager.perform_encryption_operation(app.id, "encrypt", b"manager mobile payload")
+	decrypted = await manager.perform_encryption_operation(
+		app.id,
+		"decrypt",
+		encrypted["result"]["encrypted_data"].encode("utf-8"),
+	)
+
+	assert encrypted["success"] is True
+	assert encrypted["security"]["secure_element_used"] is True
+	assert base64.b64decode(decrypted["result"]["decrypted_data"]) == b"manager mobile payload"
+
+
+@pytest.mark.asyncio
+async def test_mobile_app_manager_ios_software_encrypt_decrypt_round_trip():
+	manager = MobileAppManager("tenant_runtime")
+	device = await manager.register_device(
+		MobilePlatform.IOS,
+		{"model": "iPhone Runtime", "os_version": "17", "has_secure_enclave": False},
+	)
+	app = await manager.install_app(device.id, {"version": "1.0.0"})
+
+	encrypted = await manager.perform_encryption_operation(app.id, "encrypt", b"ios software payload")
+	decrypted = await manager.perform_encryption_operation(
+		app.id,
+		"decrypt",
+		encrypted["result"]["encrypted_data"].encode("utf-8"),
+	)
+
+	assert encrypted["success"] is True
+	assert encrypted["security"]["secure_element_used"] is False
+	assert base64.b64decode(decrypted["result"]["decrypted_data"]) == b"ios software payload"
