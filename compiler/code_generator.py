@@ -371,12 +371,76 @@ def _rule_evaluation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, D
         return 404, {{"error": "unknown_capability", "capability": str(capability_name)}}
 
 
+def _capability_name_from_payload_or_path(path: str, payload: Dict[str, Any]) -> str | None:
+    capability_name = payload.get("capability") or payload.get("capability_name")
+    if capability_name:
+        return str(capability_name)
+    if path.startswith("/capabilities/"):
+        parts = [part for part in path.split("/") if part]
+        if len(parts) >= 2:
+            return parts[1]
+    return None
+
+
+def _configuration_payload(path: str, payload: Dict[str, Any], validate: bool = False) -> tuple[int, Dict[str, Any]]:
+    capability_name = _capability_name_from_payload_or_path(path, payload)
+    if not capability_name:
+        return 400, {{"error": "missing_capability"}}
+    if APG_CAPABILITIES is None:
+        return 404, {{"error": "capabilities_unavailable"}}
+    configuration = payload.get("configuration", payload.get("overrides"))
+    if configuration is not None and not isinstance(configuration, dict):
+        return 400, {{"error": "configuration_must_be_object"}}
+    try:
+        if validate:
+            validator = getattr(APG_CAPABILITIES, "validate_capability_configuration", None)
+            if validator is None:
+                return 404, {{"error": "configuration_validation_unavailable"}}
+            return 200, validator(str(capability_name), configuration)
+        resolver = getattr(APG_CAPABILITIES, "capability_configuration", None)
+        if resolver is None:
+            return 404, {{"error": "configuration_resolution_unavailable"}}
+        return 200, {{
+            "capability": str(capability_name),
+            "configuration": resolver(str(capability_name), configuration),
+        }}
+    except KeyError:
+        return 404, {{"error": "unknown_capability", "capability": str(capability_name)}}
+
+
+def _approval_plan_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    capability_name = _capability_name_from_payload_or_path(path, payload)
+    if not capability_name:
+        return 400, {{"error": "missing_capability"}}
+    if APG_CAPABILITIES is None or not hasattr(APG_CAPABILITIES, "approval_plan"):
+        return 404, {{"error": "approval_planning_unavailable"}}
+    context = payload.get("context", {{}})
+    if not isinstance(context, dict):
+        return 400, {{"error": "context_must_be_object"}}
+    try:
+        return 200, APG_CAPABILITIES.approval_plan(str(capability_name), context)
+    except KeyError:
+        return 404, {{"error": "unknown_capability", "capability": str(capability_name)}}
+
+
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
     if path in {{"/rules/evaluate", "/capabilities/rules/evaluate"}} or (
         path.startswith("/capabilities/") and path.endswith("/rules/evaluate")
     ):
         return _rule_evaluation_payload(path, payload)
+    if path in {{"/configuration/resolve", "/capabilities/configuration/resolve"}} or (
+        path.startswith("/capabilities/") and path.endswith("/configuration/resolve")
+    ):
+        return _configuration_payload(path, payload)
+    if path in {{"/configuration/validate", "/capabilities/configuration/validate"}} or (
+        path.startswith("/capabilities/") and path.endswith("/configuration/validate")
+    ):
+        return _configuration_payload(path, payload, validate=True)
+    if path in {{"/approval/plan", "/capabilities/approval/plan"}} or (
+        path.startswith("/capabilities/") and path.endswith("/approval/plan")
+    ):
+        return _approval_plan_payload(path, payload)
     return 404, {{"error": "not_found", "path": path}}
 
 

@@ -435,7 +435,7 @@ def test_generated_app_manifest_includes_capability_composition_topology():
     assert json.loads(json.dumps(manifest))["ui_routes"]["/ops"]["component"] == "Dashboard"
 
 
-def test_generated_app_evaluates_capability_rules_over_http(tmp_path):
+def test_generated_app_executes_capability_operations_over_http(tmp_path):
     result = APGCompiler().compile_string(CAPABILITY_SOURCE, "erp_ops.apg")
     assert result.success is True
 
@@ -492,6 +492,33 @@ def test_generated_app_evaluates_capability_rules_over_http(tmp_path):
         )
         with urllib.request.urlopen(request, timeout=1) as response:
             allowed = json.loads(response.read().decode("utf-8"))
+
+        request = urllib.request.Request(
+            f"{base_url}/capabilities/GeneralLedger/configuration/resolve",
+            data=json.dumps({"overrides": {"currency": "USD"}}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=1) as response:
+            resolved_config = json.loads(response.read().decode("utf-8"))
+
+        request = urllib.request.Request(
+            f"{base_url}/capabilities/GeneralLedger/configuration/validate",
+            data=json.dumps({"configuration": {"posting": {"batch_size": 250}}}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=1) as response:
+            config_validation = json.loads(response.read().decode("utf-8"))
+
+        request = urllib.request.Request(
+            f"{base_url}/capabilities/GeneralLedger/approval/plan",
+            data=json.dumps({"context": {"amount": 1000}}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=1) as response:
+            approval = json.loads(response.read().decode("utf-8"))
     finally:
         process.terminate()
         try:
@@ -504,6 +531,20 @@ def test_generated_app_evaluates_capability_rules_over_http(tmp_path):
     assert denied["matched_rules"] == ["balanced_journal"]
     assert allowed["decision"] == "allow"
     assert allowed["matched_rules"] == []
+    assert resolved_config == {
+        "capability": "GeneralLedger",
+        "configuration": {"currency": "USD", "fiscal_calendar": "monthly"},
+    }
+    assert config_validation["errors"] == []
+    assert config_validation["warnings"] == ["GeneralLedger has undeclared configuration posting"]
+    assert approval == {
+        "capability": "GeneralLedger",
+        "required": True,
+        "levels": 2,
+        "approvers": ["controller", "cfo"],
+        "segregation_of_duties": False,
+        "escalation": None,
+    }
 
 
 def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):

@@ -5236,3 +5236,28 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `5f56e82` (`Execute capability rules from generated apps`) to `origin/main`.
+
+### 2026-05-28 06:01 EAT
+
+Completed checkpoint:
+
+- Extended generated app HTTP behavior beyond rule evaluation into ERP capability operations:
+  - `POST /configuration/resolve`
+  - `POST /capabilities/{CapabilityName}/configuration/resolve`
+  - `POST /configuration/validate`
+  - `POST /capabilities/{CapabilityName}/configuration/validate`
+  - `POST /approval/plan`
+  - `POST /capabilities/{CapabilityName}/approval/plan`
+- These endpoints execute generated capability helpers for configuration resolution, configuration validation, and approval planning.
+- Extended the subprocess HTTP regression to verify configuration overrides, validation warnings, and approval-plan output from a generated ERP app.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_capability_composition_runtime.py -q` -> 9 passed
+- `git diff --check -- compiler/code_generator.py tests/test_capability_composition_runtime.py docs/progress_log.md` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending.
