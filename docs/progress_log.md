@@ -8384,3 +8384,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q capabilities/common/mten/tests/test_phase1_validation.py::TestAPGIntegration::test_auth_rbac_integration capabilities/common/mten/tests/test_phase1_validation.py::TestAPGIntegration::test_audit_compliance_integration` passed with 2 tests.
 - `rg -n "For now, return mock permissions|placeholder implementations|pass  # Integration point|Would integrate with auth_rbac" capabilities/common/mten/service.py tests/test_common_mten_apg_integrations.py` found no stale MTEN APG integration placeholder text.
 - `git diff --check -- capabilities/common/mten/service.py tests/test_common_mten_apg_integrations.py` passed.
+
+### 2026-05-29 01:21 EAT
+
+Compiler serviceability baseline check:
+
+- Confirmed the main compiler path still parses APG, builds the AST, runs semantic analysis, generates Python artifacts, and writes executable output.
+- Verified the installed `apg` console script reaches the Click compiler surface; the legacy root `cli.py` argparse surface does not expose `compile`.
+- Compiled both a minimal data example and an AI-agent example with generated self-test and smoke-test verification.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile cli.py compiler/compiler.py compiler/parser.py compiler/ast_builder.py compiler/semantic_analyzer.py compiler/code_generator.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py` passed with 106 tests.
+- `.venv/bin/python -m cli.main compile examples/01_minimal_customer_records/main.apg --output /private/tmp/apg-compiler-serviceability-01 --verbose --verify` generated 9 files and passed generated self-test plus smoke test.
+- `.venv/bin/apg compile examples/05_single_support_agent/main.apg --output /private/tmp/apg-compiler-serviceability-agent --verify` generated 10 files, including `ai_agents.py`, and passed generated self-test plus smoke test.
