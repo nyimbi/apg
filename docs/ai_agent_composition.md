@@ -111,6 +111,7 @@ The file contains:
 - `AI_AGENT_RUNTIME_DATA`: dependency-free runtime catalog for generated apps.
 - `list_agent_runtimes()`, `canonical_runtime()`, `agents_by_runtime()`, and `validate_agent_runtimes()` helpers.
 - `runtime_adapter_environment_keys(runtime, agent_name)`: environment variable names the generated runtime checks for external adapter commands.
+- `runtime_adapter_command_candidates(runtime)`: conventional APG adapter shim commands the generated runtime can discover on `PATH`.
 - Per-agent and per-team `capabilities`, `configuration`, `rules`, `ui`, and `theme` metadata.
 
 The runtime manifest is dependency-free. Provider SDK wiring belongs in the selected AI capability integration, while `ai_agents.py` remains the stable contract between APG syntax and application code. Generated apps can validate declared runtimes before deployment:
@@ -122,7 +123,7 @@ assert validate_agent_runtimes()["errors"] == []
 codex_agents = agents_by_runtime().get("codex", [])
 ```
 
-Generated apps can also execute non-local runtimes through a simple external adapter command. The adapter receives a JSON invocation envelope on stdin and should write either JSON or text to stdout. Configure it through agent configuration:
+Generated apps can also execute non-local runtimes through an APG adapter command. The adapter receives a JSON invocation envelope on stdin and should write JSON or text to stdout. Configure a command directly through agent configuration when a deployment needs a custom adapter:
 
 ```apg
 agent CodeReviewer {
@@ -131,7 +132,7 @@ agent CodeReviewer {
     runtime: codex;
     system: "Review the current workspace.";
     config: {
-        adapter_command: "codex exec --json";
+        adapter_command: "support-codex-adapter";
         adapter_timeout: 300;
     };
 }
@@ -140,19 +141,55 @@ agent CodeReviewer {
 Or configure it at deployment time with environment variables:
 
 ```bash
-export APG_AGENT_RUNTIME_CODEX_COMMAND='codex exec --json'
-export APG_AGENT_RUNTIME_CLAUDE_CODE_COMMAND='claude -p --output-format json'
-export APG_AGENT_RUNTIME_OPENCODE_COMMAND='opencode run --json'
-export APG_AGENT_RUNTIME_PI_COMMAND='pi-agent --json'
+export APG_AGENT_RUNTIME_CODEX_COMMAND='my-codex-adapter'
+export APG_AGENT_RUNTIME_CLAUDE_CODE_COMMAND='my-claude-code-adapter'
+export APG_AGENT_RUNTIME_OPENCODE_COMMAND='my-opencode-adapter'
+export APG_AGENT_RUNTIME_PI_COMMAND='my-pi-adapter'
 ```
 
 Agent-specific commands take precedence:
 
 ```bash
-export APG_AGENT_CODEREVIEWER_COMMAND='codex exec --json'
+export APG_AGENT_CODEREVIEWER_COMMAND='support-codex-adapter'
 ```
 
 If no adapter command is configured, non-local runtimes return `adapter_required` with the environment keys the generated app checked. This keeps generated applications executable in offline tests while allowing deployments to bind Codex, Claude Code, OpenCode, Pi, or a future tool without changing APG grammar.
+
+## Installed Adapter Shims
+
+The APG package installs protocol shims that generated apps can discover by convention:
+
+| Runtime | APG shim command |
+| --- | --- |
+| `codex` | `apg-agent-codex` |
+| `claude_code` | `apg-agent-claude-code` or `apg-agent-claude` |
+| `opencode` | `apg-agent-opencode` |
+| `openai` | `apg-agent-openai` |
+| `ollama` | `apg-agent-ollama` |
+| `pi` | `apg-agent-pi` |
+
+These shims speak the APG envelope protocol. They do not assume a raw vendor CLI accepts APG JSON. Each shim executes a provider command only when one is configured explicitly:
+
+```bash
+export APG_AGENT_CODEX_PROVIDER_COMMAND='codex exec --json'
+export APG_AGENT_CLAUDE_CODE_PROVIDER_COMMAND='claude -p --output-format json'
+export APG_AGENT_OPENCODE_PROVIDER_COMMAND='opencode run --json'
+```
+
+Provider command lookup order is:
+
+1. `APG_AGENT_<RUNTIME>_PROVIDER_COMMAND`
+2. `APG_AGENT_<RUNTIME>_CLI`
+3. `APG_AGENT_PROVIDER_COMMAND`
+
+For example, a generated app with `runtime: codex` first checks explicit APG runtime command variables such as `APG_AGENT_RUNTIME_CODEX_COMMAND`. If none are set, it looks for `apg-agent-codex` on `PATH`. The shim then either runs `APG_AGENT_CODEX_PROVIDER_COMMAND` or returns structured `adapter_required` JSON with the provider variables it checked.
+
+Smoke-test a shim directly:
+
+```bash
+printf '%s' '{"agent":{"name":"Planner"},"runtime":"codex","input":{"ticket":"late order"}}' \
+  | apg-agent-codex
+```
 
 Generated dependency-free Python apps also expose browser consoles for declared
 agents and teams. Open `/ui`, choose an agent or team, enter a message plus an
@@ -199,9 +236,9 @@ The built-in `agents.integrations` registry includes:
 | Runtime | Kind | Purpose |
 | --- | --- | --- |
 | `local` | in-process | Deterministic offline execution for tests and simple automation. |
-| `codex` | CLI | Workspace-aware coding-agent execution through a local `codex` command. |
-| `claude_code` | CLI | Workspace-aware coding-agent execution through a local `claude` command. |
-| `opencode` | CLI | Workspace-aware execution through a local `opencode` command. |
+| `codex` | CLI | Workspace-aware coding-agent execution through `apg-agent-codex` plus an explicitly configured provider command. |
+| `claude_code` | CLI | Workspace-aware coding-agent execution through `apg-agent-claude-code` or `apg-agent-claude` plus an explicitly configured provider command. |
+| `opencode` | CLI | Workspace-aware execution through `apg-agent-opencode` plus an explicitly configured provider command. |
 | `openai` | HTTP | OpenAI-compatible chat-completions execution when `OPENAI_API_KEY` is present. |
 | `ollama` | HTTP | Local OpenAI-compatible model execution through an Ollama endpoint. |
 | `pi` | HTTP | Chat-agent execution through the Inflection API using `inflection_3_pi` when `INFLECTION_API_KEY` is present. |

@@ -8239,3 +8239,22 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `0da67f7` (`Ship APG agent adapter shim commands`).
+
+### 2026-05-29 00:31 EAT
+
+In progress:
+
+- Updated `docs/ai_agent_composition.md` to document generated runtime adapter command candidates.
+- Documented the installed APG shim commands for `codex`, `claude_code`, `opencode`, `openai`, `ollama`, and `pi`.
+- Replaced direct raw-vendor CLI runtime examples with APG adapter command examples and explicit provider-command configuration.
+- Added a direct `apg-agent-codex` smoke-test example showing the APG JSON envelope contract.
+
+Battery-conscious verification:
+
+- `rg -n 'local \`codex\` command|local \`claude\` command|local \`opencode\` command' docs/ai_agent_composition.md` found no stale direct-vendor runtime wording.
+- `rg -n 'runtime_adapter_command_candidates|apg-agent-codex|APG_AGENT_CODEX_PROVIDER_COMMAND|support-codex-adapter' docs/ai_agent_composition.md` found the expected documented adapter terms.
+- `git diff --check -- docs/ai_agent_composition.md` passed.
+
+Commit result:
+
+- Pending.
