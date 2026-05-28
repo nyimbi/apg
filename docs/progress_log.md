@@ -5285,3 +5285,27 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `0b4f738` (`Serve generated app records immediately`) to `origin/main`.
+
+### 2026-05-28 06:15 EAT
+
+Completed checkpoint:
+
+- Completed the generated app in-memory CRUD loop for entity records.
+- Generated apps now support:
+  - `PUT /entities/{EntityName}/records/{id}`
+  - `PUT /records/{EntityName}/{id}`
+  - `DELETE /entities/{EntityName}/records/{id}`
+  - `DELETE /records/{EntityName}/{id}`
+- Updates merge supplied record fields into the stored record while preserving the route id.
+- Deletes return the deleted record and remaining count, and subsequent reads return `record_not_found`.
+- Extended the generated app subprocess regression to exercise create, list, fetch, update, delete, and post-delete 404 behavior.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 12 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated CRUD completion slice.

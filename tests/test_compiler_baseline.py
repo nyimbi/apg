@@ -8,6 +8,7 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 
 from click.testing import CliRunner
@@ -198,6 +199,29 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 			fetched = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/records", timeout=1) as response:
 			all_records = json.loads(response.read().decode("utf-8"))
+		update_request = urllib.request.Request(
+			f"{base_url}/entities/Customer/records/1",
+			data=json.dumps({"record": {"email": "asha@new.example", "status": "active"}}).encode("utf-8"),
+			headers={"Content-Type": "application/json"},
+			method="PUT",
+		)
+		with urllib.request.urlopen(update_request, timeout=1) as response:
+			updated = json.loads(response.read().decode("utf-8"))
+		delete_request = urllib.request.Request(
+			f"{base_url}/entities/Customer/records/1",
+			method="DELETE",
+		)
+		with urllib.request.urlopen(delete_request, timeout=1) as response:
+			deleted = json.loads(response.read().decode("utf-8"))
+		try:
+			urllib.request.urlopen(f"{base_url}/entities/Customer/records/1", timeout=1)
+		except urllib.error.HTTPError as error:
+			missing_status = error.code
+			missing_payload = json.loads(error.read().decode("utf-8"))
+		else:
+			raise AssertionError("deleted generated app record was still fetchable")
+		with urllib.request.urlopen(f"{base_url}/entities/Customer/records", timeout=1) as response:
+			empty_list = json.loads(response.read().decode("utf-8"))
 	finally:
 		process.terminate()
 		try:
@@ -212,6 +236,12 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert listed["records"] == [created["record"]]
 	assert fetched["record"] == created["record"]
 	assert all_records["records"]["Customer"] == [created["record"]]
+	assert updated["record"] == {"id": 1, "name": "Asha", "email": "asha@new.example", "status": "active"}
+	assert deleted["deleted"] == updated["record"]
+	assert deleted["count"] == 0
+	assert missing_status == 404
+	assert missing_payload["error"] == "record_not_found"
+	assert empty_list["records"] == []
 
 
 def test_cli_compile_default_target_writes_generated_application(tmp_path):

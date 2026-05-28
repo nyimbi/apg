@@ -506,6 +506,46 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     }}
 
 
+def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    route = _record_route(path)
+    if route is None or route["entity"] is None or route["record_id"] is None:
+        return 404, {{"error": "not_found", "path": path}}
+    entity_name = route["entity"]
+    record_id = route["record_id"]
+    if entity_name not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": entity_name}}
+    raw_record = payload.get("record", payload)
+    if not isinstance(raw_record, dict):
+        return 400, {{"error": "record_must_be_object"}}
+    for index, existing in enumerate(RECORD_STORE[entity_name]):
+        if str(existing.get("id")) == str(record_id):
+            updated = dict(existing)
+            updated.update(dict(raw_record))
+            updated["id"] = existing.get("id")
+            RECORD_STORE[entity_name][index] = updated
+            return 200, {{"entity": entity_name, "record": dict(updated)}}
+    return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
+
+
+def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
+    route = _record_route(path)
+    if route is None or route["entity"] is None or route["record_id"] is None:
+        return 404, {{"error": "not_found", "path": path}}
+    entity_name = route["entity"]
+    record_id = route["record_id"]
+    if entity_name not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": entity_name}}
+    for index, existing in enumerate(RECORD_STORE[entity_name]):
+        if str(existing.get("id")) == str(record_id):
+            deleted = RECORD_STORE[entity_name].pop(index)
+            return 200, {{
+                "entity": entity_name,
+                "deleted": dict(deleted),
+                "count": len(RECORD_STORE[entity_name]),
+            }}
+    return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
+
+
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
     if path.startswith("/records/") or (
@@ -531,6 +571,15 @@ def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, An
     return 404, {{"error": "not_found", "path": path}}
 
 
+def _put_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    path = path.rstrip("/") or "/"
+    if path.startswith("/records/") or (
+        path.startswith("/entities/") and "/records/" in path
+    ):
+        return _update_record_payload(path, payload)
+    return 404, {{"error": "not_found", "path": path}}
+
+
 class ApplicationRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
@@ -553,6 +602,34 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
             status, response = _post_payload(path, payload)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
             status, response = 400, {{"error": "invalid_json", "message": str(error)}}
+        body = _json_bytes(response)
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_PUT(self) -> None:
+        path = self.path.split("?", 1)[0]
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+            raw_body = self.rfile.read(length) if length else b"{{}}"
+            payload = json.loads(raw_body.decode("utf-8") or "{{}}")
+            if not isinstance(payload, dict):
+                raise ValueError("JSON body must be an object")
+            status, response = _put_payload(path, payload)
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
+            status, response = 400, {{"error": "invalid_json", "message": str(error)}}
+        body = _json_bytes(response)
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_DELETE(self) -> None:
+        path = self.path.split("?", 1)[0]
+        status, response = _delete_record_payload(path)
         body = _json_bytes(response)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
