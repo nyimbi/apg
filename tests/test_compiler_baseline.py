@@ -163,9 +163,13 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "create_record" in component["interfaces"]["python"]["exports"]
 	assert "database_status" in component["interfaces"]["python"]["exports"]
 	assert "list_entities" in component["interfaces"]["python"]["exports"]
+	assert "list_agents" in component["interfaces"]["python"]["exports"]
+	assert "invoke_agent" in component["interfaces"]["python"]["exports"]
 	assert "query_records" in component["interfaces"]["python"]["exports"]
+	assert "runtime_adapter_environment_keys" in component["interfaces"]["python"]["exports"]
 	assert "update_record" in component["interfaces"]["python"]["exports"]
 	assert "delete_record" in component["interfaces"]["python"]["exports"]
+	assert "validate_agent_runtimes" in component["interfaces"]["python"]["exports"]
 	assert "validate_component_manifest_contract" in component["interfaces"]["python"]["exports"]
 	assert "validate_route_dispatch_contract" in component["interfaces"]["python"]["exports"]
 	assert invocation["agent"] == "Planner"

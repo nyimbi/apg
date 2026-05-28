@@ -7306,3 +7306,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated component manifest validation reports zero errors with exact artifact metadata
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 17:55 EAT
+
+Completed checkpoint:
+
+- Added generated `app.py` Python delegates for first-class AI-agent composition helpers: list/invoke agents and teams, runtime adapter environment keys, and runtime validation.
+- Added generated `app.py` Python delegates for first-class capability composition helpers: capability listing and capability health reports.
+- Updated generated component manifests and generated package exports so these AI/capability helpers are advertised as callable Python composition exports.
+- Refreshed all 20 numbered example outputs so their generated manifests expose the composition delegates.
+
+Battery-conscious verification:
+
+- Regenerated `examples/[01-20]*/output` with the compiler after the composition delegate change.
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_capability_composition_runtime.py::test_generated_package_reexports_grouped_capability_descriptions tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated component manifest validation now lists AI and capability composition helpers as callable Python exports
+- Deferred broader pytest at the user's request to conserve battery.

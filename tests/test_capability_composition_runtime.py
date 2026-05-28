@@ -700,6 +700,9 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert grouped["finance"][0]["name"] == "GeneralLedger"
     assert component["capabilities"] == ["GeneralLedger"]
     assert "/finance/gl/journals" in component["interfaces"]["http"]["paths"]
+    assert "list_capabilities" in component["interfaces"]["python"]["exports"]
+    assert "capability_health" in component["interfaces"]["python"]["exports"]
+    assert "capability_health_report" in component["interfaces"]["python"]["exports"]
     assert module.capability_names_by_erp_module()["general_ledger"] == ["GeneralLedger"]
     assert module.capability_dependency_graph() == {"GeneralLedger": []}
     assert module.capability_streaming("GeneralLedger")["processor"] == "bytewax"

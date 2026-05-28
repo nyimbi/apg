@@ -9,11 +9,13 @@ This package was automatically generated from APG source code.
 
 __version__ = "1.0.0"
 
-from .app import auth_status, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, self_test, storage_status, update_record, validate_application, validate_component_manifest_contract, validate_openapi_contract, validate_route_dispatch_contract, validate_record
+from .app import auth_status, capability_health, capability_health_report, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, invoke_agent, invoke_team, list_agent_teams, list_agents, list_capabilities, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, runtime_adapter_environment_keys, self_test, storage_status, update_record, validate_agent_runtimes, validate_application, validate_component_manifest_contract, validate_openapi_contract, validate_route_dispatch_contract, validate_record
 
 __all__ = [
     "__version__",
     "auth_status",
+    "capability_health",
+    "capability_health_report",
     "coerce_record_types",
     "component_manifest",
     "create_record",
@@ -21,6 +23,11 @@ __all__ = [
     "delete_record",
     "describe_application",
     "get_record",
+    "invoke_agent",
+    "invoke_team",
+    "list_agent_teams",
+    "list_agents",
+    "list_capabilities",
     "list_databases",
     "list_entities",
     "list_events",
@@ -30,9 +37,11 @@ __all__ = [
     "openapi_document",
     "query_records",
     "relationship_graph",
+    "runtime_adapter_environment_keys",
     "self_test",
     "storage_status",
     "update_record",
+    "validate_agent_runtimes",
     "validate_application",
     "validate_component_manifest_contract",
     "validate_openapi_contract",

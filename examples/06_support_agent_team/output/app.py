@@ -46,6 +46,60 @@ APG_APPLICATIONS = _optional_module("apg_application")
 APG_CAPABILITIES = _optional_module("apg_capabilities")
 
 
+def list_agents() -> list[str]:
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents"):
+        return AI_AGENTS.list_agents()
+    return []
+
+
+def list_agent_teams() -> list[str]:
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agent_teams"):
+        return AI_AGENTS.list_agent_teams()
+    return []
+
+
+def invoke_agent(name: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "invoke_agent"):
+        return AI_AGENTS.invoke_agent(name, payload)
+    return {"agent": name, "status": "unavailable", "error": "agents_unavailable"}
+
+
+def invoke_team(name: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "invoke_team"):
+        return AI_AGENTS.invoke_team(name, payload)
+    return {"team": name, "status": "unavailable", "error": "agents_unavailable"}
+
+
+def runtime_adapter_environment_keys(runtime: str, agent_name: str | None = None) -> list[str]:
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "runtime_adapter_environment_keys"):
+        return AI_AGENTS.runtime_adapter_environment_keys(runtime, agent_name)
+    return []
+
+
+def validate_agent_runtimes(available_agent_runtimes: list[str] | None = None) -> Dict[str, Any]:
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
+        return AI_AGENTS.validate_agent_runtimes(available_agent_runtimes)
+    return {"errors": [], "warnings": []}
+
+
+def list_capabilities() -> list[str]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities"):
+        return APG_CAPABILITIES.list_capabilities()
+    return []
+
+
+def capability_health(capability_name: str) -> Dict[str, Any]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_health"):
+        return APG_CAPABILITIES.capability_health(capability_name)
+    return {"capability": capability_name, "status": "unavailable", "healthy": False, "errors": ["capability_health_unavailable"], "warnings": []}
+
+
+def capability_health_report() -> Dict[str, Any]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_health_report"):
+        return APG_CAPABILITIES.capability_health_report()
+    return {"healthy": True, "errors": [], "warnings": [], "capabilities": {}}
+
+
 def list_entities() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES]
 
@@ -340,6 +394,11 @@ def component_manifest() -> Dict[str, Any]:
                     "delete_record",
                     "describe_application",
                     "get_record",
+                    "invoke_agent",
+                    "invoke_team",
+                    "list_agent_teams",
+                    "list_agents",
+                    "list_capabilities",
                     "list_databases",
                     "list_entities",
                     "list_events",
@@ -349,9 +408,13 @@ def component_manifest() -> Dict[str, Any]:
                     "openapi_document",
                     "query_records",
                     "relationship_graph",
+                    "runtime_adapter_environment_keys",
                     "self_test",
                     "storage_status",
                     "update_record",
+                    "capability_health",
+                    "capability_health_report",
+                    "validate_agent_runtimes",
                     "validate_application",
                     "validate_component_manifest_contract",
                     "validate_openapi_contract",
