@@ -5969,3 +5969,21 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `31ed989` (`Add parseable APG example progression`) to `origin/main`.
+
+### 2026-05-28 08:58 EAT
+
+Completed checkpoint:
+
+- Added focused regression coverage for the numbered APG example progression.
+- The new test verifies exactly 20 numbered example directories, ordered `01` through `20`.
+- The new test parses and compiles every `examples/[0-9][0-9]*/main.apg`, locking the examples as executable language artifacts instead of unchecked documentation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_examples_parseable.py`
+- `.venv/bin/pytest tests/test_examples_parseable.py -q` -> 2 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.
