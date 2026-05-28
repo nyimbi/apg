@@ -6276,3 +6276,20 @@ Battery-conscious verification:
 - `rg -n "TODO:|placeholder|stub|raise NotImplementedError" capabilities/common/apig/edge_engine.py tests/test_common_apig_edge_engine_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/apig/edge_engine.py tests/test_common_apig_edge_engine_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:02 EAT
+
+Completed checkpoint:
+
+- Made MQEB generic IoT protocol adapters executable for offline/local edge operation.
+- Generic adapters now connect and disconnect devices, queue outbound messages, receive injected inbound messages, update device `last_seen`, and dispatch inbound payloads into broker message handlers.
+- MQTT, CoAP, and LoRaWAN adapters now share the executable local queue path where appropriate, so non-specialized protocols such as OPC UA no longer hit `NotImplementedError`.
+- Added focused regression coverage for OPC UA device round-trip handling and LoRaWAN/CoAP receive paths feeding MQEB edge message buffers.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mqeb/edge_computing.py tests/test_common_mqeb_edge_adapter_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_mqeb_edge_adapter_runtime.py -q` -> 2 passed, 10 pre-existing warnings
+- `rg -n "raise NotImplementedError|TODO:|placeholder implementation|For now, placeholder" capabilities/common/mqeb/edge_computing.py tests/test_common_mqeb_edge_adapter_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/mqeb/edge_computing.py tests/test_common_mqeb_edge_adapter_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.

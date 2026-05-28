@@ -119,6 +119,8 @@ class IoTProtocolAdapter:
 		self.protocol = protocol
 		self.connected_devices: Dict[str, IoTDevice] = {}
 		self.message_handlers: List[Callable] = []
+		self.outbound_messages: Dict[str, deque[bytes]] = defaultdict(deque)
+		self.inbound_messages: Dict[str, deque[bytes]] = defaultdict(deque)
 		self.logger = logging.getLogger(f'mqeb.iot.{protocol.value}')
 	
 	async def initialize(self) -> None:
@@ -131,19 +133,54 @@ class IoTProtocolAdapter:
 	
 	async def connect_device(self, device: IoTDevice) -> bool:
 		"""Connect IoT device"""
-		raise NotImplementedError
+		if device.protocol != self.protocol:
+			self.logger.error(
+				f"Device {device.device_id} uses {device.protocol.value}, not {self.protocol.value}"
+			)
+			return False
+		self.connected_devices[device.device_id] = device
+		device.last_seen = datetime.utcnow()
+		self.outbound_messages.setdefault(device.device_id, deque())
+		self.inbound_messages.setdefault(device.device_id, deque())
+		self.logger.info(f"{self.protocol.value} device {device.device_id} connected")
+		return True
 	
 	async def disconnect_device(self, device_id: str) -> bool:
 		"""Disconnect IoT device"""
-		raise NotImplementedError
+		if device_id not in self.connected_devices:
+			return False
+		del self.connected_devices[device_id]
+		self.outbound_messages.pop(device_id, None)
+		self.inbound_messages.pop(device_id, None)
+		self.logger.info(f"{self.protocol.value} device {device_id} disconnected")
+		return True
 	
 	async def send_message(self, device_id: str, message: bytes) -> bool:
 		"""Send message to IoT device"""
-		raise NotImplementedError
+		if device_id not in self.connected_devices:
+			return False
+		self.outbound_messages[device_id].append(bytes(message))
+		self.connected_devices[device_id].last_seen = datetime.utcnow()
+		self.logger.debug(f"Queued {len(message)} bytes for {self.protocol.value} device {device_id}")
+		return True
 	
 	async def receive_message(self, device_id: str) -> Optional[bytes]:
 		"""Receive message from IoT device"""
-		raise NotImplementedError
+		if device_id not in self.connected_devices:
+			return None
+		if not self.inbound_messages[device_id]:
+			return None
+		message = self.inbound_messages[device_id].popleft()
+		self.connected_devices[device_id].last_seen = datetime.utcnow()
+		await self._handle_received_message(device_id, message)
+		return message
+
+	async def inject_received_message(self, device_id: str, message: bytes) -> bool:
+		"""Inject an inbound device message for local/offline protocol execution."""
+		if device_id not in self.connected_devices:
+			return False
+		self.inbound_messages[device_id].append(bytes(message))
+		return True
 	
 	def add_message_handler(self, handler: Callable):
 		"""Add message handler"""
@@ -210,7 +247,7 @@ class MQTTAdapter(IoTProtocolAdapter):
 	async def send_message(self, device_id: str, message: bytes) -> bool:
 		"""Send message to MQTT device"""
 		try:
-			if device_id not in self.connected_devices:
+			if not await super().send_message(device_id, message):
 				return False
 			
 			topic = f"devices/{device_id}/commands"
@@ -222,9 +259,8 @@ class MQTTAdapter(IoTProtocolAdapter):
 			return False
 	
 	async def receive_message(self, device_id: str) -> Optional[bytes]:
-		"""Receive message from MQTT device (simulated)"""
-		# In production, would receive from actual MQTT subscription
-		return None
+		"""Receive message from MQTT device."""
+		return await super().receive_message(device_id)
 	
 	async def publish_telemetry(self, device_id: str, telemetry_data: Dict[str, Any]) -> bool:
 		"""Publish telemetry data from IoT device"""
@@ -288,6 +324,7 @@ class LoRaWANAdapter(IoTProtocolAdapter):
 				return False
 			
 			# Simulate downlink transmission
+			self.outbound_messages[device_id].append(bytes(message))
 			self.logger.debug(f"Sending LoRaWAN downlink to {device_id}: {len(message)} bytes")
 			return True
 		except Exception as e:
@@ -355,7 +392,7 @@ class CoAPAdapter(IoTProtocolAdapter):
 	async def send_message(self, device_id: str, message: bytes) -> bool:
 		"""Send CoAP message to device"""
 		try:
-			if device_id not in self.connected_devices:
+			if not await super().send_message(device_id, message):
 				return False
 			
 			# Simulate CoAP PUT or POST request
