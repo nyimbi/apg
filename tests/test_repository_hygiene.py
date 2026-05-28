@@ -62,6 +62,16 @@ PYTHON_FIRST_REPORTS = {
 	"docs/reports/final_system_summary.md",
 	"docs/reports/marketplace_completion_report.md",
 }
+ROOT_RUNTIME_OUTPUT_PATHS = {
+	".pytest_cache",
+	"__pycache__",
+	"apg_demo_output",
+	"apg_language.egg-info",
+	"audit_logs",
+	"singer_state",
+	"tmp",
+	"uploads",
+}
 
 
 def _tracked_files() -> list[str]:
@@ -96,6 +106,15 @@ def test_generated_cache_artifacts_are_not_tracked():
 	]
 
 	assert forbidden == []
+
+
+def test_root_runtime_output_directories_are_not_tracked():
+	misplaced = [
+		path for path in _tracked_files()
+		if path.split("/", 1)[0] in ROOT_RUNTIME_OUTPUT_PATHS
+	]
+
+	assert misplaced == []
 
 
 def test_root_tests_and_docs_stay_in_expected_directories():

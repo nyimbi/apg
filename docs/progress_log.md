@@ -5987,3 +5987,21 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `a978880` (`Verify numbered APG examples stay executable`) to `origin/main`.
+
+### 2026-05-28 09:08 EAT
+
+Completed checkpoint:
+
+- Routed tracked generated demo output out of root `apg_demo_output/` into `examples/generated/apg_demo_output/`.
+- Routed tracked grammar scratch/draft files out of root `tmp/` into `docs/archive/grammar-drafts/`.
+- Added a repository hygiene gate preventing tracked runtime/cache output roots such as `tmp/`, `uploads/`, `audit_logs/`, `apg_demo_output/`, and cache directories from reappearing as tracked root artifacts.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_repository_hygiene.py`
+- `.venv/bin/pytest tests/test_repository_hygiene.py -q` -> 15 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.
