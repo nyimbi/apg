@@ -449,6 +449,61 @@ def self_test() -> Dict[str, Any]:
     }}
 
 
+def component_manifest() -> Dict[str, Any]:
+    app = describe_application()
+    openapi = openapi_document()
+    return {{
+        "kind": "apg.application",
+        "name": MODULE_NAME,
+        "version": MODULE_VERSION,
+        "description": MODULE_DESCRIPTION,
+        "target": "python",
+        "composable": True,
+        "interfaces": {{
+            "http": {{
+                "openapi": "/openapi.json",
+                "paths": sorted(openapi["paths"]),
+            }},
+            "python": {{
+                "package": MODULE_NAME,
+                "exports": [
+                    "describe_application",
+                    "validate_application",
+                    "self_test",
+                    "openapi_document",
+                    "metrics_snapshot",
+                    "component_manifest",
+                ],
+            }},
+            "records": sorted(ENTITY_NAMES),
+        }},
+        "entities": list_entities(),
+        "ai_agents": app.get("ai_agents", []),
+        "ai_agent_teams": app.get("ai_agent_teams", []),
+        "capabilities": app.get("capabilities", []),
+        "ui_routes": app.get("ui_routes", {{}}),
+        "streaming_processors": app.get("streaming_processors", {{}}),
+        "deployment": {{
+            "artifacts": [
+                "app.py",
+                "__init__.py",
+                "README.md",
+                "requirements.txt",
+                "Dockerfile",
+                ".dockerignore",
+                ".env.example",
+            ],
+            "commands": {{
+                "run": "python app.py",
+                "describe": "python app.py --describe",
+                "validate": "python app.py --validate",
+                "self_test": "python app.py --self-test",
+            }},
+            "environment": ["APG_HOST", "APG_PORT", "APG_DATA_FILE", "APG_API_KEY", "APG_DEBUG"],
+        }},
+    }}
+
+
 def auth_status() -> Dict[str, Any]:
     return {{
         "mode": "api_key" if os.environ.get("APG_API_KEY") else "open",
@@ -574,6 +629,7 @@ def _api_operation(
 def openapi_document() -> Dict[str, Any]:
     paths: Dict[str, Any] = {{
         "/health": {{"get": _api_operation("Application health", "Health report")}},
+        "/component.json": {{"get": _api_operation("Composable component manifest", "APG component manifest")}},
         "/manifest": {{"get": _api_operation("Application manifest", "APG manifest")}},
         "/validate": {{"get": _api_operation("Application validation", "Validation report")}},
         "/events": {{"get": _api_operation("Record mutation events", "Event log")}},
@@ -878,6 +934,7 @@ def _ui_index_html() -> str:
         f"<h1>{{html.escape(MODULE_NAME)}}</h1>"
         f"<p>{{html.escape(MODULE_DESCRIPTION or 'Generated APG application')}}</p>"
         '<nav><a href="/manifest">Manifest JSON</a> | '
+        '<a href="/component.json">Component JSON</a> | '
         '<a href="/events">Events</a> | '
         '<a href="/metrics">Metrics</a> | '
         '<a href="/self-test">Self-Test</a> | '
@@ -1035,6 +1092,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
     path = path.rstrip("/") or "/"
     if path in {{"/", "/manifest", "/application"}}:
         return 200, describe_application()
+    if path == "/component.json":
+        return 200, component_manifest()
     if path == "/health":
         validation = validate_application()
         return 200, {{
@@ -1608,6 +1667,7 @@ APG_DEBUG=0
 			"## Core HTTP endpoints",
 			"",
 			"- `GET /health` - runtime health and validation summary",
+			"- `GET /component.json` - composable application component manifest",
 			"- `GET /self-test` - generated app smoke contract",
 			"- `GET /manifest` - application manifest",
 			"- `GET /openapi.json` - OpenAPI 3.1 contract",
@@ -3107,11 +3167,12 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import auth_status, describe_application, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, relationship_graph, self_test, storage_status, validate_application, validate_record',
+			'from .app import auth_status, component_manifest, describe_application, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, relationship_graph, self_test, storage_status, validate_application, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
 			'    "auth_status",',
+			'    "component_manifest",',
 			'    "describe_application",',
 			'    "list_entities",',
 			'    "list_events",',

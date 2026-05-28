@@ -5717,3 +5717,25 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `52920db` (`Generate deployment scaffolding for apps`) to `origin/main`.
+
+### 2026-05-28 07:52 EAT
+
+Completed checkpoint:
+
+- Added generated composable application component manifests.
+- Generated apps now expose `component_manifest()` from Python packages.
+- Generated apps now serve `GET /component.json`.
+- Component manifests identify the generated app as `apg.application`, mark it composable, and list HTTP paths, Python exports, records, AI agents, agent teams, capabilities, UI routes, streaming processors, deployment artifacts, commands, and environment variables.
+- Generated OpenAPI contracts and `/ui` indexes now advertise `/component.json`.
+- Generated READMEs now document the component manifest endpoint.
+- Added focused regression coverage for package component manifests, HTTP component manifests, capability metadata in component manifests, OpenAPI/UI exposure, and README guidance.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py -q` -> 27 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated component manifest slice.

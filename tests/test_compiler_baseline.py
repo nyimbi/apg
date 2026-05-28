@@ -99,6 +99,7 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "python app.py --self-test" in dockerfile
 	assert "APG_PORT=8080" in env_example
 	assert "python app.py --self-test" in readme
+	assert "GET /component.json" in readme
 	assert "docker build -t apg-generated-app ." in readme
 	assert "POST /agents/Planner/invoke" in readme
 	compile(app, "app.py", "exec")
@@ -121,6 +122,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	try:
 		spec.loader.exec_module(module)
 		manifest = module.describe_application()
+		component = module.component_manifest()
 		invocation = module.invoke_agent("Planner", {"input": {"task": "plan"}})
 		self_test = module.self_test()
 	finally:
@@ -137,6 +139,10 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.list_records("Planner") == []
 	assert module.list_agents() == ["Planner"]
 	assert manifest["ai_agents"] == ["Planner"]
+	assert component["kind"] == "apg.application"
+	assert component["composable"] is True
+	assert "/component.json" in component["interfaces"]["http"]["paths"]
+	assert "component_manifest" in component["interfaces"]["python"]["exports"]
 	assert invocation["agent"] == "Planner"
 	assert invocation["runtime"] == "codex"
 	assert invocation["status"] == "adapter_required"
@@ -152,6 +158,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.validate_record("Planner", {})["valid"] is True
 	assert module.validate_application()["valid"] is True
 	assert "auth_status" in module.__all__
+	assert "component_manifest" in module.__all__
 	assert "describe_application" in module.__all__
 	assert "list_events" in module.__all__
 	assert "invoke_agent" in module.__all__
@@ -201,6 +208,8 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 
 		with urllib.request.urlopen(f"{base_url}/manifest", timeout=1) as response:
 			manifest = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/component.json", timeout=1) as response:
+			component = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/agents", timeout=1) as response:
 			agents = json.loads(response.read().decode("utf-8"))
 		with urllib.request.urlopen(f"{base_url}/validate", timeout=1) as response:
@@ -228,11 +237,15 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	assert health["status"] == "ok"
 	assert health["auth"]["mode"] == "open"
 	assert manifest["name"] == "baseline"
+	assert component["kind"] == "apg.application"
+	assert component["deployment"]["commands"]["self_test"] == "python app.py --self-test"
+	assert "/agents/Planner/invoke" in component["interfaces"]["http"]["paths"]
 	assert agents["agents"]["Planner"]["runtime"] == "codex"
 	assert invocation["agent"] == "Planner"
 	assert invocation["status"] == "adapter_required"
 	assert invocation["input"] == {"ticket": "reset password"}
 	assert "/agents/Planner/invoke" in openapi["paths"]
+	assert "/component.json" in openapi["paths"]
 	assert "/self-test" in openapi["paths"]
 	assert self_test["passed"] is True
 	assert self_test["checks"]["route_count"] >= 1
@@ -381,6 +394,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert created["event"]["record_id"] == 1
 	assert ui_content_type.startswith("text/html")
 	assert "/ui/entities/Customer" in ui_index
+	assert "/component.json" in ui_index
 	assert "/events" in ui_index
 	assert "/metrics" in ui_index
 	assert "/self-test" in ui_index
@@ -392,6 +406,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert openapi["openapi"] == "3.1.0"
 	assert openapi["info"]["title"] == "customer_ops"
 	assert "/auth" in openapi["paths"]
+	assert "/component.json" in openapi["paths"]
 	assert "/events" in openapi["paths"]
 	assert "/metrics" in openapi["paths"]
 	assert "/self-test" in openapi["paths"]
@@ -771,6 +786,7 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "HEALTHCHECK" in dockerfile
 	assert "APG_HOST=127.0.0.1" in env_example
 	assert "python app.py --self-test" in readme
+	assert "GET /component.json" in readme
 	assert "Dockerfile" in readme
 	assert "GET /openapi.json" in readme
 	assert "Flask-AppBuilder" not in app

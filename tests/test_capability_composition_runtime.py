@@ -497,6 +497,8 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
             screen_html = response.read().decode("utf-8")
         with urllib.request.urlopen(f"{base_url}/openapi.json", timeout=1) as response:
             openapi = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(f"{base_url}/component.json", timeout=1) as response:
+            component = json.loads(response.read().decode("utf-8"))
         with urllib.request.urlopen(f"{base_url}/streaming", timeout=1) as response:
             streaming = json.loads(response.read().decode("utf-8"))
         with urllib.request.urlopen(f"{base_url}/capabilities/GeneralLedger/streaming", timeout=1) as response:
@@ -568,6 +570,11 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
     assert "JournalScreen" in screen_html
     assert "finance_ops" in screen_html
     assert "#126E82" in screen_html
+    assert component["kind"] == "apg.application"
+    assert component["capabilities"] == ["GeneralLedger"]
+    assert component["ui_routes"]["/finance/gl/journals"]["component"] == "JournalScreen"
+    assert component["streaming_processors"] == {"bytewax": ["GeneralLedger"]}
+    assert "/component.json" in openapi["paths"]
     assert "/finance/gl/journals" in openapi["paths"]
     assert "/streaming" in openapi["paths"]
     assert "/capabilities/GeneralLedger/streaming" in openapi["paths"]
@@ -611,6 +618,7 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     sys.modules["erp_ops_generated"] = module
     try:
         spec.loader.exec_module(module)
+        component = module.component_manifest()
         grouped = module.describe_capabilities_by_erp_module()
         validation = module.validate_application()
         screens = module.capability_screens("GeneralLedger")
@@ -622,6 +630,8 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
                 sys.modules.pop(name, None)
 
     assert grouped["finance"][0]["name"] == "GeneralLedger"
+    assert component["capabilities"] == ["GeneralLedger"]
+    assert "/finance/gl/journals" in component["interfaces"]["http"]["paths"]
     assert module.capability_names_by_erp_module()["general_ledger"] == ["GeneralLedger"]
     assert module.capability_dependency_graph() == {"GeneralLedger": []}
     assert module.capability_streaming("GeneralLedger")["processor"] == "bytewax"
