@@ -6155,4 +6155,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push.
+- Pushed commit `3745b80` (`Make orchestration runnable without external engines`).
