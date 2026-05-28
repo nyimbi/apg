@@ -92,7 +92,12 @@ APG currently has an executable compiler path:
   routes, OpenAPI JSON, component manifest JSON, and semantic-model JSON;
 - capability contracts can be inspected with
   `apg capabilities contracts --json` and validated with
-  `apg capabilities validate-contracts --json`; the legacy
+  `apg capabilities validate-contracts --json`;
+- packaged capabilities can be publish-planned with
+  `apg capabilities publish-plan <package-dir> --json`, which emits
+  `apg.capability-publish-report.v1` by validating the package manifest,
+  loading the generated app entrypoint, attaching release evidence, and
+  returning a side-effect-free catalog patch; the legacy
   `python cli.py capabilities ...` helper path remains available as a
   compatibility alias.
 
@@ -713,6 +718,7 @@ apg studio snapshot app.apg --json
 apg studio plan-edit app.apg --edit-json '{"operation":"add_field","table":"Customer","name":"phone","type":"str"}' --json
 apg capabilities contracts --json
 apg capabilities validate-contracts --json
+apg capabilities publish-plan dist/capability_basics-web --json
 ```
 
 `python` is the only compiler target. Desktop, mobile, web, and deployment
@@ -920,12 +926,12 @@ apg capabilities list
 ```
 
 Capability commands operate on executable contracts and package directories,
-not grammar changes. A future publish command should emit
-`apg.capability-publish-report.v1`; it must load the package entrypoint,
-validate the manifest, prove the manifest is publishable, return the catalog
-patch, attach release-evidence verification, and record that the publish plan
-is side-effect-free. Catalog writes are an explicit downstream step, not an
-implicit CLI side effect.
+not grammar changes. `apg capabilities publish-plan <package-dir> --json`
+emits `apg.capability-publish-report.v1`: it loads the package entrypoint,
+validates the manifest, proves the manifest is publishable, returns the catalog
+patch, attaches release-evidence verification, and records that the publish
+plan is side-effect-free. Catalog writes are an explicit downstream step, not
+an implicit CLI side effect.
 
 ### `apg nl-plan`
 

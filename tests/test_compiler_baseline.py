@@ -1658,6 +1658,43 @@ def test_cli_package_json_writes_executable_profile(tmp_path):
 	assert json.loads(self_test.stdout)["passed"] is True
 
 
+def test_cli_capabilities_publish_plan_validates_package_without_writing_catalog(tmp_path):
+	source = REPO_ROOT / "examples" / "08_basic_capability_contract" / "main.apg"
+	out_dir = tmp_path / "dist"
+
+	package_result = CliRunner().invoke(
+		cli,
+		["package", str(source), "--target", "web", "--out", str(out_dir), "--json"],
+	)
+	assert package_result.exit_code == 0, package_result.output
+	package_report = json.loads(package_result.output)
+	package_dir = Path(package_report["output_dir"])
+
+	publish_result = CliRunner().invoke(
+		cli,
+		["capabilities", "publish-plan", str(package_dir), "--json"],
+	)
+
+	assert publish_result.exit_code == 0, publish_result.output
+	report = json.loads(publish_result.output)
+	assert report["format"] == "apg.capability-publish-report.v1"
+	assert report["ok"] is True
+	assert report["side_effect_free"] is True
+	assert report["manifest"]["format"] == "apg.package-manifest.v1"
+	assert report["release_evidence"]["ok"] is True
+	assert report["runtime_evidence"]["loaded"] is True
+	assert report["runtime_evidence"]["self_test"]["passed"] is True
+	assert [record["capability"] for record in report["capabilities"]] == ["AuditLog"]
+	assert report["catalog_patch"] == [
+		{
+			"op": "add_or_replace",
+			"path": "/capabilities/AuditLog",
+			"value": report["capabilities"][0],
+		}
+	]
+	assert not (package_dir / "capability_catalog.json").exists()
+
+
 def test_cli_nl_plan_json_proposes_valid_credit_memo_dsl_diff_without_writing(tmp_path):
 	source = tmp_path / "finance.apg"
 	output = tmp_path / "generated"

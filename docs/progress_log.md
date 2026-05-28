@@ -7804,3 +7804,24 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_baseline_json_audits_numbered_examples -q` passed with 1 test.
 - `.venv/bin/apg baseline` passed with 20/20 examples, 20 passed, 0 failed, and coverage for records, screens, workflows, agents, capabilities, application composition, visual theming, i18n, and ByteWax streaming.
 - `git diff --check -- compiler/baseline.py cli/baseline_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `52747de` (`Make compiler bed-down audit executable`).
+
+### 2026-05-28 21:33 EAT
+
+In progress:
+
+- Promoted the planned capability publish surface from tooling intent into executable CLI behavior.
+- Added `compiler.capability_publish.build_capability_publish_report()` and `apg capabilities publish-plan <package-dir> --json`.
+- Publish planning now validates a generated package manifest, checks referenced artifacts, reads release evidence, loads the generated package entrypoint, runs runtime self-test/manifest/semantic-model evidence, and emits a side-effect-free catalog patch without writing catalog state.
+- Updated `docs/tooling.md` so `apg.capability-publish-report.v1` is documented as a current executable contract rather than a future command.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/capability_publish.py cli/capabilities_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_capabilities_publish_plan_validates_package_without_writing_catalog -q` passed with 1 test.
+- `.venv/bin/apg package examples/08_basic_capability_contract/main.apg --target web --out /private/tmp/apg_capability_publish_smoke --json` passed and wrote a verified package.
+- `.venv/bin/apg capabilities publish-plan /private/tmp/apg_capability_publish_smoke/capability_basics-web` passed with 1 capability and 1 catalog patch op.
+- `git diff --check -- compiler/capability_publish.py cli/capabilities_command.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
