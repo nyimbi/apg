@@ -1061,31 +1061,72 @@ def _ui_entity_location(entity_name: str) -> str:
     return f"/ui/entities/{{quote(entity_name, safe='')}}"
 
 
+def _ui_record_display_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, bool)):
+        return json.dumps(value)
+    return str(value)
+
+
+def _ui_record_editor_input_html(field: Dict[str, Any], record: Dict[str, Any], form_id: str) -> str:
+    field_name = str(field["name"])
+    safe_name = html.escape(field_name, quote=True)
+    safe_form_id = html.escape(form_id, quote=True)
+    expected = _json_schema_type(str(field.get("type", "any")))
+    value = record.get(field_name)
+    if expected == "boolean":
+        checked = " checked" if value is True else ""
+        return (
+            f'<input form="{{safe_form_id}}" type="hidden" name="{{safe_name}}" value="false">'
+            f'<input form="{{safe_form_id}}" type="checkbox" name="{{safe_name}}" value="true"{{checked}}>'
+        )
+    if expected == "integer":
+        attributes = 'type="number" step="1"'
+    elif expected == "number":
+        attributes = 'type="number" step="any"'
+    else:
+        attributes = 'type="text"'
+    safe_value = html.escape(_ui_record_display_value(value), quote=True)
+    return f'<input form="{{safe_form_id}}" name="{{safe_name}}" value="{{safe_value}}" {{attributes}}>'
+
+
 def _ui_records_table_html(entity_name: str) -> str:
     records = list_records(entity_name)
     if not records:
         return "<p>No records yet.</p>"
-    field_names = [str(field["name"]) for field in _field_specs(entity_name)]
+    fields = _field_specs(entity_name)
+    field_by_name = {{str(field["name"]): field for field in fields}}
+    field_names = list(field_by_name)
     columns = ["id", "_revision"] + [
         field_name for field_name in field_names if field_name not in {{"id", "_revision"}}
     ]
     header = "".join(f"<th>{{html.escape(column)}}</th>" for column in columns)
-    safe_entity = html.escape(entity_name, quote=True)
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
     rows: list[str] = []
     for record in records:
-        cells = "".join(
-            f"<td>{{html.escape(json.dumps(record.get(column)) if isinstance(record.get(column), (dict, list, bool)) else str(record.get(column, '')))}}</td>"
-            for column in columns
-        )
-        record_id = html.escape(str(record.get("id", "")), quote=True)
+        raw_record_id = str(record.get("id", ""))
+        record_id = html.escape(quote(raw_record_id, safe=""), quote=True)
+        form_id = f"apg-update-{{entity_name}}-{{raw_record_id}}"
+        safe_form_id = html.escape(form_id, quote=True)
+        cells = []
+        for column in columns:
+            if column in field_by_name:
+                cell_value = _ui_record_editor_input_html(field_by_name[column], record, form_id)
+            else:
+                cell_value = html.escape(_ui_record_display_value(record.get(column)))
+            cells.append(f"<td>{{cell_value}}</td>")
         revision = html.escape(str(record.get("_revision", "")), quote=True)
         action = (
+            f'<form id="{{safe_form_id}}" method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}"></form>'
+            f'<input form="{{safe_form_id}}" type="hidden" name="expected_revision" value="{{revision}}">'
+            f'<button form="{{safe_form_id}}" type="submit">Save</button> '
             f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}/delete">'
             f'<input type="hidden" name="expected_revision" value="{{revision}}">'
             '<button type="submit">Delete</button>'
             '</form>'
         )
-        rows.append(f"<tr>{{cells}}<td>{{action}}</td></tr>")
+        rows.append(f"<tr>{{''.join(cells)}}<td>{{action}}</td></tr>")
     return f"<table><thead><tr>{{header}}<th>Actions</th></tr></thead><tbody>{{''.join(rows)}}</tbody></table>"
 
 
@@ -1127,10 +1168,23 @@ def _ui_payload(path: str) -> tuple[int, str]:
 
 def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     parts = [part for part in path.split("/") if part]
+    raw_form_record = payload.get("record", payload)
+    form_record = dict(raw_form_record) if isinstance(raw_form_record, dict) else {{}}
     if len(parts) == 4 and parts[0] == "ui" and parts[1] == "entities" and parts[3] == "records":
         entity_name = parts[2]
         status, response = _create_record_payload(f"/entities/{{entity_name}}/records", payload)
         if status == 201:
+            return 303, {{"location": _ui_entity_location(entity_name)}}
+        return status, response
+    if len(parts) == 5 and parts[0] == "ui" and parts[1] == "entities" and parts[3] == "records":
+        entity_name = parts[2]
+        record_id = parts[4]
+        expected_revision = form_record.pop("expected_revision", None)
+        status, response = _update_record_payload(
+            f"/entities/{{entity_name}}/records/{{record_id}}",
+            {{"record": form_record, "expected_revision": expected_revision}},
+        )
+        if status == 200:
             return 303, {{"location": _ui_entity_location(entity_name)}}
         return status, response
     if (
@@ -1143,7 +1197,7 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         entity_name = parts[2]
         record_id = parts[4]
         delete_path = f"/entities/{{entity_name}}/records/{{record_id}}"
-        expected_revision = payload.get("expected_revision")
+        expected_revision = form_record.get("expected_revision")
         if expected_revision not in (None, ""):
             delete_path = f"{{delete_path}}?expected_revision={{quote(str(expected_revision), safe='')}}"
         status, response = _delete_record_payload(delete_path)

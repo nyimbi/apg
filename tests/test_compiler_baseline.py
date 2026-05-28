@@ -611,7 +611,25 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 			created_ui = response.read().decode("utf-8")
 		with urllib.request.urlopen(f"{base_url}/entities/InventoryItem/records/1", timeout=1) as response:
 			created = json.loads(response.read().decode("utf-8"))
-		delete_data = urllib.parse.urlencode({"expected_revision": "1"}).encode("utf-8")
+		update_data = urllib.parse.urlencode(
+			{
+				"expected_revision": "1",
+				"name": "Widget Pro",
+				"quantity": "8",
+				"active": "false",
+			}
+		).encode("utf-8")
+		update_request = urllib.request.Request(
+			f"{base_url}/ui/entities/InventoryItem/records/1",
+			data=update_data,
+			headers={"Content-Type": "application/x-www-form-urlencoded"},
+			method="POST",
+		)
+		with urllib.request.urlopen(update_request, timeout=1) as response:
+			updated_ui = response.read().decode("utf-8")
+		with urllib.request.urlopen(f"{base_url}/entities/InventoryItem/records/1", timeout=1) as response:
+			updated = json.loads(response.read().decode("utf-8"))
+		delete_data = urllib.parse.urlencode({"expected_revision": "2"}).encode("utf-8")
 		delete_request = urllib.request.Request(
 			f"{base_url}/ui/entities/InventoryItem/records/1/delete",
 			data=delete_data,
@@ -636,8 +654,11 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 	assert 'action="/ui/entities/InventoryItem/records"' in entity_ui
 	assert "<table>" in created_ui
 	assert "Widget" in created_ui
+	assert 'action="/ui/entities/InventoryItem/records/1"' in created_ui
 	assert 'action="/ui/entities/InventoryItem/records/1/delete"' in created_ui
 	assert created["record"] == {"id": 1, "_revision": 1, "name": "Widget", "quantity": 7, "active": True}
+	assert "Widget Pro" in updated_ui
+	assert updated["record"] == {"id": 1, "_revision": 2, "name": "Widget Pro", "quantity": 8, "active": False}
 	assert "Widget" not in deleted_ui
 	assert records_after_delete["records"] == []
 

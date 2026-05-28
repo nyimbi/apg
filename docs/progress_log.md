@@ -5843,3 +5843,23 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `753ac6a` (`Make generated record screens executable`) to `origin/main`.
+
+### 2026-05-28 08:26 EAT
+
+Completed checkpoint:
+
+- Completed the generated entity UI CRUD loop for typed records.
+- Generated record tables now render editable field controls in each row.
+- Generated UI record update posts now call the existing revision-checked update path and redirect back to the entity screen.
+- Generated UI delete posts now correctly read `expected_revision` from form payloads before calling the revision-checked delete path.
+- Added focused regression coverage for UI create, UI update, type coercion during update, revision incrementing, UI delete, and final record state.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 18 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for this checkpoint.
