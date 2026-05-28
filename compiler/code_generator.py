@@ -5563,10 +5563,10 @@ def invoke_agent(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[st
             return base
     base.update({{
         "status": "adapter_required" if requires_adapter else "completed",
-        "mode": "planned" if requires_adapter else "local",
+        "mode": "adapter_missing" if requires_adapter else "local",
         "output": {{
             "message": (
-                f"{{agent.name}} is ready for a {{runtime}} adapter."
+                f"{{agent.name}} requires a configured {{runtime}} adapter command before invocation."
                 if requires_adapter
                 else f"{{agent.name}} handled the request locally."
             ),
@@ -5585,8 +5585,8 @@ def invoke_team(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str
     ]
     if any(item["status"] == "failed" for item in invocations):
         status = "failed"
-    elif any(item["output"].get("requires_adapter") for item in invocations):
-        status = "planned"
+    elif any(item["status"] == "adapter_required" for item in invocations):
+        status = "adapter_required"
     else:
         status = "completed"
     return {{

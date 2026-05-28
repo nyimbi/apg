@@ -8168,3 +8168,22 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `061775e` (`Treat declarative APG fields as contract surface`).
+
+### 2026-05-29 00:09 EAT
+
+In progress:
+
+- Tightened generated AI-agent invocation states so missing external adapters are reported as executable runtime state, not roadmap language.
+- `invoke_agent()` now returns `status: adapter_required` and `mode: adapter_missing` when a non-local runtime has no configured adapter command.
+- `invoke_team()` now returns `status: adapter_required` when any member needs an adapter, instead of returning `planned`.
+- Updated first-class AI-agent composition tests to assert the new adapter-missing state and explicit adapter-command guidance.
+- Recompiled all 20 numbered APG examples so checked-in generated `ai_agents.py` outputs match the current compiler.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_ai_agent_composition.py::test_ai_agent_composition_generates_runtime_manifest tests/test_ai_agent_composition.py::test_ai_agent_external_runtime_adapter_executes_configured_command tests/test_ai_agent_composition.py::test_generated_ui_exposes_agent_invocation_console tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_compiler_baseline.py::test_generated_python_app_serves_http_endpoints -q` passed with 5 tests.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler -q` passed.
+- `.venv/bin/apg baseline examples --json` passed with 20 examples, 20 passing examples, 0 failures, and python-only targeting.
+- `rg -n '"planned"|mode": "planned"|status": "planned"' compiler/code_generator.py examples/*/output/ai_agents.py tests/test_ai_agent_composition.py tests/test_compiler_baseline.py` found no generated-agent planned statuses.
+- `git diff --check -- compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_compiler_baseline.py examples docs/progress_log.md` passed.

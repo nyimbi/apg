@@ -152,14 +152,16 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert planner_invocation["agent"] == "Planner"
     assert planner_invocation["runtime"] == "codex"
     assert planner_invocation["status"] == "adapter_required"
+    assert planner_invocation["mode"] == "adapter_missing"
     assert planner_invocation["input"] == {"ticket": "late order"}
     assert planner_invocation["output"]["requires_adapter"] is True
+    assert "adapter command" in planner_invocation["output"]["message"]
     writer_invocation = namespace["invoke_agent"]("Writer", {"message": "draft reply"})
     assert writer_invocation["runtime"] == "local"
     assert writer_invocation["status"] == "completed"
     crew_invocation = namespace["invoke_team"]("SupportCrew", {"input": {"ticket": "late order"}})
     assert crew_invocation["team"] == "SupportCrew"
-    assert crew_invocation["status"] == "planned"
+    assert crew_invocation["status"] == "adapter_required"
     assert [item["agent"] for item in crew_invocation["invocations"]] == ["Planner", "Writer"]
 
 

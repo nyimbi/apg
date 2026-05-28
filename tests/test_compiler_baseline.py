@@ -344,6 +344,8 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert invocation["agent"] == "Planner"
 	assert invocation["runtime"] == "codex"
 	assert invocation["status"] == "adapter_required"
+	assert invocation["mode"] == "adapter_missing"
+	assert "adapter command" in invocation["output"]["message"]
 	assert invocation["input"] == {"task": "plan"}
 	assert self_test["passed"] is True
 	assert "/self-test" in self_test["routes"]
@@ -574,6 +576,7 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	assert agents["agents"]["Planner"]["runtime"] == "codex"
 	assert invocation["agent"] == "Planner"
 	assert invocation["status"] == "adapter_required"
+	assert invocation["mode"] == "adapter_missing"
 	assert invocation["input"] == {"ticket": "reset password"}
 	assert "/agents/Planner/invoke" in openapi["paths"]
 	assert "/component.json" in openapi["paths"]
