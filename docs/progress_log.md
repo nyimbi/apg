@@ -5261,3 +5261,27 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `bceb8e6` (`Execute configuration and approval operations from generated apps`) to `origin/main`.
+
+### 2026-05-28 06:10 EAT
+
+Completed checkpoint:
+
+- Added an executable in-memory entity record API to generated dependency-free `app.py` outputs.
+- Generated apps now expose immediate application-data routes:
+  - `GET /records`
+  - `GET /entities/{EntityName}/records`
+  - `GET /entities/{EntityName}/records/{id}`
+  - `POST /entities/{EntityName}/records`
+  - `POST /records/{EntityName}`
+- Generated packages now reexport `list_records()` for Python consumers.
+- Added a focused subprocess regression that compiles a table-backed APG app, starts the generated HTTP server, creates a `Customer` record, lists records, fetches the record by id, and verifies `/records` aggregation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 12 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated record API slice.

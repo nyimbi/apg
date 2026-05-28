@@ -209,6 +209,9 @@ MODULE_NAME = {module.name!r}
 MODULE_VERSION = {module.version!r}
 MODULE_DESCRIPTION = {module.description!r}
 ENTITIES = {entity_specs!r}
+ENTITY_NAMES = {{entity["name"] for entity in ENTITIES}}
+RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {{entity["name"]: [] for entity in ENTITIES}}
+NEXT_RECORD_IDS: Dict[str, int] = {{entity["name"]: 1 for entity in ENTITIES}}
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -229,6 +232,15 @@ APG_CAPABILITIES = _optional_module("apg_capabilities")
 
 def list_entities() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES]
+
+
+def list_records(entity_name: str | None = None) -> Dict[str, list[Dict[str, Any]]] | list[Dict[str, Any]]:
+    if entity_name is None:
+        return {{
+            name: [dict(record) for record in records]
+            for name, records in RECORD_STORE.items()
+        }}
+    return [dict(record) for record in RECORD_STORE[entity_name]]
 
 
 def describe_application() -> Dict[str, Any]:
@@ -314,6 +326,49 @@ def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
 
 
+def _record_route(path: str) -> Dict[str, str | None] | None:
+    parts = [part for part in path.split("/") if part]
+    if parts == ["records"]:
+        return {{"entity": None, "record_id": None}}
+    if len(parts) in {{2, 3}} and parts[0] == "records":
+        return {{
+            "entity": parts[1],
+            "record_id": parts[2] if len(parts) == 3 else None,
+        }}
+    if len(parts) in {{3, 4}} and parts[0] == "entities" and parts[2] == "records":
+        return {{
+            "entity": parts[1],
+            "record_id": parts[3] if len(parts) == 4 else None,
+        }}
+    return None
+
+
+def _record_by_id(entity_name: str, record_id: str) -> Dict[str, Any] | None:
+    for record in RECORD_STORE[entity_name]:
+        if str(record.get("id")) == str(record_id):
+            return dict(record)
+    return None
+
+
+def _records_payload(path: str) -> tuple[int, Dict[str, Any]]:
+    route = _record_route(path)
+    if route is None:
+        return 404, {{"error": "not_found", "path": path}}
+    entity_name = route["entity"]
+    record_id = route["record_id"]
+    if entity_name is None:
+        return 200, {{"records": list_records()}}
+    if entity_name not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": entity_name}}
+    if record_id is None:
+        records = list_records(entity_name)
+        return 200, {{"entity": entity_name, "records": records, "count": len(records)}}
+    record = _record_by_id(entity_name, record_id)
+    if record is None:
+        return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
+    return 200, {{"entity": entity_name, "record": record}}
+
+
 def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
     if path in {{"/", "/manifest", "/application"}}:
@@ -332,6 +387,10 @@ def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
         return (200 if validation["valid"] else 422), validation
     if path == "/entities":
         return 200, {{"entities": list_entities()}}
+    if path == "/records" or path.startswith("/records/") or (
+        path.startswith("/entities/") and "/records" in path
+    ):
+        return _records_payload(path)
     if path == "/agents":
         return 200, {{
             "agents": describe_application().get("ai_agent_descriptions", {{}}),
@@ -423,8 +482,36 @@ def _approval_plan_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
         return 404, {{"error": "unknown_capability", "capability": str(capability_name)}}
 
 
+def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    route = _record_route(path)
+    if route is None or route["entity"] is None or route["record_id"] is not None:
+        return 404, {{"error": "not_found", "path": path}}
+    entity_name = route["entity"]
+    if entity_name not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": entity_name}}
+    raw_record = payload.get("record", payload)
+    if not isinstance(raw_record, dict):
+        return 400, {{"error": "record_must_be_object"}}
+    record = dict(raw_record)
+    if record.get("id") in (None, ""):
+        record["id"] = NEXT_RECORD_IDS[entity_name]
+        NEXT_RECORD_IDS[entity_name] += 1
+    elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
+        return 409, {{"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}}
+    RECORD_STORE[entity_name].append(record)
+    return 201, {{
+        "entity": entity_name,
+        "record": dict(record),
+        "count": len(RECORD_STORE[entity_name]),
+    }}
+
+
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
+    if path.startswith("/records/") or (
+        path.startswith("/entities/") and path.endswith("/records")
+    ):
+        return _create_record_payload(path, payload)
     if path in {{"/rules/evaluate", "/capabilities/rules/evaluate"}} or (
         path.startswith("/capabilities/") and path.endswith("/rules/evaluate")
     ):
@@ -1834,12 +1921,13 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import describe_application, list_entities, main, validate_application',
+			'from .app import describe_application, list_entities, list_records, main, validate_application',
 			'',
 			'__all__ = [',
 			'    "__version__",',
 			'    "describe_application",',
 			'    "list_entities",',
+			'    "list_records",',
 			'    "main",',
 			'    "validate_application",',
 			']',

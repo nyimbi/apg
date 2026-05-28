@@ -31,6 +31,17 @@ agent Planner {
 }
 """
 
+DATA_APP_SOURCE = """
+module customer_ops version 1.0.0 {
+	description: "Customer operations";
+}
+
+table Customer {
+	name: str;
+	email: str;
+}
+"""
+
 
 def test_documented_python_target_generates_executable_application_files():
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
@@ -76,11 +87,13 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert module.list_entities() == [
 		{"name": "Planner", "type": "ai_agent", "properties": [], "methods": []}
 	]
+	assert module.list_records("Planner") == []
 	assert module.list_agents() == ["Planner"]
 	assert manifest["ai_agents"] == ["Planner"]
 	assert module.validate_application()["valid"] is True
 	assert "describe_application" in module.__all__
 	assert "validate_application" in module.__all__
+	assert "list_records" in module.__all__
 	assert "list_agents" in module.__all__
 
 
@@ -135,6 +148,70 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	assert manifest["name"] == "baseline"
 	assert agents["agents"]["Planner"]["runtime"] == "codex"
 	assert validation["valid"] is True
+
+
+def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
+	result = compile_apg_string(DATA_APP_SOURCE)
+	package_dir = tmp_path / "generated_data_app"
+	package_dir.mkdir()
+	for filename, content in result.generated_files.items():
+		(package_dir / filename).write_text(content, encoding="utf-8")
+
+	with socket.socket() as sock:
+		sock.bind(("127.0.0.1", 0))
+		port = sock.getsockname()[1]
+
+	process = subprocess.Popen(
+		[sys.executable, "app.py", "--host", "127.0.0.1", "--port", str(port)],
+		cwd=package_dir,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE,
+		text=True,
+	)
+	try:
+		base_url = f"http://127.0.0.1:{port}"
+		for _attempt in range(30):
+			try:
+				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
+					json.loads(response.read().decode("utf-8"))
+				break
+			except OSError:
+				if process.poll() is not None:
+					stdout, stderr = process.communicate(timeout=1)
+					raise AssertionError(f"generated app exited early\nstdout={stdout}\nstderr={stderr}")
+				time.sleep(0.05)
+		else:
+			raise AssertionError("generated data app did not answer /health")
+
+		request = urllib.request.Request(
+			f"{base_url}/entities/Customer/records",
+			data=json.dumps({"record": {"name": "Asha", "email": "asha@example.com"}}).encode("utf-8"),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		with urllib.request.urlopen(request, timeout=1) as response:
+			created = json.loads(response.read().decode("utf-8"))
+
+		with urllib.request.urlopen(f"{base_url}/entities/Customer/records", timeout=1) as response:
+			listed = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/entities/Customer/records/1", timeout=1) as response:
+			fetched = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/records", timeout=1) as response:
+			all_records = json.loads(response.read().decode("utf-8"))
+	finally:
+		process.terminate()
+		try:
+			process.wait(timeout=2)
+		except subprocess.TimeoutExpired:
+			process.kill()
+			process.wait(timeout=2)
+
+	assert created["entity"] == "Customer"
+	assert created["record"] == {"id": 1, "name": "Asha", "email": "asha@example.com"}
+	assert created["count"] == 1
+	assert listed["records"] == [created["record"]]
+	assert fetched["record"] == created["record"]
+	assert all_records["records"]["Customer"] == [created["record"]]
 
 
 def test_cli_compile_default_target_writes_generated_application(tmp_path):
