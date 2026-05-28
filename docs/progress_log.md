@@ -5986,4 +5986,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit and push for this checkpoint.
+- Pushed commit `a978880` (`Verify numbered APG examples stay executable`) to `origin/main`.
