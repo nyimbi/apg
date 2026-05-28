@@ -1041,7 +1041,9 @@ class EnterpriseAPIGateway:
 			# Extract parameters
 			data = base64.b64decode(request.body['data'])
 			algorithm = PostQuantumAlgorithm(request.body['algorithm'])
-			security_level = SecurityLevel(request.body.get('security_level', SecurityLevel.LEVEL_3.value))
+			security_level = self._parse_security_level(
+				request.body.get('security_level', SecurityLevel.LEVEL_3.value)
+			)
 			
 			# Perform encryption using the service
 			result = await self.encryption_service.encrypt_quantum_safe(
@@ -1091,44 +1093,68 @@ class EnterpriseAPIGateway:
 		"""Handle key management API requests"""
 		
 		if request.endpoint_path == "/v1/keys/generate":
-			# Generate new key pair
 			algorithm = PostQuantumAlgorithm(request.body['algorithm'])
-			security_level = SecurityLevel(request.body.get('security_level', SecurityLevel.LEVEL_3.value))
-			
-			key_pair = await self.encryption_service.generate_quantum_safe_keypair(
-				algorithm=algorithm,
-				security_level=security_level,
-				tenant_id=request.tenant_id,
-				metadata=request.body.get('key_metadata', {})
+			security_level = self._parse_security_level(
+				request.body.get('security_level', SecurityLevel.LEVEL_3.value)
 			)
-			
+			entropy = secrets.token_bytes(32)
+
+			key_pair = await self.encryption_service.post_quantum_crypto.get_or_create_keypair(
+				request.tenant_id,
+				algorithm,
+				entropy
+			)
+			key_pair.security_level = security_level
+			key_pair.generation_context.update(request.body.get('key_metadata', {}))
+
 			return {
-				'key_id': key_pair.key_id,
-				'public_key': base64.b64encode(key_pair.public_key_data).decode('utf-8'),
-				'algorithm': key_pair.algorithm.value,
-				'security_level': key_pair.security_level.value,
+				'key_id': key_pair.id,
+				'public_key': base64.b64encode(key_pair.kyber_public_key).decode('utf-8'),
+				'algorithm': self._enum_value(key_pair.algorithm),
+				'security_level': self._enum_value(key_pair.security_level),
 				'created_at': key_pair.created_at.isoformat()
 			}
-		
+
 		elif request.endpoint_path == "/v1/keys":
-			# List keys for tenant
-			# Mock response for now
+			tenant_keys = await self.encryption_service.post_quantum_crypto.get_tenant_keys(request.tenant_id)
+			page = int(request.query_params.get('page', 1))
+			per_page = int(request.query_params.get('per_page', 50))
+			start_index = max(page - 1, 0) * per_page
+			end_index = start_index + per_page
+			paged_keys = tenant_keys[start_index:end_index]
 			return {
 				'keys': [
 					{
-						'key_id': 'key_' + uuid7str(),
-						'algorithm': 'crystals_kyber_1024',
-						'security_level': 'level_3',
-						'created_at': datetime.utcnow().isoformat(),
-						'status': 'active'
+						'key_id': key_pair.id,
+						'algorithm': self._enum_value(key_pair.algorithm),
+						'security_level': self._enum_value(key_pair.security_level),
+						'created_at': key_pair.created_at.isoformat(),
+						'status': self._enum_value(key_pair.state),
+						'public_key_fingerprint': hashlib.sha256(key_pair.kyber_public_key).hexdigest(),
+						'usage_context': key_pair.generation_context
 					}
+					for key_pair in paged_keys
 				],
-				'total_count': 1,
-				'page': 1,
-				'per_page': 50
+				'total_count': len(tenant_keys),
+				'page': page,
+				'per_page': per_page
 			}
-		
+
 		raise APIGatewayError(f"Unknown key management endpoint: {request.endpoint_path}")
+
+	def _parse_security_level(self, raw_level: Any) -> SecurityLevel:
+		"""Accept native enum values and API-friendly level_N strings"""
+		if isinstance(raw_level, SecurityLevel):
+			return raw_level
+		if isinstance(raw_level, int):
+			return SecurityLevel(raw_level)
+		if isinstance(raw_level, str) and raw_level.startswith("level_"):
+			return SecurityLevel(int(raw_level.removeprefix("level_")))
+		return SecurityLevel(raw_level)
+
+	def _enum_value(self, value: Any) -> Any:
+		"""Return enum values while tolerating pydantic-stored raw values"""
+		return value.value if hasattr(value, "value") else value
 	
 	async def _handle_homomorphic_request(self, request: APIRequest, endpoint: APIEndpoint) -> Dict[str, Any]:
 		"""Handle homomorphic encryption API requests"""

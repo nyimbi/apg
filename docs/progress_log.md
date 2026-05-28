@@ -6471,3 +6471,21 @@ Battery-conscious verification:
 - `rg -n "Mock homomorphic operations for now|ciphertext_id': uuid7str\\(\\)|result_ciphertext_id': uuid7str\\(\\)|computation_time_ms': 5\\.2|noise_growth': 0\\.1" capabilities/common/encr/api_gateway.py tests/test_common_encr_api_gateway_homomorphic_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/encr/api_gateway.py tests/test_common_encr_api_gateway_homomorphic_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:59 EAT
+
+Completed checkpoint:
+
+- Replaced ENCR API key-management fabricated key listing with the real tenant key inventory from the post-quantum engine.
+- Made `/v1/keys/generate` use the service's current keypair engine instead of calling a missing `generate_quantum_safe_keypair()` method.
+- Added API security-level parsing that accepts native NIST integer values and API-friendly `level_N` strings.
+- Added focused API gateway regression coverage for generate/list behavior and empty inventory listing.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/encr/api_gateway.py tests/test_common_encr_api_gateway_key_management_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_encr_api_gateway_key_management_runtime.py -q` -> 2 passed, 10 pre-existing warnings
+- `.venv/bin/python -m pytest tests/test_common_encr_api_gateway_key_management_runtime.py tests/test_common_encr_api_gateway_homomorphic_runtime.py -q` -> 4 passed, 10 pre-existing warnings
+- `rg -n "Mock response for now|key_' \\+ uuid7str\\(\\)|generate_quantum_safe_keypair|public_key_data|key_pair\\.key_id" capabilities/common/encr/api_gateway.py tests/test_common_encr_api_gateway_key_management_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/encr/api_gateway.py tests/test_common_encr_api_gateway_key_management_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
