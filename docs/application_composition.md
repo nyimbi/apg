@@ -50,4 +50,5 @@ rendered when no capability screen owns that route.
 
 The generated `/ui` page links application routes, capability screens,
 capabilities, AI agents, and AI agent teams so a composed app can be inspected
-from one browser entry point.
+from one browser entry point. Capability and agent links open executable browser
+consoles backed by the same generated JSON APIs.

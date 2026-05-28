@@ -96,6 +96,15 @@ When APG source is compiled directly, first-class capability declarations emit
 discover screen routes, composed UI elements, bindings, and relationship edges
 without depending on a web framework.
 
+Generated dependency-free Python apps expose browser consoles under
+`/ui/capabilities/{Capability}`. These consoles can evaluate rules, resolve
+configuration overrides, and plan approvals through HTML forms while using the
+same generated JSON endpoints:
+
+- `POST /capabilities/{Capability}/rules/evaluate`
+- `POST /capabilities/{Capability}/configuration/resolve`
+- `POST /capabilities/{Capability}/approval/plan`
+
 ## Adding a Contract
 
 For a spec-backed capability, add a thin wrapper beside `cap_spec.md`:

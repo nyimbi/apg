@@ -245,3 +245,43 @@ def test_generated_app_manifest_includes_ai_agents_and_teams():
         "ai_agent_runtimes: Planner references unavailable runtime codex"
     ]
     assert json.loads(json.dumps(validation))["name"] == "support"
+
+
+def test_generated_ui_exposes_agent_invocation_console():
+    result = APGCompiler().compile_string(AI_AGENT_SOURCE, "support.apg")
+
+    assert result.success is True
+
+    ai_agents = types.ModuleType("ai_agents")
+    sys.modules["ai_agents"] = ai_agents
+    try:
+        exec(compile(result.generated_files["ai_agents.py"], "ai_agents.py", "exec"), ai_agents.__dict__)
+
+        app = types.ModuleType("app")
+        exec(compile(result.generated_files["app.py"], "app.py", "exec"), app.__dict__)
+        ui_status, ui_html = app._ui_payload("/ui")
+        agent_status, agent_html = app._ui_payload("/ui/agents/Planner")
+        invoke_status, invoke_response = app._ui_post_payload(
+            "/ui/agents/Planner/invoke",
+            {"record": {"message": "triage this", "payload_json": '{"ticket": "late order"}'}},
+        )
+        team_status, team_html = app._ui_payload("/ui/agent-teams/SupportCrew")
+        team_invoke_status, team_invoke_response = app._ui_post_payload(
+            "/ui/agent-teams/SupportCrew/invoke",
+            {"record": {"message": "coordinate", "payload_json": "{}"}},
+        )
+    finally:
+        sys.modules.pop("ai_agents", None)
+
+    assert ui_status == 200
+    assert 'href="/ui/agents/Planner"' in ui_html
+    assert 'href="/ui/agent-teams/SupportCrew"' in ui_html
+    assert agent_status == 200
+    assert "Planner" in agent_html
+    assert invoke_status == 200
+    assert "triage this" in invoke_response["html"]
+    assert "adapter_required" in invoke_response["html"]
+    assert team_status == 200
+    assert "SupportCrew" in team_html
+    assert team_invoke_status == 200
+    assert "SupportCrew" in team_invoke_response["html"]

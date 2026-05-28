@@ -33,8 +33,10 @@ capability GeneralLedger {
     contract: {
         id: general_ledger,
         provides: [ledger_service],
+        rules: [{name: "balanced", when: "debits != credits", action: "deny"}],
         ui: {shell: python}
     };
+    approvals: {levels: 1, approvers: [controller]};
 }
 """
 
@@ -122,6 +124,19 @@ def test_generated_app_manifest_includes_application_composition():
         app_screen = app._application_screen("/")
         app_screen_status, app_screen_html = app._application_screen_payload("/")
         ui_status, ui_html = app._ui_payload("/ui")
+        capability_status, capability_html = app._ui_payload("/ui/capabilities/GeneralLedger")
+        rule_status, rule_html = app._ui_post_payload(
+            "/ui/capabilities/GeneralLedger/rules/evaluate",
+            {"record": {"context_json": '{"debits": 10, "credits": 5}'}},
+        )
+        config_status, config_html = app._ui_post_payload(
+            "/ui/capabilities/GeneralLedger/configuration/resolve",
+            {"record": {"configuration_json": "{}"}},
+        )
+        approval_status, approval_html = app._ui_post_payload(
+            "/ui/capabilities/GeneralLedger/approval/plan",
+            {"record": {"context_json": "{}"}},
+        )
         openapi = app.openapi_document()
     finally:
         sys.modules.pop("apg_application", None)
@@ -143,8 +158,17 @@ def test_generated_app_manifest_includes_application_composition():
     assert ui_status == 200
     assert "Application Routes" in ui_html
     assert 'href="/finance"' in ui_html
+    assert 'href="/ui/capabilities/GeneralLedger"' in ui_html
     assert "Capabilities" in ui_html
     assert "GeneralLedger" in ui_html
+    assert capability_status == 200
+    assert "GeneralLedger" in capability_html
+    assert rule_status == 200
+    assert "&quot;decision&quot;: &quot;deny&quot;" in rule_html["html"]
+    assert config_status == 200
+    assert "&quot;capability&quot;: &quot;GeneralLedger&quot;" in config_html["html"]
+    assert approval_status == 200
+    assert "&quot;required&quot;: true" in approval_html["html"]
     assert "/" in openapi["paths"]
     assert "/finance" in openapi["paths"]
 

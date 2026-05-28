@@ -121,6 +121,12 @@ assert validate_agent_runtimes()["errors"] == []
 codex_agents = agents_by_runtime().get("codex", [])
 ```
 
+Generated dependency-free Python apps also expose browser consoles for declared
+agents and teams. Open `/ui`, choose an agent or team, enter a message plus an
+optional JSON payload, and submit the form. The form calls the same generated
+`/agents/{Agent}/invoke` or `/agent-teams/{Team}/invoke` contract used by JSON
+clients and renders the structured response inline.
+
 ## Runtime Integration
 
 AI tooling changes faster than APG grammar should. Keep the APG declaration stable and swap the execution adapter:

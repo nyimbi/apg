@@ -904,19 +904,19 @@ def _ui_index_html() -> str:
     if not capability_route_links:
         capability_route_links = "<li>No capability screens declared.</li>"
     capability_links = "".join(
-        f'<li><a href="/capabilities">{html.escape(name)}</a></li>'
+        f'<li><a href="/ui/capabilities/{html.escape(name, quote=True)}">{html.escape(name)}</a></li>'
         for name in app.get("capabilities", [])
     )
     if not capability_links:
         capability_links = "<li>No capabilities declared.</li>"
     agent_links = "".join(
-        f'<li><a href="/agents/{html.escape(name, quote=True)}/invoke">{html.escape(name)}</a></li>'
+        f'<li><a href="/ui/agents/{html.escape(name, quote=True)}">{html.escape(name)}</a></li>'
         for name in app.get("ai_agents", [])
     )
     if not agent_links:
         agent_links = "<li>No AI agents declared.</li>"
     team_links = "".join(
-        f'<li><a href="/agent-teams/{html.escape(name, quote=True)}/invoke">{html.escape(name)}</a></li>'
+        f'<li><a href="/ui/agent-teams/{html.escape(name, quote=True)}">{html.escape(name)}</a></li>'
         for name in app.get("ai_agent_teams", [])
     )
     if not team_links:
@@ -1162,13 +1162,145 @@ def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[i
         return 200, _ui_index_html()
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
         return _ui_entity_html(parts[2], query=query)
+    if len(parts) == 3 and parts[0] == "ui" and parts[1] == "agents":
+        return _ui_agent_console_html(parts[2])
+    if len(parts) == 3 and parts[0] == "ui" and parts[1] in {"agent-teams", "teams"}:
+        return _ui_agent_console_html(parts[2], team=True)
+    if len(parts) == 3 and parts[0] == "ui" and parts[1] == "capabilities":
+        return _ui_capability_console_html(parts[2])
     return 404, _html_page("Not found", f"<h1>Not found</h1><p>{html.escape(path)}</p>")
+
+
+def _parse_json_object_field(form_record: Dict[str, Any], field_name: str) -> tuple[Dict[str, Any] | None, str | None]:
+    raw_value = str(form_record.get(field_name) or "{}").strip() or "{}"
+    try:
+        value = json.loads(raw_value)
+    except json.JSONDecodeError as error:
+        return None, f"{field_name} is invalid JSON: {error}"
+    if not isinstance(value, dict):
+        return None, f"{field_name} must be a JSON object"
+    return value, None
+
+
+def _result_section(result: Dict[str, Any] | None = None, error: str = "") -> str:
+    if error:
+        return f'<section role="alert"><strong>{html.escape(error)}</strong></section>'
+    if result is None:
+        return ""
+    return "<h2>Result</h2><pre>" + html.escape(json.dumps(result, indent=2, sort_keys=True)) + "</pre>"
+
+
+def _ui_agent_console_html(name: str, result: Dict[str, Any] | None = None, error: str = "", team: bool = False) -> tuple[int, str]:
+    app = describe_application()
+    catalog_key = "ai_agent_team_descriptions" if team else "ai_agent_descriptions"
+    catalog = app.get(catalog_key, {})
+    if name not in catalog:
+        title = "Unknown agent team" if team else "Unknown agent"
+        return 404, _html_page(title, f"<h1>{title}</h1><p>{html.escape(name)}</p>")
+    action = f"/ui/{'agent-teams' if team else 'agents'}/{html.escape(name, quote=True)}/invoke"
+    description = html.escape(json.dumps(catalog[name], indent=2, sort_keys=True))
+    result_html = _result_section(result, error)
+    body = (
+        '<nav><a href="/ui">Application</a> | <a href="/agents">Agent catalog</a></nav>'
+        f"<h1>{html.escape(name)}</h1>"
+        f"<pre>{description}</pre>"
+        f'<form method="post" action="{action}">'
+        '<label>Message <input name="message" type="text"></label><br>'
+        '<label>Payload JSON<br><textarea name="payload_json" rows="8" cols="80">{}</textarea></label><br>'
+        '<button type="submit">Invoke</button>'
+        '</form>'
+        f"{result_html}"
+    )
+    return 200, _html_page(name, body)
+
+
+def _ui_capability_console_html(name: str, result: Dict[str, Any] | None = None, error: str = "") -> tuple[int, str]:
+    app = describe_application()
+    capabilities = app.get("capability_descriptions", {})
+    if name not in capabilities:
+        return 404, _html_page("Unknown capability", f"<h1>Unknown capability</h1><p>{html.escape(name)}</p>")
+    description = html.escape(json.dumps(capabilities[name], indent=2, sort_keys=True))
+    safe_name = html.escape(name, quote=True)
+    result_html = _result_section(result, error)
+    body = (
+        '<nav><a href="/ui">Application</a> | <a href="/capabilities">Capability catalog</a></nav>'
+        f"<h1>{html.escape(name)}</h1>"
+        f"<pre>{description}</pre>"
+        f'<form method="post" action="/ui/capabilities/{safe_name}/rules/evaluate">'
+        '<h2>Evaluate Rules</h2>'
+        '<label>Context JSON<br><textarea name="context_json" rows="8" cols="80">{}</textarea></label><br>'
+        '<button type="submit">Evaluate</button>'
+        '</form>'
+        f'<form method="post" action="/ui/capabilities/{safe_name}/configuration/resolve">'
+        '<h2>Resolve Configuration</h2>'
+        '<label>Overrides JSON<br><textarea name="configuration_json" rows="8" cols="80">{}</textarea></label><br>'
+        '<button type="submit">Resolve</button>'
+        '</form>'
+        f'<form method="post" action="/ui/capabilities/{safe_name}/approval/plan">'
+        '<h2>Plan Approval</h2>'
+        '<label>Context JSON<br><textarea name="context_json" rows="8" cols="80">{}</textarea></label><br>'
+        '<button type="submit">Plan</button>'
+        '</form>'
+        f"{result_html}"
+    )
+    return 200, _html_page(name, body)
 
 
 def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     parts = [part for part in path.split("/") if part]
     raw_form_record = payload.get("record", payload)
     form_record = dict(raw_form_record) if isinstance(raw_form_record, dict) else {}
+    if len(parts) == 4 and parts[0] == "ui" and parts[1] == "agents" and parts[3] == "invoke":
+        request_payload, error = _parse_json_object_field(form_record, "payload_json")
+        if error:
+            _status, html_payload = _ui_agent_console_html(parts[2], error=error)
+            return 400, {"html": html_payload}
+        message = form_record.get("message")
+        if message:
+            request_payload["message"] = message
+        status, result = _agent_invocation_payload(f"/agents/{parts[2]}/invoke", request_payload)
+        _status, html_payload = _ui_agent_console_html(parts[2], result=result if status == 200 else None, error="" if status == 200 else result.get("error", "agent invocation failed"))
+        return status, {"html": html_payload}
+    if len(parts) == 4 and parts[0] == "ui" and parts[1] in {"agent-teams", "teams"} and parts[3] == "invoke":
+        request_payload, error = _parse_json_object_field(form_record, "payload_json")
+        if error:
+            _status, html_payload = _ui_agent_console_html(parts[2], error=error, team=True)
+            return 400, {"html": html_payload}
+        message = form_record.get("message")
+        if message:
+            request_payload["message"] = message
+        status, result = _agent_invocation_payload(f"/agent-teams/{parts[2]}/invoke", request_payload)
+        _status, html_payload = _ui_agent_console_html(parts[2], result=result if status == 200 else None, error="" if status == 200 else result.get("error", "team invocation failed"), team=True)
+        return status, {"html": html_payload}
+    if len(parts) == 5 and parts[0] == "ui" and parts[1] == "capabilities":
+        capability_name = parts[2]
+        operation = "/".join(parts[3:])
+        if operation == "rules/evaluate":
+            context, error = _parse_json_object_field(form_record, "context_json")
+            if error:
+                _status, html_payload = _ui_capability_console_html(capability_name, error=error)
+                return 400, {"html": html_payload}
+            status, result = _rule_evaluation_payload(f"/capabilities/{capability_name}/rules/evaluate", {"context": context})
+        elif operation == "configuration/resolve":
+            configuration, error = _parse_json_object_field(form_record, "configuration_json")
+            if error:
+                _status, html_payload = _ui_capability_console_html(capability_name, error=error)
+                return 400, {"html": html_payload}
+            status, result = _configuration_payload(f"/capabilities/{capability_name}/configuration/resolve", {"overrides": configuration})
+        elif operation == "approval/plan":
+            context, error = _parse_json_object_field(form_record, "context_json")
+            if error:
+                _status, html_payload = _ui_capability_console_html(capability_name, error=error)
+                return 400, {"html": html_payload}
+            status, result = _approval_plan_payload(f"/capabilities/{capability_name}/approval/plan", {"context": context})
+        else:
+            return 404, {"error": "not_found", "path": path}
+        _status, html_payload = _ui_capability_console_html(
+            capability_name,
+            result=result if status == 200 else None,
+            error="" if status == 200 else result.get("error", "capability operation failed"),
+        )
+        return status, {"html": html_payload}
     if len(parts) == 4 and parts[0] == "ui" and parts[1] == "entities" and parts[3] == "records":
         entity_name = parts[2]
         status, response = _create_record_payload(f"/entities/{entity_name}/records", payload)
@@ -1806,6 +1938,9 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
                 status, response = _ui_post_payload(path, payload)
                 if status in {302, 303}:
                     self._send_redirect(status, str(response["location"]))
+                    return
+                if "html" in response:
+                    self._send_html(status, str(response["html"]))
                     return
                 self._send_html(status, _ui_error_payload(path, response))
                 return

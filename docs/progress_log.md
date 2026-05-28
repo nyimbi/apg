@@ -6090,3 +6090,26 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `92072a2` (`Expose composed apps from generated UI`).
+
+### 2026-05-28 10:18 EAT
+
+Completed checkpoint:
+
+- Turned generated `/ui` capability and AI-agent links into executable browser consoles instead of read-only discovery links.
+- Added browser-backed forms for AI agent invocation, AI agent team invocation, capability rule evaluation, capability configuration resolution, and capability approval planning.
+- Kept the browser consoles backed by the same generated JSON endpoint helpers used by API clients.
+- Added regression coverage for generated agent/team consoles and capability operation consoles.
+- Regenerated numbered example outputs so checked-in generated apps include the new operation consoles.
+- Updated AI-agent composition, capability-contract, and application-composition docs.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_application_composition_runtime.py tests/test_examples_parseable.py`
+- `.venv/bin/pytest tests/test_ai_agent_composition.py tests/test_application_composition_runtime.py tests/test_code_generator_executable_defaults.py tests/test_capability_composition_runtime.py tests/test_examples_parseable.py -q` -> 29 passed
+- `.venv/bin/python -c '...'` py-compiled 77 generated Python files under `examples/[0-9][0-9]*/output/`
+- `git diff --check`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push.
