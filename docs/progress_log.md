@@ -6862,3 +6862,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_composition_registry_templates.py -q` -> 2 passed, 2 pre-existing warnings
 - `git diff --check capabilities/composition/registry/templates.py tests/test_composition_registry_templates.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:16 EAT
+
+Completed checkpoint:
+
+- Replaced capability metadata comma-splitting with Python AST literal parsing, preserving real string values such as keywords containing commas.
+- Capability discovery now accepts multi-line `__composition_keywords__` metadata without executing the module being discovered.
+- Fixed discovered `__init__.py` path normalization so both relative scan paths and absolute files can produce module paths and categories.
+- Added focused regression coverage for literal metadata extraction, multi-line keyword lists, category/subcategory inference, and module path generation.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/service.py tests/test_composition_registry_service_metadata.py`
+- `.venv/bin/python -m pytest tests/test_composition_registry_service_metadata.py -q` -> 2 passed, 2 pre-existing warnings
+- `git diff --check capabilities/composition/registry/service.py tests/test_composition_registry_service_metadata.py`
+- Deferred broader pytest at the user's request to conserve battery.

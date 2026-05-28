@@ -8,6 +8,7 @@ and orchestration within APG's multi-tenant architecture.
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
+import ast
 import asyncio
 import json
 import os
@@ -266,29 +267,17 @@ class CapabilityRegistryService:
 			with open(init_file, 'r', encoding='utf-8') as f:
 				content = f.read()
 			
-			# Extract metadata using simple parsing
-			metadata = {}
-			
-			# Look for standard APG capability attributes
-			if '__capability_code__' in content:
-				for line in content.split('\n'):
-					line = line.strip()
-					if line.startswith('__capability_code__'):
-						metadata['capability_code'] = self._extract_string_value(line)
-					elif line.startswith('__capability_name__'):
-						metadata['capability_name'] = self._extract_string_value(line)
-					elif line.startswith('__version__'):
-						metadata['version'] = self._extract_string_value(line)
-					elif line.startswith('__description__'):
-						metadata['description'] = self._extract_string_value(line)
-					elif line.startswith('__composition_keywords__'):
-						metadata['composition_keywords'] = self._extract_list_value(line, content)
+			metadata = self._extract_metadata_literals(content)
 			
 			if metadata.get('capability_code'):
 				# Add file system information
-				relative_path = str(init_file.relative_to(Path.cwd()))
+				init_file_path = init_file.resolve()
+				try:
+					relative_path = str(init_file_path.relative_to(Path.cwd().resolve()))
+				except ValueError:
+					relative_path = str(init_file_path)
 				metadata.update({
-					'file_path': str(init_file),
+					'file_path': str(init_file_path),
 					'module_path': relative_path.replace('/__init__.py', '').replace('/', '.'),
 					'category': self._infer_category_from_path(relative_path),
 					'subcategory': self._infer_subcategory_from_path(relative_path),
@@ -301,32 +290,72 @@ class CapabilityRegistryService:
 			print(self._log_operation("extract_metadata", f"Error: {e}"))
 		
 		return None
+
+	def _extract_metadata_literals(self, content: str) -> Dict[str, Any]:
+		"""Extract standard APG capability metadata from Python literals."""
+		field_map = {
+			"__capability_code__": "capability_code",
+			"__capability_name__": "capability_name",
+			"__version__": "version",
+			"__description__": "description",
+			"__composition_keywords__": "composition_keywords",
+		}
+		metadata: Dict[str, Any] = {}
+
+		try:
+			module = ast.parse(content)
+		except SyntaxError as exc:
+			print(self._log_operation("extract_metadata", f"Invalid Python metadata source: {exc}"))
+			return metadata
+
+		for node in module.body:
+			if not isinstance(node, ast.Assign):
+				continue
+
+			for target in node.targets:
+				if not isinstance(target, ast.Name) or target.id not in field_map:
+					continue
+
+				try:
+					value = ast.literal_eval(node.value)
+				except (ValueError, SyntaxError):
+					print(self._log_operation("extract_metadata", f"Unsupported literal for {target.id}"))
+					continue
+
+				metadata_name = field_map[target.id]
+				if metadata_name == "composition_keywords":
+					if isinstance(value, (list, tuple)):
+						metadata[metadata_name] = [item for item in value if isinstance(item, str)]
+					else:
+						print(self._log_operation("extract_metadata", f"{target.id} must be a list of strings"))
+				elif isinstance(value, str):
+					metadata[metadata_name] = value
+				else:
+					print(self._log_operation("extract_metadata", f"{target.id} must be a string"))
+
+		return metadata
 	
 	def _extract_string_value(self, line: str) -> str:
 		"""Extract string value from Python assignment line."""
-		# Simple extraction - handles basic cases
 		if '=' in line:
-			value = line.split('=', 1)[1].strip()
-			# Remove quotes
-			for quote in ['"', "'"]:
-				if value.startswith(quote) and value.endswith(quote):
-					return value[1:-1]
+			try:
+				value = ast.literal_eval(line.split('=', 1)[1].strip())
+				if isinstance(value, str):
+					return value
+			except (ValueError, SyntaxError):
+				print(self._log_operation("extract_metadata", f"Unsupported string literal: {line}"))
 		return ""
 	
 	def _extract_list_value(self, line: str, content: str) -> List[str]:
 		"""Extract list value from Python assignment."""
-		# Simplified list extraction
-		try:
-			if '[' in line and ']' in line:
-				start = line.find('[')
-				end = line.find(']')
-				if start != -1 and end != -1:
-					list_str = line[start+1:end]
-					# Simple comma-separated extraction
-					items = [item.strip().strip('"\'') for item in list_str.split(',')]
-					return [item for item in items if item]
-		except Exception:
-			pass
+		if '=' in line:
+			try:
+				value = ast.literal_eval(line.split('=', 1)[1].strip())
+				if isinstance(value, (list, tuple)):
+					return [item for item in value if isinstance(item, str)]
+				print(self._log_operation("extract_metadata", f"Expected list literal: {line}"))
+			except (ValueError, SyntaxError):
+				print(self._log_operation("extract_metadata", f"Unsupported list literal: {line}"))
 		return []
 	
 	def _infer_category_from_path(self, path: str) -> str:
