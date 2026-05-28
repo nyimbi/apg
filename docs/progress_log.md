@@ -6764,3 +6764,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile capabilities/common/conf/api.py tests/test_common_conf_api_auth_runtime.py`
 - `.venv/bin/python -m pytest tests/test_common_conf_api_auth_runtime.py -q` -> 4 passed, 10 pre-existing warnings
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:45 EAT
+
+Completed checkpoint:
+
+- Made gateway gRPC protocol support importable in generated-app environments without `grpcio`, gRPC health/reflection, Redis-backed circuit breaker, or TLS manager dependencies.
+- Added lightweight fallback gRPC, health, reflection, circuit-breaker, and TLS surfaces so service registration and metrics remain executable offline.
+- gRPC service registration now records inspectable runtime service state and defaults registered endpoints to `SERVING` until active health monitoring updates them.
+- Added focused runtime coverage for offline gRPC service registration, health metrics, and endpoint selection.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/grpc_protocol_support.py tests/test_composition_gateway_grpc_runtime_fallback.py`
+- `.venv/bin/python -m pytest tests/test_composition_gateway_grpc_runtime_fallback.py -q` -> 2 passed, 4 pre-existing warnings
+- `git diff --check capabilities/composition/gateway/grpc_protocol_support.py tests/test_composition_gateway_grpc_runtime_fallback.py`
+- Deferred broader pytest at the user's request to conserve battery.
