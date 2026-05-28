@@ -8280,4 +8280,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending.
+- Pushed commit `4bb5673` (`Make gateway production posture explicit`).
