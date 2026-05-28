@@ -17,16 +17,227 @@ from flask_babel import lazy_gettext
 from sqlalchemy import func, text
 from datetime import datetime, timedelta
 import json
+import asyncio
+from collections import Counter, defaultdict
 from typing import Dict, List, Any, Optional
 
-from .models import KeyAlgorithm, KeyUsage, KeyState, SecurityLevel, ComplianceFramework
-from .service import KeyManagementService, create_key_management_service
+from .models import KeyAlgorithm, KeyUsage, KeyState, SecurityLevel, ComplianceFramework, create_key_spec_async
+from .service import KeyManagementService
 from .ai_lifecycle import AILifecycleManager, LifecycleDecision
 from .security_intelligence import SecurityIntelligenceEngine, AnomalyAlert
 from .policy_engine import IntelligentPolicyEngine, PolicyEvaluationResult
-from .cloud_federation import CloudKeyFederationManager
-from .hsm_integration import HSMIntegrationManager
-from .quantum_safe import QuantumSafeCryptographyManager
+try:
+	from .cloud_federation import CloudKeyFederationManager
+except Exception:
+	CloudKeyFederationManager = None
+try:
+	from .hsm_integration import HSMIntegrationManager
+except Exception:
+	HSMIntegrationManager = None
+try:
+	from .quantum_safe import QuantumSafeCryptographyManager
+except Exception:
+	QuantumSafeCryptographyManager = None
+
+
+_runtime_keym_service: KeyManagementService | None = None
+
+
+def set_key_management_service(service: KeyManagementService | None) -> None:
+	"""Register the runtime key-management service used by views and API helpers."""
+	global _runtime_keym_service
+	_runtime_keym_service = service
+
+
+def _enum_value(value: Any) -> Any:
+	"""Return enum values while leaving plain values unchanged."""
+	return value.value if hasattr(value, "value") else value
+
+
+def _run_async(coro):
+	"""Run a coroutine from sync Flask-AppBuilder handlers."""
+	try:
+		asyncio.get_running_loop()
+	except RuntimeError:
+		return asyncio.run(coro)
+	raise RuntimeError("Cannot run KEYM async service operation from an active event loop")
+
+
+def _get_runtime_service(view: Any = None) -> KeyManagementService | None:
+	"""Resolve an injected or globally registered key-management service."""
+	if view is not None and getattr(view, "_keym_service", None) is not None:
+		return view._keym_service
+	return _runtime_keym_service
+
+
+def _get_or_create_runtime_service(view: Any = None) -> KeyManagementService:
+	"""Resolve or initialize an in-process KEYM service for view operations."""
+	service = _get_runtime_service(view)
+	if service is not None:
+		return service
+
+	service = KeyManagementService()
+	_run_async(service.initialize({"tenant_id": "default"}))
+	set_key_management_service(service)
+	if view is not None:
+		view._keym_service = service
+	return service
+
+
+def _service_keys(service: KeyManagementService | None) -> List[Any]:
+	"""Return key objects from service runtime state."""
+	if service is None:
+		return []
+	keys = getattr(service, "keys", {})
+	if isinstance(keys, dict):
+		return list(keys.values())
+	return list(keys or [])
+
+
+def _service_key(service: KeyManagementService | None, key_id: str) -> Any | None:
+	"""Return one key object from service runtime state."""
+	if service is None:
+		return None
+	keys = getattr(service, "keys", {})
+	if isinstance(keys, dict):
+		return keys.get(key_id)
+	for key in keys or []:
+		if getattr(getattr(key, "spec", None), "id", None) == key_id:
+			return key
+	return None
+
+
+def _service_usage_stats(service: KeyManagementService | None, key_id: str) -> Any | None:
+	"""Return usage stats for a key from service runtime state."""
+	if service is None:
+		return None
+	return getattr(service, "usage_stats", {}).get(key_id)
+
+
+def _key_record(key: Any, stats: Any = None) -> Dict[str, Any]:
+	"""Normalize a runtime Key model into the list/detail view shape."""
+	spec = key.spec
+	metadata = spec.metadata
+	policy = spec.policy
+	return {
+		'id': spec.id,
+		'name': metadata.name,
+		'algorithm': _enum_value(spec.algorithm),
+		'key_size': spec.key_size,
+		'state': _enum_value(spec.state),
+		'usage': [_enum_value(usage) for usage in spec.usage],
+		'created_at': spec.created_at,
+		'created_by': spec.created_by,
+		'last_used': getattr(stats, "last_used", None) or getattr(key, "last_used", None),
+		'usage_count': getattr(stats, "total_operations", getattr(key, "usage_count", 0)),
+		'security_level': _enum_value(spec.security_level),
+		'auto_rotate': policy.auto_rotate,
+		'rotation_interval': policy.rotation_interval_days,
+		'next_rotation': getattr(key, "next_rotation", None),
+		'hsm_backed': getattr(key, "hsm_key_id", None) is not None,
+		'compliance_frameworks': [_enum_value(framework) for framework in policy.compliance_frameworks],
+		'metadata': {
+			'project': metadata.project_id,
+			'environment': metadata.environment,
+			'cost_center': metadata.cost_center,
+			'tags': metadata.tags,
+			'description': metadata.description
+		}
+	}
+
+
+def _service_dashboard_snapshot(service: KeyManagementService | None) -> Dict[str, Any]:
+	"""Build dashboard data from current service runtime state."""
+	keys = _service_keys(service)
+	stats_by_id = getattr(service, "usage_stats", {}) if service else {}
+	threats = list(getattr(service, "threats", {}).values()) if service else []
+	audit_events = list(getattr(service, "audit_events", [])) if service else []
+
+	state_counts = Counter(_enum_value(key.spec.state) for key in keys)
+	algorithm_counts = Counter(_enum_value(key.spec.algorithm) for key in keys)
+	pending_rotation = sum(
+		1
+		for key in keys
+		if getattr(key, "next_rotation", None) and key.next_rotation <= datetime.utcnow() + timedelta(days=30)
+	)
+	violation_events = [
+		event for event in audit_events
+		if "violation" in getattr(event, "event_type", "").lower()
+		or getattr(event, "outcome", "") == "violation"
+	]
+	severity_counts = Counter(getattr(threat, "severity", "low") for threat in threats)
+	total_ops = sum(getattr(stats, "total_operations", 0) for stats in stats_by_id.values())
+
+	return {
+		'timestamp': datetime.utcnow().isoformat(),
+		'summary': {
+			'total_keys': len(keys),
+			'active_keys': state_counts.get(KeyState.ACTIVE.value, 0),
+			'pending_rotation': pending_rotation,
+			'compliance_violations': len(violation_events),
+			'security_alerts': len(threats),
+			'total_operations': total_ops,
+			'audit_events': len(audit_events)
+		},
+		'algorithm_distribution': dict(algorithm_counts),
+		'security_metrics': {
+			'threat_level': _derive_threat_level(severity_counts),
+			'recent_anomalies': len([
+				threat for threat in threats
+				if getattr(threat, "detected_at", datetime.min) >= datetime.utcnow() - timedelta(hours=24)
+			]),
+			'policy_violations': len(violation_events),
+			'hsm_health': _derive_hsm_health(service)
+		},
+		'compliance_status': _derive_compliance_status(keys, violation_events)
+	}
+
+
+def _derive_threat_level(severity_counts: Counter) -> str:
+	"""Derive a threat level from runtime threat severities."""
+	if severity_counts.get("critical", 0):
+		return "critical"
+	if severity_counts.get("high", 0):
+		return "high"
+	if severity_counts.get("medium", 0):
+		return "medium"
+	if sum(severity_counts.values()):
+		return "low"
+	return "none"
+
+
+def _derive_hsm_health(service: KeyManagementService | None) -> float:
+	"""Calculate HSM health from configured runtime HSM entries."""
+	if service is None:
+		return 0.0
+	configs = getattr(service, "hsm_configs", {}) or {}
+	if not configs:
+		return 0.0
+	healthy = 0
+	for config in configs.values():
+		status = config.get("health_status") or config.get("status") or ("healthy" if config.get("enabled") else "disabled")
+		if status in {"healthy", "connected", "online"} or config.get("enabled"):
+			healthy += 1
+	return round((healthy / len(configs)) * 100, 2)
+
+
+def _derive_compliance_status(keys: List[Any], violation_events: List[Any]) -> Dict[str, str]:
+	"""Calculate compliance framework status from key policies and violations."""
+	frameworks = {framework.value for framework in ComplianceFramework}
+	declared = Counter(
+		_enum_value(framework)
+		for key in keys
+		for framework in key.spec.policy.compliance_frameworks
+	)
+	violated = Counter(
+		_enum_value(framework)
+		for event in violation_events
+		for framework in getattr(event, "compliance_frameworks", [])
+	)
+	return {
+		framework: "violation" if violated.get(framework, 0) else ("compliant" if declared.get(framework, 0) else "not_configured")
+		for framework in sorted(frameworks)
+	}
 
 
 # APG Blueprint for Key Management
@@ -50,12 +261,6 @@ class KeyManagementDashboardView(BaseView):
 	def index(self):
 		"""Main dashboard view"""
 		try:
-			# Initialize services
-			keym_service = create_key_management_service()
-			ai_lifecycle = AILifecycleManager()
-			security_intel = SecurityIntelligenceEngine()
-			policy_engine = IntelligentPolicyEngine()
-			
 			# Get dashboard data
 			dashboard_data = self._get_dashboard_data()
 			
@@ -71,34 +276,7 @@ class KeyManagementDashboardView(BaseView):
 	
 	def _get_dashboard_data(self) -> Dict[str, Any]:
 		"""Gather comprehensive dashboard data"""
-		return {
-			'timestamp': datetime.utcnow().isoformat(),
-			'summary': {
-				'total_keys': 245,
-				'active_keys': 198,
-				'pending_rotation': 15,
-				'compliance_violations': 3,
-				'security_alerts': 7
-			},
-			'algorithm_distribution': {
-				'AES-256': 120,
-				'RSA-4096': 85,
-				'ECDSA-P384': 25,
-				'Kyber-768': 15
-			},
-			'security_metrics': {
-				'threat_level': 'medium',
-				'recent_anomalies': 12,
-				'policy_violations': 3,
-				'hsm_health': 98.5
-			},
-			'compliance_status': {
-				'FIPS_140_2': 'compliant',
-				'GDPR': 'compliant',
-				'HIPAA': 'partial',
-				'PCI_DSS': 'compliant'
-			}
-		}
+		return _service_dashboard_snapshot(_get_runtime_service(self))
 
 
 class KeyListView(BaseView):
@@ -117,7 +295,6 @@ class KeyListView(BaseView):
 		page = int(request.args.get('page', 1))
 		per_page = int(request.args.get('per_page', 25))
 		
-		# Get keys data (would integrate with actual service)
 		keys_data = self._get_keys_data(
 			algorithm_filter, state_filter, search_term, page, per_page
 		)
@@ -207,42 +384,13 @@ class KeyListView(BaseView):
 	def _get_keys_data(self, algorithm_filter: str, state_filter: str, 
 					   search_term: str, page: int, per_page: int) -> Dict[str, Any]:
 		"""Get paginated keys data with filters"""
-		# Placeholder data - would integrate with actual service
-		sample_keys = [
-			{
-				'id': 'key_001',
-				'name': 'Production API Key',
-				'algorithm': 'AES-256',
-				'state': 'active',
-				'created_at': datetime.utcnow() - timedelta(days=30),
-				'last_used': datetime.utcnow() - timedelta(hours=2),
-				'usage_count': 15420,
-				'security_level': 'confidential'
-			},
-			{
-				'id': 'key_002', 
-				'name': 'Database Encryption Key',
-				'algorithm': 'RSA-4096',
-				'state': 'active',
-				'created_at': datetime.utcnow() - timedelta(days=60),
-				'last_used': datetime.utcnow() - timedelta(minutes=15),
-				'usage_count': 892,
-				'security_level': 'restricted'
-			},
-			{
-				'id': 'key_003',
-				'name': 'Legacy System Key',
-				'algorithm': 'RSA-2048', 
-				'state': 'pending_rotation',
-				'created_at': datetime.utcnow() - timedelta(days=120),
-				'last_used': datetime.utcnow() - timedelta(days=1),
-				'usage_count': 5678,
-				'security_level': 'internal'
-			}
+		service = _get_runtime_service(self)
+		key_records = [
+			_key_record(key, _service_usage_stats(service, key.spec.id))
+			for key in _service_keys(service)
 		]
 		
-		# Apply filters (simplified)
-		filtered_keys = sample_keys
+		filtered_keys = key_records
 		if algorithm_filter:
 			filtered_keys = [k for k in filtered_keys if k['algorithm'] == algorithm_filter]
 		if state_filter:
@@ -277,43 +425,46 @@ class KeyListView(BaseView):
 		if not key_data.get('algorithm'):
 			return False, "Algorithm selection is required"
 		
-		# Simulate key creation
-		key_id = f"key_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
-		return True, f"Key '{key_data['name']}' created successfully with ID: {key_id}"
+		try:
+			service = _get_or_create_runtime_service(self)
+			algorithm = KeyAlgorithm(key_data['algorithm'])
+			usage = [KeyUsage(value) for value in key_data.get('usage', [])] or [KeyUsage.ENCRYPT]
+			security_level = SecurityLevel(key_data.get('security_level') or SecurityLevel.INTERNAL.value)
+			tenant_id = getattr(service, "config", {}).get("tenant_id", "default")
+			spec = _run_async(create_key_spec_async(
+				tenant_id=tenant_id,
+				algorithm=algorithm,
+				usage=usage,
+				name=key_data['name'],
+				created_by="ui",
+				key_size=key_data.get('key_size'),
+				description=key_data.get('description'),
+				security_level=security_level,
+				auto_rotate=key_data.get('auto_rotate', True)
+			))
+			key = _run_async(service.create_key(spec, user_id="ui"))
+			return True, f"Key '{key_data['name']}' created successfully with ID: {key.spec.id}"
+		except Exception as exc:
+			return False, f"Key creation failed: {exc}"
 	
 	def _get_key_detail(self, key_id: str) -> Dict[str, Any] | None:
 		"""Get detailed key information"""
-		# Placeholder - would integrate with actual service
-		if key_id == 'key_001':
-			return {
-				'id': key_id,
-				'name': 'Production API Key',
-				'algorithm': 'AES-256',
-				'key_size': 256,
-				'state': 'active',
-				'usage': ['encrypt', 'decrypt'],
-				'created_at': datetime.utcnow() - timedelta(days=30),
-				'created_by': 'admin@company.com',
-				'last_used': datetime.utcnow() - timedelta(hours=2),
-				'usage_count': 15420,
-				'security_level': 'confidential',
-				'auto_rotate': True,
-				'rotation_interval': 90,
-				'next_rotation': datetime.utcnow() + timedelta(days=60),
-				'hsm_backed': True,
-				'compliance_frameworks': ['GDPR', 'PCI_DSS'],
-				'metadata': {
-					'project': 'api-gateway',
-					'environment': 'production',
-					'cost_center': 'engineering'
-				}
-			}
-		return None
+		service = _get_runtime_service(self)
+		key = _service_key(service, key_id)
+		if key is None:
+			return None
+		return _key_record(key, _service_usage_stats(service, key_id))
 	
 	def _rotate_key(self, key_id: str) -> tuple[bool, str]:
 		"""Rotate specific key"""
-		# Simulate key rotation
-		return True, f"Key {key_id} rotated successfully"
+		service = _get_runtime_service(self)
+		if service is None or _service_key(service, key_id) is None:
+			return False, f"Key {key_id} not found"
+		try:
+			_run_async(service.rotate_key(key_id, user_id="ui"))
+			return True, f"Key {key_id} rotated successfully"
+		except Exception as exc:
+			return False, f"Key rotation failed: {exc}"
 
 
 class SecurityDashboardView(BaseView):
@@ -732,11 +883,16 @@ class QuantumSafeView(BaseView):
 def api_dashboard_stats():
 	"""API endpoint for dashboard statistics"""
 	try:
+		snapshot = _service_dashboard_snapshot(_get_runtime_service())
+		summary = snapshot['summary']
+		compliance_values = list(snapshot['compliance_status'].values())
+		compliant = len([status for status in compliance_values if status == "compliant"])
+		configured = len([status for status in compliance_values if status != "not_configured"])
 		stats = {
-			'total_keys': 245,
-			'active_keys': 198,
-			'security_alerts': 7,
-			'compliance_score': 94.2
+			'total_keys': summary['total_keys'],
+			'active_keys': summary['active_keys'],
+			'security_alerts': summary['security_alerts'],
+			'compliance_score': round((compliant / configured) * 100, 2) if configured else 0.0
 		}
 		return jsonify({'success': True, 'data': stats})
 		
@@ -748,15 +904,16 @@ def api_dashboard_stats():
 def api_security_alerts():
 	"""API endpoint for real-time security alerts"""
 	try:
-		alerts = [
-			{
-				'id': 'alert_001',
-				'type': 'anomaly',
-				'severity': 'high',
-				'message': 'Unusual key access pattern detected',
-				'timestamp': datetime.utcnow().isoformat()
-			}
-		]
+		service = _get_runtime_service()
+		alerts = []
+		for threat in list(getattr(service, "threats", {}).values()) if service else []:
+			alerts.append({
+				'id': threat.threat_id,
+				'type': threat.threat_type,
+				'severity': threat.severity,
+				'message': f"{threat.threat_type} detected for {len(threat.affected_keys)} key(s)",
+				'timestamp': threat.detected_at.isoformat()
+			})
 		return jsonify({'success': True, 'data': alerts})
 		
 	except Exception as e:
@@ -767,12 +924,20 @@ def api_security_alerts():
 def api_key_health(key_id: str):
 	"""API endpoint for key health status"""
 	try:
+		service = _get_runtime_service()
+		key = _service_key(service, key_id)
+		if key is None:
+			return jsonify({'success': False, 'error': 'Key not found'}), 404
+
+		stats = _service_usage_stats(service, key_id)
+		rotation_due = bool(getattr(key, "next_rotation", None) and key.next_rotation <= datetime.utcnow())
 		health = {
 			'key_id': key_id,
-			'status': 'healthy',
-			'last_used': datetime.utcnow().isoformat(),
-			'usage_count': 1542,
-			'rotation_due': False
+			'status': 'rotation_due' if rotation_due else _enum_value(key.spec.state),
+			'last_used': (getattr(stats, "last_used", None) or getattr(key, "last_used", None)).isoformat()
+				if (getattr(stats, "last_used", None) or getattr(key, "last_used", None)) else None,
+			'usage_count': getattr(stats, "total_operations", getattr(key, "usage_count", 0)),
+			'rotation_due': rotation_due
 		}
 		return jsonify({'success': True, 'data': health})
 		

@@ -8562,3 +8562,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile capabilities/composition/gateway/real_time_ai_processor.py capabilities/composition/gateway/conftest.py capabilities/composition/gateway/tests/test_real_time_ai_processor_runtime.py` passed.
 - `.venv/bin/python -m pytest -q capabilities/composition/gateway/tests/test_real_time_ai_processor_runtime.py` passed with 3 tests.
 - `rg -n "This would integrate with actual service mesh infrastructure|For now, store the rule configuration|This would integrate with Kubernetes or other orchestrator|For now, simulate the action|No module named 'redis'|No module named 'apg.core'" capabilities/composition/gateway/real_time_ai_processor.py capabilities/composition/gateway/conftest.py capabilities/composition/gateway/tests/test_real_time_ai_processor_runtime.py` found no stale gateway AI processor fake-action text or import-error text.
+
+### 2026-05-29 02:36 EAT
+
+Executable KEYM view runtime slice:
+
+- Made `capabilities/common/keym/views.py` importable in this checkout by making optional cloud federation, HSM, and quantum-safe manager imports lazy/fallback-safe.
+- Added a runtime key-management service registration/resolution layer for Flask-AppBuilder views and AJAX helpers.
+- Replaced fixed dashboard totals, algorithm distribution, security metrics, and compliance status with current `KeyManagementService` state from keys, usage stats, threats, audit events, and HSM configuration.
+- Replaced key-list and key-detail placeholder rows with normalized runtime key records.
+- Key creation and rotation helpers now call the real KEYM service paths from sync views instead of returning fabricated IDs/success.
+- Dashboard stats, security alerts, and key health API helpers now read registered service state and return honest empty/not-found responses when runtime state is absent.
+- Added capability-local focused coverage for dashboard aggregation, key list/detail filtering, API stats, API alerts, and key health from runtime service state.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/keym/views.py capabilities/common/keym/tests/test_views_runtime.py` passed.
+- `.venv/bin/python -m pytest -q capabilities/common/keym/tests/test_views_runtime.py` passed with 3 tests.
+- `rg -n "Get keys data \\(would integrate with actual service\\)|Placeholder data - would integrate with actual service|Placeholder - would integrate with actual service|Production API Key|Database Encryption Key|Legacy System Key|total_keys': 245|security_alerts': 7|usage_count': 1542" capabilities/common/keym/views.py capabilities/common/keym/tests/test_views_runtime.py` found no stale KEYM view placeholder rows or fixed demo API stats.
