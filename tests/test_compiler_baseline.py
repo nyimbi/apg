@@ -436,6 +436,30 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert "/metrics" in openapi["paths"]
 	assert "/self-test" in openapi["paths"]
 	assert "/theme.css" in openapi["paths"]
+	assert openapi["paths"]["/health"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+		"$ref": "#/components/schemas/HealthReport"
+	}
+	assert openapi["paths"]["/validate"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+		"$ref": "#/components/schemas/ValidationReport"
+	}
+	assert openapi["paths"]["/metrics"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+		"$ref": "#/components/schemas/MetricsSnapshot"
+	}
+	assert openapi["paths"]["/relationships"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+		"$ref": "#/components/schemas/RelationshipGraph"
+	}
+	assert openapi["paths"]["/storage"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+		"$ref": "#/components/schemas/StorageStatus"
+	}
+	assert openapi["paths"]["/records"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+		"$ref": "#/components/schemas/RecordsByEntity"
+	}
+	assert openapi["components"]["schemas"]["HealthReport"]["properties"]["storage"] == {
+		"$ref": "#/components/schemas/StorageStatus"
+	}
+	assert openapi["components"]["schemas"]["MetricsSnapshot"]["properties"]["database_status"] == {
+		"$ref": "#/components/schemas/DatabaseStatus"
+	}
 	assert theme_content_type.startswith("text/css")
 	assert "--apg-accent" in theme_css
 	assert "ApiKeyAuth" in openapi["components"]["securitySchemes"]
