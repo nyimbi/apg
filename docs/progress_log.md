@@ -5518,3 +5518,27 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `7f91326` (`Protect generated app mutations with API keys`) to `origin/main`.
+
+### 2026-05-28 07:15 EAT
+
+Completed checkpoint:
+
+- Added generated record revision metadata for executable apps.
+- Created and imported records now include `_revision: 1`.
+- Updates increment `_revision`.
+- Generated update and delete operations now support optional optimistic concurrency checks:
+  - update payloads can include `expected_revision`.
+  - delete routes can include `?expected_revision=<n>`.
+  - stale revisions return `409 revision_conflict` with current record state.
+- Generated OpenAPI schemas now include `_revision`.
+- Added focused regression coverage for stale update conflicts, successful expected-revision updates, stale delete conflicts, and successful expected-revision deletes.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py -q` -> 17 passed
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push for the generated optimistic-revision slice.

@@ -325,7 +325,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 			process.wait(timeout=2)
 
 	assert created["entity"] == "Customer"
-	assert created["record"] == {"id": 1, "name": "Asha", "email": "asha@example.com"}
+	assert created["record"] == {"id": 1, "_revision": 1, "name": "Asha", "email": "asha@example.com"}
 	assert created["count"] == 1
 	assert listed["records"] == [created["record"]]
 	assert fetched["record"] == created["record"]
@@ -350,7 +350,13 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	customer_schema = openapi["components"]["schemas"]["CustomerRecord"]
 	assert customer_schema["required"] == ["name", "email"]
 	assert customer_schema["properties"]["name"]["type"] == "string"
-	assert updated["record"] == {"id": 1, "name": "Asha", "email": "asha@new.example", "status": "active"}
+	assert updated["record"] == {
+		"id": 1,
+		"_revision": 2,
+		"name": "Asha",
+		"email": "asha@new.example",
+		"status": "active",
+	}
 	assert updated["event"]["action"] == "update"
 	assert updated["event"]["before"] == created["record"]
 	assert updated["event"]["after"] == updated["record"]
@@ -361,8 +367,8 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert missing_status == 404
 	assert missing_payload["error"] == "record_not_found"
 	assert empty_list["records"] == []
-	assert form_created["record"] == {"id": 2, "name": "Kofi", "email": "kofi@example.com"}
-	assert third_created["record"] == {"id": 3, "name": "Amara", "email": "amara@example.com"}
+	assert form_created["record"] == {"id": 2, "_revision": 1, "name": "Kofi", "email": "kofi@example.com"}
+	assert third_created["record"] == {"id": 3, "_revision": 1, "name": "Amara", "email": "amara@example.com"}
 	assert filtered["records"] == [form_created["record"]]
 	assert filtered["filters"] == {"name": "Kofi"}
 	assert filtered["total"] == 1
@@ -376,7 +382,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert exported["count"] == 2
 	assert imported["count"] == 1
 	assert imported["failed"] == 1
-	assert imported["imported"][0] == {"id": 4, "name": "Zuri", "email": "zuri@example.com"}
+	assert imported["imported"][0] == {"id": 4, "_revision": 1, "name": "Zuri", "email": "zuri@example.com"}
 	assert imported["errors"] == [{"index": 1, "errors": ["email is required"]}]
 	assert imported["events"][0]["action"] == "import"
 	parameters = openapi["paths"]["/entities/Customer/records"]["get"]["parameters"]
@@ -427,6 +433,7 @@ def test_generated_python_app_validates_records_from_entity_fields():
 		"additionalProperties": True,
 		"properties": {
 			"id": {"oneOf": [{"type": "integer"}, {"type": "string"}]},
+			"_revision": {"type": "integer"},
 			"name": {"type": "string"},
 			"quantity": {"type": "integer"},
 			"active": {"type": "boolean"},
@@ -454,7 +461,7 @@ def test_generated_python_app_validates_records_from_entity_fields():
 		{"record": {"name": "Widget", "quantity": 3, "active": True}},
 	)
 	assert status == 201
-	assert created["record"] == {"id": 1, "name": "Widget", "quantity": 3, "active": True}
+	assert created["record"] == {"id": 1, "_revision": 1, "name": "Widget", "quantity": 3, "active": True}
 
 	status, invalid_update = namespace["_put_payload"](
 		"/entities/InventoryItem/records/1",
@@ -462,6 +469,48 @@ def test_generated_python_app_validates_records_from_entity_fields():
 	)
 	assert status == 422
 	assert invalid_update["errors"] == ["active must be boolean"]
+
+
+def test_generated_python_app_supports_optimistic_record_revisions():
+	result = compile_apg_string(TYPED_DATA_APP_SOURCE)
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	status, created = namespace["_post_payload"](
+		"/entities/InventoryItem/records",
+		{"record": {"name": "Widget", "quantity": 3, "active": True}},
+	)
+	assert status == 201
+	assert created["record"]["_revision"] == 1
+
+	status, stale_update = namespace["_put_payload"](
+		"/entities/InventoryItem/records/1",
+		{"expected_revision": 99, "record": {"quantity": 4}},
+	)
+	assert status == 409
+	assert stale_update["error"] == "revision_conflict"
+	assert stale_update["expected_revision"] == 99
+	assert stale_update["current_revision"] == 1
+
+	status, updated = namespace["_put_payload"](
+		"/entities/InventoryItem/records/1",
+		{"expected_revision": 1, "record": {"quantity": 4}},
+	)
+	assert status == 200
+	assert updated["record"]["quantity"] == 4
+	assert updated["record"]["_revision"] == 2
+
+	status, stale_delete = namespace["_delete_record_payload"](
+		"/entities/InventoryItem/records/1?expected_revision=1"
+	)
+	assert status == 409
+	assert stale_delete["current_revision"] == 2
+
+	status, deleted = namespace["_delete_record_payload"](
+		"/entities/InventoryItem/records/1?expected_revision=2"
+	)
+	assert status == 200
+	assert deleted["deleted"]["_revision"] == 2
 
 
 def test_generated_python_app_persists_records_with_data_file(tmp_path):
@@ -632,7 +681,7 @@ def test_generated_python_app_can_require_api_key_for_mutations(tmp_path):
 	assert auth["mode"] == "api_key"
 	assert unauthorized_status == 401
 	assert unauthorized["error"] == "unauthorized"
-	assert created["record"] == {"id": 1, "name": "Asha", "email": "asha@example.com"}
+	assert created["record"] == {"id": 1, "_revision": 1, "name": "Asha", "email": "asha@example.com"}
 	assert deleted["deleted"] == created["record"]
 
 

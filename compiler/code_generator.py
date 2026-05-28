@@ -457,12 +457,41 @@ def _record_event(
     return dict(event)
 
 
+def _prepare_new_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    prepared = dict(record)
+    prepared.setdefault("_revision", 1)
+    return prepared
+
+
+def _expected_revision(payload: Dict[str, Any]) -> int | None:
+    value = payload.get("expected_revision")
+    if value is None and isinstance(payload.get("record"), dict):
+        value = payload["record"].get("_revision")
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _revision_conflict(existing: Dict[str, Any], expected_revision: int | None) -> Dict[str, Any] | None:
+    current_revision = existing.get("_revision")
+    if expected_revision is None or current_revision == expected_revision:
+        return None
+    return {{
+        "error": "revision_conflict",
+        "expected_revision": expected_revision,
+        "current_revision": current_revision,
+        "record": dict(existing),
+    }}
+
+
 def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
     fields = _field_specs(str(entity["name"]))
     if not fields:
         return {{"type": "object", "additionalProperties": True}}
     schema_properties: Dict[str, Any] = {{
         "id": {{"oneOf": [{{"type": "integer"}}, {{"type": "string"}}]}},
+        "_revision": {{"type": "integer"}},
     }}
     required_fields: list[str] = []
     for field in fields:
@@ -1031,6 +1060,7 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
         NEXT_RECORD_IDS[entity_name] += 1
     elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
         return 409, {{"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}}
+    record = _prepare_new_record(record)
     RECORD_STORE[entity_name].append(record)
     event = _record_event("create", entity_name, after=record)
     persistence_error = _persist_record_store()
@@ -1068,6 +1098,7 @@ def _import_records_payload(entity_name: str, payload: Dict[str, Any]) -> tuple[
         elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
             errors.append({{"index": index, "errors": [f"duplicate id {{record['id']}}"]}})
             continue
+        record = _prepare_new_record(record)
         RECORD_STORE[entity_name].append(record)
         imported.append(dict(record))
         events.append(_record_event("import", entity_name, after=record))
@@ -1100,9 +1131,13 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
         return 422, {{"error": "record_validation_failed", **validation}}
     for index, existing in enumerate(RECORD_STORE[entity_name]):
         if str(existing.get("id")) == str(record_id):
+            conflict = _revision_conflict(existing, _expected_revision(payload))
+            if conflict is not None:
+                return 409, conflict
             updated = dict(existing)
             updated.update(dict(raw_record))
             updated["id"] = existing.get("id")
+            updated["_revision"] = int(existing.get("_revision", 1)) + 1
             RECORD_STORE[entity_name][index] = updated
             event = _record_event("update", entity_name, before=existing, after=updated)
             persistence_error = _persist_record_store()
@@ -1113,6 +1148,8 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
 
 
 def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
+    raw_path = path
+    path = path.split("?", 1)[0]
     route = _record_route(path)
     if route is None or route["entity"] is None or route["record_id"] is None:
         return 404, {{"error": "not_found", "path": path}}
@@ -1122,6 +1159,17 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
         return 404, {{"error": "unknown_entity", "entity": entity_name}}
     for index, existing in enumerate(RECORD_STORE[entity_name]):
         if str(existing.get("id")) == str(record_id):
+            expected_revision = None
+            if "?" in raw_path:
+                query = parse_qs(raw_path.split("?", 1)[1], keep_blank_values=True)
+                value = query.get("expected_revision", [None])[-1]
+                try:
+                    expected_revision = int(value) if value is not None else None
+                except (TypeError, ValueError):
+                    expected_revision = None
+            conflict = _revision_conflict(existing, expected_revision)
+            if conflict is not None:
+                return 409, conflict
             deleted = RECORD_STORE[entity_name].pop(index)
             event = _record_event("delete", entity_name, before=deleted)
             persistence_error = _persist_record_store()
@@ -1242,7 +1290,7 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
         self._send_json(status, response)
 
     def do_DELETE(self) -> None:
-        path = self.path.split("?", 1)[0]
+        path = self.path
         if not self._authorize_mutation():
             return
         status, response = _delete_record_payload(path)
