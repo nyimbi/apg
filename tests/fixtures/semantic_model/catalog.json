@@ -1,0 +1,59 @@
+{
+  "format": "apg.semantic-model-fixture-catalog.v1",
+  "tags_required": [
+    "symbols",
+    "relationships",
+    "capabilities",
+    "database_backed_forms",
+    "diagnostics",
+    "graphs"
+  ],
+  "fixtures": [
+    {
+      "id": "relationships",
+      "source": "relationships.apg",
+      "tags": ["symbols", "relationships", "graphs"],
+      "expected_ok": true,
+      "symbols": ["module.relationships", "table.Customer", "table.SalesOrder", "field.SalesOrder.customer_id"],
+      "table_fields": {
+        "Customer": ["name", "email"],
+        "SalesOrder": ["customer_id", "total"]
+      },
+      "graph_kinds": ["er", "lookup", "deployment"]
+    },
+    {
+      "id": "capability_contract",
+      "source": "capability_contract.apg",
+      "tags": ["capabilities"],
+      "expected_ok": true,
+      "symbols": ["module.capability_contract", "capability.AuditLog"],
+      "capabilities": {
+        "AuditLog": {
+          "provides": ["audit_events"],
+          "requires": []
+        }
+      }
+    },
+    {
+      "id": "database_backed_form",
+      "source": "database_backed_form.apg",
+      "tags": ["database_backed_forms"],
+      "expected_ok": true,
+      "symbols": ["module.database_backed_form", "table.Customer", "form.CustomerForm"],
+      "table_fields": {
+        "Customer": ["name", "email"]
+      },
+      "view_bindings": {
+        "CustomerForm": ["name", "email"]
+      }
+    },
+    {
+      "id": "invalid_database_backed_form",
+      "source": "invalid_database_backed_form.apg",
+      "tags": ["diagnostics", "database_backed_forms"],
+      "expected_ok": false,
+      "symbols": ["module.invalid_database_backed_form", "table.Customer", "form.CustomerForm"],
+      "diagnostic_codes": ["APG0402"]
+    }
+  ]
+}

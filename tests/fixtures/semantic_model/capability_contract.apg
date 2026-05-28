@@ -1,0 +1,11 @@
+module capability_contract version 1.0.0 {
+	description: "Semantic model capability fixture";
+}
+
+capability AuditLog {
+	contract: {
+		id: audit_log,
+		provides: [audit_events],
+		configuration: {retention_days: 365}
+	};
+}

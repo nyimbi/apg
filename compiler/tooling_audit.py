@@ -12,6 +12,7 @@ from compiler.graphs import audit_graph_fixtures
 from compiler.migrations import audit_migration_fixtures
 from compiler.nl_plan import audit_nl_plan_fixtures
 from compiler.parser_golden import audit_parser_golden
+from compiler.semantic_model import audit_semantic_model_fixtures
 from language_server.semantic_service import audit_language_server_fixtures
 
 
@@ -64,6 +65,7 @@ def _fixture_audits() -> list[FixtureAudit]:
 		("diagnostics", "apg.diagnostic-audit.v1", audit_diagnostic_fixtures),
 		("formatter", "apg.formatter-audit.v1", audit_formatter_fixtures),
 		("drift", "apg.drift-audit.v1", audit_drift_fixtures),
+		("semantic_model", "apg.semantic-model-fixture-audit.v1", audit_semantic_model_fixtures),
 		("graph", "apg.graph-fixture-audit.v1", audit_graph_fixtures),
 		("language_server", "apg.language-server-fixture-audit.v1", audit_language_server_fixtures),
 		("nl_plan", "apg.nl-plan-fixture-audit.v1", audit_nl_plan_fixtures),

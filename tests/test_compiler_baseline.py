@@ -1585,6 +1585,28 @@ def test_cli_model_text_summarizes_agent_semantics(tmp_path):
 	assert "1 agent(s)" in result.output
 
 
+def test_cli_model_audits_semantic_model_fixture_catalog():
+	result = CliRunner().invoke(cli, ["model", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.semantic-model-fixture-audit.v1"
+	assert report["ok"] is True
+	assert report["missing_tags"] == []
+	assert report["blocking_gaps"] == []
+	assert report["summary"]["fixture_count"] >= 4
+	assert report["summary"]["failing_fixture_count"] == 0
+	assert {"symbols", "relationships", "graphs"}.issubset(report["tags_covered"])
+	assert {"capabilities", "database_backed_forms", "diagnostics"}.issubset(report["tags_covered"])
+	assert {fixture["id"] for fixture in report["fixtures"]} >= {
+		"relationships",
+		"capability_contract",
+		"database_backed_form",
+		"invalid_database_backed_form",
+	}
+	assert all(fixture["format"] == "apg.semantic-model.v1" for fixture in report["fixtures"])
+
+
 def test_cli_release_json_emits_generated_application_evidence_without_output(tmp_path):
 	source = tmp_path / "agent.apg"
 	output = tmp_path / "generated"
@@ -2665,7 +2687,7 @@ def test_cli_tooling_audit_json_runs_all_fixture_catalogs():
 	report = json.loads(result.output)
 	assert report["format"] == "apg.tooling-fixture-audit.v1"
 	assert report["ok"] is True
-	assert report["surface_count"] == 9
+	assert report["surface_count"] == 10
 	assert report["summary"]["failing_surface_count"] == 0
 	assert report["summary"]["blocking_gap_count"] == 0
 	assert report["summary"]["error_count"] == 0
@@ -2675,6 +2697,7 @@ def test_cli_tooling_audit_json_runs_all_fixture_catalogs():
 		"diagnostics",
 		"formatter",
 		"drift",
+		"semantic_model",
 		"graph",
 		"language_server",
 		"nl_plan",
@@ -2683,6 +2706,7 @@ def test_cli_tooling_audit_json_runs_all_fixture_catalogs():
 	}
 	assert all(surface["ok"] and surface["format_ok"] for surface in surfaces.values())
 	assert surfaces["parser_golden"]["format"] == "apg.parser-golden-audit.v1"
+	assert surfaces["semantic_model"]["format"] == "apg.semantic-model-fixture-audit.v1"
 	assert surfaces["release_evidence"]["format"] == "apg.release-evidence-fixture-audit.v1"
 
 

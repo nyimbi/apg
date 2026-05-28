@@ -31,6 +31,10 @@ APG currently has an executable compiler path:
   symbols, tables, agents, capabilities, composition metadata, diagnostics,
   deployment metadata, graph summaries, and database-backed form binding
   diagnostics without generating application files;
+- `apg model --audit-fixtures --json` emits
+  `apg.semantic-model-fixture-audit.v1` by checking checked-in semantic-model
+  fixtures for symbol, relationship, graph, capability, database-backed form,
+  and diagnostic coverage;
 - `apg format <file> --check|--write|--json` emits `apg.format-result.v1`
   and applies deterministic APG whitespace formatting;
 - `apg format --audit-fixtures --json` emits `apg.formatter-audit.v1` by
@@ -97,8 +101,8 @@ APG currently has an executable compiler path:
   fixtures across web, desktop, mobile, and container profiles;
 - `apg tooling audit --json` emits `apg.tooling-fixture-audit.v1` by running
   every checked-in compiler tooling fixture catalog as one CI-friendly gate:
-  parser-golden, diagnostics, formatter, drift, graph, language-server,
-  natural-language planning, migrations, and release evidence;
+  parser-golden, diagnostics, formatter, drift, semantic model, graph,
+  language-server, natural-language planning, migrations, and release evidence;
 - `apg language-server <file> --check --json` emits
   `apg.language-server-check.v1` from the shared semantic model and formatter,
   proving editor-facing diagnostics, completions, definitions, references,
@@ -748,6 +752,7 @@ apg compile app.apg --target python --output generated/app
 apg lint app.apg --json
 apg lint src/apg --strict --json
 apg model app.apg --json
+apg model --audit-fixtures --json
 apg format app.apg --check
 apg format app.apg --write
 apg format --audit-fixtures --json
@@ -851,6 +856,21 @@ Validation fails with `APG0802` when a requested target is not `python`, and
 the `apg.validate-report.v1` payload includes the requested target, declared
 application packaging profiles, the nested `apg.lint-report.v1`, and
 generator-readiness checks.
+
+### `apg model`
+
+```console
+apg model app.apg --json
+apg model --audit-fixtures --json
+```
+
+The model command emits `apg.semantic-model.v1` without writing generated
+application files. `--audit-fixtures` loads
+`tests/fixtures/semantic_model/catalog.json` and emits
+`apg.semantic-model-fixture-audit.v1`. The audit fails when required semantic
+surface tags are not covered by passing fixtures, symbol/table/view/capability
+expectations drift, expected diagnostics disappear, or the semantic-model
+report format changes.
 
 ### `apg compile`
 
@@ -1424,7 +1444,7 @@ Tooling tests must be fixture-driven and deterministic.
 | Test Family | Required Coverage |
 | --- | --- |
 | Parser golden tests | Valid/invalid DSL examples for every grammar construct, enforced by `apg parser-golden --json` and the `apg.parser-golden-audit.v1` report. |
-| Semantic tests | Symbol table, lookup paths, handler targets, capability catalog binding, workflows, packages, deployments. |
+| Semantic tests | Symbol table, lookup paths, handler targets, capability catalog binding, workflows, packages, deployments, database-backed form binding, and diagnostics, enforced by `apg model --audit-fixtures --json` and the `apg.semantic-model-fixture-audit.v1` report. |
 | Diagnostic golden tests | Every diagnostic code has at least one fixture and expected JSON output. |
 | Formatter tests | Idempotency, comment preservation, modifier ordering, stable output. |
 | CLI contract tests | Exit codes, JSON schemas, text summaries, bad arguments. |
@@ -1471,6 +1491,7 @@ Exit criteria:
 - No new generator behavior required.
 - Tooling fixtures can run in CI, including `apg parser-golden --json`,
   `apg diagnostics --audit-fixtures --json`,
+  `apg model --audit-fixtures --json`,
   `apg format --audit-fixtures --json`,
   `apg graph-suite --audit-fixtures --json`,
   `apg language-server --audit-fixtures --json`,

@@ -7,6 +7,7 @@ does not write generated application files.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,9 @@ from .ast_builder import (
 from .graphs import SUPPORTED_GRAPH_KINDS, build_graph_from_module
 from .parser import APGParser, APGSyntaxError
 from .semantic_analyzer import SemanticAnalyzer, SemanticError
+
+SEMANTIC_MODEL_FIXTURE_AUDIT_FORMAT = "apg.semantic-model-fixture-audit.v1"
+DEFAULT_SEMANTIC_MODEL_CATALOG = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "semantic_model" / "catalog.json"
 
 
 def build_semantic_model(path: Path) -> dict[str, Any]:
@@ -55,6 +59,54 @@ def build_semantic_model(path: Path) -> dict[str, Any]:
 	model["diagnostics"].extend(_database_backed_view_diagnostics(model, path))
 	model["ok"] = not any(diagnostic["severity"] == "error" for diagnostic in model["diagnostics"])
 	return model
+
+
+def audit_semantic_model_fixtures(catalog_path: Path | None = None) -> dict[str, Any]:
+	"""Run checked-in semantic-model fixtures against ``apg.semantic-model.v1``."""
+	catalog_file = Path(catalog_path or DEFAULT_SEMANTIC_MODEL_CATALOG)
+	catalog_root = catalog_file.parent
+	catalog = json.loads(catalog_file.read_text(encoding="utf-8"))
+	required_tags = sorted(str(tag) for tag in catalog.get("tags_required", []))
+	covered_tags: set[str] = set()
+	fixture_reports: list[dict[str, Any]] = []
+	blocking_gaps: list[dict[str, Any]] = []
+
+	for fixture in catalog.get("fixtures", []):
+		report = _audit_semantic_model_fixture(catalog_root, fixture)
+		fixture_reports.append(report)
+		if report["ok"]:
+			covered_tags.update(report["tags"])
+		else:
+			blocking_gaps.append({
+				"id": report["id"],
+				"source": report["source"],
+				"errors": report["errors"],
+			})
+
+	missing_tags = sorted(set(required_tags).difference(covered_tags))
+	for tag in missing_tags:
+		blocking_gaps.append({
+			"id": f"missing_tag:{tag}",
+			"source": str(catalog_file),
+			"errors": [f"required semantic-model fixture tag {tag!r} is not covered by a passing fixture"],
+		})
+
+	return {
+		"format": SEMANTIC_MODEL_FIXTURE_AUDIT_FORMAT,
+		"ok": not blocking_gaps,
+		"fixture_catalog": str(catalog_file),
+		"tags_required": required_tags,
+		"tags_covered": sorted(covered_tags),
+		"missing_tags": missing_tags,
+		"fixtures": fixture_reports,
+		"summary": {
+			"fixture_count": len(fixture_reports),
+			"passing_fixture_count": sum(1 for report in fixture_reports if report["ok"]),
+			"failing_fixture_count": sum(1 for report in fixture_reports if not report["ok"]),
+			"blocking_gap_count": len(blocking_gaps),
+		},
+		"blocking_gaps": blocking_gaps,
+	}
 
 
 def build_semantic_model_from_module(module: ModuleDeclaration, source: str | Path) -> dict[str, Any]:
@@ -236,6 +288,91 @@ def _model_from_module(module: ModuleDeclaration, path: Path) -> dict[str, Any]:
 		"packages": {},
 		"graphs": _graph_summaries(module, path),
 		"diagnostics": [],
+	}
+
+
+def _audit_semantic_model_fixture(catalog_root: Path, fixture: dict[str, Any]) -> dict[str, Any]:
+	fixture_id = str(fixture["id"])
+	source = (catalog_root / str(fixture["source"])).resolve()
+	tags = sorted(str(tag) for tag in fixture.get("tags", []))
+	expected_ok = bool(fixture.get("expected_ok", True))
+	errors: list[str] = []
+	model: dict[str, Any] | None = None
+
+	try:
+		model = build_semantic_model(source)
+	except Exception as error:
+		errors.append(str(error))
+
+	if model is None:
+		return {
+			"id": fixture_id,
+			"source": str(source),
+			"tags": tags,
+			"ok": False,
+			"format": "",
+			"expected_ok": expected_ok,
+			"actual_ok": False,
+			"errors": errors or ["semantic model was not produced"],
+		}
+
+	if model.get("format") != "apg.semantic-model.v1":
+		errors.append(f"expected apg.semantic-model.v1, got {model.get('format')}")
+	if bool(model.get("ok")) != expected_ok:
+		errors.append(f"expected ok={expected_ok}, got ok={model.get('ok')}")
+
+	diagnostic_codes = [str(diagnostic.get("code")) for diagnostic in model.get("diagnostics", [])]
+	for code in fixture.get("diagnostic_codes", []):
+		if str(code) not in diagnostic_codes:
+			errors.append(f"expected diagnostic {code} was not emitted")
+
+	for symbol_id in fixture.get("symbols", []):
+		if symbol_id not in model.get("symbols", {}):
+			errors.append(f"expected symbol {symbol_id} is missing")
+
+	for table_name, field_names in fixture.get("table_fields", {}).items():
+		table = model.get("tables", {}).get(table_name)
+		if table is None:
+			errors.append(f"expected table {table_name} is missing")
+			continue
+		for field_name in field_names:
+			if field_name not in table.get("fields", {}):
+				errors.append(f"expected field {table_name}.{field_name} is missing")
+
+	for view_name, expected_bindings in fixture.get("view_bindings", {}).items():
+		view = model.get("views", {}).get(view_name)
+		if view is None:
+			errors.append(f"expected view {view_name} is missing")
+			continue
+		actual_bindings = list(view.get("bindings", []))
+		if actual_bindings != list(expected_bindings):
+			errors.append(f"expected bindings for {view_name}={list(expected_bindings)}, got {actual_bindings}")
+
+	for capability_name, expected in fixture.get("capabilities", {}).items():
+		capability = model.get("capabilities", {}).get(capability_name)
+		if capability is None:
+			errors.append(f"expected capability {capability_name} is missing")
+			continue
+		for key in ["provides", "requires"]:
+			if key in expected and list(capability.get(key, [])) != list(expected[key]):
+				errors.append(
+					f"expected capability {capability_name}.{key}={list(expected[key])}, got {list(capability.get(key, []))}"
+				)
+
+	for graph_kind in fixture.get("graph_kinds", []):
+		if graph_kind not in model.get("graphs", {}):
+			errors.append(f"expected graph kind {graph_kind} is missing")
+
+	return {
+		"id": fixture_id,
+		"source": str(source),
+		"tags": tags,
+		"ok": not errors,
+		"format": model.get("format"),
+		"expected_ok": expected_ok,
+		"actual_ok": bool(model.get("ok")),
+		"diagnostic_codes": diagnostic_codes,
+		"errors": errors,
 	}
 
 

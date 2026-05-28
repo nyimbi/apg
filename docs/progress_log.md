@@ -8076,3 +8076,22 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `0f1ad29` (`Validate database-backed forms in the semantic model`).
+
+### 2026-05-28 23:07 EAT
+
+In progress:
+
+- Added a fixture audit gate for the shared semantic model.
+- Added `compiler.semantic_model.audit_semantic_model_fixtures()` and `apg model --audit-fixtures --json`, emitting `apg.semantic-model-fixture-audit.v1`.
+- Added checked-in semantic-model fixtures covering symbols, relationships, graph summaries, capabilities, database-backed forms, and APG0402 diagnostics.
+- Wired the semantic-model audit into `apg tooling audit --json`, increasing the aggregate compiler tooling gate to 10 surfaces.
+- Updated `docs/tooling.md` so the executable baseline, current command list, test strategy, Phase 0 gate, and model command contract include the semantic-model fixture audit.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/semantic_model.py compiler/tooling_audit.py cli/model_command.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/apg model --audit-fixtures --json` passed with 4 fixtures, 4 passing fixtures, all required tags covered, and 0 blocking gaps.
+- `.venv/bin/apg model --audit-fixtures` passed in text mode.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_model_audits_semantic_model_fixture_catalog tests/test_compiler_baseline.py::test_cli_tooling_audit_json_runs_all_fixture_catalogs -q` passed with 2 tests.
+- `.venv/bin/apg tooling audit --json` passed with 10 surfaces, 10 passing surfaces, 0 errors, and 0 blocking gaps.
+- `git diff --check -- compiler/semantic_model.py compiler/tooling_audit.py cli/model_command.py compiler/__init__.py tests/test_compiler_baseline.py tests/fixtures/semantic_model docs/tooling.md docs/progress_log.md` passed.

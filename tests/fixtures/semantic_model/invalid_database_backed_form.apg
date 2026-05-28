@@ -1,0 +1,12 @@
+module invalid_database_backed_form version 1.0.0 {
+	description: "Semantic model invalid form fixture";
+}
+
+table Customer {
+	name: str;
+}
+
+form CustomerForm {
+	name: str;
+	phone: str;
+}

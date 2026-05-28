@@ -1,0 +1,14 @@
+module relationships version 1.0.0 {
+	description: "Semantic model relationship fixture";
+}
+
+table Customer {
+	name: str;
+	email: str;
+}
+
+table SalesOrder {
+	customer_id: int;
+	customer: Customer;
+	total: float;
+}

@@ -1,0 +1,13 @@
+module database_backed_form version 1.0.0 {
+	description: "Semantic model form fixture";
+}
+
+table Customer {
+	name: str;
+	email: str;
+}
+
+form CustomerForm {
+	name: str;
+	email: str;
+}
