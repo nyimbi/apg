@@ -8300,4 +8300,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending.
+- Pushed commit `49a0743` (`Treat registry recommendations as executable contracts`).
