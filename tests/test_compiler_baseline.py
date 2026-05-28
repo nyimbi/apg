@@ -110,6 +110,9 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "docker build -t apg-generated-app ." in readme
 	assert "POST /agents/Planner/invoke" in readme
 	assert "component_manifest" in smoke_test
+	assert "openapi_contract" in smoke_test
+	assert "route_dispatch" in smoke_test
+	assert "capability_health" in smoke_test
 	compile(app, "app.py", "exec")
 	compile(smoke_test, "smoke_test.py", "exec")
 
@@ -1097,6 +1100,7 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	env_example = (output / ".env.example").read_text(encoding="utf-8")
 	readme = (output / "README.md").read_text(encoding="utf-8")
 	requirements = (output / "requirements.txt").read_text(encoding="utf-8")
+	smoke_test = (output / "smoke_test.py").read_text(encoding="utf-8")
 	assert "APG Python Application" in app
 	assert "HTTPServer" in app
 	assert "HEALTHCHECK" in dockerfile
@@ -1110,6 +1114,9 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in requirements
 	assert "standard library" in requirements
+	assert "openapi_contract" in smoke_test
+	assert "component_manifest" in smoke_test
+	assert "route_dispatch" in smoke_test
 
 
 def test_cli_init_describes_python_artifact_flow():

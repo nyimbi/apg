@@ -481,6 +481,16 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
     for filename, content in result.generated_files.items():
         (app_dir / filename).write_text(content, encoding="utf-8")
 
+    smoke = subprocess.run(
+        [sys.executable, "smoke_test.py"],
+        cwd=app_dir,
+        capture_output=True,
+        text=True,
+    )
+    assert smoke.returncode == 0, smoke.stderr
+    smoke_report = json.loads(smoke.stdout)
+    assert smoke_report["checks"]["capability_health"]["healthy"] is True
+
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]

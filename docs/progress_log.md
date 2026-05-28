@@ -7201,3 +7201,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated app now reports 86 routes and 107 documented methods
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 17:13 EAT
+
+Completed checkpoint:
+
+- Strengthened generated `self_test()` output so compiled apps include capability health in their executable smoke report when capabilities are present.
+- Strengthened generated `smoke_test.py` so it explicitly fails on OpenAPI, component manifest, route dispatch, or unhealthy capability reports instead of only checking the coarse `passed` flag.
+- Hardened generated rule evaluation so missing context values do not crash ordered comparisons or accidentally match bare condition references during health sampling.
+- Refreshed all 20 numbered example outputs so their generated smoke tests enforce the current runtime contracts.
+
+Battery-conscious verification:
+
+- Regenerated `examples/[01-20]*/output` with the compiler after the smoke contract change.
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py tests/test_capability_composition_runtime.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_documented_python_target_generates_executable_application_files tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application tests/test_capability_composition_runtime.py::test_generated_app_executes_capability_operations_over_http -q` -> 3 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated app reports healthy capability health, 86 routes, and 107 documented methods
+- Deferred broader pytest at the user's request to conserve battery.

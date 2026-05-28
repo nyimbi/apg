@@ -704,21 +704,55 @@ def _evaluate_condition(expression: str, context: Dict[str, Any]) -> bool:
         if marker not in expression:
             continue
         left_text, right_text = expression.split(marker, 1)
-        left = _resolve_value(left_text.strip(), context)
-        right = _resolve_value(right_text.strip(), context)
+        left_key = left_text.strip()
+        right_key = right_text.strip()
+        left = _resolve_value(left_key, context)
+        right = _resolve_value(right_key, context)
+        if _missing_context_reference(left_key, left, context):
+            return False
+        right_missing = _missing_context_reference(right_key, right, context)
         if operator == "!=":
             return left != right
         if operator == "==":
             return left == right
-        if operator == ">=":
-            return left >= right
-        if operator == "<=":
-            return left <= right
-        if operator == ">":
-            return left > right
-        if operator == "<":
-            return left < right
-    return bool(_resolve_value(expression, context))
+        if right_missing:
+            return False
+        try:
+            if operator == ">=":
+                return left >= right
+            if operator == "<=":
+                return left <= right
+            if operator == ">":
+                return left > right
+            if operator == "<":
+                return left < right
+        except TypeError:
+            return False
+    resolved = _resolve_value(expression, context)
+    if _missing_context_reference(expression, resolved, context):
+        return False
+    return bool(resolved)
+
+
+def _missing_context_reference(text: str, resolved: Any, context: Dict[str, Any]) -> bool:
+    if text in context or resolved != text:
+        return False
+    lowered = text.lower()
+    if lowered in {"true", "false", "none", "null"}:
+        return False
+    if (text.startswith("'") and text.endswith("'")) or (text.startswith('"') and text.endswith('"')):
+        return False
+    try:
+        int(text)
+        return False
+    except ValueError:
+        pass
+    try:
+        float(text)
+        return False
+    except ValueError:
+        pass
+    return True
 
 
 def _resolve_value(value: str, context: Dict[str, Any]) -> Any:

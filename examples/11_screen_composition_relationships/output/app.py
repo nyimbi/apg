@@ -296,17 +296,20 @@ def self_test() -> Dict[str, Any]:
     openapi = openapi_document()
     routes = sorted(openapi["paths"])
     metrics = metrics_snapshot()
+    checks: Dict[str, Any] = {
+        "validation": validation,
+        "metrics": metrics,
+        "route_count": len(routes),
+        "entity_count": metrics["entity_count"],
+    }
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_health_report"):
+        checks["capability_health"] = APG_CAPABILITIES.capability_health_report()
     return {
         "name": MODULE_NAME,
         "version": MODULE_VERSION,
         "passed": validation["valid"],
         "status": "ok" if validation["valid"] else "warning",
-        "checks": {
-            "validation": validation,
-            "metrics": metrics,
-            "route_count": len(routes),
-            "entity_count": metrics["entity_count"],
-        },
+        "checks": checks,
         "routes": routes,
     }
 
