@@ -7610,3 +7610,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_migrate_plan_json_detects_destructive_schema_and_ownership_changes tests/test_compiler_baseline.py::test_cli_migrate_plan_json_allows_additive_table_changes -q` -> 2 passed
 - `.venv/bin/apg migrate-plan /private/tmp/apg_migrate_plan_smoke/previous.apg /private/tmp/apg_migrate_plan_smoke/current.apg --backend postgresql --json` -> exited 1 with destructive `apg.migration-plan.v1`
 - `.venv/bin/apg migrate-plan /private/tmp/apg_migrate_plan_additive/previous.apg /private/tmp/apg_migrate_plan_additive/current.apg --backend mysql --json` -> exited 0 with additive `apg.migration-plan.v1`
+
+### 2026-05-28 20:01 EAT
+
+Completed checkpoint:
+
+- Implemented `compiler.diagnostics` as the shared APG diagnostic registry for stable diagnostic codes, severities, trigger text, explanations, next steps, and example fixes.
+- Added `apg diagnostics` and `apg diagnostics --audit-fixtures --json`.
+- Added checked-in diagnostic fixture catalog coverage for every registered diagnostic code, including syntax, semantic, UI, rule, workflow, security, deployment, capability, agent, migration, natural-language, and internal tooling ranges.
+- Rewired `compiler.explain` diagnostic explanations to use the shared registry instead of a separate local table.
+- Updated the tooling specification so `compiler.diagnostics`, `apg diagnostics`, and the current executable baseline reflect the new diagnostic golden gate.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/diagnostics.py cli/diagnostics_command.py compiler/explain.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_diagnostics_audits_registry_fixture_catalog tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers -q` -> 2 passed
+- `.venv/bin/apg diagnostics --audit-fixtures --json` -> emitted `apg.diagnostic-audit.v1` with 35/35 fixtures, no missing codes, no unknown codes, and no severity mismatches
+- `.venv/bin/apg diagnostics --json` -> emitted `apg.diagnostic-registry.v1`

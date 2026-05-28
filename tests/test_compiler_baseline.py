@@ -1471,6 +1471,23 @@ def test_cli_parser_golden_json_audits_fixture_catalog():
 	)
 
 
+def test_cli_diagnostics_audits_registry_fixture_catalog():
+	result = CliRunner().invoke(cli, ["diagnostics", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.diagnostic-audit.v1"
+	assert report["ok"] is True
+	assert report["summary"]["registry_count"] >= 35
+	assert report["summary"]["fixture_count"] == report["summary"]["registry_count"]
+	assert report["missing_fixture_codes"] == []
+	assert report["unknown_fixture_codes"] == []
+	assert report["severity_mismatches"] == []
+	assert report["registry"]["APG0001"]["title"] == "Syntax error"
+	assert report["registry"]["APG1201"]["area"] == "natural-language"
+	assert "APG1104" in report["fixture_codes"]
+
+
 def test_cli_explain_json_covers_symbols_diagnostics_and_handlers():
 	source = REPO_ROOT / "examples" / "20_enterprise_erp_platform" / "main.apg"
 

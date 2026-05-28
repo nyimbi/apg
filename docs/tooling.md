@@ -39,8 +39,16 @@ APG currently has an executable compiler path:
 - `apg parser-golden --json` emits `apg.parser-golden-audit.v1` by running the
   checked-in parser fixture catalog and proving required grammar constructs are
   represented by passing valid fixtures;
+- `apg diagnostics --audit-fixtures --json` emits `apg.diagnostic-audit.v1`
+  by checking the shared diagnostic registry against the checked-in diagnostic
+  fixture catalog;
 - `apg explain <file> --symbol|--diagnostic|--handler ... --json` emits
   `apg.explain-report.v1` from the same semantic model used by `apg model`;
+- `apg nl-plan <file> --prompt ... --json` emits `apg.nl-plan.v1` with a
+  linted APG DSL patch proposal before code generation;
+- `apg migrate-plan <previous> <current> --json` emits
+  `apg.migration-plan.v1` for semantic-model database and capability ownership
+  changes;
 - `apg package <file> --target web|desktop|mobile|container --out <dir> --json`
   emits `apg.package-report.v1`, writes a generated Python application package,
   attaches release evidence, and adds profile-specific launch/manifest files;
@@ -145,7 +153,7 @@ designers, and natural-language tools.
 | `compiler.semantic_model` | Existing semantic-model builder. Keep it as the canonical JSON producer for `apg.semantic-model.v1`. |
 | `compiler.explain` | Existing semantic explanation builder for symbols, diagnostics, and handlers. Extend it as the semantic model deepens. |
 | `compiler.code_generator` | Existing Python artifact generator. It remains the only compile target and should consume the normalized semantic model rather than ad hoc parse fragments. |
-| `compiler.diagnostics` | Planned diagnostic registry for APG code ranges, severities, related locations, and fix IDs. |
+| `compiler.diagnostics` | Existing diagnostic registry and fixture audit for APG code ranges, severities, related locations, fix IDs, and explanation text. |
 | `compiler.formatter` | Existing deterministic formatter for `.apg` source. Extend it toward full AST-aware formatting. |
 | `compiler.graphs` | Existing graph builders for ER, lookup, workflow, handler, capability, security, agent, package, and deployment graphs. |
 | `compiler.packager` | Existing package-profile builder over generated Python applications and release evidence. Extend it toward signed distribution bundles as packaging requirements deepen. |
@@ -645,6 +653,7 @@ apg graph app.apg --kind agent --format mermaid
 apg graph-suite app.apg --json
 apg release app.apg --json
 apg parser-golden --json
+apg diagnostics --audit-fixtures --json
 apg explain app.apg --symbol table.Customer --json
 apg explain app.apg --diagnostic APG0100 --json
 apg explain app.apg --handler OperationsDashboard.select --json
@@ -779,6 +788,21 @@ fixture through the APG parser, reports actual-versus-expected validity, and
 fails when a required grammar construct is not covered by a passing valid
 fixture. This command is the grammar change gate: edits to `spec/apg.g4` should
 add or update fixture coverage in the same change.
+
+### `apg diagnostics`
+
+```console
+apg diagnostics
+apg diagnostics --json
+apg diagnostics --audit-fixtures --json
+```
+
+The diagnostics command exposes the shared diagnostic registry and emits
+`apg.diagnostic-audit.v1` when auditing fixtures. The audit loads
+`tests/fixtures/diagnostics/catalog.json`, verifies that every registered
+diagnostic has fixture coverage, rejects fixture codes that are not registered,
+and checks fixture severity against the registry. This is the diagnostic golden
+gate for APG1100/APG1200 and future semantic diagnostics.
 
 ### `apg explain`
 

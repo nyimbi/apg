@@ -5,36 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .diagnostics import explain_diagnostic
 from .semantic_model import build_semantic_model
-
-
-DIAGNOSTIC_EXPLANATIONS: dict[str, dict[str, str]] = {
-	"APG0001": {
-		"title": "Syntax error",
-		"meaning": "The parser could not accept the source at the reported location.",
-		"next_step": "Fix the syntax near the diagnostic range, then rerun lint or parser-golden.",
-	},
-	"APG0100": {
-		"title": "Semantic warning",
-		"meaning": "The semantic analyzer found a non-blocking model concern.",
-		"next_step": "Review the referenced declaration and decide whether the warning is expected for this baseline.",
-	},
-	"APG0200": {
-		"title": "Type error",
-		"meaning": "A declaration or expression does not satisfy the current semantic type rules.",
-		"next_step": "Correct the referenced type, field, or expression before compiling.",
-	},
-	"APG0802": {
-		"title": "Unsupported compiler target",
-		"meaning": "APG currently compiles to generated Python artifacts only.",
-		"next_step": "Use --target python and express desktop, mobile, web, or deployment needs as packaging profiles.",
-	},
-	"APG9000": {
-		"title": "Internal tooling error",
-		"meaning": "A tooling exception occurred while parsing, validating, or explaining APG source.",
-		"next_step": "Capture the command, source file, and error text as a compiler/tooling defect.",
-	},
-}
 
 
 def build_explain_report(
@@ -154,11 +126,7 @@ def _explain_diagnostic(model: dict[str, Any], code: str) -> list[dict[str, Any]
 		for diagnostic in model.get("diagnostics", [])
 		if str(diagnostic.get("code", "")).upper() == normalized
 	]
-	registry = DIAGNOSTIC_EXPLANATIONS.get(normalized, {
-		"title": normalized,
-		"meaning": "No built-in explanation is registered for this diagnostic code yet.",
-		"next_step": "Inspect the matching diagnostic message and add registry coverage if this code is stable.",
-	})
+	registry = explain_diagnostic(normalized)
 	return [{
 		"kind": "diagnostic",
 		"summary": f"{normalized}: {registry['title']}",

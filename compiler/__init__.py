@@ -20,6 +20,7 @@ __author__ = "APG Language Team"
 from .parser import APGParser
 from .ast_builder import ASTBuilder
 from .semantic_analyzer import SemanticAnalyzer
+from .diagnostics import audit_diagnostic_fixtures, diagnostic_registry, explain_diagnostic
 from .explain import build_explain_report
 from .semantic_model import build_semantic_model, build_semantic_model_from_module
 from .parser_golden import audit_parser_golden
@@ -34,6 +35,9 @@ __all__ = [
     'APGParser',
     'ASTBuilder',
     'SemanticAnalyzer',
+    'audit_diagnostic_fixtures',
+    'diagnostic_registry',
+    'explain_diagnostic',
     'build_explain_report',
     'build_semantic_model',
     'build_semantic_model_from_module',
