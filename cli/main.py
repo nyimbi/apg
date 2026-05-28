@@ -238,7 +238,8 @@ agent BasicAgent {{
 	console.print("\n[green]Next steps:[/green]")
 	console.print("  1. Edit main.apg to define your application")
 	console.print("  2. Run 'apg compile' to generate Python artifacts")
-	console.print("  3. Run 'python generated/app.py' to inspect the application manifest")
+	console.print("  3. Run 'python generated/app.py' to start the generated application")
+	console.print("  4. Run 'python generated/app.py --describe' to inspect JSON metadata")
 
 
 if __name__ == '__main__':

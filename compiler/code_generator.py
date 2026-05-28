@@ -199,6 +199,9 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
+import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Optional
 
 
@@ -307,8 +310,92 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
     return report
 
 
-def main() -> None:
-    print(json.dumps(describe_application(), indent=2, sort_keys=True))
+def _json_bytes(payload: Any) -> bytes:
+    return json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+
+
+def _route_payload(path: str) -> tuple[int, Dict[str, Any]]:
+    path = path.rstrip("/") or "/"
+    if path in {{"/", "/manifest", "/application"}}:
+        return 200, describe_application()
+    if path == "/health":
+        validation = validate_application()
+        return 200, {{
+            "status": "ok" if validation["valid"] else "warning",
+            "name": MODULE_NAME,
+            "version": MODULE_VERSION,
+            "valid": validation["valid"],
+            "warnings": validation["warnings"],
+        }}
+    if path == "/validate":
+        validation = validate_application()
+        return (200 if validation["valid"] else 422), validation
+    if path == "/entities":
+        return 200, {{"entities": list_entities()}}
+    if path == "/agents":
+        return 200, {{
+            "agents": describe_application().get("ai_agent_descriptions", {{}}),
+            "teams": describe_application().get("ai_agent_team_descriptions", {{}}),
+        }}
+    if path == "/capabilities":
+        app = describe_application()
+        return 200, {{
+            "capabilities": app.get("capability_descriptions", {{}}),
+            "by_erp_module": app.get("capability_descriptions_by_erp_module", {{}}),
+            "dependency_graph": app.get("capability_dependency_graph", {{}}),
+            "load_order": app.get("capability_load_order", {{}}),
+        }}
+    if path == "/routes":
+        return 200, {{"routes": describe_application().get("ui_routes", {{}})}}
+    if path == "/composition":
+        return 200, describe_application().get("composition_graph", {{"nodes": [], "edges": []}})
+    return 404, {{"error": "not_found", "path": path}}
+
+
+class ApplicationRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        path = self.path.split("?", 1)[0]
+        status, payload = _route_payload(path)
+        body = _json_bytes(payload)
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: Any) -> None:
+        if os.environ.get("APG_DEBUG") == "1":
+            super().log_message(format, *args)
+
+
+def _arg_value(argv: list[str], name: str, default: str) -> str:
+    if name not in argv:
+        return default
+    index = argv.index(name)
+    if index + 1 >= len(argv):
+        return default
+    return argv[index + 1]
+
+
+def run_server(host: str | None = None, port: int | str | None = None) -> None:
+    resolved_host = host or os.environ.get("APG_HOST") or os.environ.get("HOST") or "127.0.0.1"
+    resolved_port = int(port or os.environ.get("APG_PORT") or os.environ.get("PORT") or "8080")
+    server = HTTPServer((resolved_host, resolved_port), ApplicationRequestHandler)
+    print(f"{{MODULE_NAME}} listening on http://{{resolved_host}}:{{resolved_port}}", flush=True)
+    server.serve_forever()
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if "--describe" in args:
+        print(json.dumps(describe_application(), indent=2, sort_keys=True))
+        return
+    if "--validate" in args:
+        print(json.dumps(validate_application(), indent=2, sort_keys=True))
+        return
+    host = _arg_value(args, "--host", os.environ.get("APG_HOST") or os.environ.get("HOST") or "127.0.0.1")
+    port = _arg_value(args, "--port", os.environ.get("APG_PORT") or os.environ.get("PORT") or "8080")
+    run_server(host, port)
 
 
 if __name__ == "__main__":

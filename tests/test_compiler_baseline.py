@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import socket
+import subprocess
 import sys
+import time
+import urllib.request
 
 from click.testing import CliRunner
 
@@ -40,6 +44,8 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in app
 	assert "django" not in app.lower()
+	assert "HTTPServer" in app
+	assert "run_server" in app
 	compile(app, "app.py", "exec")
 
 
@@ -72,8 +78,63 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	]
 	assert module.list_agents() == ["Planner"]
 	assert manifest["ai_agents"] == ["Planner"]
+	assert module.validate_application()["valid"] is True
 	assert "describe_application" in module.__all__
+	assert "validate_application" in module.__all__
 	assert "list_agents" in module.__all__
+
+
+def test_generated_python_app_serves_http_endpoints(tmp_path):
+	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
+	package_dir = tmp_path / "generated_app"
+	package_dir.mkdir()
+	for filename, content in result.generated_files.items():
+		(package_dir / filename).write_text(content, encoding="utf-8")
+
+	with socket.socket() as sock:
+		sock.bind(("127.0.0.1", 0))
+		port = sock.getsockname()[1]
+
+	process = subprocess.Popen(
+		[sys.executable, "app.py", "--host", "127.0.0.1", "--port", str(port)],
+		cwd=package_dir,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE,
+		text=True,
+	)
+	try:
+		base_url = f"http://127.0.0.1:{port}"
+		for _attempt in range(30):
+			try:
+				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
+					health = json.loads(response.read().decode("utf-8"))
+				break
+			except OSError:
+				if process.poll() is not None:
+					stdout, stderr = process.communicate(timeout=1)
+					raise AssertionError(f"generated app exited early\nstdout={stdout}\nstderr={stderr}")
+				time.sleep(0.05)
+		else:
+			raise AssertionError("generated app did not answer /health")
+
+		with urllib.request.urlopen(f"{base_url}/manifest", timeout=1) as response:
+			manifest = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/agents", timeout=1) as response:
+			agents = json.loads(response.read().decode("utf-8"))
+		with urllib.request.urlopen(f"{base_url}/validate", timeout=1) as response:
+			validation = json.loads(response.read().decode("utf-8"))
+	finally:
+		process.terminate()
+		try:
+			process.wait(timeout=2)
+		except subprocess.TimeoutExpired:
+			process.kill()
+			process.wait(timeout=2)
+
+	assert health["status"] == "ok"
+	assert manifest["name"] == "baseline"
+	assert agents["agents"]["Planner"]["runtime"] == "codex"
+	assert validation["valid"] is True
 
 
 def test_cli_compile_default_target_writes_generated_application(tmp_path):
@@ -86,13 +147,14 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert result.exit_code == 0, result.output
 	assert "Compilation successful" in result.output
 	assert f"python {output}/app.py" in result.output
-	assert "application metadata as JSON" in result.output
-	assert "http://localhost:8080" not in result.output
+	assert f"python {output}/app.py --describe" in result.output
+	assert "standard-library HTTP server" in result.output
 	assert (output / "app.py").exists()
 	assert (output / "ai_agents.py").exists()
 	app = (output / "app.py").read_text(encoding="utf-8")
 	requirements = (output / "requirements.txt").read_text(encoding="utf-8")
 	assert "APG Python Application" in app
+	assert "HTTPServer" in app
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in requirements
 	assert "standard library" in requirements

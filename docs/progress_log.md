@@ -5176,4 +5176,41 @@ Battery-conscious verification:
 
 Commit result:
 
+- Pushed commit `78ff6a0` (`Add generated application validation reports`) to `origin/main`.
+
+### 2026-05-28 05:46 EAT
+
+Direction update:
+
+- User clarified the execution strategy: rapidly get to executable applications first, then work back into the fuller platform abstractions.
+- Next slices should prioritize generated app runtime behavior and runnable entrypoints over additional metadata-only surface area.
+
+### 2026-05-28 05:49 EAT
+
+Completed checkpoint:
+
+- Changed generated dependency-free `app.py` outputs from metadata-only scripts into executable standard-library HTTP applications.
+- Generated apps now start an `HTTPServer` by default and expose:
+  - `/health`
+  - `/manifest`
+  - `/validate`
+  - `/entities`
+  - `/agents`
+  - `/capabilities`
+  - `/routes`
+  - `/composition`
+- Preserved machine-readable inspection with `python generated/app.py --describe` and validation with `python generated/app.py --validate`.
+- Updated compile/run/init guidance to describe the generated HTTP app first, then JSON metadata inspection.
+- Added focused regression coverage that starts a generated app in a subprocess and calls `/health`, `/manifest`, `/agents`, and `/validate`.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py cli/compile_command.py cli/run_command.py cli/create_project.py cli/main.py tests/test_compiler_baseline.py tests/test_cli_run_command.py`
+- `.venv/bin/pytest tests/test_compiler_baseline.py tests/test_cli_run_command.py -q` -> 15 passed
+- `.venv/bin/pytest tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py -q` -> 13 passed
+- `git diff --check -- compiler/code_generator.py cli/compile_command.py cli/run_command.py cli/create_project.py cli/main.py tests/test_compiler_baseline.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py docs/progress_log.md` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
 - Pending.

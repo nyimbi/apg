@@ -159,7 +159,7 @@ def _run_single(app_path: Path, host: str, port: int, debug: bool):
 	console.print(f"[cyan]Debug:[/cyan] {'enabled' if debug else 'disabled'}")
 	console.print(f"[cyan]Application:[/cyan] {app_path}")
 	console.print(f"[cyan]Detected runtime:[/cyan] {app_kind}")
-	console.print(f"\n[green]Executing generated Python manifest[/green]")
+	console.print(f"\n[green]Executing generated Python application[/green]")
 	console.print(f"[yellow]Press Ctrl+C to stop[/yellow]")
 	console.print("-" * 50)
 	
