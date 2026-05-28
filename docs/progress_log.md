@@ -8257,4 +8257,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending.
+- Pushed commit `34b2b85` (`Document APG agent adapter shims`).
