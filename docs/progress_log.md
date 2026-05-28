@@ -5154,4 +5154,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending.
+- Pushed commit `618c028` (`Expose capability topology in generated app manifests`) to `origin/main`.
