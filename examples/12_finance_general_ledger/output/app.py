@@ -77,6 +77,12 @@ def runtime_adapter_environment_keys(runtime: str, agent_name: str | None = None
     return []
 
 
+def runtime_adapter_command_candidates(runtime: str) -> list[list[str]]:
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "runtime_adapter_command_candidates"):
+        return AI_AGENTS.runtime_adapter_command_candidates(runtime)
+    return []
+
+
 def validate_agent_runtimes(available_agent_runtimes: list[str] | None = None) -> Dict[str, Any]:
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
         return AI_AGENTS.validate_agent_runtimes(available_agent_runtimes)
@@ -413,6 +419,7 @@ def component_manifest() -> Dict[str, Any]:
                     "openapi_document",
                     "query_records",
                     "relationship_graph",
+                    "runtime_adapter_command_candidates",
                     "runtime_adapter_environment_keys",
                     "self_test",
                     "semantic_model",

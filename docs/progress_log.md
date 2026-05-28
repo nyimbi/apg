@@ -8191,3 +8191,26 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `33ca262` (`Make missing agent adapters explicit at runtime`).
+
+### 2026-05-29 00:20 EAT
+
+In progress:
+
+- Added convention-based AI-agent adapter discovery to generated runtimes.
+- Generated agent runtimes now expose `runtime_adapter_command_candidates(runtime)` alongside environment-variable resolution.
+- Runtime adapter lookup now tries, in order: per-agent configuration, APG environment variables, then executable APG adapter shims on `PATH`.
+- Added default APG adapter shim candidates for `codex`, `claude_code`, `opencode`, `openai`, `ollama`, and `pi` without invoking raw vendor CLIs directly.
+- Missing adapters still report `status: adapter_required`, `mode: adapter_missing`, and now include inspectable command candidates.
+- Recompiled all 20 numbered APG examples so checked-in generated apps export the new adapter-candidate helper.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_ai_agent_composition.py::test_ai_agent_composition_generates_runtime_manifest tests/test_ai_agent_composition.py::test_ai_agent_external_runtime_adapter_executes_configured_command tests/test_ai_agent_composition.py::test_ai_agent_external_runtime_adapter_discovers_default_shim tests/test_ai_agent_composition.py::test_generated_app_manifest_includes_ai_agents_and_teams tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_compiler_baseline.py::test_generated_python_app_serves_http_endpoints -q` passed with 6 tests.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler -q` passed.
+- `.venv/bin/apg baseline examples --json` passed with 20 examples, 20 passing examples, 0 failures, and python-only targeting.
+- `git diff --check -- compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_compiler_baseline.py examples` passed.
+
+Commit result:
+
+- Pending.

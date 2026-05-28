@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import shlex
 import subprocess
 
@@ -50,7 +51,7 @@ class AgentTeamSpec:
 
 AI_AGENT_DATA: Dict[str, Dict[str, Any]] = {'Researcher': {'role': 'researcher', 'model': 'openai:gpt-4.1-mini', 'runtime': 'codex', 'system': 'Gather structured evidence and cite source IDs.', 'capabilities': [], 'tools': ['web.search', 'docs.read'], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {}, 'rules': [], 'ui': {}, 'theme': {}}, 'Coder': {'role': 'implementation_engineer', 'model': 'claude:sonnet', 'runtime': 'claude_code', 'system': 'Implement focused code changes from accepted plans.', 'capabilities': [], 'tools': ['repo.edit', 'tests.run'], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {}, 'rules': [], 'ui': {}, 'theme': {}}, 'LocalReviewer': {'role': 'local_review', 'model': 'ollama:llama3.1', 'runtime': 'ollama', 'system': 'Review diffs locally without sending code to external services.', 'capabilities': [], 'tools': [], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {}, 'rules': [], 'ui': {}, 'theme': {}}}
 AI_TEAM_DATA: Dict[str, Dict[str, Any]] = {'DeliverySwarm': {'agents': ['Researcher', 'Coder', 'LocalReviewer'], 'capabilities': [], 'flow': [{'source': 'Researcher', 'target': 'Coder', 'condition': 'done'}, {'source': 'Coder', 'target': 'LocalReviewer', 'condition': 'done'}], 'policy': {'runtimes': ['codex', 'claude_code', 'opencode', 'openai', 'ollama', 'pi']}, 'configuration': {'handoff_mode': 'sequential', 'fallback_runtime': 'opencode'}, 'rules': [{'name': 'local_review_required', 'when': 'code_changed', 'action': 'require_review'}], 'ui': {}, 'theme': {}}}
-AI_AGENT_RUNTIME_DATA: Dict[str, Dict[str, Any]] = {'local': {'kind': 'local', 'aliases': ['offline', 'test'], 'supports_workspace': False, 'requires_token': False, 'family': 'deterministic'}, 'codex': {'kind': 'cli', 'aliases': ['codex_cli', 'openai_codex'], 'supports_workspace': True, 'requires_token': False, 'family': 'coding_agent'}, 'claude_code': {'kind': 'cli', 'aliases': ['claude', 'claude-code'], 'supports_workspace': True, 'requires_token': False, 'family': 'coding_agent'}, 'opencode': {'kind': 'cli', 'aliases': ['open_code'], 'supports_workspace': True, 'requires_token': False, 'family': 'coding_agent'}, 'openai': {'kind': 'http', 'aliases': ['openai_chat'], 'supports_workspace': False, 'requires_token': True, 'family': 'chat_agent'}, 'ollama': {'kind': 'http', 'aliases': ['local_llm'], 'supports_workspace': False, 'requires_token': False, 'family': 'local_model'}, 'pi': {'kind': 'http', 'aliases': ['inflection_pi'], 'supports_workspace': False, 'requires_token': True, 'family': 'chat_agent'}}
+AI_AGENT_RUNTIME_DATA: Dict[str, Dict[str, Any]] = {'local': {'kind': 'local', 'aliases': ['offline', 'test'], 'supports_workspace': False, 'requires_token': False, 'family': 'deterministic'}, 'codex': {'kind': 'cli', 'aliases': ['codex_cli', 'openai_codex'], 'supports_workspace': True, 'requires_token': False, 'family': 'coding_agent', 'command_candidates': [['apg-agent-codex']]}, 'claude_code': {'kind': 'cli', 'aliases': ['claude', 'claude-code'], 'supports_workspace': True, 'requires_token': False, 'family': 'coding_agent', 'command_candidates': [['apg-agent-claude-code'], ['apg-agent-claude']]}, 'opencode': {'kind': 'cli', 'aliases': ['open_code'], 'supports_workspace': True, 'requires_token': False, 'family': 'coding_agent', 'command_candidates': [['apg-agent-opencode']]}, 'openai': {'kind': 'http', 'aliases': ['openai_chat'], 'supports_workspace': False, 'requires_token': True, 'family': 'chat_agent', 'command_candidates': [['apg-agent-openai']]}, 'ollama': {'kind': 'http', 'aliases': ['local_llm'], 'supports_workspace': False, 'requires_token': False, 'family': 'local_model', 'command_candidates': [['apg-agent-ollama']]}, 'pi': {'kind': 'http', 'aliases': ['inflection_pi'], 'supports_workspace': False, 'requires_token': True, 'family': 'chat_agent', 'command_candidates': [['apg-agent-pi']]}}
 AI_AGENT_RUNTIME_ALIASES: Dict[str, str] = {'offline': 'local', 'test': 'local', 'codex_cli': 'codex', 'openai_codex': 'codex', 'claude': 'claude_code', 'claude-code': 'claude_code', 'open_code': 'opencode', 'openai_chat': 'openai', 'local_llm': 'ollama', 'inflection_pi': 'pi'}
 
 
@@ -188,6 +189,17 @@ def _coerce_command(value: Any) -> Optional[List[str]]:
     return None
 
 
+def runtime_adapter_command_candidates(runtime: str) -> List[List[str]]:
+    runtime_spec = AI_AGENT_RUNTIME_DATA.get(canonical_runtime(runtime), {})
+    candidates = runtime_spec.get("command_candidates", [])
+    commands: List[List[str]] = []
+    for candidate in candidates:
+        command = _coerce_command(candidate)
+        if command:
+            commands.append(command)
+    return commands
+
+
 def _adapter_command(agent: AIAgentSpec, runtime: str) -> tuple[Optional[List[str]], Optional[str]]:
     configured = (
         agent.configuration.get("adapter_command")
@@ -201,6 +213,10 @@ def _adapter_command(agent: AIAgentSpec, runtime: str) -> tuple[Optional[List[st
         command = _coerce_command(os.environ.get(key))
         if command:
             return command, key
+    for candidate in runtime_adapter_command_candidates(runtime):
+        resolved = shutil.which(candidate[0])
+        if resolved:
+            return [resolved, *candidate[1:]], f"runtime.{runtime}.command_candidates"
     return None, None
 
 
@@ -324,6 +340,7 @@ def invoke_agent(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[st
             ),
             "requires_adapter": requires_adapter,
             "adapter_environment_keys": runtime_adapter_environment_keys(runtime, agent.name) if requires_adapter else [],
+            "adapter_command_candidates": runtime_adapter_command_candidates(runtime) if requires_adapter else [],
         },
     })
     return base

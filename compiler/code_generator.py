@@ -334,6 +334,12 @@ def runtime_adapter_environment_keys(runtime: str, agent_name: str | None = None
     return []
 
 
+def runtime_adapter_command_candidates(runtime: str) -> list[list[str]]:
+    if AI_AGENTS is not None and hasattr(AI_AGENTS, "runtime_adapter_command_candidates"):
+        return AI_AGENTS.runtime_adapter_command_candidates(runtime)
+    return []
+
+
 def validate_agent_runtimes(available_agent_runtimes: list[str] | None = None) -> Dict[str, Any]:
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
         return AI_AGENTS.validate_agent_runtimes(available_agent_runtimes)
@@ -670,6 +676,7 @@ def component_manifest() -> Dict[str, Any]:
                     "openapi_document",
                     "query_records",
                     "relationship_graph",
+                    "runtime_adapter_command_candidates",
                     "runtime_adapter_environment_keys",
                     "self_test",
                     "semantic_model",
@@ -5257,6 +5264,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import shlex
 import subprocess
 
@@ -5436,6 +5444,17 @@ def _coerce_command(value: Any) -> Optional[List[str]]:
     return None
 
 
+def runtime_adapter_command_candidates(runtime: str) -> List[List[str]]:
+    runtime_spec = AI_AGENT_RUNTIME_DATA.get(canonical_runtime(runtime), {{}})
+    candidates = runtime_spec.get("command_candidates", [])
+    commands: List[List[str]] = []
+    for candidate in candidates:
+        command = _coerce_command(candidate)
+        if command:
+            commands.append(command)
+    return commands
+
+
 def _adapter_command(agent: AIAgentSpec, runtime: str) -> tuple[Optional[List[str]], Optional[str]]:
     configured = (
         agent.configuration.get("adapter_command")
@@ -5449,6 +5468,10 @@ def _adapter_command(agent: AIAgentSpec, runtime: str) -> tuple[Optional[List[st
         command = _coerce_command(os.environ.get(key))
         if command:
             return command, key
+    for candidate in runtime_adapter_command_candidates(runtime):
+        resolved = shutil.which(candidate[0])
+        if resolved:
+            return [resolved, *candidate[1:]], f"runtime.{{runtime}}.command_candidates"
     return None, None
 
 
@@ -5572,6 +5595,7 @@ def invoke_agent(name: str, payload: Optional[Dict[str, Any]] = None) -> Dict[st
             ),
             "requires_adapter": requires_adapter,
             "adapter_environment_keys": runtime_adapter_environment_keys(runtime, agent.name) if requires_adapter else [],
+            "adapter_command_candidates": runtime_adapter_command_candidates(runtime) if requires_adapter else [],
         }},
     }})
     return base
@@ -5631,6 +5655,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 				"supports_workspace": True,
 				"requires_token": False,
 				"family": "coding_agent",
+				"command_candidates": [["apg-agent-codex"]],
 			},
 			"claude_code": {
 				"kind": "cli",
@@ -5638,6 +5663,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 				"supports_workspace": True,
 				"requires_token": False,
 				"family": "coding_agent",
+				"command_candidates": [["apg-agent-claude-code"], ["apg-agent-claude"]],
 			},
 			"opencode": {
 				"kind": "cli",
@@ -5645,6 +5671,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 				"supports_workspace": True,
 				"requires_token": False,
 				"family": "coding_agent",
+				"command_candidates": [["apg-agent-opencode"]],
 			},
 			"openai": {
 				"kind": "http",
@@ -5652,6 +5679,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 				"supports_workspace": False,
 				"requires_token": True,
 				"family": "chat_agent",
+				"command_candidates": [["apg-agent-openai"]],
 			},
 			"ollama": {
 				"kind": "http",
@@ -5659,6 +5687,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 				"supports_workspace": False,
 				"requires_token": False,
 				"family": "local_model",
+				"command_candidates": [["apg-agent-ollama"]],
 			},
 			"pi": {
 				"kind": "http",
@@ -5666,6 +5695,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 				"supports_workspace": False,
 				"requires_token": True,
 				"family": "chat_agent",
+				"command_candidates": [["apg-agent-pi"]],
 			},
 		}
 	
@@ -5787,7 +5817,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import auth_status, capability_health, capability_health_report, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, invoke_agent, invoke_team, list_agent_teams, list_agents, list_capabilities, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, runtime_adapter_environment_keys, self_test, semantic_model, storage_status, update_record, validate_agent_runtimes, validate_application, validate_component_manifest_contract, validate_openapi_contract, validate_route_dispatch_contract, validate_record',
+			'from .app import auth_status, capability_health, capability_health_report, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, invoke_agent, invoke_team, list_agent_teams, list_agents, list_capabilities, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, runtime_adapter_command_candidates, runtime_adapter_environment_keys, self_test, semantic_model, storage_status, update_record, validate_agent_runtimes, validate_application, validate_component_manifest_contract, validate_openapi_contract, validate_route_dispatch_contract, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
@@ -5815,6 +5845,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    "openapi_document",',
 			'    "query_records",',
 			'    "relationship_graph",',
+			'    "runtime_adapter_command_candidates",',
 			'    "runtime_adapter_environment_keys",',
 			'    "self_test",',
 			'    "semantic_model",',
@@ -5838,6 +5869,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        list_agent_teams,',
 			'        list_agents,',
 			'        list_teams,',
+			'        runtime_adapter_command_candidates,',
 			'        runtime_adapter_environment_keys,',
 			'        validate_agent_runtimes,',
 			'    )',
@@ -5853,6 +5885,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'        "list_agent_teams",',
 			'        "list_agents",',
 			'        "list_teams",',
+			'        "runtime_adapter_command_candidates",',
 			'        "runtime_adapter_environment_keys",',
 			'        "validate_agent_runtimes",',
 			'    ])',

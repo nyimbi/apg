@@ -335,6 +335,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "list_agents" in component["interfaces"]["python"]["exports"]
 	assert "invoke_agent" in component["interfaces"]["python"]["exports"]
 	assert "query_records" in component["interfaces"]["python"]["exports"]
+	assert "runtime_adapter_command_candidates" in component["interfaces"]["python"]["exports"]
 	assert "runtime_adapter_environment_keys" in component["interfaces"]["python"]["exports"]
 	assert "update_record" in component["interfaces"]["python"]["exports"]
 	assert "delete_record" in component["interfaces"]["python"]["exports"]
@@ -346,6 +347,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert invocation["status"] == "adapter_required"
 	assert invocation["mode"] == "adapter_missing"
 	assert "adapter command" in invocation["output"]["message"]
+	assert invocation["output"]["adapter_command_candidates"] == [["apg-agent-codex"]]
 	assert invocation["input"] == {"task": "plan"}
 	assert self_test["passed"] is True
 	assert "/self-test" in self_test["routes"]
@@ -413,6 +415,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "validate_record" in module.__all__
 	assert "list_records" in module.__all__
 	assert "list_agents" in module.__all__
+	assert "runtime_adapter_command_candidates" in module.__all__
 	assert "runtime_adapter_environment_keys" in module.__all__
 
 

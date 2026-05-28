@@ -3,6 +3,7 @@ First-class AI agent composition tests.
 """
 
 import json
+import os
 import shlex
 import sys
 import types
@@ -117,6 +118,7 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert "AI_AGENTS" in runtime
     assert "AI_AGENT_TEAMS" in runtime
     assert "AI_AGENT_RUNTIME_DATA" in runtime
+    assert "runtime_adapter_command_candidates" in runtime
     assert "validate_agent_runtimes" in runtime
     assert "'Planner'" in runtime
     assert "'SupportCrew'" in runtime
@@ -136,6 +138,11 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert namespace["list_teams"]() == ["SupportCrew"]
     assert "codex" in namespace["list_agent_runtimes"]()
     assert namespace["canonical_runtime"]("claude") == "claude_code"
+    assert namespace["runtime_adapter_command_candidates"]("codex") == [["apg-agent-codex"]]
+    assert namespace["runtime_adapter_command_candidates"]("claude") == [
+        ["apg-agent-claude-code"],
+        ["apg-agent-claude"],
+    ]
     assert namespace["describe_agent"]("Planner")["runtime"] == "codex"
     team_description = namespace["describe_team"]("SupportCrew")
     assert team_description["capabilities"] == ["support_response"]
@@ -156,6 +163,7 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert planner_invocation["input"] == {"ticket": "late order"}
     assert planner_invocation["output"]["requires_adapter"] is True
     assert "adapter command" in planner_invocation["output"]["message"]
+    assert planner_invocation["output"]["adapter_command_candidates"] == [["apg-agent-codex"]]
     writer_invocation = namespace["invoke_agent"]("Writer", {"message": "draft reply"})
     assert writer_invocation["runtime"] == "local"
     assert writer_invocation["status"] == "completed"
@@ -194,6 +202,49 @@ def test_ai_agent_external_runtime_adapter_executes_configured_command(monkeypat
     assert invocation["output"]["returncode"] == 0
     assert invocation["output"]["adapter_source"] == "APG_AGENT_RUNTIME_CODEX_COMMAND"
     assert invocation["output"]["parsed"] == {
+        "agent": "Planner",
+        "runtime": "codex",
+        "input": {"ticket": "late order"},
+    }
+    assert team_invocation["status"] == "completed"
+    assert [item["status"] for item in team_invocation["invocations"]] == ["completed", "completed"]
+
+
+def test_ai_agent_external_runtime_adapter_discovers_default_shim(monkeypatch, tmp_path):
+    result = APGCompiler().compile_string(AI_AGENT_SOURCE, "support.apg")
+    assert result.success is True
+
+    shim = tmp_path / "apg-agent-codex"
+    shim.write_text(
+        "\n".join([
+            f"#!{sys.executable}",
+            "import json",
+            "import sys",
+            "envelope = json.load(sys.stdin)",
+            "print(json.dumps({",
+            "    'shim': 'apg-agent-codex',",
+            "    'agent': envelope['agent']['name'],",
+            "    'runtime': envelope['runtime'],",
+            "    'input': envelope['input'],",
+            "}))",
+        ]),
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ.get('PATH', '')}")
+
+    namespace = {}
+    exec(compile(result.generated_files["ai_agents.py"], "ai_agents.py", "exec"), namespace)
+
+    invocation = namespace["invoke_agent"]("Planner", {"input": {"ticket": "late order"}})
+    team_invocation = namespace["invoke_team"]("SupportCrew", {"input": {"ticket": "late order"}})
+
+    assert invocation["status"] == "completed"
+    assert invocation["mode"] == "external"
+    assert invocation["output"]["adapter_source"] == "runtime.codex.command_candidates"
+    assert invocation["output"]["adapter_command"] == [str(shim)]
+    assert invocation["output"]["parsed"] == {
+        "shim": "apg-agent-codex",
         "agent": "Planner",
         "runtime": "codex",
         "input": {"ticket": "late order"},
@@ -250,6 +301,8 @@ def test_ai_agent_runtime_catalog_supports_fast_moving_agent_tools():
     assert namespace["canonical_runtime"]("open_code") == "opencode"
     assert namespace["canonical_runtime"]("pi") == "pi"
     assert set(namespace["agents_by_runtime"]()) >= {"codex", "claude_code", "opencode", "pi"}
+    assert namespace["runtime_adapter_command_candidates"]("opencode") == [["apg-agent-opencode"]]
+    assert namespace["runtime_adapter_command_candidates"]("pi") == [["apg-agent-pi"]]
 
 
 def test_generated_app_manifest_includes_ai_agents_and_teams():
