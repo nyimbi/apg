@@ -4682,4 +4682,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending commit/push for this checkpoint.
+- Pushed commit `2e44d47` (`Make legacy CRM subpackages importable standalone`) to `origin/main`.
