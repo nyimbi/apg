@@ -6944,3 +6944,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 4 passed
 - `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:43 EAT
+
+Completed checkpoint:
+
+- Updated generated Python READMEs so APG applications with database declarations document the database runtime surface.
+- READMEs now list `/databases`, `/databases/{Database}/schemas`, `/relationships`, and declared database schema/table counts.
+- Added focused regression coverage that compiles a database declaration and verifies the generated README explains those executable database endpoints.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 5 passed
+- `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
+- Deferred broader pytest at the user's request to conserve battery.

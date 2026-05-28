@@ -176,3 +176,17 @@ def test_generated_python_exposes_database_catalog_routes_and_openapi():
 	openapi = namespace["openapi_document"]()
 	assert "/databases" in openapi["paths"]
 	assert "/databases/LedgerDB/schemas" in openapi["paths"]
+
+
+def test_generated_readme_documents_database_runtime_surface():
+	parse_result = APGParser().parse_string(DATABASE_SOURCE, "database.apg")
+	ast = ASTBuilder().build_ast(parse_result["parse_tree"], "database.apg")
+
+	files = PythonCodeGenerator(CodeGenConfig(use_composable_templates=False)).generate(ast)
+	readme = files["README.md"]
+
+	assert "## Databases" in readme
+	assert "`GET /databases`" in readme
+	assert "`GET /databases/{Database}/schemas`" in readme
+	assert "`GET /relationships`" in readme
+	assert "`LedgerDB` - 1 schema(s), 2 table(s)" in readme

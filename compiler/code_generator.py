@@ -2427,6 +2427,7 @@ if __name__ == "__main__":
 		agents = [entity for entity in module.entities if isinstance(entity, AIAgentDeclaration)]
 		teams = [entity for entity in module.entities if isinstance(entity, AgentTeamDeclaration)]
 		capabilities = [entity for entity in module.entities if isinstance(entity, CapabilityDeclaration)]
+		databases = [entity for entity in module.entities if isinstance(entity, DatabaseDeclaration)]
 		entities = [
 			entity for entity in module.entities
 			if not isinstance(entity, (AIAgentDeclaration, AgentTeamDeclaration, CapabilityDeclaration))
@@ -2503,6 +2504,25 @@ if __name__ == "__main__":
 			lines.extend(["", "## Entities", ""])
 			for entity in entities:
 				lines.append(f"- `{entity.name}`")
+
+		if databases:
+			lines.extend([
+				"",
+				"## Databases",
+				"",
+				"- `GET /databases` - database catalog with connection and schema metadata",
+				"- `GET /databases/{Database}/schemas` - schema, table, column, index, and relationship metadata for one database",
+				"- `GET /relationships` - generated entity and database relationship graph",
+				"",
+				"Declared databases:",
+				"",
+			])
+			for database in databases:
+				schema_count = len(database.schemas)
+				table_count = sum(len(schema.tables) for schema in database.schemas)
+				lines.append(
+					f"- `{database.name}` - {schema_count} schema(s), {table_count} table(s)"
+				)
 
 		if agents:
 			lines.extend(["", "## AI agents", ""])
