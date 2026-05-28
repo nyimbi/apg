@@ -14,22 +14,105 @@ import asyncio
 import logging
 import json
 import time
+import random
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from enum import Enum
-import numpy as np
 from pathlib import Path
 
 # Async HTTP client for external integrations
-import aiohttp
+try:
+    import aiohttp
+except ImportError:  # pragma: no cover - optional integration dependency
+    aiohttp = None
+
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover - lightweight generated-app fallback
+    class _RandomFallback:
+        @staticmethod
+        def random() -> float:
+            return random.random()
+
+        @staticmethod
+        def uniform(low: float, high: float) -> float:
+            return random.uniform(low, high)
+
+        @staticmethod
+        def randint(low: int, high: int) -> int:
+            return random.randint(low, high - 1)
+
+    class _NumpyFallback:
+        random = _RandomFallback()
+
+        @staticmethod
+        def mean(values: List[float]) -> float:
+            numeric = [float(value) for value in values]
+            return sum(numeric) / len(numeric) if numeric else 0.0
+
+        @staticmethod
+        def var(values: List[float]) -> float:
+            numeric = [float(value) for value in values]
+            if not numeric:
+                return 0.0
+            average = _NumpyFallback.mean(numeric)
+            return sum((value - average) ** 2 for value in numeric) / len(numeric)
+
+        @staticmethod
+        def percentile(values: List[float], percentile: float) -> float:
+            numeric = sorted(float(value) for value in values)
+            if not numeric:
+                return 0.0
+            index = min(len(numeric) - 1, max(0, int(round((percentile / 100) * (len(numeric) - 1)))))
+            return numeric[index]
+
+    np = _NumpyFallback()
 
 # Database and caching
-import redis.asyncio as redis
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+try:
+    import redis.asyncio as redis
+except ImportError:  # pragma: no cover - optional integration dependency
+    class _RedisModuleFallback:
+        Redis = Any
+
+    redis = _RedisModuleFallback()
+
+try:
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy import text
+except ImportError:  # pragma: no cover - optional integration dependency
+    AsyncSession = Any
+
+    def text(statement: str) -> str:
+        return statement
 
 logger = logging.getLogger(__name__)
+
+
+class _InMemoryRedisClient:
+    """Redis-compatible store used when generated apps run without Redis."""
+
+    def __init__(self):
+        self._values: Dict[str, Any] = {}
+        self._lists: Dict[str, List[Any]] = {}
+
+    async def setex(self, key: str, ttl: int, value: Any) -> bool:
+        self._values[key] = value
+        return True
+
+    async def get(self, key: str) -> Optional[Any]:
+        return self._values.get(key)
+
+    async def lpush(self, key: str, value: Any) -> int:
+        items = self._lists.setdefault(key, [])
+        items.insert(0, value)
+        return len(items)
+
+    async def ltrim(self, key: str, start: int, end: int) -> bool:
+        items = self._lists.get(key, [])
+        self._lists[key] = items[start:end + 1]
+        return True
 
 class OptimizationLevel(str, Enum):
     """Optimization levels for different environments."""
@@ -1116,8 +1199,247 @@ class WorldClassProductionOptimizer:
             logger.error(f"Failed to get optimization status: {e}")
             return {'error': str(e)}
 
+
+class ProductionOptimizer(WorldClassProductionOptimizer):
+    """Compatibility facade for executable production optimization cycles.
+
+    Generated applications and older gateway tests use this API to pass one
+    production metrics snapshot and receive concrete optimization decisions.
+    The facade keeps the world-class optimizer internals available while
+    avoiding network-only assumptions during local compilation/runtime smoke
+    checks.
+    """
+
+    def __init__(self, db_session: Optional[AsyncSession] = None, redis_client: Optional[Any] = None):
+        super().__init__(
+            redis_client=redis_client or _InMemoryRedisClient(),
+            db_session=db_session
+        )
+        self._last_metrics_snapshot: Dict[str, Any] = {}
+
+    async def run_optimization_cycle(self, production_metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Run one deterministic optimization pass over supplied metrics."""
+        start_time = time.time()
+        self._last_metrics_snapshot = dict(production_metrics or {})
+
+        pool_result = await self.optimize_connection_pools(self._last_metrics_snapshot)
+        cache_result = await self.optimize_caching_strategy(self._last_metrics_snapshot)
+        load_balancer_result = await self.optimize_load_balancers(self._last_metrics_snapshot)
+
+        optimizations_applied = (
+            pool_result.get("optimizations_applied", 0) +
+            cache_result.get("optimizations_applied", 0) +
+            load_balancer_result.get("optimizations_applied", 0)
+        )
+        performance_improvement = self._summarize_cycle_improvement(
+            pool_result, cache_result, load_balancer_result
+        )
+
+        result = {
+            "optimizations_applied": optimizations_applied,
+            "performance_improvement": performance_improvement,
+            "optimized_pools": pool_result.get("optimized_pools", {}),
+            "cache_recommendations": cache_result.get("cache_recommendations", {}),
+            "load_balancer_recommendations": load_balancer_result.get("load_balancer_recommendations", {}),
+            "duration": time.time() - start_time,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        self.optimization_history.append({
+            "service_id": "metrics-snapshot",
+            "optimization_level": OptimizationLevel.PRODUCTION.value,
+            "results": result,
+            "overall_impact": performance_improvement,
+            "duration": result["duration"],
+            "timestamp": result["generated_at"]
+        })
+        return result
+
+    async def optimize_connection_pools(self, production_metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Produce connection-pool recommendations from service telemetry."""
+        optimized_pools: Dict[str, Dict[str, Any]] = {}
+        for service_id, metrics in self._service_metrics(production_metrics).items():
+            request_rate = float(metrics.get("request_rate", metrics.get("requests_per_second", 0.0)) or 0.0)
+            latency_ms = float(metrics.get("avg_response_time", metrics.get("latency", 100.0)) or 100.0)
+            error_rate = float(metrics.get("error_rate", 0.0) or 0.0)
+            cpu_usage = float(metrics.get("cpu_usage", 50.0) or 50.0)
+
+            current_size = max(5, int(request_rate / 100) or 5)
+            pressure_factor = 1.0
+            if latency_ms >= 250:
+                pressure_factor += 0.5
+            if error_rate >= 3.0:
+                pressure_factor += 0.3
+            if cpu_usage >= 80:
+                pressure_factor += 0.2
+
+            recommended_size = min(100, max(current_size, int(current_size * pressure_factor)))
+            optimized_pools[service_id] = {
+                "current_config": {
+                    "pool_size": current_size,
+                    "min_pool_size": max(2, int(current_size * 0.3)),
+                    "max_pool_size": max(current_size, int(current_size * 1.8))
+                },
+                "recommended_config": {
+                    "pool_size": recommended_size,
+                    "min_pool_size": max(2, int(recommended_size * 0.35)),
+                    "max_pool_size": max(recommended_size, int(recommended_size * 2.0))
+                },
+                "optimization_actions": self._pool_actions(service_id, current_size, recommended_size),
+                "estimated_improvement": {
+                    "latency_reduction_ms": round(max(0.0, latency_ms - 120.0) * 0.25, 2),
+                    "error_rate_reduction_percent": round(max(0.0, error_rate - 1.0) * 0.4, 2)
+                }
+            }
+
+        return {
+            "optimized_pools": optimized_pools,
+            "optimizations_applied": sum(
+                1 for pool in optimized_pools.values()
+                if pool["optimization_actions"]
+            ),
+            "generated_at": datetime.utcnow().isoformat()
+        }
+
+    async def optimize_caching_strategy(self, production_metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Produce cache recommendations from service latency and traffic."""
+        recommendations: Dict[str, Dict[str, Any]] = {}
+        for service_id, metrics in self._service_metrics(production_metrics).items():
+            request_rate = float(metrics.get("request_rate", 0.0) or 0.0)
+            latency_ms = float(metrics.get("avg_response_time", metrics.get("latency", 100.0)) or 100.0)
+            error_rate = float(metrics.get("error_rate", 0.0) or 0.0)
+
+            if request_rate >= 500 or latency_ms >= 200:
+                strategy = "adaptive"
+                ttl = 180 if error_rate >= 3.0 else 300
+                max_size = max(1000, int(request_rate * 2))
+                actions = [f"Enable adaptive caching for {service_id}"]
+            else:
+                strategy = "lru"
+                ttl = 120
+                max_size = 500
+                actions = []
+
+            recommendations[service_id] = {
+                "recommended_config": {
+                    "strategy": strategy,
+                    "ttl": ttl,
+                    "max_size": max_size
+                },
+                "optimization_actions": actions,
+                "expected_improvements": {
+                    "hit_rate_increase": 0.12 if actions else 0.0,
+                    "response_time_improvement_percent": 8.0 if actions else 0.0
+                }
+            }
+
+        return {
+            "cache_recommendations": recommendations,
+            "optimizations_applied": sum(
+                1 for recommendation in recommendations.values()
+                if recommendation["optimization_actions"]
+            ),
+            "generated_at": datetime.utcnow().isoformat()
+        }
+
+    async def optimize_load_balancers(self, production_metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Produce load-balancer recommendations from snapshot metrics."""
+        recommendations: Dict[str, Dict[str, Any]] = {}
+        load_balancers = production_metrics.get("load_balancers", {}) if production_metrics else {}
+        services = self._service_metrics(production_metrics)
+
+        for lb_id, lb_metrics in load_balancers.items():
+            active_connections = int(lb_metrics.get("active_connections", 0) or 0)
+            unhealthy = int((lb_metrics.get("backend_health", {}) or {}).get("unhealthy", 0) or 0)
+            current_algorithm = lb_metrics.get("algorithm", "round_robin")
+            recommended_algorithm = "least_connections" if active_connections >= 100 else current_algorithm
+            if unhealthy:
+                recommended_algorithm = "least_response_time"
+
+            actions = []
+            if recommended_algorithm != current_algorithm:
+                actions.append(f"Switch {lb_id} from {current_algorithm} to {recommended_algorithm}")
+            if unhealthy:
+                actions.append(f"Route traffic away from {unhealthy} unhealthy backends")
+
+            recommendations[lb_id] = {
+                "current_config": {"algorithm": current_algorithm},
+                "recommended_config": {"algorithm": recommended_algorithm},
+                "optimization_actions": actions,
+                "expected_improvements": {
+                    "response_time_reduction_ms": 25.0 if actions else 0.0,
+                    "backend_utilization_improvement_percent": 10.0 if actions else 0.0
+                }
+            }
+
+        if not recommendations and services:
+            recommendations["default"] = {
+                "current_config": {"algorithm": "round_robin"},
+                "recommended_config": {"algorithm": "least_connections"},
+                "optimization_actions": ["Create default least-connections balancer for supplied services"],
+                "expected_improvements": {
+                    "response_time_reduction_ms": 15.0,
+                    "backend_utilization_improvement_percent": 8.0
+                }
+            }
+
+        return {
+            "load_balancer_recommendations": recommendations,
+            "optimizations_applied": sum(
+                1 for recommendation in recommendations.values()
+                if recommendation["optimization_actions"]
+            ),
+            "generated_at": datetime.utcnow().isoformat()
+        }
+
+    def _service_metrics(self, production_metrics: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        services = (production_metrics or {}).get("services", {})
+        if isinstance(services, dict):
+            return {
+                str(service_id): dict(metrics or {})
+                for service_id, metrics in services.items()
+            }
+        if isinstance(services, list):
+            return {
+                str(item.get("name", item.get("service_id", f"service-{index}"))): dict(item)
+                for index, item in enumerate(services)
+                if isinstance(item, dict)
+            }
+        return {}
+
+    def _pool_actions(self, service_id: str, current_size: int, recommended_size: int) -> List[str]:
+        if recommended_size > current_size:
+            return [f"Increase {service_id} connection pool from {current_size} to {recommended_size}"]
+        if recommended_size < current_size:
+            return [f"Decrease {service_id} connection pool from {current_size} to {recommended_size}"]
+        return []
+
+    def _summarize_cycle_improvement(
+        self,
+        pool_result: Dict[str, Any],
+        cache_result: Dict[str, Any],
+        load_balancer_result: Dict[str, Any]
+    ) -> Dict[str, float]:
+        latency_reduction = 0.0
+        error_reduction = 0.0
+        response_improvement_percent = 0.0
+
+        for pool in pool_result.get("optimized_pools", {}).values():
+            latency_reduction += pool.get("estimated_improvement", {}).get("latency_reduction_ms", 0.0)
+            error_reduction += pool.get("estimated_improvement", {}).get("error_rate_reduction_percent", 0.0)
+        for recommendation in cache_result.get("cache_recommendations", {}).values():
+            response_improvement_percent += recommendation.get("expected_improvements", {}).get("response_time_improvement_percent", 0.0)
+        for recommendation in load_balancer_result.get("load_balancer_recommendations", {}).values():
+            latency_reduction += recommendation.get("expected_improvements", {}).get("response_time_reduction_ms", 0.0)
+
+        return {
+            "latency_reduction_ms": round(latency_reduction, 2),
+            "error_rate_reduction_percent": round(error_reduction, 2),
+            "response_time_improvement_percent": round(response_improvement_percent, 2)
+        }
+
 # Export main classes
 __all__ = [
+    'ProductionOptimizer',
     'WorldClassProductionOptimizer',
     'ConnectionPoolOptimizer',
     'CacheOptimizer', 

@@ -6733,3 +6733,20 @@ Battery-conscious verification:
 - `rg -n "def set_config_manager|def set_gitops_manager|def set_nlp_service|pass\\s*$" capabilities/common/conf/service.py -S` -> setter definitions only, no `pass` matches
 - `git diff --check capabilities/common/conf/service.py tests/test_common_conf_service_noop_adapter.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:37 EAT
+
+Completed checkpoint:
+
+- Made the gateway production optimizer importable in generated-app environments without optional `aiohttp`, Redis, SQLAlchemy, or NumPy installations.
+- Added an in-memory Redis-compatible fallback for local optimizer state and optimization history writes.
+- Restored the executable `ProductionOptimizer` facade expected by gateway production validation callers.
+- `ProductionOptimizer.run_optimization_cycle()` now accepts a production metrics snapshot and returns deterministic connection-pool, cache, load-balancer, and performance-improvement decisions.
+- Added focused runtime coverage for the offline optimizer contract and specific optimization methods.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/gateway/production_optimizer.py tests/test_composition_gateway_production_optimizer_runtime.py`
+- `.venv/bin/python -m pytest tests/test_composition_gateway_production_optimizer_runtime.py -q` -> 2 passed, 4 pre-existing warnings
+- `git diff --check capabilities/composition/gateway/production_optimizer.py tests/test_composition_gateway_production_optimizer_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
