@@ -1,0 +1,31 @@
+{
+  "format": "apg.formatter-fixture-catalog.v1",
+  "tags_required": [
+    "file_comment",
+    "declaration_comment",
+    "inline_comment",
+    "modifier_order",
+    "relationship_modifier",
+    "idempotency"
+  ],
+  "fixtures": [
+    {
+      "id": "comments_stay_attached",
+      "source": "comments_stay_attached/input.apg",
+      "expected": "comments_stay_attached/expected.apg",
+      "tags": ["file_comment", "declaration_comment", "inline_comment", "idempotency"]
+    },
+    {
+      "id": "canonical_modifier_order",
+      "source": "canonical_modifier_order/input.apg",
+      "expected": "canonical_modifier_order/expected.apg",
+      "tags": ["modifier_order", "relationship_modifier", "idempotency"]
+    },
+    {
+      "id": "already_formatted_is_stable",
+      "source": "already_formatted_is_stable/input.apg",
+      "expected": "already_formatted_is_stable/expected.apg",
+      "tags": ["idempotency"]
+    }
+  ]
+}

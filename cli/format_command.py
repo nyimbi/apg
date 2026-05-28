@@ -8,7 +8,7 @@ from pathlib import Path
 
 import click
 
-from compiler.formatter import format_apg_source
+from compiler.formatter import audit_formatter_fixtures, format_apg_source
 
 
 def format_file(path: Path, write: bool = False, include_text: bool = True) -> dict[str, object]:
@@ -23,14 +23,42 @@ def format_file(path: Path, write: bool = False, include_text: bool = True) -> d
 
 
 @click.command(name="format")
-@click.argument("source_file", type=click.Path(path_type=Path))
+@click.argument("source_file", required=False, type=click.Path(path_type=Path))
 @click.option("--check", is_flag=True, help="Exit 1 when formatting changes are needed")
 @click.option("--write", "write_changes", is_flag=True, help="Write formatted APG source in place")
-@click.option("--json", "as_json", is_flag=True, help="Emit apg.format-result.v1 JSON")
-def format_cmd(source_file: Path, check: bool, write_changes: bool, as_json: bool) -> None:
+@click.option("--audit-fixtures", is_flag=True, help="Audit checked-in formatter fixtures")
+@click.option("--fixture-catalog", type=click.Path(path_type=Path), help="Formatter fixture catalog to audit")
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON")
+def format_cmd(
+	source_file: Path | None,
+	check: bool,
+	write_changes: bool,
+	audit_fixtures: bool,
+	fixture_catalog: Path | None,
+	as_json: bool,
+) -> None:
 	"""Format one APG source file deterministically."""
 	if check and write_changes:
 		raise click.ClickException("--check and --write cannot be combined")
+	if audit_fixtures:
+		if source_file is not None or check or write_changes:
+			raise click.ClickException("--audit-fixtures cannot be combined with a source file, --check, or --write")
+		payload = audit_formatter_fixtures(fixture_catalog)
+		if as_json:
+			click.echo(json.dumps(payload, indent=2, sort_keys=True))
+		else:
+			summary = payload["summary"]
+			status = "ok" if payload["ok"] else "failed"
+			click.echo(
+				f"Formatter fixtures {status}: "
+				f"{summary['passing_fixture_count']}/{summary['fixture_count']} passing, "
+				f"{summary['blocking_gap_count']} blocking gaps"
+			)
+		if not payload["ok"]:
+			raise click.exceptions.Exit(1)
+		return
+	if source_file is None:
+		raise click.ClickException("APG format requires a source file unless --audit-fixtures is used")
 	if not source_file.exists():
 		raise click.ClickException(f"APG source file not found: {source_file}")
 	if not source_file.is_file():

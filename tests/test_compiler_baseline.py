@@ -1992,6 +1992,22 @@ def test_cli_format_check_and_write_are_idempotent(tmp_path):
 	assert "already formatted" in second_check.output
 
 
+def test_cli_format_audits_fixture_catalog():
+	result = CliRunner().invoke(cli, ["format", "--audit-fixtures", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.formatter-audit.v1"
+	assert report["ok"] is True
+	assert report["missing_tags"] == []
+	assert report["blocking_gaps"] == []
+	assert report["summary"]["fixture_count"] >= 3
+	assert report["summary"]["changed_fixture_count"] >= 2
+	assert {"file_comment", "declaration_comment", "inline_comment"}.issubset(report["tags_covered"])
+	assert {"modifier_order", "relationship_modifier", "idempotency"}.issubset(report["tags_covered"])
+	assert all(fixture["idempotent"] for fixture in report["fixtures"])
+
+
 def test_cli_graph_json_emits_entity_relationship_graph(tmp_path):
 	source = tmp_path / "sales.apg"
 	source.write_text(RELATIONSHIP_APP_SOURCE, encoding="utf-8")

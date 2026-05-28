@@ -1,0 +1,8 @@
+module modifier_order version 1.0.0 {
+description: "Modifier ordering fixture";
+}
+
+table Product {
+sku: str [default: "SKU, temp", search, hidden, unique, required, pk, note: "legacy"];
+customer_id: int [ref > Customer.id, default: 0, required]; // relationship after default
+}

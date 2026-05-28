@@ -7889,3 +7889,25 @@ Battery-conscious verification:
 - `.venv/bin/apg evidence examples/08_basic_capability_contract/main.apg --target web --out /private/tmp/apg_evidence_bundle_smoke --json` passed with release, package, package verification, deployment verification, and capability publish-plan checks all green.
 - `.venv/bin/apg evidence examples/08_basic_capability_contract/main.apg --target web --out /private/tmp/apg_evidence_bundle_smoke` passed in text mode with all checks green.
 - `git diff --check -- compiler/evidence_bundle.py cli/evidence_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `0097e16` (`Bundle release evidence into one executable report`).
+
+### 2026-05-28 22:00 EAT
+
+In progress:
+
+- Turned the formatter contract in `docs/tooling.md` into an executable fixture audit.
+- Added `apg format --audit-fixtures --json`, emitting `apg.formatter-audit.v1`.
+- Added checked-in formatter fixtures for file-level comments, declaration-adjacent comments, inline comments, canonical field modifier ordering, relationship modifiers, and idempotency.
+- Tightened the formatter so typed field modifier lists are ordered as `pk`, `required`, `unique`, `hidden`, `search`, `default`, relationship modifiers, then other modifiers, while preserving unknown modifiers in source order.
+- Kept declaration-adjacent top-level comments attached to the declaration that follows them.
+- Updated `docs/tooling.md` so the current executable baseline and formatter CLI contract include the formatter audit gate.
+
+Battery-conscious verification:
+
+- `.venv/bin/apg format --audit-fixtures --json` passed with 3 fixtures, 3 passing fixtures, 0 missing tags, and 0 blocking gaps.
+- `.venv/bin/apg format --audit-fixtures` passed in text mode.
+- `.venv/bin/python -m py_compile compiler/formatter.py cli/format_command.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_format_json_formats_source_without_writing tests/test_compiler_baseline.py::test_cli_format_check_and_write_are_idempotent tests/test_compiler_baseline.py::test_cli_format_audits_fixture_catalog -q` passed with 3 tests.

@@ -1,0 +1,8 @@
+module stable_format version 1.0.0 {
+  description: "Already formatted source stays byte-stable";
+}
+
+agent Reviewer {
+  role: "reviewer";
+  model: "local";
+}

@@ -29,6 +29,9 @@ APG currently has an executable compiler path:
   deployment metadata, and graph summaries without generating application files;
 - `apg format <file> --check|--write|--json` emits `apg.format-result.v1`
   and applies deterministic APG whitespace formatting;
+- `apg format --audit-fixtures --json` emits `apg.formatter-audit.v1` by
+  checking the formatter fixture catalog for idempotency, comment preservation,
+  and canonical field modifier ordering;
 - `apg graph <file> --kind er --format json|mermaid|dot` emits
   `apg.graph.v1` data or renderable graph text;
 - `apg graph-suite <file> --json` emits `apg.graph-suite-report.v1` with
@@ -683,6 +686,16 @@ file-level, declaration-adjacent, and inline comments, plus canonical field
 modifier ordering for `pk`, `required`, `unique`, `hidden`, `search`, `default`,
 and relationship arrows.
 
+`apg format --audit-fixtures --json` runs the checked-in formatter fixture
+catalog and emits `apg.formatter-audit.v1` with:
+
+- `tags_required`: required formatting behaviors that must have passing
+  fixtures;
+- `tags_covered`: behaviors covered by passing fixtures;
+- `fixtures`: per-fixture source, expected output, change/idempotency status,
+  behavior tags, and errors;
+- `blocking_gaps`: fixture mismatches or missing behavior tags that block CI.
+
 ## CLI Contracts
 
 The installed command must keep the current executable `apg compile` path
@@ -703,6 +716,7 @@ apg lint src/apg --strict --json
 apg model app.apg --json
 apg format app.apg --check
 apg format app.apg --write
+apg format --audit-fixtures --json
 apg graph app.apg --kind er --format json
 apg graph app.apg --kind agent --format mermaid
 apg graph-suite app.apg --json
@@ -771,9 +785,13 @@ or missing required options.
 apg format app.apg --check
 apg format app.apg --write
 apg format app.apg --json
+apg format --audit-fixtures --json
 ```
 
 `--check` exits `1` when formatting changes are needed.
+`--audit-fixtures` exits `1` when any formatter fixture differs from its
+expected output, the output is not idempotent, or a required formatter behavior
+tag lacks a passing fixture.
 
 ### `apg validate`
 
@@ -1349,7 +1367,8 @@ Exit criteria:
 - Current behavior documented.
 - No new generator behavior required.
 - Tooling fixtures can run in CI, including `apg parser-golden --json`,
-  `apg diagnostics --audit-fixtures --json`, and `apg drift <file> --json`.
+  `apg diagnostics --audit-fixtures --json`,
+  `apg format --audit-fixtures --json`, and `apg drift <file> --json`.
 
 ### Phase 1: Shared Semantic Model MVP
 
@@ -1377,7 +1396,8 @@ Exit criteria:
 Exit criteria:
 
 - All required diagnostic families have fixtures.
-- `apg lint --json` and `apg format --check` are stable.
+- `apg lint --json`, `apg format --check`, and
+  `apg format --audit-fixtures --json` are stable.
 - Existing DSL release audit consumes the new reports.
 
 ### Phase 3: CLI And Graph Tooling
@@ -1443,7 +1463,8 @@ Good first implementation tasks:
 - write view binding validation;
 - write handler target validation;
 - add `apg lint --json` contract tests;
-- add formatter idempotency tests.
+- add formatter fixture audit coverage for idempotency, comment preservation,
+  and canonical field modifier ordering.
 
 Intermediate tasks:
 

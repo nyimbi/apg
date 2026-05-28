@@ -1,0 +1,10 @@
+// File-level APG comment
+module formatting_demo version 1.0.0 {
+description: "Shows formatter fixtures"; // inline module comment
+}
+
+// Declaration-adjacent comment
+table Customer {
+id: int [pk, increment]; // inline field comment
+name: str [unique, required, search];
+}
