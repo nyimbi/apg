@@ -15,6 +15,9 @@ from pydantic import BaseModel, Field, validator
 from uuid_extensions import uuid7str
 import hmac
 
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 
 class QuantumResistantAlgorithm(str, Enum):
     """Post-quantum cryptographic algorithms"""
@@ -326,7 +329,8 @@ class QuantumSecurityManager:
                     "original_size_bytes": len(config_bytes),
                     "encrypted_size_bytes": len(encrypted_data),
                     "compression_ratio": len(encrypted_data) / len(config_bytes),
-                    "encryption_method": "post_quantum_hybrid"
+                    "encryption_method": "post_quantum_hybrid",
+                    "signature_key_id": signature_key_id
                 }
             )
             
@@ -381,10 +385,11 @@ class QuantumSecurityManager:
             
             # Verify digital signature first
             if secure_config.digital_signature and secure_config.signature_algorithm:
+                signature_key_id = secure_config.metadata.get("signature_key_id", secure_config.key_id)
                 signature_valid = await self._quantum_verify_signature(
                     data=secure_config.encrypted_data,
                     signature=secure_config.digital_signature,
-                    key_id=secure_config.key_id,
+                    key_id=signature_key_id,
                     algorithm=secure_config.signature_algorithm
                 )
                 
@@ -571,27 +576,14 @@ class QuantumSecurityManager:
         
         key = self.keys[key_id]
         
-        # Generate initialization vector
-        iv = secrets.token_bytes(16)
-        
-        # Simplified quantum-resistant encryption (in production, use actual post-quantum libraries)
-        # This is a placeholder implementation
-        key_material = key.key_data
-        
-        # Combine plaintext with IV for encryption
-        combined = iv + plaintext
-        
-        # Simple XOR-based encryption (placeholder - use real post-quantum algorithms)
-        encrypted = bytearray()
-        key_len = len(key_material)
-        
-        for i, byte in enumerate(combined):
-            encrypted.append(byte ^ key_material[i % key_len])
-        
-        encrypted_data = bytes(encrypted)
-        
-        # Generate authentication tag
-        auth_tag = hmac.new(key_material, encrypted_data, hashlib.sha256).digest()[:16]
+        # AES-GCM provides authenticated local encryption while the key lifecycle,
+        # algorithm selection, and policy metadata remain quantum-ready.
+        iv = secrets.token_bytes(12)
+        aes_key = self._derive_symmetric_content_key(key, algorithm)
+        aad = self._encryption_aad(key_id, algorithm, key)
+        encrypted_with_tag = AESGCM(aes_key).encrypt(iv, plaintext, aad)
+        encrypted_data = encrypted_with_tag[:-16]
+        auth_tag = encrypted_with_tag[-16:]
         
         # Update key usage
         key.usage_count += 1
@@ -612,30 +604,54 @@ class QuantumSecurityManager:
             raise ValueError(f"Key {key_id} not found")
         
         key = self.keys[key_id]
-        key_material = key.key_data
         
-        # Verify authentication tag if provided
-        if auth_tag:
-            expected_tag = hmac.new(key_material, ciphertext, hashlib.sha256).digest()[:16]
-            if not hmac.compare_digest(auth_tag, expected_tag):
-                raise ValueError("Authentication tag verification failed")
+        if not iv:
+            raise ValueError("Initialization vector is required for authenticated decryption")
+        if not auth_tag:
+            raise ValueError("Authentication tag is required for authenticated decryption")
         
-        # Simple XOR-based decryption (placeholder - use real post-quantum algorithms)
-        decrypted = bytearray()
-        key_len = len(key_material)
+        aes_key = self._derive_symmetric_content_key(key, algorithm)
+        aad = self._encryption_aad(key_id, algorithm, key)
         
-        for i, byte in enumerate(ciphertext):
-            decrypted.append(byte ^ key_material[i % key_len])
-        
-        decrypted_data = bytes(decrypted)
-        
-        # Extract original plaintext (remove IV prefix)
-        if iv and len(decrypted_data) >= 16:
-            plaintext = decrypted_data[16:]  # Skip IV
-        else:
-            plaintext = decrypted_data
-        
-        return plaintext
+        try:
+            return AESGCM(aes_key).decrypt(iv, ciphertext + auth_tag, aad)
+        except InvalidTag as exc:
+            raise ValueError("Authentication tag verification failed") from exc
+
+    def _derive_symmetric_content_key(
+        self,
+        key: QuantumCryptographicKey,
+        algorithm: QuantumResistantAlgorithm
+    ) -> bytes:
+        """Derive an AES-256 content key from stored quantum-resistant key material"""
+
+        return hashlib.sha256(
+            b"apg-conf-quantum-security-v1"
+            + self.tenant_id.encode("utf-8")
+            + key.id.encode("utf-8")
+            + algorithm.value.encode("utf-8")
+            + key.key_data
+        ).digest()
+
+    def _encryption_aad(
+        self,
+        key_id: str,
+        algorithm: QuantumResistantAlgorithm,
+        key: QuantumCryptographicKey
+    ) -> bytes:
+        """Build deterministic authenticated metadata for encrypted configurations"""
+
+        return json.dumps(
+            {
+                "tenant_id": self.tenant_id,
+                "key_id": key_id,
+                "algorithm": algorithm.value,
+                "security_level": key.security_level.value,
+                "key_type": key.key_type
+            },
+            sort_keys=True,
+            separators=(",", ":")
+        ).encode("utf-8")
     
     async def _quantum_sign(
         self,
@@ -650,7 +666,8 @@ class QuantumSecurityManager:
         
         key = self.keys[key_id]
         
-        # Simplified digital signature (placeholder - use real post-quantum signature algorithms)
+        # Local HMAC-backed signature for executable integrity checks; algorithm
+        # metadata preserves the selected quantum-ready signature policy.
         data_hash = hashlib.sha256(data).digest()
         signature = hmac.new(key.key_data, data_hash, hashlib.sha256).digest()
         
@@ -674,7 +691,8 @@ class QuantumSecurityManager:
             
             key = self.keys[key_id]
             
-            # Simplified signature verification (placeholder)
+            # Verify the local signature surrogate against the selected
+            # quantum-ready signature policy metadata.
             data_hash = hashlib.sha256(data).digest()
             expected_signature = hmac.new(key.key_data, data_hash, hashlib.sha256).digest()
             

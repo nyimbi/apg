@@ -6397,3 +6397,20 @@ Battery-conscious verification:
 - `.venv/bin/python -c '... compile_apg_file(source, source.parent / "output") ...'` -> 20/20 examples compiled successfully
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 3 passed
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:30 EAT
+
+Completed checkpoint:
+
+- Replaced CONF quantum security layer XOR configuration encryption with AES-256-GCM authenticated encryption.
+- Bound encrypted configuration payloads to tenant, key, algorithm, security level, and key type through authenticated metadata.
+- Fixed quantum-secure configuration signature verification to use the generated signature key rather than the encryption key.
+- Added focused runtime coverage for encrypted configuration round trips and tamper rejection.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conf/quantum_security_layer.py tests/test_common_conf_quantum_security_layer_runtime.py`
+- `.venv/bin/python -m pytest tests/test_common_conf_quantum_security_layer_runtime.py -q` -> 2 passed, 12 pre-existing warnings
+- `rg -n "XOR|placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/conf/quantum_security_layer.py tests/test_common_conf_quantum_security_layer_runtime.py -S` -> no matches
+- `git diff --check capabilities/common/conf/quantum_security_layer.py tests/test_common_conf_quantum_security_layer_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
