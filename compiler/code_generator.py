@@ -572,20 +572,30 @@ def component_manifest() -> Dict[str, Any]:
             "python": {{
                 "package": MODULE_NAME,
                 "exports": [
+                    "auth_status",
+                    "coerce_record_types",
+                    "component_manifest",
                     "create_record",
+                    "database_status",
                     "delete_record",
                     "describe_application",
                     "get_record",
+                    "list_databases",
+                    "list_entities",
+                    "list_events",
                     "list_records",
+                    "main",
+                    "metrics_snapshot",
+                    "openapi_document",
                     "query_records",
+                    "relationship_graph",
+                    "self_test",
+                    "storage_status",
+                    "update_record",
                     "validate_application",
+                    "validate_component_manifest_contract",
                     "validate_openapi_contract",
                     "validate_record",
-                    "update_record",
-                    "self_test",
-                    "openapi_document",
-                    "metrics_snapshot",
-                    "component_manifest",
                 ],
             }},
             "records": sorted(ENTITY_NAMES),
@@ -1445,6 +1455,61 @@ def openapi_document() -> Dict[str, Any]:
     }}
 
 
+def validate_component_manifest_contract() -> Dict[str, Any]:
+    manifest = component_manifest()
+    openapi = openapi_document()
+    errors: list[str] = []
+    warnings: list[str] = []
+    interfaces = manifest.get("interfaces", {{}})
+    http = interfaces.get("http", {{}}) if isinstance(interfaces, dict) else {{}}
+    python = interfaces.get("python", {{}}) if isinstance(interfaces, dict) else {{}}
+    http_paths = sorted(http.get("paths", [])) if isinstance(http, dict) else []
+    expected_paths = sorted(openapi.get("paths", {{}}))
+    if http.get("openapi") != "/openapi.json":
+        errors.append("component manifest HTTP interface must point to /openapi.json")
+    if http_paths != expected_paths:
+        errors.append("component manifest HTTP paths do not match OpenAPI paths")
+    exports = python.get("exports", []) if isinstance(python, dict) else []
+    if not isinstance(exports, list) or not exports:
+        errors.append("component manifest Python interface does not declare exports")
+        exports = []
+    export_names: list[str] = []
+    for export_name in exports:
+        if not isinstance(export_name, str):
+            errors.append("component manifest Python exports must be strings")
+            continue
+        export_names.append(export_name)
+    missing_exports = [
+        export_name
+        for export_name in export_names
+        if export_name not in globals() or not callable(globals()[export_name])
+    ]
+    for export_name in missing_exports:
+        errors.append(f"component manifest Python export {{export_name}} is not callable")
+    expected_record_names = sorted(ENTITY_NAMES)
+    manifest_record_names = sorted(interfaces.get("records", [])) if isinstance(interfaces, dict) else []
+    if manifest_record_names != expected_record_names:
+        errors.append("component manifest record interface does not match generated entities")
+    if interfaces.get("theme") != "/theme.css":
+        errors.append("component manifest theme interface must point to /theme.css")
+    deployment = manifest.get("deployment", {{}})
+    artifacts = set(deployment.get("artifacts", [])) if isinstance(deployment, dict) else set()
+    for artifact in ["app.py", "__init__.py", "README.md", "requirements.txt", "Dockerfile", ".dockerignore", ".env.example", "smoke_test.py"]:
+        if artifact not in artifacts:
+            errors.append(f"component manifest deployment is missing artifact {{artifact}}")
+    commands = deployment.get("commands", {{}}) if isinstance(deployment, dict) else {{}}
+    for command_name in ["run", "describe", "validate", "self_test", "smoke_test"]:
+        if command_name not in commands:
+            errors.append(f"component manifest deployment is missing command {{command_name}}")
+    return {{
+        "errors": errors,
+        "warnings": warnings,
+        "http_path_count": len(http_paths),
+        "python_exports": sorted(export_names),
+        "artifact_count": len(artifacts),
+    }}
+
+
 def _walk_openapi_refs(value: Any, path: str = "$") -> list[tuple[str, str]]:
     refs: list[tuple[str, str]] = []
     if isinstance(value, dict):
@@ -1667,6 +1732,7 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
         "checks": {{}},
     }}
     _record_validation(report, "openapi_contract", validate_openapi_contract())
+    _record_validation(report, "component_manifest", validate_component_manifest_contract())
     _record_validation(report, "database_schemas", validate_database_schema_contracts())
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
         _record_validation(
@@ -5094,7 +5160,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'',
 			f'__version__ = "{module.version}"',
 			'',
-			'from .app import auth_status, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, self_test, storage_status, update_record, validate_application, validate_openapi_contract, validate_record',
+			'from .app import auth_status, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, self_test, storage_status, update_record, validate_application, validate_component_manifest_contract, validate_openapi_contract, validate_record',
 			'',
 			'__all__ = [',
 			'    "__version__",',
@@ -5119,6 +5185,7 @@ def describe_team(name: str) -> Dict[str, Any]:
 			'    "storage_status",',
 			'    "update_record",',
 			'    "validate_application",',
+			'    "validate_component_manifest_contract",',
 			'    "validate_openapi_contract",',
 			'    "validate_record",',
 			']',

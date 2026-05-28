@@ -7111,3 +7111,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated self-test reported `openapi_contract.errors == []`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 16:40 EAT
+
+Completed checkpoint:
+
+- Added generated `validate_component_manifest_contract()` support so compiled APG applications verify that advertised HTTP paths, Python exports, record interfaces, theme route, deployment artifacts, and deployment commands match executable reality.
+- Wired component manifest validation into generated `validate_application()` and `self_test()` so composition metadata regressions fail generated app health checks.
+- Re-exported the component manifest validator from generated packages and refreshed all 20 numbered example outputs.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests tests/test_compiler_baseline.py::test_generated_python_app_serves_http_endpoints -q` -> 2 passed
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated self-test reported `component_manifest.errors == []`
+- Deferred broader pytest at the user's request to conserve battery.

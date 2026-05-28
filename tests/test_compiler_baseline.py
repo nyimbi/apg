@@ -135,6 +135,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 		invocation = module.invoke_agent("Planner", {"input": {"task": "plan"}})
 		self_test = module.self_test()
 		openapi_contract = module.validate_openapi_contract()
+		component_contract = module.validate_component_manifest_contract()
 	finally:
 		sys.modules.pop("generated_pkg", None)
 		for name in list(sys.modules):
@@ -153,10 +154,14 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert component["composable"] is True
 	assert "/component.json" in component["interfaces"]["http"]["paths"]
 	assert "component_manifest" in component["interfaces"]["python"]["exports"]
+	assert "auth_status" in component["interfaces"]["python"]["exports"]
 	assert "create_record" in component["interfaces"]["python"]["exports"]
+	assert "database_status" in component["interfaces"]["python"]["exports"]
+	assert "list_entities" in component["interfaces"]["python"]["exports"]
 	assert "query_records" in component["interfaces"]["python"]["exports"]
 	assert "update_record" in component["interfaces"]["python"]["exports"]
 	assert "delete_record" in component["interfaces"]["python"]["exports"]
+	assert "validate_component_manifest_contract" in component["interfaces"]["python"]["exports"]
 	assert invocation["agent"] == "Planner"
 	assert invocation["runtime"] == "codex"
 	assert invocation["status"] == "adapter_required"
@@ -165,8 +170,12 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "/self-test" in self_test["routes"]
 	assert self_test["checks"]["entity_count"] == 1
 	assert self_test["checks"]["validation"]["checks"]["openapi_contract"]["errors"] == []
+	assert self_test["checks"]["validation"]["checks"]["component_manifest"]["errors"] == []
 	assert openapi_contract["errors"] == []
 	assert "AgentInvocationRequest" in openapi_contract["referenced_schemas"]
+	assert component_contract["errors"] == []
+	assert component_contract["artifact_count"] >= 8
+	assert "validate_component_manifest_contract" in component_contract["python_exports"]
 	assert module.auth_status()["mode"] == "open"
 	assert module.metrics_snapshot()["entity_count"] == 1
 	assert module.openapi_document()["openapi"] == "3.1.0"
@@ -192,6 +201,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert "storage_status" in module.__all__
 	assert "update_record" in module.__all__
 	assert "validate_application" in module.__all__
+	assert "validate_component_manifest_contract" in module.__all__
 	assert "validate_openapi_contract" in module.__all__
 	assert "validate_record" in module.__all__
 	assert "list_records" in module.__all__
@@ -275,6 +285,7 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	assert "/self-test" in openapi["paths"]
 	assert self_test["passed"] is True
 	assert self_test["checks"]["validation"]["checks"]["openapi_contract"]["errors"] == []
+	assert self_test["checks"]["validation"]["checks"]["component_manifest"]["errors"] == []
 	assert self_test["checks"]["route_count"] >= 1
 	assert validation["valid"] is True
 
