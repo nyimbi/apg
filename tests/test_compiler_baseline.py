@@ -1822,6 +1822,7 @@ def test_cli_capabilities_validate_contracts_json_uses_click_surface():
 
 def test_cli_explain_json_covers_symbols_diagnostics_and_handlers():
 	source = REPO_ROOT / "examples" / "20_enterprise_erp_platform" / "main.apg"
+	diagnostic_source = REPO_ROOT / "tests" / "fixtures" / "lint" / "relationship_warning.apg"
 
 	symbol_result = CliRunner().invoke(
 		cli,
@@ -1840,7 +1841,7 @@ def test_cli_explain_json_covers_symbols_diagnostics_and_handlers():
 
 	diagnostic_result = CliRunner().invoke(
 		cli,
-		["explain", str(source), "--diagnostic", "APG0100", "--json"],
+		["explain", str(diagnostic_source), "--diagnostic", "APG0100", "--json"],
 	)
 	assert diagnostic_result.exit_code == 0, diagnostic_result.output
 	diagnostic_report = json.loads(diagnostic_result.output)

@@ -8320,3 +8320,16 @@ Battery-conscious verification:
 - `.venv/bin/python -m cli.main tooling audit --json` passed with 11/11 tooling surfaces, 0 errors, and 0 blocking gaps.
 - `.venv/bin/python -m cli.main explain examples/20_enterprise_erp_platform/main.apg --diagnostic APG0100 --json` returned `apg.explain-report.v1` with `ok: true`, registry details present, and `match_count: 0`.
 - `.venv/bin/python -m cli.main lint examples/20_enterprise_erp_platform/main.apg --json` returned `ok: true` with no diagnostics.
+
+### 2026-05-29 00:54 EAT
+
+Compiler baseline repair:
+
+- Repaired the stale APG0100 explain baseline by querying the existing APG0100 lint fixture for diagnostic explanation coverage instead of the clean enterprise ERP example.
+- Preserved enterprise ERP coverage for symbol and handler explanation while binding diagnostic match-count coverage to a source file that actually emits the semantic warning.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers` passed with 1 test.
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_examples_parseable.py` passed with 92 tests.
