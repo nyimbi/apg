@@ -6383,3 +6383,17 @@ Battery-conscious verification:
 - `rg -n "mock_decrypted_data|decrypted_data_placeholder|TODO:|raise NotImplementedError|pass\\s*(#.*)?$" capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py -S` -> no matches
 - `git diff --check capabilities/common/encr/mobile_apps.py tests/test_common_encr_mobile_apps_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 12:25 EAT
+
+Completed checkpoint:
+
+- Recompiled all 20 numbered APG examples into their own `examples/[0-9][0-9]*/output/` directories.
+- Confirmed each example still compiles with the current compiler; generated files were already current and produced no example-output diffs.
+- Left `PostQuantumCryptographicEngine.encrypt()` unchanged per current user direction.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -c '... compile_apg_file(source, source.parent / "output") ...'` -> 20/20 examples compiled successfully
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 3 passed
+- Deferred broader pytest at the user's request to conserve battery.
