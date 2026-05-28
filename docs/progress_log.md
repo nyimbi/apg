@@ -6506,3 +6506,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_common_conf_predictive_analytics_runtime.py -q` -> 2 passed, 10 pre-existing warnings
 - `git diff --check capabilities/common/conf/predictive_analytics.py tests/test_common_conf_predictive_analytics_runtime.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 13:19 EAT
+
+Completed checkpoint:
+
+- Replaced the CONF `ConfigurationDSL.to_hcl()` placeholder with deterministic, readable HCL-style export.
+- Added nested map, list, scalar, boolean, null, quoted-key, and sanitized block-label rendering without adding dependencies.
+- Added focused runtime coverage for a nested application configuration export.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/conf/models.py tests/test_common_conf_models_hcl_export.py`
+- `.venv/bin/python -m pytest tests/test_common_conf_models_hcl_export.py -q` -> 1 passed, 10 pre-existing warnings
+- `.venv/bin/python -m pytest tests/test_common_conf_models_hcl_export.py tests/test_common_conf_predictive_analytics_runtime.py -q` -> 3 passed, 10 pre-existing warnings
+- `rg -n "Placeholder for HCL conversion|# HCL representation" capabilities/common/conf/models.py tests/test_common_conf_models_hcl_export.py -S` -> no matches
+- `git diff --check capabilities/common/conf/models.py tests/test_common_conf_models_hcl_export.py`
+- Deferred broader pytest at the user's request to conserve battery.

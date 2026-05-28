@@ -14,6 +14,7 @@ from enum import Enum, StrEnum
 from pathlib import Path
 from uuid_extensions import uuid7str
 import json
+import re
 
 from pydantic import BaseModel, Field, ConfigDict, validator, root_validator, AfterValidator
 from pydantic.types import SecretStr
@@ -161,8 +162,67 @@ class ConfigurationDSL(BaseModel):
 	
 	def to_hcl(self) -> str:
 		"""Export configuration as HCL"""
-		# Placeholder for HCL conversion
-		return f"# HCL representation of {self.kind} configuration\n"
+		resource_name = self.metadata.get("name") or self.kind.lower()
+		lines = [f'apg_configuration "{self._hcl_label(resource_name)}" {{']
+		for key, value in {
+			"version": self.version,
+			"kind": self.kind,
+			"metadata": self.metadata,
+			"spec": self.spec,
+			"dependencies": self.dependencies,
+			"variables": self.variables,
+		}.items():
+			lines.extend(self._hcl_attribute_lines(key, value, 1))
+		lines.append("}")
+		return "\n".join(lines) + "\n"
+
+	@classmethod
+	def _hcl_attribute_lines(cls, key: str, value: Any, indent: int) -> List[str]:
+		indent_text = "\t" * indent
+		rendered = cls._hcl_value(value, indent)
+		return [f"{indent_text}{cls._hcl_key(key)} = {rendered}"]
+
+	@classmethod
+	def _hcl_value(cls, value: Any, indent: int) -> str:
+		if value is None:
+			return "null"
+		if isinstance(value, bool):
+			return "true" if value else "false"
+		if isinstance(value, (int, float)):
+			return str(value)
+		if isinstance(value, str):
+			return json.dumps(value)
+		if isinstance(value, list):
+			if not value:
+				return "[]"
+			child_indent = "\t" * (indent + 1)
+			current_indent = "\t" * indent
+			inner = ",\n".join(
+				f"{child_indent}{cls._hcl_value(item, indent + 1)}"
+				for item in value
+			)
+			return f"[\n{inner}\n{current_indent}]"
+		if isinstance(value, dict):
+			if not value:
+				return "{}"
+			child_indent = "\t" * (indent + 1)
+			current_indent = "\t" * indent
+			inner = "\n".join(
+				f"{child_indent}{cls._hcl_key(str(item_key))} = {cls._hcl_value(item_value, indent + 1)}"
+				for item_key, item_value in value.items()
+			)
+			return f"{{\n{inner}\n{current_indent}}}"
+		return json.dumps(str(value))
+
+	@staticmethod
+	def _hcl_key(key: str) -> str:
+		if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+			return key
+		return json.dumps(key)
+
+	@staticmethod
+	def _hcl_label(label: Any) -> str:
+		return re.sub(r"[^A-Za-z0-9_]+", "_", str(label).strip().lower()).strip("_") or "configuration"
 
 
 class CMResource(BaseModel):
