@@ -13,7 +13,10 @@ from sqlalchemy.orm import relationship
 from uuid_extensions import uuid7str
 import json
 
-from ....auth_rbac.models import BaseMixin, AuditMixin, Model
+try:
+	from ....auth_rbac.models import BaseMixin, AuditMixin, Model
+except ImportError:  # pragma: no cover - exercised in standalone APG checkout
+	from .._legacy_models import BaseMixin, AuditMixin, Model
 
 
 class SOECustomer(Model, AuditMixin, BaseMixin):

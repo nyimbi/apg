@@ -4662,3 +4662,24 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `7fd67f5` (`Make CRM contact import export executable`) to `origin/main`.
+
+### 2026-05-28 03:02 EAT
+
+Completed checkpoint:
+
+- Made legacy CRM sibling subpackages importable in the standalone APG checkout.
+- Added a shared CRM legacy SQLAlchemy model shim for packages that still reference the unavailable historical `auth_rbac` model base.
+- Updated sales forecasting, order entry, pricing, order processing, and quotations models to prefer the real APG auth model base when present and fall back to the local shim otherwise.
+- Added a focused import-contract regression test for the legacy CRM packages and their conventional `models`, `service`, `views`, and `blueprint` entry points.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/crm/_legacy_models.py capabilities/crm/for/models.py capabilities/crm/ord/models.py capabilities/crm/pri/models.py capabilities/crm/pro/models.py capabilities/crm/quo/models.py tests/test_crm_legacy_subpackages.py`
+- `.venv/bin/pytest tests/test_crm_legacy_subpackages.py -q` -> 1 passed
+- CRM subpackage import sweep across `capabilities/crm/*/{models,service,views,blueprint}` -> `FAILURES 0`
+- `git diff --check -- capabilities/crm/_legacy_models.py capabilities/crm/for/models.py capabilities/crm/ord/models.py capabilities/crm/pri/models.py capabilities/crm/pro/models.py capabilities/crm/quo/models.py tests/test_crm_legacy_subpackages.py` -> no issues
+- Deferred broad pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push for this checkpoint.
