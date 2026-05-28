@@ -7324,3 +7324,17 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
 - `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated component manifest validation now lists AI and capability composition helpers as callable Python exports
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 18:03 EAT
+
+Completed checkpoint:
+
+- Adapted the copied tooling specification to APG terminology, repository paths, and executable commands.
+- Documented the current executable baseline: `.apg` sources, `apg compile`, Python-only generation, generated app self-tests, and capability contract validation.
+- Replaced the copied PBC/AppGen vocabulary with APG capabilities, first-class AI agents, capability composition, APG diagnostic codes, and `apg.*.v1` report contracts.
+- Added explicit tooling guidance that streaming contracts use ByteWax-oriented semantics.
+
+Battery-conscious verification:
+
+- Documentation-only slice; no code tests run.
+- `rg` scan confirmed no copied AppGen/AppGen-X/PBC/AGX terminology remains in `docs/tooling.md`.
