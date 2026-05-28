@@ -50,6 +50,37 @@ def list_entities() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES]
 
 
+def list_databases() -> list[Dict[str, Any]]:
+    return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+
+
+def database_status() -> Dict[str, Any]:
+    databases = list_databases()
+    schema_count = sum(len(database.get("schemas", [])) for database in databases)
+    table_count = sum(
+        len(schema.get("tables", []))
+        for database in databases
+        for schema in database.get("schemas", [])
+    )
+    reference_count = sum(
+        1
+        for database in databases
+        for schema in database.get("schemas", [])
+        for table in schema.get("tables", [])
+        for column in table.get("columns", [])
+        if isinstance(column, dict) and isinstance(column.get("reference"), dict)
+    )
+    validation = validate_database_schema_contracts()
+    return {
+        "valid": not validation["errors"],
+        "database_count": len(databases),
+        "schema_count": schema_count,
+        "table_count": table_count,
+        "reference_count": reference_count,
+        "validation": validation,
+    }
+
+
 def list_records(entity_name: str | None = None) -> Dict[str, list[Dict[str, Any]]] | list[Dict[str, Any]]:
     if entity_name is None:
         return {
@@ -249,6 +280,7 @@ def metrics_snapshot() -> Dict[str, Any]:
         "name": MODULE_NAME,
         "version": MODULE_VERSION,
         "entity_count": len(ENTITIES),
+        "database_status": database_status(),
         "record_counts": record_counts,
         "total_records": sum(record_counts.values()),
         "event_count": len(EVENT_LOG),
@@ -316,6 +348,7 @@ def component_manifest() -> Dict[str, Any]:
             "theme": "/theme.css",
         },
         "entities": list_entities(),
+        "databases": list_databases(),
         "ai_agents": app.get("ai_agents", []),
         "ai_agent_teams": app.get("ai_agent_teams", []),
         "application_compositions": app.get("application_compositions", []),
@@ -430,7 +463,7 @@ def _revision_conflict(existing: Dict[str, Any], expected_revision: int | None) 
     }
 
 
-def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
+def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, Any]:
     fields = _field_specs(str(entity["name"]))
     if not fields:
         return {"type": "object", "additionalProperties": True}
@@ -442,7 +475,7 @@ def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
     for field in fields:
         field_name = str(field["name"])
         schema_properties[field_name] = {"type": _json_schema_type(str(field.get("type", "any")))}
-        if field.get("required", True):
+        if not partial and field.get("required", True):
             required_fields.append(field_name)
     schema: Dict[str, Any] = {
         "type": "object",
@@ -454,47 +487,611 @@ def _record_schema(entity: Dict[str, Any]) -> Dict[str, Any]:
     return schema
 
 
+def _schema_ref(name: str) -> Dict[str, Any]:
+    return {"$ref": f"#/components/schemas/{name}"}
+
+
+def _json_media(schema: Dict[str, Any]) -> Dict[str, Any]:
+    return {"application/json": {"schema": schema}}
+
+
+def _record_body_schema(schema_name: str) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "record": _schema_ref(schema_name),
+        },
+        "required": ["record"],
+    }
+
+
+def _record_import_body_schema(schema_name: str) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "records": {"type": "array", "items": _schema_ref(schema_name)},
+        },
+        "required": ["records"],
+    }
+
+
+def _record_list_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {
+            "entity": {"type": "string"},
+            "records": {"type": "array", "items": _schema_ref(schema_name)},
+            "count": {"type": "integer"},
+            "total": {"type": "integer"},
+            "filters": {"type": "object", "additionalProperties": {"type": "string"}},
+            "sort": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+            "order": {"type": "string"},
+        },
+        "required": ["entity", "records", "count"],
+    }
+
+
+def _record_item_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {
+            "entity": {"type": "string"},
+            "record": _schema_ref(schema_name),
+        },
+        "required": ["entity", "record"],
+    }
+
+
+def _record_mutation_response_schema(schema_name: str, record_key: str = "record") -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {
+            record_key: _schema_ref(schema_name),
+            "event": _schema_ref("EventRecord"),
+        },
+        "required": [record_key],
+    }
+
+
+def _record_export_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {
+            "entity": {"type": "string"},
+            "records": {"type": "array", "items": _schema_ref(schema_name)},
+            "count": {"type": "integer"},
+        },
+        "required": ["entity", "records", "count"],
+    }
+
+
+def _record_import_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {
+            "entity": {"type": "string"},
+            "imported": {"type": "array", "items": _schema_ref(schema_name)},
+            "errors": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
+            "events": {"type": "array", "items": _schema_ref("EventRecord")},
+            "count": {"type": "integer"},
+            "failed": {"type": "integer"},
+        },
+        "required": ["entity", "imported", "errors", "count", "failed"],
+    }
+
+
+def _database_openapi_schemas() -> Dict[str, Any]:
+    nullable_string = {"oneOf": [{"type": "string"}, {"type": "null"}]}
+    generic_object = {"type": "object", "additionalProperties": True}
+    return {
+        "ApplicationDescription": generic_object,
+        "ComponentManifest": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "kind": {"const": "apg.application"},
+                "name": {"type": "string"},
+                "version": {"type": "string"},
+                "description": {"type": "string"},
+                "target": {"const": "python"},
+                "composable": {"type": "boolean"},
+                "interfaces": generic_object,
+                "entities": {"type": "array", "items": generic_object},
+                "databases": {"type": "array", "items": _schema_ref("DatabaseCatalogEntry")},
+                "deployment": generic_object,
+            },
+            "required": ["kind", "name", "version", "target", "composable", "interfaces"],
+        },
+        "EntityCatalog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "entities": {"type": "array", "items": generic_object},
+            },
+            "required": ["entities"],
+        },
+        "RecordsByEntity": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "records": {"type": "object", "additionalProperties": {"type": "array", "items": generic_object}},
+            },
+            "required": ["records"],
+        },
+        "AuthStatus": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "mode": {"type": "string"},
+                "header": nullable_string,
+            },
+            "required": ["mode", "header"],
+        },
+        "StorageStatus": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "mode": {"type": "string"},
+                "path": nullable_string,
+                "records": {"type": "object", "additionalProperties": {"type": "array", "items": generic_object}},
+                "events": {"type": "array", "items": _schema_ref("EventRecord")},
+            },
+            "required": ["mode", "path"],
+        },
+        "ValidationReport": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "name": {"type": "string"},
+                "valid": {"type": "boolean"},
+                "errors": {"type": "array", "items": {"type": "string"}},
+                "warnings": {"type": "array", "items": {"type": "string"}},
+                "checks": generic_object,
+            },
+            "required": ["name", "valid", "errors", "warnings", "checks"],
+        },
+        "HealthReport": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "status": {"type": "string"},
+                "name": {"type": "string"},
+                "version": {"type": "string"},
+                "valid": {"type": "boolean"},
+                "storage": _schema_ref("StorageStatus"),
+                "auth": _schema_ref("AuthStatus"),
+                "warnings": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["status", "name", "version", "valid", "storage", "auth", "warnings"],
+        },
+        "EventLog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "events": {"type": "array", "items": _schema_ref("EventRecord")},
+            },
+            "required": ["events"],
+        },
+        "MetricsSnapshot": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "name": {"type": "string"},
+                "version": {"type": "string"},
+                "entity_count": {"type": "integer"},
+                "database_status": _schema_ref("DatabaseStatus"),
+                "record_counts": {"type": "object", "additionalProperties": {"type": "integer"}},
+                "total_records": {"type": "integer"},
+                "event_count": {"type": "integer"},
+                "event_counts": {"type": "object", "additionalProperties": {"type": "integer"}},
+                "relationship_count": {"type": "integer"},
+                "storage": _schema_ref("StorageStatus"),
+                "auth": _schema_ref("AuthStatus"),
+            },
+            "required": ["name", "version", "entity_count", "record_counts", "total_records", "event_count"],
+        },
+        "SelfTestReport": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "name": {"type": "string"},
+                "version": {"type": "string"},
+                "passed": {"type": "boolean"},
+                "status": {"type": "string"},
+                "checks": generic_object,
+                "routes": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["name", "version", "passed", "status", "checks", "routes"],
+        },
+        "RelationshipNode": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "id": {"type": "string"},
+                "name": {"type": "string"},
+                "type": {"type": "string"},
+            },
+            "required": ["id", "name", "type"],
+        },
+        "RelationshipEdge": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "from": {"type": "string"},
+                "to": {"type": "string"},
+                "field": {"type": "string"},
+                "relationship": {"type": "string"},
+            },
+            "required": ["from", "to", "relationship"],
+        },
+        "RelationshipGraph": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "nodes": {"type": "array", "items": _schema_ref("RelationshipNode")},
+                "edges": {"type": "array", "items": _schema_ref("RelationshipEdge")},
+            },
+            "required": ["nodes", "edges"],
+        },
+        "AgentCatalog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "agents": generic_object,
+                "teams": generic_object,
+            },
+            "required": ["agents", "teams"],
+        },
+        "ApplicationCatalog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "applications": generic_object,
+                "dependency_graph": generic_object,
+                "components": generic_object,
+            },
+            "required": ["applications", "dependency_graph", "components"],
+        },
+        "CapabilityCatalog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "capabilities": generic_object,
+                "by_erp_module": generic_object,
+                "dependency_graph": generic_object,
+                "load_order": {"oneOf": [generic_object, {"type": "array", "items": {"type": "string"}}]},
+            },
+            "required": ["capabilities", "by_erp_module", "dependency_graph", "load_order"],
+        },
+        "RouteCatalog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "routes": generic_object,
+            },
+            "required": ["routes"],
+        },
+        "AgentInvocationRequest": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "message": {"type": "string"},
+                "payload": generic_object,
+                "context": generic_object,
+            },
+        },
+        "AgentInvocationResponse": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "agent": {"type": "string"},
+                "team": {"type": "string"},
+                "runtime": {"type": "string"},
+                "status": {"type": "string"},
+                "result": {"oneOf": [generic_object, {"type": "string"}, {"type": "null"}]},
+                "payload": generic_object,
+            },
+        },
+        "RuleEvaluationRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "capability": {"type": "string"},
+                "capability_name": {"type": "string"},
+                "context": generic_object,
+            },
+            "required": ["context"],
+        },
+        "RuleEvaluationResult": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "decision": {"type": "string"},
+                "matched_rules": {"type": "array", "items": {"type": "string"}},
+                "actions": {"type": "array", "items": generic_object},
+                "context": generic_object,
+            },
+        },
+        "CapabilityConfigurationRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "capability": {"type": "string"},
+                "capability_name": {"type": "string"},
+                "configuration": generic_object,
+                "overrides": generic_object,
+            },
+        },
+        "CapabilityConfigurationResponse": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "capability": {"type": "string"},
+                "configuration": generic_object,
+                "errors": {"type": "array", "items": {"type": "string"}},
+                "warnings": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        "ApprovalPlanRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "capability": {"type": "string"},
+                "capability_name": {"type": "string"},
+                "context": generic_object,
+            },
+            "required": ["context"],
+        },
+        "ApprovalPlanResponse": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "capability": {"type": "string"},
+                "required": {"type": "boolean"},
+                "levels": {"type": "integer"},
+                "approvers": {"type": "array", "items": {"type": "string"}},
+                "thresholds": generic_object,
+                "segregation_of_duties": {"type": "boolean"},
+                "escalation": {"oneOf": [{"type": "string"}, generic_object, {"type": "null"}]},
+            },
+        },
+        "StreamingTopology": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "processor": {"type": "string"},
+                "processors": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+                "states": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+                "streams": {"type": "object", "additionalProperties": generic_object},
+            },
+            "required": ["processor", "processors", "states", "streams"],
+        },
+        "CapabilityStreamingContract": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "processor": {"type": "string"},
+                "state": {"type": "string"},
+                "input": generic_object,
+                "output": generic_object,
+            },
+        },
+        "EventRecord": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "id": {"type": "integer"},
+                "entity": {"type": "string"},
+                "action": {"type": "string"},
+                "record_id": {"oneOf": [{"type": "integer"}, {"type": "string"}, {"type": "null"}]},
+                "before": {"oneOf": [{"type": "object", "additionalProperties": True}, {"type": "null"}]},
+                "after": {"oneOf": [{"type": "object", "additionalProperties": True}, {"type": "null"}]},
+            },
+            "required": ["id", "entity", "action"],
+        },
+        "DatabaseReference": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "kind": {"type": "string"},
+                "relationship": {"type": "string"},
+                "schema": {"type": "string"},
+                "table": {"type": "string"},
+                "column": {"type": "string"},
+                "target": {"type": "string"},
+            },
+            "required": ["table", "column"],
+        },
+        "DatabaseColumn": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "name": {"type": "string"},
+                "type": {"type": "string"},
+                "primary_key": {"type": "boolean"},
+                "nullable": {"type": "boolean"},
+                "default": {
+                    "oneOf": [
+                        {"type": "string"},
+                        {"type": "number"},
+                        {"type": "integer"},
+                        {"type": "boolean"},
+                        {"type": "null"},
+                    ]
+                },
+                "constraints": {"type": "array", "items": {"type": "string"}},
+                "reference": {"oneOf": [_schema_ref("DatabaseReference"), {"type": "null"}]},
+            },
+            "required": ["name", "type", "primary_key", "nullable", "constraints"],
+        },
+        "DatabaseIndex": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "name": nullable_string,
+                "columns": {"type": "array", "items": {"type": "string"}},
+                "unique": {"type": "boolean"},
+                "type": nullable_string,
+            },
+            "required": ["columns", "unique"],
+        },
+        "DatabaseTable": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "name": {"type": "string"},
+                "columns": {"type": "array", "items": _schema_ref("DatabaseColumn")},
+                "indexes": {"type": "array", "items": _schema_ref("DatabaseIndex")},
+            },
+            "required": ["name", "columns", "indexes"],
+        },
+        "DatabaseSchema": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "name": {"type": "string"},
+                "tables": {"type": "array", "items": _schema_ref("DatabaseTable")},
+            },
+            "required": ["name", "tables"],
+        },
+        "DatabaseCatalogEntry": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "name": {"type": "string"},
+                "type": {"const": "database"},
+                "properties": {"type": "array", "items": {"type": "string"}},
+                "connection_config": {"type": "object", "additionalProperties": True},
+                "schemas": {"type": "array", "items": _schema_ref("DatabaseSchema")},
+            },
+            "required": ["name", "type", "schemas"],
+        },
+        "DatabaseCatalog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "databases": {"type": "array", "items": _schema_ref("DatabaseCatalogEntry")},
+            },
+            "required": ["databases"],
+        },
+        "DatabaseSchemaCatalog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "database": {"type": "string"},
+                "schemas": {"type": "array", "items": _schema_ref("DatabaseSchema")},
+            },
+            "required": ["database", "schemas"],
+        },
+        "DatabaseValidation": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "errors": {"type": "array", "items": {"type": "string"}},
+                "warnings": {"type": "array", "items": {"type": "string"}},
+                "validated_databases": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["errors", "warnings", "validated_databases"],
+        },
+        "DatabaseStatus": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "valid": {"type": "boolean"},
+                "database_count": {"type": "integer"},
+                "schema_count": {"type": "integer"},
+                "table_count": {"type": "integer"},
+                "reference_count": {"type": "integer"},
+                "validation": _schema_ref("DatabaseValidation"),
+            },
+            "required": [
+                "valid",
+                "database_count",
+                "schema_count",
+                "table_count",
+                "reference_count",
+                "validation",
+            ],
+        },
+    }
+
+
 def _api_operation(
     summary: str,
     description: str,
     status: str = "200",
     request_body: bool = False,
+    request_schema: Dict[str, Any] | None = None,
+    response_schema: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
+    response: Dict[str, Any] = {"description": description}
+    if response_schema is not None:
+        response["content"] = _json_media(response_schema)
     operation: Dict[str, Any] = {
         "summary": summary,
-        "responses": {status: {"description": description}},
+        "responses": {status: response},
     }
     if request_body:
         operation["requestBody"] = {"required": True}
+        if request_schema is not None:
+            operation["requestBody"]["content"] = _json_media(request_schema)
     return operation
 
 
 def openapi_document() -> Dict[str, Any]:
     paths: Dict[str, Any] = {
-        "/health": {"get": _api_operation("Application health", "Health report")},
-        "/component.json": {"get": _api_operation("Composable component manifest", "APG component manifest")},
-        "/manifest": {"get": _api_operation("Application manifest", "APG manifest")},
-        "/openapi.json": {"get": _api_operation("OpenAPI contract", "OpenAPI 3.1 contract")},
-        "/validate": {"get": _api_operation("Application validation", "Validation report")},
-        "/events": {"get": _api_operation("Record mutation events", "Event log")},
-        "/auth": {"get": _api_operation("Authentication status", "Authentication mode")},
-        "/metrics": {"get": _api_operation("Application metrics", "Runtime metrics")},
-        "/applications": {"get": _api_operation("Application compositions", "Application composition catalog")},
-        "/self-test": {"get": _api_operation("Application self-test", "Self-test report")},
+        "/health": {"get": _api_operation("Application health", "Health report", response_schema=_schema_ref("HealthReport"))},
+        "/component.json": {"get": _api_operation("Composable component manifest", "APG component manifest", response_schema=_schema_ref("ComponentManifest"))},
+        "/manifest": {"get": _api_operation("Application manifest", "APG manifest", response_schema=_schema_ref("ApplicationDescription"))},
+        "/openapi.json": {"get": _api_operation("OpenAPI contract", "OpenAPI 3.1 contract", response_schema={"type": "object", "additionalProperties": True})},
+        "/validate": {"get": _api_operation("Application validation", "Validation report", response_schema=_schema_ref("ValidationReport"))},
+        "/events": {"get": _api_operation("Record mutation events", "Event log", response_schema=_schema_ref("EventLog"))},
+        "/auth": {"get": _api_operation("Authentication status", "Authentication mode", response_schema=_schema_ref("AuthStatus"))},
+        "/metrics": {"get": _api_operation("Application metrics", "Runtime metrics", response_schema=_schema_ref("MetricsSnapshot"))},
+        "/applications": {"get": _api_operation("Application compositions", "Application composition catalog", response_schema=_schema_ref("ApplicationCatalog"))},
+        "/self-test": {"get": _api_operation("Application self-test", "Self-test report", response_schema=_schema_ref("SelfTestReport"))},
         "/theme.css": {"get": _api_operation("Generated visual theme stylesheet", "CSS theme stylesheet")},
-        "/records": {"get": _api_operation("All entity records", "Records by entity")},
-        "/relationships": {"get": _api_operation("Entity relationship graph", "Relationship graph")},
-        "/storage": {"get": _api_operation("Record storage status", "Storage status")},
+        "/records": {"get": _api_operation("All entity records", "Records by entity", response_schema=_schema_ref("RecordsByEntity"))},
+        "/entities": {"get": _api_operation("Entity catalog", "Generated entity metadata", response_schema=_schema_ref("EntityCatalog"))},
+        "/databases": {"get": _api_operation("Database catalog", "Database schema and connection metadata", response_schema=_schema_ref("DatabaseCatalog"))},
+        "/databases/status": {"get": _api_operation("Database validation status", "Database schema validation and counts", response_schema=_schema_ref("DatabaseStatus"))},
+        "/relationships": {"get": _api_operation("Entity relationship graph", "Relationship graph", response_schema=_schema_ref("RelationshipGraph"))},
+        "/storage": {"get": _api_operation("Record storage status", "Storage status", response_schema=_schema_ref("StorageStatus"))},
+        "/agents": {"get": _api_operation("Agent catalog", "AI agent and team catalog", response_schema=_schema_ref("AgentCatalog"))},
+        "/capabilities": {"get": _api_operation("Capability catalog", "Capability catalog", response_schema=_schema_ref("CapabilityCatalog"))},
+        "/routes": {"get": _api_operation("Generated UI route catalog", "UI route catalog", response_schema=_schema_ref("RouteCatalog"))},
+        "/composition": {"get": _api_operation("Composition graph", "Composition graph", response_schema=_schema_ref("RelationshipGraph"))},
         "/ui": {"get": _api_operation("Generated application UI", "HTML application index")},
+        "/ui/databases": {"get": _api_operation("Generated database catalog UI", "HTML database catalog")},
     }
-    schemas: Dict[str, Any] = {}
+    schemas: Dict[str, Any] = _database_openapi_schemas()
     for entity in ENTITIES:
         entity_name = str(entity["name"])
         schema_name = f"{entity_name}Record"
+        patch_schema_name = f"{entity_name}RecordPatch"
         schemas[schema_name] = _record_schema(entity)
+        schemas[patch_schema_name] = _record_schema(entity, partial=True)
         paths[f"/entities/{entity_name}/records"] = {
-            "get": _api_operation(f"List {entity_name} records", "Record list"),
-            "post": _api_operation(f"Create {entity_name} record", "Created record", status="201", request_body=True),
+            "get": _api_operation(
+                f"List {entity_name} records",
+                "Record list",
+                response_schema=_record_list_response_schema(schema_name),
+            ),
+            "post": _api_operation(
+                f"Create {entity_name} record",
+                "Created record",
+                status="201",
+                request_body=True,
+                request_schema=_record_body_schema(schema_name),
+                response_schema=_record_mutation_response_schema(schema_name),
+            ),
         }
         paths[f"/entities/{entity_name}/records"]["get"]["parameters"] = [
             {"name": "filter.<field>", "in": "query", "required": False, "description": "Exact field filter"},
@@ -504,29 +1101,69 @@ def openapi_document() -> Dict[str, Any]:
             {"name": "offset", "in": "query", "required": False, "description": "Records to skip"},
         ]
         paths[f"/entities/{entity_name}/records/export"] = {
-            "get": _api_operation(f"Export {entity_name} records", "Record export"),
+            "get": _api_operation(
+                f"Export {entity_name} records",
+                "Record export",
+                response_schema=_record_export_response_schema(schema_name),
+            ),
         }
         paths[f"/entities/{entity_name}/records/import"] = {
-            "post": _api_operation(f"Import {entity_name} records", "Record import", request_body=True),
+            "post": _api_operation(
+                f"Import {entity_name} records",
+                "Record import",
+                request_body=True,
+                request_schema=_record_import_body_schema(schema_name),
+                response_schema=_record_import_response_schema(schema_name),
+            ),
         }
         paths[f"/entities/{entity_name}/records/{{id}}"] = {
-            "get": _api_operation(f"Fetch {entity_name} record", "Record"),
-            "put": _api_operation(f"Update {entity_name} record", "Updated record", request_body=True),
-            "delete": _api_operation(f"Delete {entity_name} record", "Deleted record"),
+            "get": _api_operation(
+                f"Fetch {entity_name} record",
+                "Record",
+                response_schema=_record_item_response_schema(schema_name),
+            ),
+            "put": _api_operation(
+                f"Update {entity_name} record",
+                "Updated record",
+                request_body=True,
+                request_schema=_record_body_schema(patch_schema_name),
+                response_schema=_record_mutation_response_schema(schema_name),
+            ),
+            "delete": _api_operation(
+                f"Delete {entity_name} record",
+                "Deleted record",
+                response_schema=_record_mutation_response_schema(schema_name, record_key="deleted"),
+            ),
         }
         paths[f"/ui/entities/{entity_name}"] = {
             "get": _api_operation(f"Generated {entity_name} UI", "HTML entity screen"),
         }
+        if entity.get("type") == "database":
+            paths[f"/databases/{entity_name}/schemas"] = {
+                "get": _api_operation(f"{entity_name} database schemas", "Database schema metadata", response_schema=_schema_ref("DatabaseSchemaCatalog")),
+            }
     if APG_CAPABILITIES is not None:
-        paths["/rules/evaluate"] = {"post": _api_operation("Evaluate capability rules", "Rule decision", request_body=True)}
-        paths["/configuration/resolve"] = {"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True)}
-        paths["/configuration/validate"] = {"post": _api_operation("Validate capability configuration", "Configuration validation", request_body=True)}
-        paths["/approval/plan"] = {"post": _api_operation("Plan capability approvals", "Approval plan", request_body=True)}
-        paths["/streaming"] = {"get": _api_operation("Streaming topology", "ByteWax streaming topology")}
+        paths["/rules/evaluate"] = {"post": _api_operation("Evaluate capability rules", "Rule decision", request_body=True, request_schema=_schema_ref("RuleEvaluationRequest"), response_schema=_schema_ref("RuleEvaluationResult"))}
+        paths["/configuration/resolve"] = {"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True, request_schema=_schema_ref("CapabilityConfigurationRequest"), response_schema=_schema_ref("CapabilityConfigurationResponse"))}
+        paths["/configuration/validate"] = {"post": _api_operation("Validate capability configuration", "Configuration validation", request_body=True, request_schema=_schema_ref("CapabilityConfigurationRequest"), response_schema=_schema_ref("CapabilityConfigurationResponse"))}
+        paths["/approval/plan"] = {"post": _api_operation("Plan capability approvals", "Approval plan", request_body=True, request_schema=_schema_ref("ApprovalPlanRequest"), response_schema=_schema_ref("ApprovalPlanResponse"))}
+        paths["/streaming"] = {"get": _api_operation("Streaming topology", "ByteWax streaming topology", response_schema=_schema_ref("StreamingTopology"))}
         if hasattr(APG_CAPABILITIES, "list_capabilities"):
             for capability_name in APG_CAPABILITIES.list_capabilities():
                 paths[f"/capabilities/{capability_name}/streaming"] = {
-                    "get": _api_operation(f"{capability_name} streaming contract", "Capability streaming contract"),
+                    "get": _api_operation(f"{capability_name} streaming contract", "Capability streaming contract", response_schema=_schema_ref("CapabilityStreamingContract")),
+                }
+                paths[f"/capabilities/{capability_name}/rules/evaluate"] = {
+                    "post": _api_operation(f"Evaluate {capability_name} rules", "Rule decision", request_body=True, request_schema=_schema_ref("RuleEvaluationRequest"), response_schema=_schema_ref("RuleEvaluationResult")),
+                }
+                paths[f"/capabilities/{capability_name}/configuration/resolve"] = {
+                    "post": _api_operation(f"Resolve {capability_name} configuration", "Resolved configuration", request_body=True, request_schema=_schema_ref("CapabilityConfigurationRequest"), response_schema=_schema_ref("CapabilityConfigurationResponse")),
+                }
+                paths[f"/capabilities/{capability_name}/configuration/validate"] = {
+                    "post": _api_operation(f"Validate {capability_name} configuration", "Configuration validation", request_body=True, request_schema=_schema_ref("CapabilityConfigurationRequest"), response_schema=_schema_ref("CapabilityConfigurationResponse")),
+                }
+                paths[f"/capabilities/{capability_name}/approval/plan"] = {
+                    "post": _api_operation(f"Plan {capability_name} approvals", "Approval plan", request_body=True, request_schema=_schema_ref("ApprovalPlanRequest"), response_schema=_schema_ref("ApprovalPlanResponse")),
                 }
         route_index = getattr(APG_CAPABILITIES, "ui_route_index", None)
         if route_index is not None:
@@ -535,11 +1172,11 @@ def openapi_document() -> Dict[str, Any]:
     if AI_AGENTS is not None:
         for agent_name in describe_application().get("ai_agents", []):
             paths[f"/agents/{agent_name}/invoke"] = {
-                "post": _api_operation(f"Invoke agent {agent_name}", "Agent invocation result", request_body=True),
+                "post": _api_operation(f"Invoke agent {agent_name}", "Agent invocation result", request_body=True, request_schema=_schema_ref("AgentInvocationRequest"), response_schema=_schema_ref("AgentInvocationResponse")),
             }
         for team_name in describe_application().get("ai_agent_teams", []):
             paths[f"/agent-teams/{team_name}/invoke"] = {
-                "post": _api_operation(f"Invoke agent team {team_name}", "Agent team invocation result", request_body=True),
+                "post": _api_operation(f"Invoke agent team {team_name}", "Agent team invocation result", request_body=True, request_schema=_schema_ref("AgentInvocationRequest"), response_schema=_schema_ref("AgentInvocationResponse")),
             }
     if APG_APPLICATIONS is not None:
         route_index = getattr(APG_APPLICATIONS, "application_route_index", None)
@@ -570,6 +1207,7 @@ def describe_application() -> Dict[str, Any]:
         "version": MODULE_VERSION,
         "description": MODULE_DESCRIPTION,
         "entities": list_entities(),
+        "databases": list_databases(),
     }
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents"):
         description["ai_agents"] = AI_AGENTS.list_agents()
@@ -623,6 +1261,99 @@ def _record_validation(report: Dict[str, Any], name: str, validation: Dict[str, 
     report["warnings"].extend(f"{name}: {warning}" for warning in warnings)
 
 
+def validate_database_schema_contracts() -> Dict[str, Any]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    validated: list[str] = []
+    for database in list_databases():
+        database_name = str(database.get("name", "database"))
+        validated.append(database_name)
+        schemas = database.get("schemas", [])
+        if not schemas:
+            warnings.append(f"{database_name} does not declare schemas")
+            continue
+        table_index: Dict[str, list[Dict[str, Any]]] = {}
+        seen_schemas: set[str] = set()
+        for schema in schemas:
+            schema_name = str(schema.get("name", "default"))
+            schema_key = schema_name.lower()
+            if schema_key in seen_schemas:
+                errors.append(f"{database_name} declares duplicate schema {schema_name}")
+            seen_schemas.add(schema_key)
+            seen_tables: set[str] = set()
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                if not table_name:
+                    errors.append(f"{database_name}.{schema_name} declares a table without a name")
+                    continue
+                table_key = table_name.lower()
+                qualified_key = f"{schema_name}.{table_name}".lower()
+                if table_key in seen_tables:
+                    errors.append(f"{database_name}.{schema_name} declares duplicate table {table_name}")
+                seen_tables.add(table_key)
+                table_index.setdefault(table_key, []).append(table)
+                table_index.setdefault(qualified_key, []).append(table)
+
+        for schema in schemas:
+            schema_name = str(schema.get("name", "default"))
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                columns = table.get("columns", [])
+                column_names = [str(column.get("name", "")) for column in columns if isinstance(column, dict)]
+                known_columns = {column_name.lower() for column_name in column_names if column_name}
+                if len(known_columns) != len([column_name for column_name in column_names if column_name]):
+                    errors.append(f"{database_name}.{schema_name}.{table_name} declares duplicate columns")
+                if columns and not any(bool(column.get("primary_key")) for column in columns if isinstance(column, dict)):
+                    warnings.append(f"{database_name}.{schema_name}.{table_name} does not declare a primary key")
+                for index in table.get("indexes", []):
+                    for indexed_column in index.get("columns", []):
+                        if str(indexed_column).lower() not in known_columns:
+                            errors.append(
+                                f"{database_name}.{schema_name}.{table_name} index references unknown column {indexed_column}"
+                            )
+                for column in columns:
+                    if not isinstance(column, dict):
+                        continue
+                    reference = column.get("reference")
+                    if not isinstance(reference, dict):
+                        continue
+                    target_table_name = str(reference.get("table", ""))
+                    target_column_name = str(reference.get("column", ""))
+                    target_schema_name = str(reference.get("schema", ""))
+                    target_label = (
+                        f"{target_schema_name}.{target_table_name}"
+                        if target_schema_name
+                        else target_table_name
+                    )
+                    if target_schema_name:
+                        candidates = table_index.get(f"{target_schema_name}.{target_table_name}".lower(), [])
+                    else:
+                        candidates = table_index.get(f"{schema_name}.{target_table_name}".lower(), [])
+                        if not candidates:
+                            candidates = table_index.get(target_table_name.lower(), [])
+                    if not candidates:
+                        errors.append(
+                            f"{database_name}.{schema_name}.{table_name}.{column.get('name')} references unknown table {target_label}"
+                        )
+                        continue
+                    if len(candidates) > 1:
+                        errors.append(
+                            f"{database_name}.{schema_name}.{table_name}.{column.get('name')} references ambiguous table {target_label}; use schema-qualified target"
+                        )
+                        continue
+                    target_table = candidates[0]
+                    target_columns = {
+                        str(target_column.get("name", "")).lower()
+                        for target_column in target_table.get("columns", [])
+                        if isinstance(target_column, dict)
+                    }
+                    if target_column_name.lower() not in target_columns:
+                        errors.append(
+                            f"{database_name}.{schema_name}.{table_name}.{column.get('name')} references unknown column {target_label}.{target_column_name}"
+                        )
+    return {"errors": errors, "warnings": warnings, "validated_databases": sorted(validated)}
+
+
 def validate_application(available_agent_runtimes: list[str] | None = None) -> Dict[str, Any]:
     report: Dict[str, Any] = {
         "name": MODULE_NAME,
@@ -631,6 +1362,7 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
         "warnings": [],
         "checks": {},
     }
+    _record_validation(report, "database_schemas", validate_database_schema_contracts())
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
         _record_validation(
             report,
@@ -846,12 +1578,77 @@ def relationship_graph() -> Dict[str, Any]:
         {"id": str(entity["name"]), "name": str(entity["name"]), "type": str(entity["type"])}
         for entity in ENTITIES
     ]
+    table_nodes_by_name: Dict[str, list[str]] = {}
+    for entity in ENTITIES:
+        database_name = str(entity["name"])
+        for schema in entity.get("schemas", []):
+            schema_name = str(schema.get("name", "default"))
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                if not table_name:
+                    continue
+                node_id = f"{database_name}.{schema_name}.{table_name}"
+                nodes.append({
+                    "id": node_id,
+                    "name": table_name,
+                    "type": "database_table",
+                    "database": database_name,
+                    "schema": schema_name,
+                })
+                table_nodes_by_name.setdefault(table_name.lower(), []).append(node_id)
+                table_nodes_by_name.setdefault(f"{schema_name}.{table_name}".lower(), []).append(node_id)
     entity_names = {str(entity["name"]) for entity in ENTITIES}
     entity_names_by_lower = {name.lower(): name for name in entity_names}
     edges: list[Dict[str, Any]] = []
     seen_edges: set[tuple[str, str, str, str]] = set()
     for entity in ENTITIES:
         source = str(entity["name"])
+        for schema in entity.get("schemas", []):
+            schema_name = str(schema.get("name", "default"))
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                if not table_name:
+                    continue
+                table_node = f"{source}.{schema_name}.{table_name}"
+                contains_key = (source, table_node, schema_name, "contains_table")
+                if contains_key not in seen_edges:
+                    edges.append({
+                        "from": source,
+                        "to": table_node,
+                        "field": schema_name,
+                        "relationship": "contains_table",
+                    })
+                    seen_edges.add(contains_key)
+                for column in table.get("columns", []):
+                    reference = column.get("reference") if isinstance(column, dict) else None
+                    if not isinstance(reference, dict):
+                        continue
+                    target_table = str(reference.get("table", ""))
+                    target_schema = str(reference.get("schema", ""))
+                    if target_schema:
+                        targets = table_nodes_by_name.get(f"{target_schema}.{target_table}".lower(), [])
+                    else:
+                        targets = table_nodes_by_name.get(f"{schema_name}.{target_table}".lower(), [])
+                        if not targets:
+                            targets = table_nodes_by_name.get(target_table.lower(), [])
+                    target = targets[0] if len(targets) == 1 else None
+                    if not target:
+                        continue
+                    edge_key = (
+                        table_node,
+                        target,
+                        str(column.get("name", "")),
+                        str(reference.get("relationship", "db_ref")),
+                    )
+                    if edge_key not in seen_edges:
+                        edges.append({
+                            "from": table_node,
+                            "to": target,
+                            "field": str(column.get("name", "")),
+                            "relationship": str(reference.get("relationship", "db_ref")),
+                            "target_column": str(reference.get("column", "")),
+                        })
+                        seen_edges.add(edge_key)
         for field in _field_specs(source):
             field_name = str(field["name"])
             field_type = str(field.get("type", ""))
@@ -889,6 +1686,13 @@ def _ui_index_html() -> str:
     )
     if not entity_links:
         entity_links = "<li>No APG entities declared.</li>"
+    database_links = "".join(
+        f'<li><a href="/ui/databases">{html.escape(database["name"])}</a> '
+        f'<code>{len(database.get("schemas", []))} schema(s)</code></li>'
+        for database in app.get("databases", [])
+    )
+    if not database_links:
+        database_links = "<li>No databases declared.</li>"
     application_route_links = "".join(
         f'<li><a href="{html.escape(route, quote=True)}">{html.escape(route)}</a> '
         f'<code>{html.escape(str(screen.get("application", "application")))}</code></li>'
@@ -933,6 +1737,7 @@ def _ui_index_html() -> str:
         '<a href="/metrics">Metrics</a> | '
         '<a href="/self-test">Self-Test</a> | '
         '<a href="/records">Record JSON</a> | '
+        '<a href="/ui/databases">Databases</a> | '
         '<a href="/relationships">Relationships</a> | '
         '<a href="/openapi.json">API Contract</a></nav>'
         "<h2>Application Routes</h2>"
@@ -941,6 +1746,8 @@ def _ui_index_html() -> str:
         f"<ul>{capability_route_links}</ul>"
         "<h2>Entities</h2>"
         f"<ul>{entity_links}</ul>"
+        "<h2>Databases</h2>"
+        f"<ul>{database_links}</ul>"
         "<h2>Capabilities</h2>"
         f"<ul>{capability_links}</ul>"
         "<h2>AI Agents</h2>"
@@ -949,6 +1756,49 @@ def _ui_index_html() -> str:
         f"<ul>{team_links}</ul>"
     )
     return _html_page(MODULE_NAME, body)
+
+
+def _ui_database_catalog_html() -> tuple[int, str]:
+    status = database_status()
+    status_code = 200 if status["valid"] else 422
+    status_label = "valid" if status["valid"] else "invalid"
+    database_items: list[str] = []
+    for database in list_databases():
+        database_name = str(database.get("name", "database"))
+        schema_rows: list[str] = []
+        for schema in database.get("schemas", []):
+            schema_name = str(schema.get("name", "default"))
+            table_names = ", ".join(
+                html.escape(str(table.get("name", "table")))
+                for table in schema.get("tables", [])
+            ) or "no tables"
+            schema_rows.append(
+                f"<li><strong>{html.escape(schema_name)}</strong>: {table_names}</li>"
+            )
+        schemas_html = "".join(schema_rows) or "<li>No schemas declared.</li>"
+        database_items.append(
+            f"<section><h2>{html.escape(database_name)}</h2>"
+            f'<p><a href="/databases/{html.escape(database_name, quote=True)}/schemas">'
+            "Schema JSON</a></p>"
+            f"<ul>{schemas_html}</ul></section>"
+        )
+    databases_html = "".join(database_items) or "<p>No databases declared.</p>"
+    validation_html = html.escape(json.dumps(status["validation"], indent=2, sort_keys=True))
+    body = (
+        "<h1>Databases</h1>"
+        f"<p>Status: <strong>{html.escape(status_label)}</strong>; "
+        f"{status['database_count']} database(s), "
+        f"{status['schema_count']} schema(s), "
+        f"{status['table_count']} table(s), "
+        f"{status['reference_count']} reference(s).</p>"
+        '<nav><a href="/ui">Application UI</a> | '
+        '<a href="/databases">Database JSON</a> | '
+        '<a href="/databases/status">Status JSON</a> | '
+        '<a href="/relationships">Relationships</a></nav>'
+        f"{databases_html}"
+        f"<h2>Validation</h2><pre>{validation_html}</pre>"
+    )
+    return status_code, _html_page("Databases", body)
 
 
 def _ui_field_input_html(field: Dict[str, Any]) -> str:
@@ -1160,6 +2010,8 @@ def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[i
     parts = [part for part in path.split("/") if part]
     if parts == ["ui"]:
         return 200, _ui_index_html()
+    if parts == ["ui", "databases"]:
+        return _ui_database_catalog_html()
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
         return _ui_entity_html(parts[2], query=query)
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "agents":
@@ -1504,6 +2356,20 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, openapi_document()
     if path == "/entities":
         return 200, {"entities": list_entities()}
+    if path == "/databases":
+        return 200, {"databases": list_databases()}
+    if path == "/databases/status":
+        status = database_status()
+        return (200 if status["valid"] else 422), status
+    if path.startswith("/databases/") and path.endswith("/schemas"):
+        database_name = path.strip("/").split("/")[1]
+        for database in list_databases():
+            if str(database.get("name")) == database_name:
+                return 200, {
+                    "database": database_name,
+                    "schemas": database.get("schemas", []),
+                }
+        return 404, {"error": "unknown_database", "database": database_name}
     if path == "/auth":
         return 200, auth_status()
     if path == "/events":

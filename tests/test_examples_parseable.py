@@ -73,3 +73,25 @@ def test_numbered_apg_examples_include_readmes_and_compiled_outputs():
 			failures.append(f"{example_dir}: missing apg_application.py for application composition")
 
 	assert failures == []
+
+
+def test_numbered_apg_example_outputs_match_current_compiler():
+	failures: list[str] = []
+
+	for source in numbered_example_sources():
+		compile_result = compile_apg_file(str(source))
+		if not compile_result.success:
+			failures.append(f"{source}: compile failed: {compile_result.errors}")
+			continue
+
+		output_dir = source.parent / "output"
+		for filename, expected_content in sorted(compile_result.generated_files.items()):
+			output_file = output_dir / filename
+			if not output_file.is_file():
+				failures.append(f"{source}: missing generated output {filename}")
+				continue
+			actual_content = output_file.read_text(encoding="utf-8")
+			if actual_content != expected_content:
+				failures.append(f"{source}: stale generated output {filename}")
+
+	assert failures == []

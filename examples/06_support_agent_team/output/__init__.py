@@ -11,7 +11,7 @@ This package was automatically generated from APG source code.
 
 __version__ = "1.0.0"
 
-from .app import auth_status, coerce_record_types, component_manifest, create_record, delete_record, describe_application, get_record, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, self_test, storage_status, update_record, validate_application, validate_record
+from .app import auth_status, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, self_test, storage_status, update_record, validate_application, validate_record
 
 __all__ = [
     "__version__",
@@ -19,9 +19,11 @@ __all__ = [
     "coerce_record_types",
     "component_manifest",
     "create_record",
+    "database_status",
     "delete_record",
     "describe_application",
     "get_record",
+    "list_databases",
     "list_entities",
     "list_events",
     "list_records",

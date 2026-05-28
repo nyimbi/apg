@@ -7080,3 +7080,18 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_ai_agent_composition.py::test_generated_app_manifest_includes_ai_agents_and_teams tests/test_capability_composition_runtime.py::test_generated_app_executes_capability_operations_over_http -q` -> 2 passed
 - `git diff --check -- compiler/code_generator.py tests/test_ai_agent_composition.py tests/test_capability_composition_runtime.py docs/progress_log.md`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 16:25 EAT
+
+Completed checkpoint:
+
+- Regenerated all 20 numbered example `output/` directories from their current `main.apg` sources so checked-in examples reflect the latest executable compiler/runtime contracts.
+- Added a regression test that recompiles each numbered example and fails when checked-in generated outputs drift from the current compiler.
+- Smoke-tested the most complex generated example, `examples/20_enterprise_erp_platform/output`, proving the regenerated enterprise ERP app self-test passes with 82 routes.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile tests/test_examples_parseable.py`
+- `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` -> 4 passed
+- `../../../.venv/bin/python smoke_test.py` from `examples/20_enterprise_erp_platform/output` -> passed; generated self-test reported `passed: true`
+- Deferred broader pytest at the user's request to conserve battery.
