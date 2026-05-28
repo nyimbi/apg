@@ -1,14 +1,7 @@
 module lint_relationship_warning version 1.0.0 {
-	description: "Relationship warning fixture";
+	description: "Strict warning fixture";
 }
 
-table Customer {
-	name: str;
-	email: str;
-}
-
-table SalesOrder {
-	customer_id: int;
-	customer: Customer;
-	total: float;
+process Worker {
+	helper: () -> int;
 }

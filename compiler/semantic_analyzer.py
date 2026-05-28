@@ -686,8 +686,9 @@ class SemanticAnalyzer:
 	
 	def _is_property_used(self, prop: PropertyDeclaration, entity: EntityDeclaration) -> bool:
 		"""Check if a property is used (simplified heuristic)"""
-		# This is a simplified check - in practice, would need full usage analysis
-		return len(entity.methods) > 0  # Assume used if entity has methods
+		# APG properties are usually declarative table, form, screen, capability,
+		# and configuration fields. Treat them as contract surface, not dead code.
+		return True
 	
 	def _is_method_used(self, method: MethodDeclaration, entity: EntityDeclaration) -> bool:
 		"""Check if a method is used (simplified heuristic)"""

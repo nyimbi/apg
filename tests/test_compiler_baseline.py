@@ -1421,6 +1421,21 @@ def test_cli_lint_json_reports_valid_apg_file_without_generation(tmp_path):
 	assert not output.exists()
 
 
+def test_cli_lint_treats_declarative_data_fields_as_contract_surface(tmp_path):
+	source = tmp_path / "data_app.apg"
+	source.write_text(DATA_APP_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["lint", str(source), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.lint-report.v1"
+	assert report["ok"] is True
+	assert report["severity_counts"] == {"error": 0, "warning": 0, "info": 0, "hint": 0}
+	assert report["diagnostics"] == []
+	assert report["semantic_model_available"] is True
+
+
 def test_cli_lint_catalog_uses_shared_semantic_model_for_capability_resolution(tmp_path):
 	source = tmp_path / "capability.apg"
 	catalog = write_capability_catalog(tmp_path / "catalog", "audit_log")

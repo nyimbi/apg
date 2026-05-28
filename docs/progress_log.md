@@ -8140,3 +8140,27 @@ Battery-conscious verification:
 - `.venv/bin/apg baseline examples --json` passed with 20 examples, 20 passing examples, 0 failures, and python-only targeting.
 - `rg -n "^\\s+pass$" examples/*/output compiler/code_generator.py tests/test_compiler_baseline.py -g '*.py'` found no bare `pass` lines in the generated example outputs or touched compiler/test files.
 - `git diff --check -- compiler/code_generator.py tests/test_compiler_baseline.py examples docs/progress_log.md` passed.
+
+Commit result:
+
+- Pushed commit `07c3e59` (`Keep generated capability runtimes executable`).
+
+### 2026-05-29 00:03 EAT
+
+In progress:
+
+- Reduced APG0100 warning noise by treating declarative properties as APG contract surface rather than dead code.
+- Preserved APG0100 strict-mode coverage by moving the lint warning fixture to an unused method on a supported generic APG `process` surface.
+- Added a regression test proving data-only APG applications lint cleanly without unused-field warnings.
+- Recompiled all 20 numbered APG examples so checked-in generated semantic models and embedded runtime metadata reflect the quieter diagnostics.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/semantic_analyzer.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_lint_treats_declarative_data_fields_as_contract_surface tests/test_compiler_baseline.py::test_cli_lint_audits_fixture_catalog tests/test_compiler_baseline.py::test_cli_baseline_json_audits_numbered_examples -q` passed with 3 tests.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler -q` passed.
+- `.venv/bin/apg lint --audit-fixtures --json` passed with 6 fixtures, 6 passing fixtures, all required tags covered, and 0 blocking gaps.
+- `.venv/bin/apg lint examples/20_enterprise_erp_platform/main.apg --json` passed with 0 diagnostics.
+- `.venv/bin/apg baseline examples --json` passed with 20 examples, 20 passing examples, 0 failures, and every example warning list empty.
+- `.venv/bin/apg tooling audit --json` passed with 11 surfaces, 11 passing surfaces, 0 errors, and 0 blocking gaps.
+- `git diff --check -- compiler/semantic_analyzer.py tests/test_compiler_baseline.py tests/fixtures/lint examples docs/progress_log.md` passed.

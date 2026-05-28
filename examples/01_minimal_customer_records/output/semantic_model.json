@@ -17,48 +17,7 @@
     "source": "customer_records.apg",
     "target": "python"
   },
-  "diagnostics": [
-    {
-      "code": "APG0100",
-      "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "customer_records.apg",
-      "fixes": [],
-      "message": "Property 'name' appears to be unused",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "related_locations": [],
-      "severity": "warning",
-      "title": "Semantic warning"
-    },
-    {
-      "code": "APG0100",
-      "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "customer_records.apg",
-      "fixes": [],
-      "message": "Property 'email' appears to be unused",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "related_locations": [],
-      "severity": "warning",
-      "title": "Semantic warning"
-    }
-  ],
+  "diagnostics": [],
   "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
