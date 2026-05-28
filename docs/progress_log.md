@@ -8301,3 +8301,22 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `49a0743` (`Treat registry recommendations as executable contracts`).
+
+### 2026-05-29 00:52 EAT
+
+Compiler serviceability assessment:
+
+- Verified the compiler is serviceable for the current executable baseline: APG source can be parsed, compiled, written to generated Python artifacts, and verified through generated self-tests and smoke tests.
+- Confirmed the 20 numbered APG examples still parse, compile, include checked-in outputs, match current generated artifacts, cover the bed-down domains, and pass release evidence.
+- Found one compiler-adjacent red test in `tests/test_compiler_baseline.py::test_cli_explain_json_covers_symbols_diagnostics_and_handlers`: `apg explain --diagnostic APG0100` returns a registry explanation but `match_count` is `0` for `examples/20_enterprise_erp_platform/main.apg`, while the test expects at least one current semantic warning.
+- Interpreted that failure as a stale diagnostic-explanation expectation rather than a core compile failure because the source file now lints cleanly and the diagnostic registry/tooling audits pass.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py tests/test_examples_parseable.py` ran 92 tests: 91 passed, 1 failed in the diagnostic explanation assertion above.
+- `.venv/bin/python -m pytest -q tests/test_examples_parseable.py` passed with 6 tests.
+- `.venv/bin/python -m pytest -q tests/test_compiler_baseline.py -k 'compile_default_target or compiler_report or checked_in_example_outputs or python_is_the_only_advertised_compiler_target or framework_names_are_not_silent_compiler_target_aliases'` passed with 4 tests and 82 deselected.
+- `.venv/bin/python -m cli.main compile examples/01_minimal_customer_records/main.apg --output /private/tmp/apg-compile-smoke --verify` generated 9 files and passed generated self-test plus smoke test.
+- `.venv/bin/python -m cli.main tooling audit --json` passed with 11/11 tooling surfaces, 0 errors, and 0 blocking gaps.
+- `.venv/bin/python -m cli.main explain examples/20_enterprise_erp_platform/main.apg --diagnostic APG0100 --json` returned `apg.explain-report.v1` with `ok: true`, registry details present, and `match_count: 0`.
+- `.venv/bin/python -m cli.main lint examples/20_enterprise_erp_platform/main.apg --json` returned `ok: true` with no diagnostics.
