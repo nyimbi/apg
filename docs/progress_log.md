@@ -6975,3 +6975,19 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_parser.py::TestAPGParser::test_database_parsing tests/test_semantic_analyzer.py::TestSemanticAnalyzer::test_database_validation -q` -> 2 passed, 1 pre-existing warning
 - `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 15:51 EAT
+
+Completed checkpoint:
+
+- Added generated database validation observability through `database_status()` and `GET /databases/status`.
+- Generated runtime metrics now include database validation status, database/schema/table counts, and DBML reference counts.
+- Database status returns HTTP 422 when generated schema validation fails, making broken DBML references visible through runtime health tooling.
+- Updated generated README and package exports to include the database status surface.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/code_generator.py tests/test_compiler_database_ast.py`
+- `.venv/bin/python -m pytest tests/test_compiler_database_ast.py -q` -> 6 passed
+- `git diff --check compiler/code_generator.py tests/test_compiler_database_ast.py`
+- Deferred broader pytest at the user's request to conserve battery.

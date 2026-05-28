@@ -183,6 +183,14 @@ def test_generated_python_exposes_database_catalog_routes_and_openapi():
 	assert status == 200
 	assert payload["databases"][0]["schemas"][0]["name"] == "accounting"
 
+	status, payload = namespace["_route_payload"]("/databases/status")
+	assert status == 200
+	assert payload["valid"] is True
+	assert payload["database_count"] == 1
+	assert payload["schema_count"] == 1
+	assert payload["table_count"] == 2
+	assert payload["reference_count"] == 1
+
 	status, payload = namespace["_route_payload"]("/databases/LedgerDB/schemas")
 	assert status == 200
 	assert payload["schemas"][0]["tables"][0]["name"] == "journals"
@@ -193,7 +201,11 @@ def test_generated_python_exposes_database_catalog_routes_and_openapi():
 
 	openapi = namespace["openapi_document"]()
 	assert "/databases" in openapi["paths"]
+	assert "/databases/status" in openapi["paths"]
 	assert "/databases/LedgerDB/schemas" in openapi["paths"]
+
+	metrics = namespace["metrics_snapshot"]()
+	assert metrics["database_status"]["table_count"] == 2
 
 
 def test_generated_readme_documents_database_runtime_surface():
@@ -205,6 +217,7 @@ def test_generated_readme_documents_database_runtime_surface():
 
 	assert "## Databases" in readme
 	assert "`GET /databases`" in readme
+	assert "`GET /databases/status`" in readme
 	assert "`GET /databases/{Database}/schemas`" in readme
 	assert "`GET /relationships`" in readme
 	assert "`LedgerDB` - 1 schema(s), 2 table(s)" in readme
@@ -227,3 +240,10 @@ def test_generated_validation_rejects_broken_database_references():
 		"database_schemas: BrokenDB.accounting.journals.account_id references unknown column accounts.missing_id"
 	]
 	assert namespace["self_test"]()["passed"] is False
+
+	status, payload = namespace["_route_payload"]("/databases/status")
+	assert status == 422
+	assert payload["valid"] is False
+	assert payload["validation"]["errors"] == [
+		"BrokenDB.accounting.journals.account_id references unknown column accounts.missing_id"
+	]
