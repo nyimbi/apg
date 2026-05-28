@@ -8213,4 +8213,4 @@ Battery-conscious verification:
 
 Commit result:
 
-- Pending.
+- Pushed commit `308863e` (`Let generated agents discover executable adapter shims`).
