@@ -6199,3 +6199,27 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `37c5408` (`Make gateway APG integration dependency-light`).
+
+### 2026-05-28 11:02 EAT
+
+Completed checkpoint:
+
+- Made the General Ledger service importable with the current model module by adding compatibility aliases for journal, line, posting, and trial-balance models.
+- Fixed the service import fallback so a missing optional auth/RBAC `db` object does not force an invalid standalone `from models import *` import.
+- Replaced GLR period-end balance, allocation, report, comparative balance, and comparative income pass-only helpers with executable behavior.
+- Period-end helpers now snapshot balances, evaluate allocation rules, generate report manifests, update period checklist evidence, and persist period-end metadata.
+- Comparative report helpers now return structured sections and totals from the existing account balance/activity methods.
+- Added focused regression coverage for GLR importability, comparative report data, and period-end allocation/report evidence.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/fin/glr/general_ledger/service.py capabilities/fin/glr/general_ledger/models.py tests/test_fin_glr_period_reporting_runtime.py`
+- `.venv/bin/pytest tests/test_fin_glr_period_reporting_runtime.py tests/test_fin_glr_context_resolution.py -q` -> 5 passed
+- `.venv/bin/python -c 'from capabilities.fin.glr.general_ledger.service import GeneralLedgerService; print("glr import ok")'`
+- `rg -n "Implementation for period|Implementation for comparative|not yet implemented|raise NotImplementedError" capabilities/fin/glr/general_ledger/service.py capabilities/fin/glr/general_ledger/models.py tests/test_fin_glr_period_reporting_runtime.py -S` -> no matches
+- `git diff --check capabilities/fin/glr/general_ledger/service.py capabilities/fin/glr/general_ledger/models.py tests/test_fin_glr_period_reporting_runtime.py`
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit and push.

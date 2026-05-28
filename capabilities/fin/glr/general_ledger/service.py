@@ -37,10 +37,13 @@ try:
 		GLPosting, AccountTypeEnum, BalanceTypeEnum, PeriodStatusEnum, 
 		JournalStatusEnum, JournalSourceEnum, CurrencyEnum, ReportingFrameworkEnum
 	)
-	from ...auth_rbac.models import db
 except ImportError:
 	# Fallback for standalone testing
 	from models import *
+
+try:
+	from ...auth_rbac.models import db
+except ImportError:
 	db = None
 
 # Configure logging
@@ -1411,23 +1414,153 @@ class GeneralLedgerService:
 	
 	async def _generate_period_balances(self, period: GLPeriod):
 		"""Generate account balance snapshots for period"""
-		# Implementation for period-end balance generation
-		pass
+		session = self.get_session()
+		accounts = await self._get_active_reporting_accounts(list(AccountTypeEnum))
+		generated = 0
+		total_debits = Decimal('0.00')
+		total_credits = Decimal('0.00')
+		total_transactions = 0
+		start_date, end_date = period.get_period_range()
+		opening_date = start_date - timedelta(days=1)
+
+		for account in accounts:
+			opening_balance = await self._get_account_balance(account.account_id, opening_date)
+			ending_balance = await self._get_account_balance(account.account_id, end_date)
+			stats = self._get_period_posting_stats(account.account_id, start_date, end_date)
+			period_debits = stats["period_debits"]
+			period_credits = stats["period_credits"]
+			total_debits += period_debits
+			total_credits += period_credits
+			total_transactions += stats["transaction_count"]
+
+			balance = session.query(GLAccountBalance).filter_by(
+				tenant_id=self.tenant_id,
+				account_id=account.account_id,
+				period_id=period.period_id,
+				currency=getattr(account, "primary_currency", CurrencyEnum.USD)
+			).first()
+			if balance is None:
+				balance = GLAccountBalance(
+					tenant_id=self.tenant_id,
+					account_id=account.account_id,
+					period_id=period.period_id,
+					currency=getattr(account, "primary_currency", CurrencyEnum.USD)
+				)
+				session.add(balance)
+
+			balance.as_of_date = end_date
+			balance.opening_balance = opening_balance
+			balance.period_debits = period_debits
+			balance.period_credits = period_credits
+			balance.ending_balance = ending_balance
+			balance.base_currency_balance = ending_balance
+			balance.transaction_count = stats["transaction_count"]
+			balance.largest_debit = stats["largest_debit"]
+			balance.largest_credit = stats["largest_credit"]
+			generated += 1
+
+		period.posting_count = total_transactions
+		period.total_debits = total_debits
+		period.total_credits = total_credits
+		period.closing_entries_count = generated
+		self._append_period_checklist_item(period, {
+			"step": "generate_period_balances",
+			"status": "completed",
+			"accounts_snapshotted": generated,
+			"total_debits": float(total_debits),
+			"total_credits": float(total_credits),
+			"completed_at": datetime.utcnow().isoformat()
+		})
+		session.commit()
 	
 	async def _run_period_allocations(self, period: GLPeriod):
 		"""Run automated allocations for period"""
-		# Implementation for period allocations
-		pass
+		session = self.get_session()
+		accounts = await self._get_active_reporting_accounts(list(AccountTypeEnum))
+		allocation_results = []
+
+		for account in accounts:
+			for rule in getattr(account, "auto_allocation_rules", None) or []:
+				if not rule or not rule.get("enabled", True):
+					continue
+				source_balance = await self._get_account_balance(account.account_id, period.end_date)
+				percent = Decimal(str(rule.get("percent", rule.get("percentage", 0))))
+				amount = (source_balance * percent / Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+				allocation_results.append({
+					"source_account_id": account.account_id,
+					"target_account_id": rule.get("target_account_id"),
+					"rule_name": rule.get("name", "auto_allocation"),
+					"percent": float(percent),
+					"amount": float(amount),
+					"currency": getattr(getattr(account, "primary_currency", CurrencyEnum.USD), "value", CurrencyEnum.USD.value)
+				})
+
+		self._append_period_checklist_item(period, {
+			"step": "run_period_allocations",
+			"status": "completed",
+			"allocations_evaluated": len(allocation_results),
+			"allocations": allocation_results,
+			"completed_at": datetime.utcnow().isoformat()
+		})
+		session.commit()
 	
 	async def _generate_period_reports(self, period: GLPeriod):
 		"""Generate compliance reports for period"""
-		# Implementation for period reporting
-		pass
+		session = self.get_session()
+		trial_balance = await self.generate_trial_balance(TrialBalanceParams(as_of_date=period.end_date))
+		balance_sheet = await self.generate_balance_sheet(period.end_date)
+		income_statement = await self.generate_income_statement(period.start_date, period.end_date)
+		report_manifest = {
+			"trial_balance": {
+				"balanced": trial_balance.metadata["balanced"],
+				"total_debits": trial_balance.data["totals"]["total_debits"],
+				"total_credits": trial_balance.data["totals"]["total_credits"]
+			},
+			"balance_sheet": {
+				"balanced": balance_sheet.metadata["balanced"],
+				"totals": balance_sheet.data["totals"]
+			},
+			"income_statement": {
+				"net_income": income_statement.data["totals"]["net_income"],
+				"total_revenue": income_statement.data["totals"]["total_revenue"],
+				"total_expenses": income_statement.data["totals"]["total_expenses"]
+			},
+			"generated_at": datetime.utcnow().isoformat()
+		}
+		self._append_period_checklist_item(period, {
+			"step": "generate_period_reports",
+			"status": "completed",
+			"reports": report_manifest,
+			"completed_at": datetime.utcnow().isoformat()
+		})
+		period.closing_notes = json.dumps(report_manifest, default=str)
+		session.commit()
 	
 	async def _get_comparative_balances(self, account_types: List[AccountTypeEnum], comp_date: date):
 		"""Get comparative balance data"""
-		# Implementation for comparative reporting
-		pass
+		sections: Dict[str, List[Dict[str, Any]]] = {}
+		totals: Dict[str, Decimal] = {}
+		for account in await self._get_active_reporting_accounts(account_types):
+			type_code = self._account_type_code(account)
+			balance = await self._get_account_balance(account.account_id, comp_date)
+			section = type_code.value if hasattr(type_code, "value") else str(type_code)
+			sections.setdefault(section, [])
+			totals.setdefault(section, Decimal('0.00'))
+			if balance != 0:
+				sections[section].append({
+					"account_id": account.account_id,
+					"account_code": account.account_code,
+					"account_name": account.account_name,
+					"balance": float(balance),
+					"as_of_date": comp_date.isoformat()
+				})
+				totals[section] += balance
+
+		return {
+			"as_of_date": comp_date.isoformat(),
+			"sections": sections,
+			"totals": {key: float(value) for key, value in totals.items()}
+		}
 	
 	async def _get_comparative_income_data(
 		self, 
@@ -1436,8 +1569,85 @@ class GeneralLedgerService:
 		date_to: date
 	):
 		"""Get comparative income statement data"""
-		# Implementation for comparative income reporting
-		pass
+		sections: Dict[str, List[Dict[str, Any]]] = {}
+		totals: Dict[str, Decimal] = {}
+		for account in await self._get_active_reporting_accounts(account_types):
+			type_code = self._account_type_code(account)
+			activity = await self._get_account_period_activity(account.account_id, date_from, date_to)
+			section = type_code.value if hasattr(type_code, "value") else str(type_code)
+			sections.setdefault(section, [])
+			totals.setdefault(section, Decimal('0.00'))
+			if activity != 0:
+				sections[section].append({
+					"account_id": account.account_id,
+					"account_code": account.account_code,
+					"account_name": account.account_name,
+					"activity": float(activity),
+					"period_from": date_from.isoformat(),
+					"period_to": date_to.isoformat()
+				})
+				totals[section] += activity
+
+		total_revenue = totals.get(AccountTypeEnum.REVENUE.value, Decimal('0.00'))
+		total_expenses = totals.get(AccountTypeEnum.EXPENSE.value, Decimal('0.00'))
+		return {
+			"period_from": date_from.isoformat(),
+			"period_to": date_to.isoformat(),
+			"sections": sections,
+			"totals": {
+				**{key: float(value) for key, value in totals.items()},
+				"net_income": float(total_revenue - total_expenses)
+			}
+		}
+
+	async def _get_active_reporting_accounts(self, account_types: List[AccountTypeEnum]) -> List[GLAccount]:
+		"""Return active GL accounts for reporting helper operations."""
+		session = self.get_session()
+		return session.query(GLAccount).options(
+			joinedload(GLAccount.account_type)
+		).join(GLAccountType).filter(
+			GLAccount.tenant_id == self.tenant_id,
+			GLAccountType.type_code.in_(account_types),
+			GLAccount.is_active == True
+		).order_by(
+			GLAccountType.reporting_sequence,
+			GLAccount.account_code
+		).all()
+
+	def _account_type_code(self, account: GLAccount) -> AccountTypeEnum:
+		"""Extract account type code from ORM or lightweight test account objects."""
+		account_type = getattr(account, "account_type", None)
+		return getattr(account_type, "type_code", None) or getattr(account, "type_code", None)
+
+	def _get_period_posting_stats(self, account_id: str, date_from: date, date_to: date) -> Dict[str, Any]:
+		"""Return posting statistics for account-period balance snapshots."""
+		session = self.get_session()
+		stats = session.query(
+			func.count(GLPosting.posting_id).label('transaction_count'),
+			func.coalesce(func.sum(GLPosting.debit_amount), 0).label('period_debits'),
+			func.coalesce(func.sum(GLPosting.credit_amount), 0).label('period_credits'),
+			func.coalesce(func.max(GLPosting.debit_amount), 0).label('largest_debit'),
+			func.coalesce(func.max(GLPosting.credit_amount), 0).label('largest_credit')
+		).filter(
+			GLPosting.tenant_id == self.tenant_id,
+			GLPosting.account_id == account_id,
+			GLPosting.posting_date >= date_from,
+			GLPosting.posting_date <= date_to,
+			GLPosting.is_posted == True
+		).first()
+		return {
+			"transaction_count": int(getattr(stats, "transaction_count", 0) or 0),
+			"period_debits": Decimal(str(getattr(stats, "period_debits", 0) or 0)),
+			"period_credits": Decimal(str(getattr(stats, "period_credits", 0) or 0)),
+			"largest_debit": Decimal(str(getattr(stats, "largest_debit", 0) or 0)),
+			"largest_credit": Decimal(str(getattr(stats, "largest_credit", 0) or 0))
+		}
+
+	def _append_period_checklist_item(self, period: GLPeriod, item: Dict[str, Any]) -> None:
+		"""Append a deterministic period-end evidence item."""
+		checklist = list(getattr(period, "closing_checklist", None) or [])
+		checklist.append(item)
+		period.closing_checklist = checklist
 	
 	# =====================================
 	# CURRENCY MANAGEMENT

@@ -1166,3 +1166,17 @@ class CFGLTrialBalance(Model, AuditMixin, BaseMixin):
 	
 	def __repr__(self):
 		return f"<CFGLTrialBalance {self.account.account_code} as of {self.as_of_date}>"
+
+
+# Backward-compatible model aliases used by the service, views, and tests.
+# The module contains older CFGL* names for journal/posting tables while the
+# service API is written against GL* names. Keep these aliases executable so
+# importing the GLR service does not fall back to non-package local imports.
+GLJournalEntry = CFGLJournalEntry
+GLJournalLine = CFGLJournalLine
+GLPosting = CFGLPosting
+GLTrialBalance = CFGLTrialBalance
+
+# CFGL journal/posting relationships still reference CFGL account/period names.
+CFGLAccount = GLAccount
+CFGLPeriod = GLPeriod
