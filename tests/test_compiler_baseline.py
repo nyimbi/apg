@@ -77,6 +77,51 @@ table SalesOrder {
 }
 """
 
+MIGRATION_PREVIOUS_SOURCE = """
+module migration_previous version 1.0.0 {
+	description: "Migration previous";
+}
+
+table Customer {
+	name: str;
+	age: int;
+	legacy_code: bool;
+}
+
+capability CustomerMaster {
+	contract: {
+		id: customer_master,
+		provides: [customer_master],
+		configuration: {owned_tables: [Customer]}
+	};
+}
+"""
+
+MIGRATION_CURRENT_SOURCE = """
+module migration_current version 1.0.0 {
+	description: "Migration current";
+}
+
+table Customer {
+	name: str;
+	email: str;
+	age: float;
+}
+
+table Invoice {
+	customer_id: int;
+	total: float;
+}
+
+capability Billing {
+	contract: {
+		id: billing,
+		provides: [invoice_generation],
+		configuration: {owned_tables: [Customer, Invoice]}
+	};
+}
+"""
+
 
 def test_documented_python_target_generates_executable_application_files():
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
@@ -1555,6 +1600,66 @@ def test_cli_nl_plan_rejects_unrepresentable_prompt(tmp_path):
 	assert report["dsl_patch"] == ""
 	assert report["lint"]["diagnostics"][0]["code"] == "APG1201"
 	assert report["migration_preview"]["changes"] == []
+
+
+def test_cli_migrate_plan_json_detects_destructive_schema_and_ownership_changes(tmp_path):
+	previous = tmp_path / "previous.apg"
+	current = tmp_path / "current.apg"
+	previous.write_text(MIGRATION_PREVIOUS_SOURCE, encoding="utf-8")
+	current.write_text(MIGRATION_CURRENT_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(
+		cli,
+		["migrate-plan", str(previous), str(current), "--backend", "postgresql", "--json"],
+	)
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.migration-plan.v1"
+	assert report["ok"] is False
+	assert report["backend"] == "postgresql"
+	assert report["destructive"] is True
+	assert report["requires_approval"] is True
+	changes = {(change["kind"], change["symbol"]): change for change in report["changes"]}
+	assert ("add_table", "table.Invoice") in changes
+	assert ("add_field", "field.Customer.email") in changes
+	assert changes[("add_field", "field.Customer.email")]["requires_backfill"] is True
+	assert changes[("drop_field", "field.Customer.legacy_code")]["destructive"] is True
+	assert changes[("type_change", "field.Customer.age")]["destructive"] is True
+	assert changes[("capability_ownership_transfer", "table.Customer")]["before"] == {
+		"owner": "CustomerMaster"
+	}
+	assert changes[("capability_ownership_transfer", "table.Customer")]["after"] == {
+		"owner": "Billing"
+	}
+	assert {diagnostic["code"] for diagnostic in report["diagnostics"]} >= {
+		"APG1101",
+		"APG1103",
+		"APG1104",
+		"APG1106",
+	}
+
+
+def test_cli_migrate_plan_json_allows_additive_table_changes(tmp_path):
+	previous = tmp_path / "previous.apg"
+	current = tmp_path / "current.apg"
+	previous.write_text(DATA_APP_SOURCE, encoding="utf-8")
+	current.write_text(DATA_APP_SOURCE + "\ntable Note {\n\tbody: str;\n}\n", encoding="utf-8")
+
+	result = CliRunner().invoke(
+		cli,
+		["migrate-plan", str(previous), str(current), "--backend", "mysql", "--json"],
+	)
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.migration-plan.v1"
+	assert report["ok"] is True
+	assert report["backend"] == "mysql"
+	assert report["destructive"] is False
+	assert report["requires_approval"] is False
+	assert report["changes"][0]["kind"] == "add_table"
+	assert report["changes"][0]["symbol"] == "table.Note"
 
 
 def test_checked_in_example_outputs_match_current_compiler():

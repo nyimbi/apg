@@ -149,7 +149,7 @@ designers, and natural-language tools.
 | `compiler.formatter` | Existing deterministic formatter for `.apg` source. Extend it toward full AST-aware formatting. |
 | `compiler.graphs` | Existing graph builders for ER, lookup, workflow, handler, capability, security, agent, package, and deployment graphs. |
 | `compiler.packager` | Existing package-profile builder over generated Python applications and release evidence. Extend it toward signed distribution bundles as packaging requirements deepen. |
-| `compiler.migrations` | Planned semantic-model diff planner for database and capability ownership changes. |
+| `compiler.migrations` | Existing semantic-model diff planner for database and capability ownership changes. It emits `apg.migration-plan.v1` from previous/current APG sources or semantic-model JSON files. |
 | `compiler.nl_plan` | Existing constrained natural-language-to-APG-patch planner. It emits reviewable append-only DSL diffs, candidate lint, migration previews, and test plans without writing generated code. |
 | `compiler.release` | Existing release evidence builder for generated applications. Extend it toward capability package and deployment evidence. |
 | `language_server.server` | Existing LSP entry point. It should move from direct parser/analyzer calls to the shared semantic model. |
@@ -649,6 +649,7 @@ apg explain app.apg --symbol table.Customer --json
 apg explain app.apg --diagnostic APG0100 --json
 apg explain app.apg --handler OperationsDashboard.select --json
 apg nl-plan app.apg --prompt "Add credit memos to accounts receivable" --json
+apg migrate-plan previous.apg current.apg --backend postgresql --json
 apg package app.apg --target web --out dist --json
 apg package app.apg --target desktop --out dist
 apg package app.apg --target mobile --out dist
@@ -790,6 +791,22 @@ apg explain app.apg --handler InvoiceForm.Save
 Explain output should be human-readable by default and JSON with `--json`.
 The current executable contract emits `apg.explain-report.v1`, reuses
 `apg.semantic-model.v1`, and supports symbol, diagnostic, and handler queries.
+
+### `apg migrate-plan`
+
+```console
+apg migrate-plan previous.apg current.apg --backend postgresql --json
+apg migrate-plan previous-model.json current-model.json --backend mysql --json
+```
+
+Emits `apg.migration-plan.v1` by comparing previous and current semantic
+models. Inputs can be APG source files or checked-in semantic-model JSON. The
+current executable contract detects added/dropped/renamed table candidates,
+added/dropped/renamed field candidates, type/nullability/default/relationship
+changes, index and directive changes, required-field backfill requirements, and
+capability table ownership transfers. Destructive changes set
+`destructive=true`, `requires_approval=true`, emit `APG1101`/related
+diagnostics, and exit non-zero until explicitly reviewed.
 
 ### `apg doctor`
 

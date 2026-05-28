@@ -7592,3 +7592,21 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_nl_plan_json_proposes_valid_credit_memo_dsl_diff_without_writing tests/test_compiler_baseline.py::test_cli_nl_plan_rejects_unrepresentable_prompt -q` -> 2 passed
 - `.venv/bin/apg nl-plan examples/12_finance_general_ledger/main.apg --prompt "Add credit memos to accounts receivable" --json` -> emitted `apg.nl-plan.v1` with a valid candidate lint report
 - `.venv/bin/apg nl-plan examples/12_finance_general_ledger/main.apg --prompt "make it delightful and scalable" --json` -> exited 1 with `APG1201`
+
+### 2026-05-28 19:55 EAT
+
+Completed checkpoint:
+
+- Implemented `compiler.migrations.build_migration_plan()` as the semantic-model diff planner described by the tooling specification.
+- Added the `apg migrate-plan PREVIOUS CURRENT --backend postgresql --json` CLI command.
+- Migration inputs can be APG source files or semantic-model JSON files.
+- Migration output now emits `apg.migration-plan.v1` with deterministic change records, destructive-change flags, approval requirements, summaries, and APG1100-series diagnostics.
+- Detected migration changes include table add/drop/rename candidates, field add/drop/rename candidates, type/nullability/default/relationship changes, table/field directive changes, data-backfill requirements, and capability table ownership transfers.
+- Updated the tooling specification so `compiler.migrations` and `apg migrate-plan` are documented as executable current contracts.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/migrations.py cli/migrate_plan_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py`
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_migrate_plan_json_detects_destructive_schema_and_ownership_changes tests/test_compiler_baseline.py::test_cli_migrate_plan_json_allows_additive_table_changes -q` -> 2 passed
+- `.venv/bin/apg migrate-plan /private/tmp/apg_migrate_plan_smoke/previous.apg /private/tmp/apg_migrate_plan_smoke/current.apg --backend postgresql --json` -> exited 1 with destructive `apg.migration-plan.v1`
+- `.venv/bin/apg migrate-plan /private/tmp/apg_migrate_plan_additive/previous.apg /private/tmp/apg_migrate_plan_additive/current.apg --backend mysql --json` -> exited 0 with additive `apg.migration-plan.v1`

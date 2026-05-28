@@ -23,6 +23,7 @@ from cli.explain_command import explain
 from cli.format_command import format_cmd
 from cli.graph_command import graph, graph_suite
 from cli.lint_command import lint
+from cli.migrate_plan_command import migrate_plan
 from cli.model_command import model
 from cli.nl_plan_command import nl_plan
 from cli.package_command import package
@@ -54,6 +55,7 @@ cli.add_command(format_cmd)
 cli.add_command(graph)
 cli.add_command(graph_suite)
 cli.add_command(lint)
+cli.add_command(migrate_plan)
 cli.add_command(model)
 cli.add_command(nl_plan)
 cli.add_command(package)
