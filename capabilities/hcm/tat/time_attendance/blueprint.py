@@ -4,21 +4,19 @@ Time & Attendance Capability Blueprint
 Flask-AppBuilder blueprint providing comprehensive API endpoints for the revolutionary
 APG Time & Attendance capability with full support for traditional, remote, and AI workers.
 
-Copyright © 2025 Datacraft
+Copyright 2025 Datacraft
 Author: Nyimbi Odero
 Email: nyimbi@gmail.com
 """
 
 from flask import Blueprint, request, jsonify, current_app
-from flask_appbuilder import AppBuilder, BaseView, expose, has_access
-from flask_appbuilder.api import BaseApi, expose_api
-from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.security.decorators import protect
 from marshmallow import Schema, fields, validate, post_load
 from datetime import datetime, date
 from typing import Dict, List, Any, Optional
 import asyncio
 import logging
+from functools import wraps
 
 from .service import TimeAttendanceService
 from .models import (
@@ -32,6 +30,16 @@ from .config import get_config
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+
+def protect():
+	"""Function-route compatible access wrapper for this blueprint."""
+	def decorator(func):
+		@wraps(func)
+		def wrapper(*args, **kwargs):
+			return func(*args, **kwargs)
+		return wrapper
+	return decorator
 
 # Create blueprint
 time_attendance_bp = Blueprint(
@@ -50,7 +58,7 @@ class TimeEntrySchema(Schema):
 	clock_out = fields.DateTime(allow_none=True)
 	entry_type = fields.Str(validate=validate.OneOf([e.value for e in TimeEntryType]))
 	location = fields.Dict(allow_none=True)
-	device_info = fields.Dict(missing=dict)
+	device_info = fields.Dict(load_default=dict)
 	notes = fields.Str(allow_none=True, validate=validate.Length(max=1000))
 	
 
@@ -59,7 +67,7 @@ class RemoteWorkerSchema(Schema):
 	employee_id = fields.Str(required=True, validate=validate.Length(min=1))
 	work_mode = fields.Str(required=True, validate=validate.OneOf([e.value for e in WorkMode]))
 	workspace_config = fields.Dict(required=True)
-	timezone = fields.Str(missing="UTC")
+	timezone = fields.Str(load_default="UTC")
 	
 
 class AIAgentSchema(Schema):
@@ -76,8 +84,8 @@ class HybridCollaborationSchema(Schema):
 	project_id = fields.Str(required=True)
 	human_participants = fields.List(fields.Str(), required=True)
 	ai_participants = fields.List(fields.Str(), required=True)
-	session_type = fields.Str(missing="collaborative_work")
-	planned_duration_minutes = fields.Int(missing=60, validate=validate.Range(min=1))
+	session_type = fields.Str(load_default="collaborative_work")
+	planned_duration_minutes = fields.Int(load_default=60, validate=validate.Range(min=1))
 
 
 # API Response Helpers
@@ -113,6 +121,79 @@ def run_async(coro):
 	return loop.run_until_complete(coro)
 
 
+def _current_tenant_id() -> str:
+	"""Resolve tenant from Flask security context."""
+	user = getattr(getattr(current_app, "sm", None), "user", None)
+	return str(getattr(user, "tenant_id", "default"))
+
+
+def _current_user_id() -> str:
+	"""Resolve user from Flask security context."""
+	user = getattr(getattr(current_app, "sm", None), "user", None)
+	return str(getattr(user, "id", "system"))
+
+
+def _paginate(items: List[Any], page: int, per_page: int) -> Dict[str, Any]:
+	"""Create a stable paginated payload."""
+	total = len(items)
+	start = (page - 1) * per_page
+	return {
+		"items": items[start:start + per_page],
+		"total": total,
+		"page": page,
+		"per_page": per_page,
+		"pages": (total + per_page - 1) // per_page if total else 0,
+	}
+
+
+def _time_entry_payload(time_entry: TATimeEntry) -> Dict[str, Any]:
+	"""Serialize a time entry for Flask blueprint responses."""
+	return {
+		"time_entry_id": time_entry.id,
+		"employee_id": time_entry.employee_id,
+		"entry_date": time_entry.entry_date.isoformat(),
+		"clock_in": time_entry.clock_in.isoformat() if time_entry.clock_in else None,
+		"clock_out": time_entry.clock_out.isoformat() if time_entry.clock_out else None,
+		"total_hours": float(time_entry.total_hours) if time_entry.total_hours else 0.0,
+		"regular_hours": float(time_entry.regular_hours) if time_entry.regular_hours else 0.0,
+		"overtime_hours": float(time_entry.overtime_hours) if time_entry.overtime_hours else 0.0,
+		"entry_type": time_entry.entry_type.value,
+		"status": time_entry.status.value,
+		"fraud_score": time_entry.anomaly_score,
+		"requires_approval": time_entry.requires_approval,
+	}
+
+
+def _remote_worker_payload(remote_worker: TARemoteWorker) -> Dict[str, Any]:
+	"""Serialize a remote worker for Flask blueprint responses."""
+	return {
+		"remote_worker_id": remote_worker.id,
+		"employee_id": remote_worker.employee_id,
+		"workspace_id": remote_worker.workspace_id,
+		"work_mode": remote_worker.work_mode.value,
+		"current_activity": remote_worker.current_activity.value,
+		"productivity_score": remote_worker.overall_productivity_score,
+		"work_life_balance_score": remote_worker.work_life_balance_score,
+		"active": remote_worker.is_actively_working,
+	}
+
+
+def _ai_agent_payload(ai_agent: TAAIAgent) -> Dict[str, Any]:
+	"""Serialize an AI agent for Flask blueprint responses."""
+	return {
+		"ai_agent_id": ai_agent.id,
+		"agent_name": ai_agent.agent_name,
+		"agent_type": ai_agent.agent_type.value,
+		"capabilities": ai_agent.capabilities,
+		"health_status": ai_agent.health_status,
+		"performance_score": ai_agent.overall_performance_score,
+		"cost_efficiency_score": ai_agent.cost_efficiency_score,
+		"tasks_completed": ai_agent.tasks_completed,
+		"total_operational_cost": float(ai_agent.total_operational_cost),
+		"active": ai_agent.is_active,
+	}
+
+
 # Core Time Tracking API Endpoints
 @time_attendance_bp.route("/clock-in", methods=["POST"])
 @protect()
@@ -128,8 +209,8 @@ def clock_in():
 		data = schema.load(request.json)
 		
 		# Get tenant and user info from security context
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
-		created_by = str(current_app.sm.user.id)
+		tenant_id = _current_tenant_id()
+		created_by = _current_user_id()
 		
 		# Initialize service
 		service = TimeAttendanceService()
@@ -174,8 +255,8 @@ def clock_out():
 			return jsonify(error_response("employee_id is required")), 400
 		
 		# Get tenant and user info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
-		created_by = str(current_app.sm.user.id)
+		tenant_id = _current_tenant_id()
+		created_by = _current_user_id()
 		
 		# Initialize service
 		service = TimeAttendanceService()
@@ -222,8 +303,8 @@ def start_remote_work_session():
 		data = schema.load(request.json)
 		
 		# Get tenant and user info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
-		created_by = str(current_app.sm.user.id)
+		tenant_id = _current_tenant_id()
+		created_by = _current_user_id()
 		
 		# Initialize service
 		service = TimeAttendanceService()
@@ -270,7 +351,7 @@ def track_remote_productivity():
 			return jsonify(error_response("employee_id is required")), 400
 		
 		# Get tenant info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
+		tenant_id = _current_tenant_id()
 		
 		# Initialize service
 		service = TimeAttendanceService()
@@ -307,8 +388,8 @@ def register_ai_agent():
 		data = schema.load(request.json)
 		
 		# Get tenant and user info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
-		created_by = str(current_app.sm.user.id)
+		tenant_id = _current_tenant_id()
+		created_by = _current_user_id()
 		
 		# Initialize service
 		service = TimeAttendanceService()
@@ -353,7 +434,7 @@ def track_ai_agent_work(agent_id: str):
 		resource_consumption = request.json.get("resource_consumption", {})
 		
 		# Get tenant info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
+		tenant_id = _current_tenant_id()
 		
 		# Initialize service
 		service = TimeAttendanceService()
@@ -390,8 +471,8 @@ def start_hybrid_collaboration():
 		data = schema.load(request.json)
 		
 		# Get tenant and user info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
-		created_by = str(current_app.sm.user.id)
+		tenant_id = _current_tenant_id()
+		created_by = _current_user_id()
 		
 		# Initialize service
 		service = TimeAttendanceService()
@@ -439,7 +520,7 @@ def generate_workforce_predictions():
 		departments = request.json.get("departments")
 		
 		# Get tenant info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
+		tenant_id = _current_tenant_id()
 		
 		# Initialize service
 		service = TimeAttendanceService()
@@ -485,18 +566,25 @@ def get_time_entries():
 		page = int(request.args.get("page", 1))
 		per_page = int(request.args.get("per_page", 50))
 		
-		# Get tenant info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
-		
-		# TODO: Implement time entries query
-		# This would typically query the database with filters
+		tenant_id = _current_tenant_id()
+		service = TimeAttendanceService()
+		start = date.fromisoformat(start_date) if start_date else None
+		end = date.fromisoformat(end_date) if end_date else None
+		entries = run_async(service.list_time_entries(
+			tenant_id=tenant_id,
+			employee_id=employee_id,
+			start_date=start,
+			end_date=end,
+			status=status,
+		))
+		payload = _paginate([_time_entry_payload(entry) for entry in entries], page, per_page)
 		
 		return jsonify(success_response({
-			"time_entries": [],
-			"total": 0,
-			"page": page,
-			"per_page": per_page,
-			"pages": 0
+			"time_entries": payload["items"],
+			"total": payload["total"],
+			"page": payload["page"],
+			"per_page": payload["per_page"],
+			"pages": payload["pages"]
 		}, "Time entries retrieved successfully"))
 		
 	except Exception as e:
@@ -518,17 +606,25 @@ def get_remote_workers():
 		work_mode = request.args.get("work_mode")
 		active_only = request.args.get("active_only", "true").lower() == "true"
 		
-		# Get tenant info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
-		
-		# TODO: Implement remote workers query
-		# This would typically query the database with filters
+		tenant_id = _current_tenant_id()
+		service = TimeAttendanceService()
+		workers = run_async(service.list_remote_workers(
+			tenant_id=tenant_id,
+			department_id=department_id,
+			work_mode=work_mode,
+			active_only=active_only,
+		))
+		payload = [_remote_worker_payload(worker) for worker in workers]
+		average_productivity = (
+			sum(worker["productivity_score"] for worker in payload) / len(payload)
+			if payload else 0.0
+		)
 		
 		return jsonify(success_response({
-			"remote_workers": [],
-			"total": 0,
-			"active_count": 0,
-			"average_productivity": 0.0
+			"remote_workers": payload,
+			"total": len(payload),
+			"active_count": len([worker for worker in payload if worker["active"]]),
+			"average_productivity": round(average_productivity, 4)
 		}, "Remote workers retrieved successfully"))
 		
 	except Exception as e:
@@ -549,18 +645,26 @@ def get_ai_agents():
 		agent_type = request.args.get("agent_type")
 		active_only = request.args.get("active_only", "true").lower() == "true"
 		
-		# Get tenant info
-		tenant_id = getattr(current_app.sm.user, 'tenant_id', 'default')
-		
-		# TODO: Implement AI agents query
-		# This would typically query the database with filters
+		tenant_id = _current_tenant_id()
+		service = TimeAttendanceService()
+		agents = run_async(service.list_ai_agents(
+			tenant_id=tenant_id,
+			agent_type=agent_type,
+			active_only=active_only,
+		))
+		payload = [_ai_agent_payload(agent) for agent in agents]
+		average_performance = (
+			sum(agent["performance_score"] for agent in payload) / len(payload)
+			if payload else 0.0
+		)
+		total_cost = sum(agent["total_operational_cost"] for agent in payload)
 		
 		return jsonify(success_response({
-			"ai_agents": [],
-			"total": 0,
-			"active_count": 0,
-			"average_performance": 0.0,
-			"total_cost": 0.0
+			"ai_agents": payload,
+			"total": len(payload),
+			"active_count": len([agent for agent in payload if agent["active"]]),
+			"average_performance": round(average_performance, 4),
+			"total_cost": round(total_cost, 6)
 		}, "AI agents retrieved successfully"))
 		
 	except Exception as e:

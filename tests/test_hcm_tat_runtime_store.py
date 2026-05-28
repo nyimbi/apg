@@ -2,11 +2,14 @@ import ast
 import asyncio
 from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
+from flask import Flask
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from capabilities.hcm.tat.time_attendance.api import create_app, get_current_user, get_service
+from capabilities.hcm.tat.time_attendance.blueprint import time_attendance_bp
 from capabilities.hcm.tat.time_attendance.mobile_api import (
 	_mobile_runtime_state,
 	_process_photo_verification,
@@ -201,6 +204,32 @@ def test_mobile_runtime_helpers_record_side_effects():
 	assert _mobile_runtime_state["photo_verifications"]["entry_001"]["verified"] is True
 	assert _mobile_runtime_state["work_summaries"]["entry_001"]["productivity_rating"] == 5
 	assert _mobile_runtime_state["push_tokens"]["device_001"]["platform"] == "ios"
+
+
+def test_flask_blueprint_lists_use_service_runtime_store():
+	TimeAttendanceService.reset_runtime_store()
+	service = TimeAttendanceService()
+	_run(_seed_runtime(service, tenant_id="tenant_blueprint"))
+
+	app = Flask(__name__)
+	app.secret_key = "test"
+	app.sm = SimpleNamespace(user=SimpleNamespace(id="admin", tenant_id="tenant_blueprint"))
+	app.register_blueprint(time_attendance_bp)
+	client = app.test_client()
+
+	time_entries = client.get("/api/human_capital_management/time_attendance/time-entries")
+	remote_workers = client.get("/api/human_capital_management/time_attendance/remote-workers")
+	ai_agents = client.get("/api/human_capital_management/time_attendance/ai-agents")
+
+	assert time_entries.status_code == 200
+	assert time_entries.json["data"]["total"] == 1
+	assert time_entries.json["data"]["time_entries"][0]["employee_id"] == "emp_001"
+	assert remote_workers.status_code == 200
+	assert remote_workers.json["data"]["total"] == 1
+	assert remote_workers.json["data"]["remote_workers"][0]["employee_id"] == "emp_001"
+	assert ai_agents.status_code == 200
+	assert ai_agents.json["data"]["total"] == 1
+	assert ai_agents.json["data"]["ai_agents"][0]["agent_name"] == "Codex"
 
 
 def test_time_attendance_service_has_no_missing_private_helper_calls():

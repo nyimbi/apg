@@ -4839,3 +4839,27 @@ Battery-conscious verification:
 Commit result:
 
 - Pushed commit `c559095` (`Make composition config API executable standalone`) to `origin/main`.
+
+### 2026-05-28 04:17 EAT
+
+Completed checkpoint:
+
+- Made the HCM Time Attendance Flask blueprint importable and executable under the current dependency set.
+- Normalized the legacy copyright byte in `blueprint.py`.
+- Removed stale Flask-AppBuilder imports and replaced the class-view `@protect` decorator behavior with a function-route compatible wrapper.
+- Updated Marshmallow schemas from `missing=` to `load_default=` for Marshmallow v4 compatibility.
+- Replaced the blueprint time-entry, remote-worker, and AI-agent list placeholders with service-backed runtime-store data, pagination, summaries, and serializers.
+- Extended focused HCM TAT regression coverage to verify the Flask blueprint list routes return seeded runtime service data.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/blueprint.py tests/test_hcm_tat_runtime_store.py`
+- `.venv/bin/pytest tests/test_hcm_tat_runtime_store.py -q` -> 6 passed
+- Import smoke for `time_attendance_bp` -> succeeded
+- `rg -n "TODO: Implement time entries query|TODO: Implement remote workers query|TODO: Implement AI agents query|This would typically query|current_app\\.sm\\.user|missing=|expose_api|Copyright  " capabilities/hcm/tat/time_attendance/blueprint.py` -> no matches
+- `git diff --check -- capabilities/hcm/tat/time_attendance/blueprint.py tests/test_hcm_tat_runtime_store.py` -> no issues
+- Deferred broader pytest at the user's request to conserve battery.
+
+Commit result:
+
+- Pending commit/push for this checkpoint.
