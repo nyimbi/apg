@@ -6680,3 +6680,21 @@ Battery-conscious verification:
 - `rg -n "routes = \\[\\]|load_balancers = \\[\\]|policies = \\[\\]|Implementation would trigger health check|Placeholder" capabilities/composition/gateway/api.py -S` -> no matches
 - `git diff --check capabilities/composition/gateway/api.py tests/test_composition_gateway_api_runtime_state.py`
 - Deferred broader pytest at the user's request to conserve battery.
+
+### 2026-05-28 14:18 EAT
+
+Completed checkpoint:
+
+- Replaced composition-registry APG integration sync no-ops with executable local synchronization snapshots.
+- Capability, discovery, and composition registrations now update in-memory APG integration state instead of only printing messages.
+- Discovery sync now records registration counts and endpoint counts; composition sync now records composition, binding, service mapping, and capability metadata snapshots.
+- Added sync history entries so callers can inspect what APG ecosystem synchronization did.
+- Added focused runtime coverage for APG capability/discovery/composition sync state and placeholder removal.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/composition/registry/apg_integration.py tests/test_composition_registry_apg_integration_sync.py`
+- `.venv/bin/python -m pytest tests/test_composition_registry_apg_integration_sync.py -q` -> 2 passed, 2 pre-existing warnings
+- `rg -n "In production, would sync with APG|pass\\s*$" capabilities/composition/registry/apg_integration.py -S` -> no matches
+- `git diff --check capabilities/composition/registry/apg_integration.py tests/test_composition_registry_apg_integration_sync.py`
+- Deferred broader pytest at the user's request to conserve battery.
