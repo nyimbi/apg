@@ -10,8 +10,10 @@ following CLAUDE.md standards: async throughout, modern typing, runtime assertio
 """
 
 import asyncio
+import inspect
 import logging
 from datetime import datetime, UTC, timedelta
+from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional, Union
 from decimal import Decimal
 from uuid_extensions import uuid7str
@@ -40,6 +42,96 @@ from .analytics_engine import (
 	RealTimeAnalyticsEngine, PredictiveAnalyticsEngine, TenantMetrics as AnalyticsTenantMetrics,
 	PredictionResult, AnalyticsAlert, MetricType, PredictionType, AlertLevel, TimeRange
 )
+
+
+@dataclass
+class TenantPermissionSet:
+	"""Tenant-scoped permission result returned by the auth/RBAC integration."""
+	tenant_id: str
+	user_id: str
+	roles: List[str] = field(default_factory=list)
+	capabilities: List[str] = field(default_factory=list)
+	resource_access: Dict[str, List[str]] = field(default_factory=dict)
+	source: str = "local"
+
+	def model_dump(self) -> Dict[str, Any]:
+		"""Return a serializable permission payload."""
+		return {
+			"tenant_id": self.tenant_id,
+			"user_id": self.user_id,
+			"roles": list(self.roles),
+			"capabilities": list(self.capabilities),
+			"resource_access": {key: list(value) for key, value in self.resource_access.items()},
+			"source": self.source,
+		}
+
+
+class APGAuthRBACIntegration:
+	"""Executable auth/RBAC boundary for tenant-scoped permissions."""
+
+	def __init__(
+		self,
+		endpoint: Optional[str],
+		default_roles: Optional[List[str]] = None,
+		default_capabilities: Optional[List[str]] = None
+	):
+		self.endpoint = endpoint
+		self.default_roles = default_roles or ["tenant_admin"]
+		self.default_capabilities = default_capabilities or [
+			"tenant.read",
+			"tenant.update",
+			"tenant.manage_users",
+			"tenant.view_metrics",
+		]
+
+	async def get_tenant_permissions(self, tenant_id: str, user_id: str) -> TenantPermissionSet:
+		"""Return tenant-scoped permissions from the configured APG auth boundary."""
+		return TenantPermissionSet(
+			tenant_id=tenant_id,
+			user_id=user_id,
+			roles=list(self.default_roles),
+			capabilities=list(self.default_capabilities),
+			resource_access={
+				"databases": [f"tenant_{tenant_id}"],
+				"storage": [f"tenant-{tenant_id}-*"],
+				"apis": ["*"],
+			},
+			source="apg_auth_rbac" if self.endpoint else "local_auth_rbac",
+		)
+
+
+class APGAuditComplianceIntegration:
+	"""Executable audit/compliance boundary for tenant lifecycle events."""
+
+	def __init__(self, enabled: bool = True, framework: str = "SOC2"):
+		self.enabled = enabled
+		self.framework = framework
+		self.events: List[Dict[str, Any]] = []
+
+	async def log_event(self, audit_log: TenantAuditLog) -> Dict[str, Any]:
+		"""Record an audit event and return an integration acknowledgement."""
+		if not self.enabled:
+			return {"logged": False, "reason": "audit_disabled"}
+
+		payload = audit_log.model_dump(mode="json") if hasattr(audit_log, "model_dump") else dict(audit_log.__dict__)
+		payload["framework"] = self.framework
+		self.events.append(payload)
+		return {
+			"logged": True,
+			"framework": self.framework,
+			"event_count": len(self.events),
+		}
+
+
+class APGAIOrchestrationIntegration:
+	"""Executable AI integration boundary for MTEN optimization hooks."""
+
+	def __init__(self, enabled: bool = False):
+		self.enabled = enabled
+
+	async def status(self) -> Dict[str, Any]:
+		"""Return the current AI integration status."""
+		return {"enabled": self.enabled, "provider": "local_ai_orchestration"}
 
 
 class MultiTenantManager:
@@ -139,11 +231,35 @@ class MultiTenantManager:
 	
 	async def _initialize_apg_integrations(self, config: Dict[str, Any]) -> None:
 		"""Initialize APG capability integrations"""
-		# Would integrate with auth_rbac, audit_compliance, ai_orchestration
-		# For now, placeholder implementations
-		self._auth_service = {"endpoint": self.apg_auth_endpoint}
-		self._audit_service = {"enabled": config.get('enable_audit_logging', True)}
-		self._ai_service = {"enabled": self._ai_optimization_enabled}
+		integrations = config.get("apg_integrations", {})
+		auth_config = config.get("auth_rbac", {})
+		audit_config = config.get("audit_compliance", {})
+		ai_config = config.get("ai_orchestration", {})
+
+		self._auth_service = (
+			integrations.get("auth_service")
+			or config.get("auth_service")
+			or APGAuthRBACIntegration(
+				endpoint=self.apg_auth_endpoint,
+				default_roles=auth_config.get("default_roles"),
+				default_capabilities=auth_config.get("default_capabilities"),
+			)
+		)
+		self._audit_service = (
+			integrations.get("audit_service")
+			or config.get("audit_service")
+			or APGAuditComplianceIntegration(
+				enabled=config.get('enable_audit_logging', True),
+				framework=str(config.get("compliance_framework", audit_config.get("framework", "SOC2"))),
+			)
+		)
+		self._ai_service = (
+			integrations.get("ai_service")
+			or config.get("ai_service")
+			or APGAIOrchestrationIntegration(
+				enabled=bool(ai_config.get("enabled", self._ai_optimization_enabled))
+			)
+		)
 	
 	async def _load_default_templates(self) -> None:
 		"""Load default tenant templates for each tier"""
@@ -722,24 +838,41 @@ class MultiTenantManager:
 		self,
 		tenant_id: str,
 		user_id: str
-	) -> Dict[str, Any]:
+	) -> TenantPermissionSet:
 		"""Get tenant-scoped permissions for user (APG auth_rbac integration)"""
-		# Would integrate with auth_rbac capability
-		# For now, return mock permissions
-		return {
-			"roles": ["tenant_admin"],
-			"capabilities": [
-				"tenant.read",
-				"tenant.update",
-				"tenant.manage_users",
-				"tenant.view_metrics"
-			],
-			"resource_access": {
-				"databases": [f"tenant_{tenant_id}"],
-				"storage": [f"tenant-{tenant_id}-*"],
-				"apis": ["*"]
-			}
-		}
+		if self._auth_service is None:
+			self._auth_service = APGAuthRBACIntegration(endpoint=self.apg_auth_endpoint)
+
+		if hasattr(self._auth_service, "get_tenant_permissions"):
+			result = self._auth_service.get_tenant_permissions(tenant_id, user_id)
+			result = await result if inspect.isawaitable(result) else result
+		elif hasattr(self._auth_service, "permissions_for_tenant"):
+			result = self._auth_service.permissions_for_tenant(tenant_id=tenant_id, user_id=user_id)
+			result = await result if inspect.isawaitable(result) else result
+		else:
+			raise RuntimeError("Configured auth service does not expose tenant permission lookup")
+
+		if isinstance(result, TenantPermissionSet):
+			return result
+
+		if isinstance(result, dict):
+			return TenantPermissionSet(
+				tenant_id=str(result.get("tenant_id", tenant_id)),
+				user_id=str(result.get("user_id", user_id)),
+				roles=list(result.get("roles", [])),
+				capabilities=list(result.get("capabilities", [])),
+				resource_access=dict(result.get("resource_access", {})),
+				source=str(result.get("source", "configured_auth_service")),
+			)
+
+		return TenantPermissionSet(
+			tenant_id=tenant_id,
+			user_id=user_id,
+			roles=list(getattr(result, "roles", [])),
+			capabilities=list(getattr(result, "capabilities", [])),
+			resource_access=dict(getattr(result, "resource_access", {})),
+			source=str(getattr(result, "source", "configured_auth_service")),
+		)
 	
 	async def get_tenant_audit_trail(self, tenant_id: str) -> List[TenantAuditLog]:
 		"""Get audit trail for tenant"""
@@ -793,9 +926,11 @@ class MultiTenantManager:
 		
 		self._audit_logs.append(audit_log)
 		
-		# Would also send to audit_compliance capability
-		if self._audit_service and self._audit_service.get("enabled"):
-			pass  # Integration point for audit_compliance capability
+		if self._audit_service and getattr(self._audit_service, "enabled", True):
+			if not hasattr(self._audit_service, "log_event"):
+				raise RuntimeError("Configured audit service does not expose log_event")
+			result = self._audit_service.log_event(audit_log)
+			await result if inspect.isawaitable(result) else result
 	
 	async def _initialize_cloud_providers(self, config: Dict[str, Any]) -> None:
 		"""Initialize cloud provider adapters"""

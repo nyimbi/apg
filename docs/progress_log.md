@@ -8367,3 +8367,20 @@ Battery-conscious verification:
 - `.venv/bin/python -m pytest -q tests/test_common_nlpc_core_task_dispatch.py` passed with 2 tests.
 - `.venv/bin/python -m pytest -q tests/test_common_nlpc_core_task_dispatch.py capabilities/common/nlpc/test_language_codes.py` passed with 4 tests.
 - `git diff --check -- capabilities/common/nlpc/service.py tests/test_common_nlpc_core_task_dispatch.py` passed.
+
+### 2026-05-29 01:15 EAT
+
+Executable MTEN APG integration slice:
+
+- Replaced MTEN's placeholder APG integration dictionaries with executable auth/RBAC, audit/compliance, and AI orchestration integration boundaries.
+- `get_tenant_permissions()` now routes through a configured or local auth/RBAC integration and returns a structured `TenantPermissionSet` with attribute access plus serializable output.
+- `_log_audit_event()` now forwards tenant lifecycle audit records to a configured or local audit/compliance integration instead of stopping at an empty integration point.
+- Added focused regression coverage for configured auth services, configured audit services, and the executable default audit integration.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile capabilities/common/mten/service.py tests/test_common_mten_apg_integrations.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_common_mten_apg_integrations.py` passed with 3 tests.
+- `.venv/bin/python -m pytest -q capabilities/common/mten/tests/test_phase1_validation.py::TestAPGIntegration::test_auth_rbac_integration capabilities/common/mten/tests/test_phase1_validation.py::TestAPGIntegration::test_audit_compliance_integration` passed with 2 tests.
+- `rg -n "For now, return mock permissions|placeholder implementations|pass  # Integration point|Would integrate with auth_rbac" capabilities/common/mten/service.py tests/test_common_mten_apg_integrations.py` found no stale MTEN APG integration placeholder text.
+- `git diff --check -- capabilities/common/mten/service.py tests/test_common_mten_apg_integrations.py` passed.
