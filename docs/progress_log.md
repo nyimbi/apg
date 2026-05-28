@@ -7784,3 +7784,23 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile tests/test_examples_parseable.py` passed.
 - `.venv/bin/python -m pytest tests/test_examples_parseable.py -q` passed with 6 tests.
 - `git diff --check -- examples/13_procurement_approval_workbench/main.apg examples/13_procurement_approval_workbench/output tests/test_examples_parseable.py` passed.
+
+Commit result:
+
+- Pushed commit `505d490` (`Lock example release evidence into compiler gate`).
+
+### 2026-05-28 21:26 EAT
+
+In progress:
+
+- Added `compiler.baseline` as the executable compiler bed-down audit over numbered APG examples.
+- Added `apg baseline [examples-dir] --json`, emitting `apg.compiler-baseline-report.v1`.
+- The baseline audit now checks numbered example presence, representative domain coverage, semantic/lint/validate readiness, graph-suite generation, release evidence, temp compile-and-verify execution, and python-only targeting without writing generated output into the repo.
+- Updated `docs/tooling.md` so the compiler bed-down gate references the new executable baseline command.
+
+Battery-conscious verification:
+
+- `.venv/bin/python -m py_compile compiler/baseline.py cli/baseline_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py` passed.
+- `.venv/bin/python -m pytest tests/test_compiler_baseline.py::test_cli_baseline_json_audits_numbered_examples -q` passed with 1 test.
+- `.venv/bin/apg baseline` passed with 20/20 examples, 20 passed, 0 failed, and coverage for records, screens, workflows, agents, capabilities, application composition, visual theming, i18n, and ByteWax streaming.
+- `git diff --check -- compiler/baseline.py cli/baseline_command.py cli/main.py compiler/__init__.py tests/test_compiler_baseline.py docs/tooling.md docs/progress_log.md` passed.

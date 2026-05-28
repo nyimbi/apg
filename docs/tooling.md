@@ -36,6 +36,11 @@ APG currently has an executable compiler path:
 - `apg release <file> --json` emits `apg.release-report.v1` by compiling to a
   temporary generated app, importing it, and running generated self-test,
   OpenAPI, component-manifest, route-dispatch, and semantic-model evidence;
+- `apg baseline [examples-dir] --json` emits `apg.compiler-baseline-report.v1`
+  by auditing the numbered APG examples against the compiler bed-down gate:
+  semantic/lint/validate readiness, graph-suite generation, generated release
+  evidence, temp compile-and-verify execution, python-only targeting, and
+  representative domain coverage;
 - `apg parser-golden --json` emits `apg.parser-golden-audit.v1` by running the
   checked-in parser fixture catalog and proving required grammar constructs are
   represented by passing valid fixtures;
@@ -112,6 +117,10 @@ The compiler baseline is bedded down when:
   `apg.semantic-model.v1` surfaces;
 - `apg lint`, `apg validate`, `apg model`, `apg graph-suite`, and
   `apg release` agree on parser, semantic-model, and diagnostic meaning;
+- `apg baseline examples --json` passes and provides the durable gate evidence
+  for numbered example presence, representative domain coverage, temp
+  compile-and-verify execution, graph-suite output, release evidence, and
+  python-only targeting;
 - `python` remains the only compiler target, with desktop/mobile/web/deployment
   concerns expressed as packaging profiles over generated Python artifacts;
 - unsupported framework target names such as Flask-AppBuilder or Django are not

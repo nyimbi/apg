@@ -1463,6 +1463,27 @@ def test_cli_release_text_summarizes_evidence(tmp_path):
 	assert "self-test=ok" in result.output
 
 
+def test_cli_baseline_json_audits_numbered_examples():
+	result = CliRunner().invoke(cli, ["baseline", str(REPO_ROOT / "examples"), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.compiler-baseline-report.v1"
+	assert report["ok"] is True
+	assert report["example_count"] == 20
+	assert report["checks"] == {
+		"numbered_examples_present": True,
+		"domain_coverage_ok": True,
+		"all_examples_ok": True,
+		"python_target_only": True,
+	}
+	assert report["domains"]["workflows"]["ok"] is True
+	assert report["domains"]["bytewax_streaming"]["ok"] is True
+	assert report["summary"]["failed_examples"] == 0
+	assert all(example["checks"]["compile_verify_ok"] for example in report["examples"])
+	assert all(example["checks"]["release_ok"] for example in report["examples"])
+
+
 def test_cli_parser_golden_json_audits_fixture_catalog():
 	result = CliRunner().invoke(cli, ["parser-golden", "--json"])
 
