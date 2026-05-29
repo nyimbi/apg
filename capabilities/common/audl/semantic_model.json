@@ -237,8 +237,11 @@
       ],
       "runtime": {
         "api": "api.py",
+        "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
+        "package_runtime": "audit_runtime.py",
         "service": "service.py",
+        "view_models": "view_models.py",
         "views": "views.py"
       },
       "screens": {
@@ -257,10 +260,25 @@
           "permission": "audl:view",
           "route": "/audit/events"
         },
+        "exports": {
+          "component": "AuditExportReviewQueue",
+          "permission": "audl:export",
+          "route": "/audit/exports"
+        },
         "investigations": {
           "component": "InvestigationWorkbench",
           "permission": "audl:investigate",
           "route": "/audit/investigations"
+        },
+        "legal_holds": {
+          "component": "LegalHoldConsole",
+          "permission": "audl:hold",
+          "route": "/audit/legal-holds"
+        },
+        "purges": {
+          "component": "AuditPurgeReviewQueue",
+          "permission": "audl:purge",
+          "route": "/audit/purges"
         },
         "reports": {
           "component": "AuditReportingStudio",
@@ -295,10 +313,22 @@
             "status_variant": "stacked",
             "trend_style": "sparkline"
           },
+          "export_review_panel": {
+            "icon": "file-output",
+            "masking_state": "privacy-chip"
+          },
           "investigation_case_card": {
             "icon": "folder-search",
             "priority_indicator": "left-rail",
             "shape": "rounded-rectangle"
+          },
+          "legal_hold_indicator": {
+            "icon": "lock-keyhole",
+            "status_style": "hold-ribbon"
+          },
+          "purge_approval_warning": {
+            "confirmation_style": "dual-control-banner",
+            "icon": "trash-2"
           },
           "severity_badge": {
             "icon": "shield-alert",
@@ -352,6 +382,27 @@
             "nav_group": "Investigations",
             "path": "/audit/investigations",
             "permission": "audl:investigate"
+          },
+          {
+            "component": "LegalHoldConsole",
+            "name": "legal_holds",
+            "nav_group": "Governance",
+            "path": "/audit/legal-holds",
+            "permission": "audl:hold"
+          },
+          {
+            "component": "AuditExportReviewQueue",
+            "name": "exports",
+            "nav_group": "Governance",
+            "path": "/audit/exports",
+            "permission": "audl:export"
+          },
+          {
+            "component": "AuditPurgeReviewQueue",
+            "name": "purges",
+            "nav_group": "Governance",
+            "path": "/audit/purges",
+            "permission": "audl:purge"
           },
           {
             "component": "ComplianceControlCenter",

@@ -22,6 +22,41 @@ The APG Audit Logging capability delivers enterprise-grade audit trail managemen
 - Contextual threat intelligence integration
 - Autonomous incident response workflows
 
+## Current Executable Governance Slice
+
+The package includes a dependency-light `AudlService` facade in
+`audit_runtime.py` for generated APG applications and capability composition.
+Elasticsearch, immutable object storage, ByteWax stream processors, SIEM/GRC
+exporters, cryptographic timestamping providers, ML anomaly detection, and web
+servers remain adapter boundaries while the local package executes
+deterministic audit governance.
+
+Current package-backed lifecycle:
+
+1. Append tenant-scoped audit events with actor, action, resource, severity,
+   PII, immutable-storage, and checksum context.
+2. Deny immutable events when supplied checksum evidence does not verify.
+3. Deny critical events without escalation routing.
+4. Apply and release legal holds with human evidence.
+5. Deny purge requests while legal hold is active.
+6. Require dual-control reviewer evidence for purge decisions.
+7. Deny PII-bearing exports unless masking is enabled.
+8. Require reviewer notes for export decisions.
+9. Open and close investigations with owner, resolution, and evidence.
+10. Keep event, hold, export, purge, investigation, and governance state
+    tenant-qualified so duplicate IDs across tenants cannot collide.
+11. Emit tenant-scoped governance events for audit, hold, export, purge, and
+    investigation lifecycle changes.
+
+Focused proof commands:
+
+```bash
+./.venv/bin/pytest -q capabilities/common/audl/tests/test_capability_contract.py capabilities/common/audl/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/audl --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/audl --json
+git diff --check -- capabilities/common/audl
+```
+
 ## Business Value Proposition
 
 ### For Enterprise Security Teams

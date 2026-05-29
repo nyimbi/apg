@@ -328,20 +328,30 @@ APG_CAPABILITY_METADATA = {
 			"compliance_reporting",
 			"anomaly_detection",
 			"evidence_management",
-			"investigation_workflows"
+			"investigation_workflows",
+			"legal_hold_governance",
+			"regulated_export_review",
+			"dual_control_purge_review"
 		],
 		"apis": [
 			"/api/v1/audit/events",
 			"/api/v1/audit/search",
 			"/api/v1/audit/compliance",
 			"/api/v1/audit/investigations",
-			"/api/v1/audit/evidence"
+			"/api/v1/audit/evidence",
+			"/api/v1/audit/legal-holds",
+			"/api/v1/audit/exports",
+			"/api/v1/audit/purges",
+			"/api/v1/audit/governance-events"
 		],
 		"ui_components": [
 			"audit_dashboard",
 			"compliance_reports",
 			"investigation_workbench",
-			"natural_language_query"
+			"natural_language_query",
+			"legal_hold_console",
+			"export_review_queue",
+			"purge_review_queue"
 		]
 	},
 	

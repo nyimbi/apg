@@ -1,6 +1,10 @@
 """Regression coverage for the AUDL executable capability contract."""
 
+import pytest
+
 from .. import get_capability_info
+from .. import api_helpers, view_models
+from ..audit_runtime import AudlService
 from ..capability_contract import evaluate_capability_rules, get_capability_contract
 
 
@@ -29,6 +33,9 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"events",
 		"timeline",
 		"investigations",
+		"legal_holds",
+		"exports",
+		"purges",
 		"compliance",
 		"reports",
 		"rules",
@@ -38,6 +45,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["theme"]["tokens"]["border.radius"] == "10px"
 	assert "audit_timeline" in contract["theme"]["components"]
 	assert "compliance_scorecard" in contract["theme"]["components"]
+	assert "legal_hold_indicator" in contract["theme"]["components"]
 
 
 def test_rule_engine_denies_unsafe_audit_operations():
@@ -77,3 +85,288 @@ def test_capability_info_includes_manifest_and_theme():
 		"investigations",
 		"reports",
 	}
+
+
+def test_service_runs_governed_audit_evidence_lifecycle():
+	service = AudlService()
+	event = service.append_event(
+		event_id="evt-critical",
+		tenant_id="tenant-audl",
+		actor="security-analyst",
+		action="review_access",
+		resource_type="account",
+		resource_id="acct-001",
+		severity="critical",
+		contains_pii=True,
+		escalation_configured=True,
+	)
+	hold = service.apply_legal_hold(
+		hold_id="hold-001",
+		tenant_id="tenant-audl",
+		scope={"resource_type": "account", "resource_id": "acct-001"},
+		reason="Regulatory investigation.",
+		approver="legal-counsel",
+	)
+	export = service.request_export(
+		export_id="export-001",
+		tenant_id="tenant-audl",
+		requested_by="privacy-officer",
+		query={"resource_id": "acct-001"},
+		contains_pii=True,
+		masking_enabled=True,
+		reason="Regulator evidence request.",
+	)
+	export_decision = service.decide_export(
+		export_id=export["id"],
+		tenant_id="tenant-audl",
+		reviewer="compliance-reviewer",
+		decision="approved",
+		notes="PII masking verified.",
+	)
+	investigation = service.open_investigation(
+		investigation_id="case-001",
+		tenant_id="tenant-audl",
+		event_ids=[event["id"]],
+		owner="security-lead",
+	)
+	closed = service.close_investigation(
+		investigation_id=investigation["id"],
+		tenant_id="tenant-audl",
+		closed_by="security-lead",
+		resolution="Confirmed expected privileged access.",
+		evidence={"export_id": export["id"], "hold_id": hold["id"]},
+	)
+
+	with pytest.raises(PermissionError, match="legal_hold_active"):
+		service.request_purge(
+			purge_id="purge-blocked",
+			tenant_id="tenant-audl",
+			requested_by="records-admin",
+			scope={"resource_id": "acct-001"},
+			reason="Retention cleanup.",
+		)
+
+	service.release_legal_hold(
+		hold_id=hold["id"],
+		tenant_id="tenant-audl",
+		released_by="legal-counsel",
+		release_evidence="Matter closed by regulator.",
+	)
+	purge = service.request_purge(
+		purge_id="purge-001",
+		tenant_id="tenant-audl",
+		requested_by="records-admin",
+		scope={"resource_id": "acct-001"},
+		reason="Retention cleanup.",
+	)
+	purge_decision = service.decide_purge(
+		purge_id=purge["id"],
+		tenant_id="tenant-audl",
+		reviewer="records-reviewer",
+		decision="approved",
+		notes="Legal hold released and retention policy satisfied.",
+	)
+	dashboard = view_models.dashboard_model(service, "tenant-audl")
+
+	assert event["checksum"]
+	assert hold["status"] == "active"
+	assert export_decision["decision"] == "approved"
+	assert closed["status"] == "closed"
+	assert purge_decision["decision"] == "approved"
+	assert dashboard["summary"]["event_count"] == 1
+	assert dashboard["summary"]["active_legal_hold_count"] == 0
+	assert {event["event_type"] for event in dashboard["governance_events"]} >= {
+		"audit_event_appended",
+		"legal_hold_applied",
+		"export_requested",
+		"export_decided",
+		"investigation_opened",
+		"investigation_closed",
+		"legal_hold_released",
+		"purge_requested",
+		"purge_decided",
+	}
+
+
+def test_service_blocks_audit_guardrail_violations():
+	service = AudlService()
+
+	with pytest.raises(PermissionError, match="checksum_verification_required"):
+		service.append_event(
+			event_id="evt-bad-checksum",
+			tenant_id="tenant-audl",
+			actor="system",
+			action="write",
+			resource_type="record",
+			resource_id="rec-001",
+			checksum="not-the-expected-checksum",
+		)
+
+	with pytest.raises(PermissionError, match="critical_escalation_required"):
+		service.append_event(
+			event_id="evt-critical-no-escalation",
+			tenant_id="tenant-audl",
+			actor="system",
+			action="delete",
+			resource_type="record",
+			resource_id="rec-001",
+			severity="critical",
+			escalation_configured=False,
+		)
+
+	with pytest.raises(PermissionError, match="pii_masking_required"):
+		service.request_export(
+			export_id="export-no-mask",
+			tenant_id="tenant-audl",
+			requested_by="privacy-officer",
+			query={"contains": "pii"},
+			contains_pii=True,
+			masking_enabled=False,
+			reason="Unsafe export.",
+		)
+
+	event = service.append_event(
+		event_id="evt-ok",
+		tenant_id="tenant-audl",
+		actor="system",
+		action="read",
+		resource_type="record",
+		resource_id="rec-001",
+	)
+	export = service.request_export(
+		export_id="export-ok",
+		tenant_id="tenant-audl",
+		requested_by="privacy-officer",
+		query={"event_id": event["id"]},
+		contains_pii=False,
+		masking_enabled=False,
+		reason="Internal export.",
+	)
+	with pytest.raises(ValueError, match="export reviewer notes are required"):
+		service.decide_export(
+			export_id=export["id"],
+			tenant_id="tenant-audl",
+			reviewer="reviewer",
+			decision="approved",
+			notes="",
+		)
+
+	purge = service.request_purge(
+		purge_id="purge-ok",
+		tenant_id="tenant-audl",
+		requested_by="records-admin",
+		scope={"event_id": event["id"]},
+		reason="Retention cleanup.",
+	)
+	service.apply_legal_hold(
+		hold_id="hold-after-purge-request",
+		tenant_id="tenant-audl",
+		scope={"event_id": event["id"]},
+		reason="Late legal hold.",
+		approver="legal-counsel",
+	)
+	with pytest.raises(PermissionError, match="legal_hold_active"):
+		service.decide_purge(
+			purge_id=purge["id"],
+			tenant_id="tenant-audl",
+			reviewer="records-reviewer",
+			decision="approved",
+			notes="Legal hold should block approval.",
+		)
+	service.release_legal_hold(
+		hold_id="hold-after-purge-request",
+		tenant_id="tenant-audl",
+		released_by="legal-counsel",
+		release_evidence="Late hold resolved.",
+	)
+	with pytest.raises(PermissionError, match="dual_control_reviewer_required"):
+		service.decide_purge(
+			purge_id=purge["id"],
+			tenant_id="tenant-audl",
+			reviewer="records-admin",
+			decision="approved",
+			notes="Self review is not allowed.",
+		)
+
+	investigation = service.open_investigation(
+		investigation_id="case-open",
+		tenant_id="tenant-audl",
+		event_ids=[event["id"]],
+		owner="security-lead",
+	)
+	with pytest.raises(ValueError, match="investigation closure evidence is required"):
+		service.close_investigation(
+			investigation_id=investigation["id"],
+			tenant_id="tenant-audl",
+			closed_by="security-lead",
+			resolution="Resolved.",
+			evidence={},
+		)
+
+
+def test_service_keeps_duplicate_ids_isolated_by_tenant():
+	service = AudlService()
+	for tenant_id, actor in [("tenant-aa", "actor-a"), ("tenant-bb", "actor-b")]:
+		service.append_event(
+			event_id="shared-event",
+			tenant_id=tenant_id,
+			actor=actor,
+			action="read",
+			resource_type="record",
+			resource_id="shared",
+		)
+		service.apply_legal_hold(
+			hold_id="shared-hold",
+			tenant_id=tenant_id,
+			scope={"resource_id": "shared"},
+			reason=f"Hold for {tenant_id}.",
+			approver=actor,
+		)
+
+	assert service.list_events("tenant-aa")[0]["actor"] == "actor-a"
+	assert service.list_events("tenant-bb")[0]["actor"] == "actor-b"
+	assert service.list_legal_holds("tenant-aa")[0]["tenant_id"] == "tenant-aa"
+	assert service.list_legal_holds("tenant-bb")[0]["tenant_id"] == "tenant-bb"
+
+	with pytest.raises(ValueError, match="audit event already exists"):
+		service.append_event(
+			event_id="shared-event",
+			tenant_id="tenant-aa",
+			actor="actor-a",
+			action="read",
+			resource_type="record",
+			resource_id="shared",
+		)
+
+
+def test_api_helpers_and_view_models_expose_audit_lifecycle():
+	event = api_helpers.append_event({
+		"id": "api-event",
+		"tenant_id": "tenant-api-audl",
+		"actor": "api-user",
+		"action": "export",
+		"resource_type": "report",
+		"resource_id": "report-001",
+		"contains_pii": "true",
+	})
+	export = api_helpers.request_export({
+		"id": "api-export",
+		"tenant_id": event["tenant_id"],
+		"requested_by": "privacy-officer",
+		"query": {"event_id": event["id"]},
+		"contains_pii": "true",
+		"masking_enabled": "true",
+		"reason": "Evidence export.",
+	})
+	decision = api_helpers.decide_export({
+		"id": export["id"],
+		"tenant_id": event["tenant_id"],
+		"reviewer": "privacy-reviewer",
+		"decision": "approved",
+		"notes": "Masking verified.",
+	})
+	model = view_models.export_review_model(api_helpers.SERVICE, event["tenant_id"])
+
+	assert decision["decision"] == "approved"
+	assert api_helpers.capability_status(event["tenant_id"])["event_count"] == 1
+	assert model["exports"][0]["id"] == "api-export"

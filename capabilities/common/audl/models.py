@@ -343,6 +343,104 @@ class ComplianceRule(BaseModel):
 	false_positive_count: int = Field(default=0, description="False positive count")
 
 
+class AuditLifecycleEvent(BaseModel):
+	"""Tenant-scoped immutable audit event for package composition."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(default_factory=uuid7str, description="Audit event identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Event timestamp")
+	actor: str = Field(..., description="Actor that performed the action")
+	action: str = Field(..., description="Action performed")
+	resource_type: str = Field(..., description="Affected resource type")
+	resource_id: str = Field(..., description="Affected resource identifier")
+	severity: str = Field("info", description="Audit severity")
+	contains_pii: bool = Field(False, description="Whether event evidence includes PII")
+	immutable: bool = Field(True, description="Whether immutable storage is required")
+	checksum: str = Field(..., description="Event integrity checksum")
+	details: Dict[str, Any] = Field(default_factory=dict, description="Additional event details")
+
+
+class AuditLegalHoldRecord(BaseModel):
+	"""Tenant-scoped legal hold lifecycle record."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Legal hold identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	scope: Dict[str, Any] = Field(default_factory=dict, description="Hold scope")
+	reason: str = Field(..., description="Legal hold reason")
+	approver: str = Field(..., description="Approver applying the hold")
+	status: str = Field("active", description="active or released")
+	applied_at: datetime = Field(default_factory=datetime.utcnow, description="Hold timestamp")
+	released_by: Optional[str] = Field(None, description="Actor releasing the hold")
+	release_evidence: Optional[str] = Field(None, description="Release evidence")
+	released_at: Optional[datetime] = Field(None, description="Release timestamp")
+
+
+class AuditExportRequest(BaseModel):
+	"""Governed audit evidence export request."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Export request identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	query: Dict[str, Any] = Field(default_factory=dict, description="Export query")
+	requested_by: str = Field(..., description="Requester identity")
+	contains_pii: bool = Field(False, description="Whether export includes PII")
+	masking_enabled: bool = Field(True, description="Whether PII masking is enabled")
+	reason: str = Field(..., description="Export reason")
+	decision: str = Field("pending", description="pending, approved, or rejected")
+	reviewer: Optional[str] = Field(None, description="Reviewer identity")
+	notes: Optional[str] = Field(None, description="Reviewer notes")
+	requested_at: datetime = Field(default_factory=datetime.utcnow, description="Request timestamp")
+	decided_at: Optional[datetime] = Field(None, description="Decision timestamp")
+
+
+class AuditPurgeRequest(BaseModel):
+	"""Dual-control audit purge request."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Purge request identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	scope: Dict[str, Any] = Field(default_factory=dict, description="Purge scope")
+	requested_by: str = Field(..., description="Requester identity")
+	reason: str = Field(..., description="Purge reason")
+	decision: str = Field("pending", description="pending, approved, or rejected")
+	reviewer: Optional[str] = Field(None, description="Dual-control reviewer")
+	notes: Optional[str] = Field(None, description="Reviewer notes")
+	requested_at: datetime = Field(default_factory=datetime.utcnow, description="Request timestamp")
+	decided_at: Optional[datetime] = Field(None, description="Decision timestamp")
+
+
+class AuditInvestigationRecord(BaseModel):
+	"""Investigation lifecycle over audit evidence."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Investigation identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	event_ids: List[str] = Field(default_factory=list, description="Tenant audit event IDs")
+	owner: str = Field(..., description="Investigation owner")
+	priority: str = Field("high", description="Investigation priority")
+	status: str = Field("open", description="open or closed")
+	opened_at: datetime = Field(default_factory=datetime.utcnow, description="Open timestamp")
+	closed_by: Optional[str] = Field(None, description="Actor closing the investigation")
+	resolution: Optional[str] = Field(None, description="Resolution summary")
+	evidence: Dict[str, Any] = Field(default_factory=dict, description="Resolution evidence")
+	closed_at: Optional[datetime] = Field(None, description="Close timestamp")
+
+
+class AuditGovernanceEvent(BaseModel):
+	"""Tenant-scoped AUDL governance evidence event."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(default_factory=uuid7str, description="Governance event identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	event_type: str = Field(..., description="Lifecycle event type")
+	subject_id: str = Field(..., description="Subject record identifier")
+	message: str = Field(..., description="Human-readable event message")
+	evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured evidence")
+	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Event timestamp")
+
+
 # Export all models
 __all__ = [
 	# Enums
@@ -351,6 +449,8 @@ __all__ = [
 	
 	# Core Models
 	"AuditEvent", "AuditEventBatch", "ComplianceRule",
+	"AuditLifecycleEvent", "AuditLegalHoldRecord", "AuditExportRequest",
+	"AuditPurgeRequest", "AuditInvestigationRecord", "AuditGovernanceEvent",
 	
 	# Validators
 	"validate_tenant_id", "validate_event_severity", "validate_risk_score",

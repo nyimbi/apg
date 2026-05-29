@@ -12856,3 +12856,27 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/apig --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/apig` returned no stale APIG materialized markers.
 - `git diff --check -- capabilities/common/apig` passed with no whitespace errors.
+
+### 2026-05-30 00:17 EAT
+
+AUDL governed audit-evidence lifecycle slice:
+
+- Added `capabilities/common/audl/SPECIFICATION.md` and `capabilities/common/audl/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Added dependency-light `audit_runtime.py` with tenant-qualified audit event, legal hold, export, purge, investigation, and governance-event state.
+- Added dependency-light `api_helpers.py` and `view_models.py` so generated APG applications can compose AUDL without importing the production FastAPI or Flask-AppBuilder stacks.
+- Extended AUDL models with lifecycle, legal hold, export review, purge review, investigation, and governance event records.
+- Extended AUDL contract routes and theme metadata with legal hold, export review, and purge review UI surfaces.
+- Replaced the stale embedded semantic model in `app.py` with a contract-derived semantic model and refreshed AUDL `semantic_model.json`, `release_report.json`, and `package_manifest.json` evidence.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive append-hold-export-investigate-release-purge coverage and negative checksum, critical escalation, PII masking, missing reviewer notes, legal-hold-after-purge-request, dual-control, missing closure evidence, API-helper, view-model, and duplicate-ID tenant-isolation coverage.
+- Updated `cap_spec.md` with the current executable audit-evidence lifecycle, adapter boundaries, and focused proof commands.
+- Code review found and fixed scoped legal-hold purge matching, late legal-hold purge approval bypass, and standalone package-entrypoint import drift before commit.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/audl/__init__.py capabilities/common/audl/models.py capabilities/common/audl/audit_runtime.py capabilities/common/audl/api_helpers.py capabilities/common/audl/view_models.py capabilities/common/audl/capability_contract.py capabilities/common/audl/app.py capabilities/common/audl/tests/test_capability_contract.py capabilities/common/audl/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/audl/tests/test_capability_contract.py capabilities/common/audl/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/audl --json` passed with `ok: true`; AUDL remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/audl --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, refreshed runtime routes/theme evidence, self-test passed, and release evidence valid.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/audl` returned no stale AUDL materialized markers.
+- `git diff --check -- capabilities/common/audl` passed with no whitespace errors.

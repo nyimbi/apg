@@ -180,6 +180,18 @@ class CapabilityTheme:
 		"severity_badge": {
 			"icon": "shield-alert",
 			"variant": "contrast"
+		},
+		"legal_hold_indicator": {
+			"icon": "lock-keyhole",
+			"status_style": "hold-ribbon"
+		},
+		"export_review_panel": {
+			"icon": "file-output",
+			"masking_state": "privacy-chip"
+		},
+		"purge_approval_warning": {
+			"icon": "trash-2",
+			"confirmation_style": "dual-control-banner"
 		}
 	})
 
@@ -257,6 +269,9 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("events", "/audit/events", "AuditEventExplorer", "audl:view", "Operations"),
 		CapabilityUIRoute("timeline", "/audit/timeline", "AuditTimelineWorkbench", "audl:view", "Investigations"),
 		CapabilityUIRoute("investigations", "/audit/investigations", "InvestigationWorkbench", "audl:investigate", "Investigations"),
+		CapabilityUIRoute("legal_holds", "/audit/legal-holds", "LegalHoldConsole", "audl:hold", "Governance"),
+		CapabilityUIRoute("exports", "/audit/exports", "AuditExportReviewQueue", "audl:export", "Governance"),
+		CapabilityUIRoute("purges", "/audit/purges", "AuditPurgeReviewQueue", "audl:purge", "Governance"),
 		CapabilityUIRoute("compliance", "/audit/compliance", "ComplianceControlCenter", "audl:compliance", "Governance"),
 		CapabilityUIRoute("reports", "/audit/reports", "AuditReportingStudio", "audl:report", "Governance"),
 		CapabilityUIRoute("rules", "/audit/rules", "AuditRuleWorkbench", "audl:admin", "Governance"),

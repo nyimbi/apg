@@ -5,13 +5,127 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Audit Logging package-backed APG capability", "entity_count": 0, "name": "audl", "version": "1.0.0"}, "capabilities": {"audl": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"compliance": {"enabled_frameworks": ["SOX", "GDPR", "HIPAA", "PCI-DSS"], "evidence_chain_of_custody": true, "pii_masking_enabled": true, "regulated_export_requires_approval": true}, "ingestion": {"checksum_verification_required": true, "default_batch_size": 1000, "immutable_storage_required": true, "max_batch_size": 50000, "stream_processing_enabled": true}, "investigations": {"auto_assign_critical_incidents": true, "collaborative_cases_enabled": true, "default_case_priority": "high", "timeline_reconstruction_enabled": true}, "notifications": {"critical_event_channels": ["email", "webhook"], "daily_digest_enabled": true, "real_time_alerting": true}, "retention": {"archive_after_days": 365, "default_retention_days": 2555, "legal_hold_enabled": true, "purge_requires_dual_control": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "audl_forensics"}, "ui": {"enable_compliance_center": true, "enable_investigation_workbench": true, "enable_live_timeline": true, "enable_natural_language_search": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Audit Logging", "provides": ["audl_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_id_missing": true}, "description": "All audit workloads must execute with tenant context.", "effect": {"decision": "deny", "reason": "tenant_id_required", "required_action": "attach_tenant_context"}, "name": "require_tenant_context"}, {"condition": {"checksum_verified": false, "immutable_storage": true}, "description": "Immutable audit storage requires checksum verification.", "effect": {"decision": "deny", "reason": "checksum_verification_required", "required_action": "verify_event_checksum"}, "name": "immutable_events_require_checksum"}, {"condition": {"legal_hold_active": true, "requested_operation": "purge"}, "description": "Audit data under legal hold cannot be purged.", "effect": {"decision": "deny", "reason": "legal_hold_active", "required_action": "release_legal_hold_or_abort"}, "name": "legal_hold_blocks_purge"}, {"condition": {"contains_pii": true, "masking_enabled": false, "requested_operation": "export"}, "description": "PII-bearing exports require masking before release.", "effect": {"decision": "deny", "reason": "pii_masking_required", "required_action": "enable_export_masking"}, "name": "regulated_exports_require_masking"}, {"condition": {"escalation_configured": false, "event_severity": "critical"}, "description": "Critical security findings require an escalation route.", "effect": {"decision": "deny", "reason": "critical_escalation_required", "required_action": "configure_critical_event_escalation"}, "name": "critical_events_require_escalation"}, {"condition": {"batch_size_gt": 10000, "stream_processing_enabled": false}, "description": "Large audit batches require stream processing safeguards.", "effect": {"decision": "deny", "reason": "stream_processing_required", "required_action": "enable_stream_processing"}, "name": "high_volume_ingestion_requires_stream_processing"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_id_missing": true}, "description": "All audit workloads must execute with tenant context.", "effect": {"decision": "deny", "reason": "tenant_id_required", "required_action": "attach_tenant_context"}, "name": "require_tenant_context"}, {"condition": {"checksum_verified": false, "immutable_storage": true}, "description": "Immutable audit storage requires checksum verification.", "effect": {"decision": "deny", "reason": "checksum_verification_required", "required_action": "verify_event_checksum"}, "name": "immutable_events_require_checksum"}, {"condition": {"legal_hold_active": true, "requested_operation": "purge"}, "description": "Audit data under legal hold cannot be purged.", "effect": {"decision": "deny", "reason": "legal_hold_active", "required_action": "release_legal_hold_or_abort"}, "name": "legal_hold_blocks_purge"}, {"condition": {"contains_pii": true, "masking_enabled": false, "requested_operation": "export"}, "description": "PII-bearing exports require masking before release.", "effect": {"decision": "deny", "reason": "pii_masking_required", "required_action": "enable_export_masking"}, "name": "regulated_exports_require_masking"}, {"condition": {"escalation_configured": false, "event_severity": "critical"}, "description": "Critical security findings require an escalation route.", "effect": {"decision": "deny", "reason": "critical_escalation_required", "required_action": "configure_critical_event_escalation"}, "name": "critical_events_require_escalation"}, {"condition": {"batch_size_gt": 10000, "stream_processing_enabled": false}, "description": "Large audit batches require stream processing safeguards.", "effect": {"decision": "deny", "reason": "stream_processing_required", "required_action": "enable_stream_processing"}, "name": "high_volume_ingestion_requires_stream_processing"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"compliance": {"component": "ComplianceControlCenter", "permission": "audl:compliance", "route": "/audit/compliance"}, "dashboard": {"component": "AuditDashboard", "permission": "audl:view", "route": "/audit/dashboard"}, "events": {"component": "AuditEventExplorer", "permission": "audl:view", "route": "/audit/events"}, "investigations": {"component": "InvestigationWorkbench", "permission": "audl:investigate", "route": "/audit/investigations"}, "reports": {"component": "AuditReportingStudio", "permission": "audl:report", "route": "/audit/reports"}, "rules": {"component": "AuditRuleWorkbench", "permission": "audl:admin", "route": "/audit/rules"}, "settings": {"component": "AuditCapabilitySettings", "permission": "audl:admin", "route": "/audit/settings"}, "timeline": {"component": "AuditTimelineWorkbench", "permission": "audl:view", "route": "/audit/timeline"}}, "streaming": {}, "theme": {"components": {"audit_timeline": {"chain_of_custody_badge": "inline", "event_marker": "severity-dot", "orientation": "vertical"}, "compliance_scorecard": {"status_variant": "stacked", "trend_style": "sparkline"}, "investigation_case_card": {"icon": "folder-search", "priority_indicator": "left-rail", "shape": "rounded-rectangle"}, "severity_badge": {"icon": "shield-alert", "variant": "contrast"}}, "name": "audl_forensics", "tokens": {"border.radius": "10px", "color.accent": "#C97A2B", "color.danger": "#B42318", "color.primary": "#0F4C5C", "color.success": "#2E7D32", "color.warning": "#A16207", "density": "compact", "surface.canvas": "#F3F5F7", "surface.panel": "#FFFFFF", "text.primary": "#13232F", "text.secondary": "#526371"}}, "ui": {"api_prefix": "/api/v1/audit", "blueprint_module": "blueprint.py", "requires_theme": true, "routes": [{"component": "AuditDashboard", "name": "dashboard", "nav_group": "Operations", "path": "/audit/dashboard", "permission": "audl:view"}, {"component": "AuditEventExplorer", "name": "events", "nav_group": "Operations", "path": "/audit/events", "permission": "audl:view"}, {"component": "AuditTimelineWorkbench", "name": "timeline", "nav_group": "Investigations", "path": "/audit/timeline", "permission": "audl:view"}, {"component": "InvestigationWorkbench", "name": "investigations", "nav_group": "Investigations", "path": "/audit/investigations", "permission": "audl:investigate"}, {"component": "ComplianceControlCenter", "name": "compliance", "nav_group": "Governance", "path": "/audit/compliance", "permission": "audl:compliance"}, {"component": "AuditReportingStudio", "name": "reports", "nav_group": "Governance", "path": "/audit/reports", "permission": "audl:report"}, {"component": "AuditRuleWorkbench", "name": "rules", "nav_group": "Governance", "path": "/audit/rules", "permission": "audl:admin"}, {"component": "AuditCapabilitySettings", "name": "settings", "nav_group": "Administration", "path": "/audit/settings", "permission": "audl:admin"}], "shell": "apg_python", "template_roots": ["templates/", "frontend/"]}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"audl": []}}, "contracts": {"audl": {"configuration": {"compliance": {"enabled_frameworks": ["SOX", "GDPR", "HIPAA", "PCI-DSS"], "evidence_chain_of_custody": true, "pii_masking_enabled": true, "regulated_export_requires_approval": true}, "ingestion": {"checksum_verification_required": true, "default_batch_size": 1000, "immutable_storage_required": true, "max_batch_size": 50000, "stream_processing_enabled": true}, "investigations": {"auto_assign_critical_incidents": true, "collaborative_cases_enabled": true, "default_case_priority": "high", "timeline_reconstruction_enabled": true}, "notifications": {"critical_event_channels": ["email", "webhook"], "daily_digest_enabled": true, "real_time_alerting": true}, "retention": {"archive_after_days": 365, "default_retention_days": 2555, "legal_hold_enabled": true, "purge_requires_dual_control": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "audl_forensics"}, "ui": {"enable_compliance_center": true, "enable_investigation_workbench": true, "enable_live_timeline": true, "enable_natural_language_search": true}}, "id": "audl", "provides": ["audl_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"audl": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"critical_events_require_escalation": {"condition": {"escalation_configured": false, "event_severity": "critical"}, "description": "Critical security findings require an escalation route.", "effect": {"decision": "deny", "reason": "critical_escalation_required", "required_action": "configure_critical_event_escalation"}, "name": "critical_events_require_escalation"}, "high_volume_ingestion_requires_stream_processing": {"condition": {"batch_size_gt": 10000, "stream_processing_enabled": false}, "description": "Large audit batches require stream processing safeguards.", "effect": {"decision": "deny", "reason": "stream_processing_required", "required_action": "enable_stream_processing"}, "name": "high_volume_ingestion_requires_stream_processing"}, "immutable_events_require_checksum": {"condition": {"checksum_verified": false, "immutable_storage": true}, "description": "Immutable audit storage requires checksum verification.", "effect": {"decision": "deny", "reason": "checksum_verification_required", "required_action": "verify_event_checksum"}, "name": "immutable_events_require_checksum"}, "legal_hold_blocks_purge": {"condition": {"legal_hold_active": true, "requested_operation": "purge"}, "description": "Audit data under legal hold cannot be purged.", "effect": {"decision": "deny", "reason": "legal_hold_active", "required_action": "release_legal_hold_or_abort"}, "name": "legal_hold_blocks_purge"}, "regulated_exports_require_masking": {"condition": {"contains_pii": true, "masking_enabled": false, "requested_operation": "export"}, "description": "PII-bearing exports require masking before release.", "effect": {"decision": "deny", "reason": "pii_masking_required", "required_action": "enable_export_masking"}, "name": "regulated_exports_require_masking"}, "require_tenant_context": {"condition": {"tenant_id_missing": true}, "description": "All audit workloads must execute with tenant context.", "effect": {"decision": "deny", "reason": "tenant_id_required", "required_action": "attach_tenant_context"}, "name": "require_tenant_context"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.audl": {"file": "capability_contract.py", "id": "capability.audl", "kind": "capability", "name": "Audit Logging", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("audl_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "audl",
+			"version": "1.0.0",
+			"description": "Audit Logging package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"audl": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"audl": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["audl_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"api_helpers": "api_helpers.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"package_runtime": "audit_runtime.py",
+					"views": "views.py",
+					"view_models": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"audl": {
+				"id": "audl",
+				"configuration": contract["configuration"],
+				"provides": ["audl_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"audl": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.audl": {
+				"id": "capability.audl",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +150,15 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	routes = model.get("capabilities", {}).get("audl", {}).get("ui", {}).get("routes", [])
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "audl" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 11:
+		errors.append("AUDL semantic model route manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",
