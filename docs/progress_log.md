@@ -16,6 +16,49 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 07:00 EAT
+
+Checked-in example output synchronization slice:
+
+- Extended `apg.compiler-baseline-report.v1` so the compiler baseline now
+  compares every numbered example `output/` directory with the current compiler
+  result and fails on missing, stale, or extra generated files.
+- Added `apg baseline examples --refresh-outputs --json` as the explicit
+  regeneration path for checked-in example applications.
+- Regenerated all 20 numbered example `output/app.py` files from the current
+  compiler, closing the drift introduced by the generated-source hygiene fix.
+- Updated compiler baseline tests and contributor-facing tooling guidance so
+  checked-in example outputs are executable evidence, not static snapshots.
+
+Verification:
+
+- Initial `./.venv/bin/apg baseline examples --json` correctly failed with 20
+  stale output directories, each stale only in `output/app.py`.
+- `./.venv/bin/apg baseline examples --refresh-outputs --json` -> passed with
+  20/20 examples, 20 current output directories, 0 stale output directories,
+  and 0 generated-source hygiene violations.
+- `./.venv/bin/python -m py_compile compiler/baseline.py
+  cli/baseline_command.py tests/test_compiler_baseline.py` -> passed.
+- `./.venv/bin/apg baseline examples --json` -> passed with 20/20 examples,
+  20 current output directories, 0 stale output directories, and 0
+  generated-source hygiene violations.
+- `./.venv/bin/pytest -q
+  tests/test_compiler_baseline.py::test_cli_baseline_json_audits_numbered_examples
+  tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler`
+  -> 2 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 18/18 surfaces, 20
+  current output directories in the compiler baseline surface, 0 stale output
+  directories, 0 blocking gaps, and 0 errors.
+- `git diff --check -- cli/baseline_command.py compiler/baseline.py
+  tests/test_compiler_baseline.py docs/tooling.md docs/developer_guide.md
+  examples docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- Output synchronization now covers the 20 curated numbered examples. Larger
+  historical or ad hoc generated artifacts outside that curated path still need
+  separate triage before being treated as release evidence.
+
 ### 2026-05-29 06:51 EAT
 
 Generated source hygiene baseline slice:

@@ -1920,9 +1920,13 @@ def test_cli_baseline_json_audits_numbered_examples():
 	assert report["summary"]["failed_examples"] == 0
 	assert report["summary"]["checked_generated_python_files"] >= 20
 	assert report["summary"]["generated_source_hygiene_violations"] == 0
+	assert report["summary"]["current_output_directories"] == 20
+	assert report["summary"]["stale_output_directories"] == 0
 	assert all(example["checks"]["compile_verify_ok"] for example in report["examples"])
 	assert all(example["checks"]["generated_source_hygiene_ok"] for example in report["examples"])
+	assert all(example["checks"]["checked_output_current"] for example in report["examples"])
 	assert all(example["compile_verify"]["source_hygiene"]["ok"] for example in report["examples"])
+	assert all(example["compile_verify"]["output_sync"]["ok"] for example in report["examples"])
 	assert all(example["checks"]["release_ok"] for example in report["examples"])
 
 

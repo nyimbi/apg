@@ -32,6 +32,7 @@ BED_DOWN_DOMAINS = {
 def build_compiler_baseline_report(
 	examples_dir: Path,
 	expected_examples: int = EXPECTED_NUMBERED_EXAMPLES,
+	refresh_outputs: bool = False,
 ) -> dict[str, Any]:
 	"""Run the APG compiler bed-down gate over numbered examples."""
 	sources = sorted(examples_dir.glob("[0-9][0-9]_*/main.apg"))
@@ -39,7 +40,7 @@ def build_compiler_baseline_report(
 	domain_sources: dict[str, list[str]] = {domain: [] for domain in BED_DOWN_DOMAINS}
 
 	for source in sources:
-		example_report = _audit_example(source)
+		example_report = _audit_example(source, refresh_outputs=refresh_outputs)
 		example_reports.append(example_report)
 		_collect_domain_coverage(example_report.get("model", {}), source, domain_sources)
 
@@ -81,6 +82,22 @@ def build_compiler_baseline_report(
 				)
 				for example in example_reports
 			),
+			"current_output_directories": sum(
+				1
+				for example in example_reports
+				if example.get("compile_verify", {})
+				.get("output_sync", {})
+				.get("ok")
+				is True
+			),
+			"stale_output_directories": sum(
+				1
+				for example in example_reports
+				if example.get("compile_verify", {})
+				.get("output_sync", {})
+				.get("ok")
+				is False
+			),
 			"graph_kinds": list(SUPPORTED_GRAPH_KINDS),
 		},
 		"examples": [
@@ -90,7 +107,7 @@ def build_compiler_baseline_report(
 	}
 
 
-def _audit_example(source: Path) -> dict[str, Any]:
+def _audit_example(source: Path, refresh_outputs: bool = False) -> dict[str, Any]:
 	errors: list[str] = []
 	warnings: list[str] = []
 	model: dict[str, Any] = {}
@@ -124,7 +141,7 @@ def _audit_example(source: Path) -> dict[str, Any]:
 		errors.append(f"release failed: {error}")
 
 	try:
-		compile_verify = _compile_verify_in_temp(source)
+		compile_verify = _compile_verify_in_temp(source, refresh_outputs=refresh_outputs)
 		if not compile_verify["ok"]:
 			errors.extend(f"compile-verify: {error}" for error in compile_verify.get("errors", []))
 	except Exception as error:
@@ -141,6 +158,7 @@ def _audit_example(source: Path) -> dict[str, Any]:
 		"release_ok": release.get("format") == "apg.release-report.v1" and release.get("ok") is True,
 		"compile_verify_ok": compile_verify.get("ok") is True,
 		"generated_source_hygiene_ok": compile_verify.get("source_hygiene", {}).get("ok") is True,
+		"checked_output_current": compile_verify.get("output_sync", {}).get("ok") is True,
 	}
 	return {
 		"name": source.parent.name,
@@ -156,7 +174,7 @@ def _audit_example(source: Path) -> dict[str, Any]:
 	}
 
 
-def _compile_verify_in_temp(source: Path) -> dict[str, Any]:
+def _compile_verify_in_temp(source: Path, refresh_outputs: bool = False) -> dict[str, Any]:
 	compiler = APGCompiler()
 	result = compiler.compile_file(source, target_language="python")
 	errors = [str(error) for error in result.errors]
@@ -166,6 +184,11 @@ def _compile_verify_in_temp(source: Path) -> dict[str, Any]:
 	source_hygiene = _generated_source_hygiene(result.generated_files)
 	if not source_hygiene["ok"]:
 		errors.extend(source_hygiene["violations"])
+	if refresh_outputs:
+		_refresh_output_directory(source.parent / "output", result.generated_files)
+	output_sync = _checked_output_sync(source.parent / "output", result.generated_files)
+	if not output_sync["ok"]:
+		errors.extend(output_sync["violations"])
 
 	with tempfile.TemporaryDirectory(prefix="apg-baseline-") as temporary_dir_name:
 		output_dir = Path(temporary_dir_name)
@@ -194,6 +217,7 @@ def _compile_verify_in_temp(source: Path) -> dict[str, Any]:
 					"generated_file_count": len(result.generated_files),
 					"errors": errors,
 					"source_hygiene": source_hygiene,
+					"output_sync": output_sync,
 				}
 
 	return {
@@ -201,6 +225,7 @@ def _compile_verify_in_temp(source: Path) -> dict[str, Any]:
 		"generated_file_count": len(result.generated_files),
 		"errors": errors,
 		"source_hygiene": source_hygiene,
+		"output_sync": output_sync,
 	}
 
 
@@ -227,6 +252,64 @@ def _generated_source_hygiene(generated_files: dict[str, str]) -> dict[str, Any]
 		"checked_python_files": sum(1 for path in generated_files if path.endswith(".py")),
 		"violations": violations,
 	}
+
+
+def _refresh_output_directory(output_dir: Path, generated_files: dict[str, str]) -> None:
+	output_dir.mkdir(parents=True, exist_ok=True)
+	for file_name, content in generated_files.items():
+		file_path = output_dir / file_name
+		file_path.parent.mkdir(parents=True, exist_ok=True)
+		file_path.write_text(content, encoding="utf-8")
+
+
+def _checked_output_sync(output_dir: Path, generated_files: dict[str, str]) -> dict[str, Any]:
+	violations: list[str] = []
+	expected_files = set(generated_files)
+	if not output_dir.exists():
+		return {
+			"ok": False,
+			"output_dir": str(output_dir),
+			"expected_file_count": len(expected_files),
+			"current_file_count": 0,
+			"missing_files": sorted(expected_files),
+			"stale_files": [],
+			"extra_files": [],
+			"violations": [f"{output_dir}: output directory is missing"],
+		}
+
+	current_files = {
+		path.relative_to(output_dir).as_posix()
+		for path in output_dir.rglob("*")
+		if path.is_file() and _is_checked_output_file(path)
+	}
+	missing_files = sorted(expected_files - current_files)
+	extra_files = sorted(current_files - expected_files)
+	stale_files: list[str] = []
+	for file_name in sorted(expected_files & current_files):
+		if (output_dir / file_name).read_text(encoding="utf-8") != generated_files[file_name]:
+			stale_files.append(file_name)
+
+	for file_name in missing_files:
+		violations.append(f"{output_dir}: missing generated file {file_name}")
+	for file_name in stale_files:
+		violations.append(f"{output_dir}: stale generated file {file_name}")
+	for file_name in extra_files:
+		violations.append(f"{output_dir}: extra generated file {file_name}")
+
+	return {
+		"ok": not violations,
+		"output_dir": str(output_dir),
+		"expected_file_count": len(expected_files),
+		"current_file_count": len(current_files),
+		"missing_files": missing_files,
+		"stale_files": stale_files,
+		"extra_files": extra_files,
+		"violations": violations,
+	}
+
+
+def _is_checked_output_file(path: Path) -> bool:
+	return "__pycache__" not in path.parts and path.suffix != ".pyc" and path.name != ".DS_Store"
 
 
 def _collect_domain_coverage(

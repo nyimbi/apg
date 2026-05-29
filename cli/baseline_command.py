@@ -19,14 +19,19 @@ from compiler.baseline import build_compiler_baseline_report
 	default=Path("examples"),
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.compiler-baseline-report.v1 JSON")
-def baseline(examples_dir: Path, as_json: bool) -> None:
+@click.option(
+	"--refresh-outputs",
+	is_flag=True,
+	help="Rewrite each numbered example output directory from the current compiler before auditing",
+)
+def baseline(examples_dir: Path, as_json: bool, refresh_outputs: bool) -> None:
 	"""Run the compiler bed-down gate over numbered APG examples."""
 	if not examples_dir.exists():
 		raise click.ClickException(f"Examples directory not found: {examples_dir}")
 	if not examples_dir.is_dir():
 		raise click.ClickException(f"APG baseline expects a directory: {examples_dir}")
 
-	report = build_compiler_baseline_report(examples_dir)
+	report = build_compiler_baseline_report(examples_dir, refresh_outputs=refresh_outputs)
 	if as_json:
 		click.echo(json.dumps(report, indent=2, sort_keys=True))
 	else:
