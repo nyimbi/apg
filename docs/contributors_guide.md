@@ -243,7 +243,7 @@ every contribution, especially when compute or battery is constrained.
 | Grammar | parser golden audit and relevant language contract tests |
 | Semantic model | semantic model fixture audit or focused semantic tests |
 | Generator | representative `apg compile ... --verify` and generated smoke test |
-| Capability contract | `apg capabilities validate-contracts --json` and focused contract tests |
+| Capability contract | `apg capabilities validate-contracts --json`, `apg capabilities audit --json`, and focused contract tests |
 | Capability scaffold/package | scaffold, publish-plan, publish-apply dry run, focused package tests |
 | Repository hygiene | `./.venv/bin/apg hygiene audit --json` and `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
 
@@ -262,6 +262,7 @@ Then iterate:
 ```bash
 ./.venv/bin/python -m pytest -q capabilities/common/demo/tests
 ./.venv/bin/apg capabilities validate-contracts --json
+./.venv/bin/apg capabilities audit --json
 ./.venv/bin/apg capabilities inspect common_demo --json
 ./.venv/bin/apg capabilities evaluate-rules common_demo --context-json '{}' --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/demo --json
@@ -307,6 +308,7 @@ Minimum capacity evidence:
 ./.venv/bin/apg compile path/to/capacity.apg --output /tmp/apg-capacity --verify
 ./.venv/bin/python /tmp/apg-capacity/smoke_test.py
 ./.venv/bin/apg capabilities validate-contracts --json
+./.venv/bin/apg capabilities audit --json
 ```
 
 For numbered examples or compiler-facing capacity work, also run:

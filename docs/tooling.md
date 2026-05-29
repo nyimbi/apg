@@ -176,7 +176,11 @@ APG currently has an executable compiler path:
 - capability contracts can be listed with `apg capabilities contracts --json`,
   inspected with `apg capabilities inspect <capability> --json`, rule-tested
   with `apg capabilities evaluate-rules <capability> --context-json ... --json`,
-  and validated with `apg capabilities validate-contracts --json`;
+  validated with `apg capabilities validate-contracts --json`, and audited
+  with `apg capabilities audit --json`, which emits
+  `apg.capability-operability-audit.v1` by loading every contract, executing
+  representative deterministic rule probes, summarizing UI/theme surfaces, and
+  reporting package artifact readiness;
 - new package-backed capability skeletons can be created with
   `apg capabilities scaffold <domain> <code> --name ... --json`, which emits
   `apg.capability-scaffold-report.v1` and writes a valid spec-backed contract,
@@ -853,6 +857,7 @@ apg studio snapshot app.apg --json
 apg studio plan-edit app.apg --edit-json '{"operation":"add_field","table":"Customer","name":"phone","type":"str"}' --json
 apg capabilities contracts --json
 apg capabilities validate-contracts --json
+apg capabilities audit --json
 apg capabilities publish-plan dist/capability_basics-web --json
 apg capabilities publish-apply dist/capability_basics-web --catalog dist/capabilities.json --json
 apg capabilities catalog dist/capabilities.json --json
@@ -1219,11 +1224,16 @@ language snippets are not confused with shell commands.
 ```console
 apg capabilities contracts --json
 apg capabilities validate-contracts
+apg capabilities audit --json
 apg capabilities list
 ```
 
 Capability commands operate on executable contracts and package directories,
-not grammar changes. `apg capabilities publish-plan <package-dir> --json`
+not grammar changes. `apg capabilities audit --json` is the broad capability
+operability gate: it proves each contract can be loaded and each rule engine
+can return stable decisions for representative contexts, while surfacing
+package artifact gaps as warnings unless `--strict-package-artifacts` is used.
+`apg capabilities publish-plan <package-dir> --json`
 emits `apg.capability-publish-report.v1`: it loads the package entrypoint,
 validates the manifest, proves the manifest is publishable, returns the catalog
 patch, attaches release-evidence verification, and records that the publish

@@ -97,3 +97,27 @@ def test_capabilities_evaluate_rules_rejects_invalid_context_shape():
 	payload = json.loads(result.output)
 	assert payload["ok"] is False
 	assert payload["errors"] == ["context JSON must be an object"]
+
+
+def test_capabilities_audit_executes_all_contract_rule_surfaces_as_json():
+	result = CliRunner().invoke(cli, ["capabilities", "audit", "--json"])
+
+	assert result.exit_code == 0, result.output
+	payload = json.loads(result.output)
+
+	assert payload["format"] == "apg.capability-operability-audit.v1"
+	assert payload["ok"] is True
+	assert payload["summary"]["capability_count"] >= 100
+	assert payload["summary"]["operable_contract_count"] == payload["summary"]["capability_count"]
+	assert payload["summary"]["inoperable_contract_count"] == 0
+	assert payload["summary"]["package_gap_count"] >= 0
+	assert payload["errors"] == []
+	records = {record["capability"]: record for record in payload["records"]}
+	assert "composition_events" in records
+	assert records["composition_events"]["contract_surfaces"]["rule_count"] >= 1
+	assert records["composition_events"]["contract_surfaces"]["route_count"] >= 1
+	assert records["composition_events"]["contract_surfaces"]["ui_shell"] == "apg_python"
+	assert records["composition_events"]["contract_surfaces"]["theme_tokens"]
+	probes = {probe["name"]: probe for probe in records["composition_events"]["rule_probes"]}
+	assert {"read_allowed", "write_without_tenant", "high_risk_without_review"} <= set(probes)
+	assert all(probe["ok"] for probe in probes.values())

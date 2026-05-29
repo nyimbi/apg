@@ -21,6 +21,7 @@ from compiler.capability_publish import (
 	build_capability_catalog_report,
 	build_capability_publish_report,
 )
+from compiler.capability_operability import audit_capability_operability
 
 
 CAPABILITY_SCAFFOLD_FORMAT = "apg.capability-scaffold-report.v1"
@@ -1010,6 +1011,37 @@ def validate_contracts(as_json: bool) -> None:
 			)
 			for error in report["errors"]:
 				click.echo(f"  error: {error}")
+	if not report["ok"]:
+		raise click.exceptions.Exit(1)
+
+
+@capabilities.command(name="audit")
+@click.option(
+	"--strict-package-artifacts",
+	is_flag=True,
+	help="Treat missing package runtime artifacts as blocking gaps",
+)
+@click.option("--json", "as_json", is_flag=True, help="Emit apg.capability-operability-audit.v1 JSON")
+def audit(strict_package_artifacts: bool, as_json: bool) -> None:
+	"""Audit capability operability across contracts, rule probes, UI, theme, and package evidence."""
+	report = audit_capability_operability(strict_package_artifacts=strict_package_artifacts)
+	if as_json:
+		click.echo(json.dumps(report, indent=2, sort_keys=True))
+	else:
+		summary = report["summary"]
+		status = "OK" if report["ok"] else "FAILED"
+		click.echo(
+			f"Capability operability audit {status}: "
+			f"{summary['operable_contract_count']}/{summary['capability_count']} contracts operable, "
+			f"{summary['complete_package_count']} complete package(s), "
+			f"{summary['package_gap_count']} package artifact gap(s)"
+		)
+		for error in report["errors"]:
+			click.echo(f"  error: {error}")
+		for warning in report["warnings"][:10]:
+			click.echo(f"  warning: {warning}")
+		if len(report["warnings"]) > 10:
+			click.echo(f"  ... {len(report['warnings']) - 10} more warning(s)")
 	if not report["ok"]:
 		raise click.exceptions.Exit(1)
 

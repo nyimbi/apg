@@ -133,7 +133,7 @@ Use these levels to avoid pretending partial work is complete:
 | L2 semantic | semantic model exposes records, capabilities, screens, workflows, agents, and routes | `apg model ... --json` |
 | L3 generated | compiler emits runnable Python artifacts | `apg compile ... --verify` |
 | L4 operable | generated app smoke test and self-test pass | `smoke_test.py`, `app.py --self-test` |
-| L5 composable | capability contracts validate and dependencies are explicit | `apg capabilities validate-contracts --json` |
+| L5 composable | capability contracts validate, rule probes execute, and dependencies are explicit | `apg capabilities validate-contracts --json`; `apg capabilities audit --json` |
 | L6 baseline | numbered example and checked-in output pass the compiler baseline | `apg baseline examples --json` |
 | L7 documented | developer docs and progress log explain extension points and evidence | docs audit or diff check |
 
@@ -237,6 +237,7 @@ Move or create the package under `capabilities/<domain>/<code>/`, then validate:
 ```bash
 ./.venv/bin/python -m pytest -q capabilities/procurement/approvals/tests
 ./.venv/bin/apg capabilities validate-contracts --json
+./.venv/bin/apg capabilities audit --json
 ./.venv/bin/apg capabilities inspect procurement_approvals --json
 ```
 
@@ -493,6 +494,7 @@ Choose tests by the layer changed:
 ```bash
 ./.venv/bin/apg compile path/to/capacity.apg --output /tmp/apg-capacity --verify
 ./.venv/bin/apg capabilities validate-contracts --json
+./.venv/bin/apg capabilities audit --json
 ./.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py
 ./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py
 ./.venv/bin/apg doctor --json

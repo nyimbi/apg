@@ -16,6 +16,51 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 07:40 EAT
+
+Capability operability audit slice:
+
+- Added `apg.capability-operability-audit.v1` via `apg capabilities audit
+  --json`.
+- The audit loads every executable capability contract, executes deterministic
+  rule probes for representative read/write/high-risk contexts, summarizes
+  configuration/rule/UI/theme surfaces, and reports package artifact readiness.
+- Wired the capability operability surface into `apg tooling audit --json`,
+  increasing the aggregate gate to 19 surfaces.
+- Updated tooling, developer, contributor, and capacity-development docs so
+  capability work now points at both contract validation and executable
+  operability evidence.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/capability_operability.py
+  cli/capabilities_command.py compiler/tooling_audit.py
+  tests/test_cli_capability_operability.py tests/test_tooling_audit.py` ->
+  passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_operability.py
+  tests/test_tooling_audit.py::test_cli_surface_audit_tracks_documented_command_groups`
+  -> 6 passed.
+- `./.venv/bin/apg capabilities audit --json` -> passed with 109/109
+  contracts operable, 0 inoperable contracts, 0 errors, 0 complete packages,
+  109 partial packages, and 760 package artifact gaps.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 54 documented commands, and 0 violations.
+- `./.venv/bin/pytest -q
+  tests/test_tooling_audit.py::test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces`
+  -> 1 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 19/19 surfaces, 109/109
+  capability contracts operable in the new capability operability surface, 0
+  blocking gaps, and 0 errors.
+
+Known remaining gaps:
+
+- Contract/rule operability is now enforced across all discovered capabilities,
+  but package readiness remains incomplete: every capability is still partial
+  under the audit's package-artifact definition. The next capability closure
+  work should convert these warnings into completed package artifacts and then
+  enable `apg capabilities audit --strict-package-artifacts --json` as a
+  stricter gate.
+
 ### 2026-05-29 07:22 EAT
 
 Contributor effectiveness and domain HTTP baseline slice:

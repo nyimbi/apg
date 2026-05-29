@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from compiler.baseline import build_compiler_baseline_report
+from compiler.capability_operability import audit_capability_operability
 from compiler.diagnostics import audit_diagnostic_fixtures
 from compiler.doctor import build_doctor_report
 from compiler.docs_audit import audit_docs
@@ -62,7 +63,7 @@ REQUIRED_TOP_LEVEL_COMMANDS = [
 ]
 
 REQUIRED_COMMAND_GROUPS = {
-	"capabilities": ["catalog", "contracts", "evaluate-rules", "inspect", "list", "publish-apply", "publish-plan", "scaffold", "validate-contracts"],
+	"capabilities": ["audit", "catalog", "contracts", "evaluate-rules", "inspect", "list", "publish-apply", "publish-plan", "scaffold", "validate-contracts"],
 	"deployment": ["verify"],
 	"docs": ["audit"],
 	"hygiene": ["audit"],
@@ -121,6 +122,7 @@ def _fixture_audits() -> list[FixtureAudit]:
 		("drift", "apg.drift-audit.v1", audit_drift_fixtures),
 		("semantic_model", "apg.semantic-model-fixture-audit.v1", audit_semantic_model_fixtures),
 		("graph", "apg.graph-fixture-audit.v1", audit_graph_fixtures),
+		("capability_operability", "apg.capability-operability-audit.v1", audit_capability_operability),
 		("compiler_baseline", "apg.compiler-baseline-report.v1", audit_compiler_baseline),
 		("repository_hygiene", "apg.repository-hygiene-audit.v1", audit_repository_hygiene),
 		("doctor", "apg.doctor-report.v1", build_doctor_report),

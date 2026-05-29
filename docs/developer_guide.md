@@ -333,6 +333,7 @@ Validate, inspect, and publish-plan capabilities through the CLI:
 
 ```bash
 ./.venv/bin/apg capabilities validate-contracts --json
+./.venv/bin/apg capabilities audit --json
 ./.venv/bin/apg capabilities inspect <capability_id> --json
 ./.venv/bin/apg capabilities evaluate-rules <capability_id> --context-json '{}' --json
 ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
@@ -451,7 +452,7 @@ Use the narrowest lane that proves the claim.
 | Compiler baseline | `./.venv/bin/apg baseline examples --json` for numbered examples, generated source hygiene, checked-in output sync, direct checked-output self-test/smoke-test execution, checked-output HTTP contract route probes, domain HTTP probes for records/workflows/capabilities, graph, model, and release agreement; use `./.venv/bin/apg baseline examples --refresh-outputs --json` only when intentionally regenerating example outputs |
 | Release/package | `./.venv/bin/apg package path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-package --json` |
 | Evidence bundle | `./.venv/bin/apg evidence path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-evidence --json` |
-| Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` |
+| Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` and `./.venv/bin/apg capabilities audit --json` |
 | Tooling | `./.venv/bin/apg tooling audit --json` |
 | Environment doctor | `./.venv/bin/apg doctor --json` |
 | Repository hygiene | `./.venv/bin/apg hygiene audit --json` and `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
