@@ -61,7 +61,9 @@ APG currently has an executable compiler path:
   teams, and capability dependencies;
 - `apg release <file> --json` emits `apg.release-report.v1` by compiling to a
   temporary generated app, importing it, and running generated self-test,
-  OpenAPI, component-manifest, route-dispatch, and semantic-model evidence;
+  OpenAPI, component-manifest, route-dispatch, and semantic-model evidence; it
+  also accepts `--catalog <capability-root-or-catalog.json>` as a no-write
+  release preflight;
 - `apg baseline [examples-dir] --json` emits `apg.compiler-baseline-report.v1`
   by auditing the numbered APG examples against the compiler bed-down gate:
   semantic/lint/validate readiness, graph-suite generation, generated release
@@ -94,6 +96,8 @@ APG currently has an executable compiler path:
 - `apg package <file> --target web|desktop|mobile|container --out <dir> --json`
   emits `apg.package-report.v1`, writes a generated Python application package,
   attaches release evidence, and adds profile-specific launch/manifest files;
+  with `--catalog <capability-root-or-catalog.json>`, package creation stops
+  before writing when release preflight capability resolution fails;
 - `apg package-verify <package-dir> --json` emits
   `apg.package-verification-report.v1` by validating an existing package
   directory's manifest, release evidence, generated runtime contracts, smoke
@@ -972,6 +976,7 @@ Supported graph kinds:
 
 ```console
 apg release app.apg --json
+apg release app.apg --catalog /tmp/apg-capability-catalog.json --json
 ```
 
 Emits `apg.release-report.v1` without writing project output. The verifier
@@ -979,7 +984,9 @@ compiles the APG source into a temporary generated application, imports the
 generated app with its sidecars, runs generated `self_test()`, validates
 OpenAPI/component-manifest/route-dispatch contracts, and proves that the
 compiled app exposes `apg.semantic-model.v1` through both artifact and runtime
-surfaces.
+surfaces. When `--catalog` is supplied, release first runs the same capability
+resolution preflight used by lint, validate, and compile; unresolved
+capabilities fail before temporary generation.
 
 ### `apg parser-golden`
 
@@ -1069,6 +1076,7 @@ paths, generator backends, and optional IDE/LSP dependencies.
 ```console
 apg package app.apg --target desktop --out dist
 apg package app.apg --target mobile --out dist
+apg package app.apg --catalog /tmp/apg-capability-catalog.json --target web --out dist --json
 ```
 
 Runs package validation, signing posture checks, release evidence generation,
@@ -1076,7 +1084,10 @@ and target-specific smoke checks.
 The current executable contract emits `apg.package-report.v1` and writes a
 package directory containing generated Python artifacts, `package_manifest.json`,
 `release_report.json`, and profile-specific files such as `run_web.py`,
-`run_desktop.py`, `mobile_profile.json`, or `container_profile.json`.
+`run_desktop.py`, `mobile_profile.json`, or `container_profile.json`. When
+`--catalog` is supplied, the package command passes it into release evidence
+preflight and does not create a package directory if capability resolution
+fails.
 `apg package-verify <package-dir> --json` emits
 `apg.package-verification-report.v1` for an existing package directory. It
 validates package metadata, release evidence, generated runtime contracts,

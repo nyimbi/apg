@@ -14,15 +14,18 @@ from compiler.release import build_release_report
 @click.command(name="release")
 @click.argument("source_file", type=click.Path(path_type=Path))
 @click.option("--target", default="python", help="Release target to verify")
+@click.option("--catalog", type=click.Path(path_type=Path), default=None, help="Capability contract root or local apg.capability-catalog.v1 file")
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.release-report.v1 JSON")
-def release(source_file: Path, target: str, as_json: bool) -> None:
+def release(source_file: Path, target: str, catalog: Path | None, as_json: bool) -> None:
 	"""Compile source and emit generated application release evidence."""
 	if not source_file.exists():
 		raise click.ClickException(f"APG source file not found: {source_file}")
 	if not source_file.is_file():
 		raise click.ClickException(f"APG release expects a file: {source_file}")
+	if catalog is not None and not catalog.exists():
+		raise click.ClickException(f"Capability catalog not found: {catalog}")
 
-	report = build_release_report(source_file, target=target)
+	report = build_release_report(source_file, target=target, catalog=catalog)
 	if as_json:
 		click.echo(json.dumps(report, indent=2, sort_keys=True))
 	else:

@@ -1865,6 +1865,42 @@ def test_cli_release_text_summarizes_evidence(tmp_path):
 	assert "self-test=ok" in result.output
 
 
+def test_cli_release_accepts_local_capability_catalog_preflight(tmp_path):
+	source = tmp_path / "capability.apg"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "audit_log")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["release", str(source), "--catalog", str(catalog), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.release-report.v1"
+	assert report["ok"] is True
+	assert report["preflight"]["checked"] is True
+	assert report["preflight"]["catalog_kind"] == "local_catalog"
+	assert report["preflight"]["matched_capabilities"] == [
+		{"name": "AuditLog", "matched_key": "audit_log"}
+	]
+	assert report["generated"]["file_count"] > 0
+
+
+def test_cli_release_blocks_unresolved_catalog_capability_before_generation(tmp_path):
+	source = tmp_path / "capability.apg"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "customer_master")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["release", str(source), "--catalog", str(catalog), "--json"])
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.release-report.v1"
+	assert report["ok"] is False
+	assert report["preflight"]["checked"] is True
+	assert report["preflight"]["catalog_kind"] == "local_catalog"
+	assert report["generated"] == {}
+	assert any("APG0901" in error for error in report["errors"])
+
+
 def test_cli_baseline_json_audits_numbered_examples():
 	result = CliRunner().invoke(cli, ["baseline", str(REPO_ROOT / "examples"), "--json"])
 
@@ -2059,6 +2095,48 @@ def test_cli_package_json_writes_executable_profile(tmp_path):
 	)
 	assert self_test.returncode == 0, self_test.stderr
 	assert json.loads(self_test.stdout)["passed"] is True
+
+
+def test_cli_package_accepts_local_capability_catalog_preflight(tmp_path):
+	source = tmp_path / "capability.apg"
+	out_dir = tmp_path / "dist"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "audit_log")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(
+		cli,
+		["package", str(source), "--target", "web", "--catalog", str(catalog), "--out", str(out_dir), "--json"],
+	)
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	package_dir = Path(report["output_dir"])
+	assert report["format"] == "apg.package-report.v1"
+	assert report["ok"] is True
+	assert report["catalog"] == str(catalog)
+	assert report["release"]["preflight"]["catalog_kind"] == "local_catalog"
+	assert (package_dir / "package_manifest.json").exists()
+	assert (package_dir / "release_report.json").exists()
+
+
+def test_cli_package_blocks_unresolved_catalog_capability_before_writing(tmp_path):
+	source = tmp_path / "capability.apg"
+	out_dir = tmp_path / "dist"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "customer_master")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(
+		cli,
+		["package", str(source), "--target", "web", "--catalog", str(catalog), "--out", str(out_dir), "--json"],
+	)
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.package-report.v1"
+	assert report["ok"] is False
+	assert report["output_dir"] == ""
+	assert not out_dir.exists()
+	assert any("APG0901" in error for error in report["errors"])
 
 
 def test_cli_capabilities_publish_plan_validates_package_without_writing_catalog(tmp_path):

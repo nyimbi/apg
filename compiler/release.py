@@ -10,9 +10,10 @@ from typing import Any
 
 from .compiler import APGCompiler, CodeGenConfig, CompilationResult
 from .code_generator import CodeGenerator
+from .linting import lint_path
 
 
-def build_release_report(source_file: Path, target: str = "python") -> dict[str, Any]:
+def build_release_report(source_file: Path, target: str = "python", catalog: Path | None = None) -> dict[str, Any]:
 	"""Compile APG source and verify generated application release evidence."""
 	normalized_target = CodeGenerator.normalize_target(target)
 	report: dict[str, Any] = {
@@ -20,6 +21,7 @@ def build_release_report(source_file: Path, target: str = "python") -> dict[str,
 		"ok": False,
 		"source": str(source_file),
 		"target": normalized_target,
+		"preflight": _empty_preflight_report(catalog),
 		"generated": {},
 		"evidence": {},
 		"errors": [],
@@ -29,6 +31,11 @@ def build_release_report(source_file: Path, target: str = "python") -> dict[str,
 	if normalized_target != "python":
 		report["errors"].append(f"APG release target must be 'python', not {target!r}")
 		return report
+	if catalog is not None:
+		report["preflight"] = _catalog_preflight_report(source_file, catalog)
+		if not report["preflight"]["ok"]:
+			report["errors"].extend(report["preflight"]["errors"])
+			return report
 
 	compiler = APGCompiler(CodeGenConfig(target_language=normalized_target))
 	result = compiler.compile_file(source_file, target_language=normalized_target)
@@ -49,6 +56,38 @@ def build_release_report(source_file: Path, target: str = "python") -> dict[str,
 	report["warnings"].extend(report["evidence"].get("warnings", []))
 	report["ok"] = not report["errors"] and bool(report["evidence"].get("self_test", {}).get("passed"))
 	return report
+
+
+def _empty_preflight_report(catalog: Path | None) -> dict[str, Any]:
+	return {
+		"checked": catalog is not None,
+		"ok": catalog is None,
+		"catalog": str(catalog) if catalog is not None else None,
+		"catalog_kind": None,
+		"errors": [],
+	}
+
+
+def _catalog_preflight_report(source_file: Path, catalog: Path) -> dict[str, Any]:
+	lint_report = lint_path(source_file, catalog=catalog)
+	catalog_report = lint_report.get("capability_catalog", {})
+	errors = [
+		f"{diagnostic.get('code')}: {diagnostic.get('message')}"
+		for diagnostic in lint_report.get("diagnostics", [])
+		if diagnostic.get("severity") == "error"
+	]
+	return {
+		"checked": True,
+		"ok": bool(lint_report.get("ok")),
+		"catalog": str(catalog),
+		"catalog_kind": catalog_report.get("catalog_kind"),
+		"contract_count": catalog_report.get("contract_count", 0),
+		"declared_capabilities": catalog_report.get("declared_capabilities", []),
+		"matched_capabilities": catalog_report.get("matched_capabilities", []),
+		"missing_capabilities": catalog_report.get("missing_capabilities", []),
+		"errors": errors,
+		"lint": lint_report,
+	}
 
 
 def _generated_summary(result: CompilationResult) -> dict[str, Any]:

@@ -16,6 +16,55 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:55 EAT
+
+Catalog-aware release and package preflight slice:
+
+- Added `catalog` support to `compiler.release.build_release_report()` so
+  release evidence can run a no-write capability catalog preflight before
+  temporary generation.
+- Added `apg release --catalog <capability-root-or-catalog.json>` and exposed
+  preflight evidence in `apg.release-report.v1`.
+- Added `catalog` support to `compiler.packager.build_package_report()` and
+  `apg package --catalog <capability-root-or-catalog.json>` so package creation
+  stops before writing when release preflight capability resolution fails.
+- Added focused CLI regression coverage for successful and failing local
+  catalog preflight through release and package commands.
+- Updated tooling and developer docs to show catalog-aware release/package
+  commands.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/release.py
+  cli/release_command.py compiler/packager.py cli/package_command.py
+  compiler/evidence_bundle.py tests/test_compiler_baseline.py` -> passed.
+- `./.venv/bin/pytest -q
+  tests/test_compiler_baseline.py::test_cli_release_json_emits_generated_application_evidence_without_output
+  tests/test_compiler_baseline.py::test_cli_release_accepts_local_capability_catalog_preflight
+  tests/test_compiler_baseline.py::test_cli_release_blocks_unresolved_catalog_capability_before_generation
+  tests/test_compiler_baseline.py::test_cli_package_json_writes_executable_profile
+  tests/test_compiler_baseline.py::test_cli_package_accepts_local_capability_catalog_preflight
+  tests/test_compiler_baseline.py::test_cli_package_blocks_unresolved_catalog_capability_before_writing`
+  -> 6 passed.
+- `git diff --check -- compiler/release.py cli/release_command.py
+  compiler/packager.py cli/package_command.py compiler/evidence_bundle.py
+  tests/test_compiler_baseline.py docs/tooling.md docs/developer_guide.md
+  docs/progress_log.md` -> passed.
+- `./.venv/bin/apg lint --audit-fixtures --json` -> passed with 6/6 fixtures,
+  0 blocking gaps.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109
+  valid contracts and 0 errors.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0
+  blocking gaps, and 0 errors.
+- `./.venv/bin/pytest -q tests/test_tooling_audit.py
+  tests/test_repository_hygiene.py` -> 20 passed.
+
+Known remaining gaps:
+
+- Release and package now consume local catalog evidence. Evidence bundle still
+  needs a catalog option to pass the same preflight through its full
+  release/package/deployment/publish orchestration.
+
 ### 2026-05-29 05:47 EAT
 
 Catalog-aware compile preflight slice:

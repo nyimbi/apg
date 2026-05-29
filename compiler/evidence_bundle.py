@@ -227,6 +227,7 @@ def _release_summary(report: dict[str, Any]) -> dict[str, Any]:
 		"format": report.get("format"),
 		"ok": report.get("ok"),
 		"target": report.get("target"),
+		"preflight": report.get("preflight", {}),
 		"generated_file_count": report.get("generated", {}).get("file_count", 0),
 		"self_test": evidence.get("self_test", {}),
 		"contracts": evidence.get("contracts", {}),

@@ -13,7 +13,12 @@ from .release import build_release_report
 SUPPORTED_PACKAGE_TARGETS = ("python", "web", "desktop", "mobile", "container")
 
 
-def build_package_report(source_file: Path, target: str = "web", out_dir: Path | None = None) -> dict[str, Any]:
+def build_package_report(
+	source_file: Path,
+	target: str = "web",
+	out_dir: Path | None = None,
+	catalog: Path | None = None,
+) -> dict[str, Any]:
 	"""Compile, verify, and package an APG application profile."""
 	profile = _normalize_package_target(target)
 	output_root = Path(out_dir or "dist")
@@ -22,6 +27,7 @@ def build_package_report(source_file: Path, target: str = "web", out_dir: Path |
 		"ok": False,
 		"source": str(source_file),
 		"target": profile,
+		"catalog": str(catalog) if catalog is not None else None,
 		"output_dir": "",
 		"manifest_path": "",
 		"release": {},
@@ -38,7 +44,7 @@ def build_package_report(source_file: Path, target: str = "web", out_dir: Path |
 		)
 		return report
 
-	release_report = build_release_report(source_file, target="python")
+	release_report = build_release_report(source_file, target="python", catalog=catalog)
 	report["release"] = _release_summary(release_report)
 	report["warnings"].extend(str(warning) for warning in release_report.get("warnings", []))
 	if not release_report.get("ok"):
@@ -90,6 +96,7 @@ def _release_summary(release_report: dict[str, Any]) -> dict[str, Any]:
 		"format": release_report.get("format"),
 		"ok": release_report.get("ok"),
 		"target": release_report.get("target"),
+		"preflight": release_report.get("preflight", {}),
 		"generated_file_count": release_report.get("generated", {}).get("file_count", 0),
 		"self_test": evidence.get("self_test", {}),
 		"semantic_model": evidence.get("semantic_model", {}),
