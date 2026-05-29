@@ -1,0 +1,67 @@
+"""Aggregate tooling audit contract coverage."""
+
+from __future__ import annotations
+
+from compiler.tooling_audit import (
+	audit_cli_surface_contracts,
+	audit_studio_designer_surface,
+	audit_tooling_fixtures,
+)
+
+
+def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
+	report = audit_tooling_fixtures()
+
+	assert report["format"] == "apg.tooling-fixture-audit.v1"
+	assert report["ok"] is True
+	surfaces = {surface["name"]: surface for surface in report["surfaces"]}
+	for surface_name in {
+		"parser_golden",
+		"diagnostics",
+		"lint",
+		"formatter",
+		"drift",
+		"semantic_model",
+		"graph",
+		"language_server",
+		"nl_plan",
+		"migration",
+		"release_evidence",
+		"cli_surface",
+		"ide_integration",
+		"studio_designer",
+	}:
+		assert surfaces[surface_name]["ok"] is True
+		assert surfaces[surface_name]["format_ok"] is True
+	assert report["summary"]["surface_count"] == 14
+	assert report["summary"]["blocking_gap_count"] == 0
+
+
+def test_cli_surface_audit_tracks_documented_command_groups():
+	report = audit_cli_surface_contracts()
+
+	assert report["format"] == "apg.cli-surface-audit.v1"
+	assert report["ok"] is True
+	assert "compile" in report["registered_commands"]
+	assert "language-server" in report["registered_commands"]
+	assert "package-verify" in report["registered_commands"]
+	assert "tooling" in report["registered_commands"]
+	assert report["missing_commands"] == []
+	groups = {group["command"]: group for group in report["command_groups"]}
+	assert groups["capabilities"]["missing_subcommands"] == []
+	assert groups["deployment"]["missing_subcommands"] == []
+	assert groups["studio"]["missing_subcommands"] == []
+	assert report["summary"]["blocking_gap_count"] == 0
+
+
+def test_studio_designer_audit_proves_snapshot_and_dry_run_edit():
+	report = audit_studio_designer_surface()
+
+	assert report["format"] == "apg.studio-surface-audit.v1"
+	assert report["ok"] is True
+	checks = {check["name"]: check for check in report["checks"]}
+	assert checks["snapshot"]["ok"] is True
+	assert checks["snapshot"]["panel_count"] >= 8
+	assert checks["plan_edit"]["ok"] is True
+	assert checks["plan_edit"]["changed"] is True
+	assert checks["plan_edit"]["written"] is False

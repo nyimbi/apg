@@ -104,9 +104,12 @@ APG currently has an executable compiler path:
   `apg.release-evidence-fixture-audit.v1` by running checked-in verifier
   fixtures across web, desktop, mobile, and container profiles;
 - `apg tooling audit --json` emits `apg.tooling-fixture-audit.v1` by running
-  every checked-in compiler tooling fixture catalog as one CI-friendly gate:
-  parser-golden, diagnostics, lint, formatter, drift, semantic model, graph,
-  language-server, natural-language planning, migrations, and release evidence;
+  every checked-in compiler tooling fixture catalog plus the non-fixture CLI,
+  IDE, and Studio contracts as one CI-friendly gate: parser-golden,
+  diagnostics, lint, formatter, drift, semantic model, graph, language-server,
+  natural-language planning, migrations, release evidence, top-level command
+  registration, required command-group subcommands, VS Code integration, and
+  Studio snapshot/edit-planning surfaces;
 - `apg language-server <file> --check --json` emits
   `apg.language-server-check.v1` from the shared semantic model and formatter,
   proving editor-facing diagnostics, completions, definitions, references,

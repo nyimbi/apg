@@ -16,6 +16,35 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 04:42 EAT
+
+Aggregate tooling audit closure slice:
+
+- Extended `apg tooling audit --json` beyond fixture-backed compiler catalogs
+  so it now also proves the documented top-level CLI command surface, required
+  command-group subcommands, VS Code IDE integration, and Studio snapshot/edit
+  planning surfaces.
+- Added `apg.cli-surface-audit.v1` and `apg.studio-surface-audit.v1` reports
+  inside the aggregate `apg.tooling-fixture-audit.v1` output.
+- Added focused tests that assert the aggregate audit covers parser, diagnostic,
+  lint, formatter, drift, semantic-model, graph, language-server, natural
+  language planning, migration, release-evidence, CLI, IDE, and Studio surfaces.
+- Updated `docs/tooling.md` so the current executable baseline for
+  `apg tooling audit` matches the wider implemented gate.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/tooling_audit.py tests/test_tooling_audit.py` -> passed.
+- `./.venv/bin/pytest -q tests/test_tooling_audit.py tests/test_enhanced_cli.py` -> 6 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0 blocking gaps, and 0 errors.
+- `git diff --check -- compiler/tooling_audit.py tests/test_tooling_audit.py docs/tooling.md docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- The audit now proves command registration and designer/IDE surface contracts;
+  future slices should keep pushing individual command behavior from fixture
+  coverage into deeper end-to-end runtime evidence where that is still thin.
+
 ### 2026-05-29 04:29 EAT
 
 APG language documentation slice:
