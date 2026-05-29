@@ -16,6 +16,64 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 19:53 EAT
+
+VIDC video-conferencing runtime implementation-depth slice:
+
+- Converted `capabilities/common/vidc` from generated materialized record
+  scaffolding into a domain-specific video meeting runtime package.
+- Added `video_runtime.py` with deterministic IDs, room/meeting/participant/
+  recording status vocabularies, participant role validation, rule
+  required-action extraction, UTC timestamps, and serializable records for
+  meeting rooms, meetings, participants, recordings, captions, and audit
+  events.
+- Replaced the generic record model with meeting room, meeting, participant,
+  recording, caption, and audit-event records.
+- Replaced generic service behavior with `VidcService` lifecycle methods for
+  tenant-scoped room creation, accountable host enforcement, external guest
+  policy checks, recording consent/encryption gates, large meeting review,
+  participant tracking, recording creation, caption generation, meeting closure,
+  dashboard summaries, compatibility records, and audit events.
+- Expanded API and view helpers so VIDC exposes video status, meeting console,
+  room manager, participant panel, recording library, caption workbench,
+  analytics, settings, route, rule, and theme composition surfaces.
+- Rewrote `cap_spec.md` around current executable VIDC behavior, adapter
+  boundaries, UI surfaces, theme metadata, known non-goals, and proof commands.
+- Replaced generated package tests with focused lifecycle, package-publish,
+  guardrail, and view-model tests.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/vidc` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/vidc/__init__.py
+  capabilities/common/vidc/models.py capabilities/common/vidc/video_runtime.py
+  capabilities/common/vidc/service.py capabilities/common/vidc/api.py
+  capabilities/common/vidc/views.py
+  capabilities/common/vidc/capability_contract.py capabilities/common/vidc/app.py
+  capabilities/common/vidc/test_capability_contract.py
+  capabilities/common/vidc/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -c "import importlib; ..."` for VIDC `video_runtime`,
+  service, API, views, and capability contract passed with `vidc imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/vidc/test_capability_contract.py
+  capabilities/common/vidc/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/vidc --json` passed with `vidc` classified as
+  `domain_specific`, `video_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/vidc --json`
+  passed with `ok: true`, warnings empty, and side-effect-free catalog patch
+  evidence.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 105
+  domain-specific packages, 4 materialized-baseline packages, 0 mixed
+  implementations, 0 contract-only packages, 919 custom Python files, 0 errors,
+  and 4 warnings; the next implementation-depth target is `walt`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
 ### 2026-05-29 19:47 EAT
 
 USRM user-management runtime implementation-depth slice:
