@@ -132,3 +132,59 @@ class ExecutionPlan:
 			"approvals_required": [dict(item) for item in self.approvals_required],
 			"estimated_cost_limit": self.estimated_cost_limit,
 		}
+
+
+@dataclass(frozen=True)
+class RuntimeApprovalRequest:
+	"""Governed request to enable an external agent runtime."""
+
+	id: str
+	tenant_id: str
+	runtime_name: str
+	kind: str
+	requested_by: str
+	workspace_runtime: bool = False
+	sandbox_policy: str | None = None
+	capabilities: tuple[str, ...] = ()
+	cost_limit: float | None = None
+	decision: str = "pending"
+	reviewer: str | None = None
+	notes: str | None = None
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"runtime_name": self.runtime_name,
+			"kind": self.kind,
+			"requested_by": self.requested_by,
+			"workspace_runtime": self.workspace_runtime,
+			"sandbox_policy": self.sandbox_policy,
+			"capabilities": list(self.capabilities),
+			"cost_limit": self.cost_limit,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+		}
+
+
+@dataclass(frozen=True)
+class AgentAuditEvent:
+	"""Tenant-scoped evidence event for AGNT lifecycle changes."""
+
+	id: str
+	tenant_id: str
+	event_type: str
+	subject_id: str
+	message: str
+	evidence: dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_type": self.event_type,
+			"subject_id": self.subject_id,
+			"message": self.message,
+			"evidence": dict(self.evidence),
+		}

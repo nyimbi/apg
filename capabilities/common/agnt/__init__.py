@@ -47,12 +47,13 @@ def register_capability() -> dict[str, Any]:
 		"capabilities": {
 			"agent_registry": "Register first-class AI agents with model, runtime, tools, memory, and IO contracts",
 			"runtime_adapters": "Select fast-changing Codex, Claude Code, OpenCode, Pi, local, or custom agent backends by configuration",
+			"runtime_approval_governance": "Request and approve external agent runtimes before use",
 			"team_composition": "Compose agents into swarms, teams, and handoff graphs",
 			"handoff_graphs": "Validate agent-to-agent flow edges before execution",
 			"capability_rules": "Evaluate deterministic agent-composition governance rules",
 			"visual_theming": "Apply AI-agent operations theme tokens and components"
 		},
-		"endpoints": {"agents": "/agnt/api/v1/agents", "teams": "/agnt/api/v1/teams", "runtimes": "/agnt/api/v1/runtimes", "executions": "/agnt/api/v1/executions", "memory": "/agnt/api/v1/memory"},
+		"endpoints": {"agents": "/agnt/api/v1/agents", "teams": "/agnt/api/v1/teams", "runtimes": "/agnt/api/v1/runtimes", "runtime_approvals": "/agnt/api/v1/runtime-approvals", "executions": "/agnt/api/v1/executions", "memory": "/agnt/api/v1/memory"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

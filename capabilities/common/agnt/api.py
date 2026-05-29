@@ -28,6 +28,30 @@ def register_runtime(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def request_runtime_approval(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.request_runtime_approval(
+		request_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		runtime_name=str(payload["runtime_name"]),
+		requested_by=str(payload["requested_by"]),
+		kind=str(payload.get("kind") or "external"),
+		workspace_runtime=bool(payload.get("workspace_runtime", False)),
+		sandbox_policy=payload.get("sandbox_policy", "workspace-read"),
+		capabilities=tuple(payload.get("capabilities") or ()),
+		cost_limit=payload.get("cost_limit"),
+	)
+
+
+def decide_runtime_approval(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.decide_runtime_approval(
+		request_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		reviewer=str(payload["reviewer"]),
+		decision=str(payload.get("decision") or "approved"),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
 def register_agent(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.register_agent(
 		agent_id=str(payload["id"]),
@@ -74,3 +98,11 @@ def list_teams(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_runtimes() -> list[dict[str, Any]]:
 	return SERVICE.list_runtimes()
+
+
+def list_runtime_approvals(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_runtime_approvals(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)

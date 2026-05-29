@@ -7,6 +7,7 @@ from typing import Any
 from .agent_composition import AgentCompositionPlanner
 from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .models import AgentDefinition, AgentRuntime, AgentTeam, HandoffEdge
+from .models import AgentAuditEvent, RuntimeApprovalRequest
 
 
 class AgntService:
@@ -16,6 +17,8 @@ class AgntService:
 		self._agents: dict[str, AgentDefinition] = {}
 		self._runtimes: dict[str, AgentRuntime] = {}
 		self._teams: dict[str, AgentTeam] = {}
+		self._runtime_approvals: dict[str, RuntimeApprovalRequest] = {}
+		self._events: list[AgentAuditEvent] = []
 		self._planner = AgentCompositionPlanner()
 		for runtime in _default_runtimes():
 			self._runtimes[runtime.name] = runtime
@@ -57,10 +60,128 @@ class AgntService:
 			cost_limit=cost_limit,
 		)
 		self._runtimes[name] = runtime
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="runtime_registered",
+			subject_id=name,
+			message=f"Registered agent runtime {name}.",
+			evidence={"kind": kind, "external_runtime": external_runtime, "workspace_runtime": workspace_runtime},
+		)
 		return runtime.to_dict()
 
 	def list_runtimes(self) -> list[dict[str, Any]]:
 		return [runtime.to_dict() for runtime in sorted(self._runtimes.values(), key=lambda item: item.name)]
+
+	def request_runtime_approval(
+		self,
+		request_id: str,
+		tenant_id: str,
+		runtime_name: str,
+		requested_by: str,
+		kind: str = "external",
+		workspace_runtime: bool = False,
+		sandbox_policy: str | None = "workspace-read",
+		capabilities: list[str] | tuple[str, ...] | None = None,
+		cost_limit: float | None = None,
+	) -> dict[str, Any]:
+		self._enforce_runtime_policy(
+			tenant_id=tenant_id,
+			registered=True,
+			workspace_runtime=workspace_runtime,
+			sandbox_policy_attached=bool(sandbox_policy),
+			external_runtime=False,
+			approval_recorded=True,
+		)
+		if not runtime_name:
+			raise ValueError("runtime_name is required")
+		if not requested_by:
+			raise ValueError("requested_by is required")
+		request = RuntimeApprovalRequest(
+			id=request_id,
+			tenant_id=tenant_id,
+			runtime_name=runtime_name,
+			kind=kind,
+			requested_by=requested_by,
+			workspace_runtime=workspace_runtime,
+			sandbox_policy=sandbox_policy,
+			capabilities=tuple(capabilities or ()),
+			cost_limit=cost_limit,
+		)
+		self._runtime_approvals[request_id] = request
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="runtime_approval_requested",
+			subject_id=request_id,
+			message=f"Requested approval for external runtime {runtime_name}.",
+			evidence={"runtime_name": runtime_name, "requested_by": requested_by},
+		)
+		return request.to_dict()
+
+	def decide_runtime_approval(
+		self,
+		request_id: str,
+		tenant_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		request = self._runtime_approvals.get(request_id)
+		if request is None or request.tenant_id != tenant_id:
+			raise KeyError(f"unknown runtime approval request for tenant: {request_id}")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("runtime approval decision must be approved or rejected")
+		if not reviewer:
+			raise ValueError("reviewer is required")
+		if not notes:
+			raise ValueError("approval notes are required")
+		decided = RuntimeApprovalRequest(
+			id=request.id,
+			tenant_id=request.tenant_id,
+			runtime_name=request.runtime_name,
+			kind=request.kind,
+			requested_by=request.requested_by,
+			workspace_runtime=request.workspace_runtime,
+			sandbox_policy=request.sandbox_policy,
+			capabilities=request.capabilities,
+			cost_limit=request.cost_limit,
+			decision=decision,
+			reviewer=reviewer,
+			notes=notes,
+		)
+		self._runtime_approvals[request_id] = decided
+		if decision == "approved":
+			self.register_runtime(
+				name=request.runtime_name,
+				kind=request.kind,
+				approved=True,
+				workspace_runtime=request.workspace_runtime,
+				external_runtime=True,
+				sandbox_policy=request.sandbox_policy,
+				capabilities=request.capabilities,
+				cost_limit=request.cost_limit,
+				tenant_id=tenant_id,
+			)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="runtime_approval_decided",
+			subject_id=request_id,
+			message=f"Runtime approval {request_id} was {decision}.",
+			evidence={"runtime_name": request.runtime_name, "reviewer": reviewer},
+		)
+		return decided.to_dict()
+
+	def list_runtime_approvals(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		requests = list(self._runtime_approvals.values())
+		if tenant_id is not None:
+			requests = [request for request in requests if request.tenant_id == tenant_id]
+		return [request.to_dict() for request in sorted(requests, key=lambda item: item.id)]
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		events = list(self._events)
+		if tenant_id is not None:
+			events = [event for event in events if event.tenant_id == tenant_id]
+		return [event.to_dict() for event in events]
 
 	def register_agent(
 		self,
@@ -100,6 +221,13 @@ class AgntService:
 			status=status,
 		)
 		self._agents[agent_id] = agent
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="agent_registered",
+			subject_id=agent_id,
+			message=f"Registered agent {name}.",
+			evidence={"runtime": runtime, "model": model},
+		)
 		return agent.to_dict()
 
 	def list_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -138,6 +266,13 @@ class AgntService:
 			parallel_execution_enabled=parallel_execution_enabled,
 		)
 		self._teams[team_id] = team
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="team_registered",
+			subject_id=team_id,
+			message=f"Registered agent team {name}.",
+			evidence={"agent_count": len(agent_ids), "handoff_count": len(edges)},
+		)
 		return team.to_dict()
 
 	def list_teams(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -152,12 +287,20 @@ class AgntService:
 			raise KeyError(f"unknown agent team: {team_id}")
 		if tenant_id is not None and team.tenant_id != tenant_id:
 			raise KeyError(f"unknown agent team for tenant: {team_id}")
-		return self._planner.build_plan(
+		plan = self._planner.build_plan(
 			team=team,
 			agents=self._agents,
 			runtimes=self._runtimes,
 			objective=objective,
 		).to_dict()
+		self._record_event(
+			tenant_id=team.tenant_id,
+			event_type="execution_plan_built",
+			subject_id=plan["id"],
+			message=f"Built execution plan for team {team.id}.",
+			evidence={"step_count": len(plan["steps"]), "objective": objective},
+		)
+		return plan
 
 	def composition_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		contract = self.describe(tenant_id)
@@ -168,9 +311,15 @@ class AgntService:
 			"agent_count": len(self.list_agents(tenant_id)),
 			"team_count": len(self.list_teams(tenant_id)),
 			"runtime_count": len(self._runtimes),
+			"runtime_approval_count": len(self.list_runtime_approvals(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"routes": contract["ui"]["routes"],
 			"theme": contract["theme"],
 		}
+
+	def _enforce_tenant(self, tenant_id: str) -> None:
+		result = self.evaluate({"tenant_context_present": bool(tenant_id)})
+		_raise_if_blocked(result)
 
 	def _enforce_agent_policy(
 		self,
@@ -229,6 +378,25 @@ class AgntService:
 		_raise_if_blocked(result)
 		if unknown_agents:
 			raise KeyError(f"unknown team agent(s): {', '.join(unknown_agents)}")
+
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		evidence: dict[str, Any] | None = None,
+	) -> None:
+		self._events.append(
+			AgentAuditEvent(
+				id=f"agnt-event-{len(self._events) + 1}",
+				tenant_id=tenant_id,
+				event_type=event_type,
+				subject_id=subject_id,
+				message=message,
+				evidence=dict(evidence or {}),
+			)
+		)
 
 
 def _default_runtimes() -> tuple[AgentRuntime, ...]:

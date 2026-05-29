@@ -12765,3 +12765,24 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/accs --json` passed with `ok: true`; ACCS remains `domain_specific`, with 0 baseline markers and 0 warnings.
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/accs --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
 - `git diff --check -- capabilities/common/accs` passed with no whitespace errors.
+
+### 2026-05-29 23:25 EAT
+
+AGNT external-runtime approval lifecycle slice:
+
+- Added `capabilities/common/agnt/SPECIFICATION.md` and `capabilities/common/agnt/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Extended AGNT models with runtime approval requests and tenant-scoped audit events.
+- Extended AGNT service behavior so tenants can request approval for external runtimes, reviewers can approve or reject requests, approved requests register provider-neutral runtimes, and lifecycle changes emit audit events.
+- Extended AGNT API helpers and view models with runtime-approval, approval-queue, governance-evidence, and audit-event surfaces.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive request-approve-register-agent-team-plan coverage and negative direct-unapproved-runtime, missing-sandbox, rejected-runtime, and tenant-mismatch guardrail coverage.
+- Updated `cap_spec.md` with the current runtime-approval lifecycle and focused proof commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/agnt/__init__.py capabilities/common/agnt/models.py capabilities/common/agnt/agent_composition.py capabilities/common/agnt/service.py capabilities/common/agnt/api.py capabilities/common/agnt/views.py capabilities/common/agnt/capability_contract.py capabilities/common/agnt/app.py capabilities/common/agnt/test_capability_contract.py capabilities/common/agnt/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/agnt` returned no stale AGNT materialized markers.
+- `./.venv/bin/pytest -q capabilities/common/agnt/test_capability_contract.py capabilities/common/agnt/tests` passed with 10 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/agnt --json` passed with `ok: true`; AGNT remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/agnt --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
+- `git diff --check -- capabilities/common/agnt` passed with no whitespace errors.

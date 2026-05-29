@@ -1,7 +1,9 @@
 """Regression coverage for the AGNT executable capability contract."""
 
 from agents import DEFAULT_AGENT_INTEGRATIONS
-from capabilities.common.agnt import register_capability
+import pytest
+
+from capabilities.common.agnt import api, register_capability, views
 from capabilities.common.agnt.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.agnt.service import AgntService
 
@@ -38,6 +40,7 @@ def test_registration_includes_full_agent_capability_contract():
 	assert registration["ui_components"]["runtimes"] == "/agnt/runtimes"
 	assert "agnt:run" in registration["permissions"]
 	assert "runtime_adapters" in registration["capabilities"]
+	assert "runtime_approval_governance" in registration["capabilities"]
 
 
 def test_service_registers_agents_teams_and_execution_plans():
@@ -111,3 +114,135 @@ def test_service_blocks_invalid_agent_team_and_runtime_changes():
 		assert "team_agent_required" in str(exc)
 	else:
 		raise AssertionError("expected empty team to be blocked")
+
+
+def test_external_runtime_approval_lifecycle_enables_new_provider():
+	service = AgntService()
+	request = service.request_runtime_approval(
+		request_id="runtime-request-1",
+		tenant_id="tenant-agnt",
+		runtime_name="future_agent",
+		requested_by="platform-owner",
+		kind="external",
+		workspace_runtime=True,
+		sandbox_policy="workspace-write",
+		capabilities=["code", "analysis"],
+		cost_limit=12.5,
+	)
+	queue = views.runtime_approval_queue_model(service, "tenant-agnt")
+
+	assert request["decision"] == "pending"
+	assert queue["pending_requests"][0]["runtime_name"] == "future_agent"
+
+	with pytest.raises(PermissionError, match="external_runtime_approval_required"):
+		service.register_runtime(
+			name="blocked_future_agent",
+			tenant_id="tenant-agnt",
+			kind="external",
+			external_runtime=True,
+			approved=False,
+			workspace_runtime=True,
+			sandbox_policy="workspace-write",
+		)
+
+	decision = service.decide_runtime_approval(
+		request_id=request["id"],
+		tenant_id="tenant-agnt",
+		reviewer="security-reviewer",
+		decision="approved",
+		notes="Sandbox and cost limits accepted.",
+	)
+	agent = service.register_agent(
+		agent_id="future-builder",
+		tenant_id="tenant-agnt",
+		name="Future Builder",
+		model="future-code-model",
+		runtime="future_agent",
+		system_prompt="Build governed APG slices.",
+		tool_allowlist=["shell"],
+	)
+	team = service.register_team(
+		team_id="future-delivery",
+		tenant_id="tenant-agnt",
+		name="Future Delivery",
+		agent_ids=[agent["id"]],
+	)
+	plan = service.plan_execution(team["id"], "Ship an approved runtime slice.", tenant_id="tenant-agnt")
+	evidence = views.governance_evidence_model(service, "tenant-agnt")
+
+	assert decision["decision"] == "approved"
+	assert plan["runtime_assignments"] == {"future-builder": "future_agent"}
+	assert evidence["summary"]["runtime_approval_count"] == 1
+	assert {event["event_type"] for event in evidence["audit_events"]} >= {
+		"runtime_approval_requested",
+		"runtime_approval_decided",
+		"runtime_registered",
+		"agent_registered",
+		"team_registered",
+		"execution_plan_built",
+	}
+
+
+def test_runtime_approval_blocks_missing_sandbox_rejections_and_tenant_mismatch():
+	service = AgntService()
+
+	with pytest.raises(PermissionError, match="workspace_sandbox_required"):
+		service.request_runtime_approval(
+			request_id="runtime-request-missing-sandbox",
+			tenant_id="tenant-agnt",
+			runtime_name="unsafe_workspace_agent",
+			requested_by="platform-owner",
+			workspace_runtime=True,
+			sandbox_policy=None,
+		)
+
+	request = service.request_runtime_approval(
+		request_id="runtime-request-rejected",
+		tenant_id="tenant-agnt",
+		runtime_name="rejected_agent",
+		requested_by="platform-owner",
+		workspace_runtime=False,
+	)
+
+	with pytest.raises(KeyError, match="unknown runtime approval request for tenant"):
+		service.decide_runtime_approval(
+			request_id=request["id"],
+			tenant_id="other-tenant",
+			reviewer="security-reviewer",
+			decision="approved",
+			notes="Wrong tenant.",
+		)
+
+	decision = service.decide_runtime_approval(
+		request_id=request["id"],
+		tenant_id="tenant-agnt",
+		reviewer="security-reviewer",
+		decision="rejected",
+		notes="Provider risk not accepted.",
+	)
+
+	assert decision["decision"] == "rejected"
+	assert "rejected_agent" not in {runtime["name"] for runtime in service.list_runtimes()}
+
+
+def test_api_helpers_expose_runtime_approval_lifecycle():
+	request = api.request_runtime_approval({
+		"id": "api-runtime-request",
+		"tenant_id": "tenant-api-agnt",
+		"runtime_name": "api_future_agent",
+		"requested_by": "api-owner",
+		"workspace_runtime": True,
+		"sandbox_policy": "workspace-write",
+		"capabilities": ["code"],
+	})
+	decision = api.decide_runtime_approval({
+		"id": request["id"],
+		"tenant_id": request["tenant_id"],
+		"reviewer": "api-security",
+		"decision": "approved",
+		"notes": "API runtime accepted.",
+	})
+
+	assert decision["decision"] == "approved"
+	assert api.list_runtime_approvals(request["tenant_id"])[0]["runtime_name"] == "api_future_agent"
+	assert "runtime_approval_requested" in {event["event_type"] for event in api.list_audit_events(request["tenant_id"])}

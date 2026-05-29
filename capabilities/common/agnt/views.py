@@ -20,6 +20,8 @@ def dashboard_model(
 		"agents": service.list_agents(tenant_id),
 		"teams": service.list_teams(tenant_id),
 		"runtimes": service.list_runtimes(),
+		"runtime_approvals": service.list_runtime_approvals(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
 		"routes": capability_routes(tenant_id),
 		"theme": get_capability_contract(tenant_id)["theme"],
 	}
@@ -42,8 +44,40 @@ def runtime_manager_model(service: AgntService | None = None) -> dict[str, objec
 	service = service or AgntService()
 	return {
 		"runtimes": service.list_runtimes(),
+		"runtime_approvals": service.list_runtime_approvals(),
 		"required_fields": ["name", "kind", "approved", "sandbox_policy"],
 		"known_runtime_names": ["local", "codex", "claude_code", "opencode", "pi"],
+	}
+
+
+def runtime_approval_queue_model(
+	service: AgntService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AgntService()
+	return {
+		"pending_requests": [
+			request for request in service.list_runtime_approvals(tenant_id)
+			if request["decision"] == "pending"
+		],
+		"decided_requests": [
+			request for request in service.list_runtime_approvals(tenant_id)
+			if request["decision"] != "pending"
+		],
+		"actions": ["approve", "reject"],
+		"required_fields": ["reviewer", "decision", "notes"],
+	}
+
+
+def governance_evidence_model(
+	service: AgntService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AgntService()
+	return {
+		"summary": service.composition_summary(tenant_id),
+		"runtime_approvals": service.list_runtime_approvals(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
 	}
 
 
