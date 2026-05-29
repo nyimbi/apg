@@ -11253,3 +11253,17 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 81, materialized baseline packages dropped to 26, mixed packages dropped to 1, contract-only packages remained 1, custom Python files increased to 896, and warning count dropped to 28. The next implementation-depth warning is `kngr`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+
+### 2026-05-29 15:44 EAT
+
+Developer, contributor, and capacity guide consolidation slice:
+
+- Rewrote `docs/developer_guide.md` as the APG internals playbook for developers changing grammar, AST, semantic model, generated Python runtime, capability packages, examples, tooling, and documentation.
+- Rewrote `docs/contributors_guide.md` as the contributor workflow guide for first-30-minute setup, work-packet selection, focused proof, staging discipline, docs/progress-log expectations, review checks, and Lore commits.
+- Rewrote `docs/capacity_development_guide.md` as the capacity builder guide for defining executable capacities, distinguishing capabilities from capacities, composing records/rules/screens/workflows/agents/Bytewax streams, readiness levels, package-backed behavior, parallel development, and review gates.
+- Reduced repeated onboarding prose across the three guides while keeping concrete commands, owner boundaries, packet templates, verification expectations, and contributor handoffs.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 60 local links checked, 46 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors before recording this progress-log entry.

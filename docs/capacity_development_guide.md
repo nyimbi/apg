@@ -1,17 +1,43 @@
 # APG Capacity Development Guide
 
-This guide explains how to build new APG capacities: coherent platform or
-business abilities that combine APG source, capability packages, configuration,
-rules, screens, workflows, AI agents, streaming metadata, generated Python
-applications, tests, docs, and release evidence.
+This guide explains how to build new APG capacities. A capacity is a coherent
+business or platform ability that combines APG source, generated Python,
+capability packages, rules, screens, workflows, AI agents, Bytewax streaming
+metadata, tests, documentation, and release evidence.
 
-Use this guide when the goal is "make APG able to do something new", not merely
-"add a file".
+Use this guide when the goal is to make APG able to do something new, such as
+procurement approval, ledger posting, customer onboarding, device management,
+agentic operations, or integration monitoring.
 
-## Capacity Start Here
+## Capacity Versus Capability
 
-A capacity is a runnable thread of business or platform behavior. Start with
-one event, not with a module inventory.
+A **capability** is a composable unit with a contract and package-backed
+behavior: services provided, services required, configuration, rules, UI
+routes, theme tokens, tests, and publish-plan evidence.
+
+A **capacity** is an executable ability assembled from one or more capabilities
+plus APG language/runtime surfaces.
+
+Example:
+
+```text
+Capacity: Procurement approval automation
+First event: purchase request submitted
+Capabilities: supplier master, budget control, workflow orchestration, audit logging
+Rules: supplier required, amount positive, large request review
+Screens: request workbench, approval queue
+Workflow: draft -> review -> approved -> ordered
+Agent: procurement planner under approval
+Streaming: Bytewax procurement_events -> procurement_alerts
+Evidence: model, compile, smoke test, package tests, publish-plan
+```
+
+Build capacities as vertical slices. Do not create a large module inventory
+before one event compiles and runs.
+
+## Minimum Executable Capacity
+
+A capacity starts with one event:
 
 ```text
 event
@@ -23,539 +49,30 @@ event
   -> README/progress handoff
 ```
 
-The first capacity slice should fit on one screen:
-
-```text
-Capacity:
-First event:
-APG source:
-Primary records:
-Rules:
-Screens:
-Workflow:
-Agents:
-Bytewax streams:
-Capability owners:
-Generated proof:
-Package proof:
-Non-goals:
-Next slice:
-```
-
-Do not build a complete ERP outline before one event compiles. A procurement
-capacity starts with "request submitted", not with every procurement module. A
-finance capacity starts with "journal entered", not with every ledger report.
-An agentic capacity starts with "task assigned to an agent under approval", not
-with every possible model provider.
-
-## Minimum Executable Capacity
-
-A minimum executable capacity has these artifacts:
+Minimum artifacts:
 
 | Artifact | Required content |
 | --- | --- |
-| `examples/<nn>_<capacity>/main.apg` | records, capability uses, rules, screens, workflows, agents, streams, and app composition for one event |
+| `examples/<nn>_<capacity>/main.apg` | records, capabilities, rules, screens, workflows, agents, streams, and app composition for one event |
 | `examples/<nn>_<capacity>/README.md` | readiness level, event path, proof commands, generated-output status, next slice |
-| generated output directory | refreshed only when intentionally compiling examples for review |
-| capability package(s) | domain service/API/view behavior for durable runtime state, not only contract prose |
-| package `cap_spec.md` | current executable behavior, guardrails, adapter boundaries, proof commands |
-| tests/audits | focused compiler/example/package proof that matches the slice |
-| `docs/progress_log.md` | updated when capacity readiness or implementation depth changes |
+| generated output | refreshed only when intentionally compiling examples for review |
+| capability packages | domain service/API/view behavior where durable state is needed |
+| package `cap_spec.md` | executable behavior, guardrails, adapter boundaries, proof commands |
+| tests/audits | focused compiler, example, and package proof |
+| `docs/progress_log.md` | updated when readiness or implementation-depth evidence changes |
 
-The slice is ready to commit when another contributor can clone, run the proof
-commands, and see exactly where to add the next event.
+If a capacity cannot name the first event, APG source path, package owners, and
+proof commands, reduce scope.
 
-## Capacity Build Runbook
+## Capacity Packet Template
 
-Use this runbook for every new capacity:
-
-1. **Name the event.** Use a verb phrase such as `request_submitted`,
-   `journal_posted`, `lead_qualified`, `agent_plan_approved`, or
-   `source_event_alerted`.
-2. **Write the APG source.** Keep it terse and readable; prefer records,
-   relationships, rules, screens, workflows, agents, and Bytewax streams that
-   map directly to the event.
-3. **Inspect semantics.**
-
-   ```bash
-   ./.venv/bin/apg model examples/<nn>_<capacity>/main.apg --json
-   ```
-
-4. **Compile the application.**
-
-   ```bash
-   ./.venv/bin/apg compile examples/<nn>_<capacity>/main.apg --output /tmp/<capacity>-app --verify
-   ./.venv/bin/python /tmp/<capacity>-app/smoke_test.py
-   ```
-
-5. **Deepen one package if needed.**
-
-   ```bash
-   ./.venv/bin/pytest -q capabilities/<domain>/<code>/test_capability_contract.py capabilities/<domain>/<code>/tests
-   ./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
-   ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
-   ```
-
-6. **Document the evidence.** Update the example README, the package spec, and
-   the progress log when readiness changed.
-7. **Commit the slice.** Stage only the capacity files and package files that
-   belong to the packet.
-
-If any step fails, fix the earliest failing layer. Do not patch generated output
-around missing APG meaning.
-
-## Capacity Triage Board
-
-Every capacity should have a visible next slice. Use this board to decide what
-to do next and to let multiple contributors work without collision.
-
-| Readiness gap | Owner | Next slice | Proof |
-| --- | --- | --- | --- |
-| source does not parse | language/compiler owner | narrow APG syntax or fix the source | parser test; `apg model ... --json` |
-| source parses but semantics are missing | semantic owner | expose stable semantic-model keys | `apg model ... --json` |
-| semantics exist but generated app is inert | runtime owner | generated helper, route, manifest, or smoke assertion | `apg compile ... --verify`; smoke test |
-| generated app exists but durable behavior is generic | capability owner | package models, service, API, views, rules, tests | package pytest; implementation audit; publish-plan |
-| rules are prose only | capability owner | deterministic rule inputs and negative tests | package tests; rule evaluation |
-| screens are disconnected | source/runtime owner | route, component, permission, relationship, and theme metadata | semantic model; generated manifest |
-| agents are provider-specific or vague | agent/capability owner | provider-agnostic runtime config, tools, memory, approval rules | model output; package tests |
-| streams are vague | source/runtime owner | Bytewax flow names and event envelopes | model output; generated metadata |
-| contributors cannot extend it | docs owner | README packet, proof commands, next slice | docs audit; diff check |
-
-The board should be represented in the example README or progress-log entry for
-active capacities. A contributor should be able to pick one row, own it, and
-prove it without editing unrelated rows.
-
-## Capacity Review Gate
-
-Review capacity work against executable evidence, not ambition.
-
-| Gate | Must be true before merging |
-| --- | --- |
-| Authoring | APG source is terse, readable, and parseable |
-| Semantics | key records, capabilities, rules, screens, workflows, agents, and streams are inspectable in `apg model` when present |
-| Runtime | generated Python imports and the smoke test proves the changed surface |
-| Capability | package-owned behavior has domain service/API/view code, deterministic guardrails, and publish-plan evidence |
-| Composition | relationships between records, screens, workflows, agents, and capabilities are named rather than implied |
-| Governance | tenant, rule, approval, provider, and integration boundaries are explicit |
-| Handoff | README, package spec, or progress log names proof commands and next gap |
-
-If a capacity only clears the first three gates, label it as an early generated
-capacity and make the package-backed gap explicit. If it clears all gates, the
-capacity is ready for broader examples, deployment profiles, and deeper tests.
-
-## Capacity Expansion Order
-
-Expand capacities in this order so each layer has something real to consume:
-
-1. Event and APG source.
-2. Semantic model visibility.
-3. Generated Python runtime and smoke test.
-4. One domain-specific capability package.
-5. Rule guardrails and negative tests.
-6. Screen composition and theme metadata.
-7. Workflow transitions and generated route/manifest exposure.
-8. AI agent composition with provider-agnostic adapter boundaries.
-9. Bytewax streaming metadata and deterministic local envelopes.
-10. Release evidence, docs, and deployment profile.
-
-This order keeps APG executable while it grows. Skip ahead only when the skipped
-layer is explicitly out of scope for the current capacity.
-
-## Capacity Builder Contract
-
-A capacity is accepted when it gives APG a new executable ability that a second
-contributor can run, inspect, and extend. It is not accepted merely because a
-document lists the desired modules.
-
-```text
-capacity packet
-  -> parseable APG source
-  -> semantic model evidence
-  -> generated Python app evidence
-  -> package-backed capability behavior where durable behavior is needed
-  -> focused tests or audits
-  -> README/progress-log handoff
-```
-
-Every capacity slice must name:
-
-| Required item | Why it matters |
-| --- | --- |
-| Business event | keeps the capacity grounded in something observable |
-| APG source path | shows how an author declares it |
-| Semantic model keys | proves tooling can understand it |
-| Generated routes/helpers/manifests | proves the compiler exposes it |
-| Capability package owners | identifies where durable behavior belongs |
-| Rules and guardrails | makes correctness deterministic and testable |
-| Screens/workflows/agents/streams | shows composition points, not just data |
-| Focused proof commands | lets the next contributor verify before extending |
-| Known non-goals | prevents accidental live integrations or broad rewrites |
-
-If a proposed capacity cannot name those items yet, start with a seed slice
-that makes them visible.
-
-## Build One Executable Thread First
-
-Start every capacity with one event that can travel through APG source,
-generated Python, package-backed behavior, and evidence.
-
-```text
-business event
-  -> APG records/rules/screens/workflows/agents
-  -> semantic model
-  -> generated Python app
-  -> capability package behavior
-  -> focused proof
-  -> progress-log handoff
-```
-
-Do not begin with a broad module list. Begin with the smallest event that proves
-the capacity matters:
-
-| Capacity | First event | First proof |
-| --- | --- | --- |
-| Procurement | request submitted -> rule decision -> approval queue | compile example, smoke route, package rule test |
-| Finance | journal entered -> validation -> posting summary | semantic model, generated app, ledger service test |
-| CRM | lead captured -> qualification rule -> owner assignment | model output, generated screen, package workflow test |
-| AI operations | task assigned -> agent plan -> governed tool decision | agent semantic model, generated manifest, rule test |
-| Streaming | source event -> Bytewax flow metadata -> alert route | model graph, compile, stream metadata assertion |
-
-The first slice is successful when another contributor can answer:
-
-- where the APG source lives;
-- what generated artifact proves it exists;
-- which package owns durable behavior;
-- what rule or workflow protects correctness;
-- which command they should run before extending it.
-
-## Capacity And Capability
-
-A **capability** is a composable unit with a contract: services provided,
-services required, configuration, rules, UI routes, theme, tenant behavior, and
-tests.
-
-A **capacity** is an executable ability built from one or more capabilities plus
-the language/runtime surfaces needed to demonstrate it.
-
-Example:
-
-```text
-Capacity: Procurement approval automation
-  Records: PurchaseRequest, Supplier, BudgetCheck
-  Capability: ProcurementApproval
-  Capability: SupplierMaster
-  Capability: PlatformAudit
-  Rules: supplier_required, amount_positive, large_request_review
-  Screen: ProcurementApprovalWorkbench
-  Workflow: draft -> review -> approved -> ordered
-  Agent: ProcurementPlanner
-  Streaming: Bytewax procurement_events -> procurement_alerts
-  Evidence: compile --verify, generated smoke test, capability contract validation
-```
-
-Build capacities as vertical slices. Each slice should be executable before the
-next slice expands scope.
-
-## What "Effective" Means
-
-A contributor is effective on a capacity when they can answer five questions
-without private context:
-
-- What user or system outcome does the capacity provide?
-- Which APG source file declares it?
-- Which package-backed capabilities implement the durable behavior?
-- Which generated app route, helper, manifest, or smoke test proves it runs?
-- Which focused command should be run before committing the next slice?
-
-If any answer is missing, add the missing contract before adding more behavior.
-Capacity work should reduce ambiguity for the next contributor.
-
-## Capacity Developer Quickstart
-
-Use this path when you need to make a capacity real quickly.
-
-1. Name one business event in plain language.
-2. Write or choose one APG source file that declares the records, rules,
-   screens, workflows, agents, streaming metadata, and capabilities needed for
-   that event.
-3. Run `apg model ... --json` and confirm the event appears as stable semantic
-   data.
-4. Run `apg compile ... --verify` and the generated `smoke_test.py`.
-5. If the event depends on durable package behavior, improve exactly one
-   capability package and prove it with focused tests plus `publish-plan`.
-6. Update the example README with current readiness, proof commands, and next
-   slice.
-7. Update `docs/progress_log.md` when readiness or executable evidence changes.
-
-The quickstart is complete when a second contributor can run one command path
-from APG source to generated Python and see where package behavior should be
-extended next.
-
-## Capacity Design Invariants
-
-Every capacity should preserve these invariants:
-
-| Invariant | Practical rule |
-| --- | --- |
-| Author-first | the APG source should read like a compact business declaration, not generated implementation code |
-| Python-first | generated output targets practical Python artifacts before framework-specific variants |
-| Capability-backed | durable behavior belongs in package contracts and service/API/view helpers, not only in example prose |
-| Rule-visible | guardrails have names, deterministic inputs, and tests |
-| Screen-composed | screens name routes, components, relationships, permissions, and theme expectations |
-| Agent-governed | AI agents name runtime, model, tools, memory, approval, and cost or risk controls |
-| Bytewax-oriented | streaming declarations use Bytewax terminology and event envelopes when stream behavior is present |
-| Tenant-aware | package behavior respects tenant context and ownership boundaries |
-| Evidence-driven | readiness advances only when commands prove the current repository state |
-
-If a proposed capacity violates an invariant, either adjust the slice or record
-the gap explicitly. Do not bury missing governance, rule, or integration
-behavior behind a broad "future work" sentence.
-
-## Definition Of Done For A Capacity Slice
-
-A capacity slice is done when the current repository, not intent, proves the
-next readiness step. Use this checklist before committing:
-
-- APG source exists or the package/service behavior has an explicit consumer.
-- `apg model <source> --json` exposes the relevant records, capabilities,
-  screens, workflows, agents, or streaming metadata when the slice changes APG
-  source.
-- `apg compile <source> --output /tmp/<name> --verify` passes when generated
-  behavior is part of the slice.
-- Generated `smoke_test.py` passes when an application output is produced.
-- Capability package tests, `implementation-audit`, and `publish-plan` pass
-  when durable package behavior changed.
-- The example README or package `cap_spec.md` names current behavior and the
-  next missing executable layer.
-- `docs/progress_log.md` records evidence when capacity readiness, package
-  readiness, or platform burn-down changed.
-- External integrations remain behind explicit adapter boundaries unless the
-  slice intentionally wires and verifies them.
-
-Use focused proof. Run broader baselines when compiler contracts, generated
-output contracts, or shared package contracts changed.
-
-## Capacity Patterns That Scale
-
-Use these repeatable patterns when building ERP, CRM, finance, operations,
-agentic, and integration capacities:
-
-| Pattern | Use when | First slice |
-| --- | --- | --- |
-| Transaction workbench | users submit, review, approve, or reject business documents | records, validation rules, review screen, approval workflow |
-| Master-data registry | users maintain reusable parties, products, assets, accounts, or policies | records, uniqueness rules, CRUD screen, audit event |
-| Operational monitor | systems emit events that require triage | event record, Bytewax metadata, alert rule, monitor screen |
-| AI-assisted planner | an agent proposes actions under governance | agent runtime, tool list, approval rule, plan route |
-| Compliance evidence loop | actions produce evidence for audit or attestation | evidence record, retention rule, report screen, package test |
-| Integration adapter | APG coordinates with an external system | explicit boundary, config contract, deterministic local adapter stub, not live credentials |
-
-Build the first slice of a pattern end to end before adding more entities. A
-small transaction workbench that compiles and has package guardrails is more
-valuable than a full ERP outline that does not run.
-
-## Capacity Factory Loop
-
-Use this loop to build capacities quickly without losing executable grounding:
-
-1. **Sketch the capacity packet.** Name the outcome, source path, packages,
-   public routes, rules, screens, workflows, agents, streaming flows, and proof.
-2. **Write or update one APG example.** Keep it parseable and small enough that
-   contributors can read it end to end.
-3. **Compile to Python.** Generated output is the first serious proof that the
-   capacity is real.
-4. **Attach package-backed behavior.** Scaffold or improve the capability
-   packages that own durable services, rules, APIs, views, and themes.
-5. **Burn down implementation depth.** Use `implementation-audit` to ensure the
-   packages are not only materialized baselines.
-6. **Expose composition.** Ensure screens, workflows, agents, and Bytewax
-   metadata appear in the semantic model and generated manifests.
-7. **Record evidence.** Update the example README, capacity docs, and
-   `docs/progress_log.md`.
-8. **Commit the verified slice.** Leave the next contributor a smaller, clearer
-   gap.
-
-The loop is intentionally repetitive. APG becomes useful by repeating it across
-ERP, CRM, finance, operations, agentic, and integration capacities until each
-one has source, generated runtime behavior, package evidence, and documentation.
-
-## Parallel Capacity Development
-
-Capacities can be built quickly in parallel when each contributor owns a
-different durable surface. Use these boundaries:
-
-| Lane | Owns | Must coordinate with |
-| --- | --- | --- |
-| Capacity lead | packet, public names, readiness level, README, progress log | every lane before public names change |
-| APG source owner | `examples/<nn>_<capacity>/main.apg` and author-facing shape | compiler owner before relying on new syntax |
-| Compiler owner | parser, semantic model, generated app surfaces | source owner and runtime owner for semantic keys |
-| Capability owner | one `capabilities/<domain>/<code>/` package | capacity lead for service/rule names |
-| Runtime owner | generated routes, helpers, manifests, smoke tests | compiler owner for generated output contracts |
-| Docs owner | README, guide links, proof commands | all owners for current command evidence |
-
-Safe parallel work:
-
-- one contributor deepens a package while another improves the example README;
-- one contributor adds generated runtime exposure while another adds package
-  guardrail tests;
-- one contributor refreshes docs after another lands compiler behavior;
-- different contributors burn down different capability packages.
-
-Unsafe parallel work without coordination:
-
-- multiple contributors editing `spec/apg.g4` and semantic keys independently;
-- one contributor refreshing example outputs while another changes generator
-  contracts;
-- two contributors changing the same capability service public methods;
-- docs claiming a capacity readiness level before the proof commands exist.
-
-Parallel capacity work should converge through one visible packet and one final
-evidence trail. Speed without convergence creates more work for the next
-contributor.
-
-## Capacity Seed Kit
-
-When starting a new capacity, create a seed that another contributor can extend
-without a meeting. The seed should be small, executable, and explicit about
-what is still missing.
-
-Minimum seed artifacts:
-
-```text
-examples/<nn>_<capacity_name>/main.apg
-examples/<nn>_<capacity_name>/README.md
-examples/<nn>_<capacity_name>/output/
-capabilities/<domain>/<code>/capability_contract.py
-docs/progress_log.md
-```
-
-Minimum seed commands:
-
-```bash
-./.venv/bin/apg model examples/<nn>_<capacity_name>/main.apg --json
-./.venv/bin/apg compile examples/<nn>_<capacity_name>/main.apg --output /tmp/apg-capacity-seed --verify
-./.venv/bin/python /tmp/apg-capacity-seed/smoke_test.py
-./.venv/bin/apg capabilities validate-contracts --json
-```
-
-The README must name:
-
-- the first business event;
-- current readiness level;
-- capability packages that own durable behavior;
-- semantic-model keys expected to exist;
-- generated routes, helpers, or manifests expected to exist;
-- rules, screens, workflows, agents, and Bytewax streams included in the seed;
-- exact proof commands;
-- next slice for package behavior, compiler behavior, or documentation.
-
-Do not seed a capacity with a large directory of disconnected files. Seed one
-path from APG source to generated runtime evidence, then let other contributors
-take adjacent packets.
-
-## Capacity Extension Matrix
-
-Use this matrix to decide the next extension after a seed compiles.
-
-| Current gap | Add next | Prove with |
-| --- | --- | --- |
-| source exists but semantic model is thin | stable semantic-model keys and graph relationships | `apg model ... --json`, `apg graph-suite ... --json` |
-| generated app lacks visible behavior | route/helper/manifest output and smoke assertions | `apg compile ... --verify`, generated `smoke_test.py` |
-| package contract exists but behavior is generic | domain models, service methods, API helpers, view models | focused package tests, implementation audit |
-| rules are documented but not enforced | deterministic rule contexts and guardrail tests | package tests and `apg capabilities evaluate-rules ... --json` |
-| screens exist but composition is unclear | explicit routes, components, permissions, and relationships | semantic model, generated manifests, screen docs |
-| agents exist but governance is unclear | runtime adapter config, tool references, memory, approval rules | semantic model, AGNT package tests, publish-plan |
-| streaming is declared vaguely | Bytewax flow names, event envelopes, input/output topics | model graph, generated metadata, package stream tests |
-| contributors cannot extend it | README packet and progress-log handoff | docs audit and diff check |
-
-Only expand horizontally after the current vertical path is inspectable. A
-capacity that does one event end to end is more useful than a capacity that
-lists twenty modules with no generated proof.
-
-## Two-Hour Capacity Start
-
-Use this sequence when a contributor needs to start a new capacity without
-waiting for a full architecture pass.
-
-1. Name the business event that proves value:
-
-   ```text
-   event -> rule decision -> screen/workflow response -> audit/evidence output
-   ```
-
-2. Create or choose one example directory:
-
-   ```text
-   examples/<nn>_<capacity_name>/main.apg
-   examples/<nn>_<capacity_name>/README.md
-   ```
-
-3. Keep the first APG source narrow. Include only the records, capability
-   contract, rules, screen, workflow, agent, and Bytewax metadata needed to
-   prove that event.
-
-4. Compile to a temporary output directory:
-
-   ```bash
-   ./.venv/bin/apg compile examples/<nn>_<capacity_name>/main.apg --output /tmp/apg-capacity --verify
-   ./.venv/bin/python /tmp/apg-capacity/smoke_test.py
-   ```
-
-5. If the source declares a package-backed capability, validate the package
-   separately:
-
-   ```bash
-   ./.venv/bin/apg capabilities validate-contracts --json
-   ./.venv/bin/apg capabilities audit --strict-package-artifacts --json
-   ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
-   ```
-
-6. Record the current readiness level and the exact next slice in the example
-   README and `docs/progress_log.md`.
-
-At the end of two hours, a useful capacity may still be small. It should not be
-ambiguous. The next contributor should know the event, APG source path,
-capability package path, proof commands, and next missing executable layer.
-
-## Capacity Delivery Spine
-
-Every capacity should have one visible spine that a new contributor can follow:
-
-```text
-README packet
-  -> examples/<nn>_<capacity>/main.apg
-  -> semantic model keys
-  -> generated Python app artifacts
-  -> package-backed capability behavior
-  -> focused tests
-  -> progress-log evidence
-```
-
-Keep this spine intact as the capacity grows. If a contributor adds package
-behavior but no example can compose it, the capacity is hard to discover. If an
-example declares a capability but no package can publish-plan it, the capacity
-is hard to reuse. If generated code changes but no smoke test proves it, the
-capacity is hard to trust.
-
-The spine also defines handoffs:
-
-| Artifact | Owner question | Extension point |
-| --- | --- | --- |
-| README packet | What business outcome exists now? | readiness level and known gaps |
-| APG source | How does an author declare the capacity? | records, screens, workflows, agents, capabilities |
-| Semantic model | How do tools inspect it? | stable JSON keys and graph relationships |
-| Generated app | How does it run locally? | routes, helpers, manifests, smoke tests |
-| Capability package | What durable behavior is reusable? | service/API/view/rule implementation |
-| Tests | What proves the next edit is safe? | focused layer checks |
-| Progress log | What evidence did the last contributor leave? | commands, outcomes, next gap |
-
-## Capacity Blueprint
-
-Start each capacity with this compact blueprint in its README or design note:
+Put this blueprint in the example README or working note before implementation:
 
 ```text
 Name:
 Outcome:
 Primary users:
+First event:
 Tenant/security boundary:
 Records owned:
 Capabilities provided:
@@ -566,787 +83,243 @@ Workflows:
 Agents:
 Streaming:
 Generated routes/helpers:
-Tests:
+Package owners:
+Focused proof:
 Known gaps:
+Next slice:
 ```
 
-Keep the blueprint current as implementation lands. It should describe current
-executable behavior, not the full future vision.
+The blueprint describes current executable intent. Keep it updated as evidence
+lands.
 
-## Minimum Useful Capacity Slice
+## Build Runbook
 
-A slice is useful when it creates or improves one observable path:
+1. **Name one event.** Use a concrete phrase such as `request submitted`,
+   `journal posted`, `lead qualified`, `device telemetry received`, or
+   `agent plan approved`.
 
-```text
-APG source -> semantic model -> generated Python artifact -> focused proof
-```
+2. **Write APG source.** Keep the source terse and readable. Include only the
+   records, relationships, capability uses, rules, screens, workflows, agents,
+   and Bytewax streams needed for the event.
 
-For a new capacity, the smallest acceptable slice is usually:
+3. **Inspect semantics.**
 
-```text
-examples/<nn>_<capacity_name>/main.apg
-examples/<nn>_<capacity_name>/README.md
-generated output in examples/<nn>_<capacity_name>/output/ when refreshed intentionally
-one capability package or an explicit package gap
-progress-log evidence
-```
+   ```bash
+   ./.venv/bin/apg model examples/<nn>_<capacity>/main.apg --json
+   ```
 
-For an existing capacity, the smallest useful slice is often one of these:
+4. **Compile and smoke-test.**
 
-- replace one materialized baseline capability with domain behavior;
-- add one deterministic rule and focused rule test;
-- expose one generated screen relationship or workflow route;
-- add one agent declaration with model, runtime, tools, memory, and rules;
-- add one Bytewax streaming metadata path and semantic-model evidence;
-- refresh one example output after an intentional compiler output change.
+   ```bash
+   ./.venv/bin/apg compile examples/<nn>_<capacity>/main.apg --output /tmp/apg-capacity --verify
+   ./.venv/bin/python /tmp/apg-capacity/smoke_test.py
+   ```
 
-Do not add many capacity files at once if none of them compile, publish-plan, or
-show up in the semantic model.
+5. **Deepen package behavior when durable state is needed.**
 
-## Build The Capacity From Both Ends
+   ```bash
+   ./.venv/bin/pytest -q capabilities/<domain>/<code>/test_capability_contract.py capabilities/<domain>/<code>/tests
+   ./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
+   ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+   ```
 
-Move from APG source downward and from package behavior upward.
+6. **Document evidence.** Update the example README, package spec, and progress
+   log when readiness changes.
 
-Top-down path:
+7. **Commit the slice.** Stage only the capacity files, package files, tests,
+   and docs that belong to the packet.
 
-1. Write the APG declaration a business author should understand.
-2. Confirm it parses and appears in `apg model ... --json`.
-3. Confirm generated Python exposes routes, manifests, helpers, or sidecars.
-4. Add smoke-test assertions for the generated surface.
+If a step fails, fix the earliest failing layer. Do not patch generated output
+around missing APG meaning.
 
-Bottom-up path:
+## Authoring Standards For Capacity Source
 
-1. Build or deepen the package-backed capability that owns durable behavior.
-2. Validate the contract and package artifacts.
-3. Prove deterministic service/rule/API/view behavior with focused tests.
-4. Publish-plan the package and connect it to an APG example or catalog path.
+APG capacity source should read as a compact declaration of the business event,
+not as generated implementation code.
 
-The capacity becomes strong when the two paths meet: APG source declares a
-capability, generated code exposes it, and the package can provide real runtime
-behavior behind the contract.
+A useful source file names:
 
-## Capacity-To-Capability Mapping
+- records and relationships;
+- capability dependencies;
+- deterministic rules;
+- screens and screen relationships;
+- workflows and states;
+- AI agents, tools, memory, runtime, and approvals;
+- Bytewax-oriented stream names and event envelopes;
+- application composition and target `python` runtime.
 
-Use this mapping before implementing a new capacity:
+Keep provider details behind adapters. For AI agents, model providers such as
+Codex, Claude Code, OpenCode, Pi, local models, or hosted APIs belong behind
+runtime configuration and approval rules, not hard-coded business logic.
 
-| Capacity concern | APG surface | Capability package surface |
-| --- | --- | --- |
-| Durable business data | `table` declarations | model dataclasses or persistence adapters |
-| Service ownership | `capability` contract `provides` | service class methods |
-| Dependencies | `requires` and app composition | explicit dependency names and adapters |
-| Configuration | contract configuration/schema | config dataclass and validation |
-| Rules | `rules` lists | deterministic rule evaluation and guardrail tests |
-| UI | `screens`, route metadata, UI contract | view-model helpers and route descriptors |
-| Theme | app/capability theme tokens | theme metadata and token validation |
-| Workflow | `workflow` declarations | state transition helpers when package-owned |
-| AI agent | `agent` declarations | adapter config, tool references, governance rules |
-| Streaming | Bytewax runtime metadata | event envelopes and stream state helpers |
+## Composition Rules
 
-If a concern appears only in prose, it is not yet a capacity contract.
+Capacity composition must be explicit.
 
-## Capacity Development Packet
+| Composition point | What to name |
+| --- | --- |
+| Records | owner, identifiers, required fields, relationships |
+| Rules | stable rule names, deterministic inputs, decision vocabulary |
+| Screens | route, title, contains, composes, binds, actions, permissions, theme |
+| Workflows | states, transitions, guards, approvals, audit events |
+| Agents | runtime, model/provider boundary, tools, memory, approvals, budget/risk controls |
+| Streams | Bytewax flow name, input event, output event, partition key, retry/error behavior |
+| Capabilities | provided services, required services, package owner, adapter boundary |
 
-Before editing code, write a small packet in the capacity README or design note.
-This gives parallel contributors enough context to move without private
-discussion.
+Implicit relationships slow contributors down. If one screen depends on a
+record, rule, workflow, or capability, name the relationship in source,
+semantic output, README, or package spec.
 
-```text
-Capacity:
-Current readiness level:
-Next readiness level:
-Business event that proves value:
-APG example path:
-Capability package paths:
-Public routes:
-Semantic model keys:
-Rules to enforce:
-Screens to expose:
-Workflows to run:
-Agents to declare:
-Streaming flows:
-Package evidence:
-Focused verification:
-Docs touched:
-Out of scope for this slice:
-```
+## Readiness Levels
 
-Example packet:
-
-```text
-Capacity: Procurement approval automation
-Current readiness level: L2 semantic
-Next readiness level: L3 generated
-Business event that proves value: submit request -> rule evaluation -> review route
-APG example path: examples/13_procurement_approval_workbench/main.apg
-Capability package paths: capabilities/scm/pom, capabilities/common/audl
-Public routes: /procurement/approvals, /self-test
-Semantic model keys: capabilities, screens, workflows, agents
-Rules to enforce: supplier_required, amount_positive, large_request_review
-Screens to expose: ProcurementApprovalWorkbench
-Workflows to run: ProcurementApprovalFlow
-Agents to declare: ProcurementPlanner
-Streaming flows: procurement_events -> procurement_alerts through Bytewax metadata
-Package evidence: publish-plan for procurement capability package
-Focused verification: compile --verify, smoke_test.py, capability audit
-Docs touched: example README, capacity guide, progress log
-Out of scope for this slice: external supplier API integration
-```
-
-The packet should become more specific as the capacity matures. Replace broad
-phrases such as "AI integration" with concrete agent names, tool references,
-rules, and generated inspection surfaces.
-
-## Capacity Team Roles
-
-When building a capacity in parallel, split work by durable ownership rather
-than by vague implementation layers.
-
-| Role | Owns | Produces | Verification |
-| --- | --- | --- | --- |
-| Capacity lead | README packet, public names, readiness level, progress log | coherent slice boundary | docs audit and final evidence review |
-| Language/compiler owner | APG source shape, semantic model, generated output | parseable and compilable APG | model, graph, compile, baseline checks |
-| Capability owner | package contract, services, rules, UI contract, package evidence | reusable capability package | package tests, validate-contracts, audit, publish-plan |
-| Runtime owner | generated app behavior, routes, helpers, smoke tests | executable Python app | compile `--verify`, self-test, smoke test, HTTP probes |
-| Documentation owner | example README, guide updates, known gaps | contributor handoff docs | docs audit and diff check |
-
-One person can hold multiple roles for a small capacity. The important rule is
-that every role has a concrete artifact and verification command.
-
-## Capacity Backlog Shape
-
-Track capacity work as executable backlog items:
-
-```text
-L2 -> L3: Generate workflow route for ProcurementApprovalFlow
-Files: compiler/code_generator.py, tests/test_generated_workflow_runtime.py
-Proof: compile examples/13_procurement_approval_workbench/main.apg --verify
-Non-goal: external ERP procurement API
-```
-
-Avoid backlog items like:
-
-```text
-Improve procurement
-Add AI
-Make workflows better
-```
-
-They do not tell a contributor where to edit, what to prove, or what to avoid.
-
-## Choosing The Next Capacity Slice
-
-When a capacity has several possible improvements, choose in this order:
-
-1. Fix parse or compile failures.
-2. Add missing semantic-model exposure for already accepted source.
-3. Make generated Python behavior inspectable or smoke-testable.
-4. Add package-backed service/rule/API/view behavior.
-5. Add or tighten focused tests.
-6. Refresh checked-in example output only when the compiler output contract
-   intentionally changed.
-7. Improve docs after the behavior exists.
-
-This order keeps capacity work grounded in executable reality. A detailed README
-cannot compensate for source that does not compile or packages that still only
-contain generated baseline placeholders.
-
-## Minimum File Shape
-
-A serious capacity usually has one APG example plus one or more package-backed
-capabilities:
-
-```text
-examples/<nn>_<capacity_name>/
-  main.apg
-  README.md
-  output/
-
-capabilities/<domain>/<code>/
-  __init__.py
-  cap_spec.md
-  capability_contract.py
-  models.py
-  service.py
-  api.py
-  views.py
-  app.py
-  semantic_model.json
-  package_manifest.json
-  release_report.json
-  tests/
-```
-
-For early exploration, the APG example can land before the package. Before the
-capacity is considered buildable by others, the package contract and focused
-tests should exist.
-
-## Capacity Lifecycle
-
-1. Define the outcome.
-2. Choose capability boundaries.
-3. Model records.
-4. Define capability contracts.
-5. Add deterministic rules.
-6. Add screens and element relationships.
-7. Add workflows for stateful processes.
-8. Add AI agents for model-backed work.
-9. Add Bytewax streaming metadata where event flow matters.
-10. Compose the generated application shell.
-11. Compile and verify.
-12. Add focused tests.
-13. Materialize missing package artifacts when a valid contract does not yet
-    have publishable package evidence.
-14. Document the capacity and update the progress log.
-15. Commit and push the verified slice.
-
-## Capacity Readiness Levels
-
-Use these levels to avoid pretending partial work is complete:
+Use these readiness levels in example READMEs and progress-log entries:
 
 | Level | Meaning | Evidence |
 | --- | --- | --- |
-| L0 idea | Outcome is described but not executable | README/design note only |
-| L1 parseable | APG source parses and appears in docs/examples | parser or baseline proof |
-| L2 semantic | semantic model exposes records, capabilities, screens, workflows, agents, and routes | `apg model ... --json` |
-| L3 generated | compiler emits runnable Python artifacts | `apg compile ... --verify` |
-| L4 operable | generated app smoke test and self-test pass | `smoke_test.py`, `app.py --self-test` |
-| L5 composable | capability contracts validate, rule probes execute, dependencies are explicit, and package implementation depth is known | `apg capabilities validate-contracts --json`; `apg capabilities audit --json`; `apg capabilities implementation-audit --json` |
-| L6 baseline | numbered example and checked-in output pass the compiler baseline | `apg baseline examples --json` |
-| L7 documented | developer docs and progress log explain extension points and evidence | docs audit or diff check |
+| 0 - design | event and owners named, no parseable source yet | blueprint only |
+| 1 - parseable | `main.apg` parses and appears in semantic JSON | `apg model ... --json` |
+| 2 - generated | generated Python app imports and smoke-tests | compile with `--verify`, smoke test |
+| 3 - package-backed | durable behavior executes in package services | package pytest, implementation audit, publish-plan |
+| 4 - governed | rules, approvals, tenant boundaries, and negative tests are present | guardrail tests and rule evidence |
+| 5 - composable | screens, workflows, agents, streams, and capabilities are inspectable and documented | semantic model, generated manifests, README |
+| 6 - release-ready | release/package/deployment evidence exists for intended profile | release, package, package-verify, deployment or evidence command |
 
-Progress one level at a time. A capacity can be useful at L3 or L4, but it
-should be labeled honestly until package contracts, docs, and baseline evidence
-catch up.
+Advance readiness only when commands prove the new level.
 
-## 1. Define The Outcome
+## Capacity Expansion Order
 
-Write one concrete sentence:
+Expand in this order so every layer has something real to consume:
 
-```text
-This capacity lets a generated APG app receive purchase requests, validate
-supplier and amount rules, route approvals, record audit events, and expose a
-procurement workbench screen.
-```
+1. First event and APG source.
+2. Semantic model visibility.
+3. Generated Python runtime and smoke test.
+4. One domain-specific capability package.
+5. Rule guardrails and negative tests.
+6. Screen composition and theme metadata.
+7. Workflow transitions and generated route/manifest exposure.
+8. AI agent composition with provider-agnostic adapters.
+9. Bytewax streaming metadata and deterministic local envelopes.
+10. Release evidence, docs, and deployment profile.
 
-Then list:
+Skip a layer only when the README says it is intentionally out of scope for the
+current slice.
 
-- primary users;
-- records and ownership;
-- services provided;
-- services required;
-- deterministic rules;
-- workflows and states;
-- screens and actions;
-- AI-assisted work;
-- streaming events;
-- tenant/security boundaries;
-- verification evidence.
+## Package-Backed Behavior
 
-If the outcome cannot be observed in generated code, CLI output, tests, or docs,
-it is not concrete enough.
+Durable behavior belongs in capability packages, not only in example prose.
 
-## 2. Choose Capability Boundaries
+For each package in a capacity, require:
 
-Start with one core capability. Split only when ownership, lifecycle, or
-dependency direction differs.
+- domain models instead of generic materialized records;
+- service methods that execute one real lifecycle;
+- API helpers that expose package behavior without framework dependencies;
+- view models and route/theme metadata for UI composition;
+- deterministic rules and guardrail tests;
+- tenant context and ownership checks where relevant;
+- adapter boundaries for live external systems;
+- `cap_spec.md` describing current behavior and proof commands;
+- publish-plan evidence.
 
-Good boundaries:
-
-- `ProcurementApproval`
-- `InventoryControl`
-- `GeneralLedger`
-- `CustomerCare`
-- `AuditLog`
-
-Weak boundaries:
-
-- `EverythingERP`
-- `AIPlatform`
-- `Manager`
-- `Helper`
-- `Integration`
-
-Boundary questions:
-
-- What services does this capability provide?
-- What services does it require?
-- What data does it own?
-- What rules does it enforce?
-- What UI does it expose?
-- What theme tokens does it need?
-- What events does it publish or consume?
-- What tenant context is mandatory?
-
-## 3. Model Records
-
-Use APG tables for durable records:
-
-```apg
-table PurchaseRequest {
-    request_number: str;
-    requester: str;
-    supplier_id: int;
-    amount: decimal;
-    status: str;
-}
-
-table Supplier {
-    supplier_number: str;
-    legal_name: str;
-    active: bool;
-    risk_rating: str;
-}
-```
-
-Keep early records small. Add fields when a rule, screen, workflow, API, or
-test needs them.
-
-## 4. Define Capability Contracts
-
-For package-backed capabilities, start with the scaffold:
+Run:
 
 ```bash
-./.venv/bin/apg capabilities scaffold procurement approvals --name "Procurement Approvals" --json
-```
-
-Move or create the package under `capabilities/<domain>/<code>/`, then validate:
-
-```bash
-./.venv/bin/python -m pytest -q capabilities/procurement/approvals/tests
-./.venv/bin/apg capabilities validate-contracts --json
-./.venv/bin/apg capabilities audit --json
-./.venv/bin/apg capabilities materialize-packages --capability procurement_approvals --json
-./.venv/bin/apg capabilities inspect procurement_approvals --json
-```
-
-A minimum APG source contract shape:
-
-```apg
-capability ProcurementApproval {
-    contract: {
-        id: procurement_approval,
-        provides: [purchase_request_review, approval_routing],
-        requires: [audit_events, supplier_master],
-        configuration: {
-            approval_threshold: 5000,
-            currency: "KES",
-            tenant_scoped: true
-        },
-        configuration_schema: {
-            tenant_id: str,
-            approval_threshold: decimal,
-            currency: str
-        },
-        rules: [
-            {name: "supplier_required", when: "supplier_id missing", action: "deny"},
-            {name: "large_request_review", when: "amount > approval_threshold", action: "require_review"}
-        ],
-        ui: {shell: python},
-        theme: {name: procurement_theme, tokens: {accent: "#174EA6", warning: "#B7791F"}}
-    };
-}
-```
-
-Contract quality checks:
-
-- `id` is stable snake_case.
-- `provides` names business services.
-- `requires` names dependencies, not implementation guesses.
-- configuration has safe local defaults.
-- configuration schema includes tenant context when tenant-sensitive.
-- rules are named and deterministic.
-- UI and theme contracts exist.
-
-## 5. Add Rules
-
-Rules should be deterministic and testable:
-
-```apg
-rules: [
-    {name: "supplier_required", when: "supplier_id missing", action: "deny", priority: 100},
-    {name: "amount_positive", when: "amount <= 0", action: "deny", priority: 90},
-    {name: "large_request_review", when: "amount > approval_threshold", action: "require_review", priority: 50},
-    {name: "inactive_supplier_review", when: "supplier_active == false", action: "require_review", priority: 40}
-];
-```
-
-Use dependency capabilities for external checks:
-
-- `supplier_master`;
-- `budget_control`;
-- `audit_events`;
-- `identity_access`.
-
-Do not put network calls or external API behavior inside rule strings.
-
-Rule implementation checklist:
-
-- Put deterministic decisions in rule definitions or package service code.
-- Keep model-backed AI suggestions separate from allow/deny decisions unless a
-  human or deterministic rule validates the result.
-- Include priority when rule order matters.
-- Test both passing and failing contexts.
-- Expose rule evaluation through capability inspection or a focused CLI helper
-  when the rule is part of the public contract.
-
-## 6. Add Screens And Relationships
-
-Screens make a capacity inspectable and operable:
-
-```apg
-screens: {
-    ProcurementApprovalWorkbench: {
-        route: "/procurement/approvals",
-        title: "Procurement Approvals",
-        layout: dashboard,
-        contains: [RequestKpis, ApprovalQueue],
-        composes: [SupplierRiskPanel, BudgetImpactTable],
-        binds: [purchase_request.status, supplier.risk_rating],
-        actions: [approve, reject, escalate],
-        events: [{on: "select", do: "filter", target: SupplierRiskPanel}],
-        relationships: [
-            ApprovalQueue -> SupplierRiskPanel,
-            ApprovalQueue -> BudgetImpactTable
-        ]
-    }
-};
-```
-
-A good screen declares route, title, layout, contained elements, composed
-elements, bindings, actions, events, and relationships.
-
-Screen development checklist:
-
-- every screen has a stable route;
-- every repeated element has a source entity or capability service;
-- every action maps to a workflow step, service method, or generated handler;
-- relationships are named when they matter to graphs or Studio;
-- theme tokens are declared by the capability or application shell;
-- generated manifests expose the screen so downstream tooling can inspect it.
-
-## 7. Add Workflows
-
-Use workflows when process state matters:
-
-```apg
-workflow ProcurementApprovalFlow {
-    steps: str = "draft -> review -> approved -> ordered";
-    human_tasks: [review];
-    assignments: {review: procurement_manager};
-    guards: {review: "amount > 0"};
-    waits: {approved: approval_received};
-    retry_policy: {review: {attempts: 3}};
-    compensation: {ordered: cancel_purchase_order};
-}
-```
-
-Generated workflow behavior should expose deterministic step chains, guards,
-waits, retries, run state, resume, and compensation recording.
-
-Workflow development checklist:
-
-- states and transitions are explicit;
-- human tasks and assignments are named;
-- guards are deterministic strings or capability-backed checks;
-- retry and compensation behavior is declared when failure matters;
-- generated smoke tests or HTTP probes can run at least one workflow path.
-
-## 8. Add AI Agents
-
-Use AI agents for model-backed planning, review, summarization,
-classification, or tool orchestration:
-
-```apg
-agent ProcurementPlanner {
-    role: "procurement approval analyst";
-    model: "openai:gpt-4.1-mini";
-    runtime: codex;
-    system: "Summarize procurement approval risks and next actions.";
-    capabilities: [approval_routing];
-    tools: [supplier_master, budget_control, audit_events];
-    memory: vector procurement_memory;
-    configuration: {temperature: 0.1, max_steps: 4};
-    rules: [
-        {name: "request_context_required", when: "request_number missing", action: "deny"}
-    ];
-}
-```
-
-Agent standards:
-
-- declare `model`;
-- declare `role` or `system`;
-- keep provider details in adapters;
-- use runtime identifiers such as `codex`, `claude_code`, `opencode`, `pi`,
-  `openai`, or `ollama`;
-- keep deterministic governance outside the model where possible.
-
-Agent development checklist:
-
-- model and runtime are explicit;
-- provider-specific details are isolated behind adapters or configuration;
-- tools reference capability services, not vague natural-language names;
-- memory is declared only when the generated app can represent it;
-- rules constrain agent use where tenant, security, or approval boundaries
-  matter;
-- generated sidecars or manifests list agents for inspection.
-
-## 9. Add Bytewax Streaming
-
-Use Bytewax when the capacity needs event processing:
-
-```apg
-streaming: {
-    processor: bytewax,
-    input: procurement_events,
-    output: procurement_alerts,
-    state: procurement_stream_state,
-    window: 5min
-};
-```
-
-Standards:
-
-- use `processor: bytewax`;
-- name input, output, and state explicitly;
-- treat external brokers as integration capabilities;
-- do not make APG internal stream semantics broker-first.
-
-## 10. Compose The Application
-
-The application shell proves the capacity can be assembled:
-
-```apg
-app ProcurementOperationsApp {
-    description: "Procurement approval operations";
-    capabilities: [ProcurementApproval, SupplierMaster, PlatformAudit];
-    agents: [ProcurementPlanner];
-    routes: ["/procurement/approvals"];
-    components: {
-        approval_workbench: {capability: approval_routing, route: "/procurement/approvals"}
-    };
-    screens: {
-        Home: {route: "/", capability: ProcurementApproval, component: "ProcurementApprovalWorkbench"}
-    };
-    workflows: [ProcurementApprovalFlow];
-    theme: {name: procurement_operations_theme, tokens: {accent: "#174EA6"}};
-    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
-    deployments: {default: local, container: docker};
-}
-```
-
-## 11. Compile And Verify
-
-Use a temporary output directory:
-
-```bash
-./.venv/bin/apg compile path/to/capacity.apg --output /tmp/apg-capacity --verify
-./.venv/bin/python /tmp/apg-capacity/smoke_test.py
-./.venv/bin/python /tmp/apg-capacity/app.py --self-test
-```
-
-Inspect generated surfaces:
-
-```bash
-./.venv/bin/python - <<'PY'
-import sys
-sys.path.insert(0, "/tmp/apg-capacity")
-import app
-print(app.list_entities())
-print(app.list_capabilities())
-print(app.list_workflows())
-print(app.validate_application()["valid"])
-PY
-```
-
-If the capacity includes packaging or release evidence:
-
-```bash
-./.venv/bin/apg evidence path/to/capacity.apg --target container --out /tmp/apg-evidence --json
-```
-
-## 12. Add Focused Tests
-
-Choose tests by the layer changed:
-
-```bash
-./.venv/bin/apg compile path/to/capacity.apg --output /tmp/apg-capacity --verify
-./.venv/bin/apg capabilities validate-contracts --json
-./.venv/bin/apg capabilities audit --json
-./.venv/bin/apg capabilities audit --strict-package-artifacts --json
 ./.venv/bin/apg capabilities implementation-audit --json
-./.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py
-./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py
-./.venv/bin/apg doctor --json
-./.venv/bin/apg hygiene audit --json
-./.venv/bin/apg docs audit --json
-./.venv/bin/apg tooling audit --json
-./.venv/bin/apg lint path/to/capacity.apg --catalog /tmp/apg-capability-catalog.json --json
+./.venv/bin/apg capabilities audit --strict-package-artifacts --json
 ```
 
-Do not default to the full repository suite for every capacity slice. Run the
-smallest commands that prove the changed behavior, then broaden verification
-when the slice touches shared compiler or generator contracts.
+Use the audit output as the burn-down board for package depth.
 
-## 13. Document The Capacity
+## AI Agent Capacities
 
-A capacity document should state:
+AI agents are first-class capacity components when they participate in the
+business event.
 
-- outcome;
-- users;
-- records;
-- capabilities;
-- provided and required services;
-- configuration;
-- rules;
-- workflows;
-- screens and relationships;
-- agents;
-- streaming;
-- generated routes and manifests;
-- verification commands;
-- known gaps.
+An agent capacity must name:
 
-If the capacity lives under `examples/`, each example directory needs `main.apg`,
-`README.md`, and generated `output/`.
+- agent role and allowed objective;
+- runtime adapter boundary;
+- supported provider options;
+- tools and capability services it may call;
+- memory scope and retention;
+- approval rules for risky actions;
+- cost, latency, or execution budget where applicable;
+- audit events and human review route;
+- fallback when the provider is unavailable.
 
-## Parallel Delivery
+Keep rapidly changing provider integrations behind adapters. A capacity should
+be able to switch from one provider runtime to another without rewriting the
+business event or package rules.
 
-Capacities can be built in parallel when ownership is clear:
+## Bytewax Streaming Capacities
 
-| Lane | Owns | Avoid touching |
+APG uses Bytewax terminology for streaming capacities. A stream slice should
+name:
+
+- flow name;
+- input event envelope;
+- output event envelope;
+- partition key;
+- stateful operator intent;
+- retry and dead-letter policy;
+- capability package that owns durable state;
+- generated metadata or manifest output;
+- local deterministic proof.
+
+Do not use Kafka as the default architecture. If a future integration needs
+Kafka, model it as an adapter boundary around Bytewax-oriented APG stream
+semantics.
+
+## Parallel Capacity Development
+
+Capacity work can be parallel when each contributor owns a different surface.
+
+| Lane | Owns | Coordinates with |
 | --- | --- | --- |
-| Language/compiler | grammar, AST, semantic model, generator | capability package internals unless needed for fixtures |
-| Capability package | `capabilities/<domain>/<code>/` | shared compiler files |
-| Example/app | `examples/<nn>_*/` | unrelated examples |
-| Tests | focused tests for the slice | broad suite rewrites |
-| Docs | capacity docs, guide updates, progress log | unrelated historical docs |
+| Capacity lead | packet, public names, readiness level, README, progress log | all lanes before public names change |
+| APG source owner | example `main.apg` | compiler owner before relying on new syntax |
+| Compiler owner | parser, AST, semantic model, generated surfaces | source and runtime owners |
+| Capability owner | one package tree | capacity lead for service/rule names |
+| Runtime owner | generated routes, helpers, manifests, smoke tests | compiler owner for semantic keys |
+| Docs owner | README, guide links, proof commands | every lane for current evidence |
 
-Parallel lanes must agree on public names: capability IDs, provided services,
-routes, workflow names, agent names, and JSON format keys.
+Safe parallel work:
 
-## Maximum-Velocity Capacity Build
+- one contributor deepens a package while another updates the example README;
+- one contributor adds generated runtime exposure while another adds package
+  guardrail tests;
+- different contributors burn down different capability packages.
 
-When several contributors are available, split the capacity by artifacts rather
-than by vague themes.
+Unsafe parallel work without coordination:
 
-1. The capacity lead freezes public names for the slice: capability IDs, record
-   names, routes, workflow names, agent names, event names, and JSON keys.
-2. The language/compiler owner makes the APG source parse, model, and compile.
-3. The capability owner makes one package publish-plan ready with real service,
-   rule, API, and view behavior.
-4. The runtime owner proves generated app self-test, smoke test, and route or
-   manifest inspection.
-5. The documentation owner updates the example README, relevant guide section,
-   and progress log.
+- multiple contributors changing `spec/apg.g4` and semantic keys independently;
+- refreshing example output while generator contracts are moving;
+- two contributors changing the same service public methods;
+- docs claiming readiness before proof commands pass.
 
-Run integration checks only after each lane has passed its focused proof. This
-keeps velocity high without hiding broken contracts until the end.
+## Review Gate
 
-Merge order for parallel capacity slices:
+Before merging or committing a capacity slice, confirm:
 
-1. public-name and APG source slice;
-2. semantic/generator slice;
-3. capability package slice;
-4. example output or release-evidence slice;
-5. documentation/progress-log slice.
+- APG source is parseable and readable.
+- Semantic JSON exposes the changed records, rules, screens, workflows, agents,
+  streams, or capability references.
+- Generated Python imports and smoke-tests when runtime output changed.
+- Package-owned behavior has domain services, APIs, views, rules, and tests
+  when durable behavior changed.
+- Tenant, approval, provider, integration, and adapter boundaries are explicit.
+- README, package spec, or progress log records proof commands and the next gap.
+- Focused verification passed and full-suite gaps are honest.
 
-If two slices need the same shared file, stop parallel edits for that file and
-choose one owner. Keep the other contributor on package, example, or docs work
-until the shared contract lands.
+## Capacity Definition Of Done
 
-## Slice Planning Templates
+A capacity slice is done when another contributor can:
 
-Use one of these templates to keep work small.
+1. find the APG source;
+2. run the semantic and compile proof;
+3. inspect generated Python evidence;
+4. identify package owners for durable behavior;
+5. run package proof when package behavior changed;
+6. read the README or progress log to understand the next slice.
 
-Language/compiler slice:
-
-```text
-Goal:
-Syntax:
-AST field:
-Semantic model key:
-Generated behavior:
-Fixture/test:
-Docs:
-Verification:
-```
-
-Capability package slice:
-
-```text
-Goal:
-Capability id:
-Provides:
-Requires:
-Configuration:
-Rules:
-UI/routes:
-Tests:
-Verification:
-```
-
-Example capacity slice:
-
-```text
-Goal:
-Example path:
-Records:
-Capability contracts:
-Screens/workflows/agents:
-Generated output change:
-README update:
-Verification:
-```
-
-## Acceptance Checklist
-
-A capacity is ready to build on when:
-
-- APG source parses.
-- `apg compile --verify` passes.
-- generated `smoke_test.py` passes.
-- generated app exposes expected entities, capabilities, workflows, screens,
-  routes, and manifests.
-- capability contracts have named provides, requires, configuration, rules, UI,
-  and theme.
-- capability packages have complete artifacts under
-  `apg capabilities audit --strict-package-artifacts --json`.
-- rules are deterministic and named.
-- screens declare relationships.
-- workflows declare executable steps.
-- agents declare model and runtime.
-- streaming uses Bytewax when present.
-- focused tests cover the changed behavior.
-- documentation explains how to use and extend the capacity.
-- `docs/progress_log.md` records verification evidence.
-
-## Expansion Order
-
-Expand a capacity in this order:
-
-1. Add records.
-2. Add capability contract services.
-3. Add rules.
-4. Add screens.
-5. Add workflows.
-6. Add agents.
-7. Add streaming.
-8. Add app composition.
-9. Add package and release evidence.
-10. Add docs and tests.
-
-This order keeps each step inspectable and executable.
-
-## Anti-Patterns
-
-Avoid:
-
-- one giant capability for an entire ERP domain;
-- rules without names;
-- screens without routes;
-- agents without models;
-- hidden external services;
-- grammar changes without semantic-model follow-through;
-- generated behavior not visible in OpenAPI, component manifests, or tests;
-- docs that describe unimplemented behavior as current.
+If those steps require a meeting or private memory, the capacity is not yet
+documented well enough.
