@@ -270,7 +270,7 @@ def _scaffold_files(domain: str, code: str, display_name: str) -> dict[str, str]
 	capability_id = f"{domain}_{code}"
 	class_prefix = "".join(part.title() for part in capability_id.split("_"))
 	return {
-		"__init__.py": _init_py(display_name),
+		"__init__.py": _init_py(display_name, class_prefix),
 		"cap_spec.md": _cap_spec_md(domain, code, display_name, capability_id),
 		"capability_contract.py": _capability_contract_py(),
 		"models.py": _models_py(class_prefix),
@@ -278,16 +278,17 @@ def _scaffold_files(domain: str, code: str, display_name: str) -> dict[str, str]
 		"api.py": _api_py(class_prefix),
 		"views.py": _views_py(class_prefix),
 		"tests/__init__.py": "",
-		"tests/test_capability_contract.py": _contract_test_py(capability_id, display_name),
+		"tests/test_capability_contract.py": _contract_test_py(domain, code, capability_id, display_name),
 	}
 
 
-def _init_py(display_name: str) -> str:
+def _init_py(display_name: str, class_prefix: str) -> str:
 	return f'''"""APG capability package for {display_name}."""
 
 from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .service import {class_prefix}Service
 
-__all__ = ["evaluate_capability_rules", "get_capability_contract"]
+__all__ = ["{class_prefix}Service", "evaluate_capability_rules", "get_capability_contract"]
 '''
 
 
@@ -386,6 +387,15 @@ class {class_prefix}Record:
 \ttenant_id: str
 \tstatus: str = "active"
 \tmetadata: dict[str, Any] = field(default_factory=dict)
+
+\tdef to_dict(self) -> dict[str, Any]:
+\t\t"""Return a JSON-ready representation of this capability record."""
+\t\treturn {{
+\t\t\t"id": self.id,
+\t\t\t"tenant_id": self.tenant_id,
+\t\t\t"status": self.status,
+\t\t\t"metadata": dict(self.metadata),
+\t\t}}
 '''
 
 
@@ -397,16 +407,97 @@ from __future__ import annotations
 from typing import Any
 
 from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .models import {class_prefix}Record
 
 
 class {class_prefix}Service:
-\t"""Small executable service shell backed by the capability contract."""
+\t"""Executable dependency-light service backed by the capability contract."""
+
+\tdef __init__(self) -> None:
+\t\tself._records: dict[str, {class_prefix}Record] = {{}}
 
 \tdef describe(self, tenant_id: str = "default") -> dict[str, Any]:
 \t\treturn get_capability_contract(tenant_id)
 
 \tdef evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
 \t\treturn evaluate_capability_rules(context)
+
+\tdef list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+\t\trecords = self._records.values()
+\t\tif tenant_id is not None:
+\t\t\trecords = [record for record in records if record.tenant_id == tenant_id]
+\t\treturn [record.to_dict() for record in sorted(records, key=lambda item: item.id)]
+
+\tdef get_record(self, record_id: str, tenant_id: str | None = None) -> dict[str, Any] | None:
+\t\trecord = self._records.get(record_id)
+\t\tif record is None:
+\t\t\treturn None
+\t\tif tenant_id is not None and record.tenant_id != tenant_id:
+\t\t\treturn None
+\t\treturn record.to_dict()
+
+\tdef create_record(
+\t\tself,
+\t\trecord_id: str,
+\t\ttenant_id: str,
+\t\tmetadata: dict[str, Any] | None = None,
+\t\tstatus: str = "active",
+\t\tpolicy_attached: bool = True,
+\t\trisk_level: str = "low",
+\t\treview_recorded: bool = True,
+\t) -> dict[str, Any]:
+\t\t"""Create one tenant-scoped record after contract-rule evaluation."""
+\t\tself._enforce_write_policy(tenant_id, policy_attached, risk_level, review_recorded)
+\t\tif record_id in self._records:
+\t\t\traise ValueError(f"record already exists: {{record_id}}")
+\t\trecord = {class_prefix}Record(
+\t\t\tid=record_id,
+\t\t\ttenant_id=tenant_id,
+\t\t\tstatus=status,
+\t\t\tmetadata=dict(metadata or {{}}),
+\t\t)
+\t\tself._records[record_id] = record
+\t\treturn record.to_dict()
+
+\tdef update_status(
+\t\tself,
+\t\trecord_id: str,
+\t\tstatus: str,
+\t\ttenant_id: str | None = None,
+\t\tpolicy_attached: bool = True,
+\t\trisk_level: str = "low",
+\t\treview_recorded: bool = True,
+\t) -> dict[str, Any]:
+\t\t"""Update one record status after contract-rule evaluation."""
+\t\trecord = self._records.get(record_id)
+\t\tif record is None:
+\t\t\traise KeyError(f"unknown record: {{record_id}}")
+\t\tif tenant_id is not None and record.tenant_id != tenant_id:
+\t\t\traise KeyError(f"unknown record for tenant: {{record_id}}")
+\t\tself._enforce_write_policy(record.tenant_id, policy_attached, risk_level, review_recorded)
+\t\trecord.status = status
+\t\treturn record.to_dict()
+
+\tdef _enforce_write_policy(
+\t\tself,
+\t\ttenant_id: str,
+\t\tpolicy_attached: bool,
+\t\trisk_level: str,
+\t\treview_recorded: bool,
+\t) -> None:
+\t\tresult = self.evaluate({{
+\t\t\t"tenant_context_present": bool(tenant_id),
+\t\t\t"operation_type": "write",
+\t\t\t"policy_attached": policy_attached,
+\t\t\t"risk_level": risk_level,
+\t\t\t"review_recorded": review_recorded,
+\t\t}})
+\t\tif result["decision"] == "deny":
+\t\t\treasons = ", ".join(action.get("reason", "policy_denied") for action in result["actions"])
+\t\t\traise PermissionError(reasons or "capability_write_denied")
+\t\tif result["decision"] == "require_review":
+\t\t\treasons = ", ".join(action.get("reason", "review_required") for action in result["actions"])
+\t\t\traise PermissionError(reasons or "capability_review_required")
 '''
 
 
@@ -420,16 +511,62 @@ from typing import Any
 from .service import {class_prefix}Service
 
 
+SERVICE = {class_prefix}Service()
+
+
 def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 \t"""Return dependency-light capability status for generated integrations."""
-\tcontract = {class_prefix}Service().describe(tenant_id)
+\tcontract = SERVICE.describe(tenant_id)
 \treturn {{
 \t\t"capability": contract["capability"],
 \t\t"display_name": contract["display_name"],
 \t\t"tenant_id": tenant_id,
 \t\t"route_count": len(contract["ui"]["routes"]),
 \t\t"rule_count": len(contract["rule_engine"]["rules"]),
+\t\t"record_count": len(SERVICE.list_records(tenant_id)),
 \t}}
+
+
+def create_record(payload: dict[str, Any]) -> dict[str, Any]:
+\t"""Create a tenant-scoped record from a JSON-like payload."""
+\treturn SERVICE.create_record(
+\t\trecord_id=str(payload["id"]),
+\t\ttenant_id=str(payload.get("tenant_id") or "default"),
+\t\tmetadata=dict(payload.get("metadata") or {{}}),
+\t\tstatus=str(payload.get("status") or "active"),
+\t\tpolicy_attached=bool(payload.get("policy_attached", True)),
+\t\trisk_level=str(payload.get("risk_level") or "low"),
+\t\treview_recorded=bool(payload.get("review_recorded", True)),
+\t)
+
+
+def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
+\t"""List records for generated integrations or smoke tests."""
+\treturn SERVICE.list_records(tenant_id)
+
+
+def get_record(record_id: str, tenant_id: str | None = None) -> dict[str, Any] | None:
+\t"""Return one record if it exists for the requested tenant."""
+\treturn SERVICE.get_record(record_id, tenant_id)
+
+
+def update_record_status(
+\trecord_id: str,
+\tstatus: str,
+\ttenant_id: str | None = None,
+\tpolicy_attached: bool = True,
+\trisk_level: str = "low",
+\treview_recorded: bool = True,
+) -> dict[str, Any]:
+\t"""Update one record status through the rule-guarded service path."""
+\treturn SERVICE.update_status(
+\t\trecord_id,
+\t\tstatus,
+\t\ttenant_id,
+\t\tpolicy_attached=policy_attached,
+\t\trisk_level=risk_level,
+\t\treview_recorded=review_recorded,
+\t)
 '''
 
 
@@ -439,15 +576,34 @@ def _views_py(class_prefix: str) -> str:
 from __future__ import annotations
 
 from .capability_contract import get_capability_contract
+from .service import {class_prefix}Service
 
 
 def capability_routes(tenant_id: str = "default") -> list[dict[str, str]]:
 \t"""Return APG Python UI route metadata."""
 \treturn list(get_capability_contract(tenant_id)["ui"]["routes"])
+
+
+def dashboard_model(
+\tservice: {class_prefix}Service | None = None,
+\ttenant_id: str = "default",
+) -> dict[str, object]:
+\t"""Return a dependency-light dashboard view model."""
+\tservice = service or {class_prefix}Service()
+\tcontract = service.describe(tenant_id)
+\treturn {{
+\t\t"capability": contract["capability"],
+\t\t"display_name": contract["display_name"],
+\t\t"tenant_id": tenant_id,
+\t\t"routes": capability_routes(tenant_id),
+\t\t"records": service.list_records(tenant_id),
+\t\t"rules": contract["rule_engine"]["rules"],
+\t\t"theme": contract["theme"],
+\t}}
 '''
 
 
-def _contract_test_py(capability_id: str, display_name: str) -> str:
+def _contract_test_py(domain: str, code: str, capability_id: str, display_name: str) -> str:
 	return f'''"""Scaffolded capability contract tests."""
 
 from __future__ import annotations
@@ -455,15 +611,35 @@ from __future__ import annotations
 from pathlib import Path
 import importlib.util
 import sys
+import types
 
 from capabilities.capability_contract_registry import validate_contract_shape
 
 
 CONTRACT_PATH = Path(__file__).resolve().parents[1] / "capability_contract.py"
+PACKAGE_DIR = Path(__file__).resolve().parents[1]
+PACKAGE_NAME = "scaffolded_{domain}_{code}"
 
 
 def _load_contract_module():
 \tspec = importlib.util.spec_from_file_location("scaffolded_capability_contract", CONTRACT_PATH)
+\tassert spec is not None
+\tassert spec.loader is not None
+\tmodule = importlib.util.module_from_spec(spec)
+\tsys.modules[spec.name] = module
+\tspec.loader.exec_module(module)
+\treturn module
+
+
+def _load_package_module(name: str):
+\tif PACKAGE_NAME not in sys.modules:
+\t\tpackage = types.ModuleType(PACKAGE_NAME)
+\t\tpackage.__path__ = [str(PACKAGE_DIR)]
+\t\tsys.modules[PACKAGE_NAME] = package
+\tspec = importlib.util.spec_from_file_location(
+\t\tf"{{PACKAGE_NAME}}.{{name}}",
+\t\tPACKAGE_DIR / f"{{name}}.py",
+\t)
 \tassert spec is not None
 \tassert spec.loader is not None
 \tmodule = importlib.util.module_from_spec(spec)
@@ -490,6 +666,36 @@ def test_scaffolded_capability_rules_are_executable():
 
 \tassert result["decision"] == "deny"
 \tassert "tenant_context_required" in result["matched_rules"]
+
+
+def test_scaffolded_service_api_and_views_are_executable():
+\tservice_module = _load_package_module("service")
+\tapi_module = _load_package_module("api")
+\tviews_module = _load_package_module("views")
+
+\tservice = service_module.{''.join(part.title() for part in capability_id.split('_'))}Service()
+\trecord = service.create_record("demo-1", "tenant-test", {{"amount": 42}})
+\tupdated = service.update_status("demo-1", "approved", tenant_id="tenant-test")
+\tdashboard = views_module.dashboard_model(service, tenant_id="tenant-test")
+\tapi_record = api_module.create_record({{"id": "api-1", "tenant_id": "tenant-test"}})
+
+\tassert record["metadata"]["amount"] == 42
+\tassert updated["status"] == "approved"
+\tassert dashboard["records"][0]["id"] == "demo-1"
+\tassert api_record["id"] == "api-1"
+\tassert api_module.capability_status("tenant-test")["record_count"] == 1
+
+
+def test_scaffolded_service_enforces_write_rules():
+\tservice_module = _load_package_module("service")
+\tservice = service_module.{''.join(part.title() for part in capability_id.split('_'))}Service()
+
+\ttry:
+\t\tservice.create_record("blocked-1", "", policy_attached=False)
+\texcept PermissionError as exc:
+\t\tassert "tenant_context_required" in str(exc)
+\telse:
+\t\traise AssertionError("expected tenant and policy denial")
 '''
 
 

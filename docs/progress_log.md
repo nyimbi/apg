@@ -16,6 +16,43 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:28 EAT
+
+Executable scaffold runtime slice:
+
+- Upgraded `apg capabilities scaffold` output from a metadata-oriented service
+  shell into a runnable dependency-light capability starter runtime.
+- Generated `models.py` now includes JSON-ready tenant-scoped records.
+- Generated `service.py` now includes an in-memory record store, list/get,
+  rule-guarded create, and rule-guarded status update behavior.
+- Generated `api.py` now exposes capability status, create, list, get, and
+  status-update helpers backed by a singleton service instance.
+- Generated `views.py` now exposes route metadata and a dashboard view model
+  with tenant records, rules, and theme data.
+- Generated scaffold tests now verify contract validity, deterministic rule
+  execution, service/API/view runtime behavior, and write-rule enforcement
+  using an isolated synthetic package name so scaffolds under generic domains
+  such as `common` do not collide with repository packages.
+- Updated capability, developer, capacity, and tooling docs to describe the
+  scaffold as an immediately executable starter runtime rather than an inert
+  package shell.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile cli/capabilities_command.py tests/test_cli_capability_scaffold.py` -> passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_scaffold.py tests/test_cli_capability_operability.py tests/test_tooling_audit.py` -> 9 passed.
+- `./.venv/bin/apg capabilities scaffold common demo --name "Demo Capacity" --out /private/tmp/apg-scaffold-runtime-proof --force --json` -> emitted `apg.capability-scaffold-report.v1` and wrote 9 files.
+- `./.venv/bin/pytest -q /private/tmp/apg-scaffold-runtime-proof/common/demo/tests` -> 4 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0 blocking gaps, and 0 errors.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109 valid contracts and 0 errors.
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py` -> 17 passed.
+
+Known remaining gaps:
+
+- The scaffold now provides executable generic runtime behavior; contributors
+  still need to specialize records, service operations, API payloads, and
+  dashboard models for each real business capacity.
+
 ### 2026-05-29 05:20 EAT
 
 Capability contract operability slice:

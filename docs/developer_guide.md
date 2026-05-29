@@ -268,6 +268,11 @@ For a new package-backed capability, start with:
 ./.venv/bin/apg capabilities scaffold <domain> <code> --name "Display Name" --json
 ```
 
+The scaffolded package is runnable immediately: `service.py` provides
+tenant-scoped record create/list/get/update behavior with deterministic rule
+enforcement, `api.py` exposes dependency-light helper functions, and `views.py`
+returns dashboard route/record/theme metadata.
+
 Inspect and exercise the capability contract before changing generated app
 code:
 

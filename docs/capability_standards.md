@@ -304,8 +304,11 @@ Use the CLI scaffold for a new package-backed capability:
 ./.venv/bin/apg capabilities scaffold common demo --name "Demo Capacity" --json
 ```
 
-The scaffold produces a valid spec-backed contract and dependency-light package
-shell that can be refined into domain-specific behavior.
+The scaffold produces a valid spec-backed contract plus an executable
+dependency-light package runtime: tenant-scoped records, rule-guarded
+create/update service methods, API helpers, dashboard view metadata, and
+focused contract/runtime tests. Refine that starter behavior into
+domain-specific operations instead of replacing it with inert placeholders.
 
 For a Python capability package under `capabilities/<domain>/<code>/`, use this
 shape where practical:

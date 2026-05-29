@@ -151,7 +151,8 @@ APG currently has an executable compiler path:
 - new package-backed capability skeletons can be created with
   `apg capabilities scaffold <domain> <code> --name ... --json`, which emits
   `apg.capability-scaffold-report.v1` and writes a valid spec-backed contract,
-  dependency-light package shell, and focused contract tests;
+  dependency-light record/service/API/view runtime, and focused
+  contract/runtime tests;
 - packaged capabilities can be publish-planned with
   `apg capabilities publish-plan <package-dir> --json`, which emits
   `apg.capability-publish-report.v1` by validating the package manifest,
