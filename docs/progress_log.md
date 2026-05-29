@@ -56,6 +56,26 @@ Known remaining gaps:
 - This proves the generated dependency-free app smoke contract for one enterprise ERP example, not the full runtime behavior of every capability package.
 - The next compiler-facing slice should expand executable generation where APG language constructs still compile only to metadata rather than behavior.
 
+### 2026-05-29 03:25 EAT
+
+Generated capability runtime promotion:
+
+- Promoted generated capability runtime helpers through the main generated app/package surface: rule listing/evaluation, configuration resolution/validation, approval planning, theming, language support, screens, streaming, and capability descriptions.
+- Added component-manifest Python exports for these capability runtime helpers so generated applications advertise the behavior they can execute.
+- Regenerated all 20 numbered example output directories from the current compiler so checked-in generated artifacts match the executable compiler surface.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py` -> passed.
+- `./.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py::test_capability_declaration_generates_runtime_manifest tests/test_capability_composition_runtime.py::test_generated_package_reexports_grouped_capability_descriptions tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler` -> 3 passed.
+- Fresh compile of `examples/20_enterprise_erp_platform/main.apg` followed by generated `smoke_test.py` -> exit code 0.
+- Regenerated example outputs command compiled 20/20 examples with no failures.
+
+Known remaining gaps:
+
+- Rule execution currently supports deterministic expression matching over structured contexts; richer rule-engine adapters and persistence-backed workflows still need further implementation.
+- Full behavior across every generated capability HTTP route needs broader runtime sweeps when battery allows.
+
 ### 2026-05-26 01:35 EAT
 
 Completed and pushed:

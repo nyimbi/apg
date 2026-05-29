@@ -107,6 +107,81 @@ def capability_health_report() -> Dict[str, Any]:
     return {"healthy": True, "errors": [], "warnings": [], "capabilities": {}}
 
 
+def describe_capability(capability_name: str) -> Dict[str, Any]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capability"):
+        return APG_CAPABILITIES.describe_capability(capability_name)
+    return {"name": capability_name, "available": False, "error": "capabilities_unavailable"}
+
+
+def describe_capabilities() -> Dict[str, Dict[str, Any]]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "describe_capabilities"):
+        return APG_CAPABILITIES.describe_capabilities()
+    return {}
+
+
+def capability_rules(capability_name: str) -> list[Dict[str, Any]]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_rules"):
+        return APG_CAPABILITIES.capability_rules(capability_name)
+    return []
+
+
+def evaluate_capability_rules(capability_name: str, context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "evaluate_capability_rules"):
+        return APG_CAPABILITIES.evaluate_capability_rules(capability_name, context or {})
+    return {"decision": "allow", "matched_rules": [], "actions": [], "context": context or {}, "warning": "capability_rules_unavailable"}
+
+
+def capability_configuration(capability_name: str, overrides: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_configuration"):
+        return APG_CAPABILITIES.capability_configuration(capability_name, overrides)
+    return dict(overrides or {})
+
+
+def validate_capability_configuration(
+    capability_name: str,
+    configuration: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "validate_capability_configuration"):
+        return APG_CAPABILITIES.validate_capability_configuration(capability_name, configuration)
+    return {"errors": ["capability_configuration_unavailable"], "warnings": []}
+
+
+def approval_plan(capability_name: str, context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "approval_plan"):
+        return APG_CAPABILITIES.approval_plan(capability_name, context or {})
+    return {"capability": capability_name, "required": False, "approvers": [], "context": context or {}}
+
+
+def capability_theme(capability_name: str, tenant_overrides: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_theme"):
+        return APG_CAPABILITIES.capability_theme(capability_name, tenant_overrides)
+    return {"name": capability_name, "tokens": dict(tenant_overrides or {})}
+
+
+def theme_token(capability_name: str, token: str, default: Any = None) -> Any:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "theme_token"):
+        return APG_CAPABILITIES.theme_token(capability_name, token, default)
+    return capability_theme(capability_name).get("tokens", {}).get(token, default)
+
+
+def capability_languages(capability_name: str) -> list[str]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_languages"):
+        return APG_CAPABILITIES.capability_languages(capability_name)
+    return []
+
+
+def capability_screens(capability_name: str) -> list[Dict[str, Any]]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_screens"):
+        return APG_CAPABILITIES.capability_screens(capability_name)
+    return []
+
+
+def capability_streaming(capability_name: str) -> Dict[str, Any]:
+    if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "capability_streaming"):
+        return APG_CAPABILITIES.capability_streaming(capability_name)
+    return {}
+
+
 def list_entities() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES]
 
@@ -398,12 +473,17 @@ def component_manifest() -> Dict[str, Any]:
                 "package": MODULE_NAME,
                 "exports": [
                     "auth_status",
+                    "approval_plan",
+                    "capability_configuration",
                     "coerce_record_types",
                     "component_manifest",
                     "create_record",
                     "database_status",
                     "delete_record",
+                    "describe_capabilities",
                     "describe_application",
+                    "describe_capability",
+                    "evaluate_capability_rules",
                     "get_record",
                     "invoke_agent",
                     "invoke_team",
@@ -424,11 +504,18 @@ def component_manifest() -> Dict[str, Any]:
                     "self_test",
                     "semantic_model",
                     "storage_status",
-                    "update_record",
                     "capability_health",
                     "capability_health_report",
+                    "capability_languages",
+                    "capability_rules",
+                    "capability_screens",
+                    "capability_streaming",
+                    "capability_theme",
+                    "theme_token",
+                    "update_record",
                     "validate_agent_runtimes",
                     "validate_application",
+                    "validate_capability_configuration",
                     "validate_component_manifest_contract",
                     "validate_openapi_contract",
                     "validate_route_dispatch_contract",

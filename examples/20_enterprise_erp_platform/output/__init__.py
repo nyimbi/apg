@@ -9,19 +9,29 @@ This package was automatically generated from APG source code.
 
 __version__ = "1.0.0"
 
-from .app import auth_status, capability_health, capability_health_report, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, get_record, invoke_agent, invoke_team, list_agent_teams, list_agents, list_capabilities, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, runtime_adapter_command_candidates, runtime_adapter_environment_keys, self_test, semantic_model, storage_status, update_record, validate_agent_runtimes, validate_application, validate_component_manifest_contract, validate_openapi_contract, validate_route_dispatch_contract, validate_record
+from .app import approval_plan, auth_status, capability_configuration, capability_health, capability_health_report, capability_languages, capability_rules, capability_screens, capability_streaming, capability_theme, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, describe_capabilities, describe_capability, evaluate_capability_rules, get_record, invoke_agent, invoke_team, list_agent_teams, list_agents, list_capabilities, list_databases, list_entities, list_events, list_records, main, metrics_snapshot, openapi_document, query_records, relationship_graph, runtime_adapter_command_candidates, runtime_adapter_environment_keys, self_test, semantic_model, storage_status, theme_token, update_record, validate_agent_runtimes, validate_application, validate_capability_configuration, validate_component_manifest_contract, validate_openapi_contract, validate_route_dispatch_contract, validate_record
 
 __all__ = [
     "__version__",
+    "approval_plan",
     "auth_status",
+    "capability_configuration",
     "capability_health",
     "capability_health_report",
+    "capability_languages",
+    "capability_rules",
+    "capability_screens",
+    "capability_streaming",
+    "capability_theme",
     "coerce_record_types",
     "component_manifest",
     "create_record",
     "database_status",
     "delete_record",
     "describe_application",
+    "describe_capabilities",
+    "describe_capability",
+    "evaluate_capability_rules",
     "get_record",
     "invoke_agent",
     "invoke_team",
@@ -42,9 +52,11 @@ __all__ = [
     "self_test",
     "semantic_model",
     "storage_status",
+    "theme_token",
     "update_record",
     "validate_agent_runtimes",
     "validate_application",
+    "validate_capability_configuration",
     "validate_component_manifest_contract",
     "validate_openapi_contract",
     "validate_route_dispatch_contract",
@@ -111,13 +123,18 @@ else:
 
 try:
     from .apg_capabilities import (
+        approval_plan,
         capability_dependency_graph,
+        capability_configuration,
         capability_health,
         capability_health_report,
+        capability_languages,
         capability_load_order,
+        capability_rules,
         capability_screens,
         capability_streaming,
         capability_theme,
+        evaluate_capability_rules,
         describe_capabilities,
         describe_capabilities_by_erp_module,
         describe_capability,
@@ -131,18 +148,24 @@ try:
         supported_language_codes,
         theme_token,
         ui_route_index,
+        validate_capability_configuration,
     )
 except ImportError:
     __all__ = list(__all__)
 else:
     __all__.extend([
+        "approval_plan",
         "capability_dependency_graph",
+        "capability_configuration",
         "capability_health",
         "capability_health_report",
+        "capability_languages",
         "capability_load_order",
+        "capability_rules",
         "capability_screens",
         "capability_streaming",
         "capability_theme",
+        "evaluate_capability_rules",
         "describe_capabilities",
         "describe_capabilities_by_erp_module",
         "describe_capability",
@@ -156,4 +179,5 @@ else:
         "supported_language_codes",
         "theme_token",
         "ui_route_index",
+        "validate_capability_configuration",
     ])

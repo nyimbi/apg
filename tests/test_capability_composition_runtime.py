@@ -691,6 +691,14 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
         screens = module.capability_screens("GeneralLedger")
         theme = module.capability_theme("GeneralLedger")
         health = module.capability_health("GeneralLedger")
+        rules = module.capability_rules("GeneralLedger")
+        rule_decision = module.evaluate_capability_rules(
+            "GeneralLedger",
+            {"debits": 100, "credits": 90, "period": {"closed": False}},
+        )
+        config = module.capability_configuration("GeneralLedger", {"currency": "USD"})
+        config_validation = module.validate_capability_configuration("GeneralLedger", config)
+        approval = module.approval_plan("GeneralLedger", {"amount": 2500})
     finally:
         sys.modules.pop("erp_ops_generated", None)
         for name in list(sys.modules):
@@ -703,6 +711,11 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert "list_capabilities" in component["interfaces"]["python"]["exports"]
     assert "capability_health" in component["interfaces"]["python"]["exports"]
     assert "capability_health_report" in component["interfaces"]["python"]["exports"]
+    assert "capability_rules" in component["interfaces"]["python"]["exports"]
+    assert "evaluate_capability_rules" in component["interfaces"]["python"]["exports"]
+    assert "capability_configuration" in component["interfaces"]["python"]["exports"]
+    assert "validate_capability_configuration" in component["interfaces"]["python"]["exports"]
+    assert "approval_plan" in component["interfaces"]["python"]["exports"]
     assert module.capability_names_by_erp_module()["general_ledger"] == ["GeneralLedger"]
     assert module.capability_dependency_graph() == {"GeneralLedger": []}
     assert module.capability_streaming("GeneralLedger")["processor"] == "bytewax"
@@ -713,6 +726,12 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert theme["tokens"]["accent"] == "#126E82"
     assert health["healthy"] is True
     assert health["status"] == "ok"
+    assert [rule["name"] for rule in rules] == ["posting_period_open", "balanced_journal"]
+    assert rule_decision["decision"] == "deny"
+    assert rule_decision["matched_rules"] == ["balanced_journal"]
+    assert config["currency"] == "USD"
+    assert config_validation["errors"] == []
+    assert approval["approvers"] == ["controller", "cfo"]
     assert module.theme_token("GeneralLedger", "accent") == "#126E82"
     assert len(module.african_language_codes()) >= 40
     assert "sw" in module.supported_language_codes()
@@ -721,13 +740,19 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
     assert "capability_screens" in module.__all__
     assert "capability_health" in module.__all__
     assert "capability_health_report" in module.__all__
+    assert "capability_configuration" in module.__all__
+    assert "capability_languages" in module.__all__
+    assert "capability_rules" in module.__all__
     assert "capability_streaming" in module.__all__
     assert "capability_theme" in module.__all__
+    assert "evaluate_capability_rules" in module.__all__
     assert "describe_capabilities_by_erp_module" in module.__all__
     assert "composition_graph" in module.__all__
+    assert "approval_plan" in module.__all__
     assert "supported_language_codes" in module.__all__
     assert "streaming_state_index" in module.__all__
     assert "theme_token" in module.__all__
+    assert "validate_capability_configuration" in module.__all__
     assert "validate_application" in module.__all__
     assert json.loads(json.dumps(grouped))["accounts_payable"][0]["name"] == "GeneralLedger"
 
