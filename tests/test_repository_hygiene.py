@@ -7,6 +7,15 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+ALLOWED_ROOT_TRACKED_FILES = {
+	".gitignore",
+	"LICENSE",
+	"README.md",
+	"cli.py",
+	"pytest.ini",
+	"setup.py",
+	"uuid_extensions.py",
+}
 ALLOWED_ROOT_MARKDOWN = {"README.md"}
 SOURCE_ROOT_OPERATIONAL_DOC_DIRECTORIES = {"capabilities", "gen", "mobile_apps"}
 SOURCE_ROOT_OPERATIONAL_DOC_SUFFIXES = (
@@ -123,6 +132,11 @@ def test_root_runtime_output_directories_are_not_tracked():
 	]
 
 	assert misplaced == []
+
+
+def test_root_tracked_files_stay_intentional_and_minimal():
+	root_files = sorted(path for path in _tracked_files() if "/" not in path)
+	assert root_files == sorted(ALLOWED_ROOT_TRACKED_FILES)
 
 
 def test_root_tests_and_docs_stay_in_expected_directories():

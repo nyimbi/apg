@@ -263,7 +263,7 @@ Style is secondary to correctness, scope control, and evidence.
 - Do not put secrets in APG source, generated examples, docs, or tests.
 - Do not add external side effects to audits that should be side-effect-free.
 - Do not require optional services for dependency-light generated apps.
-- Do not replace Bytewax with Kafka for internal APG streaming direction.
+- Do not replace Bytewax with a broker-first internal streaming direction.
 - Do not add provider-specific AI grammar for every new agent tool; use
   adapters.
 - Do not mark broad objectives complete from narrow evidence.
@@ -282,4 +282,3 @@ Good first contribution areas:
 
 Avoid starting with broad refactors, global formatting, dependency changes, or
 large capability rewrites.
-

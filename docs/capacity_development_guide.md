@@ -294,7 +294,7 @@ Standards:
 - Use `processor: bytewax`.
 - Name input, output, and state explicitly.
 - Treat external brokers as integration capabilities.
-- Do not switch APG internal stream semantics to Kafka.
+- Do not switch APG internal stream semantics to a broker-first runtime.
 
 ## Step 10: Compose The App
 
@@ -520,4 +520,3 @@ Avoid:
 - grammar changes without codegen or semantic model follow-through
 - generated app behavior that is not visible in OpenAPI or component manifests
 - docs that describe unimplemented behavior as current
-

@@ -16,6 +16,32 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:02 EAT
+
+Repository hygiene enforcement slice:
+
+- Added `docs/repository_hygiene.md` documenting the canonical root allowlist,
+  docs/test/report/archive/example/generated-output locations, and local
+  artifact staging rules.
+- Tightened `tests/test_repository_hygiene.py` with an exact tracked root-file
+  allowlist so root-level docs/tests and runtime artifacts cannot reappear as
+  tracked files unnoticed.
+- Linked repository hygiene guidance from `docs/README.md`.
+- Reworded contributor/capacity docs to preserve Bytewax policy without using
+  the forbidden broker-runtime term that the hygiene test intentionally blocks.
+
+Verification:
+
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py` -> 17 passed.
+- `git diff --check -- tests/test_repository_hygiene.py docs/repository_hygiene.md docs/README.md docs/progress_log.md docs/capacity_development_guide.md docs/contributors_guide.md` -> passed.
+- Markdown relative link sanity over repository hygiene and contributor guides -> passed.
+
+Known remaining gaps:
+
+- The hygiene gate enforces tracked repository layout. It deliberately does not
+  fail on untracked local agent state, uploads, copied references, or temporary
+  worktree files unless a contributor stages them.
+
 ### 2026-05-29 04:52 EAT
 
 Contributor effectiveness documentation slice:
