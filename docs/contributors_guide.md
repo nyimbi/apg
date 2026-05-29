@@ -7,6 +7,36 @@ The contribution rule is simple: make one useful final state more true in the
 current repository, prove it with evidence, document it, and commit a reviewable
 slice.
 
+## Contributor Operating Contract
+
+APG contribution work is organized around verified packets. A packet is the
+smallest coherent change that leaves the repository more executable than it was
+before.
+
+```text
+one outcome
+  -> one primary owner
+  -> one public contract
+  -> one focused proof path
+  -> one progress handoff
+  -> one Lore commit
+```
+
+Every contributor should be able to answer these questions before opening an
+editor:
+
+| Question | Good answer |
+| --- | --- |
+| What outcome changes? | one APG construct, generated artifact, capability behavior, example, audit, or guide |
+| Where is the owner? | one package, compiler module, example directory, test fixture, or docs page |
+| What public name must stay stable? | command, JSON `format`, semantic key, route, capability ID, rule, service method, screen, workflow, or agent |
+| What command proves it? | focused pytest, APG CLI audit, compile smoke, package publish-plan, or docs audit |
+| What is intentionally out of scope? | live integrations, broad output refreshes, unrelated cleanup, full-suite tests when not needed |
+
+If the answers span unrelated owners, split the contribution. The project gains
+velocity from small packets that compose, not from large diffs that are hard to
+prove.
+
 ## Immediate Contributor Path
 
 Use this path when you want to become useful quickly.
@@ -51,6 +81,39 @@ The fastest contributors are not the ones who touch the most files. They are the
 ones who leave the next contributor with fewer unknowns and a command that
 proves the current state.
 
+## Work Packet Template
+
+Use this exact template when claiming work in an issue, branch note, README, or
+progress-log entry.
+
+```text
+Outcome:
+Owner:
+Lane:
+Files expected:
+Public contract:
+Focused proof:
+Docs/progress-log update:
+Known non-goals:
+```
+
+Example:
+
+```text
+Outcome: recommender package produces tenant-scoped recommendations instead of generic records.
+Owner: capabilities/common/recs/
+Lane: capability implementation depth
+Files expected: models.py, service.py, api.py, views.py, cap_spec.md, focused tests
+Public contract: recs capability ID, rule IDs, service create/list/recommend APIs, publish-plan package shape
+Focused proof: package pytest; implementation-audit --root; publish-plan; strict package audit
+Docs/progress-log update: progress log with command outcomes
+Known non-goals: live vector database or external model provider integration
+```
+
+This template is deliberately concrete. It prevents "improve APG" from turning
+into a diff that touches many surfaces without making any one surface reliably
+better.
+
 ## Contributor Quick Card
 
 Use this card when you have no prior APG context.
@@ -76,6 +139,41 @@ If you are unsure where to help, run:
 Pick the first shallow capability or docs drift you can fix without new
 dependencies. A small verified improvement is better than a large unproven
 branch.
+
+## New Contributor First Green Slice
+
+A first green slice should fit in one of these lanes:
+
+| Lane | Good first green slice | Proof |
+| --- | --- | --- |
+| Docs | replace stale wording with exact APG commands and links | `apg docs audit --json`; `git diff --check -- docs` |
+| Example | clarify one numbered example README from current generated output | focused `apg compile ... --verify`; generated `smoke_test.py` |
+| Capability | enforce one rule or replace one generic service path | focused package tests; `implementation-audit --root`; `publish-plan` |
+| Compiler | expose one already-parseable construct in semantic JSON | focused test; `apg model ... --json` |
+| Generator | add one generated helper or route backed by semantic data | `apg compile ... --verify`; generated smoke test |
+| Tooling | add or document one audit field or fixture check | focused CLI test; relevant APG audit |
+
+Do not choose a first slice that requires broad grammar redesign, multiple
+package conversions, and generated-output refreshes in one commit. Those are
+valid project goals, but they should be decomposed into green slices first.
+
+## Reviewer's Fast Checklist
+
+Use this checklist when reviewing or self-reviewing a contribution:
+
+- Does the diff have one primary owner?
+- Does it improve parseability, semantic visibility, generated execution,
+  package behavior, capacity evidence, or contributor speed?
+- Are public names stable or intentionally documented?
+- Does the proof command cover the changed contract rather than only a nearby
+  file?
+- Does the progress log record meaningful executable progress when readiness
+  changed?
+- Are unrelated dirty files absent from the staged diff?
+- Does the Lore commit explain why the change was made and what was not tested?
+
+If any answer is unclear, ask for a narrower packet or stronger evidence before
+expanding the diff.
 
 ## Contributor Effectiveness Standard
 

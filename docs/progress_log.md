@@ -16,6 +16,38 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 13:24 EAT
+
+Contributor effectiveness documentation slice:
+
+- Strengthened the developer guide with an immediate effectiveness spine,
+  green-slice evidence table, first-commit packet template, concrete packet
+  examples, and source-reading order tied to APG's real compiler,
+  capability-package, example, and docs surfaces.
+- Strengthened the contributors guide with a contributor operating contract,
+  work-packet template, first green-slice lanes, and a reviewer fast checklist
+  so new contributors can choose a scoped packet, prove it, and commit it
+  without private context.
+- Strengthened the capacity development guide with a capacity builder contract,
+  required capacity-slice fields, definition of done, and parallel development
+  ownership boundaries for capacity leads, source owners, compiler owners,
+  capability owners, runtime owners, and docs owners.
+
+Verification:
+
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md` -> passed.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+
+Known remaining gaps:
+
+- The documentation now gives new contributors a stronger path to immediate
+  effectiveness, but the active platform objective still requires continued
+  capability implementation-depth burn-down. The next implementation target
+  remains `grc_rcm` from the latest implementation audit.
+
 ### 2026-05-29 13:12 EAT
 
 GEOS implementation-depth slice:

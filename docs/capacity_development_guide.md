@@ -8,6 +8,39 @@ applications, tests, docs, and release evidence.
 Use this guide when the goal is "make APG able to do something new", not merely
 "add a file".
 
+## Capacity Builder Contract
+
+A capacity is accepted when it gives APG a new executable ability that a second
+contributor can run, inspect, and extend. It is not accepted merely because a
+document lists the desired modules.
+
+```text
+capacity packet
+  -> parseable APG source
+  -> semantic model evidence
+  -> generated Python app evidence
+  -> package-backed capability behavior where durable behavior is needed
+  -> focused tests or audits
+  -> README/progress-log handoff
+```
+
+Every capacity slice must name:
+
+| Required item | Why it matters |
+| --- | --- |
+| Business event | keeps the capacity grounded in something observable |
+| APG source path | shows how an author declares it |
+| Semantic model keys | proves tooling can understand it |
+| Generated routes/helpers/manifests | proves the compiler exposes it |
+| Capability package owners | identifies where durable behavior belongs |
+| Rules and guardrails | makes correctness deterministic and testable |
+| Screens/workflows/agents/streams | shows composition points, not just data |
+| Focused proof commands | lets the next contributor verify before extending |
+| Known non-goals | prevents accidental live integrations or broad rewrites |
+
+If a proposed capacity cannot name those items yet, start with a seed slice
+that makes them visible.
+
 ## Build One Executable Thread First
 
 Start every capacity with one event that can travel through APG source,
@@ -125,6 +158,30 @@ If a proposed capacity violates an invariant, either adjust the slice or record
 the gap explicitly. Do not bury missing governance, rule, or integration
 behavior behind a broad "future work" sentence.
 
+## Definition Of Done For A Capacity Slice
+
+A capacity slice is done when the current repository, not intent, proves the
+next readiness step. Use this checklist before committing:
+
+- APG source exists or the package/service behavior has an explicit consumer.
+- `apg model <source> --json` exposes the relevant records, capabilities,
+  screens, workflows, agents, or streaming metadata when the slice changes APG
+  source.
+- `apg compile <source> --output /tmp/<name> --verify` passes when generated
+  behavior is part of the slice.
+- Generated `smoke_test.py` passes when an application output is produced.
+- Capability package tests, `implementation-audit`, and `publish-plan` pass
+  when durable package behavior changed.
+- The example README or package `cap_spec.md` names current behavior and the
+  next missing executable layer.
+- `docs/progress_log.md` records evidence when capacity readiness, package
+  readiness, or platform burn-down changed.
+- External integrations remain behind explicit adapter boundaries unless the
+  slice intentionally wires and verifies them.
+
+Use focused proof. Run broader baselines when compiler contracts, generated
+output contracts, or shared package contracts changed.
+
 ## Capacity Patterns That Scale
 
 Use these repeatable patterns when building ERP, CRM, finance, operations,
@@ -167,6 +224,40 @@ Use this loop to build capacities quickly without losing executable grounding:
 The loop is intentionally repetitive. APG becomes useful by repeating it across
 ERP, CRM, finance, operations, agentic, and integration capacities until each
 one has source, generated runtime behavior, package evidence, and documentation.
+
+## Parallel Capacity Development
+
+Capacities can be built quickly in parallel when each contributor owns a
+different durable surface. Use these boundaries:
+
+| Lane | Owns | Must coordinate with |
+| --- | --- | --- |
+| Capacity lead | packet, public names, readiness level, README, progress log | every lane before public names change |
+| APG source owner | `examples/<nn>_<capacity>/main.apg` and author-facing shape | compiler owner before relying on new syntax |
+| Compiler owner | parser, semantic model, generated app surfaces | source owner and runtime owner for semantic keys |
+| Capability owner | one `capabilities/<domain>/<code>/` package | capacity lead for service/rule names |
+| Runtime owner | generated routes, helpers, manifests, smoke tests | compiler owner for generated output contracts |
+| Docs owner | README, guide links, proof commands | all owners for current command evidence |
+
+Safe parallel work:
+
+- one contributor deepens a package while another improves the example README;
+- one contributor adds generated runtime exposure while another adds package
+  guardrail tests;
+- one contributor refreshes docs after another lands compiler behavior;
+- different contributors burn down different capability packages.
+
+Unsafe parallel work without coordination:
+
+- multiple contributors editing `spec/apg.g4` and semantic keys independently;
+- one contributor refreshing example outputs while another changes generator
+  contracts;
+- two contributors changing the same capability service public methods;
+- docs claiming a capacity readiness level before the proof commands exist.
+
+Parallel capacity work should converge through one visible packet and one final
+evidence trail. Speed without convergence creates more work for the next
+contributor.
 
 ## Capacity Seed Kit
 

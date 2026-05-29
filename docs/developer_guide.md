@@ -9,6 +9,41 @@ repository, run one reliable baseline, choose the right implementation surface,
 make a vertical slice executable, prove it, document it, and commit it without
 waiting for tribal knowledge.
 
+## Immediate Effectiveness Spine
+
+Use this spine for every new developer, every pairing session, and every
+handoff. It keeps APG development focused on executable reality instead of
+broad exploration.
+
+```text
+baseline evidence
+  -> one work packet
+  -> one owning layer
+  -> one vertical change
+  -> focused proof
+  -> docs/progress-log handoff
+  -> Lore commit and push
+```
+
+The first useful result from a new developer should be a **green slice**: one
+small APG behavior that can be run, inspected, and extended. A green slice is
+not a large architecture document. It is a current repository state that another
+developer can prove with commands.
+
+Minimum green-slice evidence:
+
+| Lane | Required proof |
+| --- | --- |
+| Grammar or parser | parser fixture or representative `.apg` file parses; invalid shape still fails |
+| Semantic model | `apg model <file> --json` exposes the intended stable key |
+| Generated app | `apg compile <file> --output /tmp/<name> --verify` and generated `smoke_test.py` pass |
+| Capability package | focused package tests, implementation audit, and publish-plan pass |
+| Example capacity | example README names readiness, output exists when intentionally refreshed, compile proof passes |
+| Documentation | `apg docs audit --json` and `git diff --check -- docs` pass |
+
+If a change cannot be placed in one lane, split it. APG moves faster when each
+commit makes one contract more trustworthy.
+
 ## Start Here
 
 If you have just joined APG, do not begin by reading every directory. Run one
@@ -39,6 +74,47 @@ Every packet must name:
 - the next gap left for another contributor.
 
 If a packet cannot name those five things, narrow it before editing.
+
+## First Commit Work Packet
+
+Before editing, write this packet into your issue note, handoff note, example
+README, or progress-log draft. Keep it short enough that another contributor
+can review scope in one minute.
+
+```text
+Outcome:
+Lane:
+Owning path:
+Public contract:
+Representative source/package:
+Focused proof:
+Docs/progress-log update:
+Not in this slice:
+```
+
+Examples:
+
+```text
+Outcome: workflow transitions appear in generated route metadata.
+Lane: compiler generated runtime
+Owning path: compiler/code_generator.py
+Public contract: generated component manifest route entries
+Representative source/package: examples/08_sales_workflow/main.apg
+Focused proof: apg compile ... --verify; generated smoke_test.py
+Docs/progress-log update: yes, compiler baseline evidence changed
+Not in this slice: workflow persistence adapters
+```
+
+```text
+Outcome: one materialized capability becomes domain-specific.
+Lane: capability depth
+Owning path: capabilities/common/grph/
+Public contract: grph service methods, rules, view models, publish-plan package
+Representative source/package: capabilities/common/grph/capability_contract.py
+Focused proof: package pytest; implementation-audit; publish-plan
+Docs/progress-log update: yes, implementation burn-down changed
+Not in this slice: live graph database integration
+```
 
 ## Immediate Effectiveness Contract
 
@@ -169,6 +245,21 @@ downstream surfaces can consume it:
 | `tests/` | Focused regression tests and fixture catalogs. |
 | `docs/` | User, contributor, developer, grammar, tooling, standards, and progress docs. |
 | `vscode-extension/` | APG VS Code integration metadata. |
+
+## Source Reading Order
+
+Read the codebase by the problem you are solving, not alphabetically.
+
+| Problem | Read first | Then read |
+| --- | --- | --- |
+| Syntax accepted incorrectly or rejected incorrectly | `spec/apg.g4`, parser fixtures, `compiler/parser.py` | `compiler/ast_builder.py`, parser golden tests |
+| Parsed syntax missing from tools | `compiler/ast_builder.py`, `compiler/semantic_model.py` | `compiler/semantic_analyzer.py`, graph/model fixtures |
+| Generated app missing behavior | `compiler/code_generator.py`, one numbered example output | generated smoke test and release evidence helpers |
+| Capability package shallow or generic | one `capabilities/<domain>/<code>/` tree | `docs/capability_standards.md`, implementation audit output |
+| Contributor cannot extend a feature | nearest README/guide/progress-log entry | docs audit, tooling specification |
+
+Stop reading when you can name the owning path, public contract, and focused
+proof. Extra reading is useful only when it changes the implementation decision.
 
 ## Immediate Operating Model
 
