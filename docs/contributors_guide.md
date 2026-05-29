@@ -165,7 +165,7 @@ every contribution, especially when compute or battery is constrained.
 
 | Change | Minimum useful verification |
 | --- | --- |
-| Docs only | `git diff --check -- docs` |
+| Docs only | `./.venv/bin/apg docs audit --json` and `git diff --check -- docs` |
 | CLI/tooling | focused CLI tests plus `./.venv/bin/apg tooling audit --json` |
 | Environment doctor | `./.venv/bin/apg doctor --json` |
 | Grammar | parser golden audit and relevant language contract tests |

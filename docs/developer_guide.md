@@ -346,7 +346,7 @@ Use the narrowest lane that proves the claim.
 
 | Lane | Commands |
 | --- | --- |
-| Docs | `git diff --check -- docs` |
+| Docs | `./.venv/bin/apg docs audit --json` and `git diff --check -- docs` |
 | Parser | `./.venv/bin/apg parser-golden --json` |
 | Semantic model | `./.venv/bin/apg model --audit-fixtures --json` |
 | Lint | `./.venv/bin/apg lint --audit-fixtures --json` |

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from compiler.tooling_audit import (
+	audit_docs,
 	audit_cli_surface_contracts,
 	audit_studio_designer_surface,
 	audit_tooling_fixtures,
@@ -25,6 +26,7 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 		"graph",
 		"repository_hygiene",
 		"doctor",
+		"docs",
 		"language_server",
 		"nl_plan",
 		"migration",
@@ -35,7 +37,7 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 	}:
 		assert surfaces[surface_name]["ok"] is True
 		assert surfaces[surface_name]["format_ok"] is True
-	assert report["summary"]["surface_count"] == 16
+	assert report["summary"]["surface_count"] == 17
 	assert report["summary"]["blocking_gap_count"] == 0
 
 
@@ -45,6 +47,7 @@ def test_cli_surface_audit_tracks_documented_command_groups():
 	assert report["format"] == "apg.cli-surface-audit.v1"
 	assert report["ok"] is True
 	assert "compile" in report["registered_commands"]
+	assert "docs" in report["registered_commands"]
 	assert "hygiene" in report["registered_commands"]
 	assert "language-server" in report["registered_commands"]
 	assert "package-verify" in report["registered_commands"]
@@ -53,9 +56,22 @@ def test_cli_surface_audit_tracks_documented_command_groups():
 	groups = {group["command"]: group for group in report["command_groups"]}
 	assert groups["capabilities"]["missing_subcommands"] == []
 	assert groups["deployment"]["missing_subcommands"] == []
+	assert groups["docs"]["missing_subcommands"] == []
 	assert groups["hygiene"]["missing_subcommands"] == []
 	assert groups["studio"]["missing_subcommands"] == []
 	assert report["summary"]["blocking_gap_count"] == 0
+
+
+def test_docs_audit_proves_required_docs_links_and_commands():
+	report = audit_docs()
+
+	assert report["format"] == "apg.docs-audit.v1"
+	assert report["ok"] is True
+	assert report["summary"]["missing_required_doc_count"] == 0
+	assert report["summary"]["broken_local_link_count"] == 0
+	assert report["summary"]["unknown_documented_command_count"] == 0
+	commands = {item["command"] for item in report["documented_commands"]}
+	assert {"compile", "tooling", "doctor", "hygiene"}.issubset(commands)
 
 
 def test_studio_designer_audit_proves_snapshot_and_dry_run_edit():

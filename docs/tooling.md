@@ -118,17 +118,20 @@ APG currently has an executable compiler path:
   fixtures across web, desktop, mobile, and container profiles;
 - `apg tooling audit --json` emits `apg.tooling-fixture-audit.v1` by running
   every checked-in compiler tooling fixture catalog plus the non-fixture CLI,
-  repository hygiene, IDE, and Studio contracts as one CI-friendly gate: parser-golden,
-  diagnostics, lint, formatter, drift, semantic model, graph, language-server,
-  natural-language planning, migrations, release evidence, top-level command
-  registration, required command-group subcommands, tracked root documentation
-  and test placement, VS Code integration, and Studio snapshot/edit-planning
-  surfaces;
+  repository hygiene, docs, IDE, and Studio contracts as one CI-friendly gate:
+  parser-golden, diagnostics, lint, formatter, drift, semantic model, graph,
+  language-server, natural-language planning, migrations, release evidence,
+  top-level command registration, required command-group subcommands, tracked
+  root documentation and test placement, documentation navigation and command
+  examples, VS Code integration, and Studio snapshot/edit-planning surfaces;
 - `apg hygiene audit --json` emits `apg.repository-hygiene-audit.v1` by
   checking the tracked repository layout, root allowlist, documentation and
   test placement, Python-first defaults, Bytewax-native streaming terminology,
   and generated/cache artifact exclusions without reading local untracked
   agent state;
+- `apg docs audit --json` emits `apg.docs-audit.v1` by checking required
+  contributor-facing docs, local Markdown navigation links, and documented APG
+  command examples against the registered CLI surface;
 - `apg doctor --json` emits `apg.doctor-report.v1` by checking Python version,
   required imports, parser artifacts, core compiler/language-server/template
   paths, capability contract registry health, and optional IDE/LSP packages;
@@ -825,6 +828,7 @@ apg evidence app.apg --target web --out dist/evidence --json
 apg evidence --audit-fixtures --json
 apg tooling audit --json
 apg hygiene audit --json
+apg docs audit --json
 apg validate
 apg run
 apg doctor --json
@@ -1162,7 +1166,7 @@ apg tooling audit --json
 The tooling audit emits `apg.tooling-fixture-audit.v1` and runs every
 checked-in compiler tooling fixture catalog through one command. It aggregates
 parser-golden, diagnostics, lint, formatter, semantic drift, graph-suite,
-repository hygiene, language-server, natural-language planner, migration,
+repository hygiene, docs, language-server, natural-language planner, migration,
 release-evidence fixture audits, and non-fixture CLI, IDE, and Studio surface
 contracts. Each surface reports its expected format, actual format, format
 match, summary, error count, and blocking-gap count. The aggregate exits
@@ -1185,6 +1189,18 @@ files only, matching the repository hygiene policy: `README.md` is the only
 root Markdown document, tests live under `tests/` or capability-local
 `tests/`, generated/cache output is not tracked, and public docs/templates stay
 Python-first and Bytewax-native.
+
+### `apg docs audit`
+
+```console
+apg docs audit --json
+```
+
+The docs audit emits `apg.docs-audit.v1` and makes contributor-facing
+documentation navigability executable. It checks that required guides exist,
+local Markdown links resolve, and line-start APG command examples reference
+registered top-level CLI commands. It deliberately ignores APG DSL examples so
+language snippets are not confused with shell commands.
 
 ### `apg capabilities`
 
@@ -1551,6 +1567,7 @@ Tooling tests must be fixture-driven and deterministic.
 | Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios, enforced by `apg migrate-plan --audit-fixtures --json` and the `apg.migration-fixture-audit.v1` report. |
 | Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, migration previews, source immutability, and rejected unsafe plans, enforced by `apg nl-plan --audit-fixtures --json` and the `apg.nl-plan-fixture-audit.v1` report. |
 | Verifier tests | Web/mobile/desktop/capability/deployment release evidence contracts, enforced by `apg evidence --audit-fixtures --json` and the `apg.release-evidence-fixture-audit.v1` report. |
+| Docs tests | Required guides, local Markdown links, and APG command examples, enforced by `apg docs audit --json` and the `apg.docs-audit.v1` report. |
 | Aggregate tooling gate | All checked-in compiler-adjacent fixture catalogs, enforced by `apg tooling audit --json` and the `apg.tooling-fixture-audit.v1` report. |
 | Drift tests | CLI, LSP, IDE, generator, and tests consume the same semantic model. |
 

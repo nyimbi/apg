@@ -16,6 +16,50 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 06:34 EAT
+
+Documentation audit surface slice:
+
+- Added `compiler.docs_audit.audit_docs()` emitting `apg.docs-audit.v1` for
+  required contributor-facing documentation, local Markdown navigation links,
+  and documented APG command examples checked against the registered CLI.
+- Added `apg docs audit --json` and text output, then wired the docs surface
+  into `apg tooling audit --json`, increasing the aggregate tooling gate to 17
+  surfaces.
+- Fixed the root `README.md` contribution link from missing
+  `CONTRIBUTING.md` to the checked-in contributors guide.
+- Tightened command-example scanning so APG DSL snippets are not mistaken for
+  shell commands.
+- Updated tooling, developer, contributor, and capacity-development docs to
+  include the docs audit in verification guidance.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/docs_audit.py
+  cli/docs_command.py cli/main.py compiler/tooling_audit.py
+  tests/test_tooling_audit.py` -> passed.
+- `./.venv/bin/apg docs audit --json` -> passed with 15 required docs, 68
+  local links, 51 documented commands, and 0 violations.
+- `./.venv/bin/apg docs audit` -> passed in text mode.
+- `./.venv/bin/pytest -q
+  tests/test_tooling_audit.py::test_docs_audit_proves_required_docs_links_and_commands
+  tests/test_tooling_audit.py::test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces
+  tests/test_tooling_audit.py::test_cli_surface_audit_tracks_documented_command_groups`
+  -> 3 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 17/17 surfaces, 0
+  blocking gaps, and 0 errors.
+- `git diff --check -- compiler/docs_audit.py cli/docs_command.py
+  cli/main.py compiler/tooling_audit.py tests/test_tooling_audit.py
+  README.md docs/tooling.md docs/developer_guide.md
+  docs/contributors_guide.md docs/capacity_development_guide.md
+  docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- The docs audit checks required docs, selected navigation docs, and APG CLI
+  command examples. It does not yet validate every historical report or every
+  external URL.
+
 ### 2026-05-29 06:26 EAT
 
 Doctor JSON serviceability slice:

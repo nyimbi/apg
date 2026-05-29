@@ -372,6 +372,7 @@ Choose tests by the layer changed:
 ./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py
 ./.venv/bin/apg doctor --json
 ./.venv/bin/apg hygiene audit --json
+./.venv/bin/apg docs audit --json
 ./.venv/bin/apg tooling audit --json
 ./.venv/bin/apg lint path/to/capacity.apg --catalog /tmp/apg-capability-catalog.json --json
 ```

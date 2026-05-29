@@ -500,7 +500,7 @@ docker run --rm -p 8080:8080 apg-generated-app
 
 ## Contributing
 
-We welcome contributions from the community! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+We welcome contributions from the community. Start with the [Contributors Guide](docs/contributors_guide.md) for the current APG workflow, evidence standards, and commit protocol.
 
 ### Development Setup
 ```bash

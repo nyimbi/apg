@@ -25,6 +25,7 @@ from cli.compile_command import compile_cmd
 from cli.deployment_command import deployment
 from cli.diagnostics_command import diagnostics
 from cli.doctor_command import doctor
+from cli.docs_command import docs
 from cli.drift_command import drift
 from cli.evidence_command import evidence
 from cli.explain_command import explain
@@ -68,6 +69,7 @@ cli.add_command(compile_cmd, name='compile')
 cli.add_command(deployment)
 cli.add_command(diagnostics)
 cli.add_command(doctor)
+cli.add_command(docs)
 cli.add_command(drift)
 cli.add_command(evidence)
 cli.add_command(explain)

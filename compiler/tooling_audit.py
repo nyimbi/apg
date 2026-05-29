@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from compiler.diagnostics import audit_diagnostic_fixtures
 from compiler.doctor import build_doctor_report
+from compiler.docs_audit import audit_docs
 from compiler.drift import audit_drift_fixtures
 from compiler.evidence_bundle import audit_release_evidence_fixtures
 from compiler.formatter import audit_formatter_fixtures
@@ -33,6 +34,7 @@ REQUIRED_TOP_LEVEL_COMMANDS = [
 	"deployment",
 	"diagnostics",
 	"doctor",
+	"docs",
 	"drift",
 	"evidence",
 	"explain",
@@ -61,6 +63,7 @@ REQUIRED_TOP_LEVEL_COMMANDS = [
 REQUIRED_COMMAND_GROUPS = {
 	"capabilities": ["catalog", "contracts", "evaluate-rules", "inspect", "list", "publish-apply", "publish-plan", "scaffold", "validate-contracts"],
 	"deployment": ["verify"],
+	"docs": ["audit"],
 	"hygiene": ["audit"],
 	"ide": ["audit"],
 	"studio": ["plan-edit", "snapshot"],
@@ -119,6 +122,7 @@ def _fixture_audits() -> list[FixtureAudit]:
 		("graph", "apg.graph-fixture-audit.v1", audit_graph_fixtures),
 		("repository_hygiene", "apg.repository-hygiene-audit.v1", audit_repository_hygiene),
 		("doctor", "apg.doctor-report.v1", build_doctor_report),
+		("docs", "apg.docs-audit.v1", audit_docs),
 		("language_server", "apg.language-server-fixture-audit.v1", audit_language_server_fixtures),
 		("nl_plan", "apg.nl-plan-fixture-audit.v1", audit_nl_plan_fixtures),
 		("migration", "apg.migration-fixture-audit.v1", audit_migration_fixtures),
