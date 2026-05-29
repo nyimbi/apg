@@ -12172,3 +12172,24 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 99, materialized baseline packages dropped to 10, contract-only packages remain 0, custom Python files increased to 913, and warning count dropped to 10. The next implementation-depth warning is `shdn`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `git diff --check -- capabilities/common/seop` passed with no whitespace errors.
+
+### 2026-05-29 19:16 EAT
+
+Executable SHDN shutdown/lifecycle runtime slice:
+
+- Converted `capabilities/common/shdn` from generated materialized baseline package status into a domain-specific shutdown and lifecycle-control runtime.
+- Added `lifecycle_runtime.py` with deterministic shutdown target, shutdown plan, drain operation, backup snapshot, shutdown execution, recovery, audit event, target type, criticality, stable ID, and timestamp primitives.
+- Replaced generic record/service/API/view behavior with SHDN lifecycle methods for service registration, shutdown plan creation, drain orchestration, backup and restore-test evidence recording, guarded shutdown execution, recovery evidence, compatibility records, dashboards, list APIs, and UI view models.
+- Replaced generated package tests with package contract/runtime tests covering service-plan-drain-snapshot-shutdown-recovery execution and tenant, owner, approval, drain, health-gate, force-shutdown review, and recovery-evidence guardrails.
+- Updated `cap_spec.md` to describe current executable SHDN runtime behavior, adapter boundaries, routes, rules, and focused verification commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/shdn/__init__.py capabilities/common/shdn/models.py capabilities/common/shdn/lifecycle_runtime.py capabilities/common/shdn/service.py capabilities/common/shdn/api.py capabilities/common/shdn/views.py capabilities/common/shdn/capability_contract.py capabilities/common/shdn/app.py capabilities/common/shdn/test_capability_contract.py capabilities/common/shdn/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package" capabilities/common/shdn` returned no remaining SHDN baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.shdn.lifecycle_runtime','capabilities.common.shdn.service','capabilities.common.shdn.api','capabilities.common.shdn.views','capabilities.common.shdn.capability_contract']]; print('shdn imports ok')"` passed with `shdn imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/shdn/test_capability_contract.py capabilities/common/shdn/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/shdn --json` passed with `ok: true`; `shdn` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/shdn --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 100, materialized baseline packages dropped to 9, contract-only packages remain 0, custom Python files increased to 914, and warning count dropped to 9. The next implementation-depth warning is `srch`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.

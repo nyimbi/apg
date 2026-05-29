@@ -5,14 +5,33 @@ from __future__ import annotations
 from typing import Any
 
 from .capability_contract import evaluate_capability_rules, get_capability_contract
-from .models import ShdnRecord
+from .lifecycle_runtime import (
+	BackupSnapshotRecord,
+	DrainOperationRecord,
+	LifecycleAuditEventRecord,
+	RecoveryRecord,
+	ShutdownExecutionRecord,
+	ShutdownPlanRecord,
+	ShutdownTargetRecord,
+	lifecycle_required_actions,
+	normalize_criticality,
+	normalize_target_type,
+	stable_id,
+	utc_now,
+)
 
 
 class ShdnService:
-	"""Dependency-light service backed by the capability contract."""
+	"""Deterministic lifecycle-control service for APG composition."""
 
 	def __init__(self) -> None:
-		self._records: dict[str, ShdnRecord] = {}
+		self.targets: dict[str, ShutdownTargetRecord] = {}
+		self.plans: dict[str, ShutdownPlanRecord] = {}
+		self.drains: dict[str, DrainOperationRecord] = {}
+		self.snapshots: dict[str, BackupSnapshotRecord] = {}
+		self.executions: dict[str, ShutdownExecutionRecord] = {}
+		self.recoveries: dict[str, RecoveryRecord] = {}
+		self.audit_events: dict[str, LifecycleAuditEventRecord] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -20,11 +39,254 @@ class ShdnService:
 	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
 		return evaluate_capability_rules(context)
 
-	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
-		records = list(self._records.values())
-		if tenant_id is not None:
-			records = [record for record in records if record.tenant_id == tenant_id]
-		return [record.to_dict() for record in sorted(records, key=lambda item: item.id)]
+	def register_service(
+		self,
+		tenant_id: str,
+		target_id: str,
+		target_type: str,
+		owner: str,
+		environment: str = "production",
+		dependencies: list[str] | None = None,
+		criticality: str = "normal",
+		drain_timeout_seconds: int = 300,
+		health_gate_ref: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		context = {
+			"tenant_context_present": True,
+			"operation": "register_service",
+			"service_owner_assigned": bool(str(owner or "").strip()),
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		if not str(target_id or "").strip():
+			raise ValueError("shutdown_target_id_required")
+		if drain_timeout_seconds <= 0:
+			raise ValueError("drain_timeout_must_be_positive")
+		record = ShutdownTargetRecord(
+			id=stable_id("shdn_target", tenant_id, target_id),
+			tenant_id=tenant_id,
+			target_id=target_id,
+			target_type=normalize_target_type(target_type),
+			owner=owner,
+			environment=str(environment or "production"),
+			criticality=normalize_criticality(criticality),
+			dependencies=sorted({str(item) for item in dependencies or [] if str(item).strip()}),
+			drain_timeout_seconds=int(drain_timeout_seconds),
+			health_gate_ref=health_gate_ref,
+		)
+		self.targets[record.id] = record
+		self._record_event(tenant_id, "target_registered", record.id, f"Lifecycle target registered: {target_id}", owner)
+		return record.to_dict()
+
+	def create_shutdown_plan(
+		self,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		target_ids: list[str],
+		reason: str,
+		rollback_plan_ref: str,
+		restart_sequence: list[str],
+		approved_by: str | None = None,
+		scheduled_for: str | None = None,
+		maintenance_window_ref: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(name or "").strip():
+			raise ValueError("shutdown_plan_name_required")
+		if not str(owner or "").strip():
+			raise ValueError("shutdown_plan_owner_required")
+		if not target_ids:
+			raise ValueError("shutdown_plan_targets_required")
+		if not str(reason or "").strip():
+			raise ValueError("shutdown_plan_reason_required")
+		if not str(rollback_plan_ref or "").strip():
+			raise PermissionError("rollback_plan_required")
+		if not restart_sequence:
+			raise PermissionError("restart_sequence_required")
+		if not str(maintenance_window_ref or "").strip():
+			raise PermissionError("maintenance_window_required")
+		targets = [self._get_target(tenant_id, target_id) for target_id in target_ids]
+		production_service = any(target.environment == "production" or target.criticality == "critical" for target in targets)
+		context = {
+			"tenant_context_present": True,
+			"operation": "create_shutdown_plan",
+			"production_service": production_service,
+			"approval_recorded": bool(str(approved_by or "").strip()),
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		record = ShutdownPlanRecord(
+			id=stable_id("shdn_plan", tenant_id, name, len(self.plans)),
+			tenant_id=tenant_id,
+			name=name,
+			owner=owner,
+			target_ids=sorted({target.id for target in targets}),
+			reason=reason,
+			status="scheduled" if scheduled_for else "approved",
+			rollback_plan_ref=rollback_plan_ref,
+			restart_sequence=[str(step) for step in restart_sequence],
+			approved_by=approved_by,
+			scheduled_for=scheduled_for,
+			maintenance_window_ref=maintenance_window_ref,
+		)
+		self.plans[record.id] = record
+		self._record_event(tenant_id, "plan_created", record.id, f"Shutdown plan created: {name}", owner)
+		return record.to_dict()
+
+	def start_drain(
+		self,
+		tenant_id: str,
+		plan_id: str,
+		target_id: str,
+		active_sessions: int = 0,
+		queue_depth: int = 0,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		plan = self._get_plan(tenant_id, plan_id)
+		target = self._get_target(tenant_id, target_id)
+		self._require_plan_target(plan, target)
+		if active_sessions < 0 or queue_depth < 0:
+			raise ValueError("drain_counts_must_be_non_negative")
+		status = "quiesced" if active_sessions == 0 and queue_depth == 0 else "draining"
+		record = DrainOperationRecord(
+			id=stable_id("shdn_drain", tenant_id, plan_id, target.id),
+			tenant_id=tenant_id,
+			plan_id=plan.id,
+			target_id=target.id,
+			active_sessions=int(active_sessions),
+			queue_depth=int(queue_depth),
+			status=status,
+			completed_at=utc_now() if status == "quiesced" else None,
+		)
+		self.drains[record.id] = record
+		target.state = status
+		target.updated_at = utc_now()
+		plan.status = "executing"
+		self._record_event(tenant_id, "drain_started", record.id, f"Drain status for {target.target_id}: {status}", plan.owner)
+		return record.to_dict()
+
+	def record_backup_snapshot(
+		self,
+		tenant_id: str,
+		plan_id: str,
+		target_id: str,
+		evidence_ref: str,
+		restore_test_ref: str,
+		verified: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		plan = self._get_plan(tenant_id, plan_id)
+		target = self._get_target(tenant_id, target_id)
+		self._require_plan_target(plan, target)
+		if not str(evidence_ref or "").strip():
+			raise PermissionError("backup_snapshot_required")
+		if not str(restore_test_ref or "").strip():
+			raise PermissionError("restore_test_required")
+		record = BackupSnapshotRecord(
+			id=stable_id("shdn_snapshot", tenant_id, plan_id, target.id),
+			tenant_id=tenant_id,
+			plan_id=plan.id,
+			target_id=target.id,
+			evidence_ref=evidence_ref,
+			restore_test_ref=restore_test_ref,
+			verified=bool(verified),
+		)
+		self.snapshots[record.id] = record
+		target.state = "snapshot_ready" if verified else target.state
+		target.updated_at = utc_now()
+		self._record_event(tenant_id, "snapshot_recorded", record.id, f"Backup snapshot recorded for {target.target_id}", plan.owner)
+		return record.to_dict()
+
+	def execute_shutdown(
+		self,
+		tenant_id: str,
+		plan_id: str,
+		target_id: str,
+		actor: str,
+		health_gate_ref: str,
+		force_shutdown: bool = False,
+		force_review_recorded: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		plan = self._get_plan(tenant_id, plan_id)
+		target = self._get_target(tenant_id, target_id)
+		self._require_plan_target(plan, target)
+		drain = self._get_drain(tenant_id, plan.id, target.id)
+		snapshot = self._get_snapshot(tenant_id, plan.id, target.id)
+		context = {
+			"tenant_context_present": True,
+			"operation": "execute_shutdown",
+			"health_gate_passed": bool(str(health_gate_ref or "").strip()),
+			"backup_snapshot_present": bool(snapshot.verified),
+			"production_service": target.environment == "production" or target.criticality == "critical",
+			"approval_recorded": bool(str(plan.approved_by or "").strip()),
+			"force_shutdown": bool(force_shutdown),
+			"force_review_recorded": bool(force_review_recorded),
+		}
+		if drain.status != "quiesced":
+			raise PermissionError("drain_not_quiesced")
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		status = "blocked" if result["decision"] == "require_review" else "completed"
+		record = ShutdownExecutionRecord(
+			id=stable_id("shdn_execution", tenant_id, plan.id, target.id, len(self.executions)),
+			tenant_id=tenant_id,
+			plan_id=plan.id,
+			target_id=target.id,
+			actor=actor,
+			status=status,
+			force_shutdown=bool(force_shutdown),
+			required_actions=lifecycle_required_actions(result),
+			matched_rules=list(result["matched_rules"]),
+		)
+		self.executions[record.id] = record
+		if status == "completed":
+			target.state = "stopped"
+			plan.status = "completed" if self._all_plan_targets_stopped(plan) else "executing"
+		else:
+			plan.status = "blocked"
+		target.health_gate_ref = health_gate_ref
+		target.updated_at = utc_now()
+		self._record_event(tenant_id, "shutdown_executed", record.id, f"Shutdown execution {status}: {target.target_id}", actor, "high")
+		return record.to_dict()
+
+	def record_recovery(
+		self,
+		tenant_id: str,
+		plan_id: str,
+		target_id: str,
+		actor: str,
+		evidence_ref: str,
+		post_shutdown_health_check_ref: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		plan = self._get_plan(tenant_id, plan_id)
+		target = self._get_target(tenant_id, target_id)
+		self._require_plan_target(plan, target)
+		if not str(evidence_ref or "").strip():
+			raise PermissionError("incident_link_required")
+		if not str(post_shutdown_health_check_ref or "").strip():
+			raise PermissionError("post_shutdown_health_check_required")
+		record = RecoveryRecord(
+			id=stable_id("shdn_recovery", tenant_id, plan.id, target.id),
+			tenant_id=tenant_id,
+			plan_id=plan.id,
+			target_id=target.id,
+			actor=actor,
+			evidence_ref=evidence_ref,
+			post_shutdown_health_check_ref=post_shutdown_health_check_ref,
+			status="recovered",
+		)
+		self.recoveries[record.id] = record
+		target.state = "recovered"
+		target.updated_at = utc_now()
+		self._record_event(tenant_id, "recovery_recorded", record.id, f"Recovery evidence recorded for {target.target_id}", actor)
+		return record.to_dict()
 
 	def create_record(
 		self,
@@ -33,24 +295,124 @@ class ShdnService:
 		metadata: dict[str, Any] | None = None,
 		status: str = "active",
 	) -> dict[str, Any]:
-		self._enforce_write_policy(tenant_id)
-		record = ShdnRecord(
-			id=record_id,
+		metadata = dict(metadata or {})
+		return self.register_service(
 			tenant_id=tenant_id,
-			status=status,
-			metadata=dict(metadata or {}),
+			target_id=record_id,
+			target_type=str(metadata.get("target_type") or "service"),
+			owner=str(metadata.get("owner") or "compatibility-owner"),
+			environment=str(metadata.get("environment") or "production"),
+			dependencies=list(metadata.get("dependencies") or []),
+			criticality=str(metadata.get("criticality") or "normal"),
+			drain_timeout_seconds=int(metadata.get("drain_timeout_seconds", 300)),
+			health_gate_ref=metadata.get("health_gate_ref") or status,
 		)
-		self._records[record_id] = record
+
+	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self.list_targets(tenant_id)
+
+	def list_targets(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.targets, tenant_id)
+
+	def list_plans(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.plans, tenant_id)
+
+	def list_drains(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.drains, tenant_id)
+
+	def list_snapshots(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.snapshots, tenant_id)
+
+	def list_executions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.executions, tenant_id)
+
+	def list_recoveries(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.recoveries, tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.audit_events, tenant_id)
+
+	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		targets = self.list_targets(tenant_id)
+		plans = self.list_plans(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"target_count": len(targets),
+			"production_target_count": sum(1 for item in targets if item["environment"] == "production"),
+			"critical_target_count": sum(1 for item in targets if item["criticality"] == "critical"),
+			"active_plan_count": sum(1 for item in plans if item["status"] in {"approved", "scheduled", "executing", "blocked"}),
+			"completed_plan_count": sum(1 for item in plans if item["status"] == "completed"),
+			"quiesced_drain_count": sum(1 for item in self.list_drains(tenant_id) if item["status"] == "quiesced"),
+			"snapshot_count": len(self.list_snapshots(tenant_id)),
+			"shutdown_count": len([item for item in targets if item["state"] == "stopped"]),
+			"recovery_count": len(self.list_recoveries(tenant_id)),
+			"recent_events": self.list_audit_events(tenant_id)[-5:],
+		}
+
+	def _require_tenant(self, tenant_id: str) -> None:
+		if not str(tenant_id or "").strip():
+			self._raise_policy(self.evaluate({"tenant_context_present": False}))
+
+	def _raise_policy(self, result: dict[str, Any]) -> None:
+		reasons = ", ".join(action.get("reason", "shdn_policy_blocked") for action in result["actions"])
+		raise PermissionError(reasons or "shdn_policy_blocked")
+
+	def _get_target(self, tenant_id: str, target_id: str) -> ShutdownTargetRecord:
+		target = self.targets.get(target_id)
+		if target is None:
+			target = next((item for item in self.targets.values() if item.tenant_id == tenant_id and item.target_id == target_id), None)
+		if target is None or target.tenant_id != tenant_id:
+			raise KeyError(f"shutdown_target_not_found:{target_id}")
+		return target
+
+	def _get_plan(self, tenant_id: str, plan_id: str) -> ShutdownPlanRecord:
+		plan = self.plans.get(plan_id)
+		if plan is None or plan.tenant_id != tenant_id:
+			raise KeyError(f"shutdown_plan_not_found:{plan_id}")
+		return plan
+
+	def _get_drain(self, tenant_id: str, plan_id: str, target_id: str) -> DrainOperationRecord:
+		drain = self.drains.get(stable_id("shdn_drain", tenant_id, plan_id, target_id))
+		if drain is None or drain.tenant_id != tenant_id:
+			raise PermissionError("drain_not_recorded")
+		return drain
+
+	def _get_snapshot(self, tenant_id: str, plan_id: str, target_id: str) -> BackupSnapshotRecord:
+		snapshot = self.snapshots.get(stable_id("shdn_snapshot", tenant_id, plan_id, target_id))
+		if snapshot is None or snapshot.tenant_id != tenant_id:
+			raise PermissionError("backup_snapshot_required")
+		return snapshot
+
+	def _require_plan_target(self, plan: ShutdownPlanRecord, target: ShutdownTargetRecord) -> None:
+		if target.id not in plan.target_ids:
+			raise PermissionError(f"target_not_in_shutdown_plan:{target.id}")
+
+	def _all_plan_targets_stopped(self, plan: ShutdownPlanRecord) -> bool:
+		return all(self.targets[target_id].state == "stopped" for target_id in plan.target_ids if target_id in self.targets)
+
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		actor: str,
+		severity: str = "low",
+	) -> dict[str, Any]:
+		record = LifecycleAuditEventRecord(
+			id=stable_id("shdn_event", tenant_id, event_type, subject_id, len(self.audit_events)),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject_id=subject_id,
+			message=message,
+			actor=actor,
+			severity=severity,
+		)
+		self.audit_events[record.id] = record
 		return record.to_dict()
 
-	def _enforce_write_policy(self, tenant_id: str) -> None:
-		result = self.evaluate({
-			"tenant_context_present": bool(tenant_id),
-			"operation_type": "write",
-			"policy_attached": True,
-			"risk_level": "low",
-			"review_recorded": True,
-		})
-		if result["decision"] != "allow":
-			reasons = ", ".join(action.get("reason", "capability_policy_blocked") for action in result["actions"])
-			raise PermissionError(reasons or "capability_policy_blocked")
+	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = [record.to_dict() for record in records.values()]
+		if tenant_id is not None:
+			items = [item for item in items if item["tenant_id"] == tenant_id]
+		return sorted(items, key=lambda item: item["id"])
