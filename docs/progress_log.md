@@ -16,6 +16,63 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 18:17 EAT
+
+SBOX sandbox/testing runtime implementation-depth slice:
+
+- Converted `capabilities/common/sbox` from generated materialized record
+  scaffolding into a domain-specific sandbox and safe testing runtime.
+- Replaced the generic record model with isolation profiles, sandbox
+  templates, datasets, sandbox environments, sandbox runs, and audit events.
+- Added `sandbox_runtime.py` with deterministic IDs, dataset/run/isolation
+  normalization, sandbox state helpers, run result classification, policy
+  summary text, and sandbox risk scoring.
+- Replaced generic service behavior with `SboxService` lifecycle methods for
+  isolation profile creation, template creation, dataset registration,
+  sandbox creation, run start/completion, sandbox expiration, dashboard
+  summaries, audit events, compatibility records, and policy enforcement.
+- Expanded API and view helpers so SBOX exposes sandbox, template, dataset,
+  run monitor, policy, logs, settings, route, rule, and theme composition
+  surfaces.
+- Rewrote `cap_spec.md` around current executable SBOX behavior, adapter
+  boundaries, UI surfaces, theme metadata, known non-goals, and proof commands.
+- Replaced generated package tests with focused lifecycle, package-publish,
+  guardrail, and view-model tests.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/sbox` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/sbox/__init__.py
+  capabilities/common/sbox/models.py capabilities/common/sbox/sandbox_runtime.py
+  capabilities/common/sbox/service.py capabilities/common/sbox/api.py
+  capabilities/common/sbox/views.py capabilities/common/sbox/capability_contract.py
+  capabilities/common/sbox/app.py capabilities/common/sbox/test_capability_contract.py
+  capabilities/common/sbox/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/sbox/test_capability_contract.py
+  capabilities/common/sbox/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "import importlib; ..."` for SBOX models,
+  `sandbox_runtime`, service, API, views, and capability contract passed with
+  `sbox imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/sbox --json` passed with `sbox` classified as
+  `domain_specific`, `sandbox_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/sbox --json`
+  passed with `ok: true`, warnings empty, and side-effect-free catalog patch
+  evidence.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 94
+  domain-specific packages, 14 materialized-baseline packages, 0 mixed
+  implementations, 1 contract-only package, 908 custom Python files, 0 errors,
+  and 15 warnings; the next implementation-depth target is `schd`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `git diff --check -- capabilities/common/sbox docs/progress_log.md` passed
+  with no whitespace errors.
+
 ### 2026-05-29 18:09 EAT
 
 REGY service-registry implementation-depth closure slice:
