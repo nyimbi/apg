@@ -16,6 +16,40 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 06:40 EAT
+
+Aggregate compiler baseline surface slice:
+
+- Wired `compiler.baseline.build_compiler_baseline_report(examples)` into
+  `apg tooling audit --json` as the `compiler_baseline` surface.
+- The aggregate tooling gate now proves numbered example presence, 20-example
+  domain coverage, lint/validate/model/graph/release agreement, and
+  compile-and-verify execution alongside the existing fixture, CLI, docs,
+  hygiene, IDE, and Studio surfaces.
+- Updated tooling and developer docs so the umbrella audit and verification
+  lanes explicitly include `apg baseline examples --json`.
+
+Verification:
+
+- `./.venv/bin/apg baseline examples --json` -> passed with 20/20 examples, 0
+  failed examples, python-only targeting, and full domain coverage.
+- `./.venv/bin/python -m py_compile compiler/tooling_audit.py
+  tests/test_tooling_audit.py` -> passed.
+- `./.venv/bin/pytest -q
+  tests/test_tooling_audit.py::test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces`
+  -> 1 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 18/18 surfaces, 0
+  blocking gaps, and 0 errors.
+- `git diff --check -- compiler/tooling_audit.py tests/test_tooling_audit.py
+  docs/tooling.md docs/developer_guide.md docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- `apg tooling audit --json` now runs the numbered-example compiler baseline,
+  so it is heavier than before. Use focused fixture commands for small local
+  edits when battery is constrained, and reserve the aggregate gate for shared
+  compiler/tooling surfaces or pre-commit evidence.
+
 ### 2026-05-29 06:34 EAT
 
 Documentation audit surface slice:

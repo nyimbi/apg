@@ -24,6 +24,7 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 		"drift",
 		"semantic_model",
 		"graph",
+		"compiler_baseline",
 		"repository_hygiene",
 		"doctor",
 		"docs",
@@ -37,7 +38,9 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 	}:
 		assert surfaces[surface_name]["ok"] is True
 		assert surfaces[surface_name]["format_ok"] is True
-	assert report["summary"]["surface_count"] == 17
+	assert surfaces["compiler_baseline"]["summary"]["passed_examples"] == 20
+	assert surfaces["compiler_baseline"]["summary"]["failed_examples"] == 0
+	assert report["summary"]["surface_count"] == 18
 	assert report["summary"]["blocking_gap_count"] == 0
 
 

@@ -352,6 +352,7 @@ Use the narrowest lane that proves the claim.
 | Lint | `./.venv/bin/apg lint --audit-fixtures --json` |
 | Validate | `./.venv/bin/apg validate path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target python --json` |
 | Generator | `./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --catalog /tmp/apg-capability-catalog.json --output /tmp/apg-erp --verify` |
+| Compiler baseline | `./.venv/bin/apg baseline examples --json` |
 | Release/package | `./.venv/bin/apg package path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-package --json` |
 | Evidence bundle | `./.venv/bin/apg evidence path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-evidence --json` |
 | Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` |

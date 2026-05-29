@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from compiler.baseline import build_compiler_baseline_report
 from compiler.diagnostics import audit_diagnostic_fixtures
 from compiler.doctor import build_doctor_report
 from compiler.docs_audit import audit_docs
@@ -120,6 +121,7 @@ def _fixture_audits() -> list[FixtureAudit]:
 		("drift", "apg.drift-audit.v1", audit_drift_fixtures),
 		("semantic_model", "apg.semantic-model-fixture-audit.v1", audit_semantic_model_fixtures),
 		("graph", "apg.graph-fixture-audit.v1", audit_graph_fixtures),
+		("compiler_baseline", "apg.compiler-baseline-report.v1", audit_compiler_baseline),
 		("repository_hygiene", "apg.repository-hygiene-audit.v1", audit_repository_hygiene),
 		("doctor", "apg.doctor-report.v1", build_doctor_report),
 		("docs", "apg.docs-audit.v1", audit_docs),
@@ -131,6 +133,14 @@ def _fixture_audits() -> list[FixtureAudit]:
 		("ide_integration", "apg.ide-audit.v1", audit_vscode_extension),
 		("studio_designer", STUDIO_SURFACE_AUDIT_FORMAT, audit_studio_designer_surface),
 	]
+
+
+def audit_compiler_baseline() -> dict[str, Any]:
+	"""Run the numbered-example compiler bed-down gate."""
+	from pathlib import Path
+
+	examples_dir = Path(__file__).resolve().parents[1] / "examples"
+	return build_compiler_baseline_report(examples_dir)
 
 
 def audit_cli_surface_contracts() -> dict[str, Any]:

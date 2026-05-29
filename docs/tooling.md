@@ -120,10 +120,11 @@ APG currently has an executable compiler path:
   every checked-in compiler tooling fixture catalog plus the non-fixture CLI,
   repository hygiene, docs, IDE, and Studio contracts as one CI-friendly gate:
   parser-golden, diagnostics, lint, formatter, drift, semantic model, graph,
-  language-server, natural-language planning, migrations, release evidence,
-  top-level command registration, required command-group subcommands, tracked
-  root documentation and test placement, documentation navigation and command
-  examples, VS Code integration, and Studio snapshot/edit-planning surfaces;
+  compiler baseline numbered examples, language-server, natural-language
+  planning, migrations, release evidence, top-level command registration,
+  required command-group subcommands, tracked root documentation and test
+  placement, documentation navigation and command examples, VS Code
+  integration, and Studio snapshot/edit-planning surfaces;
 - `apg hygiene audit --json` emits `apg.repository-hygiene-audit.v1` by
   checking the tracked repository layout, root allowlist, documentation and
   test placement, Python-first defaults, Bytewax-native streaming terminology,
@@ -1165,12 +1166,13 @@ apg tooling audit --json
 
 The tooling audit emits `apg.tooling-fixture-audit.v1` and runs every
 checked-in compiler tooling fixture catalog through one command. It aggregates
-parser-golden, diagnostics, lint, formatter, semantic drift, graph-suite,
-repository hygiene, docs, language-server, natural-language planner, migration,
-release-evidence fixture audits, and non-fixture CLI, IDE, and Studio surface
-contracts. Each surface reports its expected format, actual format, format
-match, summary, error count, and blocking-gap count. The aggregate exits
-non-zero if any surface fails or emits the wrong report contract.
+parser-golden, diagnostics, lint, formatter, semantic drift, graph-suite, the
+compiler baseline numbered-example gate, repository hygiene, docs,
+language-server, natural-language planner, migration, release-evidence fixture
+audits, and non-fixture CLI, IDE, and Studio surface contracts. Each surface
+reports its expected format, actual format, format match, summary, error count,
+and blocking-gap count. The aggregate exits non-zero if any surface fails or
+emits the wrong report contract.
 
 This is the Phase 0 umbrella CI gate. Individual fixture commands remain useful
 for focused debugging, but `apg tooling audit --json` is the fastest way to
@@ -1564,6 +1566,7 @@ Tooling tests must be fixture-driven and deterministic.
 | CLI contract tests | Exit codes, JSON schemas, text summaries, bad arguments. |
 | LSP tests | Completion, hover, definition, references, rename, code actions, formatting, and source immutability, enforced by `apg language-server --audit-fixtures --json` and the `apg.language-server-fixture-audit.v1` report. |
 | Graph tests | ER, lookup, workflow, handler, capability, security, agent, package, deployment graph output, enforced by `apg graph-suite --audit-fixtures --json` and the `apg.graph-fixture-audit.v1` report. |
+| Compiler baseline tests | Numbered examples, domain coverage, lint/validate/model/graph/release/compile-verify agreement, enforced by `apg baseline examples --json` and the `apg.compiler-baseline-report.v1` report. |
 | Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios, enforced by `apg migrate-plan --audit-fixtures --json` and the `apg.migration-fixture-audit.v1` report. |
 | Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, migration previews, source immutability, and rejected unsafe plans, enforced by `apg nl-plan --audit-fixtures --json` and the `apg.nl-plan-fixture-audit.v1` report. |
 | Verifier tests | Web/mobile/desktop/capability/deployment release evidence contracts, enforced by `apg evidence --audit-fixtures --json` and the `apg.release-evidence-fixture-audit.v1` report. |
