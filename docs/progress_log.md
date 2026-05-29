@@ -12558,3 +12558,25 @@ Battery-conscious verification:
 
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links valid, 49 documented commands registered, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` passed with no whitespace errors.
+
+### 2026-05-29 20:31 EAT
+
+Executable WSBL website-builder runtime slice:
+
+- Converted `capabilities/common/wsbl` from generated materialized baseline package status into a domain-specific website-builder runtime.
+- Added `website_runtime.py` with deterministic site, domain, page, component, publish request, audit event, stable ID, timestamp, and status primitives.
+- Replaced generic record/service/API/view behavior with WSBL lifecycle methods for tenant site creation, domain validation, governed component creation and review, page section composition, publication request review, site publishing, rollback, compatibility records, dashboards, list APIs, and UI view models.
+- Replaced generated package tests with package contract/runtime tests covering site-page-component-publish execution and tenant, owner, domain validation, custom component review, publish approval, accessibility, consent policy, API, and view-model guardrails.
+- Updated `cap_spec.md` to describe current executable WSBL runtime behavior, adapter boundaries, routes, rules, and focused verification commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/wsbl/__init__.py capabilities/common/wsbl/models.py capabilities/common/wsbl/website_runtime.py capabilities/common/wsbl/service.py capabilities/common/wsbl/api.py capabilities/common/wsbl/views.py capabilities/common/wsbl/capability_contract.py capabilities/common/wsbl/app.py capabilities/common/wsbl/test_capability_contract.py capabilities/common/wsbl/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package" capabilities/common/wsbl` returned no remaining WSBL baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.wsbl.website_runtime','capabilities.common.wsbl.service','capabilities.common.wsbl.api','capabilities.common.wsbl.views','capabilities.common.wsbl.capability_contract']]; print('wsbl imports ok')"` passed with `wsbl imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/wsbl/test_capability_contract.py capabilities/common/wsbl/tests/test_package_contract.py` passed with 11 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/wsbl --json` passed with `ok: true`; `wsbl` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/wsbl --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 108, materialized baseline packages dropped to 1, contract-only packages remain 0, custom Python files increased to 922, and warning count dropped to 1.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- Remaining implementation-depth warning is `ztna`.
