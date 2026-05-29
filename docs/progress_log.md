@@ -12193,3 +12193,24 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/shdn --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 100, materialized baseline packages dropped to 9, contract-only packages remain 0, custom Python files increased to 914, and warning count dropped to 9. The next implementation-depth warning is `srch`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+
+### 2026-05-29 19:22 EAT
+
+Executable SRCH search-engine runtime slice:
+
+- Converted `capabilities/common/srch` from generated materialized baseline package status into a domain-specific enterprise search runtime.
+- Added `search_runtime.py` with deterministic search index, search document, query record, audit event, classification, query type, stable ID, and timestamp primitives.
+- Replaced generic record/service/API/view behavior with SRCH methods for index creation, embedding-index readiness, document indexing, bulk ingestion, governed keyword/semantic/hybrid queries, facets, analytics, compatibility records, dashboards, list APIs, and UI view models.
+- Replaced generated package tests with package contract/runtime tests covering index-document-query execution and tenant, owner, lineage, restricted RBAC, semantic embedding, large result-window review, API, and view-model guardrails.
+- Updated `cap_spec.md` to describe current executable SRCH runtime behavior, adapter boundaries, routes, rules, and focused verification commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/srch/__init__.py capabilities/common/srch/models.py capabilities/common/srch/search_runtime.py capabilities/common/srch/service.py capabilities/common/srch/api.py capabilities/common/srch/views.py capabilities/common/srch/capability_contract.py capabilities/common/srch/app.py capabilities/common/srch/test_capability_contract.py capabilities/common/srch/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package" capabilities/common/srch` returned no remaining SRCH baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.srch.search_runtime','capabilities.common.srch.service','capabilities.common.srch.api','capabilities.common.srch.views','capabilities.common.srch.capability_contract']]; print('srch imports ok')"` passed with `srch imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/srch/test_capability_contract.py capabilities/common/srch/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/srch --json` passed with `ok: true`; `srch` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/srch --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 101, materialized baseline packages dropped to 8, contract-only packages remain 0, custom Python files increased to 915, and warning count dropped to 8. The next implementation-depth warning is `tens`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
