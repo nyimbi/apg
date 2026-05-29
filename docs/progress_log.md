@@ -16,6 +16,29 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 04:06 EAT
+
+Generated workflow guard and task-semantics slice:
+
+- Extended generated workflow descriptions with executable guard, assignment, human-task, timer, retry-policy, and compensation metadata from APG workflow fields.
+- `run_workflow()` and `resume_workflow()` now evaluate simple deterministic guard expressions over the workflow payload, mark runs as `blocked` when a guard fails, and include task metadata in the execution trace.
+- Workflow validation now rejects metadata that references unknown steps and warns when human tasks have no assignee.
+- Regenerated all 20 numbered example output directories from the current compiler.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/code_generator.py tests/test_generated_workflow_runtime.py` -> passed.
+- `./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py` -> 3 passed.
+- `./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler` -> 4 passed.
+- Generated `examples/13_procurement_approval_workbench/main.apg` in a temp directory and ran generated `smoke_test.py` -> exit code 0.
+- Regenerated example outputs command compiled 20/20 examples with no failures.
+- `git diff --check` over the compiler, workflow test, generated examples, and this log passed.
+
+Known remaining gaps:
+
+- Guard evaluation is intentionally deterministic and local: it supports simple field presence and comparison predicates over payload/configuration-like values, not arbitrary code execution.
+- Full BPMN-style semantics such as parallel gateways, event waits, retry execution loops, and compensation execution remain larger workflow-engine slices.
+
 ### 2026-05-29 03:59 EAT
 
 Generated workflow run state and resume slice:

@@ -20,6 +20,26 @@ workflow ProcurementApproval {
 """
 
 
+ADVANCED_WORKFLOW_SOURCE = """
+module governed_procurement_flow version 1.0.0 {
+    description: "Governed workflow runtime coverage";
+}
+
+workflow GovernedProcurement {
+    steps: str = "draft -> budget_review -> procurement_review -> finance_approval -> approved";
+    guards: dict = {"budget_review": "amount <= budget_limit", "finance_approval": "amount > finance_threshold"};
+    assignments: dict = {"budget_review": "budget_owner", "finance_approval": "finance_controller"};
+    human_tasks: str = "budget_review, finance_approval";
+    timers: dict = {"finance_approval": "PT24H"};
+    retry_policy: dict = {"procurement_review": "3"};
+    compensation: dict = {"procurement_review": "release_budget_hold"};
+    process: () -> bool = {
+        return true;
+    };
+}
+"""
+
+
 def test_generated_app_executes_declared_workflow_steps():
     result = APGCompiler().compile_string(WORKFLOW_SOURCE, "procurement_flow.apg")
     assert result.success is True, result.errors
@@ -132,3 +152,48 @@ def test_generated_app_persists_and_resumes_workflow_runs(tmp_path, monkeypatch)
     assert "/workflows/runs/{id}" in openapi["paths"]
     assert "/workflows/runs/{id}/resume" in openapi["paths"]
     assert "resume_workflow" in namespace["component_manifest"]()["interfaces"]["python"]["exports"]
+
+
+def test_generated_app_executes_workflow_guards_and_task_metadata():
+    result = APGCompiler().compile_string(ADVANCED_WORKFLOW_SOURCE, "governed_procurement_flow.apg")
+    assert result.success is True, result.errors
+
+    namespace: dict[str, object] = {}
+    exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+    workflow = namespace["describe_workflow"]("GovernedProcurement")
+    assert workflow["guards"]["budget_review"] == "amount <= budget_limit"
+    assert workflow["assignments"]["finance_approval"] == "finance_controller"
+    assert workflow["human_tasks"] == ["budget_review", "finance_approval"]
+    assert workflow["timers"]["finance_approval"] == "PT24H"
+    assert workflow["retry_policy"]["procurement_review"] == "3"
+    assert workflow["compensation"]["procurement_review"] == "release_budget_hold"
+    assert workflow["transitions"][0]["guard"] == "amount <= budget_limit"
+
+    blocked = namespace["run_workflow"](
+        "GovernedProcurement",
+        {"amount": 7500, "budget_limit": 5000, "finance_threshold": 1000},
+    )
+    assert blocked["status"] == "blocked"
+    assert blocked["blocked_at"] == "budget_review"
+    assert blocked["pending_steps"][0] == "budget_review"
+    assert blocked["trace"][-1]["guard_passed"] is False
+    assert blocked["trace"][-1]["assignee"] == "budget_owner"
+    assert blocked["trace"][-1]["task_type"] == "human"
+
+    completed = namespace["run_workflow"](
+        "GovernedProcurement",
+        {"amount": 4500, "budget_limit": 5000, "finance_threshold": 1000},
+    )
+    assert completed["status"] == "completed"
+    assert completed["completed_at"] == "approved"
+    finance_step = [step for step in completed["trace"] if step["step"] == "finance_approval"][0]
+    assert finance_step["guard_passed"] is True
+    assert finance_step["assignee"] == "finance_controller"
+    assert finance_step["timer"] == "PT24H"
+    procurement_step = [step for step in completed["trace"] if step["step"] == "procurement_review"][0]
+    assert procurement_step["retry_policy"] == "3"
+    assert procurement_step["compensation"] == "release_budget_hold"
+
+    validation = namespace["validate_application"]()
+    assert validation["checks"]["workflows"]["errors"] == []

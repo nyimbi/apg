@@ -519,6 +519,180 @@ def _split_workflow_sequence(value: Any) -> list[str]:
     return parts
 
 
+def _workflow_mapping(value: Any) -> Dict[str, Any]:
+    if value is None:
+        return {{}}
+    if isinstance(value, dict):
+        return {{str(key): item for key, item in value.items()}}
+    if isinstance(value, list):
+        mapping: Dict[str, Any] = {{}}
+        for item in value:
+            if isinstance(item, dict):
+                step = item.get("step") or item.get("name") or item.get("from")
+                if step not in (None, ""):
+                    mapping[str(step)] = dict(item)
+            elif isinstance(item, str):
+                mapping.update(_workflow_mapping(item))
+        return mapping
+    text = str(value).strip()
+    if not text:
+        return {{}}
+    try:
+        loaded = json.loads(text)
+    except json.JSONDecodeError:
+        loaded = None
+    if isinstance(loaded, dict):
+        return {{str(key): item for key, item in loaded.items()}}
+    if isinstance(loaded, list):
+        return _workflow_mapping(loaded)
+    mapping: Dict[str, Any] = {{}}
+    for item in text.split(";"):
+        part = item.strip()
+        if not part:
+            continue
+        separator = ":" if ":" in part else "=" if "=" in part else None
+        if separator is None:
+            continue
+        key, raw_value = part.split(separator, 1)
+        key = key.strip()
+        raw_value = raw_value.strip()
+        if key:
+            mapping[key] = raw_value
+    return mapping
+
+
+def _workflow_step_metadata(workflow: Dict[str, Any], step: str) -> Dict[str, Any]:
+    step = str(step)
+    metadata: Dict[str, Any] = {{}}
+    guards = workflow.get("guards", {{}})
+    assignments = workflow.get("assignments", {{}})
+    timers = workflow.get("timers", {{}})
+    retry_policy = workflow.get("retry_policy", {{}})
+    compensation = workflow.get("compensation", {{}})
+    human_tasks = set(str(item) for item in workflow.get("human_tasks", []))
+    if step in guards:
+        metadata["guard"] = guards[step]
+    if step in assignments:
+        metadata["assignee"] = assignments[step]
+        metadata["task_type"] = "human"
+    elif step in human_tasks:
+        metadata["task_type"] = "human"
+    if step in timers:
+        metadata["timer"] = timers[step]
+    if step in retry_policy:
+        metadata["retry_policy"] = retry_policy[step]
+    if step in compensation:
+        metadata["compensation"] = compensation[step]
+    return metadata
+
+
+def _context_value(path: str, context: Dict[str, Any]) -> Any:
+    current: Any = context
+    for part in str(path).split("."):
+        key = part.strip()
+        if not key:
+            continue
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return None
+    return current
+
+
+def _literal_or_context(value: str, context: Dict[str, Any]) -> Any:
+    text = str(value).strip()
+    if not text:
+        return ""
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        return text[1:-1]
+    lowered = text.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    if lowered in {{"none", "null"}}:
+        return None
+    try:
+        if "." in text:
+            return float(text)
+        return int(text)
+    except ValueError:
+        pass
+    context_value = _context_value(text, context)
+    if context_value is not None:
+        return context_value
+    if "," in text:
+        return [part.strip() for part in text.split(",") if part.strip()]
+    return text
+
+
+def _compare_values(left: Any, operator: str, right: Any) -> bool:
+    if operator in {{"in", "not in"}}:
+        if isinstance(right, str):
+            candidates = [part.strip() for part in right.split(",") if part.strip()]
+        else:
+            candidates = right
+        try:
+            result = left in candidates
+        except TypeError:
+            result = False
+        return not result if operator == "not in" else result
+    if operator == "contains":
+        try:
+            return right in left
+        except TypeError:
+            return False
+    if operator in {{"==", "!="}}:
+        result = left == right
+        return not result if operator == "!=" else result
+    try:
+        left_value = float(left)
+        right_value = float(right)
+    except (TypeError, ValueError):
+        left_value = str(left)
+        right_value = str(right)
+    if operator == ">=":
+        return left_value >= right_value
+    if operator == "<=":
+        return left_value <= right_value
+    if operator == ">":
+        return left_value > right_value
+    if operator == "<":
+        return left_value < right_value
+    return False
+
+
+def _evaluate_workflow_condition(condition: Any, context: Dict[str, Any]) -> bool:
+    if condition in (None, ""):
+        return True
+    if isinstance(condition, bool):
+        return condition
+    text = str(condition).strip()
+    lowered = text.lower()
+    if lowered in {{"always", "true", "allow"}}:
+        return True
+    if lowered in {{"never", "false", "deny"}}:
+        return False
+    if " or " in lowered:
+        return any(_evaluate_workflow_condition(part, context) for part in text.split(" or "))
+    if " and " in lowered:
+        return all(_evaluate_workflow_condition(part, context) for part in text.split(" and "))
+    if lowered.endswith(" present"):
+        field = text[: -len(" present")].strip()
+        return _context_value(field, context) is not None
+    if lowered.endswith(" missing"):
+        field = text[: -len(" missing")].strip()
+        return _context_value(field, context) is None
+    for operator in (" not in ", " contains ", ">=", "<=", "==", "!=", ">", "<", " in "):
+        if operator in text:
+            left_text, right_text = text.split(operator, 1)
+            normalized_operator = operator.strip()
+            left = _context_value(left_text.strip(), context)
+            right = _literal_or_context(right_text, context)
+            return _compare_values(left, normalized_operator, right)
+    return bool(_context_value(text, context))
+
+
 def describe_workflow(workflow_name: str) -> Dict[str, Any]:
     flows = SEMANTIC_MODEL.get("flows", {{}})
     flow = dict(flows.get(workflow_name, {{}})) if isinstance(flows, dict) else {{}}
@@ -526,8 +700,18 @@ def describe_workflow(workflow_name: str) -> Dict[str, Any]:
     defaults = _workflow_defaults(entity)
     steps = _split_workflow_sequence(defaults.get("steps") or flow.get("steps"))
     stages = _split_workflow_sequence(defaults.get("stages") or flow.get("stages"))
+    guards = _workflow_mapping(defaults.get("guards") or defaults.get("guard_rules") or defaults.get("conditions"))
+    assignments = _workflow_mapping(defaults.get("assignments") or defaults.get("assignees") or defaults.get("owners"))
+    timers = _workflow_mapping(defaults.get("timers") or defaults.get("sla") or defaults.get("deadlines"))
+    retry_policy = _workflow_mapping(defaults.get("retry_policy") or defaults.get("retries"))
+    compensation = _workflow_mapping(defaults.get("compensation") or defaults.get("compensations"))
+    human_tasks = _split_workflow_sequence(defaults.get("human_tasks") or defaults.get("manual_steps"))
     transitions = [
-        {{"from": steps[index], "to": steps[index + 1]}}
+        {{
+            "from": steps[index],
+            "to": steps[index + 1],
+            **({{"guard": guards.get(steps[index + 1])}} if steps[index + 1] in guards else {{}}),
+        }}
         for index in range(max(0, len(steps) - 1))
     ]
     return {{
@@ -538,6 +722,12 @@ def describe_workflow(workflow_name: str) -> Dict[str, Any]:
         "methods": list(entity.get("methods", flow.get("methods", []))),
         "steps": steps,
         "stages": stages,
+        "guards": guards,
+        "assignments": assignments,
+        "human_tasks": human_tasks,
+        "timers": timers,
+        "retry_policy": retry_policy,
+        "compensation": compensation,
         "transitions": transitions,
     }}
 
@@ -546,6 +736,81 @@ def describe_workflows() -> Dict[str, Dict[str, Any]]:
     return {{
         workflow_name: describe_workflow(workflow_name)
         for workflow_name in list_workflows()
+    }}
+
+
+def _execute_workflow_steps(
+    workflow: Dict[str, Any],
+    steps: list[str],
+    start_index: int,
+    payload: Dict[str, Any],
+    pause_at: str | None = None,
+    existing_trace: list[Dict[str, Any]] | None = None,
+    existing_completed_steps: list[str] | None = None,
+) -> Dict[str, Any]:
+    selected_steps = steps[start_index:]
+    if pause_at is not None and pause_at not in selected_steps:
+        return {{
+            "status": "error",
+            "error": "unknown_pause_step",
+            "pause_at": pause_at,
+            "steps": selected_steps,
+            "payload": payload,
+        }}
+    trace = list(existing_trace or [])
+    completed_steps = list(existing_completed_steps or [])
+    guards = workflow.get("guards", {{}})
+    for offset, step in enumerate(selected_steps):
+        index = start_index + offset
+        entry: Dict[str, Any] = {{
+            "index": index,
+            "step": step,
+            **_workflow_step_metadata(workflow, step),
+        }}
+        guard = guards.get(step)
+        if guard is not None:
+            guard_passed = _evaluate_workflow_condition(guard, payload)
+            entry["guard"] = guard
+            entry["guard_passed"] = guard_passed
+            if not guard_passed:
+                entry["status"] = "blocked"
+                trace.append(entry)
+                return {{
+                    "status": "blocked",
+                    "current_step": step,
+                    "completed_at": None,
+                    "steps": selected_steps,
+                    "completed_steps": completed_steps,
+                    "pending_steps": selected_steps[offset:],
+                    "trace": trace,
+                    "payload": payload,
+                    "blocked_at": step,
+                    "blocked_reason": "guard_failed",
+                    "guard": guard,
+                }}
+        entry["status"] = "completed"
+        trace.append(entry)
+        completed_steps.append(step)
+        if pause_at == step and offset < len(selected_steps) - 1:
+            return {{
+                "status": "paused",
+                "current_step": step,
+                "completed_at": None,
+                "steps": selected_steps,
+                "completed_steps": completed_steps,
+                "pending_steps": selected_steps[offset + 1:],
+                "trace": trace,
+                "payload": payload,
+            }}
+    return {{
+        "status": "completed",
+        "current_step": selected_steps[-1],
+        "completed_at": selected_steps[-1],
+        "steps": selected_steps,
+        "completed_steps": completed_steps,
+        "pending_steps": [],
+        "trace": trace,
+        "payload": payload,
     }}
 
 
@@ -573,47 +838,20 @@ def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> D
     start_index = steps.index(start_at)
     selected_steps = steps[start_index:]
     pause_at = payload.get("pause_at", payload.get("stop_after"))
-    if pause_at is not None:
-        pause_at = str(pause_at)
-        if pause_at not in selected_steps:
-            return {{
-                "workflow": workflow_name,
-                "status": "error",
-                "error": "unknown_pause_step",
-                "pause_at": pause_at,
-                "steps": selected_steps,
-                "payload": payload,
-            }}
-        run_until = selected_steps.index(pause_at) + 1
-        executed_steps = selected_steps[:run_until]
-        pending_steps = selected_steps[run_until:]
-        status = "paused" if pending_steps else "completed"
-    else:
-        executed_steps = selected_steps
-        pending_steps = []
-        status = "completed"
-    trace = [
-        {{
-            "index": index,
-            "step": step,
-            "status": "completed",
+    pause_at = str(pause_at) if pause_at is not None else None
+    execution = _execute_workflow_steps(workflow, steps, start_index, payload, pause_at)
+    if execution.get("status") == "error":
+        return {{
+            "workflow": workflow_name,
+            **execution,
         }}
-        for index, step in enumerate(executed_steps, start=start_index)
-    ]
     run_id = f"workflow-run-{{NEXT_WORKFLOW_RUN_ID}}"
     NEXT_WORKFLOW_RUN_ID += 1
     result = {{
         "id": run_id,
         "workflow": workflow_name,
-        "status": status,
         "started_at": start_at,
-        "current_step": executed_steps[-1],
-        "completed_at": selected_steps[-1] if status == "completed" else None,
-        "steps": selected_steps,
-        "completed_steps": executed_steps,
-        "pending_steps": pending_steps,
-        "trace": trace,
-        "payload": payload,
+        **execution,
     }}
     event = _record_event("workflow.run", workflow_name, after=result)
     result["event_id"] = event["id"]
@@ -671,47 +909,26 @@ def resume_workflow(run_id: str, payload: Dict[str, Any] | None = None) -> Dict[
 
     selected_steps = steps[start_index:]
     pause_at = payload_update.get("pause_at", payload_update.get("stop_after"))
-    if pause_at is not None:
-        pause_at = str(pause_at)
-        if pause_at not in selected_steps:
-            return {{
-                "id": run_id,
-                "workflow": workflow_name,
-                "status": "error",
-                "error": "unknown_pause_step",
-                "pause_at": pause_at,
-                "steps": selected_steps,
-                "payload": merged_payload,
-            }}
-        run_until = selected_steps.index(pause_at) + 1
-        executed_steps = selected_steps[:run_until]
-        pending_steps = selected_steps[run_until:]
-        status = "paused" if pending_steps else "completed"
-    else:
-        executed_steps = selected_steps
-        pending_steps = []
-        status = "completed"
-
-    trace = list(existing.get("trace", []))
-    trace.extend(
-        {{
-            "index": index,
-            "step": step,
-            "status": "completed",
-        }}
-        for index, step in enumerate(executed_steps, start=start_index)
+    pause_at = str(pause_at) if pause_at is not None else None
+    workflow = describe_workflow(workflow_name)
+    execution = _execute_workflow_steps(
+        workflow,
+        steps,
+        start_index,
+        merged_payload,
+        pause_at,
+        existing_trace=list(existing.get("trace", [])),
+        existing_completed_steps=list(existing.get("completed_steps", [])),
     )
-    completed_steps = list(existing.get("completed_steps", []))
-    completed_steps.extend(executed_steps)
+    if execution.get("status") == "error":
+        return {{
+            "id": run_id,
+            "workflow": workflow_name,
+            **execution,
+        }}
     updated = dict(existing)
     updated.update({{
-        "status": status,
-        "current_step": executed_steps[-1],
-        "completed_at": steps[-1] if status == "completed" else None,
-        "completed_steps": completed_steps,
-        "pending_steps": pending_steps,
-        "trace": trace,
-        "payload": merged_payload,
+        **execution,
         "resumed": True,
     }})
     event = _record_event("workflow.resume", workflow_name, before=existing, after=updated)
@@ -1391,6 +1608,12 @@ def _database_openapi_schemas() -> Dict[str, Any]:
                 "type": {{"type": "string"}},
                 "steps": {{"type": "array", "items": {{"type": "string"}}}},
                 "stages": {{"type": "array", "items": {{"type": "string"}}}},
+                "guards": generic_object,
+                "assignments": generic_object,
+                "human_tasks": {{"type": "array", "items": {{"type": "string"}}}},
+                "timers": generic_object,
+                "retry_policy": generic_object,
+                "compensation": generic_object,
                 "transitions": {{"type": "array", "items": generic_object}},
                 "methods": {{"type": "array", "items": {{"type": "string"}}}},
             }},
@@ -1430,6 +1653,9 @@ def _database_openapi_schemas() -> Dict[str, Any]:
                 "trace": {{"type": "array", "items": generic_object}},
                 "payload": generic_object,
                 "event_id": {{"type": "integer"}},
+                "blocked_at": {{"type": "string"}},
+                "blocked_reason": {{"type": "string"}},
+                "guard": {{"oneOf": [{{"type": "string"}}, {{"type": "boolean"}}, generic_object]}},
             }},
             "required": ["id", "workflow", "status", "steps", "trace", "payload"],
         }},
@@ -2546,11 +2772,26 @@ def validate_workflow_contracts() -> Dict[str, Any]:
     for workflow_name in list_workflows():
         workflow = describe_workflow(workflow_name)
         steps = workflow.get("steps", [])
+        step_set = set(str(step) for step in steps)
         if not steps:
             warnings.append(f"{{workflow_name}} does not declare executable steps")
         transitions = workflow.get("transitions", [])
         if len(steps) > 1 and len(transitions) != len(steps) - 1:
             errors.append(f"{{workflow_name}} transition count does not match step chain")
+        for section in ("guards", "assignments", "timers", "retry_policy", "compensation"):
+            mapping = workflow.get(section, {{}})
+            if not isinstance(mapping, dict):
+                errors.append(f"{{workflow_name}} {{section}} metadata must be an object")
+                continue
+            for step in mapping:
+                if str(step) not in step_set:
+                    errors.append(f"{{workflow_name}} {{section}} references unknown step {{step}}")
+        assignments = workflow.get("assignments", {{}})
+        for step in workflow.get("human_tasks", []):
+            if str(step) not in step_set:
+                errors.append(f"{{workflow_name}} human task references unknown step {{step}}")
+            elif str(step) not in assignments:
+                warnings.append(f"{{workflow_name}} human task {{step}} has no assignee")
     return {{"errors": errors, "warnings": warnings, "validated_workflows": list_workflows()}}
 
 
