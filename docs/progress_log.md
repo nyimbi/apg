@@ -10314,6 +10314,29 @@ Battery-conscious verification:
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
 
+### 2026-05-29 10:47 EAT
+
+Executable DIST distributed-computing runtime slice:
+
+- Converted `capabilities/common/dist` from a generated materialized baseline into a domain-specific distributed-computing capability package.
+- Replaced heavy framework/runtime-bound models, services, APIs, and views with dependency-light tenant worker pools, worker nodes, idempotent distributed jobs, partitions, result aggregations, scaling decisions, and audit events.
+- Added `distributed_engine.py` with deterministic partition IDs, stable result/audit hashes, and queue-pressure scaling posture helpers.
+- Added `DistService` behavior for worker-pool creation, worker registration, job submission, large-partition review, idempotency reuse, partition dispatch, partition completion/failure, result aggregation, scaling decisions, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so DIST exposes compute dashboard, job console, worker pools, queue/partition monitors, scaling panels, aggregations, audit state, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current runtime behavior and the explicit external Kubernetes, Ray, Dask, Spark, Slurm, Bytewax, Redis, RabbitMQ, Kafka, and cloud-worker integration boundary.
+- Added focused contract/service tests for successful partitioned execution, aggregation, scaling decisions, guardrails around tenant context, quota, health checks, job ownership, idempotency, healthy workers, and large partition review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/dist/__init__.py capabilities/common/dist/models.py capabilities/common/dist/distributed_engine.py capabilities/common/dist/service.py capabilities/common/dist/api.py capabilities/common/dist/views.py capabilities/common/dist/test_capability_contract.py capabilities/common/dist/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/dist/test_capability_contract.py capabilities/common/dist/tests/test_materialized_package.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/dist` returned no remaining DIST baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `dist` is now `domain_specific`, custom Python files increased to 884, domain-specific packages increased to 65, materialized baseline packages dropped to 38, and warning count dropped to 44.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dist --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- capabilities/common/dist/__init__.py capabilities/common/dist/models.py capabilities/common/dist/distributed_engine.py capabilities/common/dist/service.py capabilities/common/dist/api.py capabilities/common/dist/views.py capabilities/common/dist/test_capability_contract.py capabilities/common/dist/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
+
 ### 2026-05-29 10:31 EAT
 
 Executable DEPL deployment-management runtime slice:
