@@ -2768,6 +2768,21 @@ def test_cli_doctor_recognizes_spec_parser_artifacts():
 	assert "django" not in result.output
 
 
+def test_cli_doctor_json_emits_serviceability_contract():
+	result = CliRunner().invoke(cli, ["doctor", "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.doctor-report.v1"
+	assert report["ok"] is True
+	assert report["target_language"] == "Python"
+	checks = {check["name"]: check for check in report["checks"]}
+	assert checks["python_version"]["ok"] is True
+	assert checks["parser_artifacts"]["message"] == "Generated parser found"
+	assert checks["capability_contract_registry"]["contract_count"] >= 100
+	assert report["summary"]["blocking_failure_count"] == 0
+
+
 def test_cli_version_advertises_python_target_not_framework_target():
 	result = CliRunner().invoke(cli, ["version"])
 

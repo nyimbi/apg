@@ -24,6 +24,7 @@ from cli.create_project import create
 from cli.compile_command import compile_cmd
 from cli.deployment_command import deployment
 from cli.diagnostics_command import diagnostics
+from cli.doctor_command import doctor
 from cli.drift_command import drift
 from cli.evidence_command import evidence
 from cli.explain_command import explain
@@ -66,6 +67,7 @@ cli.add_command(create)
 cli.add_command(compile_cmd, name='compile')
 cli.add_command(deployment)
 cli.add_command(diagnostics)
+cli.add_command(doctor)
 cli.add_command(drift)
 cli.add_command(evidence)
 cli.add_command(explain)
@@ -106,69 +108,6 @@ def version():
 	console.print("  • Executable Python application artifacts")
 	console.print("  • VS Code extension with Language Server")
 	console.print("  • Comprehensive project templates")
-
-
-@cli.command()
-def doctor():
-	"""Check APG installation and environment"""
-	console.print("[bold blue]APG Environment Check[/bold blue]")
-	console.print()
-	
-	# Check Python version
-	python_version = sys.version_info
-	if python_version >= (3, 10):
-		console.print(f"✅ Python {python_version.major}.{python_version.minor}.{python_version.micro}")
-	else:
-		console.print(f"❌ Python {python_version.major}.{python_version.minor} (requires 3.10+)")
-	
-	# Check required packages
-	required_packages = [
-		'antlr4',
-		'click',
-		'rich'
-	]
-	
-	console.print("\n[bold]Required Packages:[/bold]")
-	for package in required_packages:
-		try:
-			__import__(package.replace('-', '_'))
-			console.print(f"✅ {package}")
-		except ImportError:
-			console.print(f"❌ {package} (not installed)")
-	
-	# Check APG components
-	console.print("\n[bold]APG Components:[/bold]")
-	
-	components = [
-		('Grammar File', apg_root / 'spec' / 'apg.g4'),
-		('Compiler', apg_root / 'compiler' / 'compiler.py'),
-		('Language Server', apg_root / 'language_server' / 'server.py'),
-		('VS Code Extension', apg_root / 'vscode-extension' / 'package.json'),
-		('Templates', apg_root / 'templates')
-	]
-	
-	for name, path in components:
-		if path.exists():
-			console.print(f"✅ {name}")
-		else:
-			console.print(f"❌ {name} (missing: {path})")
-	
-	# Check ANTLR grammar compilation
-	console.print("\n[bold]Grammar Compilation:[/bold]")
-	grammar_file = apg_root / 'spec' / 'apg.g4'
-	if grammar_file.exists():
-		console.print("✅ Grammar file found")
-		
-		# Check if generated parser exists
-		generated_dir = apg_root / 'spec'
-		if all((generated_dir / name).exists() for name in ["apgLexer.py", "apgParser.py", "apgVisitor.py"]):
-			console.print("✅ Generated parser found")
-		else:
-			console.print("⚠️  Generated parser not found (run 'apg compile --generate-parser')")
-	else:
-		console.print("❌ Grammar file not found")
-	
-	console.print("\n[green]APG environment check complete![/green]")
 
 
 @cli.command()

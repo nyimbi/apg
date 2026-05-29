@@ -129,6 +129,9 @@ APG currently has an executable compiler path:
   test placement, Python-first defaults, Bytewax-native streaming terminology,
   and generated/cache artifact exclusions without reading local untracked
   agent state;
+- `apg doctor --json` emits `apg.doctor-report.v1` by checking Python version,
+  required imports, parser artifacts, core compiler/language-server/template
+  paths, capability contract registry health, and optional IDE/LSP packages;
 - `apg language-server <file> --check --json` emits
   `apg.language-server-check.v1` from the shared semantic model and formatter,
   proving editor-facing diagnostics, completions, definitions, references,
@@ -821,9 +824,10 @@ apg deployment verify dist/app-container --json
 apg evidence app.apg --target web --out dist/evidence --json
 apg evidence --audit-fixtures --json
 apg tooling audit --json
+apg hygiene audit --json
 apg validate
 apg run
-apg doctor
+apg doctor --json
 apg language-server
 apg language-server app.apg --check --json
 apg language-server app.apg --rename Customer --to Account --json
@@ -1076,8 +1080,16 @@ behavior tag lacks a passing fixture.
 
 ### `apg doctor`
 
-Checks parser generation, Python package imports, catalog availability, template
-paths, generator backends, and optional IDE/LSP dependencies.
+```console
+apg doctor --json
+```
+
+Emits `apg.doctor-report.v1` and checks the serviceability baseline new
+contributors need before making compiler or capability changes: Python version,
+required imports, parser artifacts, core compiler/language-server/template
+paths, capability contract registry health, and optional IDE/LSP dependencies.
+The text mode remains available with `apg doctor`; `--json` is the stable
+contract used by automation and the aggregate tooling audit.
 
 ### `apg package`
 

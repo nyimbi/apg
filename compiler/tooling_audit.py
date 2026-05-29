@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from compiler.diagnostics import audit_diagnostic_fixtures
+from compiler.doctor import build_doctor_report
 from compiler.drift import audit_drift_fixtures
 from compiler.evidence_bundle import audit_release_evidence_fixtures
 from compiler.formatter import audit_formatter_fixtures
@@ -117,6 +118,7 @@ def _fixture_audits() -> list[FixtureAudit]:
 		("semantic_model", "apg.semantic-model-fixture-audit.v1", audit_semantic_model_fixtures),
 		("graph", "apg.graph-fixture-audit.v1", audit_graph_fixtures),
 		("repository_hygiene", "apg.repository-hygiene-audit.v1", audit_repository_hygiene),
+		("doctor", "apg.doctor-report.v1", build_doctor_report),
 		("language_server", "apg.language-server-fixture-audit.v1", audit_language_server_fixtures),
 		("nl_plan", "apg.nl-plan-fixture-audit.v1", audit_nl_plan_fixtures),
 		("migration", "apg.migration-fixture-audit.v1", audit_migration_fixtures),

@@ -33,6 +33,7 @@ From the repository root:
 uv venv .venv
 uv pip install -e ".[dev,language-server]"
 ./.venv/bin/apg --help
+./.venv/bin/apg doctor --json
 ./.venv/bin/apg tooling audit --json
 ./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify
 ```
@@ -166,6 +167,7 @@ every contribution, especially when compute or battery is constrained.
 | --- | --- |
 | Docs only | `git diff --check -- docs` |
 | CLI/tooling | focused CLI tests plus `./.venv/bin/apg tooling audit --json` |
+| Environment doctor | `./.venv/bin/apg doctor --json` |
 | Grammar | parser golden audit and relevant language contract tests |
 | Semantic model | semantic model fixture audit or focused semantic tests |
 | Generator | representative `apg compile ... --verify` and generated smoke test |

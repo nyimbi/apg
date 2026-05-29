@@ -16,6 +16,50 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 06:26 EAT
+
+Doctor JSON serviceability slice:
+
+- Added `compiler.doctor.build_doctor_report()` emitting
+  `apg.doctor-report.v1` for the contributor serviceability baseline:
+  Python version, required imports, core APG component paths, generated parser
+  artifacts, capability contract registry health, and optional IDE/LSP
+  package availability.
+- Moved `apg doctor` into `cli/doctor_command.py` and added
+  `apg doctor --json` while preserving human-readable text mode.
+- Wired the doctor report into `apg tooling audit --json`, increasing the
+  aggregate tooling gate to 16 surfaces.
+- Added focused regression coverage for the JSON contract and tooling audit
+  surface.
+- Updated tooling, developer, contributor, and capacity-development docs to
+  use `apg doctor --json` as executable environment evidence.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/doctor.py
+  cli/doctor_command.py cli/main.py compiler/tooling_audit.py
+  tests/test_compiler_baseline.py tests/test_tooling_audit.py` -> passed.
+- `./.venv/bin/apg doctor --json` -> passed with 13/13 required checks, 0
+  blocking failures, and 109 valid capability contracts.
+- `./.venv/bin/apg doctor` -> passed in text mode.
+- `./.venv/bin/pytest -q
+  tests/test_compiler_baseline.py::test_cli_doctor_recognizes_spec_parser_artifacts
+  tests/test_compiler_baseline.py::test_cli_doctor_json_emits_serviceability_contract
+  tests/test_tooling_audit.py::test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces
+  tests/test_tooling_audit.py::test_cli_surface_audit_tracks_documented_command_groups`
+  -> 4 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 16/16 surfaces, 0
+  blocking gaps, and 0 errors.
+- `git diff --check -- compiler/doctor.py cli/doctor_command.py cli/main.py
+  compiler/tooling_audit.py tests/test_compiler_baseline.py
+  tests/test_tooling_audit.py docs/tooling.md docs/developer_guide.md
+  docs/contributors_guide.md docs/capacity_development_guide.md` -> passed.
+
+Known remaining gaps:
+
+- Doctor checks prove local serviceability and registry health. They do not
+  replace package/release/evidence commands for generated application behavior.
+
 ### 2026-05-29 06:15 EAT
 
 Repository hygiene CLI surface slice:

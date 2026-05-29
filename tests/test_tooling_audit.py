@@ -24,6 +24,7 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 		"semantic_model",
 		"graph",
 		"repository_hygiene",
+		"doctor",
 		"language_server",
 		"nl_plan",
 		"migration",
@@ -34,7 +35,7 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 	}:
 		assert surfaces[surface_name]["ok"] is True
 		assert surfaces[surface_name]["format_ok"] is True
-	assert report["summary"]["surface_count"] == 15
+	assert report["summary"]["surface_count"] == 16
 	assert report["summary"]["blocking_gap_count"] == 0
 
 

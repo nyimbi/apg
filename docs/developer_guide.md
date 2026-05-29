@@ -67,6 +67,7 @@ the virtual environment, then install the editable package:
 uv venv .venv
 uv pip install -e ".[dev,language-server]"
 ./.venv/bin/apg --help
+./.venv/bin/apg doctor --json
 ```
 
 When the virtual environment already exists, refresh it with:
@@ -94,6 +95,7 @@ tooling contracts:
 
 ```bash
 ./.venv/bin/apg tooling audit --json
+./.venv/bin/apg doctor --json
 ```
 
 Run a representative compile when touching language, semantic model, generator,
@@ -354,6 +356,7 @@ Use the narrowest lane that proves the claim.
 | Evidence bundle | `./.venv/bin/apg evidence path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-evidence --json` |
 | Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` |
 | Tooling | `./.venv/bin/apg tooling audit --json` |
+| Environment doctor | `./.venv/bin/apg doctor --json` |
 | Repository hygiene | `./.venv/bin/apg hygiene audit --json` and `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
 
 ## Definition Of Done
