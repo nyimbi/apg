@@ -265,6 +265,7 @@ Validate, inspect, and publish-plan capabilities through the CLI:
 ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
 ./.venv/bin/apg capabilities publish-apply capabilities/<domain>/<code> --catalog /tmp/apg-capability-catalog.json --dry-run --json
 ./.venv/bin/apg capabilities catalog /tmp/apg-capability-catalog.json --json
+./.venv/bin/apg lint path/to/app.apg --catalog /tmp/apg-capability-catalog.json --json
 ```
 
 Capability changes should keep configuration, deterministic rules, UI routes,

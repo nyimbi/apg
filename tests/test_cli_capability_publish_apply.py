@@ -127,3 +127,51 @@ def test_capabilities_publish_apply_writes_local_catalog():
 	missing_payload = json.loads(missing_report.output)
 	assert missing_payload["ok"] is False
 	assert missing_payload["errors"] == ["capability not found in catalog: missing_demo"]
+
+
+def test_publish_apply_catalog_feeds_lint_capability_resolution():
+	runner = CliRunner()
+	with runner.isolated_filesystem():
+		package_dir = _scaffold_demo_package(runner)
+		catalog_path = Path("catalog/capabilities.json")
+		publish = runner.invoke(
+			cli,
+			[
+				"capabilities",
+				"publish-apply",
+				str(package_dir),
+				"--catalog",
+				str(catalog_path),
+				"--json",
+			],
+		)
+		source = Path("app.apg")
+		source.write_text(
+			"""
+module local_catalog_lint version 1.0.0 {
+	description: "Local catalog lint proof";
+}
+
+capability Demo {
+	contract: {
+		id: common_demo,
+		provides: [common_demo_records],
+		configuration: {tenant_scoped: true}
+	};
+}
+""",
+			encoding="utf-8",
+		)
+		lint = runner.invoke(
+			cli,
+			["lint", str(source), "--catalog", str(catalog_path), "--json"],
+		)
+
+	assert publish.exit_code == 0, publish.output
+	assert lint.exit_code == 0, lint.output
+	payload = json.loads(lint.output)
+	assert payload["ok"] is True
+	assert payload["capability_catalog"]["catalog_kind"] == "local_catalog"
+	assert payload["capability_catalog"]["matched_capabilities"] == [
+		{"name": "Demo", "matched_key": "common_demo"}
+	]

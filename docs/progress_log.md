@@ -16,6 +16,52 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:37 EAT
+
+Local catalog lint consumption slice:
+
+- Extended `apg lint --catalog` so it accepts either the existing executable
+  contract registry directory or a local `apg.capability-catalog.v1` JSON file
+  written by `apg capabilities publish-apply`.
+- Preserved the existing directory-backed `capability_contract.py` behavior and
+  added `catalog_kind` metadata so reports distinguish `contract_registry` from
+  `local_catalog`.
+- Added focused CLI regression coverage for successful local catalog resolution
+  and unknown declared capability diagnostics against a local catalog file.
+- Added an end-to-end CLI regression proving a scaffolded capability can be
+  published into a local catalog and then used by `apg lint --catalog` to
+  resolve APG source capabilities.
+- Updated CLI help plus tooling, developer, contributor, and capacity docs to
+  show local catalog files feeding lint validation.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/linting.py cli/lint_command.py
+  tests/test_compiler_baseline.py tests/test_cli_capability_publish_apply.py`
+  -> passed.
+- `./.venv/bin/pytest -q tests/test_compiler_baseline.py -k "lint_catalog or
+  capability_catalog"` -> 4 passed, 84 deselected.
+- `./.venv/bin/pytest -q tests/test_cli_capability_publish_apply.py` -> 3
+  passed.
+- `./.venv/bin/apg lint --audit-fixtures --json` -> passed with 6/6 fixtures,
+  0 blocking gaps.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109
+  valid contracts and 0 errors.
+- `git diff --check -- compiler/linting.py cli/lint_command.py
+  tests/test_compiler_baseline.py tests/test_cli_capability_publish_apply.py
+  docs/tooling.md docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` -> passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0
+  blocking gaps, and 0 errors.
+- `./.venv/bin/pytest -q tests/test_tooling_audit.py` -> 3 passed.
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py` -> 17 passed.
+
+Known remaining gaps:
+
+- Local catalogs now feed lint validation. Remote marketplace synchronization,
+  catalog signing, and runtime catalog distribution remain separate lifecycle
+  work.
+
 ### 2026-05-29 05:27 EAT
 
 Contributor effectiveness documentation slice:

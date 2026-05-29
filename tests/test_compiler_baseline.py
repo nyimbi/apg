@@ -222,6 +222,45 @@ def get_capability_contract(tenant_id="default"):
 	return root
 
 
+def write_local_capability_catalog(path: Path, capability_id: str = "audit_log") -> Path:
+	path.parent.mkdir(parents=True, exist_ok=True)
+	path.write_text(
+		json.dumps(
+			{
+				"format": "apg.capability-catalog.v1",
+				"capabilities": {
+					capability_id: {
+						"capability": capability_id,
+						"package": capability_id,
+						"version": "1.0.0",
+						"profile": "python",
+						"package_dir": f"capabilities/common/{capability_id}",
+						"provides": ["audit_events"] if capability_id == "audit_log" else [capability_id],
+						"requires": [],
+						"configuration": {"tenant_scoped": True},
+						"rules": [
+							{"name": "allow_default", "when": "tenant_context_present", "action": "allow"}
+						],
+						"rule_engine": {"type": "deterministic"},
+						"ui": {"routes": [{"name": "dashboard", "path": f"/{capability_id}"}]},
+						"screens": {},
+						"theme": {"name": f"{capability_id}_theme"},
+						"streaming": {},
+						"release_evidence": "release_report.json",
+						"manifest": "package_manifest.json",
+						"entrypoint": "app.py",
+					}
+				},
+			},
+			indent=2,
+			sort_keys=True,
+		)
+		+ "\n",
+		encoding="utf-8",
+	)
+	return path
+
+
 def test_documented_python_target_generates_executable_application_files():
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
 
@@ -1464,6 +1503,28 @@ def test_cli_lint_catalog_uses_shared_semantic_model_for_capability_resolution(t
 	assert report["diagnostics"] == []
 
 
+def test_cli_lint_accepts_local_capability_catalog_json(tmp_path):
+	source = tmp_path / "capability.apg"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "audit_log")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["lint", str(source), "--catalog", str(catalog), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.lint-report.v1"
+	assert report["ok"] is True
+	assert report["capability_catalog"]["checked"] is True
+	assert report["capability_catalog"]["ok"] is True
+	assert report["capability_catalog"]["catalog_kind"] == "local_catalog"
+	assert report["capability_catalog"]["contract_count"] == 1
+	assert report["capability_catalog"]["declared_capabilities"] == ["AuditLog"]
+	assert report["capability_catalog"]["matched_capabilities"] == [
+		{"name": "AuditLog", "matched_key": "audit_log"}
+	]
+	assert report["diagnostics"] == []
+
+
 def test_cli_lint_catalog_reports_unknown_declared_capability(tmp_path):
 	source = tmp_path / "capability.apg"
 	catalog = write_capability_catalog(tmp_path / "catalog", "customer_master")
@@ -1476,6 +1537,28 @@ def test_cli_lint_catalog_reports_unknown_declared_capability(tmp_path):
 	assert report["ok"] is False
 	assert report["capability_catalog"]["checked"] is True
 	assert report["capability_catalog"]["ok"] is False
+	assert report["capability_catalog"]["missing_capabilities"] == [
+		{"name": "AuditLog", "candidates": ["AuditLog", "audit_log", "audit_events"]}
+	]
+	assert report["severity_counts"]["error"] == 1
+	diagnostic_codes = [diagnostic["code"] for diagnostic in report["diagnostics"]]
+	assert diagnostic_codes == ["APG0901"]
+	assert "does not resolve in catalog" in report["diagnostics"][0]["message"]
+
+
+def test_cli_lint_local_capability_catalog_reports_unknown_declared_capability(tmp_path):
+	source = tmp_path / "capability.apg"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "customer_master")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["lint", str(source), "--catalog", str(catalog), "--json"])
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["ok"] is False
+	assert report["capability_catalog"]["checked"] is True
+	assert report["capability_catalog"]["ok"] is False
+	assert report["capability_catalog"]["catalog_kind"] == "local_catalog"
 	assert report["capability_catalog"]["missing_capabilities"] == [
 		{"name": "AuditLog", "candidates": ["AuditLog", "audit_log", "audit_events"]}
 	]

@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from capabilities.capability_contract_registry import validate_contract_registry
+from compiler.capability_publish import (
+	CAPABILITY_CATALOG_FORMAT,
+	build_capability_catalog_report,
+)
 from compiler.parser import APGSyntaxError
 from compiler.semantic_analyzer import SemanticError
 from compiler.semantic_model import build_semantic_model
@@ -189,6 +193,7 @@ def _empty_catalog_report(catalog: Path | None) -> dict[str, Any]:
 		"checked": catalog is not None,
 		"ok": catalog is None,
 		"catalog": str(catalog) if catalog is not None else None,
+		"catalog_kind": None,
 		"contract_count": 0,
 		"declared_capabilities": [],
 		"matched_capabilities": [],
@@ -198,6 +203,16 @@ def _empty_catalog_report(catalog: Path | None) -> dict[str, Any]:
 
 
 def _capability_catalog_report(
+	file_path: Path,
+	model: dict[str, Any],
+	catalog: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+	if catalog.is_file():
+		return _local_capability_catalog_report(file_path, model, catalog)
+	return _contract_registry_catalog_report(file_path, model, catalog)
+
+
+def _contract_registry_catalog_report(
 	file_path: Path,
 	model: dict[str, Any],
 	catalog: Path,
@@ -244,12 +259,87 @@ def _capability_catalog_report(
 		"checked": True,
 		"ok": validation["valid"] and not missing,
 		"catalog": str(catalog),
+		"catalog_kind": "contract_registry",
 		"contract_count": validation["contract_count"],
 		"declared_capabilities": sorted(declared),
 		"matched_capabilities": matched,
 		"missing_capabilities": missing,
 		"errors": list(validation["errors"]),
 	}, diagnostics
+
+
+def _local_capability_catalog_report(
+	file_path: Path,
+	model: dict[str, Any],
+	catalog: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+	report = build_capability_catalog_report(catalog)
+	diagnostics: list[dict[str, Any]] = []
+	for error in report["errors"]:
+		diagnostics.append(_catalog_diagnostic(
+			file_path,
+			code="APG9000",
+			title="Capability catalog error",
+			message=f"Capability catalog validation failed: {error}",
+			severity="error",
+		))
+
+	registry_keys = _local_catalog_keys(report.get("records", []))
+	declared = model.get("capabilities", {})
+	contracts = model.get("contracts", {})
+	matched: list[dict[str, Any]] = []
+	missing: list[dict[str, Any]] = []
+
+	if report["ok"]:
+		for name, capability in declared.items():
+			candidates = _capability_candidate_keys(name, capability, contracts.get(name, {}))
+			matched_key = next((candidate for candidate in candidates if _normalize_capability_key(candidate) in registry_keys), None)
+			if matched_key is None:
+				missing_item = {"name": name, "candidates": candidates}
+				missing.append(missing_item)
+				diagnostics.append(_catalog_diagnostic(
+					file_path,
+					code="APG0901",
+					title="Unknown capability include",
+					message=(
+						f"Capability '{name}' does not resolve in catalog {catalog}; "
+						f"tried {', '.join(candidates)}."
+					),
+					severity="error",
+					symbol=model.get("symbols", {}).get(f"capability.{name}"),
+				))
+			else:
+				matched.append({"name": name, "matched_key": matched_key})
+
+	return {
+		"checked": True,
+		"ok": report["ok"] and not missing,
+		"catalog": str(catalog),
+		"catalog_kind": "local_catalog",
+		"catalog_format": CAPABILITY_CATALOG_FORMAT,
+		"contract_count": report["capability_count"],
+		"declared_capabilities": sorted(declared),
+		"matched_capabilities": matched,
+		"missing_capabilities": missing,
+		"errors": list(report["errors"]),
+	}, diagnostics
+
+
+def _local_catalog_keys(records: list[dict[str, Any]]) -> set[str]:
+	keys: set[str] = set()
+	for record in records:
+		for value in [
+			record.get("capability"),
+			record.get("package"),
+		]:
+			if isinstance(value, str) and value:
+				keys.add(_normalize_capability_key(value))
+		for list_key in ("provides", "requires"):
+			values = record.get(list_key, [])
+			if isinstance(values, list):
+				for item in values:
+					keys.add(_normalize_capability_key(str(item)))
+	return keys
 
 
 def _capability_candidate_keys(name: str, capability: dict[str, Any], contract: dict[str, Any]) -> list[str]:
@@ -379,6 +469,7 @@ def _aggregate_catalog_reports(file_reports: list[dict[str, Any]], catalog: Path
 		"checked": True,
 		"ok": bool(reports) and all(report["ok"] for report in reports),
 		"catalog": str(catalog),
+		"catalog_kind": next((report.get("catalog_kind") for report in reports if report.get("catalog_kind")), None),
 		"contract_count": max((report["contract_count"] for report in reports), default=0),
 		"declared_capabilities": sorted({
 			capability

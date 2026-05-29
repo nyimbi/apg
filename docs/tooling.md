@@ -22,9 +22,11 @@ APG currently has an executable compiler path:
 - the primary generation command is `apg compile <file> --output <dir>`;
 - `apg lint <file-or-directory> --json` emits `apg.lint-report.v1` from the
   shared semantic model without writing generated code;
-- `apg lint <file-or-directory> --catalog <capability-root> --json` validates
-  declared APG capabilities against executable capability contracts discovered
-  from checked-in `capability_contract.py` files;
+- `apg lint <file-or-directory> --catalog <capability-root-or-catalog.json>
+  --json` validates declared APG capabilities against either executable
+  capability contracts discovered from checked-in `capability_contract.py` files
+  or a local `apg.capability-catalog.v1` JSON file created by
+  `apg capabilities publish-apply`;
 - `apg lint --audit-fixtures --json` emits `apg.lint-fixture-audit.v1` by
   checking checked-in lint fixtures for valid source, syntax diagnostics,
   strict warning promotion, capability catalog validation, shared semantic-model

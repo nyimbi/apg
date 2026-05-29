@@ -39,7 +39,7 @@ def _print_text_report(report: dict[str, Any]) -> None:
 @click.argument("path", required=False, type=click.Path(path_type=Path))
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.lint-report.v1 JSON")
 @click.option("--strict", is_flag=True, help="Treat warnings as errors")
-@click.option("--catalog", type=click.Path(path_type=Path), default=None, help="Capability contract catalog root")
+@click.option("--catalog", type=click.Path(path_type=Path), default=None, help="Capability contract root or local apg.capability-catalog.v1 file")
 @click.option("--audit-fixtures", is_flag=True, help="Audit checked-in lint fixtures")
 @click.option("--fixtures", type=click.Path(path_type=Path), default=None, help="Lint fixture catalog path")
 def lint(

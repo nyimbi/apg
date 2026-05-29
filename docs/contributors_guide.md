@@ -192,6 +192,7 @@ Then iterate:
 ./.venv/bin/apg capabilities evaluate-rules common_demo --context-json '{}' --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/demo --json
 ./.venv/bin/apg capabilities publish-apply capabilities/common/demo --catalog /tmp/apg-capability-catalog.json --dry-run --json
+./.venv/bin/apg lint examples/08_basic_capability_contract/main.apg --catalog /tmp/apg-capability-catalog.json --json
 ```
 
 Capability PRs should keep these aligned:
