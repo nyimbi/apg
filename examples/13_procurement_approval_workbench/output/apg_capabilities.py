@@ -7,6 +7,7 @@ Generated from first-class APG capability declarations.
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -51,6 +52,8 @@ CAPABILITIES: Dict[str, CapabilitySpec] = {
     name: CapabilitySpec(name=name, **data)
     for name, data in CAPABILITY_DATA.items()
 }
+
+_MISSING = object()
 
 
 def list_capabilities() -> List[str]:
@@ -660,13 +663,17 @@ def capability_rules(capability_name: str) -> List[Dict[str, Any]]:
     return sorted(rules, key=lambda rule: int(rule.get("priority") or 0), reverse=True)
 
 
-def evaluate_capability_rules(capability_name: str, context: Dict[str, Any]) -> Dict[str, Any]:
+def evaluate_capability_rules(capability_name: str, context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    capability = get_capability(capability_name)
+    context = dict(context or {})
+    evaluation_context = dict(capability.configuration)
+    _deep_merge(evaluation_context, context)
     matched: List[str] = []
     actions: List[Dict[str, Any]] = []
     decision = "allow"
     precedence = {"allow": 0, "audit": 1, "warn": 1, "require_review": 2, "deny": 3}
     for rule in capability_rules(capability_name):
-        if not _matches_rule(rule, context):
+        if not _matches_rule(rule, evaluation_context):
             continue
         matched.append(str(rule["name"]))
         effect = dict(rule.get("effect") or {})
@@ -676,7 +683,13 @@ def evaluate_capability_rules(capability_name: str, context: Dict[str, Any]) -> 
         candidate = str(effect.get("decision") or "allow")
         if precedence.get(candidate, 0) > precedence.get(decision, 0):
             decision = candidate
-    return {"decision": decision, "matched_rules": matched, "actions": actions, "context": context}
+    return {
+        "decision": decision,
+        "matched_rules": matched,
+        "actions": actions,
+        "context": context,
+        "effective_context": evaluation_context,
+    }
 
 
 def _matches_rule(rule: Dict[str, Any], context: Dict[str, Any]) -> bool:
@@ -698,7 +711,16 @@ def _evaluate_condition(expression: str, context: Dict[str, Any]) -> bool:
     if not expression:
         return False
     if expression.startswith("not "):
-        return not bool(_resolve_value(expression[4:].strip(), context))
+        return not _evaluate_condition(expression[4:].strip(), context)
+    lowered = expression.lower()
+    if lowered.endswith(" missing"):
+        target = expression[:-8].strip()
+        resolved = _resolve_value(target, context)
+        return _missing_context_reference(target, resolved, context) or resolved in (None, "")
+    if lowered.endswith(" present"):
+        target = expression[:-8].strip()
+        resolved = _resolve_value(target, context)
+        return not (_missing_context_reference(target, resolved, context) or resolved in (None, ""))
     for operator in ("!=", "==", ">=", "<=", ">", "<"):
         marker = f" {operator} "
         if marker not in expression:
@@ -706,17 +728,16 @@ def _evaluate_condition(expression: str, context: Dict[str, Any]) -> bool:
         left_text, right_text = expression.split(marker, 1)
         left_key = left_text.strip()
         right_key = right_text.strip()
-        left = _resolve_value(left_key, context)
-        right = _resolve_value(right_key, context)
-        if _missing_context_reference(left_key, left, context):
+        left, left_missing = _resolve_rule_operand(left_key, context)
+        right, right_missing = _resolve_rule_operand(right_key, context)
+        if left_missing:
             return False
-        right_missing = _missing_context_reference(right_key, right, context)
+        if right_missing:
+            return False
         if operator == "!=":
             return left != right
         if operator == "==":
             return left == right
-        if right_missing:
-            return False
         try:
             if operator == ">=":
                 return left >= right
@@ -732,6 +753,82 @@ def _evaluate_condition(expression: str, context: Dict[str, Any]) -> bool:
     if _missing_context_reference(expression, resolved, context):
         return False
     return bool(resolved)
+
+
+def _resolve_rule_operand(text: str, context: Dict[str, Any]) -> tuple[Any, bool]:
+    value = _safe_expression_value(text, context)
+    if value is not _MISSING:
+        return value, False
+    value = _resolve_value(text, context)
+    return value, _missing_context_reference(text, value, context)
+
+
+def _safe_expression_value(expression: str, context: Dict[str, Any]) -> Any:
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError:
+        return _MISSING
+    try:
+        return _eval_expression_node(tree.body, context)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return _MISSING
+
+
+def _eval_expression_node(node: ast.AST, context: Dict[str, Any]) -> Any:
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Name):
+        value = _resolve_value(node.id, context)
+        if _missing_context_reference(node.id, value, context):
+            return _MISSING
+        return value
+    if isinstance(node, ast.Attribute):
+        path = _attribute_path(node)
+        if path is None:
+            return _MISSING
+        value = _resolve_value(path, context)
+        if _missing_context_reference(path, value, context):
+            return _MISSING
+        return value
+    if isinstance(node, ast.UnaryOp):
+        operand = _eval_expression_node(node.operand, context)
+        if operand is _MISSING:
+            return _MISSING
+        if isinstance(node.op, ast.USub):
+            return -operand
+        if isinstance(node.op, ast.UAdd):
+            return +operand
+        return _MISSING
+    if isinstance(node, ast.BinOp):
+        left = _eval_expression_node(node.left, context)
+        right = _eval_expression_node(node.right, context)
+        if left is _MISSING or right is _MISSING:
+            return _MISSING
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            return left / right
+        if isinstance(node.op, ast.FloorDiv):
+            return left // right
+        if isinstance(node.op, ast.Mod):
+            return left % right
+    return _MISSING
+
+
+def _attribute_path(node: ast.AST) -> str | None:
+    parts: List[str] = []
+    current: ast.AST | None = node
+    while isinstance(current, ast.Attribute):
+        parts.append(current.attr)
+        current = current.value
+    if isinstance(current, ast.Name):
+        parts.append(current.id)
+        return ".".join(reversed(parts))
+    return None
 
 
 def _missing_context_reference(text: str, resolved: Any, context: Dict[str, Any]) -> bool:

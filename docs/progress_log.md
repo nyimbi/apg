@@ -76,6 +76,29 @@ Known remaining gaps:
 - Rule execution currently supports deterministic expression matching over structured contexts; richer rule-engine adapters and persistence-backed workflows still need further implementation.
 - Full behavior across every generated capability HTTP route needs broader runtime sweeps when battery allows.
 
+### 2026-05-29 03:32 EAT
+
+Generated rule-engine arithmetic execution:
+
+- Extended generated capability rule evaluation so APG rules can execute simple arithmetic/comparison expressions such as `on_hand - reserved < 0`.
+- Rule evaluation now merges capability configuration into the effective rule context, allowing expressions such as `amount > approval_threshold` to use configured thresholds without duplicating them in request payloads.
+- Added deterministic support for `field missing` and `field present` rule predicates.
+- Regenerated all 20 numbered example output directories from the current compiler.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/code_generator.py tests/test_capability_composition_runtime.py` -> passed.
+- `./.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py::test_generated_rule_engine_evaluates_arithmetic_and_configuration_thresholds tests/test_capability_composition_runtime.py::test_capability_declaration_generates_runtime_manifest tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler` -> 3 passed.
+- Generated `examples/14_inventory_warehouse_operations/main.apg` in a temp directory and called `apg_capabilities.evaluate_capability_rules("WarehouseInventory", {"on_hand": 4, "reserved": 5, "reorder_level": 2})` -> `decision: deny`, `matched_rules: ["no_negative_stock"]`.
+- Generated `examples/14_inventory_warehouse_operations` `smoke_test.py` -> exit code 0.
+- Regenerated example outputs command compiled 20/20 examples with no failures.
+- `git diff --check` over the compiler, focused test, generated examples, and this log passed.
+
+Known remaining gaps:
+
+- The safe evaluator intentionally supports a small arithmetic expression subset; richer rule functions, aggregations, temporal windows, and external data lookups still need explicit runtime implementations.
+- Full HTTP route sweeps for every generated example remain deferred until a broader battery/compute window.
+
 ### 2026-05-26 01:35 EAT
 
 Completed and pushed:

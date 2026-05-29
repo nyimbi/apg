@@ -409,6 +409,56 @@ def test_capability_declaration_generates_runtime_manifest():
     assert validation["warnings"] == ["GeneralLedger requires external service audit_log"]
 
 
+def test_generated_rule_engine_evaluates_arithmetic_and_configuration_thresholds():
+    source = """
+capability WarehouseInventory {
+    contract: {
+        id: warehouse_inventory,
+        provides: [stock_balances],
+        configuration: {approval_threshold: 50000},
+        rules: [
+            {name: "no_negative_stock", when: "on_hand - reserved < 0", action: "deny"},
+            {name: "high_value_approval", when: "amount > approval_threshold", action: "require_review"},
+            {name: "budget_required", when: "budget_code missing", action: "deny"}
+        ]
+    };
+}
+"""
+    result = APGCompiler().compile_string(source, "warehouse.apg")
+    assert result.success is True, result.errors
+    namespace = {}
+    exec(compile(result.generated_files["apg_capabilities.py"], "apg_capabilities.py", "exec"), namespace)
+
+    negative_stock = namespace["evaluate_capability_rules"](
+        "WarehouseInventory",
+        {"on_hand": 4, "reserved": 5, "amount": 100, "budget_code": "OPS"},
+    )
+    assert negative_stock["decision"] == "deny"
+    assert negative_stock["matched_rules"] == ["no_negative_stock"]
+
+    high_value = namespace["evaluate_capability_rules"](
+        "WarehouseInventory",
+        {"on_hand": 10, "reserved": 1, "amount": 75000, "budget_code": "OPS"},
+    )
+    assert high_value["decision"] == "require_review"
+    assert high_value["matched_rules"] == ["high_value_approval"]
+    assert high_value["effective_context"]["approval_threshold"] == 50000
+
+    missing_budget = namespace["evaluate_capability_rules"](
+        "WarehouseInventory",
+        {"on_hand": 10, "reserved": 1, "amount": 100},
+    )
+    assert missing_budget["decision"] == "deny"
+    assert missing_budget["matched_rules"] == ["budget_required"]
+
+    allowed = namespace["evaluate_capability_rules"](
+        "WarehouseInventory",
+        {"on_hand": 10, "reserved": 1, "amount": 100, "budget_code": "OPS"},
+    )
+    assert allowed["decision"] == "allow"
+    assert allowed["matched_rules"] == []
+
+
 def test_generated_app_manifest_includes_capability_descriptions():
     result = APGCompiler().compile_string(CAPABILITY_SOURCE, "erp_ops.apg")
 
