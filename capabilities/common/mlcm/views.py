@@ -20,8 +20,99 @@ def dashboard_model(
 		"capability": contract["capability"],
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
+		"summary": service.dashboard_summary(tenant_id),
 		"routes": capability_routes(tenant_id),
-		"records": service.list_records(tenant_id),
+		"models": service.list_models(tenant_id),
+		"deployments": service.list_deployments(tenant_id),
+		"drift_signals": service.list_drift_signals(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+	}
+
+
+def registry_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	return {
+		"tenant_id": tenant_id,
+		"models": service.list_models(tenant_id),
+		"versions": service.list_versions(tenant_id),
+		"route": "/mlcm/models",
+	}
+
+
+def version_manager_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	return {
+		"tenant_id": tenant_id,
+		"versions": service.list_versions(tenant_id),
+		"evaluations": service.list_evaluations(tenant_id),
+		"promotions": service.list_promotion_requests(tenant_id),
+		"route": "/mlcm/versions",
+	}
+
+
+def evaluation_console_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	return {
+		"tenant_id": tenant_id,
+		"minimum_eval_score": service.minimum_eval_score,
+		"evaluations": service.list_evaluations(tenant_id),
+		"versions": service.list_versions(tenant_id),
+		"route": "/mlcm/evaluation",
+	}
+
+
+def deployment_board_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	return {
+		"tenant_id": tenant_id,
+		"targets": service.list_targets(tenant_id),
+		"deployments": service.list_deployments(tenant_id),
+		"rollbacks": service.list_rollbacks(tenant_id),
+		"route": "/mlcm/deployments",
+	}
+
+
+def drift_monitor_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	signals = service.list_drift_signals(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"signals": signals,
+		"unresolved": [
+			signal
+			for signal in signals
+			if signal["drift_detected"] and not signal["review_recorded"]
+		],
+		"route": "/mlcm/drift",
+	}
+
+
+def governance_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rules": contract["rule_engine"]["rules"],
+		"promotions": service.list_promotion_requests(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
+		"route": "/mlcm/governance",
 	}

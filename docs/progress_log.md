@@ -11355,3 +11355,26 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations before recording this progress-log entry.
 - `git diff --check -- capabilities/common/mchn docs/progress_log.md` passed with no whitespace errors before recording this progress-log entry.
+
+### 2026-05-29 16:29 EAT
+
+Executable MLCM model-lifecycle runtime slice:
+
+- Converted `capabilities/common/mlcm` from generated materialized records into a domain-specific AI model lifecycle runtime.
+- Replaced generic records with model artifacts, model versions, evaluation runs, promotion requests, deployment targets, deployment records, drift signals, rollback records, and audit events.
+- Added `lifecycle_runtime.py` with deterministic IDs, model stage and score normalization, evaluation posture, promotion posture, model-card completeness, deployment posture, and drift posture helpers.
+- Added `MlcmService` behavior for model registration, version creation, evaluation evidence, promotion gates, deployment targets, serving deployments, drift review, rollback execution, compatibility records, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so MLCM exposes status, registry, version management, evaluation console, deployment board, drift monitor, governance, rollbacks, audit events, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and explicit model-registry, artifact-store, evaluation-runner, deployment-substrate, monitoring, drift, audit, and incident-response adapter boundaries.
+- Added focused lifecycle and guardrail tests covering successful model-version-evaluation-promotion-deployment-drift execution and tenant context, model ownership, model-card, evaluation-score, production-approval, drift-review, and tenant-isolation guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mlcm/__init__.py capabilities/common/mlcm/models.py capabilities/common/mlcm/lifecycle_runtime.py capabilities/common/mlcm/service.py capabilities/common/mlcm/api.py capabilities/common/mlcm/views.py capabilities/common/mlcm/test_capability_contract.py capabilities/common/mlcm/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/mlcm/test_capability_contract.py capabilities/common/mlcm/tests` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package|Materialized capability package" capabilities/common/mlcm` returned no remaining MLCM baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.mlcm.models','capabilities.common.mlcm.lifecycle_runtime','capabilities.common.mlcm.service','capabilities.common.mlcm.api','capabilities.common.mlcm.views']]; print('mlcm imports ok')"` passed with `mlcm imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mlcm --json` passed with `ok: true`; `mlcm` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mlcm --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 85, materialized baseline packages dropped to 22, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 900, and warning count dropped to 24. The next implementation-depth warning is `ncod`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.

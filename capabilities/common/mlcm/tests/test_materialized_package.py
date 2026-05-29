@@ -1,8 +1,9 @@
-"""Materialized capability package tests."""
+"""AI Model Lifecycle Management package contract and runtime tests."""
 
 from __future__ import annotations
 
 from pathlib import Path
+import importlib
 import importlib.util
 import sys
 
@@ -22,7 +23,7 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_materialized_contract_shape_is_valid():
+def test_mlcm_contract_shape_is_valid():
 	module = _load_module("materialized_contract_mlcm", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
@@ -32,7 +33,7 @@ def test_materialized_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
-def test_materialized_app_entrypoint_is_publishable():
+def test_mlcm_app_entrypoint_is_publishable():
 	module = _load_module("materialized_app_mlcm", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
@@ -44,3 +45,19 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "mlcm" in model["capabilities"]
+
+
+def test_mlcm_compatibility_record_uses_model_registry():
+	module = importlib.import_module("capabilities.common.mlcm.service")
+	service = module.MlcmService()
+
+	record = service.create_record(
+		record_id="legacy-model",
+		tenant_id="tenant-test",
+		metadata={"name": "Legacy Model", "owner": "legacy-owner", "problem_type": "forecasting"},
+	)
+
+	assert record["id"] == "legacy-model"
+	assert record["name"] == "Legacy Model"
+	assert record["owner"] == "legacy-owner"
+	assert service.list_records("tenant-test")[0]["problem_type"] == "forecasting"
