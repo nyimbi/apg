@@ -15,7 +15,14 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from unittest.mock import AsyncMock, MagicMock
 
-import aioredis
+try:
+	import aioredis
+except ImportError:  # pragma: no cover - tests that need Redis should install extras
+	class _AioRedisModule:
+		@staticmethod
+		def from_url(*args, **kwargs):
+			raise RuntimeError("aioredis is required for Redis-backed API tests")
+	aioredis = _AioRedisModule()
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -88,12 +95,12 @@ def test_engine(test_config):
 		},
 		echo=test_config.database.echo
 	)
-	
+
 	# Create all tables
 	Base.metadata.create_all(engine)
-	
+
 	yield engine
-	
+
 	# Cleanup
 	Base.metadata.drop_all(engine)
 	engine.dispose()
@@ -103,21 +110,21 @@ def test_session(test_engine):
 	"""Create test database session."""
 	Session = sessionmaker(bind=test_engine)
 	session = Session()
-	
+
 	yield session
-	
+
 	session.close()
 
 @pytest_asyncio.fixture
 async def redis_client(test_config):
 	"""Create test Redis client."""
 	client = aioredis.from_url(f"redis://{test_config.redis.host}:{test_config.redis.port}/{test_config.redis.database}")
-	
+
 	# Clear test database
 	await client.flushdb()
-	
+
 	yield client
-	
+
 	await client.flushdb()
 	await client.close()
 
@@ -173,14 +180,14 @@ async def service_discovery(redis_client, api_service):
 	"""Create service discovery."""
 	discovery = ServiceDiscovery(redis_client, api_service)
 	await discovery.initialize()
-	
+
 	yield discovery
-	
+
 	await discovery.shutdown()
 
 @pytest_asyncio.fixture
-async def integration_manager(redis_client, service_discovery, api_service, 
-							 consumer_service, analytics_service, 
+async def integration_manager(redis_client, service_discovery, api_service,
+							 consumer_service, analytics_service,
 							 metrics_collector, health_monitor):
 	"""Create APG integration manager."""
 	manager = APGIntegrationManager(
@@ -188,9 +195,9 @@ async def integration_manager(redis_client, service_discovery, api_service,
 		consumer_service, analytics_service, metrics_collector, health_monitor
 	)
 	await manager.initialize()
-	
+
 	yield manager
-	
+
 	await manager.shutdown()
 
 # =============================================================================
@@ -252,7 +259,7 @@ def sample_capability_info():
 def sample_workflow_data():
 	"""Sample workflow data for testing."""
 	from ..integration import CrossCapabilityWorkflow, WorkflowStep, EventType
-	
+
 	return CrossCapabilityWorkflow(
 		workflow_id="test_workflow",
 		workflow_name="Test Workflow",
@@ -331,26 +338,26 @@ def db_api_key(test_session, db_consumer):
 def mock_http_session():
 	"""Mock aiohttp ClientSession."""
 	session = AsyncMock()
-	
+
 	# Mock successful response
 	response = AsyncMock()
 	response.status = 200
 	response.json = AsyncMock(return_value={"status": "healthy"})
 	response.text = AsyncMock(return_value="OK")
 	response.headers = {"content-type": "application/json"}
-	
+
 	session.get = AsyncMock(return_value=response)
 	session.post = AsyncMock(return_value=response)
 	session.__aenter__ = AsyncMock(return_value=session)
 	session.__aexit__ = AsyncMock(return_value=None)
-	
+
 	return session
 
 @pytest.fixture
 def mock_gateway_request():
 	"""Mock gateway request."""
 	from ..gateway import GatewayRequest
-	
+
 	return GatewayRequest(
 		request_id="test_req_123",
 		method="GET",
@@ -368,7 +375,7 @@ def mock_gateway_request():
 def mock_upstream_server():
 	"""Mock upstream server."""
 	from ..gateway import UpstreamServer
-	
+
 	return UpstreamServer(
 		url="http://localhost:8000",
 		weight=1,
@@ -385,12 +392,12 @@ def mock_upstream_server():
 async def test_capability(test_config):
 	"""Create test capability instance."""
 	capability = IntegrationAPIManagementCapability(test_config)
-	
+
 	# Initialize without APG registration for testing
 	await capability.initialize(register_with_apg=False)
-	
+
 	yield capability
-	
+
 	await capability.cleanup()
 
 @pytest.fixture
@@ -407,7 +414,7 @@ def performance_test_data():
 	"""Generate performance test data."""
 	apis = []
 	consumers = []
-	
+
 	# Generate multiple APIs
 	for i in range(100):
 		apis.append({
@@ -420,7 +427,7 @@ def performance_test_data():
 			"tenant_id": "perf_tenant",
 			"created_by": "perf_test"
 		})
-	
+
 	# Generate multiple consumers
 	for i in range(50):
 		consumers.append({
@@ -429,7 +436,7 @@ def performance_test_data():
 			"tenant_id": "perf_tenant",
 			"created_by": "perf_test"
 		})
-	
+
 	return {"apis": apis, "consumers": consumers}
 
 # =============================================================================
@@ -440,7 +447,7 @@ def performance_test_data():
 def cleanup_after_test():
 	"""Cleanup after each test."""
 	yield
-	
+
 	# Any additional cleanup can be added here
 	pass
 
@@ -480,15 +487,15 @@ def assert_eventually():
 		"""Assert that condition becomes true within timeout."""
 		import time
 		start_time = time.time()
-		
+
 		while time.time() - start_time < timeout:
 			if await condition_func():
 				return True
 			await asyncio.sleep(interval)
-		
+
 		# Final check
 		return await condition_func()
-	
+
 	return _assert_eventually
 
 @pytest.fixture
@@ -496,7 +503,7 @@ def test_metrics():
 	"""Test metrics collection utilities."""
 	def _create_test_metric(name, value, labels=None):
 		from ..monitoring import Metric, MetricType
-		
+
 		return Metric(
 			name=name,
 			metric_type=MetricType.GAUGE,
@@ -505,7 +512,7 @@ def test_metrics():
 			labels=labels or {},
 			description=f"Test metric: {name}"
 		)
-	
+
 	return _create_test_metric
 
 # =============================================================================
@@ -516,12 +523,12 @@ __all__ = [
 	# Configuration
 	'test_config',
 	'test_server_url',
-	
+
 	# Database
 	'test_engine',
 	'test_session',
 	'redis_client',
-	
+
 	# Services
 	'api_service',
 	'consumer_service',
@@ -532,27 +539,27 @@ __all__ = [
 	'alert_manager',
 	'service_discovery',
 	'integration_manager',
-	
+
 	# Test Data
 	'sample_api_data',
 	'sample_consumer_data',
 	'sample_capability_info',
 	'sample_workflow_data',
 	'performance_test_data',
-	
+
 	# Database Objects
 	'db_api',
 	'db_consumer',
 	'db_api_key',
-	
+
 	# Mocks
 	'mock_http_session',
 	'mock_gateway_request',
 	'mock_upstream_server',
-	
+
 	# Integration
 	'test_capability',
-	
+
 	# Utilities
 	'assert_eventually',
 	'test_metrics'

@@ -16,6 +16,29 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 03:16 EAT
+
+Completed API Management executable-runtime slice:
+
+- Replaced API lifecycle placeholder hooks with cache-backed gateway update events, deprecation notices, OpenAPI 3.0.3 regeneration, and real-time API/consumer metrics.
+- Added focused service-runtime-hook coverage for OpenAPI regeneration, lifecycle event ledgers, and real-time metric accumulation.
+- Made the `capabilities.int.api` package importable in dependency-light environments by treating gateway/runtime packages such as `aiohttp`, `aioredis`, `aiohttp-cors`, `PyJWT`, and `uvloop` as optional until the gateway is actually started.
+- Fixed `capabilities/int/api/api.py` import-time async syntax blockers in Flask-AppBuilder API methods and removed the stale gateway proxy placeholder response.
+- Made `capabilities/int/api/config.py` compatible with the installed Pydantic runtime without adding a new dependency.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/int/api/config.py capabilities/int/api/service.py capabilities/int/api/api.py capabilities/int/api/discovery.py capabilities/int/api/integration.py capabilities/int/api/monitoring.py capabilities/int/api/gateway.py capabilities/int/api/factory.py capabilities/int/api/runner.py capabilities/int/api/tests/conftest.py capabilities/int/api/tests/test_service_runtime_hooks.py` -> passed.
+- `./.venv/bin/python -m pytest -q capabilities/int/api/tests/test_service_runtime_hooks.py` -> 3 passed, 5 existing deprecation warnings.
+- `./.venv/bin/python -c 'import capabilities.int.api as api; from capabilities.int.api.service import APILifecycleService, AnalyticsService; print(api.__version__, APILifecycleService.__name__, AnalyticsService.__name__)'` -> `1.0.0 APILifecycleService AnalyticsService`.
+- Stale placeholder scan for the replaced service hooks and async syntax blockers returned no matches.
+- `git diff --check` over the API Management slice and this log passed.
+
+Known remaining gaps:
+
+- Full live gateway network runtime still needs verification with installed gateway extras and Redis; this slice keeps service-layer behavior executable without requiring those runtime services.
+- Existing Pydantic/SQLAlchemy deprecation warnings remain and should be handled in a separate compatibility cleanup slice.
+
 ### 2026-05-26 01:35 EAT
 
 Completed and pushed:

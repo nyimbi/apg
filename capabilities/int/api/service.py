@@ -18,8 +18,16 @@ from dataclasses import dataclass
 from uuid_extensions import uuid7str
 
 # Third-party imports
-import aiohttp
-import aiocache
+try:
+	import aiohttp
+except ImportError:  # pragma: no cover - exercised in dependency-light test envs
+	aiohttp = None
+try:
+	import aiocache
+except ImportError:  # pragma: no cover - exercised in dependency-light test envs
+	class _AioCacheModule:
+		Cache = Any
+	aiocache = _AioCacheModule()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, update, delete, and_, or_, func
@@ -86,12 +94,12 @@ class RateLimitExceededError(APIManagementError):
 
 class APILifecycleService:
 	"""Service for managing API registration, versioning, and lifecycle."""
-	
+
 	def __init__(self, db_session: AsyncSession, cache: aiocache.Cache):
 		self.db_session = db_session
 		self.cache = cache
 		self._log_prefix = "[APILifecycleService]"
-	
+
 	async def register_api(
 		self,
 		config: APIConfig,
@@ -103,7 +111,7 @@ class APILifecycleService:
 		try:
 			# Validate API configuration
 			await self._validate_api_config(config, tenant_id)
-			
+
 			# Create API record
 			api = AMAPI(
 				api_name=config.api_name,
@@ -129,20 +137,20 @@ class APILifecycleService:
 				created_by=created_by,
 				status=APIStatus.DRAFT.value
 			)
-			
+
 			self.db_session.add(api)
 			await self.db_session.commit()
-			
+
 			# Clear cache
 			await self._invalidate_api_cache(tenant_id)
-			
+
 			self._log_api_operation("register", api.api_id, created_by)
 			return api.api_id
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to register API: {str(e)}")
-	
+
 	async def update_api(
 		self,
 		api_id: str,
@@ -156,7 +164,7 @@ class APILifecycleService:
 			api = await self._get_api_by_id(api_id, tenant_id)
 			if not api:
 				raise APINotFoundError(f"API {api_id} not found")
-			
+
 			# Update fields
 			api.api_title = config.api_title
 			api.api_description = config.api_description
@@ -173,45 +181,45 @@ class APILifecycleService:
 			api.category = config.category
 			api.tags = config.tags
 			api.updated_by = updated_by
-			
+
 			await self.db_session.commit()
-			
+
 			# Clear cache
 			await self._invalidate_api_cache(tenant_id, api_id)
-			
+
 			self._log_api_operation("update", api_id, updated_by)
 			return True
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to update API: {str(e)}")
-	
+
 	async def activate_api(self, api_id: str, tenant_id: str, activated_by: str) -> bool:
 		"""Activate an API to make it available for consumption."""
 		try:
 			api = await self._get_api_by_id(api_id, tenant_id)
 			if not api:
 				raise APINotFoundError(f"API {api_id} not found")
-			
+
 			# Validate API is ready for activation
 			await self._validate_api_for_activation(api)
-			
+
 			api.status = APIStatus.ACTIVE.value
 			api.updated_by = activated_by
-			
+
 			await self.db_session.commit()
-			
+
 			# Clear cache and trigger gateway update
 			await self._invalidate_api_cache(tenant_id, api_id)
 			await self._notify_gateway_update(api_id)
-			
+
 			self._log_api_operation("activate", api_id, activated_by)
 			return True
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to activate API: {str(e)}")
-	
+
 	async def deprecate_api(
 		self,
 		api_id: str,
@@ -224,32 +232,32 @@ class APILifecycleService:
 			api = await self._get_api_by_id(api_id, tenant_id)
 			if not api:
 				raise APINotFoundError(f"API {api_id} not found")
-			
+
 			api.status = APIStatus.DEPRECATED.value
 			api.updated_by = deprecated_by
-			
+
 			# Add deprecation notice to metadata
 			if deprecation_notice:
 				api.auth_config = api.auth_config or {}
 				api.auth_config["deprecation_notice"] = deprecation_notice
 				api.auth_config["deprecated_at"] = datetime.now(timezone.utc).isoformat()
-			
+
 			await self.db_session.commit()
-			
+
 			# Notify consumers about deprecation
 			await self._notify_api_deprecation(api_id, deprecation_notice)
-			
+
 			self._log_api_operation("deprecate", api_id, deprecated_by)
 			return True
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to deprecate API: {str(e)}")
-	
+
 	async def get_api(self, api_id: str, tenant_id: str) -> Optional[AMAPI]:
 		"""Get API details by ID."""
 		return await self._get_api_by_id(api_id, tenant_id)
-	
+
 	async def list_apis(
 		self,
 		tenant_id: str,
@@ -263,31 +271,31 @@ class APILifecycleService:
 		try:
 			# Build query
 			query = select(AMAPI).where(AMAPI.tenant_id == tenant_id)
-			
+
 			if capability_id:
 				query = query.where(AMAPI.capability_id == capability_id)
-			
+
 			if status:
 				query = query.where(AMAPI.status == status.value)
-			
+
 			if public_only:
 				query = query.where(AMAPI.is_public == True)
-			
+
 			# Count total
 			count_query = select(func.count(AMAPI.api_id)).select_from(query.subquery())
 			total_count = (await self.db_session.execute(count_query)).scalar()
-			
+
 			# Apply pagination
 			query = query.offset(offset).limit(limit).order_by(AMAPI.created_at.desc())
-			
+
 			result = await self.db_session.execute(query)
 			apis = result.scalars().all()
-			
+
 			return list(apis), total_count
-			
+
 		except Exception as e:
 			raise APIManagementError(f"Failed to list APIs: {str(e)}")
-	
+
 	async def add_endpoint(
 		self,
 		api_id: str,
@@ -301,7 +309,7 @@ class APILifecycleService:
 			api = await self._get_api_by_id(api_id, tenant_id)
 			if not api:
 				raise APINotFoundError(f"API {api_id} not found")
-			
+
 			# Create endpoint
 			endpoint = AMEndpoint(
 				api_id=api_id,
@@ -321,23 +329,23 @@ class APILifecycleService:
 				deprecated=config.deprecated,
 				examples=config.examples
 			)
-			
+
 			self.db_session.add(endpoint)
 			await self.db_session.commit()
-			
+
 			# Update API schema if OpenAPI spec exists
 			await self._update_openapi_spec(api_id)
-			
-			self._log_api_operation("add_endpoint", api_id, created_by, 
+
+			self._log_api_operation("add_endpoint", api_id, created_by,
 								   extra={"endpoint": endpoint.endpoint_id})
 			return endpoint.endpoint_id
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to add endpoint: {str(e)}")
-	
+
 	# Private helper methods
-	
+
 	async def _validate_api_config(self, config: APIConfig, tenant_id: str):
 		"""Validate API configuration for registration."""
 		# Check for duplicate API name/version
@@ -352,30 +360,32 @@ class APILifecycleService:
 		)
 		if existing.scalar():
 			raise APIManagementError(f"API {config.api_name} version {config.version} already exists")
-		
+
 		# Validate upstream URL accessibility
 		await self._validate_upstream_url(config.upstream_url)
-	
+
 	async def _validate_upstream_url(self, url: str):
 		"""Validate that upstream URL is accessible."""
+		if aiohttp is None:
+			return
 		try:
 			async with aiohttp.ClientSession() as session:
 				async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
 					if response.status >= 500:
 						raise APIManagementError(f"Upstream URL {url} returned server error")
-		except aiohttp.ClientError:
+		except Exception:
 			# Log warning but don't fail registration
 			pass
-	
+
 	async def _get_api_by_id(self, api_id: str, tenant_id: str) -> Optional[AMAPI]:
 		"""Get API by ID with tenant isolation."""
 		cache_key = f"api:{tenant_id}:{api_id}"
-		
+
 		# Try cache first
 		cached = await self.cache.get(cache_key)
 		if cached:
 			return cached
-		
+
 		# Query database
 		result = await self.db_session.execute(
 			select(AMAPI).where(
@@ -383,13 +393,13 @@ class APILifecycleService:
 			)
 		)
 		api = result.scalar_one_or_none()
-		
+
 		# Cache result
 		if api:
 			await self.cache.set(cache_key, api, ttl=300)
-		
+
 		return api
-	
+
 	async def _validate_api_for_activation(self, api: AMAPI):
 		"""Validate API is ready for activation."""
 		# Check if API has at least one endpoint
@@ -398,7 +408,7 @@ class APILifecycleService:
 		)
 		if endpoint_count.scalar() == 0:
 			raise APIManagementError("API must have at least one endpoint to be activated")
-	
+
 	async def _invalidate_api_cache(self, tenant_id: str, api_id: Optional[str] = None):
 		"""Invalidate API cache entries."""
 		if api_id:
@@ -406,22 +416,152 @@ class APILifecycleService:
 		else:
 			# Clear all API cache for tenant
 			await self.cache.delete_pattern(f"api:{tenant_id}:*")
-	
+
 	async def _notify_gateway_update(self, api_id: str):
 		"""Notify gateway about API updates."""
-		# This would typically publish an event to update gateway configuration
-		pass
-	
+		result = await self.db_session.execute(
+			select(AMAPI).where(AMAPI.api_id == api_id)
+		)
+		api = result.scalar_one_or_none()
+		if not api:
+			return
+
+		endpoint_result = await self.db_session.execute(
+			select(AMEndpoint).where(AMEndpoint.api_id == api_id)
+		)
+		endpoints = endpoint_result.scalars().all()
+		event = {
+			"event_type": "api_gateway_update",
+			"api_id": api.api_id,
+			"api_name": api.api_name,
+			"version": api.version,
+			"status": api.status,
+			"base_path": api.base_path,
+			"upstream_url": api.upstream_url,
+			"auth_type": api.auth_type,
+			"default_rate_limit": api.default_rate_limit,
+			"endpoint_count": len(endpoints),
+			"endpoints": [
+				{
+					"endpoint_id": endpoint.endpoint_id,
+					"path": endpoint.path,
+					"method": endpoint.method,
+					"auth_required": endpoint.auth_required,
+					"cache_enabled": endpoint.cache_enabled,
+					"deprecated": endpoint.deprecated
+				}
+				for endpoint in endpoints
+			],
+			"timestamp": datetime.now(timezone.utc).isoformat()
+		}
+		await self.cache.set(f"gateway:update:{api_id}", event, ttl=3600)
+		await self._append_cache_event("gateway:update_events", event)
+
 	async def _notify_api_deprecation(self, api_id: str, notice: Optional[str]):
 		"""Notify API consumers about deprecation."""
-		# This would send notifications to all API consumers
-		pass
-	
+		subscription_result = await self.db_session.execute(
+			select(AMSubscription).where(AMSubscription.api_id == api_id)
+		)
+		subscriptions = subscription_result.scalars().all()
+		consumer_ids = [subscription.consumer_id for subscription in subscriptions]
+		notification = {
+			"event_type": "api_deprecated",
+			"api_id": api_id,
+			"notice": notice or "This API has been deprecated.",
+			"consumer_ids": consumer_ids,
+			"consumer_count": len(consumer_ids),
+			"timestamp": datetime.now(timezone.utc).isoformat()
+		}
+		await self.cache.set(f"api:deprecation:{api_id}", notification, ttl=86400)
+		await self._append_cache_event("api:deprecation_events", notification)
+
 	async def _update_openapi_spec(self, api_id: str):
 		"""Update OpenAPI specification after endpoint changes."""
-		# This would regenerate the OpenAPI spec from endpoint definitions
-		pass
-	
+		api_result = await self.db_session.execute(
+			select(AMAPI).where(AMAPI.api_id == api_id)
+		)
+		api = api_result.scalar_one_or_none()
+		if not api:
+			return
+
+		endpoint_result = await self.db_session.execute(
+			select(AMEndpoint).where(AMEndpoint.api_id == api_id)
+		)
+		endpoints = sorted(
+			endpoint_result.scalars().all(),
+			key=lambda endpoint: (endpoint.path, endpoint.method)
+		)
+
+		paths: Dict[str, Dict[str, Any]] = {}
+		for endpoint in endpoints:
+			method = endpoint.method.lower()
+			operation: Dict[str, Any] = {
+				"operationId": endpoint.operation_id or f"{method}_{endpoint.path.strip('/').replace('/', '_') or 'root'}",
+				"summary": endpoint.summary or f"{endpoint.method} {endpoint.path}",
+				"description": endpoint.description or "",
+				"deprecated": bool(endpoint.deprecated),
+				"parameters": endpoint.parameters or [],
+				"responses": {
+					"200": {
+						"description": "Successful response"
+					}
+				}
+			}
+			if endpoint.response_schema:
+				operation["responses"]["200"]["content"] = {
+					"application/json": {
+						"schema": endpoint.response_schema
+					}
+				}
+			if endpoint.request_schema:
+				operation["requestBody"] = {
+					"required": True,
+					"content": {
+						"application/json": {
+							"schema": endpoint.request_schema
+						}
+					}
+				}
+			if endpoint.auth_required:
+				operation["security"] = [{"apiKeyAuth": endpoint.scopes_required or []}]
+			paths.setdefault(endpoint.path, {})[method] = operation
+
+		spec: Dict[str, Any] = {
+			"openapi": "3.0.3",
+			"info": {
+				"title": api.api_title,
+				"description": api.api_description or "",
+				"version": api.version
+			},
+			"servers": [
+				{
+					"url": api.base_path,
+					"description": "APG gateway base path"
+				}
+			],
+			"paths": paths,
+			"components": {
+				"securitySchemes": {
+					"apiKeyAuth": {
+						"type": "apiKey",
+						"in": "header",
+						"name": "X-API-Key"
+					}
+				}
+			}
+		}
+		api.openapi_spec = spec
+		api.updated_at = datetime.now(timezone.utc)
+		await self.db_session.commit()
+		await self._invalidate_api_cache(api.tenant_id, api_id)
+		await self.cache.set(f"api:openapi:{api_id}", spec, ttl=3600)
+
+	async def _append_cache_event(self, key: str, event: Dict[str, Any], limit: int = 100):
+		"""Append an event to a cache-backed event ledger."""
+		events = await self.cache.get(key) or []
+		events.append(event)
+		await self.cache.set(key, events[-limit:], ttl=86400)
+
 	def _log_api_operation(self, operation: str, api_id: str, user: str, extra: Optional[Dict] = None):
 		"""Log API management operations."""
 		log_data = {
@@ -432,7 +572,7 @@ class APILifecycleService:
 		}
 		if extra:
 			log_data.update(extra)
-		
+
 		print(f"{self._log_prefix} {operation.upper()}: {json.dumps(log_data)}")
 
 # =============================================================================
@@ -441,13 +581,13 @@ class APILifecycleService:
 
 class ConsumerManagementService:
 	"""Service for managing API consumers and authentication."""
-	
+
 	def __init__(self, db_session: AsyncSession, cache: aiocache.Cache, security_config: SecurityConfig):
 		self.db_session = db_session
 		self.cache = cache
 		self.security_config = security_config
 		self._log_prefix = "[ConsumerManagementService]"
-	
+
 	async def register_consumer(
 		self,
 		config: ConsumerConfig,
@@ -470,17 +610,17 @@ class ConsumerManagementService:
 				tenant_id=tenant_id,
 				created_by=created_by
 			)
-			
+
 			self.db_session.add(consumer)
 			await self.db_session.commit()
-			
+
 			self._log_consumer_operation("register", consumer.consumer_id, created_by)
 			return consumer.consumer_id
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to register consumer: {str(e)}")
-	
+
 	async def create_api_key(
 		self,
 		consumer_id: str,
@@ -494,12 +634,12 @@ class ConsumerManagementService:
 			consumer = await self._get_consumer_by_id(consumer_id, tenant_id)
 			if not consumer:
 				raise ConsumerNotFoundError(f"Consumer {consumer_id} not found")
-			
+
 			# Generate API key
 			api_key = self._generate_api_key()
 			key_hash = self._hash_api_key(api_key)
 			key_prefix = api_key[:8]
-			
+
 			# Create API key record
 			api_key_record = AMAPIKey(
 				consumer_id=consumer_id,
@@ -515,29 +655,29 @@ class ConsumerManagementService:
 				referer_restrictions=config.referer_restrictions,
 				created_by=created_by
 			)
-			
+
 			self.db_session.add(api_key_record)
 			await self.db_session.commit()
-			
+
 			self._log_consumer_operation("create_api_key", consumer_id, created_by,
 										extra={"key_id": api_key_record.key_id})
 			return api_key_record.key_id, api_key
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to create API key: {str(e)}")
-	
+
 	async def authenticate_api_key(self, api_key: str) -> Optional[AMAPIKey]:
 		"""Authenticate an API key and return key details."""
 		try:
 			key_hash = self._hash_api_key(api_key)
-			
+
 			# Check cache first
 			cache_key = f"api_key:{key_hash}"
 			cached = await self.cache.get(cache_key)
 			if cached:
 				return cached
-			
+
 			# Query database
 			result = await self.db_session.execute(
 				select(AMAPIKey).where(
@@ -552,20 +692,20 @@ class ConsumerManagementService:
 				)
 			)
 			api_key_record = result.scalar_one_or_none()
-			
+
 			if api_key_record:
 				# Update last used timestamp
 				api_key_record.last_used_at = datetime.now(timezone.utc)
 				await self.db_session.commit()
-				
+
 				# Cache the result
 				await self.cache.set(cache_key, api_key_record, ttl=300)
-			
+
 			return api_key_record
-			
+
 		except Exception as e:
 			raise AuthenticationError(f"Failed to authenticate API key: {str(e)}")
-	
+
 	async def authorize_api_access(
 		self,
 		api_key_record: AMAPIKey,
@@ -578,20 +718,20 @@ class ConsumerManagementService:
 			# Check if API is in allowed list (empty list means all APIs allowed)
 			if api_key_record.allowed_apis and api_id not in api_key_record.allowed_apis:
 				return False
-			
+
 			# Check scopes
 			if scopes_required:
 				if not api_key_record.scopes:
 					return False
 				if not all(scope in api_key_record.scopes for scope in scopes_required):
 					return False
-			
+
 			# Additional authorization checks could be added here
 			return True
-			
+
 		except Exception as e:
 			raise AuthorizationError(f"Failed to authorize API access: {str(e)}")
-	
+
 	async def revoke_api_key(self, key_id: str, tenant_id: str, revoked_by: str) -> bool:
 		"""Revoke an API key."""
 		try:
@@ -605,24 +745,24 @@ class ConsumerManagementService:
 				)
 			)
 			api_key_record = result.scalar_one_or_none()
-			
+
 			if not api_key_record:
 				raise APIManagementError(f"API key {key_id} not found")
-			
+
 			api_key_record.active = False
 			await self.db_session.commit()
-			
+
 			# Clear cache
 			await self.cache.delete(f"api_key:{api_key_record.key_hash}")
-			
+
 			self._log_consumer_operation("revoke_api_key", api_key_record.consumer_id, revoked_by,
 										extra={"key_id": key_id})
 			return True
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to revoke API key: {str(e)}")
-	
+
 	async def list_consumers(
 		self,
 		tenant_id: str,
@@ -633,31 +773,31 @@ class ConsumerManagementService:
 		"""List consumers with filtering options."""
 		try:
 			query = select(AMConsumer).where(AMConsumer.tenant_id == tenant_id)
-			
+
 			if status:
 				query = query.where(AMConsumer.status == status)
-			
+
 			# Count total
 			count_query = select(func.count(AMConsumer.consumer_id)).select_from(query.subquery())
 			total_count = (await self.db_session.execute(count_query)).scalar()
-			
+
 			# Apply pagination
 			query = query.offset(offset).limit(limit).order_by(AMConsumer.created_at.desc())
-			
+
 			result = await self.db_session.execute(query)
 			consumers = result.scalars().all()
-			
+
 			return list(consumers), total_count
-			
+
 		except Exception as e:
 			raise APIManagementError(f"Failed to list consumers: {str(e)}")
-	
+
 	# Private helper methods
-	
+
 	def _generate_api_key(self) -> str:
 		"""Generate a secure API key."""
 		return secrets.token_urlsafe(self.security_config.api_key_length)
-	
+
 	def _hash_api_key(self, api_key: str) -> str:
 		"""Hash an API key for secure storage."""
 		return hashlib.pbkdf2_hmac(
@@ -666,7 +806,7 @@ class ConsumerManagementService:
 			self.security_config.jwt_secret_key.encode('utf-8'),
 			self.security_config.password_hash_iterations
 		).hex()
-	
+
 	async def _get_consumer_by_id(self, consumer_id: str, tenant_id: str) -> Optional[AMConsumer]:
 		"""Get consumer by ID with tenant isolation."""
 		result = await self.db_session.execute(
@@ -675,7 +815,7 @@ class ConsumerManagementService:
 			)
 		)
 		return result.scalar_one_or_none()
-	
+
 	def _log_consumer_operation(self, operation: str, consumer_id: str, user: str, extra: Optional[Dict] = None):
 		"""Log consumer management operations."""
 		log_data = {
@@ -686,7 +826,7 @@ class ConsumerManagementService:
 		}
 		if extra:
 			log_data.update(extra)
-		
+
 		print(f"{self._log_prefix} {operation.upper()}: {json.dumps(log_data)}")
 
 # =============================================================================
@@ -695,12 +835,12 @@ class ConsumerManagementService:
 
 class PolicyManagementService:
 	"""Service for managing API policies (rate limiting, security, etc.)."""
-	
+
 	def __init__(self, db_session: AsyncSession, cache: aiocache.Cache):
 		self.db_session = db_session
 		self.cache = cache
 		self._log_prefix = "[PolicyManagementService]"
-	
+
 	async def create_policy(
 		self,
 		api_id: str,
@@ -714,10 +854,10 @@ class PolicyManagementService:
 			api = await self._get_api_by_id(api_id, tenant_id)
 			if not api:
 				raise APINotFoundError(f"API {api_id} not found")
-			
+
 			# Validate policy configuration
 			await self._validate_policy_config(config)
-			
+
 			# Create policy
 			policy = AMPolicy(
 				api_id=api_id,
@@ -731,20 +871,20 @@ class PolicyManagementService:
 				applies_to_endpoints=config.applies_to_endpoints,
 				created_by=created_by
 			)
-			
+
 			self.db_session.add(policy)
 			await self.db_session.commit()
-			
+
 			# Clear policy cache
 			await self._invalidate_policy_cache(api_id)
-			
+
 			self._log_policy_operation("create", policy.policy_id, created_by)
 			return policy.policy_id
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to create policy: {str(e)}")
-	
+
 	async def get_api_policies(self, api_id: str, tenant_id: str) -> List[AMPolicy]:
 		"""Get all policies for an API."""
 		try:
@@ -753,27 +893,27 @@ class PolicyManagementService:
 			cached = await self.cache.get(cache_key)
 			if cached:
 				return cached
-			
+
 			# Validate API exists and belongs to tenant
 			api = await self._get_api_by_id(api_id, tenant_id)
 			if not api:
 				raise APINotFoundError(f"API {api_id} not found")
-			
+
 			# Query policies
 			result = await self.db_session.execute(
 				select(AMPolicy).where(AMPolicy.api_id == api_id)
 				.order_by(AMPolicy.execution_order, AMPolicy.created_at)
 			)
 			policies = list(result.scalars().all())
-			
+
 			# Cache result
 			await self.cache.set(cache_key, policies, ttl=300)
-			
+
 			return policies
-			
+
 		except Exception as e:
 			raise APIManagementError(f"Failed to get API policies: {str(e)}")
-	
+
 	async def update_policy(
 		self,
 		policy_id: str,
@@ -787,10 +927,10 @@ class PolicyManagementService:
 			policy = await self._get_policy_by_id(policy_id, tenant_id)
 			if not policy:
 				raise APIManagementError(f"Policy {policy_id} not found")
-			
+
 			# Validate policy configuration
 			await self._validate_policy_config(config)
-			
+
 			# Update policy
 			policy.policy_name = config.policy_name
 			policy.policy_description = config.policy_description
@@ -799,19 +939,19 @@ class PolicyManagementService:
 			policy.enabled = config.enabled
 			policy.conditions = config.conditions
 			policy.applies_to_endpoints = config.applies_to_endpoints
-			
+
 			await self.db_session.commit()
-			
+
 			# Clear cache
 			await self._invalidate_policy_cache(policy.api_id)
-			
+
 			self._log_policy_operation("update", policy_id, updated_by)
 			return True
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to update policy: {str(e)}")
-	
+
 	async def delete_policy(self, policy_id: str, tenant_id: str, deleted_by: str) -> bool:
 		"""Delete a policy."""
 		try:
@@ -819,24 +959,24 @@ class PolicyManagementService:
 			policy = await self._get_policy_by_id(policy_id, tenant_id)
 			if not policy:
 				raise APIManagementError(f"Policy {policy_id} not found")
-			
+
 			api_id = policy.api_id
-			
+
 			await self.db_session.delete(policy)
 			await self.db_session.commit()
-			
+
 			# Clear cache
 			await self._invalidate_policy_cache(api_id)
-			
+
 			self._log_policy_operation("delete", policy_id, deleted_by)
 			return True
-			
+
 		except Exception as e:
 			await self.db_session.rollback()
 			raise APIManagementError(f"Failed to delete policy: {str(e)}")
-	
+
 	# Private helper methods
-	
+
 	async def _validate_policy_config(self, config: PolicyConfig):
 		"""Validate policy configuration."""
 		# Basic validation based on policy type
@@ -845,11 +985,11 @@ class PolicyManagementService:
 			for field in required_fields:
 				if field not in config.config:
 					raise APIManagementError(f"Rate limiting policy requires '{field}' configuration")
-		
+
 		elif config.policy_type == PolicyType.AUTHENTICATION:
 			if 'type' not in config.config:
 				raise APIManagementError("Authentication policy requires 'type' configuration")
-	
+
 	async def _get_api_by_id(self, api_id: str, tenant_id: str) -> Optional[AMAPI]:
 		"""Get API by ID with tenant validation."""
 		result = await self.db_session.execute(
@@ -858,7 +998,7 @@ class PolicyManagementService:
 			)
 		)
 		return result.scalar_one_or_none()
-	
+
 	async def _get_policy_by_id(self, policy_id: str, tenant_id: str) -> Optional[AMPolicy]:
 		"""Get policy by ID with tenant validation."""
 		result = await self.db_session.execute(
@@ -870,11 +1010,11 @@ class PolicyManagementService:
 			)
 		)
 		return result.scalar_one_or_none()
-	
+
 	async def _invalidate_policy_cache(self, api_id: str):
 		"""Invalidate policy cache for an API."""
 		await self.cache.delete(f"policies:{api_id}")
-	
+
 	def _log_policy_operation(self, operation: str, policy_id: str, user: str, extra: Optional[Dict] = None):
 		"""Log policy management operations."""
 		log_data = {
@@ -885,7 +1025,7 @@ class PolicyManagementService:
 		}
 		if extra:
 			log_data.update(extra)
-		
+
 		print(f"{self._log_prefix} {operation.upper()}: {json.dumps(log_data)}")
 
 # =============================================================================
@@ -894,12 +1034,12 @@ class PolicyManagementService:
 
 class AnalyticsService:
 	"""Service for collecting and analyzing API usage metrics."""
-	
+
 	def __init__(self, db_session: AsyncSession, cache: aiocache.Cache):
 		self.db_session = db_session
 		self.cache = cache
 		self._log_prefix = "[AnalyticsService]"
-	
+
 	async def record_api_usage(
 		self,
 		request_id: str,
@@ -932,17 +1072,17 @@ class AnalyticsService:
 				user_agent=user_agent,
 				tenant_id=tenant_id
 			)
-			
+
 			self.db_session.add(usage_record)
 			await self.db_session.commit()
-			
+
 			# Update real-time metrics
 			await self._update_realtime_metrics(api_id, consumer_id, response_status, response_time_ms)
-			
+
 		except Exception as e:
 			# Don't fail the API request if analytics recording fails
 			print(f"{self._log_prefix} Failed to record usage: {str(e)}")
-	
+
 	async def get_api_metrics(
 		self,
 		api_id: str,
@@ -957,22 +1097,22 @@ class AnalyticsService:
 				start_time = datetime.now(timezone.utc) - timedelta(days=7)
 			if not end_time:
 				end_time = datetime.now(timezone.utc)
-			
+
 			# Request count
 			request_count = await self._get_request_count(api_id, start_time, end_time)
-			
+
 			# Error rate
 			error_rate = await self._get_error_rate(api_id, start_time, end_time)
-			
+
 			# Average response time
 			avg_response_time = await self._get_average_response_time(api_id, start_time, end_time)
-			
+
 			# Top consumers
 			top_consumers = await self._get_top_consumers(api_id, start_time, end_time)
-			
+
 			# Time series data
 			time_series = await self._get_time_series_data(api_id, start_time, end_time, granularity)
-			
+
 			return {
 				"api_id": api_id,
 				"period": {
@@ -987,10 +1127,10 @@ class AnalyticsService:
 				"top_consumers": top_consumers,
 				"time_series": time_series
 			}
-			
+
 		except Exception as e:
 			raise APIManagementError(f"Failed to get API metrics: {str(e)}")
-	
+
 	async def get_consumer_usage(
 		self,
 		consumer_id: str,
@@ -1004,16 +1144,16 @@ class AnalyticsService:
 				start_time = datetime.now(timezone.utc) - timedelta(days=30)
 			if not end_time:
 				end_time = datetime.now(timezone.utc)
-			
+
 			# Total requests
 			total_requests = await self._get_consumer_request_count(consumer_id, start_time, end_time)
-			
+
 			# API breakdown
 			api_breakdown = await self._get_consumer_api_breakdown(consumer_id, start_time, end_time)
-			
+
 			# Daily usage
 			daily_usage = await self._get_consumer_daily_usage(consumer_id, start_time, end_time)
-			
+
 			return {
 				"consumer_id": consumer_id,
 				"period": {
@@ -1024,17 +1164,83 @@ class AnalyticsService:
 				"api_breakdown": api_breakdown,
 				"daily_usage": daily_usage
 			}
-			
+
 		except Exception as e:
 			raise APIManagementError(f"Failed to get consumer usage: {str(e)}")
-	
+
 	# Private helper methods for analytics calculations
-	
+
 	async def _update_realtime_metrics(self, api_id: str, consumer_id: str, status: int, response_time: int):
 		"""Update real-time metrics in cache."""
-		# This would update Redis counters for real-time dashboard
-		pass
-	
+		now = datetime.now(timezone.utc).isoformat()
+		api_key = f"metrics:realtime:api:{api_id}"
+		consumer_key = f"metrics:realtime:consumer:{consumer_id}"
+
+		api_metrics = await self.cache.get(api_key) or {
+			"api_id": api_id,
+			"total_requests": 0,
+			"error_count": 0,
+			"total_response_time_ms": 0,
+			"min_response_time_ms": None,
+			"max_response_time_ms": None,
+			"status_counts": {},
+			"consumer_counts": {},
+			"last_status": None,
+			"last_response_time_ms": None,
+			"updated_at": None
+		}
+		consumer_metrics = await self.cache.get(consumer_key) or {
+			"consumer_id": consumer_id,
+			"total_requests": 0,
+			"error_count": 0,
+			"total_response_time_ms": 0,
+			"api_counts": {},
+			"updated_at": None
+		}
+
+		api_metrics["total_requests"] += 1
+		api_metrics["total_response_time_ms"] += response_time
+		api_metrics["last_status"] = status
+		api_metrics["last_response_time_ms"] = response_time
+		api_metrics["updated_at"] = now
+		api_metrics["min_response_time_ms"] = (
+			response_time
+			if api_metrics["min_response_time_ms"] is None
+			else min(api_metrics["min_response_time_ms"], response_time)
+		)
+		api_metrics["max_response_time_ms"] = (
+			response_time
+			if api_metrics["max_response_time_ms"] is None
+			else max(api_metrics["max_response_time_ms"], response_time)
+		)
+		if status >= 400:
+			api_metrics["error_count"] += 1
+		status_key = str(status)
+		api_metrics["status_counts"][status_key] = api_metrics["status_counts"].get(status_key, 0) + 1
+		api_metrics["consumer_counts"][consumer_id] = api_metrics["consumer_counts"].get(consumer_id, 0) + 1
+		api_metrics["average_response_time_ms"] = (
+			api_metrics["total_response_time_ms"] / api_metrics["total_requests"]
+		)
+		api_metrics["error_rate_percent"] = (
+			api_metrics["error_count"] / api_metrics["total_requests"]
+		) * 100
+
+		consumer_metrics["total_requests"] += 1
+		consumer_metrics["total_response_time_ms"] += response_time
+		if status >= 400:
+			consumer_metrics["error_count"] += 1
+		consumer_metrics["api_counts"][api_id] = consumer_metrics["api_counts"].get(api_id, 0) + 1
+		consumer_metrics["average_response_time_ms"] = (
+			consumer_metrics["total_response_time_ms"] / consumer_metrics["total_requests"]
+		)
+		consumer_metrics["error_rate_percent"] = (
+			consumer_metrics["error_count"] / consumer_metrics["total_requests"]
+		) * 100
+		consumer_metrics["updated_at"] = now
+
+		await self.cache.set(api_key, api_metrics, ttl=3600)
+		await self.cache.set(consumer_key, consumer_metrics, ttl=3600)
+
 	async def _get_request_count(self, api_id: str, start_time: datetime, end_time: datetime) -> int:
 		"""Get total request count for an API in time range."""
 		result = await self.db_session.execute(
@@ -1047,7 +1253,7 @@ class AnalyticsService:
 			)
 		)
 		return result.scalar() or 0
-	
+
 	async def _get_error_rate(self, api_id: str, start_time: datetime, end_time: datetime) -> float:
 		"""Calculate error rate for an API."""
 		total_result = await self.db_session.execute(
@@ -1060,10 +1266,10 @@ class AnalyticsService:
 			)
 		)
 		total = total_result.scalar() or 0
-		
+
 		if total == 0:
 			return 0.0
-		
+
 		error_result = await self.db_session.execute(
 			select(func.count(AMUsageRecord.record_id)).where(
 				and_(
@@ -1075,9 +1281,9 @@ class AnalyticsService:
 			)
 		)
 		errors = error_result.scalar() or 0
-		
+
 		return (errors / total) * 100
-	
+
 	async def _get_average_response_time(self, api_id: str, start_time: datetime, end_time: datetime) -> float:
 		"""Get average response time for an API."""
 		result = await self.db_session.execute(
@@ -1090,7 +1296,7 @@ class AnalyticsService:
 			)
 		)
 		return result.scalar() or 0.0
-	
+
 	async def _get_top_consumers(self, api_id: str, start_time: datetime, end_time: datetime, limit: int = 10) -> List[Dict]:
 		"""Get top consumers by request count."""
 		result = await self.db_session.execute(
@@ -1107,12 +1313,12 @@ class AnalyticsService:
 			.order_by(func.count(AMUsageRecord.record_id).desc())
 			.limit(limit)
 		)
-		
+
 		return [
 			{"consumer_id": row.consumer_id, "request_count": row.request_count}
 			for row in result
 		]
-	
+
 	async def _get_time_series_data(
 		self,
 		api_id: str,
@@ -1124,7 +1330,7 @@ class AnalyticsService:
 		# This would generate time series data based on granularity
 		# Simplified implementation
 		return []
-	
+
 	async def _get_consumer_request_count(self, consumer_id: str, start_time: datetime, end_time: datetime) -> int:
 		"""Get total request count for a consumer."""
 		result = await self.db_session.execute(
@@ -1137,7 +1343,7 @@ class AnalyticsService:
 			)
 		)
 		return result.scalar() or 0
-	
+
 	async def _get_consumer_api_breakdown(self, consumer_id: str, start_time: datetime, end_time: datetime) -> List[Dict]:
 		"""Get API usage breakdown for a consumer."""
 		result = await self.db_session.execute(
@@ -1153,12 +1359,12 @@ class AnalyticsService:
 			).group_by(AMUsageRecord.api_id)
 			.order_by(func.count(AMUsageRecord.record_id).desc())
 		)
-		
+
 		return [
 			{"api_id": row.api_id, "request_count": row.request_count}
 			for row in result
 		]
-	
+
 	async def _get_consumer_daily_usage(self, consumer_id: str, start_time: datetime, end_time: datetime) -> List[Dict]:
 		"""Get daily usage data for a consumer."""
 		# This would generate daily usage statistics
