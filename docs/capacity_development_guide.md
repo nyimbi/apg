@@ -141,6 +141,14 @@ That creates a spec-backed package under `capabilities/common/demo/` with
 `cap_spec.md`, `capability_contract.py`, dependency-light `models.py`,
 `service.py`, `api.py`, `views.py`, and contract tests. The generated contract
 is valid against APG's registry shape before you add domain-specific behavior.
+Once the package lives under `capabilities/`, inspect and execute the rule
+contract directly:
+
+```bash
+./.venv/bin/apg capabilities inspect common_demo --json
+./.venv/bin/apg capabilities evaluate-rules common_demo \
+  --context-json '{"tenant_context_present": false}' --json
+```
 
 Minimum contract:
 

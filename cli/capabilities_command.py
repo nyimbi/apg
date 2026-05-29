@@ -11,6 +11,8 @@ from typing import Any
 import click
 
 from capabilities.capability_contract_registry import (
+	evaluate_rules,
+	get_contract,
 	load_contract_registry,
 	validate_contract_registry,
 )
@@ -18,6 +20,8 @@ from compiler.capability_publish import build_capability_publish_report
 
 
 CAPABILITY_SCAFFOLD_FORMAT = "apg.capability-scaffold-report.v1"
+CAPABILITY_INSPECT_FORMAT = "apg.capability-inspect-report.v1"
+CAPABILITY_RULE_EVALUATION_FORMAT = "apg.capability-rule-evaluation-report.v1"
 SAFE_SEGMENT_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
 
 
@@ -56,6 +60,128 @@ def _contracts_report(category: str | None = None) -> dict[str, Any]:
 		"contract_count": len(records),
 		"records": records,
 	}
+
+
+def _inspect_report(capability_id: str, tenant_id: str) -> dict[str, Any]:
+	errors: list[str] = []
+	try:
+		contract = get_contract(capability_id, tenant_id=tenant_id)
+	except KeyError:
+		contract = {}
+		errors.append(f"unknown capability contract: {capability_id}")
+	except Exception as exc:  # pragma: no cover - defensive report shape
+		contract = {}
+		errors.append(str(exc))
+
+	if errors:
+		return {
+			"format": CAPABILITY_INSPECT_FORMAT,
+			"ok": False,
+			"capability": capability_id,
+			"tenant_id": tenant_id,
+			"errors": errors,
+		}
+
+	return {
+		"format": CAPABILITY_INSPECT_FORMAT,
+		"ok": True,
+		"capability": contract["capability"],
+		"display_name": contract.get("display_name", contract["capability"]),
+		"tenant_id": tenant_id,
+		"summary": {
+			"configuration_sections": sorted(contract["configuration"].keys()),
+			"rule_count": len(contract["rule_engine"]["rules"]),
+			"route_count": len(contract["ui"]["routes"]),
+			"theme": contract["theme"]["name"],
+			"ui_shell": contract["ui"]["shell"],
+		},
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"rules": contract["rule_engine"]["rules"],
+		"ui": contract["ui"],
+		"theme": contract["theme"],
+		"errors": [],
+	}
+
+
+def _rule_evaluation_report(
+	capability_id: str,
+	tenant_id: str,
+	context_json: str | None,
+	context_file: Path | None,
+) -> dict[str, Any]:
+	errors: list[str] = []
+	context = _load_rule_context(context_json, context_file, errors)
+	if errors:
+		return {
+			"format": CAPABILITY_RULE_EVALUATION_FORMAT,
+			"ok": False,
+			"capability": capability_id,
+			"tenant_id": tenant_id,
+			"context": context,
+			"errors": errors,
+		}
+	try:
+		result = evaluate_rules(capability_id, context, tenant_id=tenant_id)
+	except KeyError:
+		return {
+			"format": CAPABILITY_RULE_EVALUATION_FORMAT,
+			"ok": False,
+			"capability": capability_id,
+			"tenant_id": tenant_id,
+			"context": context,
+			"errors": [f"unknown capability contract: {capability_id}"],
+		}
+	except Exception as exc:  # pragma: no cover - defensive report shape
+		return {
+			"format": CAPABILITY_RULE_EVALUATION_FORMAT,
+			"ok": False,
+			"capability": capability_id,
+			"tenant_id": tenant_id,
+			"context": context,
+			"errors": [str(exc)],
+		}
+	return {
+		"format": CAPABILITY_RULE_EVALUATION_FORMAT,
+		"ok": True,
+		"capability": capability_id,
+		"tenant_id": tenant_id,
+		"context": context,
+		"decision": result["decision"],
+		"matched_rules": result["matched_rules"],
+		"actions": result["actions"],
+		"result": result,
+		"errors": [],
+	}
+
+
+def _load_rule_context(
+	context_json: str | None,
+	context_file: Path | None,
+	errors: list[str],
+) -> dict[str, Any]:
+	if context_json and context_file:
+		errors.append("use only one of --context-json or --context-file")
+		return {}
+	if context_file:
+		try:
+			text = context_file.read_text(encoding="utf-8")
+		except OSError as exc:
+			errors.append(f"could not read context file: {exc}")
+			return {}
+	elif context_json:
+		text = context_json
+	else:
+		text = "{}"
+	try:
+		parsed = json.loads(text)
+	except json.JSONDecodeError as exc:
+		errors.append(f"context must be valid JSON: {exc}")
+		return {}
+	if not isinstance(parsed, dict):
+		errors.append("context JSON must be an object")
+		return {}
+	return parsed
 
 
 def _scaffold_report(
@@ -409,6 +535,63 @@ def contracts(category: str | None, as_json: bool) -> None:
 				f"routes={record['routes']:<2} "
 				f"theme={record['theme']}"
 			)
+
+
+@capabilities.command(name="inspect")
+@click.argument("capability_id")
+@click.option("--tenant-id", default="default", help="Tenant id used to resolve tenant-scoped configuration")
+@click.option("--json", "as_json", is_flag=True, help="Emit apg.capability-inspect-report.v1 JSON")
+def inspect_capability(capability_id: str, tenant_id: str, as_json: bool) -> None:
+	"""Inspect one capability's configuration, rules, UI, and theme contract."""
+	report = _inspect_report(capability_id, tenant_id)
+	if as_json:
+		click.echo(json.dumps(report, indent=2, sort_keys=True))
+	else:
+		if report["ok"]:
+			summary = report["summary"]
+			click.echo(f"Capability: {report['capability']} ({report['display_name']})")
+			click.echo(f"  tenant: {report['tenant_id']}")
+			click.echo(f"  configuration sections: {', '.join(summary['configuration_sections'])}")
+			click.echo(f"  rules: {summary['rule_count']}")
+			click.echo(f"  routes: {summary['route_count']} via {summary['ui_shell']}")
+			click.echo(f"  theme: {summary['theme']}")
+		else:
+			click.echo(f"Capability inspect FAILED: {capability_id}")
+			for error in report["errors"]:
+				click.echo(f"  error: {error}")
+	if not report["ok"]:
+		raise click.exceptions.Exit(1)
+
+
+@capabilities.command(name="evaluate-rules")
+@click.argument("capability_id")
+@click.option("--tenant-id", default="default", help="Tenant id used to load the capability contract")
+@click.option("--context-json", default=None, help="JSON object used as the rule-evaluation context")
+@click.option("--context-file", type=click.Path(path_type=Path), default=None, help="Path to a JSON object used as the rule-evaluation context")
+@click.option("--json", "as_json", is_flag=True, help="Emit apg.capability-rule-evaluation-report.v1 JSON")
+def evaluate_capability_rules(
+	capability_id: str,
+	tenant_id: str,
+	context_json: str | None,
+	context_file: Path | None,
+	as_json: bool,
+) -> None:
+	"""Evaluate one capability's deterministic rule engine."""
+	report = _rule_evaluation_report(capability_id, tenant_id, context_json, context_file)
+	if as_json:
+		click.echo(json.dumps(report, indent=2, sort_keys=True))
+	else:
+		if report["ok"]:
+			click.echo(f"Capability rule decision: {report['decision']}")
+			click.echo(f"  capability: {report['capability']}")
+			click.echo(f"  tenant: {report['tenant_id']}")
+			click.echo(f"  matched rules: {', '.join(report['matched_rules']) or 'none'}")
+		else:
+			click.echo(f"Capability rule evaluation FAILED: {capability_id}")
+			for error in report["errors"]:
+				click.echo(f"  error: {error}")
+	if not report["ok"]:
+		raise click.exceptions.Exit(1)
 
 
 @capabilities.command(name="validate-contracts")

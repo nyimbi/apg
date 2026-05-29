@@ -268,6 +268,15 @@ For a new package-backed capability, start with:
 ./.venv/bin/apg capabilities scaffold <domain> <code> --name "Display Name" --json
 ```
 
+Inspect and exercise the capability contract before changing generated app
+code:
+
+```bash
+./.venv/bin/apg capabilities inspect <capability_id> --tenant-id tenant-dev --json
+./.venv/bin/apg capabilities evaluate-rules <capability_id> \
+  --context-json '{"tenant_context_present": false}' --json
+```
+
 At minimum, a capability package should include:
 
 ```text
@@ -351,8 +360,10 @@ Generator:
 Capabilities:
 
 ```bash
+./.venv/bin/apg capabilities inspect composition_events --json
+./.venv/bin/apg capabilities evaluate-rules composition_events --context-json '{"tenant_context_present": false}' --json
 ./.venv/bin/apg capabilities validate-contracts --json
-./.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py tests/test_capability_composition_runtime.py
+./.venv/bin/python -m pytest -q tests/test_cli_capability_operability.py tests/test_capability_contract_registry.py tests/test_capability_composition_runtime.py
 ```
 
 Tooling:

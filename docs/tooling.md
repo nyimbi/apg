@@ -144,9 +144,10 @@ APG currently has an executable compiler path:
   and `apg_application.py` sidecars;
 - generated apps expose `--self-test`, `--describe`, `--validate`, HTTP
   routes, OpenAPI JSON, component manifest JSON, and semantic-model JSON;
-- capability contracts can be inspected with
-  `apg capabilities contracts --json` and validated with
-  `apg capabilities validate-contracts --json`;
+- capability contracts can be listed with `apg capabilities contracts --json`,
+  inspected with `apg capabilities inspect <capability> --json`, rule-tested
+  with `apg capabilities evaluate-rules <capability> --context-json ... --json`,
+  and validated with `apg capabilities validate-contracts --json`;
 - new package-backed capability skeletons can be created with
   `apg capabilities scaffold <domain> <code> --name ... --json`, which emits
   `apg.capability-scaffold-report.v1` and writes a valid spec-backed contract,

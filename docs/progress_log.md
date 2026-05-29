@@ -16,6 +16,43 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:20 EAT
+
+Capability contract operability slice:
+
+- Added `apg capabilities inspect <capability> --tenant-id ... --json`,
+  emitting `apg.capability-inspect-report.v1` with tenant-scoped
+  configuration, configuration schema, deterministic rules, UI routes, and
+  theme tokens for one first-class capability contract.
+- Added `apg capabilities evaluate-rules <capability> --context-json ... --json`
+  and `--context-file`, emitting
+  `apg.capability-rule-evaluation-report.v1` with the rule-engine decision,
+  matched rules, effects, and evaluated context.
+- Added the new commands to the aggregate tooling audit's required capability
+  command surface so direct capability inspection and rule execution cannot
+  silently disappear.
+- Added focused CLI tests for inspect output, inline rule context execution,
+  context-file execution, and invalid context rejection.
+- Updated developer, capacity-development, capability-contract, and tooling
+  docs so contributors can scaffold, inspect, execute rules, and then validate
+  capability contracts from the APG CLI.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile cli/capabilities_command.py compiler/tooling_audit.py tests/test_cli_capability_operability.py` -> passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_operability.py tests/test_cli_capability_scaffold.py tests/test_tooling_audit.py` -> 9 passed.
+- `./.venv/bin/apg capabilities inspect composition_events --tenant-id tenant-dev --json` -> emitted `apg.capability-inspect-report.v1` with 3 rules, 4 routes, `apg_python` UI shell, and tenant-scoped configuration.
+- `./.venv/bin/apg capabilities evaluate-rules composition_events --context-json '{"tenant_context_present": false, "operation_type": "write", "policy_attached": false}' --json` -> emitted `apg.capability-rule-evaluation-report.v1` with `deny` and matched `tenant_context_required` plus `operation_policy_required`.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0 blocking gaps, and 0 errors.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109 valid contracts and 0 errors.
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py` -> 17 passed.
+
+Known remaining gaps:
+
+- The CLI now makes existing contract surfaces directly operable; individual
+  domain capabilities still need deeper domain-specific service/API/view
+  behavior beyond the common contract rule engine.
+
 ### 2026-05-29 05:14 EAT
 
 Executable capability scaffold slice:

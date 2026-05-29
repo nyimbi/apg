@@ -59,7 +59,7 @@ and component styling.
 Use the CLI for a lightweight developer or CI gate:
 
 ```bash
-python cli.py capabilities validate-contracts
+./.venv/bin/apg capabilities validate-contracts
 ```
 
 Expected success output:
@@ -71,8 +71,31 @@ Expected success output:
 List contracts for inspection:
 
 ```bash
-python cli.py capabilities contracts
-python cli.py capabilities contracts --json
+./.venv/bin/apg capabilities contracts
+./.venv/bin/apg capabilities contracts --json
+```
+
+Inspect one contract's configuration, rule, UI, and theme surfaces:
+
+```bash
+./.venv/bin/apg capabilities inspect composition_events --tenant-id tenant-dev --json
+```
+
+Run the deterministic rule engine from the command line:
+
+```bash
+./.venv/bin/apg capabilities evaluate-rules composition_events \
+  --context-json '{"tenant_context_present": false}' --json
+```
+
+Use `--context-file context.json` when the context is too large for an inline
+JSON argument. The command emits `apg.capability-rule-evaluation-report.v1`
+with `decision`, `matched_rules`, `actions`, and the evaluated context.
+
+Create a new spec-backed capability package:
+
+```bash
+./.venv/bin/apg capabilities scaffold common demo --name "Demo Capacity" --json
 ```
 
 ## Generated Applications
