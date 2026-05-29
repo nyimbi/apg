@@ -16,6 +16,35 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 04:52 EAT
+
+Contributor effectiveness documentation slice:
+
+- Added `docs/developer_guide.md` to make compiler, grammar, semantic-model,
+  code-generation, CLI/tooling, language-server, Studio, capability, example,
+  documentation, and verification workflows explicit for APG developers.
+- Added `docs/contributors_guide.md` to define contribution mindset, work
+  selection, worktree hygiene, style, documentation expectations, testing
+  lanes, Lore commit protocol, handoff checklist, review standards, safety
+  rules, and effective first issues.
+- Added `docs/capacity_development_guide.md` to teach contributors how to build
+  new APG capacities from records, capability contracts, deterministic rules,
+  screens, workflows, AI agents, Bytewax streaming, app composition, tests,
+  docs, and release evidence.
+- Linked the new guides from `docs/README.md`.
+
+Verification:
+
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/README.md docs/progress_log.md` -> passed.
+- Markdown relative link sanity over the new guides and `docs/README.md` -> passed.
+- `wc -l docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` -> 1,185 total guide lines.
+
+Known remaining gaps:
+
+- These guides are contributor-enablement docs. They do not by themselves
+  implement new runtime capacities; they define the repeatable development path
+  for doing that work without losing executable evidence.
+
 ### 2026-05-29 04:42 EAT
 
 Aggregate tooling audit closure slice:

@@ -43,6 +43,9 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 - [Marketplace Microservices Guide](./marketplace_microservices_guide.md) - Marketplace service design and integration
 
 ### Development
+- [Developer Guide](./developer_guide.md) - How to change APG grammar, compiler, generator, CLI, tooling, language server, Studio, examples, tests, and docs
+- [Contributors Guide](./contributors_guide.md) - Contribution workflow, evidence standards, testing expectations, commit protocol, and review checklist
+- [Capacity Development Guide](./capacity_development_guide.md) - How to build new APG capacities from records, capabilities, rules, screens, workflows, agents, Bytewax streaming, tests, and docs
 - [API Reference](./api/README.md) - Complete API documentation
 - [Goal Progress Log](./progress_log.md) - Durable progress, verification evidence, and next work for the active APG closure goal
 - [Roadmaps](./roadmaps/) - Implementation roadmaps and active planning artifacts moved out of the repository root
@@ -61,6 +64,7 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 | **Getting Started** | [Installation](./installation.md) → [Quick Start](./quickstart.md) → [Tutorial](./apg_tutorial.md) |
 | **Core Platform** | [Architecture](./architecture.md) → [APG Language Guide](./apg_language.md) → [Grammar Guide](./apg_grammar_guide.md) → [Cheat Sheet](./apg_cheat_sheet.md) → [API Reference](./api/README.md) |
 | **Capabilities** | [Capabilities](./capabilities/README.md) → [Capability Standards](./capability_standards.md) → [Capability Contracts](./capability_contracts.md) → [Application Composition](./application_composition.md) → [Screen Composition](./screen_composition.md) → [AI Agent Composition](./ai_agent_composition.md) → [Marketplace Guide](./marketplace_microservices_guide.md) |
+| **Contributing** | [Developer Guide](./developer_guide.md) → [Contributors Guide](./contributors_guide.md) → [Capacity Development Guide](./capacity_development_guide.md) |
 | **Planning** | [Roadmaps](./roadmaps/) → [Specifications](./specifications/) → [Progress Log](./progress_log.md) |
 | **Operations** | [Deployment](./deployment.md) → [Reports](./reports/README.md) → [Progress Log](./progress_log.md) |
 
