@@ -16,6 +16,41 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:51 EAT
+
+Local capability catalog inspection slice:
+
+- Added `compiler.capability_publish.build_capability_catalog_report()` to
+  validate and summarize `apg.capability-catalog.v1` files.
+- Added `apg capabilities catalog <catalog.json> --json`, emitting
+  `apg.capability-catalog-report.v1` with catalog status, capability count,
+  record summaries, and schema errors.
+- Added `--capability <id>` support so automation can inspect one catalog
+  record and fail cleanly when the id is missing.
+- Added the catalog command to the aggregate CLI surface audit so local catalog
+  consumption remains part of the executable capability lifecycle.
+- Extended publish-apply tests to prove full-catalog inspection, single-record
+  inspection, and missing-capability error behavior.
+- Updated developer, capability, capacity, and tooling docs to include catalog
+  validation after publish-apply.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/capability_publish.py cli/capabilities_command.py compiler/tooling_audit.py tests/test_cli_capability_publish_apply.py` -> passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_publish_apply.py` -> 2 passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_publish_apply.py tests/test_cli_capability_scaffold.py tests/test_cli_capability_operability.py tests/test_tooling_audit.py` -> 11 passed.
+- `./.venv/bin/apg capabilities catalog /private/tmp/apg-publish-apply-proof/catalog/capabilities.json --json` -> emitted `apg.capability-catalog-report.v1`, `ok=true`, one `common_demo` record.
+- `./.venv/bin/apg capabilities catalog /private/tmp/apg-publish-apply-proof/catalog/capabilities.json --capability common_demo --json` -> emitted `apg.capability-catalog-report.v1`, `ok=true`, scoped to `common_demo`.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0 blocking gaps, and 0 errors.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109 valid contracts and 0 errors.
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py` -> 17 passed.
+
+Known remaining gaps:
+
+- Local catalog read/write is now executable. Remote marketplace publication,
+  signed catalog provenance, and runtime catalog synchronization remain
+  separate platform lifecycle work.
+
 ### 2026-05-29 05:44 EAT
 
 Local capability catalog publication slice:

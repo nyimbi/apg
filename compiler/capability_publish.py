@@ -11,7 +11,23 @@ from typing import Any
 
 
 CAPABILITY_CATALOG_FORMAT = "apg.capability-catalog.v1"
+CAPABILITY_CATALOG_REPORT_FORMAT = "apg.capability-catalog-report.v1"
 CAPABILITY_PUBLISH_APPLY_FORMAT = "apg.capability-publish-apply-report.v1"
+REQUIRED_CATALOG_RECORD_KEYS = {
+	"capability",
+	"entrypoint",
+	"manifest",
+	"package",
+	"package_dir",
+	"profile",
+	"provides",
+	"release_evidence",
+	"requires",
+	"rule_engine",
+	"theme",
+	"ui",
+	"version",
+}
 REQUIRED_PACKAGE_FILES = {
 	"app.py",
 	"package_manifest.json",
@@ -142,6 +158,43 @@ def apply_capability_publish_report(
 	return report
 
 
+def build_capability_catalog_report(
+	catalog_path: Path,
+	capability: str | None = None,
+) -> dict[str, Any]:
+	"""Validate and summarize a local APG capability catalog."""
+	report: dict[str, Any] = {
+		"format": CAPABILITY_CATALOG_REPORT_FORMAT,
+		"ok": False,
+		"catalog": str(catalog_path),
+		"capability": capability,
+		"capability_count": 0,
+		"records": [],
+		"errors": [],
+		"warnings": [],
+	}
+	catalog = _load_existing_catalog(catalog_path, report)
+	if report["errors"]:
+		return report
+
+	capabilities = catalog.get("capabilities", {})
+	report["capability_count"] = len(capabilities)
+	selected_ids = [capability] if capability else sorted(capabilities)
+	if capability and capability not in capabilities:
+		report["errors"].append(f"capability not found in catalog: {capability}")
+		return report
+
+	for capability_id in selected_ids:
+		record = capabilities[capability_id]
+		if not isinstance(record, dict):
+			report["errors"].append(f"catalog record {capability_id} must be an object")
+			continue
+		report["records"].append(_catalog_record_summary(capability_id, record, report))
+
+	report["ok"] = not report["errors"]
+	return report
+
+
 def _read_json(path: Path, report: dict[str, Any], label: str) -> dict[str, Any]:
 	try:
 		return json.loads(path.read_text(encoding="utf-8"))
@@ -152,9 +205,10 @@ def _read_json(path: Path, report: dict[str, Any], label: str) -> dict[str, Any]
 	return {}
 
 
-def _load_or_create_catalog(catalog_path: Path, report: dict[str, Any]) -> dict[str, Any]:
+def _load_existing_catalog(catalog_path: Path, report: dict[str, Any]) -> dict[str, Any]:
 	if not catalog_path.exists():
-		return {"format": CAPABILITY_CATALOG_FORMAT, "capabilities": {}}
+		report["errors"].append(f"capability catalog not found: {catalog_path}")
+		return {}
 	if not catalog_path.is_file():
 		report["errors"].append(f"catalog path is not a file: {catalog_path}")
 		return {}
@@ -166,6 +220,12 @@ def _load_or_create_catalog(catalog_path: Path, report: dict[str, Any]) -> dict[
 	if not isinstance(catalog.get("capabilities"), dict):
 		report["errors"].append("capability catalog capabilities must be an object")
 	return catalog
+
+
+def _load_or_create_catalog(catalog_path: Path, report: dict[str, Any]) -> dict[str, Any]:
+	if not catalog_path.exists():
+		return {"format": CAPABILITY_CATALOG_FORMAT, "capabilities": {}}
+	return _load_existing_catalog(catalog_path, report)
 
 
 def _apply_catalog_patch(
@@ -192,6 +252,37 @@ def _apply_catalog_patch(
 		capabilities[capability_id] = value
 		applied.append(capability_id)
 	return sorted(applied)
+
+
+def _catalog_record_summary(
+	capability_id: str,
+	record: dict[str, Any],
+	report: dict[str, Any],
+) -> dict[str, Any]:
+	missing = sorted(REQUIRED_CATALOG_RECORD_KEYS - set(record))
+	if missing:
+		report["errors"].append(f"catalog record {capability_id} missing: {', '.join(missing)}")
+	if record.get("capability") != capability_id:
+		report["errors"].append(f"catalog record {capability_id} capability id mismatch")
+	for list_key in ("provides", "requires", "rules"):
+		if list_key in record and not isinstance(record[list_key], list):
+			report["errors"].append(f"catalog record {capability_id}.{list_key} must be a list")
+	for dict_key in ("configuration", "rule_engine", "screens", "streaming", "theme", "ui"):
+		if dict_key in record and not isinstance(record[dict_key], dict):
+			report["errors"].append(f"catalog record {capability_id}.{dict_key} must be an object")
+	return {
+		"capability": capability_id,
+		"package": record.get("package"),
+		"version": record.get("version"),
+		"profile": record.get("profile"),
+		"package_dir": record.get("package_dir"),
+		"entrypoint": record.get("entrypoint"),
+		"provides": list(record.get("provides", [])) if isinstance(record.get("provides", []), list) else [],
+		"requires": list(record.get("requires", [])) if isinstance(record.get("requires", []), list) else [],
+		"route_count": len(record.get("ui", {}).get("routes", [])) if isinstance(record.get("ui"), dict) else 0,
+		"rule_count": len(record.get("rules", [])) if isinstance(record.get("rules"), list) else 0,
+		"theme": record.get("theme", {}).get("name") if isinstance(record.get("theme"), dict) else None,
+	}
 
 
 def _manifest_summary(manifest: dict[str, Any]) -> dict[str, Any]:

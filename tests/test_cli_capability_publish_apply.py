@@ -85,6 +85,18 @@ def test_capabilities_publish_apply_writes_local_catalog():
 			],
 		)
 		catalog_after_reapply = json.loads(catalog_path.read_text(encoding="utf-8"))
+		catalog_report = runner.invoke(
+			cli,
+			["capabilities", "catalog", str(catalog_path), "--json"],
+		)
+		capability_report = runner.invoke(
+			cli,
+			["capabilities", "catalog", str(catalog_path), "--capability", "common_demo", "--json"],
+		)
+		missing_report = runner.invoke(
+			cli,
+			["capabilities", "catalog", str(catalog_path), "--capability", "missing_demo", "--json"],
+		)
 
 	assert result.exit_code == 0, result.output
 	payload = json.loads(result.output)
@@ -100,3 +112,18 @@ def test_capabilities_publish_apply_writes_local_catalog():
 	assert reapply_payload["catalog_summary"]["capability_count_before"] == 1
 	assert reapply_payload["catalog_summary"]["capability_count_after"] == 1
 	assert catalog_after_reapply == catalog
+	assert catalog_report.exit_code == 0, catalog_report.output
+	catalog_payload = json.loads(catalog_report.output)
+	assert catalog_payload["format"] == "apg.capability-catalog-report.v1"
+	assert catalog_payload["ok"] is True
+	assert catalog_payload["capability_count"] == 1
+	assert catalog_payload["records"][0]["capability"] == "common_demo"
+	assert catalog_payload["records"][0]["route_count"] == 1
+	assert catalog_payload["records"][0]["rule_count"] == 2
+	assert capability_report.exit_code == 0, capability_report.output
+	capability_payload = json.loads(capability_report.output)
+	assert capability_payload["records"][0]["package"] == "common_demo"
+	assert missing_report.exit_code == 1
+	missing_payload = json.loads(missing_report.output)
+	assert missing_payload["ok"] is False
+	assert missing_payload["errors"] == ["capability not found in catalog: missing_demo"]

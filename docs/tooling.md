@@ -162,7 +162,10 @@ APG currently has an executable compiler path:
 - valid publish plans can be applied to an explicit local catalog path with
   `apg capabilities publish-apply <package-dir> --catalog <catalog.json> --json`,
   which emits `apg.capability-publish-apply-report.v1` and writes
-  `apg.capability-catalog.v1`; the legacy
+  `apg.capability-catalog.v1`;
+- local capability catalogs can be validated and inspected with
+  `apg capabilities catalog <catalog.json> --json`, optionally scoped with
+  `--capability <id>`, emitting `apg.capability-catalog-report.v1`; the legacy
   `python cli.py capabilities ...` helper path remains available as a
   compatibility alias.
 
@@ -814,6 +817,7 @@ apg capabilities contracts --json
 apg capabilities validate-contracts --json
 apg capabilities publish-plan dist/capability_basics-web --json
 apg capabilities publish-apply dist/capability_basics-web --catalog dist/capabilities.json --json
+apg capabilities catalog dist/capabilities.json --json
 ```
 
 `python` is the only compiler target. Desktop, mobile, web, and deployment
@@ -1137,6 +1141,8 @@ patch, attaches release-evidence verification, and records that the publish
 plan is side-effect-free. `apg capabilities publish-apply <package-dir>
 --catalog <catalog.json> --json` is the explicit downstream catalog write. Use
 `--dry-run` to validate the same local catalog update without writing.
+`apg capabilities catalog <catalog.json> --json` validates the resulting local
+catalog and summarizes capability records for downstream automation.
 
 ### `apg nl-plan`
 

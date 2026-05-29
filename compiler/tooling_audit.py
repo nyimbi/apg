@@ -56,7 +56,7 @@ REQUIRED_TOP_LEVEL_COMMANDS = [
 ]
 
 REQUIRED_COMMAND_GROUPS = {
-	"capabilities": ["contracts", "evaluate-rules", "inspect", "list", "publish-apply", "publish-plan", "scaffold", "validate-contracts"],
+	"capabilities": ["catalog", "contracts", "evaluate-rules", "inspect", "list", "publish-apply", "publish-plan", "scaffold", "validate-contracts"],
 	"deployment": ["verify"],
 	"ide": ["audit"],
 	"studio": ["plan-edit", "snapshot"],

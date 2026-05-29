@@ -153,6 +153,7 @@ ready for side-effect-free publish planning:
   --catalog /tmp/apg-capability-catalog.json --dry-run --json
 ./.venv/bin/apg capabilities publish-apply capabilities/common/demo \
   --catalog /tmp/apg-capability-catalog.json --json
+./.venv/bin/apg capabilities catalog /tmp/apg-capability-catalog.json --json
 ```
 
 Once the package lives under `capabilities/`, inspect and execute the rule

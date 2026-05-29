@@ -16,7 +16,11 @@ from capabilities.capability_contract_registry import (
 	load_contract_registry,
 	validate_contract_registry,
 )
-from compiler.capability_publish import apply_capability_publish_report, build_capability_publish_report
+from compiler.capability_publish import (
+	apply_capability_publish_report,
+	build_capability_catalog_report,
+	build_capability_publish_report,
+)
 
 
 CAPABILITY_SCAFFOLD_FORMAT = "apg.capability-scaffold-report.v1"
@@ -1055,6 +1059,37 @@ def publish_plan(package_dir: Path, as_json: bool) -> None:
 		)
 		for record in report["capabilities"]:
 			click.echo(f"  {record['capability']} -> {record['package']}")
+		for error in report["errors"]:
+			click.echo(f"  error: {error}")
+		for warning in report["warnings"]:
+			click.echo(f"  warning: {warning}")
+	if not report["ok"]:
+		raise click.exceptions.Exit(1)
+
+
+@capabilities.command(name="catalog")
+@click.argument("catalog_path", type=click.Path(path_type=Path))
+@click.option("--capability", "capability_id", default=None, help="Inspect one capability id from the catalog")
+@click.option("--json", "as_json", is_flag=True, help="Emit apg.capability-catalog-report.v1 JSON")
+def catalog(catalog_path: Path, capability_id: str | None, as_json: bool) -> None:
+	"""Validate and inspect a local APG capability catalog."""
+	report = build_capability_catalog_report(catalog_path, capability=capability_id)
+	if as_json:
+		click.echo(json.dumps(report, indent=2, sort_keys=True))
+	else:
+		status = "OK" if report["ok"] else "FAILED"
+		click.echo(
+			f"Capability catalog {status}: "
+			f"{report['capability_count']} capability(ies) in {report['catalog']}"
+		)
+		for record in report["records"]:
+			click.echo(
+				f"  {record['capability']:<32} "
+				f"package={record['package']} "
+				f"version={record['version']} "
+				f"routes={record['route_count']} "
+				f"rules={record['rule_count']}"
+			)
 		for error in report["errors"]:
 			click.echo(f"  error: {error}")
 		for warning in report["warnings"]:

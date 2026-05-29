@@ -312,6 +312,8 @@ focused contract/runtime tests. It also writes `app.py`,
 the package can pass `apg capabilities publish-plan <package-dir> --json` and
 then `apg capabilities publish-apply <package-dir> --catalog <catalog.json>
 --json` when you intentionally want to update a local capability catalog.
+Validate the resulting catalog with `apg capabilities catalog <catalog.json>
+--json`.
 Refine that starter behavior into domain-specific operations instead of
 replacing it with inert placeholders.
 
