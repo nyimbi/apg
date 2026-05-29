@@ -10540,3 +10540,23 @@ Battery-conscious verification:
 
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-29 12:00 EAT
+
+Executable DVRL data-virtualization specification slice:
+
+- Replaced stale materialized-package wording in `capabilities/common/dvrl/cap_spec.md` with the current executable package boundary.
+- Documented DVRL as APG's package-backed data virtualization runtime for tenant-scoped virtual source registration, federated query parsing/planning, schema discovery, adapters, Singer tap integration, natural-language query assistance, APG service integration, connection health handling, lineage, cache metadata, governance rules, UI route metadata, semantic-model publication, and publish-plan evidence.
+- Recorded current runtime files and integration boundaries: `service.py`, `models.py`, `connectors.py`, `adapters.py`, `singer_integration.py`, `nlp_integration.py`, `apg_integrations.py`, `error_handling.py`, and `real_implementations.py`.
+- Clarified required services (`tenant_context`, credential vault such as `keym`, `auth`/RBAC, `audl`, and `cach`) and the external runtime boundary for live database, SaaS, object-store, streaming, Bytewax, Singer, and credentialed source adapters.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/dvrl --json` passed with `ok: true`; `dvrl` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dvrl --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, and release evidence remained valid.
+- `rg -n "This package materializes|materialized APG capability package|Tenant-scoped dependency-light capability record|Dependency-light service backed by the capability contract" capabilities/common/dvrl` returned no remaining DVRL baseline markers.
+- `./.venv/bin/pytest -q capabilities/common/dvrl/test_capability_contract.py capabilities/common/dvrl/tests/test_materialized_package.py` passed with 5 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `dvrl` is now removed from warnings, domain-specific packages increased to 70, mixed packages dropped to 3, and warning count dropped to 39.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- capabilities/common/dvrl/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
