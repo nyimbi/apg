@@ -10234,3 +10234,25 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `bclg` is now `domain_specific`, custom Python files increased to 877, domain-specific packages increased to 58, materialized baseline packages dropped to 45, and warning count dropped to 51.
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/bclg --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+
+### 2026-05-29 09:20 EAT
+
+Executable BKUP continuity runtime slice:
+
+- Converted `capabilities/common/bkup` from a generated materialized baseline into a domain-specific backup and restore capability package.
+- Replaced generic records with tenant backup plans, encrypted snapshot metadata, point-in-time restore runs, continuity reports, retention/legal-hold metadata, and audit events.
+- Added `backup_engine.py` with deterministic snapshot hashing and RPO/RTO/restore-test continuity findings.
+- Added `BkupService` behavior for backup-plan creation, snapshot creation, restore execution, stale restore-test review, restore approval, continuity report recording, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so BKUP exposes plan, snapshot, restore-console, continuity-report, review-queue, and audit-event state instead of generic records.
+- Updated `cap_spec.md` to describe the current runtime behavior and the explicit storage/provider integration boundary.
+- Added focused contract/service tests for successful backup/restore flows and guardrails around missing owners, unencrypted snapshots, failed integrity checks, production approval, and stale restore tests.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/bkup/__init__.py capabilities/common/bkup/models.py capabilities/common/bkup/backup_engine.py capabilities/common/bkup/service.py capabilities/common/bkup/api.py capabilities/common/bkup/views.py capabilities/common/bkup/test_capability_contract.py capabilities/common/bkup/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/bkup/test_capability_contract.py capabilities/common/bkup/tests/test_materialized_package.py` passed with 7 tests and only unrelated existing SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/bkup` returned no remaining BKUP baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `bkup` is now `domain_specific`, custom Python files increased to 878, domain-specific packages increased to 59, materialized baseline packages dropped to 44, and warning count dropped to 50.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/bkup --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
