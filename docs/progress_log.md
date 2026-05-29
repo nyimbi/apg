@@ -16,6 +16,67 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 18:35 EAT
+
+SCPT custom scripting runtime implementation-depth slice:
+
+- Converted `capabilities/common/scpt` from generated materialized record
+  scaffolding into a domain-specific scripting-engine runtime package.
+- Added `script_runtime.py` with deterministic IDs, language and permission
+  normalization, Python import inspection, Python syntax validation,
+  execution-status helpers, dangerous-permission detection, and policy
+  summary text.
+- Replaced the generic record model with package policies, constrained
+  sandboxes, versioned script definitions, approvals, executions, and audit
+  events.
+- Replaced generic service behavior with `ScptService` lifecycle methods for
+  package policy creation, sandbox creation, script creation, script approval,
+  publication, workflow binding, deterministic execution metadata, execution
+  completion, dashboard summaries, compatibility records, and policy
+  enforcement.
+- Expanded API and view helpers so SCPT exposes script-workbench, registry,
+  execution console, sandbox monitor, package policy, approval, settings,
+  route, rule, and theme composition surfaces.
+- Rewrote `cap_spec.md` around current executable SCPT behavior, adapter
+  boundaries, UI surfaces, theme metadata, known non-goals, and proof
+  commands.
+- Replaced generated package tests with focused lifecycle, package-publish,
+  guardrail, and view-model tests.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/scpt` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/scpt/__init__.py
+  capabilities/common/scpt/models.py capabilities/common/scpt/script_runtime.py
+  capabilities/common/scpt/service.py capabilities/common/scpt/api.py
+  capabilities/common/scpt/views.py
+  capabilities/common/scpt/capability_contract.py capabilities/common/scpt/app.py
+  capabilities/common/scpt/test_capability_contract.py
+  capabilities/common/scpt/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -c "import importlib; ..."` for SCPT models,
+  `script_runtime`, service, API, views, and capability contract passed with
+  `scpt imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/scpt/test_capability_contract.py
+  capabilities/common/scpt/tests/test_package_contract.py` passed with 8
+  tests and only pre-existing adjacent SQLAlchemy/Pydantic deprecation
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/scpt --json` passed with `scpt` classified as
+  `domain_specific`, `script_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/scpt --json`
+  passed with `ok: true`, warnings empty, and side-effect-free catalog patch
+  evidence.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 96
+  domain-specific packages, 12 materialized-baseline packages, 0 mixed
+  implementations, 1 contract-only package, 910 custom Python files, 0 errors,
+  and 13 warnings; the next implementation-depth target is `scrp`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
 ### 2026-05-29 18:26 EAT
 
 SCHD scheduling/job orchestration runtime implementation-depth slice:
