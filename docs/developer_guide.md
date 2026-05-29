@@ -9,6 +9,45 @@ enter the repository, prove the current baseline, choose the right owning layer,
 make one executable slice better, verify it, update the handoff trail, and
 commit it without private context.
 
+## Immediate Developer Assignment
+
+If you are new to APG and nobody has assigned you a ticket, do this:
+
+1. Prove the local baseline:
+
+   ```bash
+   git status --short
+   uv sync
+   ./.venv/bin/apg docs audit --json
+   ./.venv/bin/apg capabilities implementation-audit --json
+   ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-dev-assignment --verify
+   ./.venv/bin/python /tmp/apg-dev-assignment/smoke_test.py
+   ```
+
+2. Pick the first local finding you can finish in one packet:
+
+   | Finding | Packet to take |
+   | --- | --- |
+   | docs audit fails | fix the named guide, command, or link |
+   | implementation audit shows materialized baseline | deepen the first named capability package |
+   | compile baseline fails | fix the earliest compiler or generator boundary |
+   | example README and source disagree | repair that one example and proof commands |
+   | all baseline checks pass | add one guardrail, generated smoke assertion, or capacity event |
+
+3. Write the packet before editing:
+
+   ```text
+   I am making <public APG contract> executable by changing <owner>.
+   I will prove it with <focused command>.
+   I will leave <unrelated dirty files and broader systems> untouched.
+   ```
+
+4. Finish the packet completely: code or docs, focused proof, handoff note,
+   exact staging, Lore commit, push.
+
+This is the default way to progress APG. Do not wait for a complete mental map
+of the platform before making one verified contract better.
+
 ## Read This First: One Executable Packet
 
 APG is too broad to approach as one project. Treat it as a chain of executable

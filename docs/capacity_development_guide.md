@@ -9,6 +9,52 @@ Use this guide when the goal is to make APG able to do something new, such as
 procurement approval, ledger posting, customer onboarding, device management,
 agentic operations, or integration monitoring.
 
+## Capacity Quickstart For A New Contributor
+
+When you are asked to build a new APG capacity, resist starting with a broad
+module design. Start with one event that can be parsed, modeled, compiled, and
+smoke-tested.
+
+Use this exact sequence:
+
+1. Create or choose `examples/<nn>_<capacity>/`.
+2. In the README, write:
+
+   ```text
+   First event:
+   Actor:
+   Observable result:
+   Tenant/security boundary:
+   Durable package owner:
+   Proof commands:
+   Next slice:
+   ```
+
+3. Write the smallest `main.apg` that names the records, rule, screen,
+   workflow, agent, stream, and capabilities needed for that event.
+4. Run:
+
+   ```bash
+   ./.venv/bin/apg model examples/<nn>_<capacity>/main.apg --json
+   ./.venv/bin/apg compile examples/<nn>_<capacity>/main.apg --output /tmp/apg-<capacity> --verify
+   ./.venv/bin/python /tmp/apg-<capacity>/smoke_test.py
+   ```
+
+5. If durable behavior is needed, deepen exactly one package:
+
+   ```bash
+   ./.venv/bin/pytest -q capabilities/<domain>/<code>/test_capability_contract.py capabilities/<domain>/<code>/tests
+   ./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
+   ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+   ```
+
+6. Update the example README, package `cap_spec.md`, and progress log when
+   readiness changed.
+
+That gives the capacity a real execution thread. More events, screens,
+workflows, agents, and streams should be added as later slices, each with its
+own proof.
+
 ## Start With One Executable Thread
 
 A capacity starts when one real event can move through source, semantic model,

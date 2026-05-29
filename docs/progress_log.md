@@ -11761,7 +11761,7 @@ Contributor onboarding and capacity development guide slice:
 Battery-conscious verification:
 
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
-- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` passed with no whitespace errors.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
 
 ### 2026-05-29 09:07 EAT
 
@@ -12545,3 +12545,16 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 107, materialized baseline packages dropped to 2, contract-only packages remain 0, custom Python files increased to 921, and warning count dropped to 2.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - Remaining implementation-depth warnings are `wsbl` and `ztna`.
+
+### 2026-05-29 20:21 EAT
+
+Contributor onboarding and capacity-development documentation slice:
+
+- Tightened `docs/developer_guide.md` with an immediate unassigned-developer assignment: prove the local baseline, use audits to choose the first finishable packet, write the public-contract proof note, and complete a Lore commit.
+- Tightened `docs/contributors_guide.md` with the fastest-useful-contribution decision table and required checked-in handoff facts.
+- Tightened `docs/capacity_development_guide.md` with a new-contributor capacity quickstart that starts from one executable event, then moves through APG source, semantic model, compile verification, smoke test, package deepening, and readiness documentation.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links valid, 49 documented commands registered, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` passed with no whitespace errors.

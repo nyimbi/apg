@@ -7,6 +7,34 @@ leave the repository easier for the next contributor.
 The contribution rule is simple: make one current APG state more executable,
 prove it with commands, document the evidence, and commit only that slice.
 
+## The Fastest Useful Contribution
+
+The fastest useful contribution is not the largest feature. It is the smallest
+verified improvement that another contributor can build on without asking for
+context.
+
+Use this decision table after the baseline commands:
+
+| You see | Do this | Do not do this |
+| --- | --- | --- |
+| a broken docs command | fix that command and rerun docs audit | rewrite the whole guide |
+| a materialized capability package | implement one domain lifecycle and guardrails | add live integrations first |
+| a parseable example with weak README evidence | update the README with current model/compile/smoke proof | refresh unrelated outputs |
+| semantic JSON has a field but generated app ignores it | update generator and smoke proof | patch generated output only |
+| a capacity idea with no first event | write the event blueprint and proof path | create a broad module inventory |
+
+Your first contribution should leave these facts visible in checked-in files:
+
+```text
+Changed contract:
+Owning file or package:
+Command that proves it:
+Known gap:
+Next contributor action:
+```
+
+If those facts only exist in chat, the contribution is not yet ready.
+
 ## Immediate Contributor Runbook
 
 Use this runbook for the first contribution, even if you do not yet understand
