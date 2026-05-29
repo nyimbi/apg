@@ -16,6 +16,68 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 20:07 EAT
+
+WALT wallet and payment runtime implementation-depth slice:
+
+- Converted `capabilities/common/walt` from generated materialized record
+  scaffolding into a domain-specific wallet, payment, settlement,
+  reconciliation, and financial-governance runtime package.
+- Added `wallet_runtime.py` with deterministic IDs, UTC timestamps,
+  currency/instrument normalization, money minor-unit conversion, rule
+  required-action extraction, and serializable records for wallets, payment
+  instruments, transactions, settlement batches, reconciliations, and audit
+  events.
+- Replaced the generic record model with wallet, payment instrument,
+  transaction, settlement, reconciliation, and audit-event records while
+  preserving `WaltRecord` as a wallet compatibility alias.
+- Replaced generic service behavior with `WaltService` lifecycle methods for
+  tenant-scoped wallet creation, owner/ledger/compliance enforcement,
+  encrypted tokenized instrument registration, high-value MFA gates,
+  risk-review routing, balance holds, transaction capture, settlement batches,
+  reconciliation records, dashboard summaries, compatibility records, and audit
+  events.
+- Expanded API and view helpers so WALT exposes wallet status, wallet console,
+  transaction console, instrument vault, settlement center, reconciliation
+  queue, risk review, settings, route, rule, and theme composition surfaces.
+- Rewrote `cap_spec.md` around current executable WALT behavior, adapter
+  boundaries, UI surfaces, theme metadata, known non-goals, and proof commands.
+- Replaced generated package tests with focused lifecycle, package-publish,
+  guardrail, and view-model tests.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/walt` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/walt/__init__.py
+  capabilities/common/walt/models.py capabilities/common/walt/wallet_runtime.py
+  capabilities/common/walt/service.py capabilities/common/walt/api.py
+  capabilities/common/walt/views.py
+  capabilities/common/walt/capability_contract.py capabilities/common/walt/app.py
+  capabilities/common/walt/test_capability_contract.py
+  capabilities/common/walt/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -c "import importlib; ..."` for WALT `wallet_runtime`,
+  service, API, views, and capability contract passed with `walt imports ok`
+  after a non-fatal OpenTelemetry availability warning from adjacent imports.
+- `./.venv/bin/pytest -q capabilities/common/walt/test_capability_contract.py
+  capabilities/common/walt/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/walt --json` passed with `walt` classified as
+  `domain_specific`, `wallet_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/walt --json`
+  passed with `ok: true`, warnings empty, release evidence `ok: true`, and
+  side-effect-free catalog patch evidence.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 106
+  domain-specific packages, 3 materialized-baseline packages, 0 mixed
+  implementations, 0 contract-only packages, 920 custom Python files, 0 errors,
+  and 3 warnings; the next implementation-depth target is `wflo`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
 ### 2026-05-29 19:57 EAT
 
 Developer, contributor, and capacity guide effectiveness follow-up:
