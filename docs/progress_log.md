@@ -11378,3 +11378,26 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/mlcm --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 85, materialized baseline packages dropped to 22, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 900, and warning count dropped to 24. The next implementation-depth warning is `ncod`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+
+### 2026-05-29 16:38 EAT
+
+Executable NCOD no-code builder runtime slice:
+
+- Converted `capabilities/common/ncod` from generated materialized records into a domain-specific no-code/low-code app builder runtime.
+- Replaced generic records with builder apps, pages, components, data bindings, workflow bindings, script extensions, connector bindings, validation results, publish releases, and audit events.
+- Added `builder_runtime.py` with deterministic IDs, app status normalization, page layout and route normalization, component and data-source type validation, version bumping, accessibility checks, data-schema checks, readiness checks, and publish posture helpers.
+- Added `NcodService` behavior for app creation, page composition, component placement, data binding, workflow attachment, script extension policy enforcement, connector policy enforcement, app validation, publishing, compatibility records, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so NCOD exposes app library, builder, page composer, component catalog, publish center, connector bindings, settings, audit events, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and explicit workflow, script, connector, RBAC, tenant-policy, accessibility, theming, deployment, audit, and marketplace adapter boundaries.
+- Added focused lifecycle and guardrail tests covering successful app-page-component-data-workflow-script-connector-validation-publish execution and tenant context, app ownership, accessibility label, data binding validation, script policy, connector policy, publish approval, production review, and tenant-isolation guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/ncod/__init__.py capabilities/common/ncod/models.py capabilities/common/ncod/builder_runtime.py capabilities/common/ncod/service.py capabilities/common/ncod/api.py capabilities/common/ncod/views.py capabilities/common/ncod/test_capability_contract.py capabilities/common/ncod/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/ncod/test_capability_contract.py capabilities/common/ncod/tests` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package|Materialized capability package" capabilities/common/ncod` returned no remaining NCOD baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.ncod.models','capabilities.common.ncod.builder_runtime','capabilities.common.ncod.service','capabilities.common.ncod.api','capabilities.common.ncod.views']]; print('ncod imports ok')"` passed with `ncod imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/ncod --json` passed with `ok: true`; `ncod` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ncod --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 86, materialized baseline packages dropped to 21, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 901, and warning count dropped to 23. The next implementation-depth warning is `onto`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
