@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""IOTD package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import importlib.util
 import sys
 
 from capabilities.capability_contract_registry import validate_contract_shape
+from capabilities.common.iotd.service import IotdService
+from capabilities.common.iotd.views import dashboard_model
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
@@ -22,7 +24,7 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_materialized_contract_shape_is_valid():
+def test_iotd_contract_shape_is_valid():
 	module = _load_module("materialized_contract_iotd", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
@@ -32,7 +34,7 @@ def test_materialized_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
-def test_materialized_app_entrypoint_is_publishable():
+def test_iotd_app_entrypoint_is_publishable():
 	module = _load_module("materialized_app_iotd", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
@@ -44,3 +46,19 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "iotd" in model["capabilities"]
+
+
+def test_iotd_compatibility_record_uses_device_runtime():
+	service = IotdService()
+
+	record = service.create_record(
+		"device-compat",
+		"tenant-test",
+		metadata={"fleet_id": "compat-fleet", "owner_id": "compat-owner"},
+	)
+	dashboard = dashboard_model(service, "tenant-test")
+
+	assert record["id"] == "device-compat"
+	assert record["fleet_id"] == "compat-fleet"
+	assert dashboard["summary"]["device_count"] == 1
+	assert dashboard["summary"]["theme"] == "iotd_device_ops"

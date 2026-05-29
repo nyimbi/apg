@@ -11229,3 +11229,27 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `envm` is now removed from warnings, domain-specific packages increased to 71, materialized baseline packages dropped to 34, and warning count dropped to 38.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+
+### 2026-05-29 15:39 EAT
+
+Executable IOTD device-runtime slice:
+
+- Converted `capabilities/common/iotd` from generated materialized records into a domain-specific IoT device-management runtime.
+- Replaced generic records with device identities, telemetry events, device commands, firmware artifacts, firmware deployments, audit events, and health reports.
+- Added `device_runtime.py` with telemetry schema validation, ISO timestamp parsing, stale-device inspection, and device health posture helpers.
+- Added `IotdService` behavior for device registration, telemetry ingestion, dangerous-command approval, command acknowledgement, firmware registration, firmware deployment, health reporting, stale-device queues, dashboard summaries, compatibility records, and APG rule enforcement.
+- Expanded API and view helpers so IOTD exposes device inventory, telemetry monitoring, command center, firmware manager, security/audit state, rules state, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and the explicit external MQTT, OPC-UA, Modbus, hardware-security, certificate-store, firmware-delivery, event-bus, audit, and monitoring integration boundary.
+- Added focused contract/service tests for successful device telemetry-command-firmware-health lifecycle execution and guardrails around tenant context, device identity, owner policy, stale review, telemetry encryption, telemetry schema, dangerous-command approval, unsigned firmware, and tenant isolation.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/iotd/__init__.py capabilities/common/iotd/models.py capabilities/common/iotd/device_runtime.py capabilities/common/iotd/service.py capabilities/common/iotd/api.py capabilities/common/iotd/views.py capabilities/common/iotd/test_capability_contract.py capabilities/common/iotd/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/iotd/test_capability_contract.py capabilities/common/iotd/tests/test_materialized_package.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/iotd` returned no remaining IOTD baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.iotd.models','capabilities.common.iotd.device_runtime','capabilities.common.iotd.service','capabilities.common.iotd.api','capabilities.common.iotd.views']]; print('iotd imports ok')"` passed with `iotd imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/iotd --json` passed with `ok: true`; `iotd` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/iotd --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 81, materialized baseline packages dropped to 26, mixed packages dropped to 1, contract-only packages remained 1, custom Python files increased to 896, and warning count dropped to 28. The next implementation-depth warning is `kngr`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
