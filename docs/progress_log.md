@@ -12214,3 +12214,24 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/srch --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 101, materialized baseline packages dropped to 8, contract-only packages remain 0, custom Python files increased to 915, and warning count dropped to 8. The next implementation-depth warning is `tens`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+
+### 2026-05-29 19:28 EAT
+
+Executable TENS legacy-tenant runtime slice:
+
+- Converted `capabilities/common/tens` from generated materialized baseline package status into a domain-specific legacy tenant migration runtime.
+- Added `tenant_runtime.py` with deterministic legacy tenant, tenant mapping, access boundary, migration plan, deprecation plan, audit event, stable ID, and timestamp primitives.
+- Replaced generic record/service/API/view behavior with TENS methods for legacy tenant registration, validated tenant mapping, auth-boundary validation, migration approval and completion, deprecation planning, compatibility records, dashboards, list APIs, and UI view models.
+- Replaced generated package tests with package contract/runtime tests covering legacy-tenant-mapping-boundary-migration-deprecation execution and tenant, owner, mapping validation, auth boundary, migration approval, deprecation, API, and view-model guardrails.
+- Updated `cap_spec.md` to describe current executable TENS runtime behavior, adapter boundaries, routes, rules, and focused verification commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/tens/__init__.py capabilities/common/tens/models.py capabilities/common/tens/tenant_runtime.py capabilities/common/tens/service.py capabilities/common/tens/api.py capabilities/common/tens/views.py capabilities/common/tens/capability_contract.py capabilities/common/tens/app.py capabilities/common/tens/test_capability_contract.py capabilities/common/tens/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package" capabilities/common/tens` returned no remaining TENS baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.tens.tenant_runtime','capabilities.common.tens.service','capabilities.common.tens.api','capabilities.common.tens.views','capabilities.common.tens.capability_contract']]; print('tens imports ok')"` passed with `tens imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/tens/test_capability_contract.py capabilities/common/tens/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/tens --json` passed with `ok: true`; `tens` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/tens --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 102, materialized baseline packages dropped to 7, contract-only packages remain 0, custom Python files increased to 916, and warning count dropped to 7. The next implementation-depth warning is `them`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
