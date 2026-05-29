@@ -30,6 +30,7 @@ directories when a capability has its own package-local test suite.
 | Historical reports | `docs/reports/` |
 | Roadmaps and planning docs | `docs/roadmaps/` |
 | Specifications | `docs/specifications/` |
+| Copied reference documents | `docs/reference/` |
 | Archived older docs | `docs/archive/` |
 | Repository tests | `tests/` |
 | Test fixtures | `tests/fixtures/` |
@@ -52,6 +53,9 @@ directories when a capability has its own package-local test suite.
 - Keep internal streaming language Bytewax-oriented.
 - Move historical or aspirational documents into `docs/archive/`,
   `docs/reports/`, or `docs/roadmaps/` instead of leaving them at source root.
+- Keep copied reference PDFs, Word files, spreadsheets, and decks under
+  `docs/reference/` when they are intentionally part of the repository. Leave
+  local-only references untracked.
 
 ## Enforcement
 
@@ -59,11 +63,14 @@ Repository layout is enforced by:
 
 ```bash
 ./.venv/bin/apg hygiene audit --json
+./.venv/bin/apg hygiene audit --include-untracked --json
 ./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py
 ```
 
 The CLI audit emits `apg.repository-hygiene-audit.v1` and is included in
-`apg tooling audit --json`. The hygiene checks inspect tracked files, not every
-untracked local artifact. A developer may have local agent state or scratch
-uploads in the worktree; those must not be staged unless a task explicitly
-makes them part of the repository contract.
+`apg tooling audit --json`. The default hygiene checks inspect tracked files so
+CI is stable and independent of a developer's local agent state. Add
+`--include-untracked` when preparing a contribution or cleaning a workspace; it
+also reports local untracked runtime output directories, root-level agent state,
+root-level Markdown/tests, and copied reference documents that should move under
+`docs/reference/` before being committed.

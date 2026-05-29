@@ -8,7 +8,13 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from cli.main import cli
-from compiler.repository_hygiene import audit_repository_hygiene
+from compiler.repository_hygiene import (
+	audit_repository_hygiene,
+	_local_agent_state_not_at_repository_root,
+	_local_docs_and_tests_not_at_repository_root,
+	_local_reference_docs_under_docs_reference,
+	_local_root_runtime_output_directories_not_present,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -138,6 +144,36 @@ def test_cli_hygiene_audit_emits_json_contract():
 	assert result.exit_code == 0
 	assert '"format": "apg.repository-hygiene-audit.v1"' in result.output
 	assert '"ok": true' in result.output
+
+
+def test_local_untracked_hygiene_checks_classify_root_clutter():
+	untracked_files = [
+		"uploads/image.png",
+		"tmp/generated.json",
+		".omx/state/run.json",
+		".claude/settings.json",
+		"CLAUDE.local.md",
+		"test_scratch.py",
+		"NOTES.md",
+		"docs/copied_reference.pdf",
+		"docs/reference/kept_reference.pdf",
+		"docs/tutorial.md",
+	]
+
+	assert _local_root_runtime_output_directories_not_present(REPO_ROOT, untracked_files) == ["tmp", "uploads"]
+	assert _local_agent_state_not_at_repository_root(REPO_ROOT, untracked_files) == [
+		".claude",
+		".omx",
+		"CLAUDE.local.md",
+	]
+	assert _local_docs_and_tests_not_at_repository_root(REPO_ROOT, untracked_files) == [
+		"CLAUDE.local.md",
+		"NOTES.md",
+		"test_scratch.py",
+	]
+	assert _local_reference_docs_under_docs_reference(REPO_ROOT, untracked_files) == [
+		"docs/copied_reference.pdf",
+	]
 
 
 def test_generated_cache_artifacts_are_not_tracked():

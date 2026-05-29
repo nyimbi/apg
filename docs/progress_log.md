@@ -16,6 +16,50 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 08:12 EAT
+
+Local worktree hygiene evidence slice:
+
+- Extended `apg.repository-hygiene-audit.v1` with an explicit
+  `--include-untracked` mode so root cleanup can inspect local untracked
+  clutter without changing the CI-friendly tracked-file default.
+- Added local checks for untracked runtime-output roots, root-level agent state,
+  root-level Markdown/tests, and copied reference documents outside
+  `docs/reference/`.
+- Updated repository hygiene and tooling documentation so contributors know
+  when to run the tracked-file gate and when to run the local cleanup gate.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/repository_hygiene.py
+  cli/hygiene_command.py tests/test_repository_hygiene.py` -> passed.
+- `./.venv/bin/pytest -q
+  tests/test_repository_hygiene.py::test_local_untracked_hygiene_checks_classify_root_clutter
+  tests/test_repository_hygiene.py::test_cli_hygiene_audit_emits_json_contract`
+  -> 2 passed.
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py` -> 20 passed.
+- `./.venv/bin/apg hygiene audit --json` -> passed with tracked-file scope.
+- `./.venv/bin/apg hygiene audit --include-untracked --json` -> intentionally
+  reported current local cleanup gaps for `.claude`, `.omx`,
+  `.simple-task-master`, `CLAUDE.local.md`, `uploads`, and the copied PDF under
+  `docs/`.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 55 documented commands, and 0 violations.
+- `./.venv/bin/apg tooling audit --json` -> passed with 19/19 surfaces, 0
+  blocking gaps, 0 errors, and repository hygiene still passing in tracked-file
+  scope.
+- `git diff --check -- compiler/repository_hygiene.py cli/hygiene_command.py
+  tests/test_repository_hygiene.py docs/repository_hygiene.md docs/tooling.md
+  docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- The local cleanup gate reports current untracked clutter but this slice does
+  not delete or move user-local artifacts. The next cleanup slice should either
+  move intentionally retained reference material into `docs/reference/` or
+  delete/ignore local-only artifacts after confirming they are not repository
+  deliverables.
+
 ### 2026-05-29 07:58 EAT
 
 Capability package materialization slice:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterable
 
 
 REPOSITORY_HYGIENE_AUDIT_FORMAT = "apg.repository-hygiene-audit.v1"
@@ -92,11 +92,20 @@ ROOT_RUNTIME_OUTPUT_PATHS = {
 	"tmp",
 	"uploads",
 }
+LOCAL_AGENT_STATE_PATHS = {
+	".claude",
+	".omc",
+	".omx",
+	".simple-task-master",
+	"CLAUDE.local.md",
+}
+LOCAL_REFERENCE_DOC_SUFFIXES = (".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx")
 
 CheckFunction = Callable[[Path, list[str], list[str]], list[str]]
+LocalCheckFunction = Callable[[Path, list[str]], list[str]]
 
 
-def audit_repository_hygiene(repo_root: Path | None = None) -> dict[str, object]:
+def audit_repository_hygiene(repo_root: Path | None = None, include_untracked: bool = False) -> dict[str, object]:
 	"""Return APG repository hygiene evidence for tracked project files."""
 	root = repo_root or Path(__file__).resolve().parents[1]
 	tracked_files = _tracked_files(root)
@@ -120,6 +129,15 @@ def audit_repository_hygiene(repo_root: Path | None = None) -> dict[str, object]
 		_run_check("status_reports_describe_python_first_platform_defaults", root, tracked_files, tracked_index_entries, _status_reports_describe_python_first_platform_defaults),
 		_run_check("apg_streaming_runtime_bytewax_native", root, tracked_files, tracked_index_entries, _apg_streaming_runtime_bytewax_native),
 	]
+	untracked_files: list[str] = []
+	if include_untracked:
+		untracked_files = _untracked_files(root)
+		checks.extend([
+			_run_local_check("local_root_runtime_output_directories_not_present", root, untracked_files, _local_root_runtime_output_directories_not_present),
+			_run_local_check("local_agent_state_not_at_repository_root", root, untracked_files, _local_agent_state_not_at_repository_root),
+			_run_local_check("local_docs_and_tests_not_at_repository_root", root, untracked_files, _local_docs_and_tests_not_at_repository_root),
+			_run_local_check("local_reference_docs_under_docs_reference", root, untracked_files, _local_reference_docs_under_docs_reference),
+		])
 	violations = [
 		{"check": check["name"], "violation": violation}
 		for check in checks
@@ -130,8 +148,10 @@ def audit_repository_hygiene(repo_root: Path | None = None) -> dict[str, object]
 		"format": REPOSITORY_HYGIENE_AUDIT_FORMAT,
 		"ok": not violations,
 		"repo_root": str(root),
-		"scope": "tracked_files",
+		"scope": "tracked_files+local_untracked_files" if include_untracked else "tracked_files",
 		"tracked_file_count": len(tracked_files),
+		"include_untracked": include_untracked,
+		"untracked_file_count": len(untracked_files),
 		"checks": checks,
 		"summary": {
 			"check_count": len(checks),
@@ -160,6 +180,21 @@ def _run_check(
 	}
 
 
+def _run_local_check(
+	name: str,
+	root: Path,
+	untracked_files: list[str],
+	check: LocalCheckFunction,
+) -> dict[str, object]:
+	violations = check(root, untracked_files)
+	return {
+		"name": name,
+		"ok": not violations,
+		"violation_count": len(violations),
+		"violations": violations,
+	}
+
+
 def _tracked_files(root: Path) -> list[str]:
 	result = subprocess.run(
 		["git", "ls-files"],
@@ -169,6 +204,17 @@ def _tracked_files(root: Path) -> list[str]:
 		text=True,
 	)
 	return result.stdout.splitlines()
+
+
+def _untracked_files(root: Path) -> list[str]:
+	result = subprocess.run(
+		["git", "ls-files", "--others", "--exclude-standard", "-z"],
+		cwd=root,
+		check=True,
+		capture_output=True,
+		text=True,
+	)
+	return sorted(path for path in result.stdout.split("\0") if path)
 
 
 def _tracked_index_entries(root: Path) -> list[str]:
@@ -197,6 +243,48 @@ def _root_runtime_output_directories_not_tracked(root: Path, tracked_files: list
 		path for path in tracked_files
 		if path.split("/", 1)[0] in ROOT_RUNTIME_OUTPUT_PATHS
 	]
+
+
+def _local_root_runtime_output_directories_not_present(root: Path, untracked_files: list[str]) -> list[str]:
+	return _unique_roots(
+		path for path in untracked_files
+		if path.split("/", 1)[0] in ROOT_RUNTIME_OUTPUT_PATHS
+	)
+
+
+def _local_agent_state_not_at_repository_root(root: Path, untracked_files: list[str]) -> list[str]:
+	return _unique_roots(
+		path for path in untracked_files
+		if path.split("/", 1)[0] in LOCAL_AGENT_STATE_PATHS
+	)
+
+
+def _local_docs_and_tests_not_at_repository_root(root: Path, untracked_files: list[str]) -> list[str]:
+	return sorted(
+		path for path in untracked_files
+		if "/" not in path and (
+			path.startswith("test_")
+			or path.endswith("_test.py")
+			or (path.endswith(".md") and path not in ALLOWED_ROOT_MARKDOWN)
+		)
+	)
+
+
+def _local_reference_docs_under_docs_reference(root: Path, untracked_files: list[str]) -> list[str]:
+	return sorted(
+		path for path in untracked_files
+		if path.startswith("docs/")
+		and not path.startswith("docs/reference/")
+		and path.lower().endswith(LOCAL_REFERENCE_DOC_SUFFIXES)
+	)
+
+
+def _unique_roots(paths: Iterable[str]) -> list[str]:
+	roots = {
+		path.split("/", 1)[0]
+		for path in paths
+	}
+	return sorted(roots)
 
 
 def _root_tracked_files_intentional_and_minimal(root: Path, tracked_files: list[str], tracked_index_entries: list[str]) -> list[str]:

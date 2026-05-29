@@ -17,9 +17,14 @@ def hygiene() -> None:
 
 @hygiene.command(name="audit")
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.repository-hygiene-audit.v1 JSON")
-def audit(as_json: bool) -> None:
+@click.option(
+	"--include-untracked",
+	is_flag=True,
+	help="Also report untracked local root clutter and misplaced local docs/tests.",
+)
+def audit(as_json: bool, include_untracked: bool) -> None:
 	"""Verify tracked files follow APG repository hygiene rules."""
-	report = audit_repository_hygiene()
+	report = audit_repository_hygiene(include_untracked=include_untracked)
 	if as_json:
 		click.echo(json.dumps(report, indent=2, sort_keys=True))
 	else:
@@ -30,6 +35,8 @@ def audit(as_json: bool) -> None:
 			f"{summary['passing_check_count']}/{summary['check_count']} checks passing, "
 			f"{summary['violation_count']} violation(s)"
 		)
+		if include_untracked:
+			click.echo(f"  Local untracked files inspected: {report['untracked_file_count']}")
 		for check in report["checks"]:
 			prefix = "OK" if check["ok"] else "FAIL"
 			click.echo(f"  {prefix} {check['name']}: {check['violation_count']} violation(s)")

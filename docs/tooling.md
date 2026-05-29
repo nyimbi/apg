@@ -133,6 +133,10 @@ APG currently has an executable compiler path:
   test placement, Python-first defaults, Bytewax-native streaming terminology,
   and generated/cache artifact exclusions without reading local untracked
   agent state;
+- `apg hygiene audit --include-untracked --json` expands the same
+  `apg.repository-hygiene-audit.v1` contract to local worktree cleanup by
+  reporting untracked runtime-output roots, root-level agent state, root-level
+  Markdown/tests, and copied reference documents outside `docs/reference/`;
 - `apg docs audit --json` emits `apg.docs-audit.v1` by checking required
   contributor-facing docs, local Markdown navigation links, and documented APG
   command examples against the registered CLI surface;
