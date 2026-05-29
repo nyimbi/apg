@@ -5,6 +5,11 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from click.testing import CliRunner
+
+from cli.main import cli
+from compiler.repository_hygiene import audit_repository_hygiene
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_ROOT_TRACKED_FILES = {
@@ -43,6 +48,7 @@ STREAMING_TERM_EXCLUDED_PREFIXES = (
 STREAMING_TERM_EXCLUDED_PATHS = {
 	"docs/progress_log.md",
 	"tests/test_repository_hygiene.py",
+	"compiler/repository_hygiene.py",
 }
 PYTHON_TEMPLATE_FORBIDDEN_TERMS = (
 	"Flask-AppBuilder",
@@ -111,6 +117,27 @@ def _tracked_index_entries() -> list[str]:
 		text=True,
 	)
 	return result.stdout.splitlines()
+
+
+def test_repository_hygiene_audit_is_executable_from_compiler():
+	report = audit_repository_hygiene(REPO_ROOT)
+
+	assert report["format"] == "apg.repository-hygiene-audit.v1"
+	assert report["ok"] is True
+	assert report["scope"] == "tracked_files"
+	assert report["summary"]["violation_count"] == 0
+	checks = {check["name"]: check for check in report["checks"]}
+	assert checks["root_tracked_files_intentional_and_minimal"]["ok"] is True
+	assert checks["root_tests_and_docs_expected_directories"]["ok"] is True
+	assert checks["apg_streaming_runtime_bytewax_native"]["ok"] is True
+
+
+def test_cli_hygiene_audit_emits_json_contract():
+	result = CliRunner().invoke(cli, ["hygiene", "audit", "--json"])
+
+	assert result.exit_code == 0
+	assert '"format": "apg.repository-hygiene-audit.v1"' in result.output
+	assert '"ok": true' in result.output
 
 
 def test_generated_cache_artifacts_are_not_tracked():

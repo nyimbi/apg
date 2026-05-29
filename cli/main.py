@@ -29,6 +29,7 @@ from cli.evidence_command import evidence
 from cli.explain_command import explain
 from cli.format_command import format_cmd
 from cli.graph_command import graph, graph_suite
+from cli.hygiene_command import hygiene
 from cli.ide_command import ide
 from cli.lint_command import lint
 from cli.migrate_plan_command import migrate_plan
@@ -71,6 +72,7 @@ cli.add_command(explain)
 cli.add_command(format_cmd)
 cli.add_command(graph)
 cli.add_command(graph_suite)
+cli.add_command(hygiene)
 cli.add_command(ide)
 cli.add_command(lint)
 cli.add_command(migrate_plan)

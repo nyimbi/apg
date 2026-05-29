@@ -118,11 +118,17 @@ APG currently has an executable compiler path:
   fixtures across web, desktop, mobile, and container profiles;
 - `apg tooling audit --json` emits `apg.tooling-fixture-audit.v1` by running
   every checked-in compiler tooling fixture catalog plus the non-fixture CLI,
-  IDE, and Studio contracts as one CI-friendly gate: parser-golden,
+  repository hygiene, IDE, and Studio contracts as one CI-friendly gate: parser-golden,
   diagnostics, lint, formatter, drift, semantic model, graph, language-server,
   natural-language planning, migrations, release evidence, top-level command
-  registration, required command-group subcommands, VS Code integration, and
-  Studio snapshot/edit-planning surfaces;
+  registration, required command-group subcommands, tracked root documentation
+  and test placement, VS Code integration, and Studio snapshot/edit-planning
+  surfaces;
+- `apg hygiene audit --json` emits `apg.repository-hygiene-audit.v1` by
+  checking the tracked repository layout, root allowlist, documentation and
+  test placement, Python-first defaults, Bytewax-native streaming terminology,
+  and generated/cache artifact exclusions without reading local untracked
+  agent state;
 - `apg language-server <file> --check --json` emits
   `apg.language-server-check.v1` from the shared semantic model and formatter,
   proving editor-facing diagnostics, completions, definitions, references,
@@ -1144,15 +1150,29 @@ apg tooling audit --json
 The tooling audit emits `apg.tooling-fixture-audit.v1` and runs every
 checked-in compiler tooling fixture catalog through one command. It aggregates
 parser-golden, diagnostics, lint, formatter, semantic drift, graph-suite,
-language-server, natural-language planner, migration, and release-evidence
-fixture audits. Each surface reports its expected format, actual format,
-format match, summary, error count, and blocking-gap count. The aggregate exits
+repository hygiene, language-server, natural-language planner, migration,
+release-evidence fixture audits, and non-fixture CLI, IDE, and Studio surface
+contracts. Each surface reports its expected format, actual format, format
+match, summary, error count, and blocking-gap count. The aggregate exits
 non-zero if any surface fails or emits the wrong report contract.
 
 This is the Phase 0 umbrella CI gate. Individual fixture commands remain useful
 for focused debugging, but `apg tooling audit --json` is the fastest way to
 prove that the compiler-adjacent tooling baseline is bedded down before moving
 to larger platform capabilities.
+
+### `apg hygiene audit`
+
+```console
+apg hygiene audit --json
+```
+
+The hygiene audit emits `apg.repository-hygiene-audit.v1` and turns the root
+documentation/test placement rules into an APG CLI surface. It checks tracked
+files only, matching the repository hygiene policy: `README.md` is the only
+root Markdown document, tests live under `tests/` or capability-local
+`tests/`, generated/cache output is not tracked, and public docs/templates stay
+Python-first and Bytewax-native.
 
 ### `apg capabilities`
 

@@ -16,6 +16,50 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 06:15 EAT
+
+Repository hygiene CLI surface slice:
+
+- Added `compiler.repository_hygiene.audit_repository_hygiene()` emitting
+  `apg.repository-hygiene-audit.v1` from the tracked-file root allowlist,
+  documentation/test placement, Python-first template/doc guards, Bytewax
+  streaming guard, generated artifact exclusions, and framework-neutral
+  composable checks.
+- Added `apg hygiene audit --json` and text output so root documentation/test
+  placement is a first-class APG command rather than only pytest knowledge.
+- Wired repository hygiene into `apg tooling audit --json`, increasing the
+  aggregate tooling gate to 15 surfaces and adding the `hygiene audit` command
+  group to CLI surface coverage.
+- Added focused regression coverage for the compiler audit API, CLI JSON
+  contract, and aggregate tooling surface.
+- Updated tooling, developer, contributor, capacity-development, and repository
+  hygiene docs to point contributors at the executable hygiene command.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/repository_hygiene.py
+  cli/hygiene_command.py cli/main.py compiler/tooling_audit.py
+  tests/test_repository_hygiene.py tests/test_tooling_audit.py` -> passed.
+- `./.venv/bin/apg hygiene audit --json` -> passed with 17/17 checks and 0
+  violations.
+- `./.venv/bin/apg hygiene audit` -> passed in text mode.
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py
+  tests/test_tooling_audit.py` -> 22 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 15/15 surfaces, 0
+  blocking gaps, and 0 errors.
+- `git diff --check -- compiler/repository_hygiene.py cli/hygiene_command.py
+  cli/main.py compiler/tooling_audit.py tests/test_repository_hygiene.py
+  tests/test_tooling_audit.py docs/tooling.md docs/developer_guide.md
+  docs/repository_hygiene.md docs/contributors_guide.md
+  docs/capacity_development_guide.md` -> passed.
+
+Known remaining gaps:
+
+- The hygiene audit intentionally covers tracked repository state. Local
+  untracked agent state, uploads, and scratch files remain a worktree hygiene
+  concern and must not be staged unless explicitly promoted into the repository
+  contract.
+
 ### 2026-05-29 06:02 EAT
 
 Catalog-aware evidence bundle slice:

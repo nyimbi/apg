@@ -171,7 +171,7 @@ every contribution, especially when compute or battery is constrained.
 | Generator | representative `apg compile ... --verify` and generated smoke test |
 | Capability contract | `apg capabilities validate-contracts --json` and focused contract tests |
 | Capability scaffold/package | scaffold, publish-plan, publish-apply dry run, focused package tests |
-| Repository hygiene | `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
+| Repository hygiene | `./.venv/bin/apg hygiene audit --json` and `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
 
 Always inspect command output before claiming a pass.
 

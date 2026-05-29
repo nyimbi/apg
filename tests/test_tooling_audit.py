@@ -23,6 +23,7 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 		"drift",
 		"semantic_model",
 		"graph",
+		"repository_hygiene",
 		"language_server",
 		"nl_plan",
 		"migration",
@@ -33,7 +34,7 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 	}:
 		assert surfaces[surface_name]["ok"] is True
 		assert surfaces[surface_name]["format_ok"] is True
-	assert report["summary"]["surface_count"] == 14
+	assert report["summary"]["surface_count"] == 15
 	assert report["summary"]["blocking_gap_count"] == 0
 
 
@@ -43,6 +44,7 @@ def test_cli_surface_audit_tracks_documented_command_groups():
 	assert report["format"] == "apg.cli-surface-audit.v1"
 	assert report["ok"] is True
 	assert "compile" in report["registered_commands"]
+	assert "hygiene" in report["registered_commands"]
 	assert "language-server" in report["registered_commands"]
 	assert "package-verify" in report["registered_commands"]
 	assert "tooling" in report["registered_commands"]
@@ -50,6 +52,7 @@ def test_cli_surface_audit_tracks_documented_command_groups():
 	groups = {group["command"]: group for group in report["command_groups"]}
 	assert groups["capabilities"]["missing_subcommands"] == []
 	assert groups["deployment"]["missing_subcommands"] == []
+	assert groups["hygiene"]["missing_subcommands"] == []
 	assert groups["studio"]["missing_subcommands"] == []
 	assert report["summary"]["blocking_gap_count"] == 0
 

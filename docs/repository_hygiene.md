@@ -58,10 +58,12 @@ directories when a capability has its own package-local test suite.
 Repository layout is enforced by:
 
 ```bash
+./.venv/bin/apg hygiene audit --json
 ./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py
 ```
 
-The hygiene tests check tracked files, not every untracked local artifact. A
-developer may have local agent state or scratch uploads in the worktree; those
-must not be staged unless a task explicitly makes them part of the repository
-contract.
+The CLI audit emits `apg.repository-hygiene-audit.v1` and is included in
+`apg tooling audit --json`. The hygiene checks inspect tracked files, not every
+untracked local artifact. A developer may have local agent state or scratch
+uploads in the worktree; those must not be staged unless a task explicitly
+makes them part of the repository contract.

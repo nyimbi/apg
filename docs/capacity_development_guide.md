@@ -370,6 +370,7 @@ Choose tests by the layer changed:
 ./.venv/bin/apg capabilities validate-contracts --json
 ./.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py
 ./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py
+./.venv/bin/apg hygiene audit --json
 ./.venv/bin/apg tooling audit --json
 ./.venv/bin/apg lint path/to/capacity.apg --catalog /tmp/apg-capability-catalog.json --json
 ```

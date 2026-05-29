@@ -14,6 +14,7 @@ from compiler.linting import audit_lint_fixtures
 from compiler.migrations import audit_migration_fixtures
 from compiler.nl_plan import audit_nl_plan_fixtures
 from compiler.parser_golden import audit_parser_golden
+from compiler.repository_hygiene import audit_repository_hygiene
 from compiler.semantic_model import audit_semantic_model_fixtures
 from compiler.studio import build_studio_edit_plan, build_studio_snapshot
 from language_server.semantic_service import audit_language_server_fixtures
@@ -37,6 +38,7 @@ REQUIRED_TOP_LEVEL_COMMANDS = [
 	"format",
 	"graph",
 	"graph-suite",
+	"hygiene",
 	"ide",
 	"init",
 	"language-server",
@@ -58,6 +60,7 @@ REQUIRED_TOP_LEVEL_COMMANDS = [
 REQUIRED_COMMAND_GROUPS = {
 	"capabilities": ["catalog", "contracts", "evaluate-rules", "inspect", "list", "publish-apply", "publish-plan", "scaffold", "validate-contracts"],
 	"deployment": ["verify"],
+	"hygiene": ["audit"],
 	"ide": ["audit"],
 	"studio": ["plan-edit", "snapshot"],
 	"tooling": ["audit"],
@@ -113,6 +116,7 @@ def _fixture_audits() -> list[FixtureAudit]:
 		("drift", "apg.drift-audit.v1", audit_drift_fixtures),
 		("semantic_model", "apg.semantic-model-fixture-audit.v1", audit_semantic_model_fixtures),
 		("graph", "apg.graph-fixture-audit.v1", audit_graph_fixtures),
+		("repository_hygiene", "apg.repository-hygiene-audit.v1", audit_repository_hygiene),
 		("language_server", "apg.language-server-fixture-audit.v1", audit_language_server_fixtures),
 		("nl_plan", "apg.nl-plan-fixture-audit.v1", audit_nl_plan_fixtures),
 		("migration", "apg.migration-fixture-audit.v1", audit_migration_fixtures),

@@ -354,7 +354,7 @@ Use the narrowest lane that proves the claim.
 | Evidence bundle | `./.venv/bin/apg evidence path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-evidence --json` |
 | Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` |
 | Tooling | `./.venv/bin/apg tooling audit --json` |
-| Repository hygiene | `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
+| Repository hygiene | `./.venv/bin/apg hygiene audit --json` and `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
 
 ## Definition Of Done
 
