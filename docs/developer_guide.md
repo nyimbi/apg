@@ -188,8 +188,10 @@ Add a capability package:
    `semantic_model.json`, package manifest, release report, and tests aligned.
 3. Use `apg capabilities materialize-packages --capability <id> --json` when a
    checked-in contract is valid but package artifacts are missing.
-4. Validate contracts, run focused package tests, and run publish-plan.
-5. Add or update the APG example that composes the capability.
+4. Run `apg capabilities implementation-audit --json` and confirm the package
+   is not still a materialized baseline before claiming domain behavior.
+5. Validate contracts, run focused package tests, and run publish-plan.
+6. Add or update the APG example that composes the capability.
 
 Add a new capacity:
 
@@ -560,6 +562,7 @@ Use the narrowest lane that proves the claim.
 | Evidence bundle | `./.venv/bin/apg evidence path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-evidence --json` |
 | Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` and `./.venv/bin/apg capabilities audit --json` |
 | Capability package closure | `./.venv/bin/apg capabilities materialize-packages --dry-run --json`, `./.venv/bin/apg capabilities materialize-packages --json`, and `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` |
+| Capability implementation depth | `./.venv/bin/apg capabilities implementation-audit --json` to find remaining materialized baselines; use `--strict` when a capacity is supposed to be domain-implemented |
 | Tooling | `./.venv/bin/apg tooling audit --json` |
 | Environment doctor | `./.venv/bin/apg doctor --json` |
 | Repository hygiene | `./.venv/bin/apg hygiene audit --json` and `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |

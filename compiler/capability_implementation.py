@@ -1,0 +1,187 @@
+"""Capability implementation-depth audit for APG packages."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from capabilities.capability_contract_registry import (
+	CapabilityContractRecord,
+	load_contract_registry,
+	validate_contract_registry,
+)
+
+
+CAPABILITY_IMPLEMENTATION_AUDIT_FORMAT = "apg.capability-implementation-audit.v1"
+BASELINE_MARKERS = (
+	"This package materializes the executable APG contract",
+	"Dependency-light service backed by the capability contract",
+	"Tenant-scoped dependency-light capability record",
+	"dependency-light dashboard view model",
+	"test_materialized_package",
+	"materialized APG capability package",
+)
+STANDARD_PACKAGE_FILES = {
+	"__init__.py",
+	"api.py",
+	"app.py",
+	"capability_contract.py",
+	"models.py",
+	"service.py",
+	"test_capability_contract.py",
+	"views.py",
+}
+STANDARD_PACKAGE_DIRECTORIES = {"__pycache__", "tests"}
+
+
+def audit_capability_implementation(
+	root: Path | str | None = None,
+	strict: bool = False,
+) -> dict[str, Any]:
+	"""Report whether capability packages are still materialized baselines."""
+	registry_report = validate_contract_registry(root)
+	errors: list[str] = list(registry_report["errors"])
+	warnings: list[str] = []
+	records: list[dict[str, Any]] = []
+
+	registry: dict[str, CapabilityContractRecord] = {}
+	if registry_report["valid"]:
+		registry = load_contract_registry(root)
+
+	for capability_id, record in sorted(registry.items()):
+		record_report = _audit_record(record)
+		records.append(record_report)
+		if record_report["implementation_gap"]:
+			message = (
+				f"{capability_id}: implementation level is "
+				f"{record_report['implementation_level']}"
+			)
+			if strict:
+				errors.append(message)
+			else:
+				warnings.append(message)
+
+	materialized_baseline_count = sum(
+		1 for record in records
+		if record["implementation_level"] == "materialized_baseline"
+	)
+	mixed_count = sum(1 for record in records if record["implementation_level"] == "mixed")
+	contract_only_count = sum(
+		1 for record in records
+		if record["implementation_level"] == "contract_only"
+	)
+	domain_specific_count = sum(
+		1 for record in records
+		if record["implementation_level"] == "domain_specific"
+	)
+	return {
+		"format": CAPABILITY_IMPLEMENTATION_AUDIT_FORMAT,
+		"ok": not errors,
+		"strict": strict,
+		"contract_validation": {
+			"valid": bool(registry_report["valid"]),
+			"contract_count": registry_report["contract_count"],
+			"error_count": registry_report["error_count"],
+		},
+		"summary": {
+			"capability_count": len(records),
+			"materialized_baseline_count": materialized_baseline_count,
+			"mixed_implementation_count": mixed_count,
+			"contract_only_count": contract_only_count,
+			"domain_specific_count": domain_specific_count,
+			"custom_python_file_count": sum(
+				record["custom_python_file_count"] for record in records
+			),
+			"error_count": len(errors),
+			"warning_count": len(warnings),
+		},
+		"records": records,
+		"errors": errors,
+		"warnings": warnings,
+		"blocking_gaps": [
+			{"surface": "capability_implementation", "error": error}
+			for error in errors
+		],
+	}
+
+
+def _audit_record(record: CapabilityContractRecord) -> dict[str, Any]:
+	package_dir = record.path.parent
+	baseline_markers = _baseline_markers(package_dir)
+	custom_python_files = _custom_python_files(package_dir)
+	implementation_level = _implementation_level(baseline_markers, custom_python_files)
+	return {
+		"capability": record.capability_id,
+		"display_name": record.display_name,
+		"category": _category(record.path),
+		"package_dir": str(package_dir),
+		"implementation_level": implementation_level,
+		"implementation_gap": implementation_level != "domain_specific",
+		"baseline_marker_count": len(baseline_markers),
+		"baseline_markers": baseline_markers,
+		"custom_python_file_count": len(custom_python_files),
+		"custom_python_files": custom_python_files,
+		"next_action": _next_action(implementation_level),
+	}
+
+
+def _baseline_markers(package_dir: Path) -> list[dict[str, str]]:
+	matches: list[dict[str, str]] = []
+	for path in sorted(package_dir.glob("**/*")):
+		if not path.is_file() or "__pycache__" in path.parts:
+			continue
+		if path.suffix not in {".py", ".md"}:
+			continue
+		content = path.read_text(encoding="utf-8", errors="ignore")
+		for marker in BASELINE_MARKERS:
+			if marker in content:
+				matches.append({
+					"path": str(path.relative_to(package_dir)),
+					"marker": marker,
+				})
+	return matches
+
+
+def _custom_python_files(package_dir: Path) -> list[str]:
+	custom_files: list[str] = []
+	for path in sorted(package_dir.glob("*.py")):
+		if path.name in STANDARD_PACKAGE_FILES:
+			continue
+		custom_files.append(str(path.relative_to(package_dir)))
+	for child in sorted(package_dir.iterdir()):
+		if child.name in STANDARD_PACKAGE_DIRECTORIES or not child.is_dir():
+			continue
+		if any(path.suffix == ".py" for path in child.glob("**/*.py")):
+			custom_files.append(str(child.relative_to(package_dir)))
+	return custom_files
+
+
+def _implementation_level(
+	baseline_markers: list[dict[str, str]],
+	custom_python_files: list[str],
+) -> str:
+	if baseline_markers and custom_python_files:
+		return "mixed"
+	if baseline_markers:
+		return "materialized_baseline"
+	if not custom_python_files:
+		return "contract_only"
+	return "domain_specific"
+
+
+def _next_action(implementation_level: str) -> str:
+	if implementation_level == "materialized_baseline":
+		return "Replace generated record/service/API/view helpers with domain-specific behavior behind the same contract."
+	if implementation_level == "mixed":
+		return "Keep the custom behavior and remove remaining generated baseline surfaces as they are replaced."
+	if implementation_level == "contract_only":
+		return "Add domain-specific service/API/view behavior behind the executable capability contract."
+	return "Maintain domain behavior and keep contract, package, and publish evidence current."
+
+
+def _category(path: Path) -> str:
+	parts = path.parts
+	if "capabilities" not in parts:
+		return ""
+	index = parts.index("capabilities")
+	return parts[index + 1] if index + 1 < len(parts) else ""

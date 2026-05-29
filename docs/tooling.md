@@ -123,11 +123,12 @@ APG currently has an executable compiler path:
   every checked-in compiler tooling fixture catalog plus the non-fixture CLI,
   repository hygiene, docs, IDE, and Studio contracts as one CI-friendly gate:
   parser-golden, diagnostics, lint, formatter, drift, semantic model, graph,
-  capability operability, compiler baseline numbered examples, language-server,
-  natural-language planning, migrations, release evidence, top-level command
-  registration, required command-group subcommands, tracked root documentation
-  and test placement, documentation navigation and command examples, VS Code
-  integration, and Studio snapshot/edit-planning surfaces;
+  capability operability, capability implementation depth, compiler baseline
+  numbered examples, language-server, natural-language planning, migrations,
+  release evidence, top-level command registration, required command-group
+  subcommands, tracked root documentation and test placement, documentation
+  navigation and command examples, VS Code integration, and Studio
+  snapshot/edit-planning surfaces;
 - `apg hygiene audit --json` emits `apg.repository-hygiene-audit.v1` by
   checking the tracked repository layout, root allowlist, documentation and
   test placement, Python-first defaults, Bytewax-native streaming terminology,
@@ -191,6 +192,12 @@ APG currently has an executable compiler path:
   `cap_spec.md`, record/service/API/view helpers, publishable `app.py`,
   semantic model, package manifest, release evidence, and package-local tests
   unless `--force` is explicitly used;
+- capability implementation depth can be audited with
+  `apg capabilities implementation-audit --json`, which emits
+  `apg.capability-implementation-audit.v1` by separating domain-specific
+  packages from mixed packages, contract-only packages, and packages that still
+  contain materialized baseline service/model/API/view markers; add `--strict`
+  when those implementation gaps should block a capacity-readiness gate;
 - new package-backed capability skeletons can be created with
   `apg capabilities scaffold <domain> <code> --name ... --json`, which emits
   `apg.capability-scaffold-report.v1` and writes a valid spec-backed contract,
@@ -1191,13 +1198,14 @@ apg tooling audit --json
 
 The tooling audit emits `apg.tooling-fixture-audit.v1` and runs every
 checked-in compiler tooling fixture catalog through one command. It aggregates
-parser-golden, diagnostics, lint, formatter, semantic drift, graph-suite, the
-compiler baseline numbered-example gate, repository hygiene, docs,
-language-server, natural-language planner, migration, release-evidence fixture
-audits, and non-fixture CLI, IDE, and Studio surface contracts. Each surface
-reports its expected format, actual format, format match, summary, error count,
-and blocking-gap count. The aggregate exits non-zero if any surface fails or
-emits the wrong report contract.
+parser-golden, diagnostics, lint, formatter, semantic drift, graph-suite,
+capability operability, capability implementation depth, the compiler baseline
+numbered-example gate, repository hygiene, docs, language-server,
+natural-language planner, migration, release-evidence fixture audits, and
+non-fixture CLI, IDE, and Studio surface contracts. Each surface reports its
+expected format, actual format, format match, summary, error count, and
+blocking-gap count. The aggregate exits non-zero if any surface fails or emits
+the wrong report contract.
 
 This is the Phase 0 umbrella CI gate. Individual fixture commands remain useful
 for focused debugging, but `apg tooling audit --json` is the fastest way to
@@ -1235,6 +1243,7 @@ language snippets are not confused with shell commands.
 apg capabilities contracts --json
 apg capabilities validate-contracts
 apg capabilities audit --json
+apg capabilities implementation-audit --json
 apg capabilities materialize-packages --json
 apg capabilities list
 ```
@@ -1248,7 +1257,10 @@ package artifact gaps as warnings unless `--strict-package-artifacts` is used.
 contracts by writing only missing package artifacts; use `--dry-run` to inspect
 the write set first and `--capability <id>` for one package. After
 materialization, `apg capabilities audit --strict-package-artifacts --json`
-should report zero package gaps.
+should report zero package gaps. `apg capabilities implementation-audit
+--json` is the next depth gate: it reports which complete packages are still
+materialized baselines, mixed implementations, contract-only packages, and
+which packages have domain-specific implementation files.
 `apg capabilities publish-plan <package-dir> --json`
 emits `apg.capability-publish-report.v1`: it loads the package entrypoint,
 validates the manifest, proves the manifest is publishable, returns the catalog

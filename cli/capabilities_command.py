@@ -23,6 +23,7 @@ from compiler.capability_publish import (
 )
 from compiler.capability_operability import audit_capability_operability
 from compiler.capability_materializer import materialize_capability_packages
+from compiler.capability_implementation import audit_capability_implementation
 
 
 CAPABILITY_SCAFFOLD_FORMAT = "apg.capability-scaffold-report.v1"
@@ -1043,6 +1044,39 @@ def audit(strict_package_artifacts: bool, as_json: bool) -> None:
 			click.echo(f"  warning: {warning}")
 		if len(report["warnings"]) > 10:
 			click.echo(f"  ... {len(report['warnings']) - 10} more warning(s)")
+	if not report["ok"]:
+		raise click.exceptions.Exit(1)
+
+
+@capabilities.command(name="implementation-audit")
+@click.option(
+	"--strict",
+	is_flag=True,
+	help="Treat materialized-baseline packages as blocking implementation gaps",
+)
+@click.option("--root", type=click.Path(path_type=Path), default=None, help="Capability root directory to audit")
+@click.option("--json", "as_json", is_flag=True, help="Emit apg.capability-implementation-audit.v1 JSON")
+def implementation_audit(strict: bool, root: Path | None, as_json: bool) -> None:
+	"""Audit whether capability packages still rely on materialized baseline code."""
+	report = audit_capability_implementation(root=root, strict=strict)
+	if as_json:
+		click.echo(json.dumps(report, indent=2, sort_keys=True))
+	else:
+		summary = report["summary"]
+		status = "OK" if report["ok"] else "FAILED"
+		click.echo(
+			f"Capability implementation audit {status}: "
+			f"{summary['domain_specific_count']} domain-specific, "
+			f"{summary['mixed_implementation_count']} mixed, "
+			f"{summary['contract_only_count']} contract-only, "
+			f"{summary['materialized_baseline_count']} materialized baseline package(s)"
+		)
+		for warning in report["warnings"][:10]:
+			click.echo(f"  warning: {warning}")
+		if len(report["warnings"]) > 10:
+			click.echo(f"  ... {len(report['warnings']) - 10} more warning(s)")
+		for error in report["errors"]:
+			click.echo(f"  error: {error}")
 	if not report["ok"]:
 		raise click.exceptions.Exit(1)
 

@@ -16,6 +16,52 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 08:32 EAT
+
+Capability implementation-depth audit slice:
+
+- Added `apg capabilities implementation-audit --json`, emitting
+  `apg.capability-implementation-audit.v1` so complete packages can be
+  separated into domain-specific, mixed, materialized-baseline, and
+  contract-only implementation levels.
+- Added `--strict` support for readiness gates that should fail when packages
+  still have implementation gaps.
+- Wired the implementation-depth report into `apg tooling audit --json` as the
+  `capability_implementation` surface.
+- Updated tooling, developer, contributor, and capacity-development docs so
+  package work does not stop at materialized artifact shape.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/capability_implementation.py
+  cli/capabilities_command.py compiler/tooling_audit.py
+  tests/test_cli_capability_implementation.py tests/test_tooling_audit.py` ->
+  passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_implementation.py
+  tests/test_tooling_audit.py::test_cli_surface_audit_tracks_documented_command_groups
+  tests/test_tooling_audit.py::test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces`
+  -> 4 passed.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  109 capabilities, 54 domain-specific packages, 5 mixed packages, 49
+  materialized-baseline packages, 1 contract-only package, 873 custom Python
+  files, 0 errors, and 55 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 55 documented commands, and 0 violations.
+- `./.venv/bin/apg tooling audit --json` -> passed with 20/20 surfaces, 0
+  blocking gaps, 0 errors, and the new `capability_implementation` surface
+  reporting the same implementation-depth counts.
+- `git diff --check -- compiler/capability_implementation.py
+  cli/capabilities_command.py compiler/tooling_audit.py
+  tests/test_cli_capability_implementation.py docs/tooling.md
+  docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md` -> passed.
+
+Known remaining gaps:
+
+- The audit makes implementation-depth gaps explicit but does not yet replace
+  the 49 materialized baselines, 5 mixed implementations, or 1 contract-only
+  package with domain-specific service/API/view behavior.
+
 ### 2026-05-29 08:12 EAT
 
 Local worktree hygiene evidence slice:
