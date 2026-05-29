@@ -286,6 +286,7 @@ def _workflow_step_metadata(workflow: Dict[str, Any], step: str) -> Dict[str, An
     guards = workflow.get("guards", {})
     assignments = workflow.get("assignments", {})
     timers = workflow.get("timers", {})
+    waits = workflow.get("waits", {})
     retry_policy = workflow.get("retry_policy", {})
     compensation = workflow.get("compensation", {})
     human_tasks = set(str(item) for item in workflow.get("human_tasks", []))
@@ -298,11 +299,63 @@ def _workflow_step_metadata(workflow: Dict[str, Any], step: str) -> Dict[str, An
         metadata["task_type"] = "human"
     if step in timers:
         metadata["timer"] = timers[step]
+    if step in waits:
+        metadata["wait_for"] = waits[step]
     if step in retry_policy:
         metadata["retry_policy"] = retry_policy[step]
     if step in compensation:
         metadata["compensation"] = compensation[step]
     return metadata
+
+
+def _compensation_actions(workflow: Dict[str, Any], completed_steps: list[str]) -> list[Dict[str, Any]]:
+    compensation = workflow.get("compensation", {})
+    actions: list[Dict[str, Any]] = []
+    if not isinstance(compensation, dict):
+        return actions
+    for step in reversed(completed_steps):
+        if step in compensation:
+            actions.append({"step": step, "action": compensation[step]})
+    return actions
+
+
+def _retry_limit(policy: Any) -> int:
+    if isinstance(policy, dict):
+        for key in ("attempts", "max_attempts", "retries", "limit"):
+            if key in policy:
+                return _retry_limit(policy[key])
+        return 1
+    try:
+        parsed = int(policy)
+    except (TypeError, ValueError):
+        return 1
+    return max(1, parsed)
+
+
+def _step_failure_budget(step: str, payload: Dict[str, Any]) -> int:
+    failures = payload.get("step_failures", payload.get("failures", {}))
+    if isinstance(failures, dict) and step in failures:
+        try:
+            return max(0, int(failures[step]))
+        except (TypeError, ValueError):
+            return 0
+    fail_steps = payload.get("fail_steps", [])
+    if isinstance(fail_steps, str):
+        fail_steps = [part.strip() for part in fail_steps.split(",") if part.strip()]
+    if isinstance(fail_steps, list) and step in [str(item) for item in fail_steps]:
+        return 999999
+    return 0
+
+
+def _available_workflow_events(payload: Dict[str, Any]) -> set[str]:
+    raw_events = payload.get("events", payload.get("completed_events", payload.get("signals", [])))
+    if isinstance(raw_events, str):
+        return {part.strip() for part in raw_events.split(",") if part.strip()}
+    if isinstance(raw_events, list):
+        return {str(item) for item in raw_events}
+    if isinstance(raw_events, dict):
+        return {str(key) for key, value in raw_events.items() if value}
+    return set()
 
 
 def _context_value(path: str, context: Dict[str, Any]) -> Any:
@@ -422,6 +475,7 @@ def describe_workflow(workflow_name: str) -> Dict[str, Any]:
     guards = _workflow_mapping(defaults.get("guards") or defaults.get("guard_rules") or defaults.get("conditions"))
     assignments = _workflow_mapping(defaults.get("assignments") or defaults.get("assignees") or defaults.get("owners"))
     timers = _workflow_mapping(defaults.get("timers") or defaults.get("sla") or defaults.get("deadlines"))
+    waits = _workflow_mapping(defaults.get("waits") or defaults.get("event_waits") or defaults.get("wait_for"))
     retry_policy = _workflow_mapping(defaults.get("retry_policy") or defaults.get("retries"))
     compensation = _workflow_mapping(defaults.get("compensation") or defaults.get("compensations"))
     human_tasks = _split_workflow_sequence(defaults.get("human_tasks") or defaults.get("manual_steps"))
@@ -445,6 +499,7 @@ def describe_workflow(workflow_name: str) -> Dict[str, Any]:
         "assignments": assignments,
         "human_tasks": human_tasks,
         "timers": timers,
+        "waits": waits,
         "retry_policy": retry_policy,
         "compensation": compensation,
         "transitions": transitions,
@@ -479,6 +534,9 @@ def _execute_workflow_steps(
     trace = list(existing_trace or [])
     completed_steps = list(existing_completed_steps or [])
     guards = workflow.get("guards", {})
+    retry_policy = workflow.get("retry_policy", {})
+    waits = workflow.get("waits", {})
+    available_events = _available_workflow_events(payload)
     for offset, step in enumerate(selected_steps):
         index = start_index + offset
         entry: Dict[str, Any] = {
@@ -506,7 +564,58 @@ def _execute_workflow_steps(
                     "blocked_at": step,
                     "blocked_reason": "guard_failed",
                     "guard": guard,
+                    "compensations": _compensation_actions(workflow, completed_steps),
                 }
+        wait_for = waits.get(step)
+        if wait_for is not None:
+            event_name = str(wait_for)
+            entry["wait_for"] = event_name
+            if event_name not in available_events:
+                entry["status"] = "waiting"
+                trace.append(entry)
+                return {
+                    "status": "waiting",
+                    "current_step": step,
+                    "completed_at": None,
+                    "steps": selected_steps,
+                    "completed_steps": completed_steps,
+                    "pending_steps": selected_steps[offset:],
+                    "trace": trace,
+                    "payload": payload,
+                    "waiting_at": step,
+                    "waiting_for": event_name,
+                    "compensations": [],
+                }
+            entry["event_received"] = event_name
+        failure_budget = _step_failure_budget(step, payload)
+        retry_limit = _retry_limit(retry_policy.get(step)) if isinstance(retry_policy, dict) and step in retry_policy else 1
+        attempts: list[Dict[str, Any]] = []
+        for attempt_number in range(1, retry_limit + 1):
+            failed = failure_budget >= attempt_number
+            attempts.append({
+                "attempt": attempt_number,
+                "status": "failed" if failed else "completed",
+            })
+            if not failed:
+                break
+        entry["attempts"] = attempts
+        if attempts and attempts[-1]["status"] == "failed":
+            entry["status"] = "failed"
+            trace.append(entry)
+            return {
+                "status": "failed",
+                "current_step": step,
+                "completed_at": None,
+                "steps": selected_steps,
+                "completed_steps": completed_steps,
+                "pending_steps": selected_steps[offset:],
+                "trace": trace,
+                "payload": payload,
+                "failed_at": step,
+                "failure_reason": "step_failed",
+                "attempts": attempts,
+                "compensations": _compensation_actions(workflow, completed_steps),
+            }
         entry["status"] = "completed"
         trace.append(entry)
         completed_steps.append(step)
@@ -520,6 +629,7 @@ def _execute_workflow_steps(
                 "pending_steps": selected_steps[offset + 1:],
                 "trace": trace,
                 "payload": payload,
+                "compensations": [],
             }
     return {
         "status": "completed",
@@ -530,6 +640,7 @@ def _execute_workflow_steps(
         "pending_steps": [],
         "trace": trace,
         "payload": payload,
+        "compensations": [],
     }
 
 
@@ -1331,6 +1442,7 @@ def _database_openapi_schemas() -> Dict[str, Any]:
                 "assignments": generic_object,
                 "human_tasks": {"type": "array", "items": {"type": "string"}},
                 "timers": generic_object,
+                "waits": generic_object,
                 "retry_policy": generic_object,
                 "compensation": generic_object,
                 "transitions": {"type": "array", "items": generic_object},
@@ -1374,6 +1486,11 @@ def _database_openapi_schemas() -> Dict[str, Any]:
                 "event_id": {"type": "integer"},
                 "blocked_at": {"type": "string"},
                 "blocked_reason": {"type": "string"},
+                "waiting_at": {"type": "string"},
+                "waiting_for": {"type": "string"},
+                "failed_at": {"type": "string"},
+                "failure_reason": {"type": "string"},
+                "compensations": {"type": "array", "items": generic_object},
                 "guard": {"oneOf": [{"type": "string"}, {"type": "boolean"}, generic_object]},
             },
             "required": ["id", "workflow", "status", "steps", "trace", "payload"],
@@ -2497,7 +2614,7 @@ def validate_workflow_contracts() -> Dict[str, Any]:
         transitions = workflow.get("transitions", [])
         if len(steps) > 1 and len(transitions) != len(steps) - 1:
             errors.append(f"{workflow_name} transition count does not match step chain")
-        for section in ("guards", "assignments", "timers", "retry_policy", "compensation"):
+        for section in ("guards", "assignments", "timers", "waits", "retry_policy", "compensation"):
             mapping = workflow.get(section, {})
             if not isinstance(mapping, dict):
                 errors.append(f"{workflow_name} {section} metadata must be an object")

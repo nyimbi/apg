@@ -16,6 +16,30 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 04:11 EAT
+
+Generated workflow waits, retries, and compensation slice:
+
+- Extended generated workflow runtime metadata with event-wait declarations from `waits`, `event_waits`, or `wait_for` workflow fields.
+- Workflow execution now returns `waiting` when a step declares a required event that is absent from the payload, and records the `waiting_at` / `waiting_for` state in the run trace.
+- Retry policy is now execution-changing: payload-driven step failures exercise declared retry attempts and produce `failed` runs when attempts are exhausted.
+- Failed or blocked runs now return deterministic compensation actions for previously completed steps that declare compensation metadata.
+- Regenerated all 20 numbered example output directories from the current compiler.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/code_generator.py tests/test_generated_workflow_runtime.py` -> passed.
+- `./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py` -> 3 passed.
+- `./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler` -> 4 passed.
+- Generated `examples/13_procurement_approval_workbench/main.apg` in a temp directory and ran generated `smoke_test.py` -> exit code 0.
+- Regenerated example outputs command compiled 20/20 examples with no failures.
+- `git diff --check` over the compiler, workflow test, generated examples, and this log passed.
+
+Known remaining gaps:
+
+- Waits and failures are payload-driven deterministic execution hooks. Real asynchronous timers, event subscriptions, and durable worker retries need a larger workflow-engine slice.
+- Parallel gateways and compensation action execution are still not implemented; generated apps now compute the compensation plan but do not call external side effects.
+
 ### 2026-05-29 04:06 EAT
 
 Generated workflow guard and task-semantics slice:

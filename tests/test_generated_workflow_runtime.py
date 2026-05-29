@@ -31,6 +31,7 @@ workflow GovernedProcurement {
     assignments: dict = {"budget_review": "budget_owner", "finance_approval": "finance_controller"};
     human_tasks: str = "budget_review, finance_approval";
     timers: dict = {"finance_approval": "PT24H"};
+    waits: dict = {"finance_approval": "finance_packet_ready"};
     retry_policy: dict = {"procurement_review": "3"};
     compensation: dict = {"procurement_review": "release_budget_hold"};
     process: () -> bool = {
@@ -166,6 +167,7 @@ def test_generated_app_executes_workflow_guards_and_task_metadata():
     assert workflow["assignments"]["finance_approval"] == "finance_controller"
     assert workflow["human_tasks"] == ["budget_review", "finance_approval"]
     assert workflow["timers"]["finance_approval"] == "PT24H"
+    assert workflow["waits"]["finance_approval"] == "finance_packet_ready"
     assert workflow["retry_policy"]["procurement_review"] == "3"
     assert workflow["compensation"]["procurement_review"] == "release_budget_hold"
     assert workflow["transitions"][0]["guard"] == "amount <= budget_limit"
@@ -177,13 +179,61 @@ def test_generated_app_executes_workflow_guards_and_task_metadata():
     assert blocked["status"] == "blocked"
     assert blocked["blocked_at"] == "budget_review"
     assert blocked["pending_steps"][0] == "budget_review"
+    assert blocked["compensations"] == []
     assert blocked["trace"][-1]["guard_passed"] is False
     assert blocked["trace"][-1]["assignee"] == "budget_owner"
     assert blocked["trace"][-1]["task_type"] == "human"
 
-    completed = namespace["run_workflow"](
+    waiting = namespace["run_workflow"](
         "GovernedProcurement",
         {"amount": 4500, "budget_limit": 5000, "finance_threshold": 1000},
+    )
+    assert waiting["status"] == "waiting"
+    assert waiting["waiting_at"] == "finance_approval"
+    assert waiting["waiting_for"] == "finance_packet_ready"
+    assert waiting["pending_steps"][0] == "finance_approval"
+    assert waiting["trace"][-1]["status"] == "waiting"
+
+    failed = namespace["run_workflow"](
+        "GovernedProcurement",
+        {
+            "amount": 4500,
+            "budget_limit": 5000,
+            "finance_threshold": 1000,
+            "events": ["finance_packet_ready"],
+            "step_failures": {"procurement_review": 3},
+        },
+    )
+    assert failed["status"] == "failed"
+    assert failed["failed_at"] == "procurement_review"
+    assert [attempt["status"] for attempt in failed["attempts"]] == ["failed", "failed", "failed"]
+    assert failed["compensations"] == []
+
+    compensated = namespace["run_workflow"](
+        "GovernedProcurement",
+        {
+            "amount": 4500,
+            "budget_limit": 5000,
+            "finance_threshold": 1000,
+            "events": ["finance_packet_ready"],
+            "fail_steps": ["finance_approval"],
+        },
+    )
+    assert compensated["status"] == "failed"
+    assert compensated["failed_at"] == "finance_approval"
+    assert compensated["compensations"] == [
+        {"step": "procurement_review", "action": "release_budget_hold"}
+    ]
+
+    completed = namespace["run_workflow"](
+        "GovernedProcurement",
+        {
+            "amount": 4500,
+            "budget_limit": 5000,
+            "finance_threshold": 1000,
+            "events": ["finance_packet_ready"],
+            "step_failures": {"procurement_review": 2},
+        },
     )
     assert completed["status"] == "completed"
     assert completed["completed_at"] == "approved"
@@ -191,9 +241,16 @@ def test_generated_app_executes_workflow_guards_and_task_metadata():
     assert finance_step["guard_passed"] is True
     assert finance_step["assignee"] == "finance_controller"
     assert finance_step["timer"] == "PT24H"
+    assert finance_step["event_received"] == "finance_packet_ready"
     procurement_step = [step for step in completed["trace"] if step["step"] == "procurement_review"][0]
     assert procurement_step["retry_policy"] == "3"
     assert procurement_step["compensation"] == "release_budget_hold"
+    assert [attempt["status"] for attempt in procurement_step["attempts"]] == [
+        "failed",
+        "failed",
+        "completed",
+    ]
+    assert completed["compensations"] == []
 
     validation = namespace["validate_application"]()
     assert validation["checks"]["workflows"]["errors"] == []
