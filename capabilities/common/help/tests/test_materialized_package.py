@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""HELP package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import importlib.util
 import sys
 
 from capabilities.capability_contract_registry import validate_contract_shape
+from capabilities.common.help.service import HelpService
+from capabilities.common.help.views import dashboard_model
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
@@ -44,3 +46,25 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "help" in model["capabilities"]
+
+
+def test_help_package_compatibility_runtime_is_executable():
+	service = HelpService()
+
+	record = service.create_record(
+		record_id="article-compat",
+		tenant_id="tenant-test",
+		metadata={
+			"title": "Compatibility article",
+			"body": "Compatibility records become editable help articles.",
+			"owner_id": "owner-test",
+			"topics": ["compatibility"],
+		},
+	)
+	summary = service.dashboard_summary("tenant-test")
+	model = dashboard_model(service, "tenant-test")
+
+	assert record["kind"] == "article"
+	assert record["title"] == "Compatibility article"
+	assert summary["article_count"] == 1
+	assert model["summary"]["article_count"] == 1

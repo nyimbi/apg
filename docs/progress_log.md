@@ -16,6 +16,75 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 14:55 EAT
+
+HELP implementation-depth slice:
+
+- Converted `help` from a materialized-baseline package into a domain-specific
+  help-center and knowledge-base runtime package.
+- Added executable tenant-scoped knowledge articles, publication lifecycle,
+  restricted-content filtering, deterministic search, cited answer generation,
+  feedback capture, curation items, freshness queueing, compatibility records,
+  dashboard summaries, and contract-rule evaluation.
+- Added `help_runtime.py` as the HELP-specific search, answer composition, and
+  freshness-inspection algorithm surface so package behavior is no longer
+  generic record scaffolding.
+- Replaced generic package API and view helpers with help-specific helpers for
+  article authoring, publication, search, answers, feedback, dashboard,
+  help center, editor, curation queue, support analytics, routes, rules, and
+  theme metadata.
+- Rewrote `cap_spec.md` to describe current executable behavior, runtime
+  surfaces, guardrails, adapter boundaries, UI surfaces, theme contract, and
+  focused verification commands.
+- Expanded focused tests for the article-to-answer lifecycle, cited answers,
+  low-rating feedback curation, compatibility records, view models, and policy
+  failures for tenant context, ownership, approval, RBAC filtering, freshness
+  review, missing citations, rating bounds, and tenant isolation.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/help/__init__.py
+  capabilities/common/help/models.py capabilities/common/help/help_runtime.py
+  capabilities/common/help/service.py capabilities/common/help/api.py
+  capabilities/common/help/views.py
+  capabilities/common/help/test_capability_contract.py
+  capabilities/common/help/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/python - <<'PY' ... importlib.import_module(...) ... PY` for
+  `capabilities.common.help.models`, `help_runtime`, `service`, `api`, and
+  `views` -> passed.
+- `./.venv/bin/pytest -q capabilities/common/help/test_capability_contract.py
+  capabilities/common/help/tests/test_materialized_package.py` -> 8 passed
+  with 10 pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/common/help` -> no matches.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/help --json` -> passed with `help` classified as
+  `domain_specific`, `help_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/help --json`
+  -> passed with a side-effect-free catalog patch and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  78 domain-specific packages, 29 materialized-baseline packages, 1 mixed
+  package, 1 contract-only package, 893 custom Python files, 0 errors, and 31
+  warnings; next warning is `i18n`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `git diff --check -- capabilities/common/help docs/progress_log.md` ->
+  passed.
+
+Known remaining gaps:
+
+- `help` is now domain-specific, but implementation-depth still reports 29
+  materialized baselines, 1 mixed implementation, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is
+  `i18n`.
+
 ### 2026-05-29 14:27 EAT
 
 Developer/contributor/capacity guide effectiveness slice:
