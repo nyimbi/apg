@@ -10396,6 +10396,29 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `auth` is now removed from warnings, domain-specific packages increased to 69, mixed packages dropped to 4, and warning count dropped to 40.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+
+### 2026-05-29 12:26 EAT
+
+Executable ESGC carbon-accounting runtime slice:
+
+- Converted `capabilities/common/esgc` from generated record storage into a domain-specific ESG and carbon-tracking capability package.
+- Replaced generic records with tenant emissions inventories, versioned emission factors, measured emission activities, sustainability reports, reduction targets, and audit events.
+- Added `carbon_engine.py` with deterministic CO2e calculations, inventory totals, anomaly detection, target-progress calculation, and target-status helpers.
+- Added `EsgcService` behavior for inventory creation, approved factor registration, activity capture, anomaly review, report publication, reduction target tracking, dashboard summaries, compatibility helpers, and APG rule enforcement.
+- Expanded API and view helpers so ESGC exposes emissions inventory, factor library, activity records, reports, targets, audit evidence, summaries, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and the explicit external IoT meter, utility feed, supplier portal, factor database, geospatial boundary, forecasting, compliance, audit-store, and regulator-submission integration boundary.
+- Added focused contract/service tests for successful emissions-factor-activity-report-target lifecycle execution and guardrails around tenant context, inventory owner, reporting boundary, approved factors, activity units, report approvals, and anomaly review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/esgc/__init__.py capabilities/common/esgc/models.py capabilities/common/esgc/carbon_engine.py capabilities/common/esgc/service.py capabilities/common/esgc/api.py capabilities/common/esgc/views.py capabilities/common/esgc/test_capability_contract.py capabilities/common/esgc/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/esgc/test_capability_contract.py capabilities/common/esgc/tests/test_materialized_package.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/esgc` returned no remaining ESGC baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/esgc --json` passed with `ok: true`; `esgc` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/esgc --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `esgc` is now removed from warnings, domain-specific packages increased to 72, materialized baseline packages dropped to 33, and warning count dropped to 37.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/cap_spec.md` passed with no whitespace errors.
 
 ### 2026-05-29 11:41 EAT

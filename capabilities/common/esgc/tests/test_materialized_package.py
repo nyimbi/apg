@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""ESG/Carbon Tracking package tests."""
 
 from __future__ import annotations
 
@@ -44,3 +44,22 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "esgc" in model["capabilities"]
+
+
+def test_esgc_service_exposes_domain_records():
+	from capabilities.common.esgc.service import EsgcService
+
+	service = EsgcService()
+	activity = service.create_record(
+		record_id="activity-test",
+		tenant_id="tenant-test",
+		metadata={
+			"activity_type": "electricity",
+			"quantity": 2500,
+			"unit": "kwh",
+			"evidence_ref": "meter:test",
+		},
+	)
+
+	assert activity["co2e_tonnes"] == 1.0
+	assert service.dashboard_summary("tenant-test")["activity_count"] == 1
