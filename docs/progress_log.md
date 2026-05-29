@@ -16,6 +16,27 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 20:49 EAT
+
+Tracked repository hygiene evidence slice:
+
+- Verified the tracked repository layout after the ZTNA implementation-depth
+  burn-down and onboarding guide updates.
+- The root documentation/test placement requirement is currently satisfied for
+  tracked files; no tracked root-level docs/tests cleanup was required in this
+  slice.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg hygiene audit --json` passed with 17/17 checks passing, 0
+  failing checks, 0 violations, `root_tests_and_docs_expected_directories`
+  passing, and `top_level_generated_and_capability_tests_out_of_source_roots`
+  passing.
+- Not run: `./.venv/bin/apg hygiene audit --include-untracked --json` because
+  current untracked files include local agent state, uploads, and copied
+  reference material that should not be moved or staged without a dedicated
+  cleanup decision.
+
 ### 2026-05-29 20:47 EAT
 
 ZTNA zero-trust access runtime implementation-depth slice:
