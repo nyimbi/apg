@@ -8,7 +8,10 @@
   },
   "capabilities": {
     "biop": {
-      "approvals": {},
+      "approvals": {
+        "match_review": "BiometricReviewApproval",
+        "privacy_review": "BiometricReviewApproval"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -50,7 +53,10 @@
         "ui": {
           "enable_biometric_dashboard": true,
           "enable_compliance_view": true,
+          "enable_consent_center": true,
           "enable_enrollment_console": true,
+          "enable_review_queues": true,
+          "enable_template_vault": true,
           "enable_verification_workbench": true
         }
       },
@@ -142,6 +148,56 @@
               "required_action": "review_match"
             },
             "name": "low_match_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "active_consent_present": false
+            },
+            "description": "Biometric operations require active scoped consent evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_biometric_consent_required",
+              "required_action": "record_or_restore_consent"
+            },
+            "name": "biometric_operation_requires_active_consent"
+          },
+          {
+            "condition": {
+              "active_template_present": false
+            },
+            "description": "Biometric verification requires an active encrypted template.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_biometric_template_required",
+              "required_action": "enroll_active_template"
+            },
+            "name": "verification_requires_active_template"
+          },
+          {
+            "condition": {
+              "match_reviewer_same_as_requester": true,
+              "operation": "approve_match_review"
+            },
+            "description": "Low-confidence biometric match reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_match_reviewer_required",
+              "required_action": "route_to_independent_match_reviewer"
+            },
+            "name": "match_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "operation": "approve_privacy_review",
+              "privacy_reviewer_same_as_requester": true
+            },
+            "description": "Cross-border biometric privacy reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_privacy_reviewer_required",
+              "required_action": "route_to_independent_privacy_reviewer"
+            },
+            "name": "privacy_review_requires_independent_reviewer"
           }
         ],
         "type": "deterministic"
@@ -223,13 +279,63 @@
             "required_action": "review_match"
           },
           "name": "low_match_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "active_consent_present": false
+          },
+          "description": "Biometric operations require active scoped consent evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_biometric_consent_required",
+            "required_action": "record_or_restore_consent"
+          },
+          "name": "biometric_operation_requires_active_consent"
+        },
+        {
+          "condition": {
+            "active_template_present": false
+          },
+          "description": "Biometric verification requires an active encrypted template.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_biometric_template_required",
+            "required_action": "enroll_active_template"
+          },
+          "name": "verification_requires_active_template"
+        },
+        {
+          "condition": {
+            "match_reviewer_same_as_requester": true,
+            "operation": "approve_match_review"
+          },
+          "description": "Low-confidence biometric match reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_match_reviewer_required",
+            "required_action": "route_to_independent_match_reviewer"
+          },
+          "name": "match_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "operation": "approve_privacy_review",
+            "privacy_reviewer_same_as_requester": true
+          },
+          "description": "Cross-border biometric privacy reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_privacy_reviewer_required",
+            "required_action": "route_to_independent_privacy_reviewer"
+          },
+          "name": "privacy_review_requires_independent_reviewer"
         }
       ],
       "runtime": {
-        "api": "api.py",
+        "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
-        "service": "service.py",
-        "views": "views.py"
+        "service": "biometric_runtime.py",
+        "views": "view_models.py"
       },
       "screens": {
         "analytics": {
@@ -241,6 +347,11 @@
           "component": "BiometricCompliance",
           "permission": "biop:review",
           "route": "/biop/compliance"
+        },
+        "consents": {
+          "component": "BiometricConsentCenter",
+          "permission": "biop:manage_consent",
+          "route": "/biop/consents"
         },
         "dashboard": {
           "component": "BIOPDashboard",
@@ -257,10 +368,25 @@
           "permission": "biop:verify",
           "route": "/biop/liveness"
         },
+        "match_reviews": {
+          "component": "BiometricMatchReviewQueue",
+          "permission": "biop:review",
+          "route": "/biop/reviews/matches"
+        },
+        "privacy_reviews": {
+          "component": "BiometricPrivacyReviewQueue",
+          "permission": "biop:review_privacy",
+          "route": "/biop/reviews/privacy"
+        },
         "settings": {
           "component": "BIOPSettings",
           "permission": "biop:admin",
           "route": "/biop/settings"
+        },
+        "templates": {
+          "component": "BiometricTemplateVault",
+          "permission": "biop:manage_templates",
+          "route": "/biop/templates"
         },
         "users": {
           "component": "BiometricUsers",
@@ -276,6 +402,10 @@
       "streaming": {},
       "theme": {
         "components": {
+          "consent_center": {
+            "status_style": "consent-chip",
+            "visual": "scope-ledger"
+          },
           "liveness_panel": {
             "status_style": "pad-chip",
             "visual": "challenge-meter"
@@ -284,10 +414,22 @@
             "status_style": "review-chip",
             "visual": "confidence-meter"
           },
+          "match_review_queue": {
+            "status_style": "match-review-chip",
+            "visual": "confidence-review-lane"
+          },
           "modality_matrix": {
             "icon": "fingerprint",
             "risk_style": "consent-band",
             "status_indicator": "modality-pill"
+          },
+          "privacy_posture": {
+            "status_style": "cross-border-chip",
+            "visual": "jurisdiction-matrix"
+          },
+          "privacy_review_queue": {
+            "status_style": "privacy-chip",
+            "visual": "jurisdiction-review-lane"
           },
           "template_vault": {
             "highlight": "rotation-chip",
@@ -328,11 +470,25 @@
             "permission": "biop:view"
           },
           {
+            "component": "BiometricConsentCenter",
+            "name": "consents",
+            "nav_group": "Identity",
+            "path": "/biop/consents",
+            "permission": "biop:manage_consent"
+          },
+          {
             "component": "BiometricEnrollments",
             "name": "enrollments",
             "nav_group": "Identity",
             "path": "/biop/enrollments",
             "permission": "biop:enroll"
+          },
+          {
+            "component": "BiometricTemplateVault",
+            "name": "templates",
+            "nav_group": "Identity",
+            "path": "/biop/templates",
+            "permission": "biop:manage_templates"
           },
           {
             "component": "BiometricVerification",
@@ -347,6 +503,20 @@
             "nav_group": "Verification",
             "path": "/biop/liveness",
             "permission": "biop:verify"
+          },
+          {
+            "component": "BiometricMatchReviewQueue",
+            "name": "match_reviews",
+            "nav_group": "Governance",
+            "path": "/biop/reviews/matches",
+            "permission": "biop:review"
+          },
+          {
+            "component": "BiometricPrivacyReviewQueue",
+            "name": "privacy_reviews",
+            "nav_group": "Governance",
+            "path": "/biop/reviews/privacy",
+            "permission": "biop:review_privacy"
           },
           {
             "component": "BiometricCompliance",
@@ -427,7 +597,10 @@
         "ui": {
           "enable_biometric_dashboard": true,
           "enable_compliance_view": true,
+          "enable_consent_center": true,
           "enable_enrollment_console": true,
+          "enable_review_queues": true,
+          "enable_template_vault": true,
           "enable_verification_workbench": true
         }
       },
@@ -481,6 +654,18 @@
       },
       "name": "authentication_requires_liveness"
     },
+    "biometric_operation_requires_active_consent": {
+      "condition": {
+        "active_consent_present": false
+      },
+      "description": "Biometric operations require active scoped consent evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_biometric_consent_required",
+        "required_action": "record_or_restore_consent"
+      },
+      "name": "biometric_operation_requires_active_consent"
+    },
     "biometric_processing_requires_consent": {
       "condition": {
         "consent_recorded": false,
@@ -520,6 +705,32 @@
       },
       "name": "low_match_confidence_requires_review"
     },
+    "match_review_requires_independent_reviewer": {
+      "condition": {
+        "match_reviewer_same_as_requester": true,
+        "operation": "approve_match_review"
+      },
+      "description": "Low-confidence biometric match reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_match_reviewer_required",
+        "required_action": "route_to_independent_match_reviewer"
+      },
+      "name": "match_review_requires_independent_reviewer"
+    },
+    "privacy_review_requires_independent_reviewer": {
+      "condition": {
+        "operation": "approve_privacy_review",
+        "privacy_reviewer_same_as_requester": true
+      },
+      "description": "Cross-border biometric privacy reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_privacy_reviewer_required",
+        "required_action": "route_to_independent_privacy_reviewer"
+      },
+      "name": "privacy_review_requires_independent_reviewer"
+    },
     "template_storage_requires_encryption": {
       "condition": {
         "operation": "store_template",
@@ -544,6 +755,18 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "verification_requires_active_template": {
+      "condition": {
+        "active_template_present": false
+      },
+      "description": "Biometric verification requires an active encrypted template.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_biometric_template_required",
+        "required_action": "enroll_active_template"
+      },
+      "name": "verification_requires_active_template"
     }
   },
   "security": {},

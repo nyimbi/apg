@@ -5,13 +5,127 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Biometric Processing package-backed APG capability", "entity_count": 0, "name": "biop", "version": "1.0.0"}, "capabilities": {"biop": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"governance": {"audit_template_access": true, "cross_border_processing_review": true, "explicit_consent_required": true, "require_tenant_context": true}, "liveness": {"minimum_liveness_score": 0.82, "passive_liveness_allowed": true, "presentation_attack_detection": true, "required_for_authentication": true}, "modalities": {"enabled": ["face", "fingerprint", "voice", "iris", "behavioral"], "minimum_match_confidence": 0.86, "multi_modal_required_for_high_risk": true, "quality_threshold": 0.72}, "templates": {"encrypted_storage_required": true, "raw_sample_retention": "disabled", "revocation_supported": true, "template_rotation_days": 365}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "biop_biometric_control"}, "ui": {"enable_biometric_dashboard": true, "enable_compliance_view": true, "enable_enrollment_console": true, "enable_verification_workbench": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Biometric Processing", "provides": ["biop_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All biometric operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"consent_recorded": false, "operation": "process_biometric"}, "description": "Biometric processing requires explicit consent.", "effect": {"decision": "deny", "reason": "biometric_consent_required", "required_action": "record_consent"}, "name": "biometric_processing_requires_consent"}, {"condition": {"operation": "store_template", "template_encrypted": false}, "description": "Stored biometric templates must be encrypted.", "effect": {"decision": "deny", "reason": "template_encryption_required", "required_action": "encrypt_template"}, "name": "template_storage_requires_encryption"}, {"condition": {"liveness_passed": false, "operation": "authenticate"}, "description": "Authentication using biometrics requires liveness evidence.", "effect": {"decision": "deny", "reason": "liveness_required", "required_action": "complete_liveness_check"}, "name": "authentication_requires_liveness"}, {"condition": {"cross_border_processing": true, "privacy_review_recorded": false}, "description": "Cross-border biometric use requires governance review.", "effect": {"decision": "deny", "reason": "privacy_review_required", "required_action": "record_privacy_review"}, "name": "cross_border_use_requires_review"}, {"condition": {"human_review_recorded": false, "match_confidence_lt": 0.86}, "description": "Low-confidence biometric matches require human review.", "effect": {"decision": "require_review", "reason": "low_match_confidence", "required_action": "review_match"}, "name": "low_match_confidence_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All biometric operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"consent_recorded": false, "operation": "process_biometric"}, "description": "Biometric processing requires explicit consent.", "effect": {"decision": "deny", "reason": "biometric_consent_required", "required_action": "record_consent"}, "name": "biometric_processing_requires_consent"}, {"condition": {"operation": "store_template", "template_encrypted": false}, "description": "Stored biometric templates must be encrypted.", "effect": {"decision": "deny", "reason": "template_encryption_required", "required_action": "encrypt_template"}, "name": "template_storage_requires_encryption"}, {"condition": {"liveness_passed": false, "operation": "authenticate"}, "description": "Authentication using biometrics requires liveness evidence.", "effect": {"decision": "deny", "reason": "liveness_required", "required_action": "complete_liveness_check"}, "name": "authentication_requires_liveness"}, {"condition": {"cross_border_processing": true, "privacy_review_recorded": false}, "description": "Cross-border biometric use requires governance review.", "effect": {"decision": "deny", "reason": "privacy_review_required", "required_action": "record_privacy_review"}, "name": "cross_border_use_requires_review"}, {"condition": {"human_review_recorded": false, "match_confidence_lt": 0.86}, "description": "Low-confidence biometric matches require human review.", "effect": {"decision": "require_review", "reason": "low_match_confidence", "required_action": "review_match"}, "name": "low_match_confidence_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "BiometricAnalytics", "permission": "biop:view", "route": "/biop/analytics"}, "compliance": {"component": "BiometricCompliance", "permission": "biop:review", "route": "/biop/compliance"}, "dashboard": {"component": "BIOPDashboard", "permission": "biop:view", "route": "/biop/dashboard"}, "enrollments": {"component": "BiometricEnrollments", "permission": "biop:enroll", "route": "/biop/enrollments"}, "liveness": {"component": "LivenessWorkbench", "permission": "biop:verify", "route": "/biop/liveness"}, "settings": {"component": "BIOPSettings", "permission": "biop:admin", "route": "/biop/settings"}, "users": {"component": "BiometricUsers", "permission": "biop:view", "route": "/biop/users"}, "verification": {"component": "BiometricVerification", "permission": "biop:verify", "route": "/biop/verification"}}, "streaming": {}, "theme": {"components": {"liveness_panel": {"status_style": "pad-chip", "visual": "challenge-meter"}, "match_result": {"status_style": "review-chip", "visual": "confidence-meter"}, "modality_matrix": {"icon": "fingerprint", "risk_style": "consent-band", "status_indicator": "modality-pill"}, "template_vault": {"highlight": "rotation-chip", "visual": "encrypted-record-list"}}, "name": "biop_biometric_control", "tokens": {"border.radius": "8px", "color.accent": "#2B6CB0", "color.danger": "#C53030", "color.primary": "#214E34", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8F7", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/biop/api/v1", "requires_theme": true, "routes": [{"component": "BIOPDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/biop/dashboard", "permission": "biop:view"}, {"component": "BiometricUsers", "name": "users", "nav_group": "Identity", "path": "/biop/users", "permission": "biop:view"}, {"component": "BiometricEnrollments", "name": "enrollments", "nav_group": "Identity", "path": "/biop/enrollments", "permission": "biop:enroll"}, {"component": "BiometricVerification", "name": "verification", "nav_group": "Verification", "path": "/biop/verification", "permission": "biop:verify"}, {"component": "LivenessWorkbench", "name": "liveness", "nav_group": "Verification", "path": "/biop/liveness", "permission": "biop:verify"}, {"component": "BiometricCompliance", "name": "compliance", "nav_group": "Governance", "path": "/biop/compliance", "permission": "biop:review"}, {"component": "BiometricAnalytics", "name": "analytics", "nav_group": "Operations", "path": "/biop/analytics", "permission": "biop:view"}, {"component": "BIOPSettings", "name": "settings", "nav_group": "Administration", "path": "/biop/settings", "permission": "biop:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"biop": []}}, "contracts": {"biop": {"configuration": {"governance": {"audit_template_access": true, "cross_border_processing_review": true, "explicit_consent_required": true, "require_tenant_context": true}, "liveness": {"minimum_liveness_score": 0.82, "passive_liveness_allowed": true, "presentation_attack_detection": true, "required_for_authentication": true}, "modalities": {"enabled": ["face", "fingerprint", "voice", "iris", "behavioral"], "minimum_match_confidence": 0.86, "multi_modal_required_for_high_risk": true, "quality_threshold": 0.72}, "templates": {"encrypted_storage_required": true, "raw_sample_retention": "disabled", "revocation_supported": true, "template_rotation_days": 365}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "biop_biometric_control"}, "ui": {"enable_biometric_dashboard": true, "enable_compliance_view": true, "enable_enrollment_console": true, "enable_verification_workbench": true}}, "id": "biop", "provides": ["biop_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"biop": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"authentication_requires_liveness": {"condition": {"liveness_passed": false, "operation": "authenticate"}, "description": "Authentication using biometrics requires liveness evidence.", "effect": {"decision": "deny", "reason": "liveness_required", "required_action": "complete_liveness_check"}, "name": "authentication_requires_liveness"}, "biometric_processing_requires_consent": {"condition": {"consent_recorded": false, "operation": "process_biometric"}, "description": "Biometric processing requires explicit consent.", "effect": {"decision": "deny", "reason": "biometric_consent_required", "required_action": "record_consent"}, "name": "biometric_processing_requires_consent"}, "cross_border_use_requires_review": {"condition": {"cross_border_processing": true, "privacy_review_recorded": false}, "description": "Cross-border biometric use requires governance review.", "effect": {"decision": "deny", "reason": "privacy_review_required", "required_action": "record_privacy_review"}, "name": "cross_border_use_requires_review"}, "low_match_confidence_requires_review": {"condition": {"human_review_recorded": false, "match_confidence_lt": 0.86}, "description": "Low-confidence biometric matches require human review.", "effect": {"decision": "require_review", "reason": "low_match_confidence", "required_action": "review_match"}, "name": "low_match_confidence_requires_review"}, "template_storage_requires_encryption": {"condition": {"operation": "store_template", "template_encrypted": false}, "description": "Stored biometric templates must be encrypted.", "effect": {"decision": "deny", "reason": "template_encryption_required", "required_action": "encrypt_template"}, "name": "template_storage_requires_encryption"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All biometric operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.biop": {"file": "capability_contract.py", "id": "capability.biop", "kind": "capability", "name": "Biometric Processing", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("biop_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "biop",
+			"version": "1.0.0",
+			"description": "Biometric Processing package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"biop": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"biop": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["biop_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api_helpers": "api_helpers.py",
+					"entrypoint": "app.py",
+					"service": "biometric_runtime.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"match_review": "BiometricReviewApproval",
+					"privacy_review": "BiometricReviewApproval",
+				},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"biop": {
+				"id": "biop",
+				"configuration": contract["configuration"],
+				"provides": ["biop_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"biop": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.biop": {
+				"id": "capability.biop",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +150,15 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	routes = model.get("capabilities", {}).get("biop", {}).get("ui", {}).get("routes", [])
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "biop" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("BIOP semantic model route manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

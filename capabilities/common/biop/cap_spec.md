@@ -5,6 +5,32 @@
 **Market Position:** 10x Superior to Gartner Magic Quadrant Leaders  
 **Last Updated:** January 29, 2025  
 
+## Current Executable Package Scope
+
+BIOP is now packaged for generated APG applications as a dependency-light biometric governance control plane. The production-oriented SQLAlchemy, Flask-AppBuilder, and biometric-engine modules remain available for full deployments, while `biometric_runtime.py`, `api_helpers.py`, and `view_models.py` provide a directly executable package surface for composition.
+
+The executable package lifecycle covers:
+
+- tenant-scoped biometric consent capture with modality, jurisdiction, purpose, grantor, evidence, and revocation state;
+- encrypted biometric template enrollment with active consent, quality threshold, retention policy, retirement, and tenant-local ID isolation;
+- liveness-backed verification with match confidence, source/target jurisdiction, template status, consent scope, and deterministic decision state;
+- cross-border privacy review with independent reviewer, notes, approval/rejection, and stale-review protection;
+- low-confidence match review with independent reviewer, notes, approval/rejection, and duplicate pending-review protection;
+- consent revocation that blocks future processing and retires consent-bound active templates;
+- dashboard, consent-center, template-vault, verification-workbench, review-queue, and audit view models for generated apps;
+- contract-derived semantic model, release evidence, UI routes, rule metadata, and visual theme components.
+
+The package deliberately does not store raw biometric samples or perform real biometric matching. Sensor capture, model inference, HSM-backed encryption, fraud-network lookup, and production persistence belong behind adapters that must honor this executable governance contract.
+
+### Focused Proof Commands
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/biop/__init__.py capabilities/common/biop/biometric_runtime.py capabilities/common/biop/api_helpers.py capabilities/common/biop/view_models.py capabilities/common/biop/capability_contract.py capabilities/common/biop/app.py capabilities/common/biop/test_capability_contract.py capabilities/common/biop/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/biop/test_capability_contract.py capabilities/common/biop/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/biop --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/biop --json
+```
+
 ## Executive Summary
 
 ### Revolutionary Business Value Proposition

@@ -12963,3 +12963,29 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/bclg --json` passed with BCLG review rules, 10 UI routes, review theme evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/bclg` returned no stale BCLG materialized markers.
 - `git diff --check -- capabilities/common/bclg` passed with no whitespace errors.
+
+### 2026-05-30 01:56 EAT
+
+BIOP governed biometric consent, template, verification, and review lifecycle slice:
+
+- Added `capabilities/common/biop/SPECIFICATION.md` and `capabilities/common/biop/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Added dependency-light `biometric_runtime.py` with tenant-qualified biometric consent, encrypted template, verification, review approval, and audit event state.
+- Added dependency-light `api_helpers.py` and `view_models.py` so generated APG applications can compose BIOP without importing production Flask, Flask-AppBuilder, database, biometric engine, sensor, model, or HSM stacks.
+- Added consent recording/revocation, encrypted template enrollment/retirement, liveness-backed verification, cross-border privacy review, low-confidence match review, and audit evidence workflows.
+- Enforced active consent, active encrypted template, quality threshold, liveness threshold, independent reviewer, reviewer notes, duplicate pending review prevention, stale review decision blocking, caller review-boolean bypass prevention, and tenant-local ID isolation.
+- Extended BIOP contract routes and theme metadata with consent center, template vault, match review queue, privacy review queue, and privacy posture surfaces.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive consent-template-local-verification-cross-border-privacy-review-match-review-audit coverage and API-helper/view-model coverage.
+- Added negative revoked consent, unencrypted template, low quality, low liveness, caller review boolean bypass, duplicate review, self-review, missing notes, rejected privacy review, rejected match review, retired template, and duplicate-ID tenant-isolation coverage.
+- Updated `cap_spec.md` with the current executable package scope, adapter boundaries, view surfaces, and focused proof commands.
+- Manual code review found and fixed ambiguous caller review-boolean handling in verification context and added explicit low-confidence match review bypass coverage before commit.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/biop/__init__.py capabilities/common/biop/biometric_runtime.py capabilities/common/biop/api_helpers.py capabilities/common/biop/view_models.py capabilities/common/biop/capability_contract.py capabilities/common/biop/app.py capabilities/common/biop/test_capability_contract.py capabilities/common/biop/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/biop/test_capability_contract.py capabilities/common/biop/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/biop --json` passed with `ok: true`; BIOP remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/biop --json` passed with consent/template/review routes, 10 executable rules, review theme evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/biop` returned no stale BIOP materialized markers.
+- `git diff --check -- capabilities/common/biop` passed with no whitespace errors.

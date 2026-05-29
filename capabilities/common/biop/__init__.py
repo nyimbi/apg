@@ -25,7 +25,7 @@ capability_metadata: dict[str, Any] = {
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
 	"provides": ["biometric_enrollment", "template_governance", "liveness_detection", "biometric_verification", "consent_management"],
-	"permissions": ["biop:view", "biop:enroll", "biop:verify", "biop:manage_templates", "biop:review", "biop:admin"]
+	"permissions": ["biop:view", "biop:enroll", "biop:verify", "biop:manage_consent", "biop:manage_templates", "biop:review", "biop:review_privacy", "biop:admin"]
 }
 
 CAPABILITY_NAME = "biometric_processing"
@@ -50,16 +50,22 @@ def register_capability() -> dict[str, Any]:
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
 			"biometric_enrollment": "Enroll tenant-scoped biometric samples with explicit consent",
+			"consent_management": "Record, scope, and revoke biometric consent evidence",
 			"template_governance": "Protect, rotate, retire, and audit biometric templates",
 			"liveness_detection": "Require presentation-attack checks for authentication flows",
 			"biometric_verification": "Run match and verification decisions with confidence thresholds",
+			"match_review": "Route low-confidence biometric matches for independent review",
+			"privacy_review": "Route cross-border biometric processing for independent privacy review",
 			"capability_rules": "Evaluate deterministic biometric-processing rules",
 			"visual_theming": "Apply biometric-control theme tokens and components"
 		},
 		"endpoints": {
+			"consents": "/biop/api/v1/consents",
 			"enrollments": "/biop/api/v1/enrollments",
 			"verification": "/biop/api/v1/verification",
 			"templates": "/biop/api/v1/templates",
+			"match_reviews": "/biop/api/v1/reviews/matches",
+			"privacy_reviews": "/biop/api/v1/reviews/privacy",
 			"liveness": "/biop/api/v1/liveness",
 			"compliance": "/biop/api/v1/compliance"
 		},
