@@ -16,6 +16,26 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 04:16 EAT
+
+Generated workflow compensation execution slice:
+
+- Added generated `execute_workflow_compensations(run_id, payload=None)` API for durable execution of compensation plans on failed or blocked workflow runs.
+- Added `POST /workflows/runs/{id}/compensate` plus OpenAPI schema coverage and component-manifest/package exports.
+- Compensation execution now records completed compensation actions, marks run compensation status as `completed` or `skipped`, writes a `workflow.compensate` event, and persists the updated run state through `APG_DATA_FILE`.
+- Regenerated all 20 numbered example output directories from the current compiler.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/code_generator.py tests/test_generated_workflow_runtime.py` -> passed.
+- `./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py` -> 3 passed.
+- Regenerated example outputs command compiled 20/20 examples with no failures.
+
+Known remaining gaps:
+
+- Compensation actions currently execute as deterministic generated runtime actions and persist their result; adapters that call real external undo/rollback services remain a future integration slice.
+- Real asynchronous worker execution, event subscriptions, and timer queues still need a broader generated workflow service layer.
+
 ### 2026-05-29 04:11 EAT
 
 Generated workflow waits, retries, and compensation slice:

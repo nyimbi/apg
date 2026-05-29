@@ -771,6 +771,63 @@ def resume_workflow(run_id: str, payload: Dict[str, Any] | None = None) -> Dict[
     return dict(updated)
 
 
+def execute_workflow_compensations(
+    run_id: str,
+    payload: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    run_id = str(run_id)
+    existing = WORKFLOW_RUNS.get(run_id)
+    if existing is None:
+        raise KeyError(run_id)
+    payload = dict(payload or {})
+    actions = [
+        dict(action)
+        for action in existing.get("compensations", [])
+        if isinstance(action, dict)
+    ]
+    if existing.get("compensation_status") == "completed":
+        return {
+            "id": run_id,
+            "workflow": existing.get("workflow"),
+            "status": "completed",
+            "already_executed": True,
+            "actions": existing.get("compensation_results", []),
+            "run": dict(existing),
+        }
+    results: list[Dict[str, Any]] = []
+    for index, action in enumerate(actions, start=1):
+        result = dict(action)
+        result.update({
+            "index": index,
+            "status": "completed",
+            "mode": "generated",
+        })
+        if payload:
+            result["payload"] = dict(payload)
+        results.append(result)
+    updated = dict(existing)
+    updated.update({
+        "compensation_status": "completed" if actions else "skipped",
+        "compensation_results": results,
+    })
+    event = _record_event("workflow.compensate", str(existing.get("workflow")), before=existing, after=updated)
+    updated["compensation_event_id"] = event["id"]
+    WORKFLOW_RUNS[run_id] = dict(updated)
+    persistence_error = _persist_record_store()
+    if persistence_error:
+        updated["persistence_error"] = persistence_error
+        WORKFLOW_RUNS[run_id] = dict(updated)
+    return {
+        "id": run_id,
+        "workflow": updated.get("workflow"),
+        "status": updated["compensation_status"],
+        "already_executed": False,
+        "actions": results,
+        "event_id": event["id"],
+        "run": dict(updated),
+    }
+
+
 def semantic_model() -> Dict[str, Any]:
     return json.loads(json.dumps(SEMANTIC_MODEL))
 
@@ -1109,6 +1166,7 @@ def component_manifest() -> Dict[str, Any]:
                     "describe_workflow",
                     "describe_workflows",
                     "evaluate_capability_rules",
+                    "execute_workflow_compensations",
                     "get_record",
                     "get_workflow_run",
                     "invoke_agent",
@@ -1502,6 +1560,28 @@ def _database_openapi_schemas() -> Dict[str, Any]:
                 "runs": {"type": "array", "items": _schema_ref("WorkflowRunResult")},
             },
             "required": ["runs"],
+        },
+        "WorkflowCompensationRequest": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "payload": generic_object,
+                "context": generic_object,
+            },
+        },
+        "WorkflowCompensationResult": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "id": {"type": "string"},
+                "workflow": {"type": "string"},
+                "status": {"type": "string"},
+                "already_executed": {"type": "boolean"},
+                "actions": {"type": "array", "items": generic_object},
+                "event_id": {"type": "integer"},
+                "run": _schema_ref("WorkflowRunResult"),
+            },
+            "required": ["id", "status", "already_executed", "actions", "run"],
         },
         "RecordsByEntity": {
             "type": "object",
@@ -1995,6 +2075,7 @@ def openapi_document() -> Dict[str, Any]:
         "/workflows/runs": {"get": _api_operation("Workflow run catalog", "Generated workflow run state", response_schema=_schema_ref("WorkflowRunCatalog"))},
         "/workflows/runs/{id}": {"get": _api_operation("Workflow run detail", "Generated workflow run state", response_schema=_schema_ref("WorkflowRunResult"))},
         "/workflows/runs/{id}/resume": {"post": _api_operation("Resume workflow run", "Workflow resume result", request_body=True, request_schema=_schema_ref("WorkflowRunRequest"), response_schema=_schema_ref("WorkflowRunResult"))},
+        "/workflows/runs/{id}/compensate": {"post": _api_operation("Execute workflow compensations", "Workflow compensation result", request_body=True, request_schema=_schema_ref("WorkflowCompensationRequest"), response_schema=_schema_ref("WorkflowCompensationResult"))},
         "/databases": {"get": _api_operation("Database catalog", "Database schema and connection metadata", response_schema=_schema_ref("DatabaseCatalog"))},
         "/databases/status": {"get": _api_operation("Database validation status", "Database schema validation and counts", response_schema=_schema_ref("DatabaseStatus"))},
         "/relationships": {"get": _api_operation("Entity relationship graph", "Relationship graph", response_schema=_schema_ref("RelationshipGraph"))},
@@ -2396,6 +2477,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             route.startswith("/capabilities/") and route.endswith("/approval/plan")
         ):
             return "_approval_plan_payload"
+        if route.startswith("/workflows/runs/") and route.endswith("/compensate"):
+            return "_workflow_compensation_payload"
         if route.startswith("/workflows/runs/") and route.endswith("/resume"):
             return "_workflow_resume_payload"
         if route.startswith("/workflows/") and route.endswith("/run"):
@@ -3845,6 +3928,19 @@ def _workflow_resume_payload(path: str, payload: Dict[str, Any]) -> tuple[int, D
         return 404, {"error": "workflow_run_not_found", "id": parts[2]}
 
 
+def _workflow_compensation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 4:
+        return 404, {"error": "not_found", "path": path}
+    context = payload.get("payload", payload.get("context", {}))
+    if not isinstance(context, dict):
+        return 400, {"error": "payload_must_be_object"}
+    try:
+        return 200, execute_workflow_compensations(parts[2], context)
+    except KeyError:
+        return 404, {"error": "workflow_run_not_found", "id": parts[2]}
+
+
 def _streaming_payload() -> tuple[int, Dict[str, Any]]:
     if APG_CAPABILITIES is None:
         return 404, {"error": "capabilities_unavailable"}
@@ -4065,6 +4161,8 @@ def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, An
         path.startswith("/capabilities/") and path.endswith("/approval/plan")
     ):
         return _approval_plan_payload(path, payload)
+    if path.startswith("/workflows/runs/") and path.endswith("/compensate"):
+        return _workflow_compensation_payload(path, payload)
     if path.startswith("/workflows/runs/") and path.endswith("/resume"):
         return _workflow_resume_payload(path, payload)
     if path.startswith("/workflows/") and path.endswith("/run"):

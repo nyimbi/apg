@@ -224,6 +224,30 @@ def test_generated_app_executes_workflow_guards_and_task_metadata():
     assert compensated["compensations"] == [
         {"step": "procurement_review", "action": "release_budget_hold"}
     ]
+    compensation_status = namespace["execute_workflow_compensations"](
+        compensated["id"],
+        {"operator": "system"},
+    )
+    assert compensation_status["status"] == "completed"
+    assert compensation_status["actions"] == [
+        {
+            "step": "procurement_review",
+            "action": "release_budget_hold",
+            "index": 1,
+            "status": "completed",
+            "mode": "generated",
+            "payload": {"operator": "system"},
+        }
+    ]
+    assert namespace["get_workflow_run"](compensated["id"])["compensation_status"] == "completed"
+    assert namespace["list_events"]("GovernedProcurement")[-1]["action"] == "workflow.compensate"
+
+    status, route_compensation = namespace["_post_payload"](
+        f"/workflows/runs/{compensated['id']}/compensate",
+        {"payload": {"operator": "system"}},
+    )
+    assert status == 200
+    assert route_compensation["already_executed"] is True
 
     completed = namespace["run_workflow"](
         "GovernedProcurement",
@@ -254,3 +278,6 @@ def test_generated_app_executes_workflow_guards_and_task_metadata():
 
     validation = namespace["validate_application"]()
     assert validation["checks"]["workflows"]["errors"] == []
+    openapi = namespace["openapi_document"]()
+    assert "/workflows/runs/{id}/compensate" in openapi["paths"]
+    assert "execute_workflow_compensations" in namespace["component_manifest"]()["interfaces"]["python"]["exports"]
