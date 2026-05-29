@@ -16,6 +16,45 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 06:51 EAT
+
+Generated source hygiene baseline slice:
+
+- Removed the remaining bare `pass` body from generated Python runtime helper
+  code by making numeric literal fallback state explicit.
+- Extended `apg.compiler-baseline-report.v1` so each numbered example's
+  compile-and-verify evidence includes generated Python source hygiene:
+  no TODO implementation markers, no placeholder implementation text, no
+  legacy framework target leakage, and no bare `pass` bodies.
+- Added aggregate summary counts for checked generated Python files and
+  generated-source hygiene violations.
+- Updated tooling and developer documentation so the compiler baseline is
+  explicitly a generated-source hygiene gate, not only a runtime smoke gate.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/code_generator.py
+  compiler/baseline.py tests/test_compiler_baseline.py` -> passed.
+- Direct compile probe for `examples/01_minimal_customer_records/main.apg` ->
+  generated 9 files with no bare `pass` in Python output.
+- `./.venv/bin/pytest -q tests/test_code_generator_executable_defaults.py
+  tests/test_compiler_baseline.py::test_cli_baseline_json_audits_numbered_examples`
+  -> 6 passed.
+- `./.venv/bin/apg baseline examples --json` -> passed with 20/20 examples,
+  `generated_source_hygiene_ok` true for every example, and 0 generated-source
+  hygiene violations.
+- `./.venv/bin/apg tooling audit --json` -> passed with 18/18 surfaces, 77
+  checked generated Python files in the compiler baseline surface, 0
+  generated-source hygiene violations, 0 blocking gaps, and 0 errors.
+- `git diff --check -- compiler/code_generator.py compiler/baseline.py
+  tests/test_compiler_baseline.py docs/tooling.md docs/developer_guide.md
+  docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- The hygiene gate covers generated Python produced by the compiler baseline.
+  It does not yet scan every historical checked-in generated output directory.
+
 ### 2026-05-29 06:40 EAT
 
 Aggregate compiler baseline surface slice:

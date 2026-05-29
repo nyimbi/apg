@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -66,6 +67,20 @@ def build_compiler_baseline_report(
 		"summary": {
 			"passed_examples": sum(1 for example in example_reports if example["ok"]),
 			"failed_examples": sum(1 for example in example_reports if not example["ok"]),
+			"checked_generated_python_files": sum(
+				example.get("compile_verify", {})
+				.get("source_hygiene", {})
+				.get("checked_python_files", 0)
+				for example in example_reports
+			),
+			"generated_source_hygiene_violations": sum(
+				len(
+					example.get("compile_verify", {})
+					.get("source_hygiene", {})
+					.get("violations", [])
+				)
+				for example in example_reports
+			),
 			"graph_kinds": list(SUPPORTED_GRAPH_KINDS),
 		},
 		"examples": [
@@ -125,6 +140,7 @@ def _audit_example(source: Path) -> dict[str, Any]:
 		"graph_suite_ok": graph_suite.get("format") == "apg.graph-suite-report.v1" and graph_suite.get("ok") is True,
 		"release_ok": release.get("format") == "apg.release-report.v1" and release.get("ok") is True,
 		"compile_verify_ok": compile_verify.get("ok") is True,
+		"generated_source_hygiene_ok": compile_verify.get("source_hygiene", {}).get("ok") is True,
 	}
 	return {
 		"name": source.parent.name,
@@ -146,6 +162,10 @@ def _compile_verify_in_temp(source: Path) -> dict[str, Any]:
 	errors = [str(error) for error in result.errors]
 	if not result.success:
 		return {"ok": False, "generated_file_count": len(result.generated_files), "errors": errors}
+
+	source_hygiene = _generated_source_hygiene(result.generated_files)
+	if not source_hygiene["ok"]:
+		errors.extend(source_hygiene["violations"])
 
 	with tempfile.TemporaryDirectory(prefix="apg-baseline-") as temporary_dir_name:
 		output_dir = Path(temporary_dir_name)
@@ -173,12 +193,39 @@ def _compile_verify_in_temp(source: Path) -> dict[str, Any]:
 					"ok": False,
 					"generated_file_count": len(result.generated_files),
 					"errors": errors,
+					"source_hygiene": source_hygiene,
 				}
 
 	return {
-		"ok": True,
+		"ok": not errors,
 		"generated_file_count": len(result.generated_files),
-		"errors": [],
+		"errors": errors,
+		"source_hygiene": source_hygiene,
+	}
+
+
+def _generated_source_hygiene(generated_files: dict[str, str]) -> dict[str, Any]:
+	violations: list[str] = []
+	for file_name, content in sorted(generated_files.items()):
+		if not file_name.endswith(".py"):
+			continue
+		for forbidden in (
+			"TODO: Implement",
+			"placeholder implementation",
+			"None  # TODO",
+			"Flask-AppBuilder",
+			"flask_appbuilder",
+		):
+			if forbidden in content:
+				violations.append(f"{file_name}: generated source contains {forbidden!r}")
+		if "django" in content.lower():
+			violations.append(f"{file_name}: generated source contains framework target 'django'")
+		if re.search(r"^\s*pass\s*$", content, re.MULTILINE):
+			violations.append(f"{file_name}: generated source contains a bare pass body")
+	return {
+		"ok": not violations,
+		"checked_python_files": sum(1 for path in generated_files if path.endswith(".py")),
+		"violations": violations,
 	}
 
 

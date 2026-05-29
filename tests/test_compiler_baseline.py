@@ -1918,7 +1918,11 @@ def test_cli_baseline_json_audits_numbered_examples():
 	assert report["domains"]["workflows"]["ok"] is True
 	assert report["domains"]["bytewax_streaming"]["ok"] is True
 	assert report["summary"]["failed_examples"] == 0
+	assert report["summary"]["checked_generated_python_files"] >= 20
+	assert report["summary"]["generated_source_hygiene_violations"] == 0
 	assert all(example["checks"]["compile_verify_ok"] for example in report["examples"])
+	assert all(example["checks"]["generated_source_hygiene_ok"] for example in report["examples"])
+	assert all(example["compile_verify"]["source_hygiene"]["ok"] for example in report["examples"])
 	assert all(example["checks"]["release_ok"] for example in report["examples"])
 
 

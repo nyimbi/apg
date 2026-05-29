@@ -666,11 +666,11 @@ def _literal_or_context(value: str, context: Dict[str, Any]) -> Any:
     if lowered in {{"none", "null"}}:
         return None
     try:
-        if "." in text:
-            return float(text)
-        return int(text)
+        numeric_value = float(text) if "." in text else int(text)
     except ValueError:
-        pass
+        numeric_value = None
+    if numeric_value is not None:
+        return numeric_value
     context_value = _context_value(text, context)
     if context_value is not None:
         return context_value
