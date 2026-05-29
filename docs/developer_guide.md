@@ -40,6 +40,61 @@ Every packet must name:
 
 If a packet cannot name those five things, narrow it before editing.
 
+## Immediate Effectiveness Contract
+
+A new APG developer is effective when they can take one packet from evidence to
+commit without asking where the work belongs. Use this contract for every
+developer-facing task:
+
+| Question | Required answer before editing |
+| --- | --- |
+| What becomes executable? | One APG syntax shape, semantic key, generated artifact, package behavior, example, or guide path |
+| Who consumes it? | APG authors, generated app users, capability packages, CLI tooling, language-server clients, or contributors |
+| Which public names are affected? | command names, JSON `format` values, semantic keys, route names, capability IDs, rule IDs, service methods |
+| Where is the owner? | one primary directory or module, plus focused tests/docs |
+| How is it proven? | exact command, expected result, and known verification gap |
+| What is not included? | explicit non-goals so parallel contributors do not collide |
+
+When the answer spans many owners, split the work into dependency order:
+grammar, AST, semantic model, generated Python, capability package, examples,
+docs. Commit each verified slice before starting the next one.
+
+## APG Developer Mental Model
+
+Think of APG as four connected contracts, not as one compiler file:
+
+1. **Authoring contract:** `.apg` source should be terse, readable, and stable.
+   The grammar and examples define what authors can write.
+2. **Meaning contract:** the AST, semantic analyzer, and semantic model define
+   what tools can understand.
+3. **Execution contract:** generated Python, package-backed capabilities, rules,
+   screens, workflows, agents, and Bytewax metadata define what can run or be
+   inspected today.
+4. **Evidence contract:** CLI JSON output, tests, audits, release evidence,
+   docs, and progress-log entries define what contributors can trust.
+
+Most defects are contract breaks between two adjacent layers. Fix the first
+broken boundary instead of patching a later layer around missing earlier
+meaning. For example, if a screen relationship parses but does not appear in
+`apg model --json`, fix semantic projection before changing generated views.
+
+## High-Leverage First Commits
+
+Use one of these first-commit shapes when onboarding a developer:
+
+| Shape | Files | Proof | Why it helps |
+| --- | --- | --- | --- |
+| Semantic assertion | one compiler test, one fixture or example | focused pytest, `apg model ... --json` | makes accepted syntax visible to tools |
+| Generated-app smoke improvement | `compiler/code_generator.py`, focused test, example output if intentional | `apg compile ... --verify`, generated `smoke_test.py` | moves APG toward runnable apps |
+| Capability-depth burn-down | one `capabilities/<domain>/<code>/` tree | package tests, `implementation-audit`, `publish-plan` | turns contracts into composable behavior |
+| Example handoff | one numbered example README/source/output | focused compile and smoke test | gives capacity builders a working reference |
+| Tooling evidence | one CLI/audit module and docs | focused CLI test, `apg tooling audit --json` | makes future contributors faster |
+| Contributor docs | one guide and progress log | `apg docs audit --json`, `git diff --check` | removes private knowledge from the project |
+
+Avoid a first commit that touches grammar, generator, five capability packages,
+and docs in one diff. APG velocity comes from many verified packets that stack
+cleanly.
+
 ## Current Development North Star
 
 APG should rapidly produce executable Python applications from terse, readable

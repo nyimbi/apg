@@ -84,6 +84,65 @@ without private context:
 If any answer is missing, add the missing contract before adding more behavior.
 Capacity work should reduce ambiguity for the next contributor.
 
+## Capacity Developer Quickstart
+
+Use this path when you need to make a capacity real quickly.
+
+1. Name one business event in plain language.
+2. Write or choose one APG source file that declares the records, rules,
+   screens, workflows, agents, streaming metadata, and capabilities needed for
+   that event.
+3. Run `apg model ... --json` and confirm the event appears as stable semantic
+   data.
+4. Run `apg compile ... --verify` and the generated `smoke_test.py`.
+5. If the event depends on durable package behavior, improve exactly one
+   capability package and prove it with focused tests plus `publish-plan`.
+6. Update the example README with current readiness, proof commands, and next
+   slice.
+7. Update `docs/progress_log.md` when readiness or executable evidence changes.
+
+The quickstart is complete when a second contributor can run one command path
+from APG source to generated Python and see where package behavior should be
+extended next.
+
+## Capacity Design Invariants
+
+Every capacity should preserve these invariants:
+
+| Invariant | Practical rule |
+| --- | --- |
+| Author-first | the APG source should read like a compact business declaration, not generated implementation code |
+| Python-first | generated output targets practical Python artifacts before framework-specific variants |
+| Capability-backed | durable behavior belongs in package contracts and service/API/view helpers, not only in example prose |
+| Rule-visible | guardrails have names, deterministic inputs, and tests |
+| Screen-composed | screens name routes, components, relationships, permissions, and theme expectations |
+| Agent-governed | AI agents name runtime, model, tools, memory, approval, and cost or risk controls |
+| Bytewax-oriented | streaming declarations use Bytewax terminology and event envelopes when stream behavior is present |
+| Tenant-aware | package behavior respects tenant context and ownership boundaries |
+| Evidence-driven | readiness advances only when commands prove the current repository state |
+
+If a proposed capacity violates an invariant, either adjust the slice or record
+the gap explicitly. Do not bury missing governance, rule, or integration
+behavior behind a broad "future work" sentence.
+
+## Capacity Patterns That Scale
+
+Use these repeatable patterns when building ERP, CRM, finance, operations,
+agentic, and integration capacities:
+
+| Pattern | Use when | First slice |
+| --- | --- | --- |
+| Transaction workbench | users submit, review, approve, or reject business documents | records, validation rules, review screen, approval workflow |
+| Master-data registry | users maintain reusable parties, products, assets, accounts, or policies | records, uniqueness rules, CRUD screen, audit event |
+| Operational monitor | systems emit events that require triage | event record, Bytewax metadata, alert rule, monitor screen |
+| AI-assisted planner | an agent proposes actions under governance | agent runtime, tool list, approval rule, plan route |
+| Compliance evidence loop | actions produce evidence for audit or attestation | evidence record, retention rule, report screen, package test |
+| Integration adapter | APG coordinates with an external system | explicit boundary, config contract, deterministic local adapter stub, not live credentials |
+
+Build the first slice of a pattern end to end before adding more entities. A
+small transaction workbench that compiles and has package guardrails is more
+valuable than a full ERP outline that does not run.
+
 ## Capacity Factory Loop
 
 Use this loop to build capacities quickly without losing executable grounding:

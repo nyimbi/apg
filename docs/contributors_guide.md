@@ -51,6 +51,66 @@ The fastest contributors are not the ones who touch the most files. They are the
 ones who leave the next contributor with fewer unknowns and a command that
 proves the current state.
 
+## Contributor Quick Card
+
+Use this card when you have no prior APG context.
+
+```text
+1. Run git status and avoid unrelated files.
+2. Compile one known example and run its smoke test.
+3. Choose one lane: docs, example, compiler, capability, capacity, or tooling.
+4. Write a packet with outcome, files, public contract, proof, and non-goals.
+5. Edit only that packet.
+6. Run focused proof and inspect the output.
+7. Update docs/progress_log.md when behavior, readiness, or evidence changed.
+8. Stage only the packet, run git diff --cached --check, commit, push.
+```
+
+If you are unsure where to help, run:
+
+```bash
+./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg docs audit --json
+```
+
+Pick the first shallow capability or docs drift you can fix without new
+dependencies. A small verified improvement is better than a large unproven
+branch.
+
+## Contributor Effectiveness Standard
+
+A contributor is immediately effective when their packet leaves APG in a state
+that another contributor can extend without a meeting.
+
+| Standard | What it means in APG |
+| --- | --- |
+| Clear owner | the diff has one primary owning directory or module |
+| Executable outcome | source compiles, generated app runs, package publish-plans, or docs audit proves navigation |
+| Public contract named | JSON keys, routes, capability IDs, rules, services, screens, workflows, agents, or commands are explicit |
+| Focused proof | one or two commands prove the changed layer |
+| Honest boundary | missing integrations and untested paths are named |
+| Handoff trail | README, guide, cap spec, or progress log explains next work |
+
+Do not wait to understand all of APG before contributing. Understand the packet,
+its owner, and its proof deeply enough that the next person can build on it.
+
+## First PR Day Plan
+
+Use this plan for a new contributor's first day:
+
+| Time | Action | Output |
+| --- | --- | --- |
+| 0-15 min | run worktree, CLI, and compile smoke checks | local baseline known |
+| 15-45 min | read one guide plus one owning package/example/test | packet context known |
+| 45-60 min | write the packet and non-goals | reviewable scope |
+| 60-180 min | implement the smallest vertical slice | changed files |
+| 180-220 min | run focused proof and docs/diff checks | evidence |
+| 220-240 min | update progress log, commit, push | durable handoff |
+
+If the proof fails after the timebox, narrow the packet rather than expanding
+scope. Leave a precise progress-log note only when you have real evidence or a
+clear blocker.
+
 ## Same-Day Contribution Choices
 
 Choose work that can be made real and reviewed the same day. If you are new,

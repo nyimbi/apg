@@ -10376,6 +10376,21 @@ Battery-conscious verification:
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 60 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- capabilities/common/edge/__init__.py capabilities/common/edge/models.py capabilities/common/edge/edge_engine.py capabilities/common/edge/service.py capabilities/common/edge/api.py capabilities/common/edge/views.py capabilities/common/edge/test_capability_contract.py capabilities/common/edge/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
 
+### 2026-05-29 11:41 EAT
+
+Developer, contributor, and capacity guide immediate-effectiveness expansion:
+
+- Expanded `docs/developer_guide.md` with an immediate effectiveness contract, APG developer mental model, and high-leverage first-commit table so new developers can choose packet scope, owner paths, public contracts, proof commands, and non-goals before editing.
+- Expanded `docs/contributors_guide.md` with a contributor quick card, effectiveness standard, and first PR day plan so new contributors can get from baseline checks to a committed packet without broad repository reading.
+- Expanded `docs/capacity_development_guide.md` with a capacity developer quickstart, capacity design invariants, and repeatable capacity patterns for ERP, CRM, finance, operations, AI-agent, streaming, compliance, and integration slices.
+- Kept the docs focused on executable APG reality: parseable source, semantic model, generated Python, capability packages, rules, screens, workflows, agents, Bytewax metadata, focused proof, progress-log handoff, and small commits.
+
+Battery-conscious verification:
+
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` passed with no whitespace errors before this progress-log entry.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
+
 ### 2026-05-29 10:47 EAT
 
 Executable DIST distributed-computing runtime slice:
