@@ -75,6 +75,73 @@ Do not use the first contribution to redesign the grammar, replace the
 generator, or normalize historical archives. Those can be good later tasks, but
 they are poor onboarding slices because they have large blast radius.
 
+## New Contributor Work Packets
+
+Use a work packet when assigning or claiming APG work. It should fit in one
+commit unless the evidence says it must be split.
+
+```text
+Outcome:
+Owner:
+Lane:
+Files expected:
+Public names affected:
+Example or fixture:
+Verification:
+Docs to update:
+Known non-goals:
+```
+
+Example work packets:
+
+| Packet | Files expected | Verification |
+| --- | --- | --- |
+| Add one generator route to expose a semantic-model section | `compiler/code_generator.py`, focused generator test, one example output if needed | compile representative example, smoke test |
+| Make one capability package publish-plan ready | one `capabilities/<domain>/<code>/` tree | package tests, capability audit, publish-plan |
+| Add one author-facing APG construct | grammar, AST, semantic model, docs, fixture | parser/semantic tests, compile example |
+| Improve one onboarding path | `docs/*.md`, `docs/progress_log.md` | docs audit and diff check |
+
+Good work packets have a visible endpoint. Poor packets say "clean up
+capabilities" or "improve compiler" without a source file, generated artifact,
+or command that proves completion.
+
+## Immediate Effectiveness Rules
+
+Follow these rules until you know the repository well:
+
+- Start from a numbered example or one capability package, not from a broad
+  search across the whole tree.
+- Prefer one vertical slice over many partial edits.
+- Keep public names stable: capability IDs, routes, JSON keys, rule names,
+  workflow names, agent names, and screen names.
+- Treat `apg.*.v1` JSON formats as contracts.
+- Preserve dependency-light generated Python output.
+- Use package contracts as the bridge between APG source and durable runtime
+  behavior.
+- Update docs only with behavior that exists now, or label the gap explicitly.
+- Record actual verification output in `docs/progress_log.md`.
+
+When in doubt, make the next smallest executable state real: parseable source,
+semantic JSON, generated app, capability contract, package evidence, or docs
+that make one of those easier to extend.
+
+## Picking Safe Parallel Work
+
+Multiple contributors can move quickly if each owns a different surface. Use
+these patterns:
+
+| Safe in parallel | Why it works | Merge coordination |
+| --- | --- | --- |
+| One contributor edits a capability package while another edits docs | Mostly disjoint files | Agree on capability ID and public wording |
+| One contributor adds examples while another improves package tests | Output paths differ | Coordinate if compiler output is regenerated |
+| One contributor works on CLI docs while another works on compiler internals | Docs can track current command names | Re-run docs audit after CLI changes |
+| One contributor improves a generated route while another validates contracts | Different runtime layers | Re-run representative compile and capability audit |
+
+Avoid parallel edits to `spec/apg.g4`, `compiler/semantic_model.py`, and
+`compiler/code_generator.py` without agreeing on the public semantic model key
+first. These files define shared contracts and small naming conflicts can
+create large downstream drift.
+
 ## Contribution Principles
 
 Good contributions:

@@ -75,6 +75,95 @@ Known gaps:
 Keep the blueprint current as implementation lands. It should describe current
 executable behavior, not the full future vision.
 
+## Capacity Development Packet
+
+Before editing code, write a small packet in the capacity README or design note.
+This gives parallel contributors enough context to move without private
+discussion.
+
+```text
+Capacity:
+Current readiness level:
+Next readiness level:
+Business event that proves value:
+APG example path:
+Capability package paths:
+Public routes:
+Semantic model keys:
+Rules to enforce:
+Screens to expose:
+Workflows to run:
+Agents to declare:
+Streaming flows:
+Package evidence:
+Focused verification:
+Docs touched:
+Out of scope for this slice:
+```
+
+Example packet:
+
+```text
+Capacity: Procurement approval automation
+Current readiness level: L2 semantic
+Next readiness level: L3 generated
+Business event that proves value: submit request -> rule evaluation -> review route
+APG example path: examples/13_procurement_approval_workbench/main.apg
+Capability package paths: capabilities/scm/pom, capabilities/common/audl
+Public routes: /procurement/approvals, /self-test
+Semantic model keys: capabilities, screens, workflows, agents
+Rules to enforce: supplier_required, amount_positive, large_request_review
+Screens to expose: ProcurementApprovalWorkbench
+Workflows to run: ProcurementApprovalFlow
+Agents to declare: ProcurementPlanner
+Streaming flows: procurement_events -> procurement_alerts through Bytewax metadata
+Package evidence: publish-plan for procurement capability package
+Focused verification: compile --verify, smoke_test.py, capability audit
+Docs touched: example README, capacity guide, progress log
+Out of scope for this slice: external supplier API integration
+```
+
+The packet should become more specific as the capacity matures. Replace broad
+phrases such as "AI integration" with concrete agent names, tool references,
+rules, and generated inspection surfaces.
+
+## Capacity Team Roles
+
+When building a capacity in parallel, split work by durable ownership rather
+than by vague implementation layers.
+
+| Role | Owns | Produces | Verification |
+| --- | --- | --- | --- |
+| Capacity lead | README packet, public names, readiness level, progress log | coherent slice boundary | docs audit and final evidence review |
+| Language/compiler owner | APG source shape, semantic model, generated output | parseable and compilable APG | model, graph, compile, baseline checks |
+| Capability owner | package contract, services, rules, UI contract, package evidence | reusable capability package | package tests, validate-contracts, audit, publish-plan |
+| Runtime owner | generated app behavior, routes, helpers, smoke tests | executable Python app | compile `--verify`, self-test, smoke test, HTTP probes |
+| Documentation owner | example README, guide updates, known gaps | contributor handoff docs | docs audit and diff check |
+
+One person can hold multiple roles for a small capacity. The important rule is
+that every role has a concrete artifact and verification command.
+
+## Capacity Backlog Shape
+
+Track capacity work as executable backlog items:
+
+```text
+L2 -> L3: Generate workflow route for ProcurementApprovalFlow
+Files: compiler/code_generator.py, tests/test_generated_workflow_runtime.py
+Proof: compile examples/13_procurement_approval_workbench/main.apg --verify
+Non-goal: external ERP procurement API
+```
+
+Avoid backlog items like:
+
+```text
+Improve procurement
+Add AI
+Make workflows better
+```
+
+They do not tell a contributor where to edit, what to prove, or what to avoid.
+
 ## Minimum File Shape
 
 A serious capacity usually has one APG example plus one or more package-backed

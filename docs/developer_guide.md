@@ -94,6 +94,109 @@ Then compare the source in `examples/20_enterprise_erp_platform/main.apg` with
 the generated `semantic_model.json`, `app.py`, `apg_capabilities.py`, and
 `apg_application.py`.
 
+## First-Day Execution Checklist
+
+Use this checklist when onboarding yourself or another contributor. It is
+ordered to create useful context before broad reading.
+
+1. Confirm the worktree:
+
+   ```bash
+   git status --short
+   ```
+
+2. Confirm the installed APG command:
+
+   ```bash
+   ./.venv/bin/apg version
+   ./.venv/bin/apg --help
+   ```
+
+3. Compile one small application:
+
+   ```bash
+   ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-first --verify
+   ./.venv/bin/python /tmp/apg-first/smoke_test.py
+   ```
+
+4. Inspect one rich application:
+
+   ```bash
+   ./.venv/bin/apg model examples/20_enterprise_erp_platform/main.apg --json
+   ./.venv/bin/apg graph-suite examples/20_enterprise_erp_platform/main.apg --json
+   ```
+
+5. Inspect capabilities:
+
+   ```bash
+   ./.venv/bin/apg capabilities validate-contracts --json
+   ./.venv/bin/apg capabilities audit --json
+   ```
+
+6. Pick one narrow lane from the contributor task table and make a vertical
+   slice.
+
+Do not spend the first day reading every capability package. APG has enough
+historical material that broad reading can become unproductive. Read the slice
+you intend to change, prove one behavior, and leave the next contributor with
+better evidence than you found.
+
+## How To Move APG Forward
+
+Every useful APG change should increase one of these forms of executable
+reality:
+
+| Improvement | What it means | Best proof |
+| --- | --- | --- |
+| Parseability | Authors can write accepted APG source | parser golden or example baseline |
+| Semantics | Tools can understand the source as stable JSON | `apg model ... --json` |
+| Executability | The compiler emits a runnable Python app | `apg compile ... --verify` and smoke test |
+| Composability | Capabilities, screens, workflows, agents, and apps connect cleanly | graph/model/capability audits |
+| Operability | Package-backed behavior can be inspected and self-tested | capability audit and publish-plan |
+| Contributor speed | The next person can extend the slice without guessing | docs, README, progress log |
+
+If a change only adds more files without increasing one of those outcomes, it is
+probably not the next best change.
+
+## Common Implementation Recipes
+
+Use these recipes to avoid losing time on repo navigation.
+
+Add or adjust APG syntax:
+
+1. Edit `spec/apg.g4`.
+2. Regenerate parser artifacts only when the generated files need to change.
+3. Update `compiler/ast_builder.py`.
+4. Update `compiler/semantic_analyzer.py` and `compiler/semantic_model.py`.
+5. Update `compiler/code_generator.py` if the syntax should execute.
+6. Add fixtures or example source.
+7. Run parser, semantic, and compile checks for the touched feature.
+
+Add a generated runtime surface:
+
+1. Find the semantic model key consumed by the generator.
+2. Update `compiler/code_generator.py`.
+3. Compile a representative numbered example to `/tmp`.
+4. Run the generated `smoke_test.py`.
+5. Refresh checked-in example outputs only when the compiler output contract
+   intentionally changed.
+
+Add a capability package:
+
+1. Scaffold or create `capabilities/<domain>/<code>/`.
+2. Keep `capability_contract.py`, service code, views, `app.py`,
+   `semantic_model.json`, package manifest, release report, and tests aligned.
+3. Validate contracts, run focused package tests, and run publish-plan.
+4. Add or update the APG example that composes the capability.
+
+Add a new capacity:
+
+1. Start with a capacity README blueprint.
+2. Add a parseable APG example.
+3. Add or update package-backed capability contracts.
+4. Compile and smoke-test.
+5. Document extension points and known gaps.
+
 ## How To Read The Codebase
 
 Read APG from contracts outward:

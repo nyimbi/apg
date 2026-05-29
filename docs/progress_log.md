@@ -16,6 +16,33 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 07:47 EAT
+
+Contributor acceleration documentation slice:
+
+- Expanded `docs/developer_guide.md` with a first-day execution checklist,
+  explicit executable-reality outcomes, and common implementation recipes for
+  syntax, generator, capability-package, and capacity work.
+- Expanded `docs/contributors_guide.md` with work-packet templates, immediate
+  effectiveness rules, and parallel-work guidance so new contributors can claim
+  scoped APG work without guessing ownership boundaries.
+- Expanded `docs/capacity_development_guide.md` with a capacity development
+  packet, capacity team roles, and executable backlog shape so capacity work can
+  move from readiness level to readiness level with clear proof.
+
+Verification:
+
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 55 documented commands, 0 broken local links, 0 unknown
+  documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- This slice improves contributor execution guidance only. It does not add new
+  compiler, generator, or capability runtime behavior.
+
 ### 2026-05-29 07:40 EAT
 
 Capability operability audit slice:
