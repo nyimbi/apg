@@ -11267,3 +11267,27 @@ Battery-conscious verification:
 
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 60 local links checked, 46 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors before recording this progress-log entry.
+
+### 2026-05-29 15:52 EAT
+
+Executable KNGR knowledge-graph runtime slice:
+
+- Converted `capabilities/common/kngr` from generated materialized records into a domain-specific knowledge graph runtime.
+- Replaced generic records with knowledge sources, resolved entities, semantic relationships, enrichments, reasoning paths, curation records, graph publications, and audit events.
+- Added `knowledge_runtime.py` with deterministic IDs, confidence normalization, reasoning depth, publication posture, relationship status, entity curation status, and context-neighborhood helpers.
+- Added `KngrService` behavior for source registration, entity resolution, relationship linking, semantic enrichment, bounded reasoning, curation, graph publication, context exploration, dashboard summaries, compatibility records, and APG rule enforcement.
+- Expanded API and view helpers so KNGR exposes source/entity/relationship inventory, curation queues, reasoning paths, context neighborhoods, governance state, audit events, publications, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and the explicit external graph, ontology, search, NLPC, META, audit, Bytewax, vector-store, and reasoning-engine adapter boundary.
+- Added focused contract/service tests for successful source-entity-relationship-enrichment-reasoning-curation-publication lifecycle execution and guardrails around tenant context, source ownership, source evidence, low-confidence review, reasoning evidence, deep-reasoning review, graph curation, and tenant isolation.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/kngr/__init__.py capabilities/common/kngr/models.py capabilities/common/kngr/knowledge_runtime.py capabilities/common/kngr/service.py capabilities/common/kngr/api.py capabilities/common/kngr/views.py capabilities/common/kngr/test_capability_contract.py capabilities/common/kngr/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/kngr/test_capability_contract.py capabilities/common/kngr/tests` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package|Materialized capability package" capabilities/common/kngr` returned no remaining KNGR baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.kngr.models','capabilities.common.kngr.knowledge_runtime','capabilities.common.kngr.service','capabilities.common.kngr.api','capabilities.common.kngr.views']]; print('kngr imports ok')"` passed with `kngr imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/kngr --json` passed with `ok: true`; `kngr` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/kngr --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 82, materialized baseline packages dropped to 25, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 897, and warning count dropped to 27. The next implementation-depth warning is `logt`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 60 local links checked, 46 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
