@@ -16,6 +16,70 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 12:50 EAT
+
+FEDL implementation-depth slice:
+
+- Replaced FEDL generic record/service/API/view helpers with a domain-specific
+  federated learning runtime.
+- Added `federated_engine.py` for deterministic participant update digests,
+  poisoning-signal detection, aggregation digests, and model version IDs.
+- Rebuilt `models.py` around federations, attested participants, training
+  rounds, model updates, aggregation results, federated model registry entries,
+  and audit events.
+- Rebuilt `service.py`, `api.py`, and `views.py` around federation creation,
+  participant registration, round approval and startup, update submission,
+  secure aggregation, privacy-budget summaries, model registry views,
+  federation consoles, round monitors, and compatibility helpers.
+- Rewrote `cap_spec.md` so the package specification describes executable FEDL
+  behavior and the production integration boundary instead of generated package
+  scaffolding.
+- Expanded FEDL focused tests for a full federated-learning lifecycle and
+  policy failures for missing tenant context, data residency, participant
+  attestation, participant contracts, minimum participants, missing round
+  approval, privacy-budget review, federation privacy limits, invalid updates,
+  missing secure aggregation, and poisoning signals.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/fedl/__init__.py
+  capabilities/common/fedl/models.py
+  capabilities/common/fedl/federated_engine.py
+  capabilities/common/fedl/service.py capabilities/common/fedl/api.py
+  capabilities/common/fedl/views.py
+  capabilities/common/fedl/test_capability_contract.py
+  capabilities/common/fedl/tests/test_materialized_package.py` -> passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/common/fedl` -> no matches.
+- `./.venv/bin/pytest -q capabilities/common/fedl/test_capability_contract.py
+  capabilities/common/fedl/tests/test_materialized_package.py` -> 8 passed
+  with 10 pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/fedl --json` -> passed with FEDL classified as
+  `domain_specific`, 1 custom Python file, 0 baseline markers, 0 errors, and 0
+  warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/fedl --json`
+  -> passed with runtime self-test loaded, release evidence ok, and
+  side-effect-free catalog patch.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  74 domain-specific packages, 31 materialized-baseline packages, 3 mixed
+  packages, 1 contract-only package, 891 custom Python files, 0 errors, and 35
+  warnings; next warning is `geos`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+
+Known remaining gaps:
+
+- FEDL is now domain-specific, but implementation-depth still reports 31
+  materialized baselines, 3 mixed implementations, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is `geos`.
+
 ### 2026-05-29 12:39 EAT
 
 ESGN implementation-depth slice:

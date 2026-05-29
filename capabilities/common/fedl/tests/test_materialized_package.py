@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""FEDL package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import importlib.util
 import sys
 
 from capabilities.capability_contract_registry import validate_contract_shape
+from capabilities.common.fedl.service import FedlService
+from capabilities.common.fedl.views import dashboard_model
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
@@ -44,3 +46,25 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "fedl" in model["capabilities"]
+
+
+def test_package_runtime_compatibility_surface_creates_federation():
+	service = FedlService()
+
+	record = service.create_record(
+		record_id="fed-compat",
+		tenant_id="tenant-test",
+		metadata={
+			"name": "Compatibility Federation",
+			"coordinator": "compat-coordinator",
+			"model_family": "tabular",
+			"objective_metric": "auc",
+			"data_residency_regions": ["ke"],
+		},
+	)
+	model = dashboard_model(service, "tenant-test")
+
+	assert record["id"] == "fed-compat"
+	assert record["status"] == "active"
+	assert model["summary"]["federation_count"] == 1
+	assert model["federations"][0]["coordinator"] == "compat-coordinator"
