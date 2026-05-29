@@ -39,6 +39,23 @@ Known remaining gaps:
 - Full live gateway network runtime still needs verification with installed gateway extras and Redis; this slice keeps service-layer behavior executable without requiring those runtime services.
 - Existing Pydantic/SQLAlchemy deprecation warnings remain and should be handled in a separate compatibility cleanup slice.
 
+### 2026-05-29 03:20 EAT
+
+Compiler executable-app checkpoint:
+
+- Rechecked the current compiler-to-generated-app path after the API Management slice.
+- A fresh compile of `examples/20_enterprise_erp_platform/main.apg` produced generated Python artifacts in a temporary output directory.
+- The generated `smoke_test.py` ran successfully against the generated app and returned exit code 0.
+
+Verification:
+
+- `./.venv/bin/python -c 'from pathlib import Path; from tempfile import TemporaryDirectory; import subprocess, sys; from compiler.compiler import compile_apg_file; source=Path("examples/20_enterprise_erp_platform/main.apg"); td=TemporaryDirectory(); out=Path(td.name); result=compile_apg_file(source, out); assert result.success, [str(e) for e in result.errors]; completed=subprocess.run([sys.executable, "smoke_test.py"], cwd=out, text=True, capture_output=True, timeout=20); print({"returncode": completed.returncode, "stdout_prefix": completed.stdout[:300], "stderr": completed.stderr[:300]}); td.cleanup(); raise SystemExit(completed.returncode)'` -> exit code 0.
+
+Known remaining gaps:
+
+- This proves the generated dependency-free app smoke contract for one enterprise ERP example, not the full runtime behavior of every capability package.
+- The next compiler-facing slice should expand executable generation where APG language constructs still compile only to metadata rather than behavior.
+
 ### 2026-05-26 01:35 EAT
 
 Completed and pushed:
