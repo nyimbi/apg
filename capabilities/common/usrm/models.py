@@ -1,24 +1,30 @@
-"""Data models for the User Management capability."""
+"""User Management data models."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from .user_runtime import (
+	AccessReviewRecord,
+	BulkUserActionRecord,
+	DeprovisionRecord,
+	RoleAssignmentRecord,
+	UserAuditEventRecord,
+	UserInvitationRecord,
+	UserProfileRecord,
+	UserRecord,
+)
 
 
-@dataclass
-class UsrmRecord:
-	"""Tenant-scoped dependency-light capability record."""
+UsrmRecord = UserRecord
 
-	id: str
-	tenant_id: str
-	status: str = "active"
-	metadata: dict[str, Any] = field(default_factory=dict)
 
-	def to_dict(self) -> dict[str, Any]:
-		return {
-			"id": self.id,
-			"tenant_id": self.tenant_id,
-			"status": self.status,
-			"metadata": dict(self.metadata),
-		}
+__all__ = [
+	"AccessReviewRecord",
+	"BulkUserActionRecord",
+	"DeprovisionRecord",
+	"RoleAssignmentRecord",
+	"UserAuditEventRecord",
+	"UserInvitationRecord",
+	"UserProfileRecord",
+	"UserRecord",
+	"UsrmRecord",
+]

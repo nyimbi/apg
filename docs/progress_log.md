@@ -16,6 +16,64 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 19:47 EAT
+
+USRM user-management runtime implementation-depth slice:
+
+- Converted `capabilities/common/usrm` from generated materialized record
+  scaffolding into a domain-specific user lifecycle runtime package.
+- Added `user_runtime.py` with deterministic IDs, user/invitation/role/review
+  status vocabularies, access-review decision validation, rule required-action
+  extraction, UTC timestamps, and serializable records for users, profiles,
+  invitations, role assignments, access reviews, deprovisioning, bulk actions,
+  and audit events.
+- Replaced the generic record model with user, profile, invitation, role
+  assignment, access review, deprovision, bulk action, and audit-event records.
+- Replaced generic service behavior with `UsrmService` lifecycle methods for
+  tenant-scoped user creation, unique identity enforcement, profile/privacy
+  updates, consented invitations, privileged role MFA enforcement, access
+  review evidence, access-revocation-backed deprovisioning, bulk suspend
+  review, dashboard summaries, compatibility records, and audit events.
+- Expanded API and view helpers so USRM exposes user status, directory, profile
+  manager, lifecycle queue, access review, privacy preferences,
+  deprovisioning, settings, route, rule, and theme composition surfaces.
+- Rewrote `cap_spec.md` around current executable USRM behavior, adapter
+  boundaries, UI surfaces, theme metadata, known non-goals, and proof commands.
+- Replaced generated package tests with focused lifecycle, package-publish,
+  guardrail, and view-model tests.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/usrm` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/usrm/__init__.py
+  capabilities/common/usrm/models.py capabilities/common/usrm/user_runtime.py
+  capabilities/common/usrm/service.py capabilities/common/usrm/api.py
+  capabilities/common/usrm/views.py
+  capabilities/common/usrm/capability_contract.py capabilities/common/usrm/app.py
+  capabilities/common/usrm/test_capability_contract.py
+  capabilities/common/usrm/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -c "import importlib; ..."` for USRM `user_runtime`,
+  service, API, views, and capability contract passed with `usrm imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/usrm/test_capability_contract.py
+  capabilities/common/usrm/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/usrm --json` passed with `usrm` classified as
+  `domain_specific`, `user_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/usrm --json`
+  passed with `ok: true`, warnings empty, and side-effect-free catalog patch
+  evidence.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 104
+  domain-specific packages, 5 materialized-baseline packages, 0 mixed
+  implementations, 0 contract-only packages, 918 custom Python files, 0 errors,
+  and 5 warnings; the next implementation-depth target is `vidc`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
 ### 2026-05-29 19:40 EAT
 
 THEM UI/UX theming and branding runtime implementation-depth slice:
