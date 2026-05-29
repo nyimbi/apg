@@ -58,6 +58,59 @@ downstream surfaces can consume it:
 | `docs/` | User, contributor, developer, grammar, tooling, standards, and progress docs. |
 | `vscode-extension/` | APG VS Code integration metadata. |
 
+## Immediate Operating Model
+
+Use this model for the first day in the codebase:
+
+1. **Orient on the executable path.** Run `./.venv/bin/apg --help`, inspect
+   `cli/main.py`, then compile one numbered example. Do not start by reading
+   every historical file.
+2. **Pick one vertical slice.** A useful slice crosses from APG source to a
+   generated app, CLI report, capability package, fixture, or documentation
+   proof.
+3. **Find the owning layer.** Grammar edits start in `spec/apg.g4`; generated
+   runtime edits start in `compiler/code_generator.py`; capability package work
+   starts under `capabilities/<domain>/<code>/`; CLI work starts in `cli/`.
+4. **Preserve the public contract.** Existing JSON `format` values, generated
+   files, route names, semantic model keys, and CLI command names are public
+   unless a migration is intentionally documented.
+5. **Prove the result narrowly.** Use focused tests and CLI audits first. Run
+   broader checks only when shared compiler/tooling contracts changed.
+6. **Record the evidence.** Update `docs/progress_log.md` with the actual
+   commands and outcomes.
+7. **Commit the verified slice.** Stage only the files you changed for the
+   slice and use the Lore commit protocol.
+
+The fastest path to understanding APG is to trace one example:
+
+```bash
+./.venv/bin/apg model examples/20_enterprise_erp_platform/main.apg --json
+./.venv/bin/apg graph-suite examples/20_enterprise_erp_platform/main.apg --json
+./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify
+./.venv/bin/python /tmp/apg-erp/smoke_test.py
+```
+
+Then compare the source in `examples/20_enterprise_erp_platform/main.apg` with
+the generated `semantic_model.json`, `app.py`, `apg_capabilities.py`, and
+`apg_application.py`.
+
+## How To Read The Codebase
+
+Read APG from contracts outward:
+
+- **Language contract:** `spec/apg.g4`, parser golden fixtures, language docs.
+- **Meaning contract:** AST builder, semantic analyzer, semantic model.
+- **Execution contract:** code generator, generated app routes/helpers, smoke
+  tests.
+- **Composition contract:** capability registry, application composition,
+  screen composition, AI agent composition, workflow surfaces.
+- **Evidence contract:** CLI JSON reports, tooling audit, compiler baseline,
+  docs audit, release/evidence commands.
+
+Do not treat old planning documents, archived grammar drafts, or aspirational
+reports as current behavior. Current behavior is what the source, generated
+artifacts, CLI reports, and focused tests prove.
+
 ## Environment Setup
 
 This repository is currently a `setup.py` project. Use `uv` to create and manage
@@ -145,6 +198,24 @@ state, uploads, generated experiments, and nested capability worktrees.
 | New capability package | `capabilities/<domain>/<code>/` | contract validation and focused capability tests |
 | New capacity | APG source, capability packages, examples, docs | compile, smoke, contract validation, progress log |
 | New docs | `docs/` | `git diff --check -- docs` and current command examples |
+
+## New Contributor Task Lanes
+
+Choose one lane and stay inside it until the slice is verified:
+
+| Lane | Good first outcome | Main files | Proof |
+| --- | --- | --- | --- |
+| Docs | Clarify one current workflow and link it from the docs index | `docs/*.md` | `./.venv/bin/apg docs audit --json` |
+| Example | Improve or add a parseable numbered example | `examples/<nn>_*/main.apg`, `README.md`, `output/` | `./.venv/bin/apg baseline examples --json` |
+| Generator | Make generated apps expose one more real surface | `compiler/code_generator.py` | compile `--verify`, smoke test, focused generator tests |
+| Semantic | Add one stable semantic-model projection | `compiler/ast_builder.py`, `semantic_analyzer.py`, `semantic_model.py` | semantic model fixture tests |
+| Capability | Build one package-backed capability contract | `capabilities/<domain>/<code>/` | capability validation and package tests |
+| CLI | Add one JSON-producing command or report field | `cli/`, `compiler/<surface>.py` | focused CLI test and tooling audit |
+| Capacity | Compose records, rules, screens, workflows, agents, and capabilities into an executable ability | example, capability package, docs | compile, smoke, capability validation |
+
+If a task crosses three or more lanes, split it into smaller commits with a
+clear dependency order. For example, add semantic model support first, then
+generator behavior, then examples/docs.
 
 ## Grammar Work
 
@@ -283,6 +354,31 @@ Use [Capacity Development Guide](./capacity_development_guide.md) when building
 new business or platform abilities. Use [Capability Building Standards](./capability_standards.md)
 for the package and contract details.
 
+For a new capacity, start with this minimum file set:
+
+```text
+examples/<nn>_<capacity_name>/
+  main.apg
+  README.md
+  output/
+
+capabilities/<domain>/<code>/
+  cap_spec.md
+  capability_contract.py
+  models.py
+  service.py
+  api.py
+  views.py
+  app.py
+  tests/
+
+docs/<capacity_name>.md
+```
+
+Do not build a large ERP capacity as only Python package code. It should be
+visible in APG source, the semantic model, generated app output, capability
+contracts, and docs.
+
 ## CLI And Tooling Work
 
 Every durable command should have:
@@ -352,7 +448,7 @@ Use the narrowest lane that proves the claim.
 | Lint | `./.venv/bin/apg lint --audit-fixtures --json` |
 | Validate | `./.venv/bin/apg validate path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target python --json` |
 | Generator | `./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --catalog /tmp/apg-capability-catalog.json --output /tmp/apg-erp --verify` |
-| Compiler baseline | `./.venv/bin/apg baseline examples --json` for numbered examples, generated source hygiene, checked-in output sync, direct checked-output self-test/smoke-test execution, checked-output HTTP contract route probes, graph, model, and release agreement; use `./.venv/bin/apg baseline examples --refresh-outputs --json` only when intentionally regenerating example outputs |
+| Compiler baseline | `./.venv/bin/apg baseline examples --json` for numbered examples, generated source hygiene, checked-in output sync, direct checked-output self-test/smoke-test execution, checked-output HTTP contract route probes, domain HTTP probes for records/workflows/capabilities, graph, model, and release agreement; use `./.venv/bin/apg baseline examples --refresh-outputs --json` only when intentionally regenerating example outputs |
 | Release/package | `./.venv/bin/apg package path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-package --json` |
 | Evidence bundle | `./.venv/bin/apg evidence path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-evidence --json` |
 | Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` |

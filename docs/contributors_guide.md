@@ -48,6 +48,33 @@ Then read these in order:
 6. [Tooling Specification](./tooling.md)
 7. [Goal Progress Log](./progress_log.md)
 
+## First 90 Minutes
+
+After the first baseline commands pass, do one small useful thing end to end:
+
+1. Run `git status --short` and note unrelated dirty files.
+2. Pick one task lane: docs, example, semantic model, generator, capability,
+   CLI, or capacity.
+3. Read one existing test for that lane.
+4. Make the smallest change that improves executable reality.
+5. Run the focused verification for that lane.
+6. Update docs or `docs/progress_log.md` when behavior or evidence changed.
+7. Stage only your slice.
+8. Commit with Lore trailers and push.
+
+Good first 90-minute contributions:
+
+- add a missing docs link and run the docs audit;
+- tighten one numbered example README and prove the baseline still passes;
+- add one lint fixture for an existing diagnostic;
+- improve one generated app smoke assertion;
+- add one capability contract default and focused package test;
+- document one verified CLI JSON field in `docs/tooling.md`.
+
+Do not use the first contribution to redesign the grammar, replace the
+generator, or normalize historical archives. Those can be good later tasks, but
+they are poor onboarding slices because they have large blast radius.
+
 ## Contribution Principles
 
 Good contributions:
@@ -71,6 +98,33 @@ Avoid:
 - hiding external services behind untestable placeholders;
 - staging unrelated dirty files;
 - broad cleanup mixed into feature work.
+
+## Capacity Contributor Mental Model
+
+When building a new APG capacity, think in layers:
+
+```text
+business outcome
+  -> APG records and relationships
+  -> capability contracts
+  -> deterministic rules
+  -> screens and workflows
+  -> AI agents and Bytewax streaming when needed
+  -> generated Python application
+  -> tests, docs, and evidence
+```
+
+A capacity is not accepted because it has many files. It is accepted when a
+contributor can compile it, run it, inspect its generated routes/manifests, and
+extend it without guessing the missing contract.
+
+Use these questions before coding:
+
+- What concrete workflow or business ability will exist after this slice?
+- Which APG source file proves it?
+- Which capability package owns the behavior?
+- Which route, helper, CLI report, or test shows it executes?
+- Which docs tell the next contributor where to extend it?
 
 ## Worktree Hygiene
 
@@ -123,6 +177,24 @@ example, adding a new author-facing screen feature usually means:
 8. progress log records the evidence.
 
 Small vertical slices are preferred over large partial changes.
+
+## Parallel Contribution Protocol
+
+APG work can proceed quickly when contributors avoid shared-file collisions.
+Use these ownership boundaries:
+
+| Contributor lane | Owns | Coordinates before touching |
+| --- | --- | --- |
+| Grammar | `spec/apg.g4`, parser artifacts, parser fixtures | generator and semantic-model files |
+| Compiler semantics | AST, analyzer, semantic model, fixture catalogs | grammar and generator behavior |
+| Generator | `compiler/code_generator.py`, generated output fixtures | semantic model keys and example outputs |
+| Capability package | one `capabilities/<domain>/<code>/` tree | shared capability registry behavior |
+| Example capacity | one `examples/<nn>_*/` tree | compiler output refreshes |
+| Docs | relevant `docs/*.md` page and progress log | command examples and public terminology |
+
+Before merging parallel work, align public names: capability IDs, provided
+services, route paths, workflow names, screen names, agent names, event names,
+and JSON field names.
 
 ## Coding Standards
 
@@ -228,6 +300,20 @@ slice should include:
 - Bytewax streaming metadata where event flow matters;
 - generated application proof;
 - tests and documentation.
+
+Minimum capacity evidence:
+
+```bash
+./.venv/bin/apg compile path/to/capacity.apg --output /tmp/apg-capacity --verify
+./.venv/bin/python /tmp/apg-capacity/smoke_test.py
+./.venv/bin/apg capabilities validate-contracts --json
+```
+
+For numbered examples or compiler-facing capacity work, also run:
+
+```bash
+./.venv/bin/apg baseline examples --json
+```
 
 ## Commit Protocol
 

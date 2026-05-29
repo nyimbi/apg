@@ -36,6 +36,75 @@ Capacity: Procurement approval automation
 Build capacities as vertical slices. Each slice should be executable before the
 next slice expands scope.
 
+## What "Effective" Means
+
+A contributor is effective on a capacity when they can answer five questions
+without private context:
+
+- What user or system outcome does the capacity provide?
+- Which APG source file declares it?
+- Which package-backed capabilities implement the durable behavior?
+- Which generated app route, helper, manifest, or smoke test proves it runs?
+- Which focused command should be run before committing the next slice?
+
+If any answer is missing, add the missing contract before adding more behavior.
+Capacity work should reduce ambiguity for the next contributor.
+
+## Capacity Blueprint
+
+Start each capacity with this compact blueprint in its README or design note:
+
+```text
+Name:
+Outcome:
+Primary users:
+Tenant/security boundary:
+Records owned:
+Capabilities provided:
+Capabilities required:
+Rules:
+Screens:
+Workflows:
+Agents:
+Streaming:
+Generated routes/helpers:
+Tests:
+Known gaps:
+```
+
+Keep the blueprint current as implementation lands. It should describe current
+executable behavior, not the full future vision.
+
+## Minimum File Shape
+
+A serious capacity usually has one APG example plus one or more package-backed
+capabilities:
+
+```text
+examples/<nn>_<capacity_name>/
+  main.apg
+  README.md
+  output/
+
+capabilities/<domain>/<code>/
+  __init__.py
+  cap_spec.md
+  capability_contract.py
+  models.py
+  service.py
+  api.py
+  views.py
+  app.py
+  semantic_model.json
+  package_manifest.json
+  release_report.json
+  tests/
+```
+
+For early exploration, the APG example can land before the package. Before the
+capacity is considered buildable by others, the package contract and focused
+tests should exist.
+
 ## Capacity Lifecycle
 
 1. Define the outcome.
@@ -52,6 +121,25 @@ next slice expands scope.
 12. Add focused tests.
 13. Document the capacity and update the progress log.
 14. Commit and push the verified slice.
+
+## Capacity Readiness Levels
+
+Use these levels to avoid pretending partial work is complete:
+
+| Level | Meaning | Evidence |
+| --- | --- | --- |
+| L0 idea | Outcome is described but not executable | README/design note only |
+| L1 parseable | APG source parses and appears in docs/examples | parser or baseline proof |
+| L2 semantic | semantic model exposes records, capabilities, screens, workflows, agents, and routes | `apg model ... --json` |
+| L3 generated | compiler emits runnable Python artifacts | `apg compile ... --verify` |
+| L4 operable | generated app smoke test and self-test pass | `smoke_test.py`, `app.py --self-test` |
+| L5 composable | capability contracts validate and dependencies are explicit | `apg capabilities validate-contracts --json` |
+| L6 baseline | numbered example and checked-in output pass the compiler baseline | `apg baseline examples --json` |
+| L7 documented | developer docs and progress log explain extension points and evidence | docs audit or diff check |
+
+Progress one level at a time. A capacity can be useful at L3 or L4, but it
+should be labeled honestly until package contracts, docs, and baseline evidence
+catch up.
 
 ## 1. Define The Outcome
 
@@ -212,6 +300,16 @@ Use dependency capabilities for external checks:
 
 Do not put network calls or external API behavior inside rule strings.
 
+Rule implementation checklist:
+
+- Put deterministic decisions in rule definitions or package service code.
+- Keep model-backed AI suggestions separate from allow/deny decisions unless a
+  human or deterministic rule validates the result.
+- Include priority when rule order matters.
+- Test both passing and failing contexts.
+- Expose rule evaluation through capability inspection or a focused CLI helper
+  when the rule is part of the public contract.
+
 ## 6. Add Screens And Relationships
 
 Screens make a capacity inspectable and operable:
@@ -238,6 +336,15 @@ screens: {
 A good screen declares route, title, layout, contained elements, composed
 elements, bindings, actions, events, and relationships.
 
+Screen development checklist:
+
+- every screen has a stable route;
+- every repeated element has a source entity or capability service;
+- every action maps to a workflow step, service method, or generated handler;
+- relationships are named when they matter to graphs or Studio;
+- theme tokens are declared by the capability or application shell;
+- generated manifests expose the screen so downstream tooling can inspect it.
+
 ## 7. Add Workflows
 
 Use workflows when process state matters:
@@ -256,6 +363,14 @@ workflow ProcurementApprovalFlow {
 
 Generated workflow behavior should expose deterministic step chains, guards,
 waits, retries, run state, resume, and compensation recording.
+
+Workflow development checklist:
+
+- states and transitions are explicit;
+- human tasks and assignments are named;
+- guards are deterministic strings or capability-backed checks;
+- retry and compensation behavior is declared when failure matters;
+- generated smoke tests or HTTP probes can run at least one workflow path.
 
 ## 8. Add AI Agents
 
@@ -286,6 +401,16 @@ Agent standards:
 - use runtime identifiers such as `codex`, `claude_code`, `opencode`, `pi`,
   `openai`, or `ollama`;
 - keep deterministic governance outside the model where possible.
+
+Agent development checklist:
+
+- model and runtime are explicit;
+- provider-specific details are isolated behind adapters or configuration;
+- tools reference capability services, not vague natural-language names;
+- memory is declared only when the generated app can represent it;
+- rules constrain agent use where tenant, security, or approval boundaries
+  matter;
+- generated sidecars or manifests list agents for inspection.
 
 ## 9. Add Bytewax Streaming
 
@@ -417,6 +542,50 @@ Capacities can be built in parallel when ownership is clear:
 
 Parallel lanes must agree on public names: capability IDs, provided services,
 routes, workflow names, agent names, and JSON format keys.
+
+## Slice Planning Templates
+
+Use one of these templates to keep work small.
+
+Language/compiler slice:
+
+```text
+Goal:
+Syntax:
+AST field:
+Semantic model key:
+Generated behavior:
+Fixture/test:
+Docs:
+Verification:
+```
+
+Capability package slice:
+
+```text
+Goal:
+Capability id:
+Provides:
+Requires:
+Configuration:
+Rules:
+UI/routes:
+Tests:
+Verification:
+```
+
+Example capacity slice:
+
+```text
+Goal:
+Example path:
+Records:
+Capability contracts:
+Screens/workflows/agents:
+Generated output change:
+README update:
+Verification:
+```
 
 ## Acceptance Checklist
 

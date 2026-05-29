@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import socket
 import subprocess
@@ -9,6 +11,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -132,6 +135,22 @@ def build_compiler_baseline_report(
 				if example.get("compile_verify", {})
 				.get("checked_output_http", {})
 				.get("ok")
+				is False
+			),
+			"checked_output_domain_http_passed": sum(
+				1
+				for example in example_reports
+				if example.get("compile_verify", {})
+				.get("checked_output_http", {})
+				.get("domain_ok")
+				is True
+			),
+			"checked_output_domain_http_failed": sum(
+				1
+				for example in example_reports
+				if example.get("compile_verify", {})
+				.get("checked_output_http", {})
+				.get("domain_ok")
 				is False
 			),
 			"graph_kinds": list(SUPPORTED_GRAPH_KINDS),
@@ -306,45 +325,223 @@ def _run_checked_output_http_checks(output_dir: Path) -> dict[str, Any]:
 		}
 
 	port = _free_tcp_port()
-	process = subprocess.Popen(
-		[sys.executable, "app.py", "--host", "127.0.0.1", "--port", str(port)],
-		cwd=output_dir,
-		stdout=subprocess.PIPE,
-		stderr=subprocess.PIPE,
-		text=True,
-	)
 	errors: list[str] = []
 	routes: list[dict[str, Any]] = []
-	try:
-		base_url = f"http://127.0.0.1:{port}"
-		started = _wait_for_http_route(base_url + "/health", process)
-		if not started:
-			stdout, stderr = _terminate_process(process)
-			return {
-				"ok": False,
-				"output_dir": str(output_dir),
-				"port": port,
-				"routes": routes,
-				"errors": [
-					f"{output_dir}: HTTP server did not serve /health on port {port}: "
-					f"{stdout.rstrip()} {stderr.rstrip()}".strip()
-				],
-			}
-		for route in ("/health", "/openapi.json", "/component.json", "/semantic-model.json", "/self-test"):
-			result = _fetch_http_route(base_url + route)
-			routes.append({"route": route, **result})
-			if not result["ok"]:
-				errors.append(f"{output_dir}: GET {route} failed with {result['status']}")
-	finally:
-		_terminate_process(process)
+	domain_checks: list[dict[str, Any]] = []
+	with tempfile.TemporaryDirectory(prefix="apg-output-http-") as data_dir_name:
+		env = dict(os.environ)
+		env.pop("APG_API_KEY", None)
+		env["APG_DATA_FILE"] = str(Path(data_dir_name) / "records.json")
+		process = subprocess.Popen(
+			[sys.executable, "app.py", "--host", "127.0.0.1", "--port", str(port)],
+			cwd=output_dir,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			text=True,
+			env=env,
+		)
+		try:
+			base_url = f"http://127.0.0.1:{port}"
+			started = _wait_for_http_route(base_url + "/health", process)
+			if not started:
+				stdout, stderr = _terminate_process(process)
+				return {
+					"ok": False,
+					"output_dir": str(output_dir),
+					"port": port,
+					"routes": routes,
+					"domain_ok": False,
+					"domain_checks": domain_checks,
+					"errors": [
+						f"{output_dir}: HTTP server did not serve /health on port {port}: "
+						f"{stdout.rstrip()} {stderr.rstrip()}".strip()
+					],
+				}
+			for route in ("/health", "/openapi.json", "/component.json", "/semantic-model.json", "/self-test"):
+				result = _fetch_http_route(base_url + route)
+				routes.append({"route": route, **result})
+				if not result["ok"]:
+					errors.append(f"{output_dir}: GET {route} failed with {result['status']}")
+			domain_checks = _run_domain_http_checks(base_url)
+			for check in domain_checks:
+				if not check["ok"]:
+					errors.append(f"{output_dir}: {check['name']} failed")
+		finally:
+			_terminate_process(process)
 
 	return {
 		"ok": not errors,
+		"domain_ok": all(check.get("ok") for check in domain_checks),
 		"output_dir": str(output_dir),
 		"port": port,
 		"routes": routes,
+		"domain_checks": domain_checks,
 		"errors": errors,
 	}
+
+
+def _run_domain_http_checks(base_url: str) -> list[dict[str, Any]]:
+	checks: list[dict[str, Any]] = []
+	entities_response = _fetch_json_route(base_url + "/entities")
+	records_response = _fetch_json_route(base_url + "/records")
+	relationships_response = _fetch_json_route(base_url + "/relationships")
+	checks.extend([
+		_json_route_check("entities_catalog", entities_response),
+		_json_route_check("records_catalog", records_response),
+		_json_route_check("relationships_catalog", relationships_response),
+	])
+
+	entities = entities_response.get("json", {}).get("entities", [])
+	record_entities = [
+		entity
+		for entity in entities
+		if isinstance(entity, dict)
+		and entity.get("type") in {"entity", "table", "database"}
+		and entity.get("fields")
+	]
+	if record_entities:
+		record_check = _run_record_crud_http_check(base_url, record_entities[0])
+		checks.append(record_check)
+
+	workflows_response = _fetch_json_route(base_url + "/workflows")
+	checks.append(_json_route_check("workflows_catalog", workflows_response))
+	workflows = workflows_response.get("json", {}).get("workflows", {})
+	if isinstance(workflows, dict) and workflows:
+		workflow_name = sorted(workflows)[0]
+		checks.append(_run_workflow_http_check(base_url, str(workflow_name)))
+
+	capabilities_response = _fetch_json_route(base_url + "/capabilities")
+	checks.append(_json_route_check("capabilities_catalog", capabilities_response))
+	capabilities = capabilities_response.get("json", {}).get("capabilities", {})
+	if isinstance(capabilities, dict) and capabilities:
+		checks.append(_json_route_check("capabilities_health", _fetch_json_route(base_url + "/capabilities/health")))
+
+	return checks
+
+
+def _run_record_crud_http_check(base_url: str, entity: dict[str, Any]) -> dict[str, Any]:
+	entity_name = str(entity.get("name"))
+	payload = {
+		"record": {
+			str(field.get("name")): _sample_value_for_field(field)
+			for field in entity.get("fields", [])
+			if isinstance(field, dict) and field.get("name") not in {None, "", "id"}
+		}
+	}
+	create = _fetch_json_route(
+		base_url + f"/entities/{urllib.parse.quote(entity_name)}/records",
+		method="POST",
+		payload=payload,
+	)
+	record_id = create.get("json", {}).get("record", {}).get("id")
+	listing = _fetch_json_route(base_url + f"/entities/{urllib.parse.quote(entity_name)}/records")
+	read = (
+		_fetch_json_route(base_url + f"/entities/{urllib.parse.quote(entity_name)}/records/{urllib.parse.quote(str(record_id))}")
+		if record_id not in (None, "")
+		else {"ok": False, "status": "missing_id", "json": {}}
+	)
+	return {
+		"name": "record_crud",
+		"entity": entity_name,
+		"ok": create["ok"] and create["status"] == 201 and listing["ok"] and read["ok"],
+		"record_id": record_id,
+		"steps": {
+			"create": _json_route_public_result(create),
+			"list": _json_route_public_result(listing),
+			"read": _json_route_public_result(read),
+		},
+	}
+
+
+def _run_workflow_http_check(base_url: str, workflow_name: str) -> dict[str, Any]:
+	result = _fetch_json_route(
+		base_url + f"/workflows/{urllib.parse.quote(workflow_name)}/run",
+		method="POST",
+		payload={"payload": {"source": "baseline_http_probe"}},
+	)
+	return {
+		"name": "workflow_run",
+		"workflow": workflow_name,
+		"ok": result["ok"] and result["status"] in {200, 201},
+		"result": _json_route_public_result(result),
+	}
+
+
+def _sample_value_for_field(field: dict[str, Any]) -> Any:
+	field_name = str(field.get("name", "value"))
+	field_type = str(field.get("type", "str")).lower()
+	if field_type in {"int", "integer"}:
+		return 1
+	if field_type in {"float", "double", "decimal", "number"}:
+		return 1.0
+	if field_type in {"bool", "boolean"}:
+		return True
+	if "email" in field_name.lower():
+		return "baseline@example.com"
+	if "date" in field_name.lower():
+		return "2026-05-29"
+	return f"baseline_{field_name}"
+
+
+def _json_route_check(name: str, response: dict[str, Any]) -> dict[str, Any]:
+	return {
+		"name": name,
+		**_json_route_public_result(response),
+	}
+
+
+def _json_route_public_result(response: dict[str, Any]) -> dict[str, Any]:
+	return {
+		"ok": response.get("ok") is True,
+		"status": response.get("status"),
+		"summary": _json_summary(response.get("json", {})),
+	}
+
+
+def _json_summary(value: Any) -> dict[str, Any]:
+	if isinstance(value, dict):
+		summary: dict[str, Any] = {"keys": sorted(str(key) for key in value.keys())}
+		entities = value.get("entities")
+		if isinstance(entities, list):
+			summary["entity_count"] = len(entities)
+			summary["entities"] = [
+				str(entity.get("name"))
+				for entity in entities[:5]
+				if isinstance(entity, dict) and entity.get("name")
+			]
+		records = value.get("records")
+		if isinstance(records, dict):
+			summary["record_entities"] = sorted(str(name) for name in records)
+			summary["record_counts"] = {
+				str(name): len(items) if isinstance(items, list) else None
+				for name, items in records.items()
+			}
+		if isinstance(value.get("nodes"), list):
+			summary["node_count"] = len(value["nodes"])
+		if isinstance(value.get("edges"), list):
+			summary["edge_count"] = len(value["edges"])
+		workflows = value.get("workflows")
+		if isinstance(workflows, dict):
+			summary["workflow_count"] = len(workflows)
+			summary["workflows"] = sorted(str(name) for name in workflows)[:5]
+		capabilities = value.get("capabilities")
+		if isinstance(capabilities, dict):
+			summary["capability_count"] = len(capabilities)
+			summary["capabilities"] = sorted(str(name) for name in capabilities)[:5]
+		if "healthy" in value:
+			summary["healthy"] = bool(value.get("healthy"))
+		if isinstance(value.get("errors"), list):
+			summary["error_count"] = len(value["errors"])
+		if isinstance(value.get("warnings"), list):
+			summary["warning_count"] = len(value["warnings"])
+		if "count" in value:
+			summary["count"] = value.get("count")
+		if "total" in value:
+			summary["total"] = value.get("total")
+		return summary
+	if isinstance(value, list):
+		return {"item_count": len(value)}
+	return {"type": type(value).__name__}
 
 
 def _free_tcp_port() -> int:
@@ -372,6 +569,33 @@ def _fetch_http_route(url: str) -> dict[str, Any]:
 		return {"ok": False, "status": error.code}
 	except OSError:
 		return {"ok": False, "status": "unreachable"}
+
+
+def _fetch_json_route(
+	url: str,
+	method: str = "GET",
+	payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+	data = None
+	headers = {"Accept": "application/json"}
+	if payload is not None:
+		data = json.dumps(payload).encode("utf-8")
+		headers["Content-Type"] = "application/json"
+	request = urllib.request.Request(url, data=data, headers=headers, method=method)
+	try:
+		with urllib.request.urlopen(request, timeout=2.0) as response:
+			body = response.read().decode("utf-8")
+			parsed = json.loads(body) if body else {}
+			return {"ok": 200 <= response.status < 300, "status": response.status, "json": parsed}
+	except urllib.error.HTTPError as error:
+		try:
+			body = error.read().decode("utf-8")
+			parsed = json.loads(body) if body else {}
+		except (OSError, json.JSONDecodeError):
+			parsed = {}
+		return {"ok": False, "status": error.code, "json": parsed}
+	except (OSError, json.JSONDecodeError):
+		return {"ok": False, "status": "unreachable", "json": {}}
 
 
 def _terminate_process(process: subprocess.Popen[str]) -> tuple[str, str]:

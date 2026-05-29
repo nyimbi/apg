@@ -16,6 +16,54 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 07:22 EAT
+
+Contributor effectiveness and domain HTTP baseline slice:
+
+- Expanded the developer guide with an immediate operating model, codebase
+  reading path, new-contributor task lanes, and concrete capacity file shape.
+- Expanded the contributors guide with a first-90-minutes workflow, capacity
+  contributor mental model, parallel contribution ownership protocol, and
+  minimum capacity evidence commands.
+- Expanded the capacity development guide with a capacity blueprint, minimum
+  file shape, readiness levels, implementation checklists for rules/screens/
+  workflows/agents, and slice planning templates.
+- Extended `apg.compiler-baseline-report.v1` checked-output HTTP evidence from
+  core contract routes into generated domain surfaces: entity/record/
+  relationship catalogs, representative record CRUD, workflow execution, and
+  capability catalog/health probes with compact response summaries.
+- Updated tooling and developer documentation so the compiler baseline
+  describes both core contract route probes and records/workflows/capabilities
+  domain HTTP probes.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/baseline.py
+  tests/test_compiler_baseline.py` -> passed.
+- Initial `./.venv/bin/apg baseline examples --json` failed because the new
+  isolated HTTP probe used `os.environ` without importing `os`; fixed before
+  rerunning.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 54 documented commands, 0 broken local links, 0 unknown
+  documented commands, and 0 violations.
+- `./.venv/bin/apg baseline examples --json` -> passed with 20/20 examples, 20
+  checked-output HTTP passes, 20 checked-output domain HTTP passes, 0 checked-
+  output domain HTTP failures, 20 checked-output runtime passes, and 0
+  generated-source hygiene violations.
+- `./.venv/bin/pytest -q
+  tests/test_compiler_baseline.py::test_cli_baseline_json_audits_numbered_examples
+  tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler`
+  -> 2 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 18/18 surfaces, 20
+  checked-output domain HTTP passes in the compiler baseline surface, 0
+  checked-output domain HTTP failures, 0 blocking gaps, and 0 errors.
+
+Known remaining gaps:
+
+- The new guides make contributor lanes and capacity development explicit, but
+  they do not replace the need to keep each future capacity's own README and
+  executable evidence current.
+
 ### 2026-05-29 07:11 EAT
 
 Checked-output HTTP contract probe slice:
