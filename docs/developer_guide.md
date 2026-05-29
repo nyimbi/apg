@@ -122,6 +122,40 @@ change, and the proof that makes the change credible.
 Do not pick a packet because it is interesting. Pick it because it advances one
 public APG contract and has a proof command a reviewer can rerun.
 
+## Active Progression Queue
+
+When you do not know what to work on next, use APG's own evidence commands as
+the queue. Pick the first failing or incomplete contract that you can improve in
+one focused slice.
+
+| Queue | Command | Pick the next packet from |
+| --- | --- | --- |
+| compiler/serviceability | `./.venv/bin/apg docs audit --json` and one representative `apg compile ... --verify` | stale command, missing guide, broken compile, or generated smoke failure |
+| capability implementation depth | `./.venv/bin/apg capabilities implementation-audit --json` | first package classified as materialized baseline, mixed, contract-only, or warning-bearing |
+| capability package completeness | `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` | first missing package artifact, contract shape, or publish-plan blocker |
+| example readiness | `./.venv/bin/apg model examples/<nn>_<name>/main.apg --json` | first example whose README, source, output, or proof has drifted |
+| tooling reliability | `./.venv/bin/apg tooling audit --json` | first tool command without JSON evidence, docs coverage, or focused proof |
+| repository hygiene | `./.venv/bin/apg hygiene audit --json` | first misplaced artifact, generated output, stale report, or local-only file pattern |
+
+The queue is intentionally command-driven. Do not use a private task list when a
+checked-in audit can name the same work for every contributor.
+
+For each chosen item, write a slice card before editing:
+
+```text
+Queue:
+Evidence command:
+Current finding:
+Owner:
+Files expected:
+Proof after change:
+Progress-log impact:
+Commit boundary:
+```
+
+If the card names more than one owner, split it. The fastest APG progress comes
+from many narrow commits that each remove one ambiguity from the queue.
+
 ## Internal Contract Checklist
 
 Before changing implementation code, name the contract you are changing:

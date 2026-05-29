@@ -12112,3 +12112,18 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 88, materialized baseline packages dropped to 19, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 903, and warning count dropped to 21. The next implementation-depth warning is `plgn`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `git diff --check -- capabilities/common/plfd` passed with no whitespace errors.
+
+### 2026-05-29 18:49 EAT
+
+Contributor onboarding guide acceleration slice:
+
+- Expanded `docs/developer_guide.md` with an active progression queue that turns APG audit and proof commands into a shared day-one work queue for compiler serviceability, capability depth, package completeness, examples, tooling, and hygiene.
+- Expanded `docs/contributors_guide.md` with a twenty-minute triage path and a capacity contribution contract so first-time contributors can choose a local owner, name the public contract, avoid unrelated dirty files, and document first-event capacity facts without private context.
+- Expanded `docs/capacity_development_guide.md` with a capacity acceptance gate and slice contract so broad APG ambitions can be reduced into one event, one owner, one proof path, one package-backed behavior slice, and one next handoff.
+- Kept the guide updates doc-only and aligned with the current Python-first compiler, capability package, AI-agent adapter, and Bytewax stream guidance.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
+- `rg -n -i "kafka" docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` returned no matches.

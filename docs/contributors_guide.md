@@ -101,6 +101,38 @@ Choose one of these if you are unsure where to start.
 When a packet touches more than one row, split it unless the second row is
 directly required to prove the first.
 
+## Twenty-Minute Triage
+
+Use this when you have just arrived and want a useful task without asking for
+private context.
+
+1. Run:
+
+   ```bash
+   git status --short
+   ./.venv/bin/apg docs audit --json
+   ./.venv/bin/apg capabilities implementation-audit --json
+   ```
+
+2. Ignore unrelated dirty files. They may belong to another contributor or a
+   local tool.
+3. Choose one finding that has a local owner, such as one docs file, one
+   example directory, one capability package, or one compiler module.
+4. Write the packet in this form:
+
+   ```text
+   I will make <public contract> better by editing <owner>.
+   I will prove it with <command>.
+   I will not touch <unrelated dirty files or broader systems>.
+   ```
+
+5. Run the proof once before editing. If it already passes, either improve the
+   next concrete gap or choose a different packet.
+
+This triage keeps first-time work useful even when the full APG roadmap is
+large. Your job is not to absorb the whole roadmap. Your job is to turn one
+visible finding into one verified improvement.
+
 ## If You Only Have One Hour
 
 Pick one of these paths and finish it completely.
@@ -340,6 +372,28 @@ executable event.
 
 Use the [Capacity Development Guide](./capacity_development_guide.md) for the
 full blueprint.
+
+## Capacity Contribution Contract
+
+When your contribution adds or extends a capacity, reviewers should be able to
+find these facts without reading chat history:
+
+| Fact | Where it should appear |
+| --- | --- |
+| first event | example README and `main.apg` |
+| records and relationships | APG source, semantic JSON, and README |
+| rule IDs and decisions | APG source, package contract, tests, or README |
+| screen route and composition | APG source, generated manifest, and README |
+| workflow state movement | APG source and generated smoke evidence when supported |
+| AI agent boundary | APG source or README, with runtime/provider behind configuration |
+| Bytewax stream boundary | APG source or README, with adapter boundary named |
+| durable package owner | capability package path and package `cap_spec.md` |
+| proof commands | README, progress log when readiness changed, and commit message |
+| next slice | README or progress log |
+
+If one of these facts is unknown, make it the contribution. Naming the event,
+route, owner, or proof command is often the work that unlocks parallel
+implementation.
 
 ## Contribution Standards
 

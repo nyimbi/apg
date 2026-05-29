@@ -87,6 +87,28 @@ Minimum artifacts:
 If a capacity cannot name the first event, APG source path, package owners, and
 proof commands, reduce scope.
 
+## Capacity Acceptance Gate
+
+Before a capacity can be treated as buildable, it must pass this gate. The gate
+is intentionally small enough for a new contributor to evaluate from checked-in
+files.
+
+| Gate | Minimum evidence | Fails when |
+| --- | --- | --- |
+| event | one named event in the README and source | the capacity is described only as a broad module |
+| source | `examples/<nn>_<capacity>/main.apg` exists and is parseable | source is prose, pseudocode, or generated output only |
+| semantics | `apg model ... --json` exposes the intended records, rules, screens, workflows, agents, streams, or capabilities | meaning is implied but absent from semantic JSON |
+| runtime | `apg compile ... --verify` and generated `smoke_test.py` pass for generated behavior | only parser or docs evidence exists |
+| package owner | durable behavior maps to `capabilities/<domain>/<code>/` | generated app owns long-lived business behavior by itself |
+| rules | at least one deterministic rule or guardrail has a public name | policy is described as "business rules" without inputs or decisions |
+| UI | at least one screen route or composition relation is named when humans interact with the capacity | UI is left to later without a route or owner |
+| agents | provider choice, tools, approval, and fallback are configuration or adapter concerns | business source hard-codes one fast-changing AI provider |
+| streams | Bytewax flow names, event envelopes, and partition keys are named when event flow matters | broker-specific mechanics are treated as the capacity model |
+| handoff | README names readiness, proof, package owner, known gaps, and next slice | future contributors need private context |
+
+A capacity can start at level 0, but implementation should not begin until the
+first event, owner, and proof path are explicit.
+
 ## Capacity Factory Loop
 
 Use this loop to turn an idea into executable APG without waiting for the whole
@@ -180,6 +202,41 @@ Next slice:
 
 The blueprint describes current executable intent. Keep it updated as evidence
 lands.
+
+## Capacity Slice Contract
+
+Each capacity slice should fit in one commit and one reviewer pass. Use this
+contract to keep the slice narrow:
+
+```text
+Slice name:
+Readiness level before:
+Readiness level after:
+Event:
+Source path:
+Generated output path:
+Package owner:
+Public names preserved:
+Proof run:
+Not tested:
+Next slice:
+```
+
+Examples:
+
+| Slice | Good boundary |
+| --- | --- |
+| parseable event | add or repair `main.apg`, README, and semantic proof |
+| generated runtime | generator change plus one compile and smoke proof |
+| package-backed lifecycle | one package service lifecycle with guardrail tests and `cap_spec.md` update |
+| governed capacity | rule inputs, decisions, approval guardrails, and negative tests |
+| composable UI | one screen route, contains/composes/binds relations, and generated manifest proof |
+| agentic assist | one agent boundary with provider configuration, allowed tools, approval rule, and fallback |
+| stream processing | one Bytewax flow with envelope, partition key, state intent, and local proof |
+
+Avoid a slice that introduces new grammar, rewrites packages, refreshes every
+example output, and updates global docs at the same time. Split by public
+contract and proof.
 
 ## Starter Capacity Checklist
 
