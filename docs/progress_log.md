@@ -99,6 +99,30 @@ Known remaining gaps:
 - The safe evaluator intentionally supports a small arithmetic expression subset; richer rule functions, aggregations, temporal windows, and external data lookups still need explicit runtime implementations.
 - Full HTTP route sweeps for every generated example remain deferred until a broader battery/compute window.
 
+### 2026-05-29 03:49 EAT
+
+Generated workflow runtime execution:
+
+- Added dependency-free workflow helpers to generated Python apps: `list_workflows()`, `describe_workflow()`, `describe_workflows()`, and `run_workflow()`.
+- Preserved simple property defaults in generated entity metadata so workflow declarations such as `steps: str = "draft -> review -> approved"` become executable step chains.
+- Added OpenAPI and dispatch routes for `GET /workflows`, `GET /workflows/{Workflow}`, and `POST /workflows/{Workflow}/run`.
+- Added workflow validation into `validate_application()` and exported workflow helpers through the generated package and component manifest.
+- Regenerated all 20 numbered example output directories from the current compiler.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/code_generator.py tests/test_generated_workflow_runtime.py` -> passed.
+- `./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler` -> 2 passed.
+- Generated `examples/13_procurement_approval_workbench/main.apg` in a temp directory and called `app.run_workflow("ProcurementApproval", {"request_id": "PR-1"})` -> completed from `draft` to `approved`.
+- Generated `examples/13_procurement_approval_workbench` `smoke_test.py` -> exit code 0.
+- Regenerated example outputs command compiled 20/20 examples with no failures.
+- `git diff --check` over the compiler, workflow test, generated examples, and this log passed.
+
+Known remaining gaps:
+
+- The workflow runner executes deterministic declared step chains; branching, guards, retries, timers, human task state, and persistence-backed workflow resumes still need explicit runtime implementation.
+- Broader HTTP runtime sweeps remain a later verification slice when battery/compute allows.
+
 ### 2026-05-26 01:35 EAT
 
 Completed and pushed:

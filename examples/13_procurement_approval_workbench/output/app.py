@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, quote
 MODULE_NAME = 'procurement_approval_workbench'
 MODULE_VERSION = '1.0.0'
 MODULE_DESCRIPTION = None
-ENTITIES = [{'name': 'ProcurementWorkbench', 'type': 'capability', 'properties': [], 'fields': [], 'methods': []}, {'name': 'ProcurementApproval', 'type': 'workflow', 'properties': ['steps', 'stages'], 'fields': [{'name': 'steps', 'type': 'str', 'required': True}, {'name': 'stages', 'type': 'str', 'required': True}], 'methods': ['process']}]
+ENTITIES = [{'name': 'ProcurementWorkbench', 'type': 'capability', 'properties': [], 'fields': [], 'methods': []}, {'name': 'ProcurementApproval', 'type': 'workflow', 'properties': ['steps', 'stages'], 'fields': [{'name': 'steps', 'type': 'str', 'required': True, 'default': '"draft -> budget_review -> procurement_review -> finance_approval -> approved"'}, {'name': 'stages', 'type': 'str', 'required': True, 'default': '"draft, review, approval, complete"'}], 'methods': ['process']}]
 ENTITY_NAMES = {entity["name"] for entity in ENTITIES}
 RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity in ENTITIES}
 NEXT_RECORD_IDS: Dict[str, int] = {entity["name"]: 1 for entity in ENTITIES}
@@ -188,6 +188,125 @@ def list_entities() -> list[Dict[str, Any]]:
 
 def list_databases() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+
+
+def list_workflows() -> list[str]:
+    names = {
+        str(entity["name"])
+        for entity in ENTITIES
+        if entity.get("type") in {"workflow", "flow"}
+    }
+    names.update(str(name) for name in SEMANTIC_MODEL.get("flows", {}))
+    return sorted(names)
+
+
+def _workflow_entity(workflow_name: str) -> Dict[str, Any] | None:
+    for entity in ENTITIES:
+        if entity.get("type") in {"workflow", "flow"} and str(entity.get("name")) == workflow_name:
+            return dict(entity)
+    return None
+
+
+def _workflow_defaults(entity: Dict[str, Any]) -> Dict[str, Any]:
+    defaults: Dict[str, Any] = {}
+    for field in entity.get("fields", []):
+        if isinstance(field, dict) and "default" in field:
+            defaults[str(field.get("name"))] = field.get("default")
+    return defaults
+
+
+def _split_workflow_sequence(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value).strip()
+    if not text:
+        return []
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        text = text[1:-1].strip()
+    delimiter = "->" if "->" in text else ","
+    parts: list[str] = []
+    for part in text.split(delimiter):
+        item = part.strip()
+        if (item.startswith('"') and item.endswith('"')) or (item.startswith("'") and item.endswith("'")):
+            item = item[1:-1].strip()
+        if item:
+            parts.append(item)
+    return parts
+
+
+def describe_workflow(workflow_name: str) -> Dict[str, Any]:
+    flows = SEMANTIC_MODEL.get("flows", {})
+    flow = dict(flows.get(workflow_name, {})) if isinstance(flows, dict) else {}
+    entity = _workflow_entity(workflow_name) or {"name": workflow_name, "type": flow.get("type", "workflow"), "fields": [], "methods": []}
+    defaults = _workflow_defaults(entity)
+    steps = _split_workflow_sequence(defaults.get("steps") or flow.get("steps"))
+    stages = _split_workflow_sequence(defaults.get("stages") or flow.get("stages"))
+    transitions = [
+        {"from": steps[index], "to": steps[index + 1]}
+        for index in range(max(0, len(steps) - 1))
+    ]
+    return {
+        "name": workflow_name,
+        "type": entity.get("type", flow.get("type", "workflow")),
+        "properties": dict(flow.get("properties", {})),
+        "defaults": defaults,
+        "methods": list(entity.get("methods", flow.get("methods", []))),
+        "steps": steps,
+        "stages": stages,
+        "transitions": transitions,
+    }
+
+
+def describe_workflows() -> Dict[str, Dict[str, Any]]:
+    return {
+        workflow_name: describe_workflow(workflow_name)
+        for workflow_name in list_workflows()
+    }
+
+
+def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    if workflow_name not in list_workflows():
+        raise KeyError(workflow_name)
+    payload = dict(payload or {})
+    workflow = describe_workflow(workflow_name)
+    steps = list(workflow.get("steps", []))
+    if not steps:
+        steps = list(workflow.get("stages", []))
+    if not steps:
+        steps = ["start", "complete"]
+    start_at = str(payload.get("start_at") or steps[0])
+    if start_at not in steps:
+        return {
+            "workflow": workflow_name,
+            "status": "error",
+            "error": "unknown_start_step",
+            "start_at": start_at,
+            "steps": steps,
+            "payload": payload,
+        }
+    start_index = steps.index(start_at)
+    selected_steps = steps[start_index:]
+    trace = [
+        {
+            "index": index,
+            "step": step,
+            "status": "completed",
+        }
+        for index, step in enumerate(selected_steps, start=start_index)
+    ]
+    result = {
+        "workflow": workflow_name,
+        "status": "completed",
+        "started_at": start_at,
+        "completed_at": selected_steps[-1],
+        "steps": selected_steps,
+        "trace": trace,
+        "payload": payload,
+    }
+    _record_event("workflow.run", workflow_name, after=result)
+    return result
 
 
 def semantic_model() -> Dict[str, Any]:
@@ -420,6 +539,7 @@ def metrics_snapshot() -> Dict[str, Any]:
         "name": MODULE_NAME,
         "version": MODULE_VERSION,
         "entity_count": len(ENTITIES),
+        "workflow_count": len(list_workflows()),
         "database_status": database_status(),
         "record_counts": record_counts,
         "total_records": sum(record_counts.values()),
@@ -483,6 +603,8 @@ def component_manifest() -> Dict[str, Any]:
                     "describe_capabilities",
                     "describe_application",
                     "describe_capability",
+                    "describe_workflow",
+                    "describe_workflows",
                     "evaluate_capability_rules",
                     "get_record",
                     "invoke_agent",
@@ -494,11 +616,13 @@ def component_manifest() -> Dict[str, Any]:
                     "list_entities",
                     "list_events",
                     "list_records",
+                    "list_workflows",
                     "main",
                     "metrics_snapshot",
                     "openapi_document",
                     "query_records",
                     "relationship_graph",
+                    "run_workflow",
                     "runtime_adapter_command_candidates",
                     "runtime_adapter_environment_keys",
                     "self_test",
@@ -528,6 +652,7 @@ def component_manifest() -> Dict[str, Any]:
         },
         "entities": list_entities(),
         "databases": list_databases(),
+        "workflows": describe_workflows(),
         "ai_agents": app.get("ai_agents", []),
         "ai_agent_teams": app.get("ai_agent_teams", []),
         "application_compositions": app.get("application_compositions", []),
@@ -798,6 +923,49 @@ def _database_openapi_schemas() -> Dict[str, Any]:
                 "entities": {"type": "array", "items": generic_object},
             },
             "required": ["entities"],
+        },
+        "WorkflowSpec": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "name": {"type": "string"},
+                "type": {"type": "string"},
+                "steps": {"type": "array", "items": {"type": "string"}},
+                "stages": {"type": "array", "items": {"type": "string"}},
+                "transitions": {"type": "array", "items": generic_object},
+                "methods": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["name", "type", "steps", "stages", "transitions"],
+        },
+        "WorkflowCatalog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "workflows": {"type": "object", "additionalProperties": _schema_ref("WorkflowSpec")},
+            },
+            "required": ["workflows"],
+        },
+        "WorkflowRunRequest": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "payload": generic_object,
+                "start_at": {"type": "string"},
+            },
+        },
+        "WorkflowRunResult": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "workflow": {"type": "string"},
+                "status": {"type": "string"},
+                "started_at": {"type": "string"},
+                "completed_at": {"type": "string"},
+                "steps": {"type": "array", "items": {"type": "string"}},
+                "trace": {"type": "array", "items": generic_object},
+                "payload": generic_object,
+            },
+            "required": ["workflow", "status", "steps", "trace", "payload"],
         },
         "RecordsByEntity": {
             "type": "object",
@@ -1287,6 +1455,7 @@ def openapi_document() -> Dict[str, Any]:
         "/theme.css": {"get": _api_operation("Generated visual theme stylesheet", "CSS theme stylesheet")},
         "/records": {"get": _api_operation("All entity records", "Records by entity", response_schema=_schema_ref("RecordsByEntity"))},
         "/entities": {"get": _api_operation("Entity catalog", "Generated entity metadata", response_schema=_schema_ref("EntityCatalog"))},
+        "/workflows": {"get": _api_operation("Workflow catalog", "Generated workflow metadata", response_schema=_schema_ref("WorkflowCatalog"))},
         "/databases": {"get": _api_operation("Database catalog", "Database schema and connection metadata", response_schema=_schema_ref("DatabaseCatalog"))},
         "/databases/status": {"get": _api_operation("Database validation status", "Database schema validation and counts", response_schema=_schema_ref("DatabaseStatus"))},
         "/relationships": {"get": _api_operation("Entity relationship graph", "Relationship graph", response_schema=_schema_ref("RelationshipGraph"))},
@@ -1370,6 +1539,13 @@ def openapi_document() -> Dict[str, Any]:
             paths[f"/databases/{entity_name}/schemas"] = {
                 "get": _api_operation(f"{entity_name} database schemas", "Database schema metadata", response_schema=_schema_ref("DatabaseSchemaCatalog")),
             }
+    for workflow_name in list_workflows():
+        paths[f"/workflows/{workflow_name}"] = {
+            "get": _api_operation(f"Describe {workflow_name} workflow", "Workflow description", response_schema=_schema_ref("WorkflowSpec")),
+        }
+        paths[f"/workflows/{workflow_name}/run"] = {
+            "post": _api_operation(f"Run {workflow_name} workflow", "Workflow run result", request_body=True, request_schema=_schema_ref("WorkflowRunRequest"), response_schema=_schema_ref("WorkflowRunResult")),
+        }
     if APG_CAPABILITIES is not None:
         paths["/rules/evaluate"] = {"post": _api_operation("Evaluate capability rules", "Rule decision", request_body=True, request_schema=_schema_ref("RuleEvaluationRequest"), response_schema=_schema_ref("RuleEvaluationResult"))}
         paths["/configuration/resolve"] = {"post": _api_operation("Resolve capability configuration", "Resolved configuration", request_body=True, request_schema=_schema_ref("CapabilityConfigurationRequest"), response_schema=_schema_ref("CapabilityConfigurationResponse"))}
@@ -1626,6 +1802,7 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             "/validate",
             "/openapi.json",
             "/entities",
+            "/workflows",
             "/databases",
             "/databases/status",
             "/auth",
@@ -1644,6 +1821,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
         }:
             return "_route_payload"
         if route.startswith("/databases/") and route.endswith("/schemas"):
+            return "_route_payload"
+        if route.startswith("/workflows/"):
             return "_route_payload"
         if route.startswith("/capabilities/") and route.endswith("/streaming"):
             return "_route_payload"
@@ -1675,6 +1854,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             route.startswith("/capabilities/") and route.endswith("/approval/plan")
         ):
             return "_approval_plan_payload"
+        if route.startswith("/workflows/") and route.endswith("/run"):
+            return "_workflow_run_payload"
         return None
     if method == "put":
         if route.startswith("/entities/") and "/records/{id}" in route:
@@ -1877,6 +2058,20 @@ def validate_database_schema_contracts() -> Dict[str, Any]:
     return {"errors": errors, "warnings": warnings, "validated_databases": sorted(validated)}
 
 
+def validate_workflow_contracts() -> Dict[str, Any]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    for workflow_name in list_workflows():
+        workflow = describe_workflow(workflow_name)
+        steps = workflow.get("steps", [])
+        if not steps:
+            warnings.append(f"{workflow_name} does not declare executable steps")
+        transitions = workflow.get("transitions", [])
+        if len(steps) > 1 and len(transitions) != len(steps) - 1:
+            errors.append(f"{workflow_name} transition count does not match step chain")
+    return {"errors": errors, "warnings": warnings, "validated_workflows": list_workflows()}
+
+
 def validate_application(available_agent_runtimes: list[str] | None = None) -> Dict[str, Any]:
     report: Dict[str, Any] = {
         "name": MODULE_NAME,
@@ -1889,6 +2084,7 @@ def validate_application(available_agent_runtimes: list[str] | None = None) -> D
     _record_validation(report, "component_manifest", validate_component_manifest_contract())
     _record_validation(report, "route_dispatch", validate_route_dispatch_contract())
     _record_validation(report, "database_schemas", validate_database_schema_contracts())
+    _record_validation(report, "workflows", validate_workflow_contracts())
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "validate_agent_runtimes"):
         _record_validation(
             report,
@@ -2884,6 +3080,15 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, openapi_document()
     if path == "/entities":
         return 200, {"entities": list_entities()}
+    if path == "/workflows":
+        return 200, {"workflows": describe_workflows()}
+    if path.startswith("/workflows/"):
+        parts = [part for part in path.split("/") if part]
+        if len(parts) == 2:
+            try:
+                return 200, describe_workflow(parts[1])
+            except KeyError:
+                return 404, {"error": "unknown_workflow", "workflow": parts[1]}
     if path == "/databases":
         return 200, {"databases": list_databases()}
     if path == "/databases/status":
@@ -3032,6 +3237,25 @@ def _approval_plan_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
         return 200, APG_CAPABILITIES.approval_plan(str(capability_name), context)
     except KeyError:
         return 404, {"error": "unknown_capability", "capability": str(capability_name)}
+
+
+def _workflow_run_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    parts = [part for part in path.split("/") if part]
+    workflow_name = payload.get("workflow") or payload.get("workflow_name")
+    if len(parts) >= 2:
+        workflow_name = parts[1]
+    if not workflow_name:
+        return 400, {"error": "missing_workflow"}
+    context = payload.get("payload", payload.get("context", {}))
+    if not isinstance(context, dict):
+        return 400, {"error": "payload_must_be_object"}
+    if "start_at" in payload and "start_at" not in context:
+        context = dict(context)
+        context["start_at"] = payload["start_at"]
+    try:
+        return 200, run_workflow(str(workflow_name), context)
+    except KeyError:
+        return 404, {"error": "unknown_workflow", "workflow": str(workflow_name)}
 
 
 def _streaming_payload() -> tuple[int, Dict[str, Any]]:
@@ -3254,6 +3478,8 @@ def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, An
         path.startswith("/capabilities/") and path.endswith("/approval/plan")
     ):
         return _approval_plan_payload(path, payload)
+    if path.startswith("/workflows/") and path.endswith("/run"):
+        return _workflow_run_payload(path, payload)
     return 404, {"error": "not_found", "path": path}
 
 
