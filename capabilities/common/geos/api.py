@@ -19,7 +19,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, File, UploadFile, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.status import (
 	HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, 
 	HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_403_FORBIDDEN,
@@ -28,11 +28,42 @@ from starlette.status import (
 
 from .models import *
 from .service import (
-	GeographicalLocationService, GLSServiceError, GLSGeocodingError, GLSGeofenceError, GLSRouteOptimizationError, GLSComplianceError,
+	GeosService, GeographicalLocationService, GLSServiceError, GLSGeocodingError, GLSGeofenceError, GLSRouteOptimizationError, GLSComplianceError,
 	GLSFuzzyMatchingService, GLSTrajectoryAnalysisService, GLSHotspotDetectionService, 
 	GLSPredictiveModelingService, GLSAnomalyDetectionService, GLSVisualizationService, GLSRealTimeStreamingService
 )
 from .context import resolve_current_user_id, resolve_tenant_id
+
+
+APG_SERVICE = GeosService()
+
+
+def capability_status(tenant_id: str = "default") -> dict[str, Any]:
+	"""Return dependency-light APG package status for GEOS."""
+	contract = APG_SERVICE.describe(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		"summary": APG_SERVICE.dashboard_summary(tenant_id),
+	}
+
+
+def create_record(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Compatibility helper that creates a geofence record."""
+	return APG_SERVICE.create_record(
+		record_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		metadata=dict(payload.get("metadata") or {}),
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	"""Compatibility helper exposing geofences as GEOS records."""
+	return APG_SERVICE.list_records(tenant_id)
 
 # =============================================================================
 # Router and Security Configuration
@@ -1586,7 +1617,6 @@ async def demo_geofence_testing(
 # Error Handlers
 # =============================================================================
 
-@router.exception_handler(ValidationError)
 async def validation_exception_handler(request, exc):
 	"""Handle Pydantic validation errors."""
 	return JSONResponse(
@@ -1599,7 +1629,6 @@ async def validation_exception_handler(request, exc):
 		}
 	)
 
-@router.exception_handler(GLSServiceError)
 async def gls_service_exception_handler(request, exc):
 	"""Handle GLS service errors."""
 	return JSONResponse(

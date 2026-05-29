@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""GEOS package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import importlib.util
 import sys
 
 from capabilities.capability_contract_registry import validate_contract_shape
+from capabilities.common.geos.service import GeosService
+from capabilities.common.geos.views import dashboard_model
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
@@ -44,3 +46,27 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "geos" in model["capabilities"]
+
+
+def test_package_runtime_compatibility_surface_creates_geofence():
+	service = GeosService()
+
+	record = service.create_record(
+		record_id="geo-compat",
+		tenant_id="tenant-test",
+		metadata={
+			"name": "Compatibility Geofence",
+			"owner": "geo-admin",
+			"boundary": {
+				"type": "circle",
+				"center": {"latitude": -1.286389, "longitude": 36.817223},
+				"radius_meters": 1000,
+			},
+		},
+	)
+	model = dashboard_model(service, "tenant-test")
+
+	assert record["id"] == "geo-compat"
+	assert record["status"] == "active"
+	assert model["summary"]["geofence_count"] == 1
+	assert model["geofences"][0]["owner"] == "geo-admin"

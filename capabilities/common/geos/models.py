@@ -228,6 +228,7 @@ class GLSExportFormat(str, Enum):
 	"""Data export formats."""
 	JSON = "json"
 	CSV = "csv"
+	PNG = "png"
 	GEOJSON = "geojson"
 	KML = "kml"
 	GPX = "gpx"

@@ -28,6 +28,7 @@ from scipy import spatial, stats
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.preprocessing import StandardScaler
 
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .models import *
 
 # =============================================================================
@@ -2146,3 +2147,398 @@ class GeographicalLocationService:
 		}
 		
 		return health
+
+
+class GeosService:
+	"""APG-facing geo-spatial service facade with deterministic policy checks."""
+
+	def __init__(self) -> None:
+		self._event_sources: Dict[str, Dict[str, Any]] = {}
+		self._geofences: Dict[str, Dict[str, Any]] = {}
+		self._location_events: Dict[str, Dict[str, Any]] = {}
+		self._territories: Dict[str, Dict[str, Any]] = {}
+		self._analytics: Dict[str, Dict[str, Any]] = {}
+		self._audit_events: Dict[str, Dict[str, Any]] = {}
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
+		return evaluate_capability_rules(context)
+
+	def register_event_source(
+		self,
+		source_id: str,
+		tenant_id: str,
+		name: str,
+		source_type: str,
+		consent_model: str,
+		data_residency_policy: str,
+		sensitive_location: bool = False,
+		privacy_review_recorded: bool = True,
+	) -> dict[str, Any]:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"sensitive_location": bool(sensitive_location),
+			"privacy_review_recorded": bool(privacy_review_recorded),
+		})
+		self._raise_if_blocked(result)
+		if not data_residency_policy:
+			raise PermissionError("data_residency_policy_required")
+		if not consent_model:
+			raise PermissionError("location_consent_model_required")
+		source = {
+			"id": source_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"source_type": source_type,
+			"consent_model": consent_model,
+			"data_residency_policy": data_residency_policy,
+			"sensitive_location": bool(sensitive_location),
+			"status": "registered",
+		}
+		self._event_sources[source_id] = source
+		self._record_audit(tenant_id, source_id, "event_source_registered", name, result["decision"])
+		return dict(source)
+
+	def create_geofence(
+		self,
+		geofence_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		boundary: dict[str, Any],
+		trigger_events: list[str] | None = None,
+		active_rule: bool = True,
+		spatial_review_recorded: bool = True,
+	) -> dict[str, Any]:
+		coordinates = self._boundary_coordinates(boundary)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_geofence",
+			"geofence_owner_assigned": bool(owner),
+			"polygon_vertices": len(coordinates),
+			"spatial_review_recorded": bool(spatial_review_recorded),
+		})
+		self._raise_if_blocked(result)
+		if result["decision"] == "require_review":
+			raise PermissionError("large_polygon_review_required")
+		if not active_rule:
+			raise PermissionError("active_geofence_rule_required")
+		self._validate_boundary(boundary)
+		geofence = {
+			"id": geofence_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"owner": owner,
+			"boundary": dict(boundary),
+			"trigger_events": list(trigger_events or ["enter", "exit"]),
+			"status": "active",
+			"event_count": 0,
+		}
+		self._geofences[geofence_id] = geofence
+		self._record_audit(tenant_id, geofence_id, "geofence_created", owner, result["decision"], metadata={"vertex_count": len(coordinates)})
+		return dict(geofence)
+
+	def process_location_event(
+		self,
+		event_id: str,
+		tenant_id: str,
+		source_id: str,
+		entity_id: str,
+		entity_type: str,
+		latitude: float,
+		longitude: float,
+		location_consent_recorded: bool,
+		accuracy_meters: float = 10.0,
+		sensitive_location: bool = False,
+		privacy_review_recorded: bool = True,
+	) -> dict[str, Any]:
+		source_registered = source_id in self._event_sources and self._event_sources[source_id]["tenant_id"] == tenant_id
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "process_location_event",
+			"location_consent_recorded": bool(location_consent_recorded),
+			"event_source_registered": source_registered,
+			"location_event_received": True,
+			"sensitive_location": bool(sensitive_location),
+			"privacy_review_recorded": bool(privacy_review_recorded),
+		})
+		self._raise_if_blocked(result)
+		if accuracy_meters > 50:
+			raise PermissionError("minimum_accuracy_required")
+		point = {"latitude": float(latitude), "longitude": float(longitude)}
+		matched_geofences = [
+			geofence_id for geofence_id, geofence in self._geofences.items()
+			if geofence["tenant_id"] == tenant_id and self._point_in_boundary(point, geofence["boundary"])
+		]
+		for geofence_id in matched_geofences:
+			self._geofences[geofence_id]["event_count"] += 1
+		event = {
+			"id": event_id,
+			"tenant_id": tenant_id,
+			"source_id": source_id,
+			"entity_id": entity_id,
+			"entity_type": entity_type,
+			"coordinate": point,
+			"accuracy_meters": float(accuracy_meters),
+			"matched_geofences": matched_geofences,
+			"status": "processed",
+		}
+		self._location_events[event_id] = event
+		self._record_audit(tenant_id, event_id, "location_event_processed", entity_id, result["decision"], metadata={"matched_geofence_count": len(matched_geofences)})
+		return dict(event)
+
+	def create_territory(
+		self,
+		territory_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		boundary: dict[str, Any],
+		territory_type: str = "service",
+		overlap_review_recorded: bool = True,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		self._validate_boundary(boundary)
+		overlaps = [
+			territory["id"] for territory in self._territories.values()
+			if territory["tenant_id"] == tenant_id and self._boundaries_overlap(territory["boundary"], boundary)
+		]
+		if overlaps and not overlap_review_recorded:
+			raise PermissionError("territory_overlap_review_required")
+		territory = {
+			"id": territory_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"owner": owner,
+			"territory_type": territory_type,
+			"boundary": dict(boundary),
+			"overlaps": overlaps,
+			"status": "active",
+		}
+		self._territories[territory_id] = territory
+		self._record_audit(tenant_id, territory_id, "territory_created", owner, "allow", metadata={"overlap_count": len(overlaps)})
+		return dict(territory)
+
+	def run_spatial_analysis(
+		self,
+		analysis_id: str,
+		tenant_id: str,
+		spatial_index_available: bool,
+		aggregation_privacy_applied: bool,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		if not spatial_index_available:
+			raise PermissionError("spatial_index_required")
+		if not aggregation_privacy_applied:
+			raise PermissionError("aggregation_privacy_required")
+		events = self.list_location_events(tenant_id)
+		geofences = self.list_geofences(tenant_id)
+		analysis = {
+			"id": analysis_id,
+			"tenant_id": tenant_id,
+			"event_count": len(events),
+			"geofence_count": len(geofences),
+			"territory_count": len(self.list_territories(tenant_id)),
+			"hotspot_count": len([event for event in events if event["matched_geofences"]]),
+			"status": "completed",
+		}
+		self._analytics[analysis_id] = analysis
+		self._record_audit(tenant_id, analysis_id, "spatial_analysis_completed", "analytics", "allow")
+		return dict(analysis)
+
+	def list_event_sources(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._event_sources, tenant_id)
+
+	def list_geofences(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._geofences, tenant_id)
+
+	def list_location_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._location_events, tenant_id)
+
+	def list_territories(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._territories, tenant_id)
+
+	def list_analytics(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._analytics, tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._audit_events, tenant_id)
+
+	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Compatibility surface exposing geofences as GEOS records."""
+		return self.list_geofences(tenant_id)
+
+	def create_record(
+		self,
+		record_id: str,
+		tenant_id: str,
+		metadata: dict[str, Any] | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		"""Compatibility helper that creates a simple circular geofence."""
+		metadata = dict(metadata or {})
+		geofence = self.create_geofence(
+			geofence_id=record_id,
+			tenant_id=tenant_id,
+			name=str(metadata.get("name") or "Default Geofence"),
+			owner=str(metadata.get("owner") or "geo-admin"),
+			boundary=dict(metadata.get("boundary") or {
+				"type": "circle",
+				"center": {"latitude": 0.0, "longitude": 0.0},
+				"radius_meters": 1000.0,
+			}),
+			trigger_events=list(metadata.get("trigger_events") or ["enter", "exit"]),
+		)
+		if status != "active":
+			self._geofences[record_id]["status"] = status
+			geofence = self._geofences[record_id]
+		return dict(geofence)
+
+	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		return {
+			"event_source_count": len(self.list_event_sources(tenant_id)),
+			"geofence_count": len(self.list_geofences(tenant_id)),
+			"location_event_count": len(self.list_location_events(tenant_id)),
+			"territory_count": len(self.list_territories(tenant_id)),
+			"analytics_count": len(self.list_analytics(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+		}
+
+	def _enforce_tenant(self, tenant_id: str) -> None:
+		self._raise_if_blocked(self.evaluate({"tenant_context_present": bool(tenant_id)}))
+
+	def _raise_if_blocked(self, result: dict[str, Any]) -> None:
+		if result["decision"] == "deny":
+			reasons = ", ".join(action.get("reason", "geos_policy_blocked") for action in result["actions"])
+			raise PermissionError(reasons or "geos_policy_blocked")
+
+	def _record_audit(
+		self,
+		tenant_id: str,
+		subject_id: str,
+		event_type: str,
+		actor: str,
+		decision: str,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		event_id = f"audit:{len(self._audit_events) + 1:06d}"
+		event = {
+			"id": event_id,
+			"tenant_id": tenant_id,
+			"subject_id": subject_id,
+			"event_type": event_type,
+			"actor": actor,
+			"decision": decision,
+			"metadata": dict(metadata or {}),
+		}
+		self._audit_events[event_id] = event
+		return dict(event)
+
+	def _list(self, values: dict[str, dict[str, Any]], tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = list(values.values())
+		if tenant_id is not None:
+			items = [item for item in items if item["tenant_id"] == tenant_id]
+		return [dict(item) for item in sorted(items, key=lambda item: item["id"])]
+
+	def _validate_boundary(self, boundary: dict[str, Any]) -> None:
+		boundary_type = boundary.get("type")
+		coordinates = self._boundary_coordinates(boundary)
+		if boundary_type == "circle":
+			center = boundary.get("center")
+			if not isinstance(center, dict) or float(boundary.get("radius_meters") or 0) <= 0:
+				raise PermissionError("invalid_circle_geofence")
+			self._validate_coordinate(center)
+		elif boundary_type == "polygon":
+			if len(coordinates) < 3:
+				raise PermissionError("invalid_polygon_geofence")
+		elif boundary_type == "rectangle":
+			if len(coordinates) != 2:
+				raise PermissionError("invalid_rectangle_geofence")
+		else:
+			raise PermissionError("unsupported_boundary_type")
+		for coordinate in coordinates:
+			self._validate_coordinate(coordinate)
+
+	def _boundary_coordinates(self, boundary: dict[str, Any]) -> list[dict[str, float]]:
+		if boundary.get("type") == "circle" and isinstance(boundary.get("center"), dict):
+			return [boundary["center"]]
+		return [dict(item) for item in boundary.get("coordinates") or []]
+
+	def _validate_coordinate(self, coordinate: dict[str, Any]) -> None:
+		latitude = float(coordinate["latitude"])
+		longitude = float(coordinate["longitude"])
+		if not -90 <= latitude <= 90:
+			raise PermissionError("invalid_latitude")
+		if not -180 <= longitude <= 180:
+			raise PermissionError("invalid_longitude")
+
+	def _point_in_boundary(self, point: dict[str, float], boundary: dict[str, Any]) -> bool:
+		if boundary.get("type") == "circle":
+			center = boundary["center"]
+			distance_km = self._distance_km(point, center)
+			return distance_km <= float(boundary["radius_meters"]) / 1000.0
+		if boundary.get("type") == "rectangle":
+			coords = self._boundary_coordinates(boundary)
+			latitudes = [float(item["latitude"]) for item in coords]
+			longitudes = [float(item["longitude"]) for item in coords]
+			return min(latitudes) <= point["latitude"] <= max(latitudes) and min(longitudes) <= point["longitude"] <= max(longitudes)
+		if boundary.get("type") == "polygon":
+			return self._point_in_polygon(point, self._boundary_coordinates(boundary))
+		return False
+
+	def _boundaries_overlap(self, left: dict[str, Any], right: dict[str, Any]) -> bool:
+		left_box = self._bounding_box(left)
+		right_box = self._bounding_box(right)
+		return not (
+			left_box["max_lat"] < right_box["min_lat"]
+			or right_box["max_lat"] < left_box["min_lat"]
+			or left_box["max_lon"] < right_box["min_lon"]
+			or right_box["max_lon"] < left_box["min_lon"]
+		)
+
+	def _bounding_box(self, boundary: dict[str, Any]) -> dict[str, float]:
+		coords = self._boundary_coordinates(boundary)
+		if boundary.get("type") == "circle":
+			center = boundary["center"]
+			delta = float(boundary["radius_meters"]) / 111_000.0
+			return {
+				"min_lat": float(center["latitude"]) - delta,
+				"max_lat": float(center["latitude"]) + delta,
+				"min_lon": float(center["longitude"]) - delta,
+				"max_lon": float(center["longitude"]) + delta,
+			}
+		return {
+			"min_lat": min(float(item["latitude"]) for item in coords),
+			"max_lat": max(float(item["latitude"]) for item in coords),
+			"min_lon": min(float(item["longitude"]) for item in coords),
+			"max_lon": max(float(item["longitude"]) for item in coords),
+		}
+
+	def _distance_km(self, first: dict[str, float], second: dict[str, float]) -> float:
+		lat1 = math.radians(float(first["latitude"]))
+		lon1 = math.radians(float(first["longitude"]))
+		lat2 = math.radians(float(second["latitude"]))
+		lon2 = math.radians(float(second["longitude"]))
+		dlat = lat2 - lat1
+		dlon = lon2 - lon1
+		a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+		c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+		return EARTH_RADIUS_KM * c
+
+	def _point_in_polygon(self, point: dict[str, float], polygon: list[dict[str, float]]) -> bool:
+		x = float(point["longitude"])
+		y = float(point["latitude"])
+		inside = False
+		j = len(polygon) - 1
+		for i, coordinate in enumerate(polygon):
+			xi = float(coordinate["longitude"])
+			yi = float(coordinate["latitude"])
+			xj = float(polygon[j]["longitude"])
+			yj = float(polygon[j]["latitude"])
+			intersects = ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / ((yj - yi) or 1e-12) + xi)
+			if intersects:
+				inside = not inside
+			j = i
+		return inside

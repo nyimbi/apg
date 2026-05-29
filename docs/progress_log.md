@@ -16,6 +16,74 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 13:12 EAT
+
+GEOS implementation-depth slice:
+
+- Converted GEOS from a mixed implementation with generated package surfaces
+  into a domain-specific location-intelligence package.
+- Added a dependency-light `GeosService` APG facade for event sources,
+  geofences, location events, territories, spatial analytics, compatibility
+  records, dashboard summaries, and audit evidence while preserving the
+  existing comprehensive async geospatial service layer.
+- Enforced GEOS policy guardrails for tenant context, sensitive-location
+  review, data residency, consent, geofence ownership, active geofence rules,
+  large polygon review, registered event sources, location accuracy, spatial
+  index requirements, aggregation privacy, and territory overlap review.
+- Fixed broken APG package imports by exposing `GeosService`, importing
+  `ConfigDict`, removing unsupported `APIRouter.exception_handler`
+  decorators, and adding the `PNG` export format referenced by the API.
+- Rebuilt GEOS view models around map consoles, event monitors, spatial
+  analytics, route metadata, and dashboard summaries.
+- Rewrote `cap_spec.md` so it describes executable location-intelligence
+  behavior and production integration boundaries instead of generated package
+  scaffolding.
+- Expanded GEOS focused tests for the executable geospatial lifecycle,
+  compatibility helpers, view models, and policy failures.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/geos/__init__.py
+  capabilities/common/geos/models.py capabilities/common/geos/service.py
+  capabilities/common/geos/api.py capabilities/common/geos/views.py
+  capabilities/common/geos/test_capability_contract.py
+  capabilities/common/geos/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/python - <<'PY' ... importlib.import_module(...) ... PY` for
+  `capabilities.common.geos.service`, `capabilities.common.geos.views`, and
+  `capabilities.common.geos.api` -> passed; emitted the pre-existing
+  OpenTelemetry fallback warning.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/common/geos` -> no matches.
+- `./.venv/bin/pytest -q capabilities/common/geos/test_capability_contract.py
+  capabilities/common/geos/tests/test_materialized_package.py` -> 8 passed
+  with 10 pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/geos --json` -> passed with GEOS classified as
+  `domain_specific`, 1 custom Python file, 0 baseline markers, 0 errors, and 0
+  warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/geos --json`
+  -> passed with runtime self-test loaded, release evidence ok, and
+  side-effect-free catalog patch.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  75 domain-specific packages, 31 materialized-baseline packages, 2 mixed
+  packages, 1 contract-only package, 891 custom Python files, 0 errors, and 34
+  warnings; next warning is `grc_rcm`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+
+Known remaining gaps:
+
+- GEOS is now domain-specific, but implementation-depth still reports 31
+  materialized baselines, 2 mixed implementations, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is
+  `grc_rcm`.
+
 ### 2026-05-29 12:50 EAT
 
 FEDL implementation-depth slice:
