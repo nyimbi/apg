@@ -12786,3 +12786,26 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/agnt --json` passed with `ok: true`; AGNT remains `domain_specific`, with 0 baseline markers and 0 warnings.
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/agnt --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
 - `git diff --check -- capabilities/common/agnt` passed with no whitespace errors.
+
+### 2026-05-29 23:41 EAT
+
+AICR high-risk inference approval lifecycle slice:
+
+- Added `capabilities/common/aicr/SPECIFICATION.md` and `capabilities/common/aicr/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Extended AICR models with tenant-scoped AI service records, inference approvals, and governance events.
+- Added the dependency-light `AicrService` governance facade for AI service registration, governed inference requests, high-risk and large-context approval, approved execution, blocked unhealthy or policyless routing, tenant-qualified state, and audit evidence.
+- Added dependency-light `api_helpers.py` so generated APG applications can compose the AICR lifecycle without importing the optional Flask API stack.
+- Extended AICR view models with dashboard summary, service registry, inference console, governance center, metrics, approvals, inference results, and audit-event surfaces.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive service-request-approval-run coverage and negative missing-owner, missing-policy, unhealthy-service, rejected-approval, tenant-mismatch, and duplicate-ID tenant-isolation coverage.
+- Updated `cap_spec.md` with the current executable governance lifecycle, adapter boundaries, and focused proof commands.
+- Code review found and fixed tenant-isolation risk in the first in-memory implementation by keying services, approvals, and inference results by tenant plus record ID.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/aicr/__init__.py capabilities/common/aicr/models.py capabilities/common/aicr/service.py capabilities/common/aicr/api_helpers.py capabilities/common/aicr/views.py capabilities/common/aicr/capability_contract.py capabilities/common/aicr/app.py capabilities/common/aicr/test_capability_contract.py capabilities/common/aicr/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/aicr` returned no stale AICR materialized markers.
+- `./.venv/bin/pytest -q capabilities/common/aicr/test_capability_contract.py capabilities/common/aicr/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/aicr --json` passed with `ok: true`; AICR remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/aicr --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
+- `git diff --check -- capabilities/common/aicr` passed with no whitespace errors.

@@ -6,6 +6,39 @@ The AI Core Framework (aicr) is a foundational capability that provides the esse
 
 This capability enables the APG platform to become the most advanced enterprise AI platform, surpassing industry leaders like IBM Watson, Google Cloud AI, and Microsoft Azure AI by providing a unified, composable, and highly performant AI infrastructure that operates seamlessly across on-premises, edge, and cloud environments.
 
+## Current Executable Governance Slice
+
+The package now includes a dependency-light `AicrService` facade and
+`api_helpers.py` surface for generated APG applications and capability
+composition. The facade keeps provider SDKs, GPU runtimes, model stores, and
+monitoring backends behind adapters while making the AI governance lifecycle
+executable locally.
+
+Current package-backed lifecycle:
+
+1. Register a tenant-owned AI service with owner, endpoint, health, and model
+   policy metadata.
+2. Request inference with service, caller, prompt summary, workflow risk, and
+   context token count.
+3. Complete normal inference through a deterministic local envelope when the
+   service is healthy and a model policy is attached.
+4. Require approval for high-risk or large-context inference.
+5. Approve or reject the inference request with reviewer notes.
+6. Execute only approved high-risk inference.
+7. Block unhealthy services, missing model policy, rejected approvals, and
+   tenant mismatches.
+8. Emit tenant-scoped governance events for registration, approval, inference,
+   and blocking evidence.
+
+Focused proof commands:
+
+```bash
+./.venv/bin/pytest -q capabilities/common/aicr/test_capability_contract.py capabilities/common/aicr/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/aicr --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/aicr --json
+git diff --check -- capabilities/common/aicr
+```
+
 ## Business Value Proposition
 
 ### APG Ecosystem Integration

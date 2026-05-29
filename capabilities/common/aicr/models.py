@@ -737,6 +737,53 @@ class AICRMetric(BaseModel):
 	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
 
 
+class AICRServiceRecord(BaseModel):
+	"""Tenant-scoped AI service registration used by package governance."""
+
+	id: str
+	tenant_id: Annotated[str, AfterValidator(_validate_tenant_id)]
+	name: str
+	owner: str
+	service_type: str = "inference"
+	endpoint: str = "local://inference"
+	health: str = "healthy"
+	model_policy: dict[str, Any] = Field(default_factory=dict)
+	status: str = "active"
+
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+
+class AICRInferenceApproval(BaseModel):
+	"""Governed approval record for high-risk or large-context inference."""
+
+	id: str
+	tenant_id: Annotated[str, AfterValidator(_validate_tenant_id)]
+	service_id: str
+	requested_by: str
+	prompt_summary: str
+	context_tokens: int = 0
+	workflow_risk: str = "normal"
+	decision: str = "pending"
+	reviewer: str | None = None
+	notes: str | None = None
+
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+
+class AICRGovernanceEvent(BaseModel):
+	"""Tenant-scoped evidence event for AICR governance changes."""
+
+	id: str = Field(default_factory=uuid7str)
+	tenant_id: Annotated[str, AfterValidator(_validate_tenant_id)]
+	event_type: str
+	subject_id: str
+	message: str
+	evidence: dict[str, Any] = Field(default_factory=dict)
+	timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+
 # Model registry for APG composition engine
 model_registry = {
 	"AIServiceRegistration": AIServiceRegistration,
@@ -754,6 +801,9 @@ model_registry = {
 	"AICRInferenceResponse": AICRInferenceResponse,
 	"AICRPipeline": AICRPipeline,
 	"AICRMetric": AICRMetric,
+	"AICRServiceRecord": AICRServiceRecord,
+	"AICRInferenceApproval": AICRInferenceApproval,
+	"AICRGovernanceEvent": AICRGovernanceEvent,
 }
 
 __all__ = [
@@ -766,6 +816,7 @@ __all__ = [
 	"AIInferenceRequest", "AIInferenceResult", "AIServiceHealth",
 	"AICRCapabilityBase", "AICRModel", "AICRInferenceRequest",
 	"AICRInferenceResponse", "AICRPipeline", "AICRMetric",
+	"AICRServiceRecord", "AICRInferenceApproval", "AICRGovernanceEvent",
 
 	# Workflow Models
 	"AIWorkflowStep", "AIWorkflow",

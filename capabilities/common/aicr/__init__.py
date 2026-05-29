@@ -826,6 +826,7 @@ def register_capability() -> Dict[str, Any]:
 		"capabilities": {
 			"ai_service_registry": "Register, discover, and govern tenant-scoped AI services",
 			"inference_engine": "Route governed inference work across registered AI providers",
+			"inference_approval_governance": "Require approval for high-risk and large-context inference",
 			"model_catalog": "Expose shared AI model metadata to downstream capabilities",
 			"workflow_orchestration": "Compose AI workflows with human approval and monitoring",
 			"capability_rules": "Evaluate deterministic AI infrastructure governance rules",
@@ -834,6 +835,7 @@ def register_capability() -> Dict[str, Any]:
 		"endpoints": {
 			"services": "/aicr/api/v1/services",
 			"inference": "/aicr/api/v1/inference",
+			"inference_approvals": "/aicr/api/v1/inference-approvals",
 			"models": "/aicr/api/v1/models",
 			"workflows": "/aicr/api/v1/workflows",
 			"metrics": "/aicr/api/v1/metrics"

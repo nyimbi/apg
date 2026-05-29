@@ -38,8 +38,10 @@ from .models import (
 	AIModelMetadata, AIModelFramework, AIInferenceRequest, AIInferenceResult,
 	AIWorkflow, AIWorkflowStep, AIAuditEvent, AIJobPriority, AIResourceType,
 	AICRModel, AICRInferenceRequest, AICRInferenceResponse, InferenceStatus,
+	AICRServiceRecord, AICRInferenceApproval, AICRGovernanceEvent,
 	uuid7str, _validate_tenant_id, _validate_positive_int, _validate_non_negative_float
 )
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
 
 def _log_performance_metric(operation: str, duration_ms: float, success: bool) -> str:
@@ -1674,10 +1676,285 @@ class AICoreService:
 			await result
 
 
+class AicrService:
+	"""Dependency-light AI service governance facade for package composition."""
+
+	def __init__(self) -> None:
+		self._services: dict[tuple[str, str], AICRServiceRecord] = {}
+		self._approvals: dict[tuple[str, str], AICRInferenceApproval] = {}
+		self._events: list[AICRGovernanceEvent] = []
+		self._inference_results: dict[tuple[str, str], dict[str, Any]] = {}
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
+		return evaluate_capability_rules(context)
+
+	def register_ai_service(
+		self,
+		service_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		service_type: str = "inference",
+		endpoint: str = "local://inference",
+		health: str = "healthy",
+		model_policy: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_service",
+			"owner_assigned": bool(owner),
+		})
+		_raise_if_blocked(result)
+		if not name:
+			raise ValueError("AI service name is required")
+		record = AICRServiceRecord(
+			id=service_id,
+			tenant_id=tenant_id,
+			name=name,
+			owner=owner,
+			service_type=service_type,
+			endpoint=endpoint,
+			health=health,
+			model_policy=dict(model_policy or {}),
+		)
+		self._services[self._tenant_key(tenant_id, service_id)] = record
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="ai_service_registered",
+			subject_id=service_id,
+			message=f"Registered AI service {name}.",
+			evidence={"service_type": service_type, "health": health},
+		)
+		return record.model_dump(mode="json")
+
+	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self.list_ai_services(tenant_id)
+
+	def create_record(
+		self,
+		record_id: str,
+		tenant_id: str,
+		metadata: dict[str, Any] | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		metadata = dict(metadata or {})
+		record = self.register_ai_service(
+			service_id=record_id,
+			tenant_id=tenant_id,
+			name=str(metadata.get("name") or record_id),
+			owner=str(metadata.get("owner") or metadata.get("created_by") or ""),
+			service_type=str(metadata.get("service_type") or "inference"),
+			endpoint=str(metadata.get("endpoint") or "local://inference"),
+			health=str(metadata.get("health") or "healthy"),
+			model_policy=dict(metadata.get("model_policy") or {"policy": "default"}),
+		)
+		record["status"] = status
+		return record
+
+	def list_ai_services(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		records = list(self._services.values())
+		if tenant_id is not None:
+			records = [record for record in records if record.tenant_id == tenant_id]
+		return [record.model_dump(mode="json") for record in sorted(records, key=lambda item: item.id)]
+
+	def request_inference(
+		self,
+		request_id: str,
+		tenant_id: str,
+		service_id: str,
+		requested_by: str,
+		prompt_summary: str,
+		model_policy_attached: bool = True,
+		context_tokens: int = 0,
+		workflow_risk: str = "normal",
+	) -> dict[str, Any]:
+		service = self._get_service(service_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "run_inference",
+			"model_policy_attached": model_policy_attached and bool(service.model_policy),
+			"service_health": service.health,
+			"routing_requested": True,
+		})
+		_raise_if_blocked(result)
+		needs_review = workflow_risk == "high" or context_tokens > 128000
+		if needs_review:
+			approval = AICRInferenceApproval(
+				id=request_id,
+				tenant_id=tenant_id,
+				service_id=service_id,
+				requested_by=requested_by,
+				prompt_summary=prompt_summary,
+				context_tokens=context_tokens,
+				workflow_risk=workflow_risk,
+			)
+			self._approvals[self._tenant_key(tenant_id, request_id)] = approval
+			self._record_event(
+				tenant_id=tenant_id,
+				event_type="inference_approval_requested",
+				subject_id=request_id,
+				message=f"Requested inference approval for {service_id}.",
+				evidence={"workflow_risk": workflow_risk, "context_tokens": context_tokens},
+			)
+			return approval.model_dump(mode="json")
+		inference = self._complete_inference(request_id, service, prompt_summary)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="inference_completed",
+			subject_id=request_id,
+			message=f"Completed governed inference for {service_id}.",
+			evidence={"workflow_risk": workflow_risk, "context_tokens": context_tokens},
+		)
+		return inference
+
+	def decide_inference_approval(
+		self,
+		request_id: str,
+		tenant_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> dict[str, Any]:
+		approval = self._approvals.get(self._tenant_key(tenant_id, request_id))
+		if approval is None:
+			raise KeyError(f"unknown inference approval for tenant: {request_id}")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("inference approval decision must be approved or rejected")
+		if not reviewer:
+			raise ValueError("reviewer is required")
+		if not notes:
+			raise ValueError("approval notes are required")
+		decided = AICRInferenceApproval(
+			id=approval.id,
+			tenant_id=approval.tenant_id,
+			service_id=approval.service_id,
+			requested_by=approval.requested_by,
+			prompt_summary=approval.prompt_summary,
+			context_tokens=approval.context_tokens,
+			workflow_risk=approval.workflow_risk,
+			decision=decision,
+			reviewer=reviewer,
+			notes=notes,
+		)
+		self._approvals[self._tenant_key(tenant_id, request_id)] = decided
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="inference_approval_decided",
+			subject_id=request_id,
+			message=f"Inference approval {request_id} was {decision}.",
+			evidence={"reviewer": reviewer, "service_id": approval.service_id},
+		)
+		return decided.model_dump(mode="json")
+
+	def run_approved_inference(self, request_id: str, tenant_id: str) -> dict[str, Any]:
+		approval = self._approvals.get(self._tenant_key(tenant_id, request_id))
+		if approval is None:
+			raise KeyError(f"unknown inference approval for tenant: {request_id}")
+		if approval.decision != "approved":
+			raise PermissionError("inference_approval_required")
+		service = self._get_service(approval.service_id, tenant_id)
+		result = self._complete_inference(request_id, service, approval.prompt_summary)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="approved_inference_completed",
+			subject_id=request_id,
+			message=f"Completed approved inference for {approval.service_id}.",
+			evidence={"reviewer": approval.reviewer, "workflow_risk": approval.workflow_risk},
+		)
+		return result
+
+	def list_inference_approvals(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		approvals = list(self._approvals.values())
+		if tenant_id is not None:
+			approvals = [approval for approval in approvals if approval.tenant_id == tenant_id]
+		return [approval.model_dump(mode="json") for approval in sorted(approvals, key=lambda item: item.id)]
+
+	def list_inference_results(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		results = list(self._inference_results.values())
+		if tenant_id is not None:
+			results = [result for result in results if result["tenant_id"] == tenant_id]
+		return sorted(results, key=lambda item: item["request_id"])
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		events = list(self._events)
+		if tenant_id is not None:
+			events = [event for event in events if event.tenant_id == tenant_id]
+		return [event.model_dump(mode="json") for event in events]
+
+	def governance_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		services = self.list_ai_services(tenant_id)
+		approvals = self.list_inference_approvals(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"service_count": len(services),
+			"healthy_service_count": len([service for service in services if service["health"] == "healthy"]),
+			"inference_approval_count": len(approvals),
+			"pending_approval_count": len([approval for approval in approvals if approval["decision"] == "pending"]),
+			"inference_result_count": len(self.list_inference_results(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+		}
+
+	def _get_service(self, service_id: str, tenant_id: str) -> AICRServiceRecord:
+		service = self._services.get(self._tenant_key(tenant_id, service_id))
+		if service is None:
+			raise KeyError(f"unknown AI service for tenant: {service_id}")
+		return service
+
+	def _tenant_key(self, tenant_id: str, record_id: str) -> tuple[str, str]:
+		return (tenant_id, record_id)
+
+	def _complete_inference(
+		self,
+		request_id: str,
+		service: AICRServiceRecord,
+		prompt_summary: str,
+	) -> dict[str, Any]:
+		result = {
+			"request_id": request_id,
+			"tenant_id": service.tenant_id,
+			"service_id": service.id,
+			"status": "completed",
+			"result": {
+				"summary": f"Deterministic AICR envelope completed for {service.name}.",
+				"prompt_summary": prompt_summary,
+			},
+		}
+		self._inference_results[self._tenant_key(service.tenant_id, request_id)] = result
+		return result
+
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		evidence: dict[str, Any] | None = None,
+	) -> None:
+		self._events.append(
+			AICRGovernanceEvent(
+				tenant_id=tenant_id,
+				event_type=event_type,
+				subject_id=subject_id,
+				message=message,
+				evidence=dict(evidence or {}),
+			)
+		)
+
+
+def _raise_if_blocked(result: dict[str, Any]) -> None:
+	if result["decision"] == "allow":
+		return
+	reasons = ", ".join(action.get("reason", "ai_core_policy_blocked") for action in result["actions"])
+	raise PermissionError(reasons or "ai_core_policy_blocked")
+
+
 # Module exports
 __all__ = [
 	# Core service class
-	"ImportExportService", "AICoreService",
+	"ImportExportService", "AICoreService", "AicrService",
 
 	# Infrastructure components
 	"ModelRegistry", "InferenceEngine", "ResourcePool",
