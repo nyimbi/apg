@@ -80,8 +80,11 @@ class RestoreRun:
 	status: str
 	integrity_check_passed: bool
 	approval_recorded: bool = False
+	approval_id: str = ""
 	point_in_time: str | None = None
 	review_status: str = "approved"
+	reviewer: str = ""
+	reviewer_notes: str = ""
 	rto_minutes: int = 0
 
 	def to_dict(self) -> dict[str, Any]:
@@ -94,9 +97,74 @@ class RestoreRun:
 			"status": self.status,
 			"integrity_check_passed": self.integrity_check_passed,
 			"approval_recorded": self.approval_recorded,
+			"approval_id": self.approval_id,
 			"point_in_time": self.point_in_time,
 			"review_status": self.review_status,
+			"reviewer": self.reviewer,
+			"reviewer_notes": self.reviewer_notes,
 			"rto_minutes": self.rto_minutes,
+		}
+
+
+@dataclass(frozen=True)
+class RestoreApproval:
+	"""Independent restore approval evidence."""
+
+	id: str
+	tenant_id: str
+	snapshot_id: str
+	target_environment: str
+	requested_by: str
+	justification: str
+	point_in_time: str | None = None
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"snapshot_id": self.snapshot_id,
+			"target_environment": self.target_environment,
+			"requested_by": self.requested_by,
+			"justification": self.justification,
+			"point_in_time": self.point_in_time,
+			"status": self.status,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+		}
+
+
+@dataclass(frozen=True)
+class RetentionDisposition:
+	"""Snapshot retention disposition approval and legal-hold evidence."""
+
+	id: str
+	tenant_id: str
+	snapshot_id: str
+	action: str
+	requested_by: str
+	reason: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"snapshot_id": self.snapshot_id,
+			"action": self.action,
+			"requested_by": self.requested_by,
+			"reason": self.reason,
+			"status": self.status,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
 		}
 
 

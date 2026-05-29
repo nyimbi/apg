@@ -26,7 +26,7 @@ capability_metadata: dict[str, Any] = {
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
 	"provides": ["backup_plans", "snapshots", "restore_testing", "retention_policy", "continuity_reporting"],
-	"permissions": ["bkup:view", "bkup:manage_plans", "bkup:run_backup", "bkup:restore", "bkup:admin"]
+	"permissions": ["bkup:view", "bkup:manage_plans", "bkup:run_backup", "bkup:restore", "bkup:approve_restore", "bkup:approve_retention", "bkup:admin"]
 }
 
 
@@ -48,11 +48,13 @@ def register_capability() -> dict[str, Any]:
 			"backup_plans": "Define tenant-scoped backup plans, sources, schedules, retention, and ownership",
 			"snapshots": "Create encrypted snapshots with integrity and lineage metadata",
 			"restore_testing": "Run restore drills, point-in-time validation, and recovery reports",
+			"restore_approvals": "Route production and high-risk restores through independent approval",
 			"retention_policy": "Enforce retention, legal hold, deletion, and compliance policies",
+			"retention_dispositions": "Approve legal-hold-aware snapshot deletion and archival disposition",
 			"capability_rules": "Evaluate deterministic backup and restore rules",
 			"visual_theming": "Apply continuity-operations theme tokens and components"
 		},
-		"endpoints": {"plans": "/bkup/api/v1/plans", "snapshots": "/bkup/api/v1/snapshots", "restores": "/bkup/api/v1/restores", "retention": "/bkup/api/v1/retention", "reports": "/bkup/api/v1/reports"},
+		"endpoints": {"plans": "/bkup/api/v1/plans", "snapshots": "/bkup/api/v1/snapshots", "restores": "/bkup/api/v1/restores", "restore_approvals": "/bkup/api/v1/restore-approvals", "retention": "/bkup/api/v1/retention", "retention_dispositions": "/bkup/api/v1/retention-dispositions", "reports": "/bkup/api/v1/reports"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

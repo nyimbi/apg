@@ -3,6 +3,8 @@
   "display_name": "Backup and Restore",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
     "models.py",
     "service.py",

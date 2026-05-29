@@ -12989,3 +12989,32 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/biop --json` passed with consent/template/review routes, 10 executable rules, review theme evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/biop` returned no stale BIOP materialized markers.
 - `git diff --check -- capabilities/common/biop` passed with no whitespace errors.
+
+### 2026-05-30 02:08 EAT
+
+BKUP governed restore approval and retention disposition lifecycle slice:
+
+- Added `capabilities/common/bkup/SPECIFICATION.md` and `capabilities/common/bkup/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Converted BKUP service state to tenant-qualified backup plans, snapshots, restores, restore approvals, retention dispositions, reports, and audit events.
+- Added explicit `RestoreApproval` and `RetentionDisposition` records, including requester, reviewer, decision, notes, approval status, snapshot linkage, restore intent, and disposition action evidence.
+- Enforced production restore approval as fail-closed governance evidence, ignoring caller-supplied `approval_recorded` booleans unless backed by matching approved package state.
+- Enforced stale restore-test review as fail-closed governance evidence, ignoring caller-supplied `restore_test_review_recorded` booleans when the last restore-test age exceeds the package threshold.
+- Added request/decision workflows for restore approvals with independent-reviewer and reviewer-notes guardrails.
+- Added request/decision workflows for retention dispositions with independent-reviewer, reviewer-notes, delete/archive action, and legal-hold guardrails.
+- Extended API helpers and view models with restore approval queues, retention disposition queues, audit state, and shared default service state.
+- Extended the BKUP capability contract with restore approval, retention disposition, audit routes, guardrail rules, and theme components for generated APG applications.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive plan-snapshot-restore-approval-production-restore-report-retention-archive-audit coverage and API/view-model coverage.
+- Added negative missing owner, unencrypted snapshot, failed integrity, restore integrity failure, production approval boolean bypass, self restore approval, missing notes, rejected approval, stale restore-test boolean bypass, self restore review, stale report, legal-hold disposition block, self retention review, missing retention notes, and duplicate-ID tenant-isolation coverage.
+- Updated `cap_spec.md` with the current executable lifecycle, adapter boundaries, routes, guardrails, and focused proof commands.
+- Focused review found and fixed a snapshot integrity rule reason mismatch before commit.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/bkup/__init__.py capabilities/common/bkup/models.py capabilities/common/bkup/backup_engine.py capabilities/common/bkup/service.py capabilities/common/bkup/api.py capabilities/common/bkup/views.py capabilities/common/bkup/capability_contract.py capabilities/common/bkup/app.py capabilities/common/bkup/test_capability_contract.py capabilities/common/bkup/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/bkup/test_capability_contract.py capabilities/common/bkup/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/bkup --json` passed with `ok: true`; BKUP remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/bkup --json` passed with restore approval and retention disposition routes, 10 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/bkup` returned no stale BKUP materialized markers.
+- `git diff --check -- capabilities/common/bkup docs/progress_log.md` passed with no whitespace errors.

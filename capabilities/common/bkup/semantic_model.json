@@ -8,7 +8,10 @@
   },
   "capabilities": {
     "bkup": {
-      "approvals": {},
+      "approvals": {
+        "restore": "RestoreApproval",
+        "retention_disposition": "RetentionDisposition"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -45,7 +48,9 @@
           "enable_backup_dashboard": true,
           "enable_continuity_reports": true,
           "enable_plan_manager": true,
-          "enable_restore_console": true
+          "enable_restore_approval_queue": true,
+          "enable_restore_console": true,
+          "enable_retention_disposition_queue": true
         }
       },
       "erp_modules": [
@@ -100,6 +105,19 @@
           },
           {
             "condition": {
+              "operation": "create_snapshot",
+              "snapshot_integrity_passed": false
+            },
+            "description": "Snapshots require integrity evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "snapshot_integrity_check_required",
+              "required_action": "pass_snapshot_integrity_check"
+            },
+            "name": "snapshot_requires_integrity"
+          },
+          {
+            "condition": {
               "integrity_check_passed": false,
               "operation": "restore"
             },
@@ -136,6 +154,45 @@
               "required_action": "review_restore_test"
             },
             "name": "stale_restore_test_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "approve_restore",
+              "restore_reviewer_same_as_requester": true
+            },
+            "description": "Restore approvals and reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_restore_reviewer_required",
+              "required_action": "route_to_independent_restore_reviewer"
+            },
+            "name": "restore_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "legal_hold_active": true,
+              "operation": "retention_disposition"
+            },
+            "description": "Snapshots under legal hold cannot be disposed.",
+            "effect": {
+              "decision": "deny",
+              "reason": "legal_hold_blocks_disposition",
+              "required_action": "release_legal_hold_before_disposition"
+            },
+            "name": "retention_disposition_blocks_legal_hold"
+          },
+          {
+            "condition": {
+              "operation": "approve_retention_disposition",
+              "retention_reviewer_same_as_requester": true
+            },
+            "description": "Retention disposition approvals require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_retention_reviewer_required",
+              "required_action": "route_to_independent_retention_reviewer"
+            },
+            "name": "retention_review_requires_independent_reviewer"
           }
         ],
         "type": "deterministic"
@@ -181,6 +238,19 @@
         },
         {
           "condition": {
+            "operation": "create_snapshot",
+            "snapshot_integrity_passed": false
+          },
+          "description": "Snapshots require integrity evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "snapshot_integrity_check_required",
+            "required_action": "pass_snapshot_integrity_check"
+          },
+          "name": "snapshot_requires_integrity"
+        },
+        {
+          "condition": {
             "integrity_check_passed": false,
             "operation": "restore"
           },
@@ -217,6 +287,45 @@
             "required_action": "review_restore_test"
           },
           "name": "stale_restore_test_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "approve_restore",
+            "restore_reviewer_same_as_requester": true
+          },
+          "description": "Restore approvals and reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_restore_reviewer_required",
+            "required_action": "route_to_independent_restore_reviewer"
+          },
+          "name": "restore_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "legal_hold_active": true,
+            "operation": "retention_disposition"
+          },
+          "description": "Snapshots under legal hold cannot be disposed.",
+          "effect": {
+            "decision": "deny",
+            "reason": "legal_hold_blocks_disposition",
+            "required_action": "release_legal_hold_before_disposition"
+          },
+          "name": "retention_disposition_blocks_legal_hold"
+        },
+        {
+          "condition": {
+            "operation": "approve_retention_disposition",
+            "retention_reviewer_same_as_requester": true
+          },
+          "description": "Retention disposition approvals require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_retention_reviewer_required",
+            "required_action": "route_to_independent_retention_reviewer"
+          },
+          "name": "retention_review_requires_independent_reviewer"
         }
       ],
       "runtime": {
@@ -226,6 +335,11 @@
         "views": "views.py"
       },
       "screens": {
+        "audit": {
+          "component": "BackupAudit",
+          "permission": "bkup:view",
+          "route": "/bkup/audit"
+        },
         "backup": {
           "component": "BackupRuns",
           "permission": "bkup:run_backup",
@@ -251,10 +365,20 @@
           "permission": "bkup:restore",
           "route": "/bkup/restore"
         },
+        "restore_approvals": {
+          "component": "RestoreApprovalQueue",
+          "permission": "bkup:approve_restore",
+          "route": "/bkup/restore/approvals"
+        },
         "retention": {
           "component": "RetentionPolicy",
           "permission": "bkup:admin",
           "route": "/bkup/retention"
+        },
+        "retention_dispositions": {
+          "component": "RetentionDispositionQueue",
+          "permission": "bkup:approve_retention",
+          "route": "/bkup/retention/dispositions"
         },
         "settings": {
           "component": "BKUPSettings",
@@ -270,6 +394,10 @@
       "streaming": {},
       "theme": {
         "components": {
+          "backup_audit": {
+            "status_style": "decision-chip",
+            "visual": "event-ledger"
+          },
           "backup_plan": {
             "icon": "database-backup",
             "risk_style": "retention-band",
@@ -279,9 +407,17 @@
             "status_style": "test-chip",
             "visual": "rto-rpo-card"
           },
+          "restore_approval_queue": {
+            "status_style": "restore-review-chip",
+            "visual": "approval-lane"
+          },
           "restore_console": {
             "status_style": "integrity-chip",
             "visual": "restore-timeline"
+          },
+          "retention_disposition_queue": {
+            "status_style": "retention-chip",
+            "visual": "legal-hold-lane"
           },
           "snapshot_vault": {
             "highlight": "encryption-chip",
@@ -343,6 +479,13 @@
             "permission": "bkup:restore"
           },
           {
+            "component": "RestoreApprovalQueue",
+            "name": "restore_approvals",
+            "nav_group": "Recovery",
+            "path": "/bkup/restore/approvals",
+            "permission": "bkup:approve_restore"
+          },
+          {
             "component": "RetentionPolicy",
             "name": "retention",
             "nav_group": "Governance",
@@ -350,10 +493,24 @@
             "permission": "bkup:admin"
           },
           {
+            "component": "RetentionDispositionQueue",
+            "name": "retention_dispositions",
+            "nav_group": "Governance",
+            "path": "/bkup/retention/dispositions",
+            "permission": "bkup:approve_retention"
+          },
+          {
             "component": "ContinuityReports",
             "name": "reports",
             "nav_group": "Governance",
             "path": "/bkup/reports",
+            "permission": "bkup:view"
+          },
+          {
+            "component": "BackupAudit",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/bkup/audit",
             "permission": "bkup:view"
           },
           {
@@ -416,7 +573,9 @@
           "enable_backup_dashboard": true,
           "enable_continuity_reports": true,
           "enable_plan_manager": true,
-          "enable_restore_console": true
+          "enable_restore_approval_queue": true,
+          "enable_restore_console": true,
+          "enable_retention_disposition_queue": true
         }
       },
       "id": "bkup",
@@ -495,6 +654,45 @@
       },
       "name": "restore_requires_integrity_check"
     },
+    "restore_review_requires_independent_reviewer": {
+      "condition": {
+        "operation": "approve_restore",
+        "restore_reviewer_same_as_requester": true
+      },
+      "description": "Restore approvals and reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_restore_reviewer_required",
+        "required_action": "route_to_independent_restore_reviewer"
+      },
+      "name": "restore_review_requires_independent_reviewer"
+    },
+    "retention_disposition_blocks_legal_hold": {
+      "condition": {
+        "legal_hold_active": true,
+        "operation": "retention_disposition"
+      },
+      "description": "Snapshots under legal hold cannot be disposed.",
+      "effect": {
+        "decision": "deny",
+        "reason": "legal_hold_blocks_disposition",
+        "required_action": "release_legal_hold_before_disposition"
+      },
+      "name": "retention_disposition_blocks_legal_hold"
+    },
+    "retention_review_requires_independent_reviewer": {
+      "condition": {
+        "operation": "approve_retention_disposition",
+        "retention_reviewer_same_as_requester": true
+      },
+      "description": "Retention disposition approvals require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_retention_reviewer_required",
+        "required_action": "route_to_independent_retention_reviewer"
+      },
+      "name": "retention_review_requires_independent_reviewer"
+    },
     "snapshot_requires_encryption": {
       "condition": {
         "operation": "create_snapshot",
@@ -507,6 +705,19 @@
         "required_action": "encrypt_snapshot"
       },
       "name": "snapshot_requires_encryption"
+    },
+    "snapshot_requires_integrity": {
+      "condition": {
+        "operation": "create_snapshot",
+        "snapshot_integrity_passed": false
+      },
+      "description": "Snapshots require integrity evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "snapshot_integrity_check_required",
+        "required_action": "pass_snapshot_integrity_check"
+      },
+      "name": "snapshot_requires_integrity"
     },
     "stale_restore_test_requires_review": {
       "condition": {

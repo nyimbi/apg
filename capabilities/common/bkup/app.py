@@ -5,13 +5,127 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Backup and Restore package-backed APG capability", "entity_count": 0, "name": "bkup", "version": "1.0.0"}, "capabilities": {"bkup": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"governance": {"audit_backup_events": true, "legal_hold_supported": true, "require_tenant_context": true, "retention_policy_required": true}, "plans": {"plan_owner_required": true, "rpo_minutes": 60, "schedule_required": true, "source_inventory_required": true}, "restore": {"approval_required_for_production": true, "point_in_time_supported": true, "restore_test_required": true, "rto_minutes": 240}, "snapshots": {"cross_region_copy_supported": true, "encryption_required": true, "integrity_check_required": true, "lineage_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "bkup_continuity_ops"}, "ui": {"enable_backup_dashboard": true, "enable_continuity_reports": true, "enable_plan_manager": true, "enable_restore_console": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Backup and Restore", "provides": ["bkup_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All backup operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_backup_plan", "plan_owner_assigned": false}, "description": "Backup plans require an accountable owner.", "effect": {"decision": "deny", "reason": "plan_owner_required", "required_action": "assign_plan_owner"}, "name": "backup_plan_requires_owner"}, {"condition": {"operation": "create_snapshot", "snapshot_encrypted": false}, "description": "Snapshots must be encrypted.", "effect": {"decision": "deny", "reason": "snapshot_encryption_required", "required_action": "encrypt_snapshot"}, "name": "snapshot_requires_encryption"}, {"condition": {"integrity_check_passed": false, "operation": "restore"}, "description": "Restore operations require integrity checks.", "effect": {"decision": "deny", "reason": "integrity_check_required", "required_action": "pass_integrity_check"}, "name": "restore_requires_integrity_check"}, {"condition": {"approval_recorded": false, "target_environment": "production"}, "description": "Production restores require approval.", "effect": {"decision": "deny", "reason": "production_restore_approval_required", "required_action": "record_restore_approval"}, "name": "production_restore_requires_approval"}, {"condition": {"days_since_restore_test_gt": 90, "restore_test_review_recorded": false}, "description": "Stale restore tests require review.", "effect": {"decision": "require_review", "reason": "restore_test_review_required", "required_action": "review_restore_test"}, "name": "stale_restore_test_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All backup operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_backup_plan", "plan_owner_assigned": false}, "description": "Backup plans require an accountable owner.", "effect": {"decision": "deny", "reason": "plan_owner_required", "required_action": "assign_plan_owner"}, "name": "backup_plan_requires_owner"}, {"condition": {"operation": "create_snapshot", "snapshot_encrypted": false}, "description": "Snapshots must be encrypted.", "effect": {"decision": "deny", "reason": "snapshot_encryption_required", "required_action": "encrypt_snapshot"}, "name": "snapshot_requires_encryption"}, {"condition": {"integrity_check_passed": false, "operation": "restore"}, "description": "Restore operations require integrity checks.", "effect": {"decision": "deny", "reason": "integrity_check_required", "required_action": "pass_integrity_check"}, "name": "restore_requires_integrity_check"}, {"condition": {"approval_recorded": false, "target_environment": "production"}, "description": "Production restores require approval.", "effect": {"decision": "deny", "reason": "production_restore_approval_required", "required_action": "record_restore_approval"}, "name": "production_restore_requires_approval"}, {"condition": {"days_since_restore_test_gt": 90, "restore_test_review_recorded": false}, "description": "Stale restore tests require review.", "effect": {"decision": "require_review", "reason": "restore_test_review_required", "required_action": "review_restore_test"}, "name": "stale_restore_test_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"backup": {"component": "BackupRuns", "permission": "bkup:run_backup", "route": "/bkup/backup"}, "dashboard": {"component": "BKUPDashboard", "permission": "bkup:view", "route": "/bkup/dashboard"}, "plans": {"component": "BackupPlans", "permission": "bkup:manage_plans", "route": "/bkup/plans"}, "reports": {"component": "ContinuityReports", "permission": "bkup:view", "route": "/bkup/reports"}, "restore": {"component": "RestoreConsole", "permission": "bkup:restore", "route": "/bkup/restore"}, "retention": {"component": "RetentionPolicy", "permission": "bkup:admin", "route": "/bkup/retention"}, "settings": {"component": "BKUPSettings", "permission": "bkup:admin", "route": "/bkup/settings"}, "snapshots": {"component": "SnapshotVault", "permission": "bkup:view", "route": "/bkup/snapshots"}}, "streaming": {}, "theme": {"components": {"backup_plan": {"icon": "database-backup", "risk_style": "retention-band", "status_indicator": "rpo-pill"}, "continuity_report": {"status_style": "test-chip", "visual": "rto-rpo-card"}, "restore_console": {"status_style": "integrity-chip", "visual": "restore-timeline"}, "snapshot_vault": {"highlight": "encryption-chip", "visual": "snapshot-list"}}, "name": "bkup_continuity_ops", "tokens": {"border.radius": "8px", "color.accent": "#2B6CB0", "color.danger": "#C53030", "color.primary": "#214E34", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/bkup/api/v1", "requires_theme": true, "routes": [{"component": "BKUPDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/bkup/dashboard", "permission": "bkup:view"}, {"component": "BackupPlans", "name": "plans", "nav_group": "Plans", "path": "/bkup/plans", "permission": "bkup:manage_plans"}, {"component": "SnapshotVault", "name": "snapshots", "nav_group": "Backups", "path": "/bkup/snapshots", "permission": "bkup:view"}, {"component": "BackupRuns", "name": "backup", "nav_group": "Backups", "path": "/bkup/backup", "permission": "bkup:run_backup"}, {"component": "RestoreConsole", "name": "restore", "nav_group": "Recovery", "path": "/bkup/restore", "permission": "bkup:restore"}, {"component": "RetentionPolicy", "name": "retention", "nav_group": "Governance", "path": "/bkup/retention", "permission": "bkup:admin"}, {"component": "ContinuityReports", "name": "reports", "nav_group": "Governance", "path": "/bkup/reports", "permission": "bkup:view"}, {"component": "BKUPSettings", "name": "settings", "nav_group": "Administration", "path": "/bkup/settings", "permission": "bkup:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"bkup": []}}, "contracts": {"bkup": {"configuration": {"governance": {"audit_backup_events": true, "legal_hold_supported": true, "require_tenant_context": true, "retention_policy_required": true}, "plans": {"plan_owner_required": true, "rpo_minutes": 60, "schedule_required": true, "source_inventory_required": true}, "restore": {"approval_required_for_production": true, "point_in_time_supported": true, "restore_test_required": true, "rto_minutes": 240}, "snapshots": {"cross_region_copy_supported": true, "encryption_required": true, "integrity_check_required": true, "lineage_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "bkup_continuity_ops"}, "ui": {"enable_backup_dashboard": true, "enable_continuity_reports": true, "enable_plan_manager": true, "enable_restore_console": true}}, "id": "bkup", "provides": ["bkup_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"bkup": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"backup_plan_requires_owner": {"condition": {"operation": "create_backup_plan", "plan_owner_assigned": false}, "description": "Backup plans require an accountable owner.", "effect": {"decision": "deny", "reason": "plan_owner_required", "required_action": "assign_plan_owner"}, "name": "backup_plan_requires_owner"}, "production_restore_requires_approval": {"condition": {"approval_recorded": false, "target_environment": "production"}, "description": "Production restores require approval.", "effect": {"decision": "deny", "reason": "production_restore_approval_required", "required_action": "record_restore_approval"}, "name": "production_restore_requires_approval"}, "restore_requires_integrity_check": {"condition": {"integrity_check_passed": false, "operation": "restore"}, "description": "Restore operations require integrity checks.", "effect": {"decision": "deny", "reason": "integrity_check_required", "required_action": "pass_integrity_check"}, "name": "restore_requires_integrity_check"}, "snapshot_requires_encryption": {"condition": {"operation": "create_snapshot", "snapshot_encrypted": false}, "description": "Snapshots must be encrypted.", "effect": {"decision": "deny", "reason": "snapshot_encryption_required", "required_action": "encrypt_snapshot"}, "name": "snapshot_requires_encryption"}, "stale_restore_test_requires_review": {"condition": {"days_since_restore_test_gt": 90, "restore_test_review_recorded": false}, "description": "Stale restore tests require review.", "effect": {"decision": "require_review", "reason": "restore_test_review_required", "required_action": "review_restore_test"}, "name": "stale_restore_test_requires_review"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All backup operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.bkup": {"file": "capability_contract.py", "id": "capability.bkup", "kind": "capability", "name": "Backup and Restore", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("bkup_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "bkup",
+			"version": "1.0.0",
+			"description": "Backup and Restore package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"bkup": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"bkup": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["bkup_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "views.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"restore": "RestoreApproval",
+					"retention_disposition": "RetentionDisposition",
+				},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"bkup": {
+				"id": "bkup",
+				"configuration": contract["configuration"],
+				"provides": ["bkup_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"bkup": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.bkup": {
+				"id": "capability.bkup",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +150,15 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	routes = model.get("capabilities", {}).get("bkup", {}).get("ui", {}).get("routes", [])
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "bkup" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 11:
+		errors.append("BKUP semantic model route manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

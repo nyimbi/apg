@@ -11,7 +11,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"snapshots": {"encryption_required": True, "integrity_check_required": True, "cross_region_copy_supported": True, "lineage_required": True},
 	"restore": {"restore_test_required": True, "approval_required_for_production": True, "point_in_time_supported": True, "rto_minutes": 240},
 	"governance": {"require_tenant_context": True, "audit_backup_events": True, "retention_policy_required": True, "legal_hold_supported": True},
-	"ui": {"enable_backup_dashboard": True, "enable_plan_manager": True, "enable_restore_console": True, "enable_continuity_reports": True},
+	"ui": {"enable_backup_dashboard": True, "enable_plan_manager": True, "enable_restore_console": True, "enable_restore_approval_queue": True, "enable_retention_disposition_queue": True, "enable_continuity_reports": True},
 	"theme": {"default_theme": "bkup_continuity_ops", "allow_tenant_overrides": True}
 }
 
@@ -21,9 +21,13 @@ RULES: list[dict[str, Any]] = [
 	{"name": "tenant_context_required", "description": "All backup operations require tenant context.", "condition": {"tenant_context_present": False}, "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}},
 	{"name": "backup_plan_requires_owner", "description": "Backup plans require an accountable owner.", "condition": {"operation": "create_backup_plan", "plan_owner_assigned": False}, "effect": {"decision": "deny", "reason": "plan_owner_required", "required_action": "assign_plan_owner"}},
 	{"name": "snapshot_requires_encryption", "description": "Snapshots must be encrypted.", "condition": {"operation": "create_snapshot", "snapshot_encrypted": False}, "effect": {"decision": "deny", "reason": "snapshot_encryption_required", "required_action": "encrypt_snapshot"}},
+	{"name": "snapshot_requires_integrity", "description": "Snapshots require integrity evidence.", "condition": {"operation": "create_snapshot", "snapshot_integrity_passed": False}, "effect": {"decision": "deny", "reason": "snapshot_integrity_check_required", "required_action": "pass_snapshot_integrity_check"}},
 	{"name": "restore_requires_integrity_check", "description": "Restore operations require integrity checks.", "condition": {"operation": "restore", "integrity_check_passed": False}, "effect": {"decision": "deny", "reason": "integrity_check_required", "required_action": "pass_integrity_check"}},
 	{"name": "production_restore_requires_approval", "description": "Production restores require approval.", "condition": {"target_environment": "production", "approval_recorded": False}, "effect": {"decision": "deny", "reason": "production_restore_approval_required", "required_action": "record_restore_approval"}},
-	{"name": "stale_restore_test_requires_review", "description": "Stale restore tests require review.", "condition": {"days_since_restore_test_gt": 90, "restore_test_review_recorded": False}, "effect": {"decision": "require_review", "reason": "restore_test_review_required", "required_action": "review_restore_test"}}
+	{"name": "stale_restore_test_requires_review", "description": "Stale restore tests require review.", "condition": {"days_since_restore_test_gt": 90, "restore_test_review_recorded": False}, "effect": {"decision": "require_review", "reason": "restore_test_review_required", "required_action": "review_restore_test"}},
+	{"name": "restore_review_requires_independent_reviewer", "description": "Restore approvals and reviews require an independent reviewer.", "condition": {"operation": "approve_restore", "restore_reviewer_same_as_requester": True}, "effect": {"decision": "deny", "reason": "independent_restore_reviewer_required", "required_action": "route_to_independent_restore_reviewer"}},
+	{"name": "retention_disposition_blocks_legal_hold", "description": "Snapshots under legal hold cannot be disposed.", "condition": {"operation": "retention_disposition", "legal_hold_active": True}, "effect": {"decision": "deny", "reason": "legal_hold_blocks_disposition", "required_action": "release_legal_hold_before_disposition"}},
+	{"name": "retention_review_requires_independent_reviewer", "description": "Retention disposition approvals require an independent reviewer.", "condition": {"operation": "approve_retention_disposition", "retention_reviewer_same_as_requester": True}, "effect": {"decision": "deny", "reason": "independent_retention_reviewer_required", "required_action": "route_to_independent_retention_reviewer"}}
 ]
 
 UI_ROUTES: list[dict[str, str]] = [
@@ -32,12 +36,15 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "snapshots", "path": "/bkup/snapshots", "component": "SnapshotVault", "permission": "bkup:view", "nav_group": "Backups"},
 	{"name": "backup", "path": "/bkup/backup", "component": "BackupRuns", "permission": "bkup:run_backup", "nav_group": "Backups"},
 	{"name": "restore", "path": "/bkup/restore", "component": "RestoreConsole", "permission": "bkup:restore", "nav_group": "Recovery"},
+	{"name": "restore_approvals", "path": "/bkup/restore/approvals", "component": "RestoreApprovalQueue", "permission": "bkup:approve_restore", "nav_group": "Recovery"},
 	{"name": "retention", "path": "/bkup/retention", "component": "RetentionPolicy", "permission": "bkup:admin", "nav_group": "Governance"},
+	{"name": "retention_dispositions", "path": "/bkup/retention/dispositions", "component": "RetentionDispositionQueue", "permission": "bkup:approve_retention", "nav_group": "Governance"},
 	{"name": "reports", "path": "/bkup/reports", "component": "ContinuityReports", "permission": "bkup:view", "nav_group": "Governance"},
+	{"name": "audit", "path": "/bkup/audit", "component": "BackupAudit", "permission": "bkup:view", "nav_group": "Governance"},
 	{"name": "settings", "path": "/bkup/settings", "component": "BKUPSettings", "permission": "bkup:admin", "nav_group": "Administration"}
 ]
 
-THEME: dict[str, Any] = {"name": "bkup_continuity_ops", "tokens": {"color.primary": "#214E34", "color.accent": "#2B6CB0", "color.success": "#2F855A", "color.warning": "#B7791F", "color.danger": "#C53030", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D", "border.radius": "8px", "density": "compact"}, "components": {"backup_plan": {"icon": "database-backup", "status_indicator": "rpo-pill", "risk_style": "retention-band"}, "snapshot_vault": {"visual": "snapshot-list", "highlight": "encryption-chip"}, "restore_console": {"visual": "restore-timeline", "status_style": "integrity-chip"}, "continuity_report": {"visual": "rto-rpo-card", "status_style": "test-chip"}}}
+THEME: dict[str, Any] = {"name": "bkup_continuity_ops", "tokens": {"color.primary": "#214E34", "color.accent": "#2B6CB0", "color.success": "#2F855A", "color.warning": "#B7791F", "color.danger": "#C53030", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D", "border.radius": "8px", "density": "compact"}, "components": {"backup_plan": {"icon": "database-backup", "status_indicator": "rpo-pill", "risk_style": "retention-band"}, "snapshot_vault": {"visual": "snapshot-list", "highlight": "encryption-chip"}, "restore_console": {"visual": "restore-timeline", "status_style": "integrity-chip"}, "restore_approval_queue": {"visual": "approval-lane", "status_style": "restore-review-chip"}, "retention_disposition_queue": {"visual": "legal-hold-lane", "status_style": "retention-chip"}, "continuity_report": {"visual": "rto-rpo-card", "status_style": "test-chip"}, "backup_audit": {"visual": "event-ledger", "status_style": "decision-chip"}}}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:

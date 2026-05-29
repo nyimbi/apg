@@ -14,7 +14,7 @@ def dashboard_model(
 	service: BkupService | None = None,
 	tenant_id: str = "default",
 ) -> dict[str, object]:
-	service = service or BkupService()
+	service = _service_or_default(service)
 	contract = service.describe(tenant_id)
 	return {
 		"capability": contract["capability"],
@@ -25,6 +25,8 @@ def dashboard_model(
 		"plans": service.list_plans(tenant_id),
 		"snapshots": service.list_snapshots(tenant_id),
 		"restores": service.list_restores(tenant_id),
+		"restore_approvals": service.list_restore_approvals(tenant_id),
+		"retention_dispositions": service.list_retention_dispositions(tenant_id),
 		"reports": service.list_reports(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"restore_review_queue": [
@@ -40,7 +42,7 @@ def plan_manager_model(
 	service: BkupService | None = None,
 	tenant_id: str = "default",
 ) -> dict[str, object]:
-	service = service or BkupService()
+	service = _service_or_default(service)
 	return {
 		"tenant_id": tenant_id,
 		"plans": service.list_plans(tenant_id),
@@ -52,12 +54,72 @@ def restore_console_model(
 	service: BkupService | None = None,
 	tenant_id: str = "default",
 ) -> dict[str, object]:
-	service = service or BkupService()
+	service = _service_or_default(service)
 	restores = service.list_restores(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"snapshots": service.list_snapshots(tenant_id),
 		"restores": restores,
+		"restore_approvals": service.list_restore_approvals(tenant_id),
 		"pending_review": [item for item in restores if item["status"] == "pending_review"],
 		"completed": [item for item in restores if item["status"] == "completed"],
 	}
+
+
+def restore_approval_model(
+	service: BkupService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = _service_or_default(service)
+	approvals = service.list_restore_approvals(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"approvals": approvals,
+		"pending_approvals": [item for item in approvals if item["status"] == "pending"],
+		"decided_approvals": [item for item in approvals if item["status"] != "pending"],
+		"required_decision_fields": ["reviewer", "decision", "notes"],
+		"guardrails": ["independent_reviewer", "matching_snapshot_target", "reviewer_notes_required"],
+	}
+
+
+def retention_disposition_model(
+	service: BkupService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = _service_or_default(service)
+	dispositions = service.list_retention_dispositions(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"snapshots": service.list_snapshots(tenant_id),
+		"dispositions": dispositions,
+		"pending_dispositions": [item for item in dispositions if item["status"] == "pending"],
+		"decided_dispositions": [item for item in dispositions if item["status"] != "pending"],
+		"required_decision_fields": ["reviewer", "decision", "notes"],
+		"guardrails": ["legal_hold_blocks_disposition", "independent_reviewer", "reviewer_notes_required"],
+	}
+
+
+def audit_model(
+	service: BkupService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = _service_or_default(service)
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"summary": service.continuity_summary(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
+		"rules": contract["rule_engine"]["rules"],
+		"theme": contract["theme"],
+	}
+
+
+def _service_or_default(service: BkupService | None) -> BkupService:
+	if service is not None:
+		return service
+	try:
+		from .api import SERVICE
+
+		return SERVICE
+	except ImportError:  # pragma: no cover - standalone package loading path
+		return BkupService()
