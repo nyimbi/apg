@@ -16,6 +16,50 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:47 EAT
+
+Catalog-aware compile preflight slice:
+
+- Added `apg compile --catalog <capability-root-or-catalog.json>` so generation
+  can consume the same capability evidence accepted by lint and validate.
+- Compile now runs a no-write generator-readiness preflight when `--catalog` is
+  supplied; unresolved capabilities emit diagnostics and stop before generated
+  output is written.
+- Preserved existing compile behavior when no catalog is supplied.
+- Added focused CLI regression coverage for successful local catalog preflight
+  and unresolved capability blocking before output creation.
+- Updated the legacy compiler-baseline tooling audit assertion from 11 to the
+  current 14 audited surfaces so the checked-in test matches the implemented
+  aggregate gate.
+- Updated tooling and developer docs to show catalog-aware compile commands.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile cli/compile_command.py
+  tests/test_compiler_baseline.py` -> passed.
+- `./.venv/bin/pytest -q
+  tests/test_compiler_baseline.py::test_cli_compile_default_target_writes_generated_application
+  tests/test_compiler_baseline.py::test_cli_compile_accepts_local_capability_catalog_preflight
+  tests/test_compiler_baseline.py::test_cli_compile_blocks_unresolved_catalog_capability_before_writing
+  tests/test_compiler_baseline.py::test_cli_tooling_audit_json_runs_all_fixture_catalogs`
+  -> 4 passed.
+- `git diff --check -- cli/compile_command.py tests/test_compiler_baseline.py
+  docs/tooling.md docs/developer_guide.md docs/progress_log.md` -> passed.
+- `./.venv/bin/apg lint --audit-fixtures --json` -> passed with 6/6 fixtures,
+  0 blocking gaps.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109
+  valid contracts and 0 errors.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0
+  blocking gaps, and 0 errors.
+- `./.venv/bin/pytest -q tests/test_tooling_audit.py
+  tests/test_repository_hygiene.py` -> 20 passed.
+
+Known remaining gaps:
+
+- Compile can now consume local catalog evidence. Package and release evidence
+  commands still need a catalog-aware preflight before they orchestrate compile
+  or publish workflows.
+
 ### 2026-05-29 05:41 EAT
 
 Capability catalog validate bridge:

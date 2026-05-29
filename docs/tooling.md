@@ -20,6 +20,9 @@ APG currently has an executable compiler path:
 - source files use the `.apg` extension;
 - the installed command is `apg`;
 - the primary generation command is `apg compile <file> --output <dir>`;
+- `apg compile <file> --catalog <capability-root-or-catalog.json> --output
+  <dir>` runs catalog-aware generator-readiness validation before writing
+  generated files;
 - `apg lint <file-or-directory> --json` emits `apg.lint-report.v1` from the
   shared semantic model without writing generated code;
 - `apg lint <file-or-directory> --catalog <capability-root-or-catalog.json>
@@ -916,11 +919,15 @@ report format changes.
 ```console
 apg compile app.apg --output generated/app
 apg compile app.apg --target python --output generated/app --verify
+apg compile app.apg --catalog /tmp/apg-capability-catalog.json --output generated/app --verify
 ```
 
 Compilation must fail if lint or semantic validation has errors. `--verify`
 must run the generated `app.py --self-test` and generated `smoke_test.py`
-without requiring third-party runtime services.
+without requiring third-party runtime services. When `--catalog` is supplied,
+compile first runs no-write validation with the same local catalog or
+contract-registry root accepted by `apg lint` and `apg validate`; unresolved
+capabilities fail before output files are written.
 
 ### `apg graph`
 

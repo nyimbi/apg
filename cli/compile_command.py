@@ -44,9 +44,10 @@ console = Console()
 @click.option('--tests', is_flag=True, help='Generate test files')
 @click.option('--docs', is_flag=True, help='Generate documentation')
 @click.option('--verify', is_flag=True, help='Run generated self-test and smoke test after compilation')
+@click.option('--catalog', type=click.Path(path_type=Path), default=None, help='Capability contract root or local apg.capability-catalog.v1 file')
 def compile_cmd(source_file: Optional[str], output: Optional[str], target: str,
 			   generate_parser: bool, verbose: bool, watch: bool, 
-			   no_runtime: bool, tests: bool, docs: bool, verify: bool):
+			   no_runtime: bool, tests: bool, docs: bool, verify: bool, catalog: Path | None):
 	"""Compile APG source files to Python artifacts."""
 	
 	if generate_parser:
@@ -80,6 +81,8 @@ def compile_cmd(source_file: Optional[str], output: Optional[str], target: str,
 	if not source_path.exists():
 		console.print(f"[red]Source file not found: {source_file}[/red]")
 		return
+	if catalog is not None and not catalog.exists():
+		raise click.ClickException(f"Capability catalog not found: {catalog}")
 	
 	# Determine output directory
 	if not output:
@@ -103,9 +106,9 @@ def compile_cmd(source_file: Optional[str], output: Optional[str], target: str,
 	)
 	
 	if watch:
-		_watch_and_compile(source_path, config)
+		_watch_and_compile(source_path, config, catalog)
 	else:
-		_compile_single(source_path, config, verbose, verify)
+		_compile_single(source_path, config, verbose, verify, catalog)
 
 
 def _generate_parser():
@@ -173,8 +176,16 @@ def _strip_generated_parser_whitespace(output_dir: Path):
 		file_path.write_text(cleaned, encoding="utf-8")
 
 
-def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool, verify: bool = False):
+def _compile_single(
+	source_path: Path,
+	config: CodeGenConfig,
+	verbose: bool,
+	verify: bool = False,
+	catalog: Path | None = None,
+):
 	"""Compile a single APG source file"""
+	if catalog is not None:
+		_validate_compile_preflight(source_path, config, catalog)
 	
 	console.print(Panel(f"[bold blue]APG Compiler[/bold blue]", 
 					   subtitle=f"Compiling {source_path}"))
@@ -252,6 +263,30 @@ def _compile_single(source_path: Path, config: CodeGenConfig, verbose: bool, ver
 				console.print(f"\n[yellow]Warnings:[/yellow]")
 				for warning in result.warnings:
 					console.print(f"  - {warning}")
+
+
+def _validate_compile_preflight(source_path: Path, config: CodeGenConfig, catalog: Path) -> None:
+	"""Run no-write generator-readiness validation before catalog-aware compile."""
+	from cli.validate_command import validate_path
+
+	report = validate_path(source_path, target=config.target_language, catalog=catalog)
+	if report["ok"]:
+		catalog_report = report["lint"].get("capability_catalog", {})
+		console.print(
+			f"[green]Capability catalog preflight OK[/green]: "
+			f"{catalog_report.get('catalog_kind', 'catalog')} "
+			f"with {catalog_report.get('contract_count', 0)} contract(s)"
+		)
+		return
+
+	console.print("[red]Compilation preflight validation failed[/red]")
+	for diagnostic in report["diagnostics"]:
+		start = diagnostic["range"]["start"]
+		console.print(
+			f"  {diagnostic['file']}:{start['line'] + 1}:{start['character']}: "
+			f"{diagnostic['code']} {diagnostic['severity']}: {diagnostic['message']}"
+		)
+	raise click.ClickException("Compilation preflight validation failed")
 
 
 def _show_compilation_details(result, config: CodeGenConfig):
@@ -359,7 +394,7 @@ def _verify_generated_app(output_dir: Path) -> bool:
 	return True
 
 
-def _watch_and_compile(source_path: Path, config: CodeGenConfig):
+def _watch_and_compile(source_path: Path, config: CodeGenConfig, catalog: Path | None = None):
 	"""Watch source file for changes and recompile"""
 	
 	console.print(f"[blue]Watching {source_path} for changes...[/blue]")
@@ -385,7 +420,7 @@ def _watch_and_compile(source_path: Path, config: CodeGenConfig):
 			current_hash = get_file_hash(source_path)
 			if current_hash != last_hash and current_hash:
 				console.print(f"\n[cyan]Change detected in {source_path}[/cyan]")
-				_compile_single(source_path, config, False)
+				_compile_single(source_path, config, False, catalog=catalog)
 				last_hash = current_hash
 				console.print(f"\n[blue]Watching {source_path} for changes...[/blue]")
 			

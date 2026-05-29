@@ -1447,6 +1447,50 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "route_dispatch" in smoke_test
 
 
+def test_cli_compile_accepts_local_capability_catalog_preflight(tmp_path):
+	source = tmp_path / "capability.apg"
+	output = tmp_path / "generated"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "audit_log")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, [
+		"compile",
+		str(source),
+		"--catalog",
+		str(catalog),
+		"--output",
+		str(output),
+		"--verify",
+	])
+
+	assert result.exit_code == 0, result.output
+	assert "Capability catalog preflight OK" in result.output
+	assert "Generated verification passed" in result.output
+	assert (output / "app.py").exists()
+	assert (output / "apg_capabilities.py").exists()
+
+
+def test_cli_compile_blocks_unresolved_catalog_capability_before_writing(tmp_path):
+	source = tmp_path / "capability.apg"
+	output = tmp_path / "generated"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "customer_master")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, [
+		"compile",
+		str(source),
+		"--catalog",
+		str(catalog),
+		"--output",
+		str(output),
+	])
+
+	assert result.exit_code == 1, result.output
+	assert "Compilation preflight validation failed" in result.output
+	assert "APG0901" in result.output
+	assert not output.exists()
+
+
 def test_cli_lint_json_reports_valid_apg_file_without_generation(tmp_path):
 	source = tmp_path / "baseline.apg"
 	output = tmp_path / "generated"
@@ -2863,7 +2907,7 @@ def test_cli_tooling_audit_json_runs_all_fixture_catalogs():
 	report = json.loads(result.output)
 	assert report["format"] == "apg.tooling-fixture-audit.v1"
 	assert report["ok"] is True
-	assert report["surface_count"] == 11
+	assert report["surface_count"] == 14
 	assert report["summary"]["failing_surface_count"] == 0
 	assert report["summary"]["blocking_gap_count"] == 0
 	assert report["summary"]["error_count"] == 0
@@ -2880,6 +2924,9 @@ def test_cli_tooling_audit_json_runs_all_fixture_catalogs():
 		"nl_plan",
 		"migration",
 		"release_evidence",
+		"cli_surface",
+		"ide_integration",
+		"studio_designer",
 	}
 	assert all(surface["ok"] and surface["format_ok"] for surface in surfaces.values())
 	assert surfaces["parser_golden"]["format"] == "apg.parser-golden-audit.v1"
