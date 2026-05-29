@@ -16,6 +16,66 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 18:42 EAT
+
+SCRP scraper/data-harvesting runtime implementation-depth slice:
+
+- Converted `capabilities/common/scrp` from generated materialized record
+  scaffolding into a domain-specific data-harvesting runtime package.
+- Added `harvest_runtime.py` with deterministic IDs, source/extractor/mode
+  normalization, DLP-status classification, run-status helpers, result
+  retention hints, and deterministic policy summaries.
+- Replaced the generic record model with harvest sources, extractor profiles,
+  harvest jobs, harvest runs, harvest result batches, pipeline handoffs, and
+  audit events.
+- Replaced generic service behavior with `ScrpService` lifecycle methods for
+  source registration, extractor profile creation, harvest job creation,
+  harvest execution, harvest completion, result creation, pipeline handoff
+  creation, dashboard summaries, compatibility records, and policy
+  enforcement.
+- Expanded API and view helpers so SCRP exposes source registry, job monitor,
+  extractor workbench, pipeline handoff, compliance review, results, settings,
+  route, rule, and theme composition surfaces.
+- Rewrote `cap_spec.md` around current executable SCRP behavior, adapter
+  boundaries, UI surfaces, theme metadata, known non-goals, and proof
+  commands.
+- Replaced generated package tests with focused lifecycle, package-publish,
+  guardrail, and view-model tests.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/scrp` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/scrp/__init__.py
+  capabilities/common/scrp/models.py capabilities/common/scrp/harvest_runtime.py
+  capabilities/common/scrp/service.py capabilities/common/scrp/api.py
+  capabilities/common/scrp/views.py
+  capabilities/common/scrp/capability_contract.py capabilities/common/scrp/app.py
+  capabilities/common/scrp/test_capability_contract.py
+  capabilities/common/scrp/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -c "import importlib; ..."` for SCRP models,
+  `harvest_runtime`, service, API, views, and capability contract passed with
+  `scrp imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/scrp/test_capability_contract.py
+  capabilities/common/scrp/tests/test_package_contract.py` passed with 8
+  tests and only pre-existing adjacent SQLAlchemy/Pydantic deprecation
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/scrp --json` passed with `scrp` classified as
+  `domain_specific`, `harvest_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/scrp --json`
+  passed with `ok: true`, warnings empty, and side-effect-free catalog patch
+  evidence.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 97
+  domain-specific packages, 11 materialized-baseline packages, 0 mixed
+  implementations, 1 contract-only package, 911 custom Python files, 0 errors,
+  and 12 warnings; the next implementation-depth target is `secu`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
 ### 2026-05-29 18:35 EAT
 
 SCPT custom scripting runtime implementation-depth slice:
