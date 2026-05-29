@@ -16,6 +16,29 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 03:59 EAT
+
+Generated workflow run state and resume slice:
+
+- Extended generated Python apps with persistent workflow run state: `list_workflow_runs()`, `get_workflow_run()`, and `resume_workflow()`.
+- `run_workflow()` now creates stable `workflow-run-N` IDs, records completed/pending steps, supports deterministic `pause_at`/`stop_after` execution, writes workflow runs into the same `APG_DATA_FILE` storage contract as records and events, and restores run state on app reload.
+- Added HTTP/OpenAPI/component-manifest surfaces for `GET /workflows/runs`, `GET /workflows/runs/{id}`, and `POST /workflows/runs/{id}/resume`.
+- Regenerated all 20 numbered example output directories from the current compiler.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/code_generator.py tests/test_generated_workflow_runtime.py` -> passed.
+- `./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py` -> 2 passed.
+- `./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler` -> 3 passed.
+- Generated `examples/13_procurement_approval_workbench/main.apg` in a temp directory and ran generated `smoke_test.py` -> exit code 0.
+- Regenerated example outputs command compiled 20/20 examples with no failures.
+- `git diff --check` over the compiler, workflow test, generated examples, and this log passed.
+
+Known remaining gaps:
+
+- Workflow execution is still deterministic step-chain execution. Branch conditions, timer waits, human-task assignments, retry policies, and compensation semantics remain future runtime slices.
+- Broader HTTP runtime sweeps across every generated example remain deferred for a larger compute window.
+
 ### 2026-05-29 03:16 EAT
 
 Completed API Management executable-runtime slice:

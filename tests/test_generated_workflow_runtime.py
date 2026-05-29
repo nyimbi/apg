@@ -62,3 +62,73 @@ def test_generated_app_executes_declared_workflow_steps():
     assert "/workflows/ProcurementApproval/run" in openapi["paths"]
     assert namespace["component_manifest"]()["workflows"]["ProcurementApproval"]["steps"][0] == "draft"
     assert namespace["validate_application"]()["checks"]["workflows"]["errors"] == []
+
+
+def test_generated_app_persists_and_resumes_workflow_runs(tmp_path, monkeypatch):
+    result = APGCompiler().compile_string(WORKFLOW_SOURCE, "procurement_flow.apg")
+    assert result.success is True, result.errors
+
+    data_file = tmp_path / "apg-data.json"
+    monkeypatch.setenv("APG_DATA_FILE", str(data_file))
+
+    namespace: dict[str, object] = {}
+    exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+    run = namespace["run_workflow"](
+        "ProcurementApproval",
+        {"request_id": "PR-200", "pause_at": "budget_review"},
+    )
+    assert run["id"] == "workflow-run-1"
+    assert run["status"] == "paused"
+    assert run["current_step"] == "budget_review"
+    assert run["completed_at"] is None
+    assert run["pending_steps"] == ["procurement_review", "finance_approval", "approved"]
+    assert data_file.exists()
+
+    assert namespace["get_workflow_run"]("workflow-run-1")["status"] == "paused"
+    assert namespace["list_workflow_runs"]("ProcurementApproval")[0]["id"] == "workflow-run-1"
+
+    status, payload = namespace["_route_payload"]("/workflows/runs")
+    assert status == 200
+    assert payload["runs"][0]["id"] == "workflow-run-1"
+
+    status, payload = namespace["_route_payload"]("/workflows/runs/workflow-run-1")
+    assert status == 200
+    assert payload["current_step"] == "budget_review"
+
+    status, resumed = namespace["_post_payload"](
+        "/workflows/runs/workflow-run-1/resume",
+        {"payload": {"reviewer": "finance"}, "pause_at": "finance_approval"},
+    )
+    assert status == 200
+    assert resumed["status"] == "paused"
+    assert resumed["current_step"] == "finance_approval"
+    assert resumed["pending_steps"] == ["approved"]
+
+    completed = namespace["resume_workflow"]("workflow-run-1")
+    assert completed["status"] == "completed"
+    assert completed["completed_at"] == "approved"
+    assert completed["completed_steps"] == [
+        "draft",
+        "budget_review",
+        "procurement_review",
+        "finance_approval",
+        "approved",
+    ]
+    assert [event["action"] for event in namespace["list_events"]("ProcurementApproval")] == [
+        "workflow.run",
+        "workflow.resume",
+        "workflow.resume",
+    ]
+    assert namespace["storage_status"](include_records=True)["workflow_runs"][0]["status"] == "completed"
+
+    reloaded: dict[str, object] = {}
+    exec(compile(result.generated_files["app.py"], "app.py", "exec"), reloaded)
+    assert reloaded["get_workflow_run"]("workflow-run-1")["status"] == "completed"
+    assert reloaded["list_events"]("ProcurementApproval")[-1]["action"] == "workflow.resume"
+
+    openapi = namespace["openapi_document"]()
+    assert "/workflows/runs" in openapi["paths"]
+    assert "/workflows/runs/{id}" in openapi["paths"]
+    assert "/workflows/runs/{id}/resume" in openapi["paths"]
+    assert "resume_workflow" in namespace["component_manifest"]()["interfaces"]["python"]["exports"]

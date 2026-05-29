@@ -27,6 +27,8 @@ RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity i
 NEXT_RECORD_IDS: Dict[str, int] = {entity["name"]: 1 for entity in ENTITIES}
 EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
+WORKFLOW_RUNS: Dict[str, Dict[str, Any]] = {}
+NEXT_WORKFLOW_RUN_ID = 1
 SEMANTIC_MODEL: Dict[str, Any] = {'format': 'apg.semantic-model.v1', 'ok': True, 'source_files': ['crm_sales_pipeline.apg'], 'app': {'name': 'crm_sales_pipeline', 'version': '1.0.0', 'description': None, 'entity_count': 3}, 'symbols': {'module.crm_sales_pipeline': {'id': 'module.crm_sales_pipeline', 'kind': 'module', 'name': 'crm_sales_pipeline', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'table.Lead': {'id': 'table.Lead', 'kind': 'table', 'name': 'Lead', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.company': {'id': 'field.Lead.company', 'kind': 'field', 'name': 'Lead.company', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.contact_name': {'id': 'field.Lead.contact_name', 'kind': 'field', 'name': 'Lead.contact_name', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.email': {'id': 'field.Lead.email', 'kind': 'field', 'name': 'Lead.email', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.score': {'id': 'field.Lead.score', 'kind': 'field', 'name': 'Lead.score', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Lead.qualified': {'id': 'field.Lead.qualified', 'kind': 'field', 'name': 'Lead.qualified', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'table.Opportunity': {'id': 'table.Opportunity', 'kind': 'table', 'name': 'Opportunity', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.lead_id': {'id': 'field.Opportunity.lead_id', 'kind': 'field', 'name': 'Opportunity.lead_id', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.stage': {'id': 'field.Opportunity.stage', 'kind': 'field', 'name': 'Opportunity.stage', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.amount': {'id': 'field.Opportunity.amount', 'kind': 'field', 'name': 'Opportunity.amount', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.probability': {'id': 'field.Opportunity.probability', 'kind': 'field', 'name': 'Opportunity.probability', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Opportunity.expected_close_date': {'id': 'field.Opportunity.expected_close_date', 'kind': 'field', 'name': 'Opportunity.expected_close_date', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'capability.SalesPipeline': {'id': 'capability.SalesPipeline', 'kind': 'capability', 'name': 'SalesPipeline', 'file': 'crm_sales_pipeline.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}}, 'tables': {'Lead': {'name': 'Lead', 'fields': {'company': {'type': 'str', 'required': True, 'relationship': None}, 'contact_name': {'type': 'str', 'required': True, 'relationship': None}, 'email': {'type': 'str', 'required': True, 'relationship': None}, 'score': {'type': 'int', 'required': True, 'relationship': None}, 'qualified': {'type': 'bool', 'required': True, 'relationship': None}}, 'lookup_paths': {}}, 'Opportunity': {'name': 'Opportunity', 'fields': {'lead_id': {'type': 'int', 'required': True, 'relationship': {'target_table': 'Lead', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'lead'}}, 'stage': {'type': 'str', 'required': True, 'relationship': None}, 'amount': {'type': 'float', 'required': True, 'relationship': None}, 'probability': {'type': 'int', 'required': True, 'relationship': None}, 'expected_close_date': {'type': 'str', 'required': True, 'relationship': None}}, 'lookup_paths': {}}}, 'views': {}, 'flows': {}, 'operations': {}, 'rules': {'SalesPipeline.qualified_lead_minimum': {'name': 'qualified_lead_minimum', 'when': 'score < 50', 'action': 'warn'}, 'SalesPipeline.large_deal_review': {'name': 'large_deal_review', 'when': 'amount > 1000000', 'action': 'require_review'}}, 'roles': {}, 'security': {}, 'agents': {}, 'llms': {}, 'capabilities': {'SalesPipeline': {'name': 'SalesPipeline', 'provides': ['lead_management', 'opportunity_tracking', 'forecast_metrics'], 'requires': ['customer_master'], 'configuration': {'default_probability': 25, 'forecast_currency': 'KES'}, 'rules': [{'name': 'qualified_lead_minimum', 'when': 'score < 50', 'action': 'warn'}, {'name': 'large_deal_review', 'when': 'amount > 1000000', 'action': 'require_review'}], 'rule_engine': {}, 'ui': {'shell': 'python', 'routes': [{'name': 'Pipeline', 'path': '/crm/pipeline', 'component': 'PipelineScreen'}]}, 'theme': {'name': 'sales_theme', 'tokens': {'accent': '#DD6B20'}}, 'runtime': {}, 'erp_modules': ['crm', 'sales', 'project_accounting'], 'components': {}, 'business_rules': [], 'approvals': {}, 'master_data': {}, 'i18n': {}, 'streaming': {}, 'screens': {'ForecastDashboard': {'route': '/crm/forecast', 'layout': 'dashboard', 'contains': ['StageFunnel', 'OpportunityTable', 'ForecastKpis'], 'binds': ['opportunities.active'], 'actions': ['advance_stage', 'mark_won', 'mark_lost']}}}}, 'composition': {'applications': {}, 'agent_teams': {}, 'capability_dependencies': {'SalesPipeline': ['customer_master']}}, 'contracts': {'SalesPipeline': {'id': 'sales_pipeline', 'provides': ['lead_management', 'opportunity_tracking', 'forecast_metrics'], 'requires': ['customer_master'], 'configuration': {'default_probability': 25, 'forecast_currency': 'KES'}, 'rules': [{'name': 'qualified_lead_minimum', 'when': 'score < 50', 'action': 'warn'}, {'name': 'large_deal_review', 'when': 'amount > 1000000', 'action': 'require_review'}], 'ui': {'shell': 'python', 'routes': [{'name': 'Pipeline', 'path': '/crm/pipeline', 'component': 'PipelineScreen'}]}, 'theme': {'name': 'sales_theme', 'tokens': {'accent': '#DD6B20'}}}}, 'deployment': {'target': 'python', 'source': 'crm_sales_pipeline.apg'}, 'packages': {}, 'graphs': {'er': {'kind': 'er', 'nodes': 12, 'edges': 11}, 'lookup': {'kind': 'lookup', 'nodes': 4, 'edges': 3}, 'workflow': {'kind': 'workflow', 'nodes': 4, 'edges': 3}, 'handler': {'kind': 'handler', 'nodes': 4, 'edges': 3}, 'capability': {'kind': 'capability', 'nodes': 2, 'edges': 1}, 'security': {'kind': 'security', 'nodes': 4, 'edges': 3}, 'agent': {'kind': 'agent', 'nodes': 0, 'edges': 0}, 'deployment': {'kind': 'deployment', 'nodes': 4, 'edges': 3}, 'package': {'kind': 'package', 'nodes': 4, 'edges': 3}}, 'diagnostics': []}
 
 
@@ -267,6 +269,7 @@ def describe_workflows() -> Dict[str, Dict[str, Any]]:
 
 
 def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    global NEXT_WORKFLOW_RUN_ID
     if workflow_name not in list_workflows():
         raise KeyError(workflow_name)
     payload = dict(payload or {})
@@ -288,25 +291,156 @@ def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> D
         }
     start_index = steps.index(start_at)
     selected_steps = steps[start_index:]
+    pause_at = payload.get("pause_at", payload.get("stop_after"))
+    if pause_at is not None:
+        pause_at = str(pause_at)
+        if pause_at not in selected_steps:
+            return {
+                "workflow": workflow_name,
+                "status": "error",
+                "error": "unknown_pause_step",
+                "pause_at": pause_at,
+                "steps": selected_steps,
+                "payload": payload,
+            }
+        run_until = selected_steps.index(pause_at) + 1
+        executed_steps = selected_steps[:run_until]
+        pending_steps = selected_steps[run_until:]
+        status = "paused" if pending_steps else "completed"
+    else:
+        executed_steps = selected_steps
+        pending_steps = []
+        status = "completed"
     trace = [
         {
             "index": index,
             "step": step,
             "status": "completed",
         }
-        for index, step in enumerate(selected_steps, start=start_index)
+        for index, step in enumerate(executed_steps, start=start_index)
     ]
+    run_id = f"workflow-run-{NEXT_WORKFLOW_RUN_ID}"
+    NEXT_WORKFLOW_RUN_ID += 1
     result = {
+        "id": run_id,
         "workflow": workflow_name,
-        "status": "completed",
+        "status": status,
         "started_at": start_at,
-        "completed_at": selected_steps[-1],
+        "current_step": executed_steps[-1],
+        "completed_at": selected_steps[-1] if status == "completed" else None,
         "steps": selected_steps,
+        "completed_steps": executed_steps,
+        "pending_steps": pending_steps,
         "trace": trace,
         "payload": payload,
     }
-    _record_event("workflow.run", workflow_name, after=result)
-    return result
+    event = _record_event("workflow.run", workflow_name, after=result)
+    result["event_id"] = event["id"]
+    WORKFLOW_RUNS[run_id] = dict(result)
+    persistence_error = _persist_record_store()
+    if persistence_error:
+        result["persistence_error"] = persistence_error
+        WORKFLOW_RUNS[run_id] = dict(result)
+    return dict(result)
+
+
+def list_workflow_runs(workflow_name: str | None = None) -> list[Dict[str, Any]]:
+    runs = [dict(run) for run in WORKFLOW_RUNS.values()]
+    if workflow_name is not None:
+        runs = [run for run in runs if run.get("workflow") == workflow_name]
+    return runs
+
+
+def get_workflow_run(run_id: str) -> Dict[str, Any]:
+    run = WORKFLOW_RUNS.get(str(run_id))
+    if run is None:
+        raise KeyError(run_id)
+    return dict(run)
+
+
+def resume_workflow(run_id: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    run_id = str(run_id)
+    existing = WORKFLOW_RUNS.get(run_id)
+    if existing is None:
+        raise KeyError(run_id)
+    if existing.get("status") == "completed":
+        result = dict(existing)
+        result["resumed"] = False
+        return result
+    workflow_name = str(existing.get("workflow"))
+    if workflow_name not in list_workflows():
+        raise KeyError(workflow_name)
+    payload_update = dict(payload or {})
+    merged_payload = dict(existing.get("payload", {}))
+    merged_payload.update(payload_update)
+    steps = list(existing.get("steps") or describe_workflow(workflow_name).get("steps", []))
+    if not steps:
+        steps = ["start", "complete"]
+    current_step = str(existing.get("current_step") or existing.get("started_at") or steps[0])
+    if current_step in steps:
+        start_index = steps.index(current_step) + 1
+    else:
+        start_index = 0
+    if start_index >= len(steps):
+        existing["status"] = "completed"
+        existing["completed_at"] = steps[-1]
+        existing["pending_steps"] = []
+        WORKFLOW_RUNS[run_id] = dict(existing)
+        return dict(existing)
+
+    selected_steps = steps[start_index:]
+    pause_at = payload_update.get("pause_at", payload_update.get("stop_after"))
+    if pause_at is not None:
+        pause_at = str(pause_at)
+        if pause_at not in selected_steps:
+            return {
+                "id": run_id,
+                "workflow": workflow_name,
+                "status": "error",
+                "error": "unknown_pause_step",
+                "pause_at": pause_at,
+                "steps": selected_steps,
+                "payload": merged_payload,
+            }
+        run_until = selected_steps.index(pause_at) + 1
+        executed_steps = selected_steps[:run_until]
+        pending_steps = selected_steps[run_until:]
+        status = "paused" if pending_steps else "completed"
+    else:
+        executed_steps = selected_steps
+        pending_steps = []
+        status = "completed"
+
+    trace = list(existing.get("trace", []))
+    trace.extend(
+        {
+            "index": index,
+            "step": step,
+            "status": "completed",
+        }
+        for index, step in enumerate(executed_steps, start=start_index)
+    )
+    completed_steps = list(existing.get("completed_steps", []))
+    completed_steps.extend(executed_steps)
+    updated = dict(existing)
+    updated.update({
+        "status": status,
+        "current_step": executed_steps[-1],
+        "completed_at": steps[-1] if status == "completed" else None,
+        "completed_steps": completed_steps,
+        "pending_steps": pending_steps,
+        "trace": trace,
+        "payload": merged_payload,
+        "resumed": True,
+    })
+    event = _record_event("workflow.resume", workflow_name, before=existing, after=updated)
+    updated["event_id"] = event["id"]
+    WORKFLOW_RUNS[run_id] = dict(updated)
+    persistence_error = _persist_record_store()
+    if persistence_error:
+        updated["persistence_error"] = persistence_error
+        WORKFLOW_RUNS[run_id] = dict(updated)
+    return dict(updated)
 
 
 def semantic_model() -> Dict[str, Any]:
@@ -462,6 +596,28 @@ def _sync_next_event_id() -> None:
     NEXT_EVENT_ID = max(numeric_ids, default=0) + 1
 
 
+def _workflow_run_numeric_id(run: Dict[str, Any]) -> int | None:
+    value = run.get("id")
+    if isinstance(value, str) and value.startswith("workflow-run-"):
+        suffix = value.rsplit("-", 1)[-1]
+        if suffix.isdigit():
+            return int(suffix)
+    if isinstance(value, int):
+        return value
+    return None
+
+
+def _sync_next_workflow_run_id() -> None:
+    global NEXT_WORKFLOW_RUN_ID
+    numeric_ids = [
+        numeric_id
+        for run in WORKFLOW_RUNS.values()
+        for numeric_id in [_workflow_run_numeric_id(run)]
+        if numeric_id is not None
+    ]
+    NEXT_WORKFLOW_RUN_ID = max(numeric_ids, default=0) + 1
+
+
 def _load_record_store() -> None:
     path = _data_path()
     if path is None or not path.exists():
@@ -488,8 +644,23 @@ def _load_record_store() -> None:
     if isinstance(raw_events, list):
         EVENT_LOG.clear()
         EVENT_LOG.extend(dict(event) for event in raw_events if isinstance(event, dict))
+    raw_workflow_runs = loaded.get("workflow_runs", {})
+    if isinstance(raw_workflow_runs, list):
+        raw_workflow_runs = {
+            str(run.get("id")): run
+            for run in raw_workflow_runs
+            if isinstance(run, dict) and run.get("id") not in (None, "")
+        }
+    if isinstance(raw_workflow_runs, dict):
+        WORKFLOW_RUNS.clear()
+        for run_id, run in raw_workflow_runs.items():
+            if isinstance(run, dict):
+                normalized = dict(run)
+                normalized.setdefault("id", str(run_id))
+                WORKFLOW_RUNS[str(normalized["id"])] = normalized
     _sync_next_record_ids()
     _sync_next_event_id()
+    _sync_next_workflow_run_id()
 
 
 def _persist_record_store() -> str | None:
@@ -501,8 +672,10 @@ def _persist_record_store() -> str | None:
         "version": MODULE_VERSION,
         "records": list_records(),
         "events": list_events(),
+        "workflow_runs": {run_id: dict(run) for run_id, run in WORKFLOW_RUNS.items()},
         "next_record_ids": dict(NEXT_RECORD_IDS),
         "next_event_id": NEXT_EVENT_ID,
+        "next_workflow_run_id": NEXT_WORKFLOW_RUN_ID,
     }
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -523,6 +696,7 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
     if include_records:
         status["records"] = list_records()
         status["events"] = list_events()
+        status["workflow_runs"] = list_workflow_runs()
     return status
 
 
@@ -540,6 +714,7 @@ def metrics_snapshot() -> Dict[str, Any]:
         "version": MODULE_VERSION,
         "entity_count": len(ENTITIES),
         "workflow_count": len(list_workflows()),
+        "workflow_run_count": len(WORKFLOW_RUNS),
         "database_status": database_status(),
         "record_counts": record_counts,
         "total_records": sum(record_counts.values()),
@@ -607,6 +782,7 @@ def component_manifest() -> Dict[str, Any]:
                     "describe_workflows",
                     "evaluate_capability_rules",
                     "get_record",
+                    "get_workflow_run",
                     "invoke_agent",
                     "invoke_team",
                     "list_agent_teams",
@@ -616,12 +792,14 @@ def component_manifest() -> Dict[str, Any]:
                     "list_entities",
                     "list_events",
                     "list_records",
+                    "list_workflow_runs",
                     "list_workflows",
                     "main",
                     "metrics_snapshot",
                     "openapi_document",
                     "query_records",
                     "relationship_graph",
+                    "resume_workflow",
                     "run_workflow",
                     "runtime_adapter_command_candidates",
                     "runtime_adapter_environment_keys",
@@ -951,21 +1129,36 @@ def _database_openapi_schemas() -> Dict[str, Any]:
             "properties": {
                 "payload": generic_object,
                 "start_at": {"type": "string"},
+                "pause_at": {"type": "string"},
+                "stop_after": {"type": "string"},
             },
         },
         "WorkflowRunResult": {
             "type": "object",
             "additionalProperties": True,
             "properties": {
+                "id": {"type": "string"},
                 "workflow": {"type": "string"},
                 "status": {"type": "string"},
                 "started_at": {"type": "string"},
-                "completed_at": {"type": "string"},
+                "current_step": {"type": "string"},
+                "completed_at": {"oneOf": [{"type": "string"}, {"type": "null"}]},
                 "steps": {"type": "array", "items": {"type": "string"}},
+                "completed_steps": {"type": "array", "items": {"type": "string"}},
+                "pending_steps": {"type": "array", "items": {"type": "string"}},
                 "trace": {"type": "array", "items": generic_object},
                 "payload": generic_object,
+                "event_id": {"type": "integer"},
             },
-            "required": ["workflow", "status", "steps", "trace", "payload"],
+            "required": ["id", "workflow", "status", "steps", "trace", "payload"],
+        },
+        "WorkflowRunCatalog": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "runs": {"type": "array", "items": _schema_ref("WorkflowRunResult")},
+            },
+            "required": ["runs"],
         },
         "RecordsByEntity": {
             "type": "object",
@@ -1456,6 +1649,9 @@ def openapi_document() -> Dict[str, Any]:
         "/records": {"get": _api_operation("All entity records", "Records by entity", response_schema=_schema_ref("RecordsByEntity"))},
         "/entities": {"get": _api_operation("Entity catalog", "Generated entity metadata", response_schema=_schema_ref("EntityCatalog"))},
         "/workflows": {"get": _api_operation("Workflow catalog", "Generated workflow metadata", response_schema=_schema_ref("WorkflowCatalog"))},
+        "/workflows/runs": {"get": _api_operation("Workflow run catalog", "Generated workflow run state", response_schema=_schema_ref("WorkflowRunCatalog"))},
+        "/workflows/runs/{id}": {"get": _api_operation("Workflow run detail", "Generated workflow run state", response_schema=_schema_ref("WorkflowRunResult"))},
+        "/workflows/runs/{id}/resume": {"post": _api_operation("Resume workflow run", "Workflow resume result", request_body=True, request_schema=_schema_ref("WorkflowRunRequest"), response_schema=_schema_ref("WorkflowRunResult"))},
         "/databases": {"get": _api_operation("Database catalog", "Database schema and connection metadata", response_schema=_schema_ref("DatabaseCatalog"))},
         "/databases/status": {"get": _api_operation("Database validation status", "Database schema validation and counts", response_schema=_schema_ref("DatabaseStatus"))},
         "/relationships": {"get": _api_operation("Entity relationship graph", "Relationship graph", response_schema=_schema_ref("RelationshipGraph"))},
@@ -1803,6 +1999,7 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             "/openapi.json",
             "/entities",
             "/workflows",
+            "/workflows/runs",
             "/databases",
             "/databases/status",
             "/auth",
@@ -1821,6 +2018,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
         }:
             return "_route_payload"
         if route.startswith("/databases/") and route.endswith("/schemas"):
+            return "_route_payload"
+        if route.startswith("/workflows/runs/"):
             return "_route_payload"
         if route.startswith("/workflows/"):
             return "_route_payload"
@@ -1854,6 +2053,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             route.startswith("/capabilities/") and route.endswith("/approval/plan")
         ):
             return "_approval_plan_payload"
+        if route.startswith("/workflows/runs/") and route.endswith("/resume"):
+            return "_workflow_resume_payload"
         if route.startswith("/workflows/") and route.endswith("/run"):
             return "_workflow_run_payload"
         return None
@@ -3082,6 +3283,15 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, {"entities": list_entities()}
     if path == "/workflows":
         return 200, {"workflows": describe_workflows()}
+    if path == "/workflows/runs":
+        return 200, {"runs": list_workflow_runs()}
+    if path.startswith("/workflows/runs/"):
+        parts = [part for part in path.split("/") if part]
+        if len(parts) == 3:
+            try:
+                return 200, get_workflow_run(parts[2])
+            except KeyError:
+                return 404, {"error": "workflow_run_not_found", "id": parts[2]}
     if path.startswith("/workflows/"):
         parts = [part for part in path.split("/") if part]
         if len(parts) == 2:
@@ -3256,6 +3466,25 @@ def _workflow_run_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict
         return 200, run_workflow(str(workflow_name), context)
     except KeyError:
         return 404, {"error": "unknown_workflow", "workflow": str(workflow_name)}
+
+
+def _workflow_resume_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 4:
+        return 404, {"error": "not_found", "path": path}
+    context = payload.get("payload", payload.get("context", {}))
+    if not isinstance(context, dict):
+        return 400, {"error": "payload_must_be_object"}
+    if "pause_at" in payload and "pause_at" not in context:
+        context = dict(context)
+        context["pause_at"] = payload["pause_at"]
+    if "stop_after" in payload and "stop_after" not in context:
+        context = dict(context)
+        context["stop_after"] = payload["stop_after"]
+    try:
+        return 200, resume_workflow(parts[2], context)
+    except KeyError:
+        return 404, {"error": "workflow_run_not_found", "id": parts[2]}
 
 
 def _streaming_payload() -> tuple[int, Dict[str, Any]]:
@@ -3478,6 +3707,8 @@ def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, An
         path.startswith("/capabilities/") and path.endswith("/approval/plan")
     ):
         return _approval_plan_payload(path, payload)
+    if path.startswith("/workflows/runs/") and path.endswith("/resume"):
+        return _workflow_resume_payload(path, payload)
     if path.startswith("/workflows/") and path.endswith("/run"):
         return _workflow_run_payload(path, payload)
     return 404, {"error": "not_found", "path": path}
