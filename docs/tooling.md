@@ -69,8 +69,8 @@ APG currently has an executable compiler path:
   semantic/lint/validate readiness, graph-suite generation, generated release
   evidence, generated Python source hygiene, temp compile-and-verify execution,
   checked-in example output synchronization, direct checked-output self-test
-  and smoke-test execution, python-only targeting, and representative domain
-  coverage;
+  and smoke-test execution, checked-output HTTP contract route probes,
+  python-only targeting, and representative domain coverage;
 - `apg parser-golden --json` emits `apg.parser-golden-audit.v1` by running the
   checked-in parser fixture catalog and proving required grammar constructs are
   represented by passing valid fixtures;
@@ -223,7 +223,8 @@ The compiler baseline is bedded down when:
   compile-and-verify execution, generated Python source hygiene, graph-suite
   output, release evidence, checked-in output directory synchronization, and
   direct checked-output self-test/smoke-test execution under each example
-  `output/` directory, and python-only targeting;
+  `output/` directory, checked-output HTTP probes for core contract routes, and
+  python-only targeting;
 - `apg baseline examples --refresh-outputs --json` is the deliberate refresh
   path for regenerating every numbered example `output/` directory from the
   current compiler before rerunning the same synchronization audit;
@@ -1573,7 +1574,7 @@ Tooling tests must be fixture-driven and deterministic.
 | CLI contract tests | Exit codes, JSON schemas, text summaries, bad arguments. |
 | LSP tests | Completion, hover, definition, references, rename, code actions, formatting, and source immutability, enforced by `apg language-server --audit-fixtures --json` and the `apg.language-server-fixture-audit.v1` report. |
 | Graph tests | ER, lookup, workflow, handler, capability, security, agent, package, deployment graph output, enforced by `apg graph-suite --audit-fixtures --json` and the `apg.graph-fixture-audit.v1` report. |
-| Compiler baseline tests | Numbered examples, domain coverage, generated source hygiene, checked-in output synchronization, direct checked-output self-test/smoke-test execution, lint/validate/model/graph/release/compile-verify agreement, enforced by `apg baseline examples --json` and the `apg.compiler-baseline-report.v1` report. |
+| Compiler baseline tests | Numbered examples, domain coverage, generated source hygiene, checked-in output synchronization, direct checked-output self-test/smoke-test execution, checked-output HTTP contract route probes, lint/validate/model/graph/release/compile-verify agreement, enforced by `apg baseline examples --json` and the `apg.compiler-baseline-report.v1` report. |
 | Migration tests | Add/drop/rename/type/nullability/default/relationship/index scenarios, enforced by `apg migrate-plan --audit-fixtures --json` and the `apg.migration-fixture-audit.v1` report. |
 | Natural-language planner tests | Prompt-to-DSL patch fixtures, lint integration, migration previews, source immutability, and rejected unsafe plans, enforced by `apg nl-plan --audit-fixtures --json` and the `apg.nl-plan-fixture-audit.v1` report. |
 | Verifier tests | Web/mobile/desktop/capability/deployment release evidence contracts, enforced by `apg evidence --audit-fixtures --json` and the `apg.release-evidence-fixture-audit.v1` report. |

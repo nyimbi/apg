@@ -16,6 +16,43 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 07:11 EAT
+
+Checked-output HTTP contract probe slice:
+
+- Extended `apg.compiler-baseline-report.v1` so the compiler baseline starts
+  each checked-in numbered example app on localhost and probes core HTTP
+  contract routes: `/health`, `/openapi.json`, `/component.json`,
+  `/semantic-model.json`, and `/self-test`.
+- Added `checked_output_http_ok` per example plus aggregate
+  `checked_output_http_passed` and `checked_output_http_failed` summary counts.
+- Updated tooling and developer documentation so the checked-in example
+  baseline proves the generated HTTP server starts and serves its core
+  contracts, not only CLI self-test/smoke-test commands.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/baseline.py
+  tests/test_compiler_baseline.py` -> passed.
+- `./.venv/bin/apg baseline examples --json` -> passed with 20/20 examples, 20
+  checked-output HTTP passes, 0 checked-output HTTP failures, 20
+  checked-output runtime passes, and 0 generated-source hygiene violations.
+- `./.venv/bin/pytest -q
+  tests/test_compiler_baseline.py::test_cli_baseline_json_audits_numbered_examples
+  tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler`
+  -> 2 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 18/18 surfaces, 20
+  checked-output HTTP passes in the compiler baseline surface, 0 checked-output
+  HTTP failures, 0 blocking gaps, and 0 errors.
+- `git diff --check -- compiler/baseline.py tests/test_compiler_baseline.py
+  docs/tooling.md docs/developer_guide.md docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- HTTP proof covers core generated contract routes for all numbered examples.
+  It does not yet exercise every domain-specific record, workflow, capability,
+  or screen route.
+
 ### 2026-05-29 07:05 EAT
 
 Direct checked-output runtime baseline slice:

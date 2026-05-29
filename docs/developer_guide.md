@@ -352,7 +352,7 @@ Use the narrowest lane that proves the claim.
 | Lint | `./.venv/bin/apg lint --audit-fixtures --json` |
 | Validate | `./.venv/bin/apg validate path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target python --json` |
 | Generator | `./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --catalog /tmp/apg-capability-catalog.json --output /tmp/apg-erp --verify` |
-| Compiler baseline | `./.venv/bin/apg baseline examples --json` for numbered examples, generated source hygiene, checked-in output sync, direct checked-output self-test/smoke-test execution, graph, model, and release agreement; use `./.venv/bin/apg baseline examples --refresh-outputs --json` only when intentionally regenerating example outputs |
+| Compiler baseline | `./.venv/bin/apg baseline examples --json` for numbered examples, generated source hygiene, checked-in output sync, direct checked-output self-test/smoke-test execution, checked-output HTTP contract route probes, graph, model, and release agreement; use `./.venv/bin/apg baseline examples --refresh-outputs --json` only when intentionally regenerating example outputs |
 | Release/package | `./.venv/bin/apg package path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-package --json` |
 | Evidence bundle | `./.venv/bin/apg evidence path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-evidence --json` |
 | Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` |

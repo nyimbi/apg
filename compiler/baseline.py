@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import re
+import socket
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -114,6 +118,22 @@ def build_compiler_baseline_report(
 				.get("ok")
 				is False
 			),
+			"checked_output_http_passed": sum(
+				1
+				for example in example_reports
+				if example.get("compile_verify", {})
+				.get("checked_output_http", {})
+				.get("ok")
+				is True
+			),
+			"checked_output_http_failed": sum(
+				1
+				for example in example_reports
+				if example.get("compile_verify", {})
+				.get("checked_output_http", {})
+				.get("ok")
+				is False
+			),
 			"graph_kinds": list(SUPPORTED_GRAPH_KINDS),
 		},
 		"examples": [
@@ -176,6 +196,7 @@ def _audit_example(source: Path, refresh_outputs: bool = False) -> dict[str, Any
 		"generated_source_hygiene_ok": compile_verify.get("source_hygiene", {}).get("ok") is True,
 		"checked_output_current": compile_verify.get("output_sync", {}).get("ok") is True,
 		"checked_output_runtime_ok": compile_verify.get("checked_output_runtime", {}).get("ok") is True,
+		"checked_output_http_ok": compile_verify.get("checked_output_http", {}).get("ok") is True,
 	}
 	return {
 		"name": source.parent.name,
@@ -209,6 +230,9 @@ def _compile_verify_in_temp(source: Path, refresh_outputs: bool = False) -> dict
 	checked_output_runtime = _run_generated_runtime_checks(source.parent / "output")
 	if not checked_output_runtime["ok"]:
 		errors.extend(checked_output_runtime["errors"])
+	checked_output_http = _run_checked_output_http_checks(source.parent / "output")
+	if not checked_output_http["ok"]:
+		errors.extend(checked_output_http["errors"])
 
 	with tempfile.TemporaryDirectory(prefix="apg-baseline-") as temporary_dir_name:
 		output_dir = Path(temporary_dir_name)
@@ -228,6 +252,7 @@ def _compile_verify_in_temp(source: Path, refresh_outputs: bool = False) -> dict
 		"output_sync": output_sync,
 		"runtime": temp_runtime,
 		"checked_output_runtime": checked_output_runtime,
+		"checked_output_http": checked_output_http,
 	}
 
 
@@ -269,6 +294,94 @@ def _run_generated_runtime_checks(output_dir: Path) -> dict[str, Any]:
 		"checks": checks,
 		"errors": errors,
 	}
+
+
+def _run_checked_output_http_checks(output_dir: Path) -> dict[str, Any]:
+	if not output_dir.exists():
+		return {
+			"ok": False,
+			"output_dir": str(output_dir),
+			"routes": [],
+			"errors": [f"{output_dir}: output directory is missing"],
+		}
+
+	port = _free_tcp_port()
+	process = subprocess.Popen(
+		[sys.executable, "app.py", "--host", "127.0.0.1", "--port", str(port)],
+		cwd=output_dir,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE,
+		text=True,
+	)
+	errors: list[str] = []
+	routes: list[dict[str, Any]] = []
+	try:
+		base_url = f"http://127.0.0.1:{port}"
+		started = _wait_for_http_route(base_url + "/health", process)
+		if not started:
+			stdout, stderr = _terminate_process(process)
+			return {
+				"ok": False,
+				"output_dir": str(output_dir),
+				"port": port,
+				"routes": routes,
+				"errors": [
+					f"{output_dir}: HTTP server did not serve /health on port {port}: "
+					f"{stdout.rstrip()} {stderr.rstrip()}".strip()
+				],
+			}
+		for route in ("/health", "/openapi.json", "/component.json", "/semantic-model.json", "/self-test"):
+			result = _fetch_http_route(base_url + route)
+			routes.append({"route": route, **result})
+			if not result["ok"]:
+				errors.append(f"{output_dir}: GET {route} failed with {result['status']}")
+	finally:
+		_terminate_process(process)
+
+	return {
+		"ok": not errors,
+		"output_dir": str(output_dir),
+		"port": port,
+		"routes": routes,
+		"errors": errors,
+	}
+
+
+def _free_tcp_port() -> int:
+	with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+		probe.bind(("127.0.0.1", 0))
+		return int(probe.getsockname()[1])
+
+
+def _wait_for_http_route(url: str, process: subprocess.Popen[str], timeout_seconds: float = 5.0) -> bool:
+	deadline = time.monotonic() + timeout_seconds
+	while time.monotonic() < deadline:
+		if process.poll() is not None:
+			return False
+		if _fetch_http_route(url)["ok"]:
+			return True
+		time.sleep(0.05)
+	return False
+
+
+def _fetch_http_route(url: str) -> dict[str, Any]:
+	try:
+		with urllib.request.urlopen(url, timeout=2.0) as response:
+			return {"ok": 200 <= response.status < 300, "status": response.status}
+	except urllib.error.HTTPError as error:
+		return {"ok": False, "status": error.code}
+	except OSError:
+		return {"ok": False, "status": "unreachable"}
+
+
+def _terminate_process(process: subprocess.Popen[str]) -> tuple[str, str]:
+	if process.poll() is None:
+		process.terminate()
+	try:
+		return process.communicate(timeout=2.0)
+	except subprocess.TimeoutExpired:
+		process.kill()
+		return process.communicate(timeout=2.0)
 
 
 def _generated_source_hygiene(generated_files: dict[str, str]) -> dict[str, Any]:

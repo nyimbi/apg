@@ -1924,13 +1924,17 @@ def test_cli_baseline_json_audits_numbered_examples():
 	assert report["summary"]["stale_output_directories"] == 0
 	assert report["summary"]["checked_output_runtime_passed"] == 20
 	assert report["summary"]["checked_output_runtime_failed"] == 0
+	assert report["summary"]["checked_output_http_passed"] == 20
+	assert report["summary"]["checked_output_http_failed"] == 0
 	assert all(example["checks"]["compile_verify_ok"] for example in report["examples"])
 	assert all(example["checks"]["generated_source_hygiene_ok"] for example in report["examples"])
 	assert all(example["checks"]["checked_output_current"] for example in report["examples"])
 	assert all(example["checks"]["checked_output_runtime_ok"] for example in report["examples"])
+	assert all(example["checks"]["checked_output_http_ok"] for example in report["examples"])
 	assert all(example["compile_verify"]["source_hygiene"]["ok"] for example in report["examples"])
 	assert all(example["compile_verify"]["output_sync"]["ok"] for example in report["examples"])
 	assert all(example["compile_verify"]["checked_output_runtime"]["ok"] for example in report["examples"])
+	assert all(example["compile_verify"]["checked_output_http"]["ok"] for example in report["examples"])
 	assert all(example["checks"]["release_ok"] for example in report["examples"])
 
 
