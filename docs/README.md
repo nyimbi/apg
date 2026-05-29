@@ -25,11 +25,16 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 - [Installation & Setup](./installation.md) - Getting started with APG
 - [Quick Start Guide](./quickstart.md) - Build your first APG application
 - [Architecture Overview](./architecture.md) - System design and components
+- [APG Language Guide](./apg_language.md) - Current executable APG language model, entity patterns, capabilities, agents, screens, workflows, rules, i18n, and generated runtime behavior
+- [APG Tutorial](./apg_tutorial.md) - Step-by-step path from a table to a composed executable application
 - [Language Reference](./language_reference.md) - APG syntax, constructs, and compilation model
+- [APG Grammar Guide](./apg_grammar_guide.md) - How `spec/apg.g4` is structured and how to extend it safely
+- [APG Cheat Sheet](./apg_cheat_sheet.md) - Compact syntax, command, route, and authoring reference
 - [Workflow Reference](./workflow_reference.md) - Workflow-oriented language and runtime reference
 
 ### Capabilities & Features
 - [Capabilities Overview](./capabilities/README.md) - Complete capability catalog
+- [Capability Building Standards](./capability_standards.md) - Standards for capability contracts, rules, UI, theming, i18n, streaming, package shape, tests, and documentation
 - [Executable Capability Contracts](./capability_contracts.md) - Configuration, rule-engine, UI, and theme contract registry
 - [Application Composition](./application_composition.md) - First-class application shells over capabilities, agents, routes, and deployment metadata
 - [Screen Composition](./screen_composition.md) - First-class screen contracts, UI relationships, and generated composition graphs
@@ -53,9 +58,9 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 
 | Category | Documentation |
 |----------|---------------|
-| **Getting Started** | [Installation](./installation.md) → [Quick Start](./quickstart.md) |
-| **Core Platform** | [Architecture](./architecture.md) → [Language Reference](./language_reference.md) → [API Reference](./api/README.md) |
-| **Capabilities** | [Capabilities](./capabilities/README.md) → [Capability Contracts](./capability_contracts.md) → [Application Composition](./application_composition.md) → [Screen Composition](./screen_composition.md) → [AI Agent Composition](./ai_agent_composition.md) → [Marketplace Guide](./marketplace_microservices_guide.md) |
+| **Getting Started** | [Installation](./installation.md) → [Quick Start](./quickstart.md) → [Tutorial](./apg_tutorial.md) |
+| **Core Platform** | [Architecture](./architecture.md) → [APG Language Guide](./apg_language.md) → [Grammar Guide](./apg_grammar_guide.md) → [Cheat Sheet](./apg_cheat_sheet.md) → [API Reference](./api/README.md) |
+| **Capabilities** | [Capabilities](./capabilities/README.md) → [Capability Standards](./capability_standards.md) → [Capability Contracts](./capability_contracts.md) → [Application Composition](./application_composition.md) → [Screen Composition](./screen_composition.md) → [AI Agent Composition](./ai_agent_composition.md) → [Marketplace Guide](./marketplace_microservices_guide.md) |
 | **Planning** | [Roadmaps](./roadmaps/) → [Specifications](./specifications/) → [Progress Log](./progress_log.md) |
 | **Operations** | [Deployment](./deployment.md) → [Reports](./reports/README.md) → [Progress Log](./progress_log.md) |
 

@@ -16,6 +16,39 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 04:29 EAT
+
+APG language documentation slice:
+
+- Added a current executable APG language guide covering modules, comments,
+  types, values, entity types, tables, applications, capabilities, rules,
+  screens, AI agents, workflows, Bytewax streaming, i18n, and generated Python
+  runtime behavior.
+- Added a step-by-step APG tutorial that grows a table into a capability,
+  screen, application shell, workflow, and AI-agent composition.
+- Added capability-building standards for contracts, naming, boundaries,
+  configuration, deterministic rules, UI screens, theming, i18n, Bytewax
+  streaming, ERP metadata, AI-agent integration, package shape, testing, and
+  documentation.
+- Added a grammar guide for safely extending `spec/apg.g4`, including parser
+  structure, contract reuse, entity-body ordering, lexical rules, AST/semantic
+  wiring, and common pitfalls.
+- Added a compact cheat sheet for authoring syntax, compile commands, generated
+  routes, language codes, and capability acceptance checks.
+- Linked the new documentation suite from `docs/README.md`.
+
+Verification:
+
+- `git diff --check -- docs/apg_language.md docs/apg_tutorial.md docs/capability_standards.md docs/apg_grammar_guide.md docs/apg_cheat_sheet.md docs/README.md docs/progress_log.md` -> passed.
+- Markdown relative link sanity over the new docs suite and `docs/README.md` -> passed.
+- `./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /private/tmp/apg-docs-verify --verify` -> compilation, generated self-test, and generated smoke test passed.
+
+Known remaining gaps:
+
+- The new docs focus on the current compiler/runtime contracts; older broad
+  aspirational references still need a consolidation pass so the documentation
+  set has one canonical narrative.
+
 ### 2026-05-29 04:16 EAT
 
 Generated workflow compensation execution slice:
