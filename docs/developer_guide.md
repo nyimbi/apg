@@ -9,6 +9,94 @@ repository, run one reliable baseline, choose the right implementation surface,
 make a vertical slice executable, prove it, document it, and commit it without
 waiting for tribal knowledge.
 
+## Read This First
+
+If you have less than one hour, use this section and then jump to the owning
+section for your lane. Do not begin by reading every file.
+
+1. Establish a clean local baseline:
+
+   ```bash
+   git status --short
+   ./.venv/bin/apg --help
+   ./.venv/bin/apg docs audit --json
+   ```
+
+2. Prove that APG can still produce an executable application:
+
+   ```bash
+   ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-dev-start --verify
+   ./.venv/bin/python /tmp/apg-dev-start/smoke_test.py
+   ```
+
+3. Pick one lane and one owner:
+
+   | Lane | Owner | First command to run |
+   | --- | --- | --- |
+   | Language/compiler | `spec/`, `compiler/`, focused compiler tests | `./.venv/bin/apg model examples/01_minimal_customer_records/main.apg --json` |
+   | Generated app runtime | `compiler/code_generator.py`, example output contract | `./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-dev-start --verify` |
+   | Capability depth | one `capabilities/<domain>/<code>/` package | `./.venv/bin/apg capabilities implementation-audit --json` |
+   | Capacity delivery | one `examples/<nn>_<capacity>/` directory plus package owners | `./.venv/bin/apg model examples/<nn>_<capacity>/main.apg --json` |
+   | Tooling/docs | `compiler/*audit*.py`, `cli/`, `docs/` | `./.venv/bin/apg tooling audit --json` |
+
+4. Write the work packet before editing:
+
+   ```text
+   Outcome:
+   Lane:
+   Owner:
+   Public contract:
+   Proof command:
+   Progress-log impact:
+   Non-goals:
+   ```
+
+5. Edit only that owner, run the proof, update `docs/progress_log.md` when
+   readiness changes, then commit and push the verified slice.
+
+This is the default APG development rhythm. A new developer is effective when
+they can repeat it without private context.
+
+## How To Progress APG Today
+
+APG currently advances fastest through four repeatable packets:
+
+| Packet | What to change | Required proof | Done when |
+| --- | --- | --- | --- |
+| Make source meaning visible | grammar, AST, semantic model, one fixture/example | focused parser/semantic test and `apg model ... --json` | the semantic JSON exposes a stable key another tool can consume |
+| Make generated apps more executable | generator, generated runtime helper, smoke test | `apg compile ... --verify`; generated `smoke_test.py` | a generated Python app imports and proves the new surface |
+| Convert a capability baseline | one package's models/service/API/views/spec/tests | package pytest; `implementation-audit --root`; `publish-plan` | the package is `domain_specific` with no baseline markers |
+| Build a capacity thread | one example plus package-backed behavior | `apg model`; `apg compile --verify`; smoke test; package proof if durable | a business event runs from APG source to generated Python and named package behavior |
+
+Choose the highest packet that has an obvious owner and a proof command. If a
+capacity requires syntax that does not exist, start in the compiler lane. If the
+syntax exists but the generated app is inert, start in generated runtime. If the
+app compiles but real behavior is generic, start in capability depth.
+
+## Source-To-Reality Checklist
+
+Use this checklist for every feature, capacity, or platform change:
+
+- **Syntax:** can an APG author express it tersely and readably?
+- **AST:** does `compiler/ast_builder.py` normalize it without losing names?
+- **Semantics:** does `apg model ... --json` expose stable, typed data?
+- **Generation:** does `apg compile ... --verify` create importable Python?
+- **Runtime:** does the generated `smoke_test.py` or package service execute
+  the behavior?
+- **Rules:** are guardrails named, deterministic, and testable?
+- **Screens:** are routes, components, permissions, relationships, and themes
+  visible when UI is involved?
+- **Agents:** are runtime, tools, memory, approval, and provider boundaries
+  explicit when AI agents are involved?
+- **Streams:** are Bytewax flows and event envelopes explicit when streaming is
+  involved?
+- **Evidence:** is the proof command recorded in the relevant README, cap spec,
+  or progress log?
+
+A feature is not complete at the first checked item. It is complete for the
+current slice when the checklist reaches the layer promised by the work packet
+and names the next missing layer.
+
 ## Immediate Effectiveness Spine
 
 Use this spine for every new developer, every pairing session, and every

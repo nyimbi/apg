@@ -16,6 +16,38 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 14:27 EAT
+
+Developer/contributor/capacity guide effectiveness slice:
+
+- Strengthened `docs/developer_guide.md` with a top-level "Read This First"
+  path, APG progress packet table, and source-to-reality checklist so new
+  developers can move from local baseline to one verified compiler, generator,
+  capability, capacity, or tooling slice.
+- Strengthened `docs/contributors_guide.md` with a new contributor start path,
+  first useful contribution formula, concrete first-packet examples, and a
+  handoff table that tells contributors which docs, specs, tests, and progress
+  notes to update for each class of change.
+- Strengthened `docs/capacity_development_guide.md` with a capacity start
+  packet, minimum executable capacity artifact list, concrete capacity build
+  runbook, and expansion order from event source through semantic model,
+  generated Python, capability packages, rules, screens, agents, Bytewax
+  streams, and release evidence.
+
+Verification:
+
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- The guides now give a sharper immediate path for new contributors, but APG
+  still needs continued implementation-depth burn-down. The next package target
+  remains `help` from the latest implementation audit.
+
 ### 2026-05-29 14:20 EAT
 
 GRPH implementation-depth slice:

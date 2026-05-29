@@ -7,6 +7,76 @@ The contribution rule is simple: make one useful final state more true in the
 current repository, prove it with evidence, document it, and commit a reviewable
 slice.
 
+## New Contributor Start Here
+
+Your first contribution should not require knowing the whole platform. It
+should require understanding one packet, one owner, and one proof command.
+
+Run this baseline:
+
+```bash
+git status --short
+./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-contributor-start --verify
+./.venv/bin/python /tmp/apg-contributor-start/smoke_test.py
+./.venv/bin/apg docs audit --json
+```
+
+Then choose one of these first packets:
+
+| If you want to... | Start here | Make this true | Prove with |
+| --- | --- | --- | --- |
+| Improve the language | `spec/apg.g4`, `compiler/ast_builder.py`, focused examples | one construct parses and appears in semantic JSON | focused compiler test; `apg model ... --json` |
+| Improve generated applications | `compiler/code_generator.py`, one example | one generated route/helper/manifest/smoke assertion works | `apg compile ... --verify`; generated smoke test |
+| Improve a capability | one `capabilities/<domain>/<code>/` directory | one package has domain-specific behavior, rules, API, views, tests | package pytest; `implementation-audit --root`; `publish-plan` |
+| Build a capacity | one `examples/<nn>_<capacity>/` directory and named packages | one business event runs from APG source to generated Python | `apg model`; `apg compile --verify`; smoke test |
+| Improve docs/tooling | one guide, audit, CLI command, or fixture | one future contributor has a shorter proof path | docs/tooling audit; diff check |
+
+Do not start with a broad platform rewrite. Start with a packet that can be
+reviewed, verified, committed, and extended today.
+
+## First Useful Contribution Formula
+
+Use this formula exactly for your first APG change:
+
+```text
+I will make <one current gap> executable in <one owner>.
+The public contract is <command/key/route/capability/rule/service>.
+I will prove it with <one or two exact commands>.
+I will not change <nearby tempting work>.
+```
+
+Examples:
+
+```text
+I will make the HELP capability domain-specific in capabilities/common/help/.
+The public contract is the help capability ID, rule IDs, service API, route metadata, and publish-plan package shape.
+I will prove it with focused HELP pytest, implementation-audit --root, and publish-plan.
+I will not add a live documentation search engine in this slice.
+```
+
+```text
+I will make one procurement approval event compile in examples/21_procurement_approval/.
+The public contract is the APG source, semantic model keys, generated routes, and smoke test.
+I will prove it with apg model, apg compile --verify, and generated smoke_test.py.
+I will not deepen supplier or payment packages in this slice.
+```
+
+This formula keeps APG work parallelizable. Other contributors can read it and
+know where you will touch, what names you protect, and which evidence matters.
+
+## What To Update When You Change Something
+
+| Change | Documentation/handoff to update |
+| --- | --- |
+| Grammar, semantic model, or generation behavior | focused tests, relevant example README, developer guide only if workflow changes |
+| Capability package behavior | package `cap_spec.md`, focused tests, `docs/progress_log.md` when implementation depth changes |
+| Capacity/example readiness | example `README.md`, generated output when intentionally refreshed, `docs/progress_log.md` when readiness changes |
+| CLI or audit output | `docs/tooling.md`, command tests, docs audit expectations |
+| Contributor workflow | this guide, developer guide, capacity guide if capacity builders are affected |
+
+Record evidence, not intent. A useful handoff says which command passed, what
+the output means, and what remains unimplemented.
+
 ## Contributor Operating Contract
 
 APG contribution work is organized around verified packets. A packet is the

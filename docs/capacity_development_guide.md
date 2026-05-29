@@ -8,6 +8,120 @@ applications, tests, docs, and release evidence.
 Use this guide when the goal is "make APG able to do something new", not merely
 "add a file".
 
+## Capacity Start Here
+
+A capacity is a runnable thread of business or platform behavior. Start with
+one event, not with a module inventory.
+
+```text
+event
+  -> APG source
+  -> semantic model
+  -> generated Python app
+  -> package-backed durable behavior
+  -> focused proof
+  -> README/progress handoff
+```
+
+The first capacity slice should fit on one screen:
+
+```text
+Capacity:
+First event:
+APG source:
+Primary records:
+Rules:
+Screens:
+Workflow:
+Agents:
+Bytewax streams:
+Capability owners:
+Generated proof:
+Package proof:
+Non-goals:
+Next slice:
+```
+
+Do not build a complete ERP outline before one event compiles. A procurement
+capacity starts with "request submitted", not with every procurement module. A
+finance capacity starts with "journal entered", not with every ledger report.
+An agentic capacity starts with "task assigned to an agent under approval", not
+with every possible model provider.
+
+## Minimum Executable Capacity
+
+A minimum executable capacity has these artifacts:
+
+| Artifact | Required content |
+| --- | --- |
+| `examples/<nn>_<capacity>/main.apg` | records, capability uses, rules, screens, workflows, agents, streams, and app composition for one event |
+| `examples/<nn>_<capacity>/README.md` | readiness level, event path, proof commands, generated-output status, next slice |
+| generated output directory | refreshed only when intentionally compiling examples for review |
+| capability package(s) | domain service/API/view behavior for durable runtime state, not only contract prose |
+| package `cap_spec.md` | current executable behavior, guardrails, adapter boundaries, proof commands |
+| tests/audits | focused compiler/example/package proof that matches the slice |
+| `docs/progress_log.md` | updated when capacity readiness or implementation depth changes |
+
+The slice is ready to commit when another contributor can clone, run the proof
+commands, and see exactly where to add the next event.
+
+## Capacity Build Runbook
+
+Use this runbook for every new capacity:
+
+1. **Name the event.** Use a verb phrase such as `request_submitted`,
+   `journal_posted`, `lead_qualified`, `agent_plan_approved`, or
+   `source_event_alerted`.
+2. **Write the APG source.** Keep it terse and readable; prefer records,
+   relationships, rules, screens, workflows, agents, and Bytewax streams that
+   map directly to the event.
+3. **Inspect semantics.**
+
+   ```bash
+   ./.venv/bin/apg model examples/<nn>_<capacity>/main.apg --json
+   ```
+
+4. **Compile the application.**
+
+   ```bash
+   ./.venv/bin/apg compile examples/<nn>_<capacity>/main.apg --output /tmp/<capacity>-app --verify
+   ./.venv/bin/python /tmp/<capacity>-app/smoke_test.py
+   ```
+
+5. **Deepen one package if needed.**
+
+   ```bash
+   ./.venv/bin/pytest -q capabilities/<domain>/<code>/test_capability_contract.py capabilities/<domain>/<code>/tests
+   ./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
+   ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+   ```
+
+6. **Document the evidence.** Update the example README, the package spec, and
+   the progress log when readiness changed.
+7. **Commit the slice.** Stage only the capacity files and package files that
+   belong to the packet.
+
+If any step fails, fix the earliest failing layer. Do not patch generated output
+around missing APG meaning.
+
+## Capacity Expansion Order
+
+Expand capacities in this order so each layer has something real to consume:
+
+1. Event and APG source.
+2. Semantic model visibility.
+3. Generated Python runtime and smoke test.
+4. One domain-specific capability package.
+5. Rule guardrails and negative tests.
+6. Screen composition and theme metadata.
+7. Workflow transitions and generated route/manifest exposure.
+8. AI agent composition with provider-agnostic adapter boundaries.
+9. Bytewax streaming metadata and deterministic local envelopes.
+10. Release evidence, docs, and deployment profile.
+
+This order keeps APG executable while it grows. Skip ahead only when the skipped
+layer is explicitly out of scope for the current capacity.
+
 ## Capacity Builder Contract
 
 A capacity is accepted when it gives APG a new executable ability that a second
