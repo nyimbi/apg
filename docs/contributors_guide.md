@@ -33,6 +33,47 @@ Then read only what matches your intended lane:
 Do not try to understand every subsystem before contributing. Understand one
 owner, one public contract, and one proof command.
 
+## If You Only Have One Hour
+
+Pick one of these paths and finish it completely.
+
+### Documentation Path
+
+1. Find one stale command, missing link, or unclear guide paragraph.
+2. Edit only the relevant docs file.
+3. Run:
+
+   ```bash
+   ./.venv/bin/apg docs audit --json
+   git diff --check -- docs
+   ```
+
+4. Commit the docs-only packet.
+
+### Capability Path
+
+1. Run `./.venv/bin/apg capabilities implementation-audit --json`.
+2. Pick one package and inspect its contract, service, spec, and tests.
+3. Add one guardrail test or one small domain helper.
+4. Run the focused package pytest and root implementation audit.
+5. Update the package `cap_spec.md` if behavior changed.
+
+### Example Path
+
+1. Choose one numbered example.
+2. Compile it to `/tmp`, not into the source tree.
+3. Run the generated smoke test.
+4. Update the README with current readiness and the next smallest gap.
+
+### Compiler Path
+
+1. Choose one fixture or example with one missing semantic field.
+2. Run `./.venv/bin/apg model <source.apg> --json`.
+3. Change the earliest compiler layer that owns the missing field.
+4. Rerun the focused compiler proof.
+
+Do not open multiple paths unless the first one is proven and committed.
+
 ## Contributor Operating Loop
 
 Use the same loop for every contribution, whether it is grammar, compiler,
@@ -90,6 +131,22 @@ Improve APG capabilities, rewrite the compiler, refresh examples, and fix docs.
 
 Split broad work into dependency order: grammar, AST, semantic model, generated
 runtime, capability package, example, docs.
+
+## Contribution Decision Tree
+
+Use this before choosing files:
+
+| Question | Yes | No |
+| --- | --- | --- |
+| Is a command failing for everyone? | fix that command or its earliest owner first | continue |
+| Is a capability still generic? | deepen one package lifecycle | continue |
+| Does source parse but generated Python lacks behavior? | inspect semantic JSON, then generator | continue |
+| Does the capacity lack a first event? | write or narrow the capacity blueprint | continue |
+| Is the problem only stale documentation? | docs-only packet | choose a code owner |
+| Does the change need live credentials? | model an adapter boundary and add local deterministic proof first | implement directly |
+
+The highest-value packet is usually the one that turns an existing promise into
+an executable local proof without introducing live-provider dependency.
 
 ## Same-Day Contribution Choices
 
@@ -159,6 +216,37 @@ Capability burn-down flow:
 Do not wire live providers first. Local deterministic package behavior gives
 the compiler, examples, UI manifests, and publish tooling something stable to
 compose.
+
+## Package Deepening Checklist
+
+A package-deepening contribution is effective when it replaces generic shape
+with domain behavior while preserving the public contract.
+
+Before editing:
+
+- name the capability ID and route names;
+- list the deterministic rules from `capability_contract.py`;
+- identify the first lifecycle event;
+- decide which live integrations stay behind adapters;
+- choose one positive test and at least two guardrail tests.
+
+During implementation:
+
+- replace generic record models with domain records;
+- keep tenant and owner checks in the service layer;
+- expose dependency-light API helpers;
+- return view models that match route/theme metadata;
+- keep compatibility shims only when existing tests or tools rely on them;
+- update `cap_spec.md` with current behavior and non-goals.
+
+Before commit:
+
+```bash
+./.venv/bin/pytest -q capabilities/<domain>/<code>/test_capability_contract.py capabilities/<domain>/<code>/tests
+./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
+./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+git diff --check -- capabilities/<domain>/<code>
+```
 
 ## How To Start A New Capacity
 

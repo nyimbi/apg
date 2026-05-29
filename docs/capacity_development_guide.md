@@ -92,6 +92,80 @@ Next slice:
 The blueprint describes current executable intent. Keep it updated as evidence
 lands.
 
+## Starter Capacity Checklist
+
+Use this checklist to turn a broad idea into a buildable APG slice.
+
+| Decision | Good answer | Bad answer |
+| --- | --- | --- |
+| First event | `invoice submitted` | `build finance` |
+| Primary actor | `accounts payable clerk` | `users` |
+| Tenant boundary | `tenant_id scopes invoices and approvals` | `security later` |
+| Durable owner | `capabilities/financials/ap/` | `generated app only` |
+| First rule | `invoice_total_positive` | `business rules` |
+| First screen | `/ap/invoices` with invoice list and action | `dashboard` |
+| First workflow | `draft -> submitted -> approved -> posted` | `ERP workflow` |
+| First agent | `invoice_triage_agent drafts exceptions, cannot post` | `AI handles it` |
+| First stream | `Bytewax invoice_events -> invoice_alerts` | `Kafka integration` |
+| Proof | model, compile, smoke test, package pytest | manual inspection |
+
+When an answer is vague, reduce the scope until the event can compile and
+smoke-test.
+
+## Capacity Source Skeleton
+
+Keep the first source file small enough for a new contributor to understand.
+The exact syntax should follow the current grammar, but the source should carry
+these concepts:
+
+```text
+app <capacity_name> targets python
+
+capability <owned_capability> {
+  provides <service_name>
+  requires <platform_service>
+  configure <key> = <value>
+}
+
+record <BusinessRecord> {
+  tenant_id: str required
+  ...
+}
+
+rule <stable_rule_name> {
+  when <condition>
+  then <decision>
+}
+
+screen <workbench_name> {
+  route "/<area>/<event>"
+  contains <BusinessRecord>
+  action <event_action>
+}
+
+workflow <event_workflow> {
+  state draft
+  state submitted
+  transition submit from draft to submitted when <rule>
+}
+
+agent <capacity_agent> {
+  runtime <adapter_name>
+  can use <service_name>
+  approval required for <risky_action>
+}
+
+stream <event_flow> {
+  engine bytewax
+  input <event_name>
+  output <alert_name>
+  partition by tenant_id
+}
+```
+
+Do not force every construct into the first slice. Include a construct only
+when it is needed for the first event and has a proof path.
+
 ## Capacity Design Sprint
 
 Use this one-hour sprint before writing code for a new capacity:
@@ -148,6 +222,40 @@ clear.
 
 If a step fails, fix the earliest failing layer. Do not patch generated output
 around missing APG meaning.
+
+## Worked Slice Pattern
+
+Use this pattern to build an ERP capacity without drifting into a full suite.
+
+### Slice 1: Parseable Event
+
+- write `examples/<nn>_<capacity>/main.apg`;
+- model one record, one rule, one screen, one workflow transition;
+- run `./.venv/bin/apg model ... --json`;
+- update the example README to readiness level 1.
+
+### Slice 2: Generated Runtime
+
+- compile the same source to `/tmp`;
+- run the generated smoke test;
+- inspect generated routes/helpers if screens or workflows changed;
+- update the README to readiness level 2.
+
+### Slice 3: Package-Backed Lifecycle
+
+- choose the capability package that owns durable behavior;
+- implement domain models, service methods, API helpers, views, and guardrails;
+- run package pytest, implementation audit, and publish-plan;
+- update package `cap_spec.md` and capacity README.
+
+### Slice 4: Composition Depth
+
+- add screen relationships, workflow routes, agent boundaries, and Bytewax
+  stream metadata only when the earlier slices are proven;
+- rerun model, compile, smoke, and package proof;
+- update `docs/progress_log.md` when global readiness changes.
+
+Each slice should be independently committable.
 
 ## Example Directory Shape
 
@@ -337,6 +445,24 @@ Publish proof: implementation-audit --root and publish-plan
 
 This is how APG closes the gap between language-level capacity and executable
 capability depth.
+
+## Capacity Backlog Examples
+
+Use these as starting points for new APG capacity packets.
+
+| Capacity | First event | Likely packages | First proof |
+| --- | --- | --- | --- |
+| Accounts payable | invoice submitted | AP, supplier master, document management, audit | model, compile, AP package pytest |
+| General ledger | journal posted | GL, period control, approval, audit | model, compile, GL package pytest |
+| Customer onboarding | customer application submitted | CRM, KYC, document management, notification | model, compile, onboarding package pytest |
+| Inventory receiving | goods receipt recorded | inventory, purchasing, warehouse, audit | model, compile, inventory package pytest |
+| Device telemetry | telemetry received | IOTD, LOGT, alerting, notification | model, compile, IOTD package pytest |
+| Agentic operations | plan proposed | AI agent runtime, workflow, audit, approval | model, compile, agent adapter proof |
+| Integration monitoring | event failed | integration, logging, alerting, retry queue | model, compile, integration package pytest |
+
+For each backlog item, write the blueprint first, then build only the first
+event. The first successful event creates the vocabulary for the rest of the
+capacity.
 
 ## AI Agent Capacities
 

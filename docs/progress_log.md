@@ -11424,3 +11424,16 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/onto --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 87, materialized baseline packages dropped to 20, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 902, and warning count dropped to 22. The next implementation-depth warning is `plfd`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+
+### 2026-05-29 16:56 EAT
+
+Contributor effectiveness guide slice:
+
+- Expanded `docs/developer_guide.md` with a first-productive-hour path, layer ownership decision tree, and fifteen-minute capability package read routine so APG developers can quickly locate the correct owner and proof command.
+- Expanded `docs/contributors_guide.md` with one-hour documentation, capability, example, and compiler contribution paths; a contribution decision tree; and a package-deepening checklist with focused verification commands.
+- Expanded `docs/capacity_development_guide.md` with a starter capacity checklist, source skeleton, worked slice pattern, and capacity backlog examples so contributors can turn broad APG ambitions into one executable event at a time.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.

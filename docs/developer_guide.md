@@ -41,6 +41,31 @@ Non-goals:
 Do not start with a broad rewrite. APG advances through small verified packets
 that leave the next developer with a clearer command path.
 
+## First Productive Hour
+
+Use this path when you are new to the repository and need to make a useful
+change immediately.
+
+| Minute | Action | Output |
+| --- | --- | --- |
+| 0-10 | Run the ten-minute baseline and inspect `git status --short` | known clean/dirty state and working CLI |
+| 10-20 | Pick one lane from the ownership table below | one directory or module owns the packet |
+| 20-30 | Run the focused proof for that owner before editing | baseline command output |
+| 30-45 | Make one reversible change | source, package, example, test, or doc update |
+| 45-55 | Rerun focused proof and inspect failure/output | evidence or next fix |
+| 55-60 | Update the local handoff note, progress log, or README if readiness changed | next contributor can continue |
+
+The first hour is successful when you can answer these five questions:
+
+- Which layer owns the change?
+- Which public name or JSON key does it affect?
+- Which command proves it?
+- Which broader check did you intentionally skip?
+- Where should the next contributor continue?
+
+If you cannot answer those questions, narrow the slice before editing more
+files.
+
 ## Environment Contract
 
 APG is developed as a Python-first repository. Use the checked-in project
@@ -128,6 +153,26 @@ Generated output is evidence, not the primary owner. If generated files are
 wrong because the generator is wrong, change the generator and refresh output
 only when the output belongs to the packet.
 
+## Ownership Decision Tree
+
+Start from the symptom, then work at the earliest owning layer.
+
+| If you need to... | Own the change in... | Do not start in... |
+| --- | --- | --- |
+| make APG source express a new idea | `spec/apg.g4`, parser fixtures, AST builder | generated output |
+| make parsed syntax visible to tools | `compiler/ast_builder.py`, `compiler/semantic_model.py` | capability packages |
+| enforce invalid references or policy at compile time | `compiler/semantic_analyzer.py` | generated smoke tests |
+| generate executable Python for existing semantics | `compiler/code_generator.py` | example `output/` only |
+| make a capability execute real domain behavior | `capabilities/<domain>/<code>/` | global docs first |
+| prove a business event end to end | `examples/<nn>_<capacity>/` plus owned packages | a broad platform rewrite |
+| expose developer evidence | `cli/`, `compiler/*audit*.py`, docs | hidden scripts |
+| clarify contribution flow | `docs/developer_guide.md`, `docs/contributors_guide.md`, `docs/capacity_development_guide.md` | chat-only notes |
+
+When two layers appear responsible, run the earliest proof command. For
+example, if generated UI is wrong, inspect `apg model ... --json` first. If the
+model is missing screen composition data, fix compiler projection before
+changing generator code.
+
 ## Command Map
 
 These commands are the fastest way to orient yourself:
@@ -148,6 +193,41 @@ These commands are the fastest way to orient yourself:
 
 Prefer JSON output for evidence because it is easier to compare, cite, and
 inspect in follow-up automation.
+
+## Read A Capability Package In Fifteen Minutes
+
+Use this routine before deepening a package:
+
+1. Open `capability_contract.py` and write down the capability ID, provided
+   services, required services, rules, routes, and theme name.
+2. Open `cap_spec.md` and compare its promised behavior with the code.
+3. Open `models.py`, `service.py`, `api.py`, and `views.py`; look for generic
+   record names, placeholder dashboard summaries, and missing guardrails.
+4. Open `test_capability_contract.py` and `tests/`; identify the existing
+   contract tests and the missing lifecycle tests.
+5. Run:
+
+   ```bash
+   ./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
+   ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+   ```
+
+The output of that read should be a packet like:
+
+```text
+Package:
+Lifecycle to implement:
+Models to replace:
+Rules to enforce:
+View/API surfaces:
+Adapter boundaries:
+Positive test:
+Guardrail tests:
+Proof commands:
+```
+
+This keeps capability work concrete and prevents generic scaffolding from
+surviving behind a polished contract.
 
 ## Primary Work Lanes
 
