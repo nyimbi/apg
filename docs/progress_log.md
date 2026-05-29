@@ -16,6 +16,68 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 13:42 EAT
+
+GRC RCM implementation-depth slice:
+
+- Converted `grc_rcm` from a mixed package with a generated service marker and
+  broken APG imports into a domain-specific GRC runtime package.
+- Replaced stale SQLAlchemy/Flask-AppBuilder package surfaces that imported
+  unavailable modules with dependency-light APG dataclasses, service methods,
+  API helpers, view models, and focused package fixtures.
+- Added executable RCM behavior for tenant-scoped risk registration, residual
+  risk scoring, control registration, compliance obligations, control
+  assessments, encrypted evidence collection, governance decisions, audit
+  events, dashboard summaries, and generated-package compatibility records.
+- Enforced RCM guardrails for tenant context, write-policy attachment,
+  high-risk review evidence, risk/control/obligation ownership, probability and
+  impact ranges, same-tenant references, failed-control evidence, encrypted
+  evidence, minimum retention, and high-risk governance rationale.
+- Rewrote `cap_spec.md` from aspirational market positioning into current
+  executable behavior, public package surfaces, guardrails, verification
+  commands, and production integration boundaries.
+- Expanded focused tests for the full RCM lifecycle, compatibility runtime,
+  view models, and policy failures.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/grc/rcm/__init__.py
+  capabilities/grc/rcm/models.py capabilities/grc/rcm/service.py
+  capabilities/grc/rcm/api.py capabilities/grc/rcm/views.py
+  capabilities/grc/rcm/conftest.py
+  capabilities/grc/rcm/test_capability_contract.py
+  capabilities/grc/rcm/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/python - <<'PY' ... importlib.import_module(...) ... PY` for
+  `capabilities.grc.rcm.models`, `service`, `api`, and `views` -> passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/grc/rcm` -> no matches.
+- `./.venv/bin/pytest -q capabilities/grc/rcm/test_capability_contract.py
+  capabilities/grc/rcm/tests/test_materialized_package.py` -> 5 passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/grc/rcm --json` -> passed with `grc_rcm` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/grc/rcm --json` ->
+  passed with runtime self-test loaded, release evidence ok, and
+  side-effect-free catalog patch.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  76 domain-specific packages, 31 materialized-baseline packages, 1 mixed
+  package, 1 contract-only package, 891 custom Python files, 0 errors, and 33
+  warnings; next warning is `grph`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+
+Known remaining gaps:
+
+- `grc_rcm` is now domain-specific, but implementation-depth still reports 31
+  materialized baselines, 1 mixed implementation, and 1 contract-only package to
+  replace with domain-specific behavior. The next burn-down target is `grph`.
+
 ### 2026-05-29 13:24 EAT
 
 Contributor effectiveness documentation slice:

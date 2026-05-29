@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""RCM package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import importlib.util
 import sys
 
 from capabilities.capability_contract_registry import validate_contract_shape
+from capabilities.grc.rcm.service import GrcRcmService
+from capabilities.grc.rcm.views import dashboard_model
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
@@ -44,3 +46,23 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "grc_rcm" in model["capabilities"]
+
+
+def test_rcm_package_compatibility_runtime_is_executable():
+	service = GrcRcmService()
+	record = service.create_record(
+		record_id="risk-compat",
+		tenant_id="tenant-test",
+		metadata={
+			"title": "Generated package compatibility risk",
+			"owner_id": "owner-test",
+			"probability": 0.5,
+			"impact": 0.5,
+		},
+	)
+	model = dashboard_model(service, "tenant-test")
+
+	assert record["kind"] == "risk"
+	assert record["risk_level"] == "low"
+	assert model["summary"]["risk_count"] == 1
+	assert model["panels"][0]["id"] == "risk_heatmap"
