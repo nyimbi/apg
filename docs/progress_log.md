@@ -10314,6 +10314,28 @@ Battery-conscious verification:
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
 
+### 2026-05-29 11:14 EAT
+
+Executable DTWN digital-twin runtime slice:
+
+- Converted `capabilities/common/dtwn` from a generated materialized baseline into a domain-specific digital-twin capability package.
+- Replaced generic records with tenant digital twins, simulation models, authenticated telemetry samples, topology links, simulation runs, predictions, and audit events.
+- Added `twin_engine.py` with deterministic state digests, state-version generation, telemetry state fusion, simulation output generation, and risk recommendations.
+- Added `DtwnService` behavior for twin creation, asset identity and ownership guardrails, model registration, calibration and confidence enforcement, authenticated telemetry ingestion, topology linking, production simulation approval, prediction review, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so DTWN exposes twin registry, model library, telemetry fusion, topology view, simulation lab, prediction review queue, audit events, dashboard summaries, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current runtime behavior and the explicit external IoT broker, geospatial service, computer-vision pipeline, machine controller, simulator, time-series database, prediction service, anomaly-detection, and edge-execution integration boundary.
+- Added focused contract/service tests for successful twin-telemetry-topology-simulation-prediction lifecycle execution and guardrails around tenant context, twin ownership, asset identity, calibration evidence, confidence thresholds, telemetry authentication, approved models, production simulation approval, and high-risk prediction review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/dtwn/__init__.py capabilities/common/dtwn/models.py capabilities/common/dtwn/twin_engine.py capabilities/common/dtwn/service.py capabilities/common/dtwn/api.py capabilities/common/dtwn/views.py capabilities/common/dtwn/test_capability_contract.py capabilities/common/dtwn/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/dtwn/test_capability_contract.py capabilities/common/dtwn/tests/test_materialized_package.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/dtwn` returned no remaining DTWN baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `dtwn` is now `domain_specific`, custom Python files increased to 886, domain-specific packages increased to 67, materialized baseline packages dropped to 36, and warning count dropped to 42.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dtwn --json` passed with `ok: true`, warnings empty, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `git diff --check -- capabilities/common/dtwn/__init__.py capabilities/common/dtwn/models.py capabilities/common/dtwn/twin_engine.py capabilities/common/dtwn/service.py capabilities/common/dtwn/api.py capabilities/common/dtwn/views.py capabilities/common/dtwn/test_capability_contract.py capabilities/common/dtwn/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
+
 ### 2026-05-29 10:47 EAT
 
 Executable DIST distributed-computing runtime slice:

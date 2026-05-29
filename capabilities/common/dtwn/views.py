@@ -1,4 +1,4 @@
-"""UI metadata helpers for the Digital Twin Framework capability."""
+"""UI view-model helpers for the APG Digital Twin Framework capability."""
 
 from __future__ import annotations
 
@@ -21,7 +21,28 @@ def dashboard_model(
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
 		"routes": capability_routes(tenant_id),
-		"records": service.list_records(tenant_id),
-		"rules": contract["rule_engine"]["rules"],
+		"summary": service.dashboard_summary(tenant_id),
+		"twins": service.list_twins(tenant_id),
+		"models": service.list_models(tenant_id),
+		"recent_telemetry": service.list_telemetry(tenant_id)[-10:],
+		"review_queue": [prediction for prediction in service.list_predictions(tenant_id) if prediction["review_required"]],
 		"theme": contract["theme"],
+	}
+
+
+def topology_model(service: DtwnService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"twins": service.list_twins(tenant_id),
+		"links": service.list_topology(tenant_id),
+		"routes": capability_routes(tenant_id),
+	}
+
+
+def simulation_lab_model(service: DtwnService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"models": service.list_models(tenant_id),
+		"simulations": service.list_simulations(tenant_id),
+		"predictions": service.list_predictions(tenant_id),
 	}

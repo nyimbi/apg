@@ -1,7 +1,10 @@
 """Regression coverage for the DTWN executable capability contract."""
 
+import pytest
+
 from capabilities.common.dtwn import register_capability
 from capabilities.common.dtwn.capability_contract import evaluate_capability_rules, get_capability_contract
+from capabilities.common.dtwn.service import DtwnService
 
 
 def test_contract_exposes_configuration_rules_ui_and_theme():
@@ -31,3 +34,132 @@ def test_registration_includes_full_capability_contract():
 	assert "iotd" in registration["dependencies"]
 	assert registration["ui_components"]["topology"] == "/dtwn/topology"
 	assert "dtwn:simulate" in registration["permissions"]
+
+
+def test_service_runs_digital_twin_lifecycle_with_simulation_and_review():
+	service = DtwnService()
+
+	pump = service.create_twin(
+		twin_id="twin-pump-1",
+		tenant_id="tenant-dtwn",
+		asset_id="asset-pump-1",
+		name="Pump 1",
+		owner="operations",
+		twin_type="pump",
+		location={"site": "plant-a", "lat": 1.2, "lon": 36.8},
+		initial_state={"temperature": 42, "vibration": 18},
+	)
+	tank = service.create_twin(
+		twin_id="twin-tank-1",
+		tenant_id="tenant-dtwn",
+		asset_id="asset-tank-1",
+		name="Tank 1",
+		owner="operations",
+		twin_type="tank",
+	)
+	model = service.register_simulation_model(
+		model_id="model-pump-risk",
+		tenant_id="tenant-dtwn",
+		name="Pump risk model",
+		version="1.0.0",
+		owner="model-risk",
+		model_type="physics_ml_hybrid",
+		calibration_evidence="calibration-report-001",
+		approved_by="chief-engineer",
+		confidence=0.91,
+	)
+	telemetry = service.ingest_telemetry(
+		sample_id="tel-1",
+		tenant_id="tenant-dtwn",
+		twin_id=pump["id"],
+		source_id="iot-gateway-1",
+		source_type="iot",
+		authenticated=True,
+		measurements={"temperature": 88, "vibration": 64},
+		geospatial_context={"site": "plant-a"},
+	)
+	link = service.link_topology(
+		link_id="link-1",
+		tenant_id="tenant-dtwn",
+		source_twin_id=pump["id"],
+		target_twin_id=tank["id"],
+		relationship="feeds",
+	)
+	run = service.run_simulation(
+		run_id="sim-1",
+		tenant_id="tenant-dtwn",
+		twin_id=pump["id"],
+		model_id=model["id"],
+		scenario="high load",
+		environment="production",
+		approved_by="shift-lead",
+	)
+	prediction = service.record_prediction(
+		prediction_id="pred-1",
+		tenant_id="tenant-dtwn",
+		twin_id=pump["id"],
+		model_id=model["id"],
+		risk_score=0.91,
+		confidence=0.86,
+		horizon="48h",
+		recommendation="inspect bearing assembly",
+	)
+
+	assert telemetry["state_version"] != pump["state_version"]
+	assert link["relationship"] == "feeds"
+	assert run["status"] == "completed"
+	assert run["outputs"]["risk_score"] > 0
+	assert prediction["review_required"] is True
+	assert service.dashboard_summary("tenant-dtwn")["review_required_prediction_count"] == 1
+
+	reviewed = service.review_prediction("pred-1", "tenant-dtwn", "reliability-engineer")
+	assert reviewed["status"] == "reviewed"
+	assert service.list_audit_events("tenant-dtwn")
+
+
+def test_service_enforces_digital_twin_guardrails():
+	service = DtwnService()
+
+	with pytest.raises(PermissionError, match="tenant_context_required"):
+		service.create_twin("twin-no-tenant", "", "asset-1", "No tenant", "owner", "asset")
+	with pytest.raises(PermissionError, match="twin_owner_required"):
+		service.create_twin("twin-no-owner", "tenant-dtwn", "asset-1", "No owner", "", "asset")
+	with pytest.raises(PermissionError, match="asset_identity_required"):
+		service.create_twin("twin-no-asset", "tenant-dtwn", "", "No asset", "owner", "asset")
+	with pytest.raises(PermissionError, match="calibration_evidence_required"):
+		service.register_simulation_model("model-no-cal", "tenant-dtwn", "No calibration", "1", "owner", "physics", "", "approver")
+	with pytest.raises(PermissionError, match="prediction_confidence_threshold"):
+		service.register_simulation_model("model-low-confidence", "tenant-dtwn", "Low confidence", "1", "owner", "physics", "evidence", "approver", confidence=0.4)
+
+	service.create_twin("twin-1", "tenant-dtwn", "asset-1", "Twin", "owner", "asset")
+	service.register_simulation_model("model-draft", "tenant-dtwn", "Draft", "1", "owner", "physics", "evidence", None)
+	with pytest.raises(PermissionError, match="telemetry_source_auth_required"):
+		service.ingest_telemetry("tel-bad", "tenant-dtwn", "twin-1", "source-1", "iot", False, {"temperature": 12})
+	with pytest.raises(PermissionError, match="simulation_model_required"):
+		service.run_simulation("sim-draft", "tenant-dtwn", "twin-1", "model-draft", "baseline")
+
+
+def test_production_simulation_requires_approval_and_high_risk_prediction_can_be_reviewed():
+	service = DtwnService()
+	service.create_twin("twin-1", "tenant-dtwn", "asset-1", "Twin", "owner", "asset", initial_state={"load": 90})
+	service.register_simulation_model("model-1", "tenant-dtwn", "Model", "1", "owner", "physics", "evidence", "approver")
+
+	with pytest.raises(PermissionError, match="simulation_approval_required"):
+		service.run_simulation("sim-prod", "tenant-dtwn", "twin-1", "model-1", "baseline", environment="production")
+
+	run = service.run_simulation("sim-prod-approved", "tenant-dtwn", "twin-1", "model-1", "baseline", environment="production", approved_by="approver")
+	assert run["status"] == "completed"
+
+	reviewed_prediction = service.record_prediction(
+		"pred-reviewed",
+		"tenant-dtwn",
+		"twin-1",
+		"model-1",
+		risk_score=0.91,
+		confidence=0.85,
+		horizon="24h",
+		recommendation="inspect",
+		reviewed_by="reviewer",
+	)
+	assert reviewed_prediction["review_required"] is False
+	assert reviewed_prediction["reviewed_by"] == "reviewer"
