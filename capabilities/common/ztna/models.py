@@ -1,24 +1,26 @@
-"""Data models for the Zero Trust Network Access capability."""
+"""Zero Trust Network Access domain models."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from .zero_trust_runtime import (
+	ZeroTrustAccessRequestRecord,
+	ZeroTrustAuditEventRecord,
+	ZeroTrustDeviceRecord,
+	ZeroTrustIdentityRecord,
+	ZeroTrustResourceRecord,
+	ZeroTrustSessionRecord,
+)
 
 
-@dataclass
-class ZtnaRecord:
-	"""Tenant-scoped dependency-light capability record."""
+ZtnaRecord = ZeroTrustAccessRequestRecord
 
-	id: str
-	tenant_id: str
-	status: str = "active"
-	metadata: dict[str, Any] = field(default_factory=dict)
 
-	def to_dict(self) -> dict[str, Any]:
-		return {
-			"id": self.id,
-			"tenant_id": self.tenant_id,
-			"status": self.status,
-			"metadata": dict(self.metadata),
-		}
+__all__ = [
+	"ZeroTrustAccessRequestRecord",
+	"ZeroTrustAuditEventRecord",
+	"ZeroTrustDeviceRecord",
+	"ZeroTrustIdentityRecord",
+	"ZeroTrustResourceRecord",
+	"ZeroTrustSessionRecord",
+	"ZtnaRecord",
+]

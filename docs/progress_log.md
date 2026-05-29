@@ -16,6 +16,66 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 20:47 EAT
+
+ZTNA zero-trust access runtime implementation-depth slice:
+
+- Converted `capabilities/common/ztna` from generated materialized record
+  scaffolding into a domain-specific zero-trust network access runtime package.
+- Added `zero_trust_runtime.py` with deterministic IDs, UTC timestamps, bounded
+  risk/trust scoring, and serializable identity, device, resource, access
+  request, session, and audit-event records.
+- Replaced the generic record model with zero-trust domain records while
+  preserving `ZtnaRecord` as an access-request compatibility alias.
+- Replaced generic service behavior with `ZtnaService` lifecycle methods for
+  tenant-scoped identity verification, device posture, protected resources,
+  resource policy attachment, access requests, high-risk review, privileged MFA,
+  session start, continuous verification, revocation, closure, dashboard
+  summaries, generic record compatibility, and audit events.
+- Expanded API and view helpers so ZTNA exposes dashboard, policy console,
+  device posture, resource map, access requests, session monitor, risk console,
+  settings, route, rule, and theme composition surfaces.
+- Rewrote `cap_spec.md` around current executable ZTNA behavior, adapter
+  boundaries, UI surfaces, theme metadata, known non-goals, and proof commands.
+- Replaced generated package tests with focused lifecycle, compatibility,
+  package-publish, guardrail, API, and view-model tests.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/ztna` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/ztna/__init__.py
+  capabilities/common/ztna/models.py
+  capabilities/common/ztna/zero_trust_runtime.py
+  capabilities/common/ztna/service.py capabilities/common/ztna/api.py
+  capabilities/common/ztna/views.py
+  capabilities/common/ztna/capability_contract.py capabilities/common/ztna/app.py
+  capabilities/common/ztna/test_capability_contract.py
+  capabilities/common/ztna/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -c "import importlib; ..."` for ZTNA
+  `zero_trust_runtime`, service, API, views, and capability contract passed
+  with `ztna imports ok` after a non-fatal OpenTelemetry availability warning
+  from adjacent imports.
+- `./.venv/bin/pytest -q capabilities/common/ztna/test_capability_contract.py
+  capabilities/common/ztna/tests/test_package_contract.py` passed with 13
+  tests and only pre-existing adjacent SQLAlchemy/Pydantic deprecation
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/ztna --json` passed with `ztna` classified as
+  `domain_specific`, `zero_trust_runtime.py` counted as the custom Python file,
+  0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ztna --json`
+  passed with `ok: true`, warnings empty, release evidence `ok: true`, and
+  side-effect-free catalog patch evidence.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 109
+  domain-specific packages, 0 materialized-baseline packages, 0 mixed
+  implementations, 0 contract-only packages, 923 custom Python files, 0 errors,
+  and 0 warnings.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
 ### 2026-05-29 20:55 EAT
 
 Developer, contributor, and capacity guide immediate-effectiveness slice:
