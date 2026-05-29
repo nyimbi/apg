@@ -77,6 +77,9 @@ class AccessibilityFinding:
 	description: str
 	remediation_owner: str
 	status: str = "open"
+	review_required: bool = False
+	review_recorded: bool = False
+	resolution: str | None = None
 	evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -89,6 +92,9 @@ class AccessibilityFinding:
 			"description": self.description,
 			"remediation_owner": self.remediation_owner,
 			"status": self.status,
+			"review_required": self.review_required,
+			"review_recorded": self.review_recorded,
+			"resolution": self.resolution,
 			"evidence": dict(self.evidence),
 		}
 
@@ -136,4 +142,48 @@ class AccessibilityAudit:
 			"target_ids": list(self.target_ids),
 			"finding_ids": list(self.finding_ids),
 			"status": self.status,
+		}
+
+
+@dataclass(frozen=True)
+class AccessibilityReview:
+	"""Formal review decision for a high-risk accessibility finding."""
+
+	id: str
+	tenant_id: str
+	finding_id: str
+	reviewer: str
+	decision: str
+	notes: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"finding_id": self.finding_id,
+			"reviewer": self.reviewer,
+			"decision": self.decision,
+			"notes": self.notes,
+		}
+
+
+@dataclass(frozen=True)
+class AccessibilityAuditEvent:
+	"""Tenant-scoped evidence event for ACCS lifecycle changes."""
+
+	id: str
+	tenant_id: str
+	event_type: str
+	subject_id: str
+	message: str
+	evidence: dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_type": self.event_type,
+			"subject_id": self.subject_id,
+			"message": self.message,
+			"evidence": dict(self.evidence),
 		}

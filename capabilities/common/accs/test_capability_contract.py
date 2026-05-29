@@ -3,6 +3,7 @@
 import pytest
 
 from capabilities.common.accs import register_capability
+from capabilities.common.accs import api, views
 from capabilities.common.accs.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.accs.service import AccsService
 
@@ -69,6 +70,7 @@ def test_service_runs_audits_and_tracks_remediation():
 	assert summary["target_count"] == 1
 	assert summary["finding_count"] == 2
 	assert summary["remediation_count"] == 2
+	assert summary["review_count"] == 0
 
 
 def test_service_blocks_invalid_audits_and_reports_publication_guardrails():
@@ -106,3 +108,130 @@ def test_service_blocks_invalid_audits_and_reports_publication_guardrails():
 
 	assert report["publishable"] is False
 	assert reasons == {"contrast_validation_required", "captions_required"}
+
+
+def test_critical_finding_review_and_closure_lifecycle():
+	service = AccsService()
+	service.register_target(
+		target_id="admin-panel",
+		tenant_id="tenant-accs",
+		surface="Admin Panel",
+		route="/admin",
+		owner="platform-owner",
+		keyboard_navigation_present=False,
+	)
+
+	audit = service.run_audit(
+		audit_id="critical-audit",
+		tenant_id="tenant-accs",
+		standard_id="wcag_2_2_aa",
+		target_ids=["admin-panel"],
+		remediation_owner="accessibility-lead",
+	)
+	finding_id = audit["finding_ids"][0]
+	finding = service.list_findings("tenant-accs")[0]
+	review_queue = views.review_queue_model(service, "tenant-accs")
+
+	assert finding["severity"] == "critical"
+	assert finding["status"] == "review_required"
+	assert finding["review_required"] is True
+	assert review_queue["findings_requiring_review"][0]["id"] == finding_id
+
+	with pytest.raises(PermissionError, match="critical_accessibility_review_required"):
+		service.close_finding(finding_id, tenant_id="tenant-accs", resolution="Keyboard trap fixed.")
+
+	review = service.record_review(
+		finding_id=finding_id,
+		tenant_id="tenant-accs",
+		reviewer="accessibility-reviewer",
+		decision="approved",
+		notes="Keyboard navigation remediation evidence accepted.",
+	)
+	closed = service.close_finding(
+		finding_id=finding_id,
+		tenant_id="tenant-accs",
+		resolution="Keyboard navigation verified through deterministic tab-order check.",
+	)
+	evidence = views.compliance_evidence_model(service, "tenant-accs")
+
+	assert review["decision"] == "approved"
+	assert closed["status"] == "closed"
+	assert closed["resolution"].startswith("Keyboard navigation verified")
+	assert evidence["summary"]["review_count"] == 1
+	assert {event["event_type"] for event in evidence["audit_events"]} >= {
+		"finding_recorded",
+		"finding_review_recorded",
+		"finding_closed",
+	}
+
+
+def test_critical_finding_closure_enforces_tenant_and_resolution_guardrails():
+	service = AccsService()
+	finding = service.record_finding(
+		finding_id="manual-critical",
+		tenant_id="tenant-accs",
+		target_id="manual",
+		rule="keyboard_navigation_required",
+		severity="critical",
+		description="Manual review found keyboard trap.",
+		remediation_owner="accessibility-lead",
+	)
+
+	with pytest.raises(KeyError, match="unknown accessibility finding for tenant"):
+		service.close_finding(finding["id"], tenant_id="other-tenant", resolution="Fixed.")
+
+	service.record_review(
+		finding_id=finding["id"],
+		tenant_id="tenant-accs",
+		reviewer="accessibility-reviewer",
+		decision="needs_work",
+		notes="Manual evidence incomplete.",
+	)
+
+	with pytest.raises(PermissionError, match="critical_accessibility_review_not_approved"):
+		service.close_finding(finding["id"], tenant_id="tenant-accs", resolution="Evidence incomplete.")
+
+	assert views.review_queue_model(service, "tenant-accs")["findings_requiring_review"][0]["id"] == finding["id"]
+
+	service.record_review(
+		finding_id=finding["id"],
+		tenant_id="tenant-accs",
+		reviewer="accessibility-reviewer",
+		decision="approved",
+		notes="Manual evidence accepted.",
+	)
+	with pytest.raises(ValueError, match="resolution evidence is required"):
+		service.close_finding(finding["id"], tenant_id="tenant-accs", resolution="")
+
+
+def test_api_helpers_expose_review_and_closure_lifecycle():
+	target = api.register_target({
+		"id": "api-admin",
+		"tenant_id": "tenant-api-accs",
+		"surface": "API Admin",
+		"route": "/api-admin",
+		"owner": "api-owner",
+		"keyboard_navigation_present": False,
+	})
+	audit = api.run_audit({
+		"id": "api-audit",
+		"tenant_id": target["tenant_id"],
+		"target_ids": [target["id"]],
+		"remediation_owner": "api-accessibility-lead",
+	})
+	review = api.record_review({
+		"finding_id": audit["finding_ids"][0],
+		"tenant_id": target["tenant_id"],
+		"reviewer": "api-reviewer",
+		"decision": "approved",
+		"notes": "API lifecycle review accepted.",
+	})
+	closed = api.close_finding({
+		"finding_id": audit["finding_ids"][0],
+		"tenant_id": target["tenant_id"],
+		"resolution": "API target keyboard path fixed.",
+	})
+
+	assert review["reviewer"] == "api-reviewer"
+	assert closed["status"] == "closed"
+	assert api.list_reviews(target["tenant_id"])[0]["finding_id"] == audit["finding_ids"][0]

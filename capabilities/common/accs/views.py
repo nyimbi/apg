@@ -25,6 +25,8 @@ def dashboard_model(
 		"targets": service.list_targets(tenant_id),
 		"findings": service.list_findings(tenant_id),
 		"remediations": service.list_remediations(tenant_id),
+		"reviews": service.list_reviews(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -63,8 +65,44 @@ def remediation_queue_model(
 	service = service or AccsService()
 	return {
 		"remediations": service.list_remediations(tenant_id),
+		"reviews": service.list_reviews(tenant_id),
 		"actions": ["assign", "start", "record_review", "close"],
 		"required_fields": ["owner", "status", "review_recorded"],
+	}
+
+
+def review_queue_model(
+	service: AccsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AccsService()
+	approved_review_finding_ids = {
+		item["finding_id"] for item in service.list_reviews(tenant_id)
+		if item["decision"] == "approved"
+	}
+	findings = [
+		item for item in service.list_findings(tenant_id)
+		if item.get("review_required") and item["id"] not in approved_review_finding_ids
+	]
+	return {
+		"findings_requiring_review": findings,
+		"recorded_reviews": service.list_reviews(tenant_id),
+		"actions": ["approve", "reject", "needs_work"],
+		"required_fields": ["reviewer", "decision", "notes"],
+	}
+
+
+def compliance_evidence_model(
+	service: AccsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AccsService()
+	return {
+		"summary": service.compliance_summary(tenant_id),
+		"audits": service.list_audits(tenant_id),
+		"findings": service.list_findings(tenant_id),
+		"reviews": service.list_reviews(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
 	}
 
 

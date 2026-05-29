@@ -47,12 +47,13 @@ def register_capability() -> dict[str, Any]:
 		"capabilities": {
 			"accessibility_audits": "Run standards-based audits across UI, content, and media surfaces",
 			"remediation_workflows": "Track findings, owners, due dates, review, and closure",
+			"review_governance": "Record formal review decisions before critical findings can close",
 			"assistive_metadata": "Manage labels, descriptions, landmarks, and assistive hints",
 			"media_accessibility": "Govern captions, transcripts, alt text, and media alternatives",
 			"capability_rules": "Evaluate deterministic accessibility-governance rules",
 			"visual_theming": "Apply accessibility-operations theme tokens and components"
 		},
-		"endpoints": {"audits": "/accs/api/v1/audits", "findings": "/accs/api/v1/findings", "remediation": "/accs/api/v1/remediation", "assistive": "/accs/api/v1/assistive", "standards": "/accs/api/v1/standards"},
+		"endpoints": {"audits": "/accs/api/v1/audits", "findings": "/accs/api/v1/findings", "remediation": "/accs/api/v1/remediation", "reviews": "/accs/api/v1/reviews", "assistive": "/accs/api/v1/assistive", "standards": "/accs/api/v1/standards"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

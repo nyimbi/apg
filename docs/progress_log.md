@@ -12744,3 +12744,24 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities validate-contracts --json` passed with `ok: true`, 109 contracts valid, and 0 errors.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `git diff --check -- capabilities/README.md capabilities/SPECIFICATION.md capabilities/PLAN.md` passed with no whitespace errors.
+
+### 2026-05-29 23:19 EAT
+
+ACCS critical-finding review and closure lifecycle slice:
+
+- Added `capabilities/common/accs/SPECIFICATION.md` and `capabilities/common/accs/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Extended ACCS models with formal accessibility reviews and audit events.
+- Extended ACCS service behavior so deterministic audits can record critical findings, critical findings remain in a review-required state until an approved formal review exists, closure requires tenant match and resolution evidence, and lifecycle changes emit audit events.
+- Extended ACCS API helpers and view models with review, closure, review-queue, compliance-evidence, and audit-event surfaces.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive audit-review-close lifecycle coverage and negative tenant, rejected-review, and missing-resolution guardrail coverage.
+- Updated `cap_spec.md` with the current review-governance lifecycle and focused proof commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/accs/__init__.py capabilities/common/accs/models.py capabilities/common/accs/accessibility_engine.py capabilities/common/accs/service.py capabilities/common/accs/api.py capabilities/common/accs/views.py capabilities/common/accs/capability_contract.py capabilities/common/accs/app.py capabilities/common/accs/test_capability_contract.py capabilities/common/accs/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/accs` returned no stale ACCS materialized markers.
+- `./.venv/bin/pytest -q capabilities/common/accs/test_capability_contract.py capabilities/common/accs/tests` passed with 10 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/accs --json` passed with `ok: true`; ACCS remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/accs --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
+- `git diff --check -- capabilities/common/accs` passed with no whitespace errors.

@@ -80,6 +80,25 @@ def update_remediation(payload: dict[str, Any]) -> dict[str, Any]:
 		status=str(payload.get("status") or "open"),
 		review_recorded=bool(payload.get("review_recorded", False)),
 		due_date=payload.get("due_date"),
+		tenant_id=payload.get("tenant_id"),
+	)
+
+
+def record_review(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.record_review(
+		finding_id=str(payload["finding_id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		reviewer=str(payload["reviewer"]),
+		decision=str(payload.get("decision") or "approved"),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
+def close_finding(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.close_finding(
+		finding_id=str(payload["finding_id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		resolution=str(payload.get("resolution") or ""),
 	)
 
 
@@ -113,3 +132,11 @@ def list_findings(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_remediations(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_remediations(tenant_id)
+
+
+def list_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_reviews(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)

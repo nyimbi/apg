@@ -8,7 +8,9 @@ from .accessibility_engine import AccessibilityAuditEngine
 from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .models import (
 	AccessibilityAudit,
+	AccessibilityAuditEvent,
 	AccessibilityFinding,
+	AccessibilityReview,
 	AccessibilityStandard,
 	AccessibilityTarget,
 	RemediationTask,
@@ -24,6 +26,8 @@ class AccsService:
 		self._findings: dict[str, AccessibilityFinding] = {}
 		self._remediations: dict[str, RemediationTask] = {}
 		self._audits: dict[str, AccessibilityAudit] = {}
+		self._reviews: dict[str, AccessibilityReview] = {}
+		self._events: list[AccessibilityAuditEvent] = []
 		self._engine = AccessibilityAuditEngine()
 		self.register_standard(
 			standard_id="wcag_2_2_aa",
@@ -192,7 +196,7 @@ class AccsService:
 		evidence: dict[str, Any] | None = None,
 		review_recorded: bool = False,
 	) -> dict[str, Any]:
-		self._enforce_finding_policy(tenant_id, bool(remediation_owner), severity, review_recorded)
+		review_required = self._enforce_finding_policy(tenant_id, bool(remediation_owner), severity, review_recorded)
 		finding = AccessibilityFinding(
 			id=finding_id,
 			tenant_id=tenant_id,
@@ -201,7 +205,9 @@ class AccsService:
 			severity=severity,
 			description=description,
 			remediation_owner=remediation_owner,
-			status=status,
+			status="review_required" if review_required and status == "open" else status,
+			review_required=review_required,
+			review_recorded=review_recorded,
 			evidence=dict(evidence or {}),
 		)
 		self._findings[finding_id] = finding
@@ -213,9 +219,17 @@ class AccsService:
 					tenant_id=tenant_id,
 					finding_id=finding_id,
 					owner=remediation_owner,
+					status="review_required" if review_required else "open",
 					review_recorded=review_recorded,
 				),
 			)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="finding_recorded",
+			subject_id=finding_id,
+			message=f"Recorded {severity} accessibility finding for {target_id}.",
+			evidence={"rule": rule, "review_required": review_required},
+		)
 		return finding.to_dict()
 
 	def list_findings(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -230,10 +244,13 @@ class AccsService:
 		status: str,
 		review_recorded: bool = False,
 		due_date: str | None = None,
+		tenant_id: str | None = None,
 	) -> dict[str, Any]:
 		task = self._remediations.get(finding_id)
 		if task is None:
 			raise KeyError(f"unknown remediation task: {finding_id}")
+		if tenant_id is not None and task.tenant_id != tenant_id:
+			raise KeyError(f"unknown remediation task for tenant: {finding_id}")
 		updated = RemediationTask(
 			id=task.id,
 			tenant_id=task.tenant_id,
@@ -244,13 +261,145 @@ class AccsService:
 			review_recorded=review_recorded or task.review_recorded,
 		)
 		self._remediations[finding_id] = updated
+		self._record_event(
+			tenant_id=updated.tenant_id,
+			event_type="remediation_updated",
+			subject_id=finding_id,
+			message=f"Updated remediation task {updated.id} to {status}.",
+			evidence={"status": status, "review_recorded": updated.review_recorded},
+		)
 		return updated.to_dict()
+
+	def record_review(
+		self,
+		finding_id: str,
+		tenant_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		finding = self._findings.get(finding_id)
+		if finding is None or finding.tenant_id != tenant_id:
+			raise KeyError(f"unknown accessibility finding for tenant: {finding_id}")
+		if not reviewer:
+			raise ValueError("reviewer is required")
+		if decision not in {"approved", "rejected", "needs_work"}:
+			raise ValueError("review decision must be approved, rejected, or needs_work")
+		if not notes:
+			raise ValueError("review notes are required")
+		review = AccessibilityReview(
+			id=f"review:{finding_id}:{len(self._reviews) + 1}",
+			tenant_id=tenant_id,
+			finding_id=finding_id,
+			reviewer=reviewer,
+			decision=decision,
+			notes=notes,
+		)
+		self._reviews[review.id] = review
+		reviewed_status = "open" if decision == "approved" and finding.status == "review_required" else finding.status
+		self._findings[finding_id] = AccessibilityFinding(
+			id=finding.id,
+			tenant_id=finding.tenant_id,
+			target_id=finding.target_id,
+			rule=finding.rule,
+			severity=finding.severity,
+			description=finding.description,
+			remediation_owner=finding.remediation_owner,
+			status=reviewed_status,
+			review_required=finding.review_required,
+			review_recorded=True,
+			resolution=finding.resolution,
+			evidence=finding.evidence,
+		)
+		task = self._remediations.get(finding_id)
+		if task is not None:
+			self._remediations[finding_id] = RemediationTask(
+				id=task.id,
+				tenant_id=task.tenant_id,
+				finding_id=task.finding_id,
+				owner=task.owner,
+				status="open" if decision == "approved" and task.status == "review_required" else task.status,
+				due_date=task.due_date,
+				review_recorded=True,
+			)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="finding_review_recorded",
+			subject_id=finding_id,
+			message=f"Recorded {decision} accessibility review for {finding_id}.",
+			evidence={"review_id": review.id, "reviewer": reviewer},
+		)
+		return review.to_dict()
+
+	def close_finding(
+		self,
+		finding_id: str,
+		tenant_id: str,
+		resolution: str,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		finding = self._findings.get(finding_id)
+		if finding is None or finding.tenant_id != tenant_id:
+			raise KeyError(f"unknown accessibility finding for tenant: {finding_id}")
+		if not resolution:
+			raise ValueError("resolution evidence is required")
+		if finding.review_required and not finding.review_recorded:
+			raise PermissionError("critical_accessibility_review_required")
+		if finding.review_required and not self._has_approved_review(finding):
+			raise PermissionError("critical_accessibility_review_not_approved")
+		closed = AccessibilityFinding(
+			id=finding.id,
+			tenant_id=finding.tenant_id,
+			target_id=finding.target_id,
+			rule=finding.rule,
+			severity=finding.severity,
+			description=finding.description,
+			remediation_owner=finding.remediation_owner,
+			status="closed",
+			review_required=finding.review_required,
+			review_recorded=finding.review_recorded,
+			resolution=resolution,
+			evidence=finding.evidence,
+		)
+		self._findings[finding_id] = closed
+		task = self._remediations.get(finding_id)
+		if task is not None:
+			self._remediations[finding_id] = RemediationTask(
+				id=task.id,
+				tenant_id=task.tenant_id,
+				finding_id=task.finding_id,
+				owner=task.owner,
+				status="closed",
+				due_date=task.due_date,
+				review_recorded=task.review_recorded or finding.review_recorded,
+			)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="finding_closed",
+			subject_id=finding_id,
+			message=f"Closed accessibility finding {finding_id}.",
+			evidence={"resolution": resolution},
+		)
+		return closed.to_dict()
 
 	def list_remediations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		tasks = list(self._remediations.values())
 		if tenant_id is not None:
 			tasks = [item for item in tasks if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(tasks, key=lambda item: item.id)]
+
+	def list_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		reviews = list(self._reviews.values())
+		if tenant_id is not None:
+			reviews = [item for item in reviews if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(reviews, key=lambda item: item.id)]
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		events = list(self._events)
+		if tenant_id is not None:
+			events = [item for item in events if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in events]
 
 	def validate_publication(self, target_id: str, tenant_id: str | None = None) -> dict[str, Any]:
 		target = self._targets.get(target_id)
@@ -283,6 +432,8 @@ class AccsService:
 			"finding_count": len(findings),
 			"open_finding_count": len(open_findings),
 			"remediation_count": len(remediations),
+			"review_count": len(self.list_reviews(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"critical_or_high_count": self._engine.summarize_findings(findings)["critical_or_high_count"],
 		}
 
@@ -306,7 +457,7 @@ class AccsService:
 		remediation_owner_assigned: bool,
 		severity: str,
 		review_recorded: bool,
-	) -> None:
+	) -> bool:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"violation_detected": True,
@@ -314,7 +465,36 @@ class AccsService:
 			"issue_severity": severity,
 			"review_recorded": review_recorded,
 		})
-		_raise_if_blocked(result)
+		_raise_if_denied(result)
+		return result["decision"] == "require_review"
+
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		evidence: dict[str, Any] | None = None,
+	) -> None:
+		self._events.append(
+			AccessibilityAuditEvent(
+				id=f"accs-event-{len(self._events) + 1}",
+				tenant_id=tenant_id,
+				event_type=event_type,
+				subject_id=subject_id,
+				message=message,
+				evidence=dict(evidence or {}),
+			)
+		)
+
+	def _has_approved_review(self, finding: AccessibilityFinding) -> bool:
+		reviews = [
+			review for review in self._reviews.values()
+			if review.finding_id == finding.id and review.tenant_id == finding.tenant_id
+		]
+		if not reviews:
+			return finding.review_recorded
+		return any(review.decision == "approved" for review in reviews)
 
 
 def _raise_if_blocked(result: dict[str, Any]) -> None:
@@ -323,4 +503,11 @@ def _raise_if_blocked(result: dict[str, Any]) -> None:
 	reasons = ", ".join(action.get("reason", "accessibility_policy_blocked") for action in result["actions"])
 	if result["decision"] == "require_review":
 		raise PermissionError(reasons or "accessibility_review_required")
+	raise PermissionError(reasons or "accessibility_policy_blocked")
+
+
+def _raise_if_denied(result: dict[str, Any]) -> None:
+	if result["decision"] != "deny":
+		return
+	reasons = ", ".join(action.get("reason", "accessibility_policy_blocked") for action in result["actions"])
 	raise PermissionError(reasons or "accessibility_policy_blocked")
