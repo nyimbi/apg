@@ -16,6 +16,57 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 18:09 EAT
+
+REGY service-registry implementation-depth closure slice:
+
+- Closed the remaining `regy` mixed-implementation gap by replacing the
+  generated-baseline package spec with a detailed executable API/service
+  registry specification.
+- Documented the actual REGY runtime surfaces: Pydantic registry models,
+  async service registration and deregistration, tenant-scoped discovery,
+  health posture, metrics lookup, event capture, discovery caching, API and UI
+  routes, deterministic registry rules, theme tokens, publish artifacts, and
+  adapter boundaries for auth, configuration, monitoring, audit, and gateway
+  synchronization.
+- Renamed the focused package contract test from its generated-baseline name to
+  `test_package_contract.py` and tightened assertions around registration
+  health-endpoint configuration, deterministic rule engine metadata, package
+  semantic rules, and `regy_service_catalog` theme publication.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/regy` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/regy/__init__.py
+  capabilities/common/regy/models.py capabilities/common/regy/service.py
+  capabilities/common/regy/api.py capabilities/common/regy/views.py
+  capabilities/common/regy/capability_contract.py capabilities/common/regy/app.py
+  capabilities/common/regy/test_capability_contract.py
+  capabilities/common/regy/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/regy/test_capability_contract.py
+  capabilities/common/regy/tests/test_package_contract.py` passed with 5 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "import importlib; ..."` for `regy` models, service,
+  API, views, and capability contract passed with `regy imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/regy --json` passed with `regy` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/regy --json`
+  passed with `ok: true`, warnings empty, and side-effect-free catalog patch
+  evidence.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 93
+  domain-specific packages, 15 materialized-baseline packages, 0 mixed
+  implementations, 1 contract-only package, 0 errors, and 16 warnings; the next
+  implementation-depth target is `sbox`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `git diff --check -- capabilities/common/regy/cap_spec.md
+  capabilities/common/regy/tests/test_package_contract.py
+  docs/progress_log.md` passed with no whitespace errors.
+
 ### 2026-05-29 18:02 EAT
 
 Contributor onboarding guide hardening slice:
