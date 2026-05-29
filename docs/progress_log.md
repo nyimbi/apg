@@ -16,6 +16,35 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 08:35 EAT
+
+Contributor guide strengthening slice:
+
+- Expanded `docs/developer_guide.md` with a current development north star,
+  priority development lanes, a four-hour onboarding plan, and a requirement
+  to patch conversion workflow.
+- Expanded `docs/contributors_guide.md` with the fastest useful contribution
+  path, implementation-depth gap discovery commands, work-packet claiming
+  guidance, and prioritized contribution lanes.
+- Expanded `docs/capacity_development_guide.md` with the capacity factory loop,
+  minimum useful capacity slice, and next-slice ordering so contributors can
+  build new capacities from APG source through generated Python proof and
+  package evidence.
+
+Verification:
+
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 58 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- These guide updates make contributor execution clearer, but the platform
+  still needs continued implementation-depth burn-down for remaining
+  materialized-baseline and mixed capability packages.
+
 ### 2026-05-29 08:58 EAT
 
 AI Agent Composition implementation-depth slice:

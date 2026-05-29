@@ -50,6 +50,31 @@ without private context:
 If any answer is missing, add the missing contract before adding more behavior.
 Capacity work should reduce ambiguity for the next contributor.
 
+## Capacity Factory Loop
+
+Use this loop to build capacities quickly without losing executable grounding:
+
+1. **Sketch the capacity packet.** Name the outcome, source path, packages,
+   public routes, rules, screens, workflows, agents, streaming flows, and proof.
+2. **Write or update one APG example.** Keep it parseable and small enough that
+   contributors can read it end to end.
+3. **Compile to Python.** Generated output is the first serious proof that the
+   capacity is real.
+4. **Attach package-backed behavior.** Scaffold or improve the capability
+   packages that own durable services, rules, APIs, views, and themes.
+5. **Burn down implementation depth.** Use `implementation-audit` to ensure the
+   packages are not only materialized baselines.
+6. **Expose composition.** Ensure screens, workflows, agents, and Bytewax
+   metadata appear in the semantic model and generated manifests.
+7. **Record evidence.** Update the example README, capacity docs, and
+   `docs/progress_log.md`.
+8. **Commit the verified slice.** Leave the next contributor a smaller, clearer
+   gap.
+
+The loop is intentionally repetitive. APG becomes useful by repeating it across
+ERP, CRM, finance, operations, agentic, and integration capacities until each
+one has source, generated runtime behavior, package evidence, and documentation.
+
 ## Capacity Blueprint
 
 Start each capacity with this compact blueprint in its README or design note:
@@ -74,6 +99,36 @@ Known gaps:
 
 Keep the blueprint current as implementation lands. It should describe current
 executable behavior, not the full future vision.
+
+## Minimum Useful Capacity Slice
+
+A slice is useful when it creates or improves one observable path:
+
+```text
+APG source -> semantic model -> generated Python artifact -> focused proof
+```
+
+For a new capacity, the smallest acceptable slice is usually:
+
+```text
+examples/<nn>_<capacity_name>/main.apg
+examples/<nn>_<capacity_name>/README.md
+generated output in examples/<nn>_<capacity_name>/output/ when refreshed intentionally
+one capability package or an explicit package gap
+progress-log evidence
+```
+
+For an existing capacity, the smallest useful slice is often one of these:
+
+- replace one materialized baseline capability with domain behavior;
+- add one deterministic rule and focused rule test;
+- expose one generated screen relationship or workflow route;
+- add one agent declaration with model, runtime, tools, memory, and rules;
+- add one Bytewax streaming metadata path and semantic-model evidence;
+- refresh one example output after an intentional compiler output change.
+
+Do not add many capacity files at once if none of them compile, publish-plan, or
+show up in the semantic model.
 
 ## Capacity Development Packet
 
@@ -163,6 +218,23 @@ Make workflows better
 ```
 
 They do not tell a contributor where to edit, what to prove, or what to avoid.
+
+## Choosing The Next Capacity Slice
+
+When a capacity has several possible improvements, choose in this order:
+
+1. Fix parse or compile failures.
+2. Add missing semantic-model exposure for already accepted source.
+3. Make generated Python behavior inspectable or smoke-testable.
+4. Add package-backed service/rule/API/view behavior.
+5. Add or tighten focused tests.
+6. Refresh checked-in example output only when the compiler output contract
+   intentionally changed.
+7. Improve docs after the behavior exists.
+
+This order keeps capacity work grounded in executable reality. A detailed README
+cannot compensate for source that does not compile or packages that still only
+contain generated baseline placeholders.
 
 ## Minimum File Shape
 

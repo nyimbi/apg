@@ -9,6 +9,32 @@ repository, run one reliable baseline, choose the right implementation surface,
 make a vertical slice executable, prove it, document it, and commit it without
 waiting for tribal knowledge.
 
+## Current Development North Star
+
+APG should rapidly produce executable Python applications from terse, readable
+APG source, then let contributors harden the generated apps through reusable
+capabilities, deterministic rules, screens, workflows, AI agents, Bytewax
+streaming metadata, visual theming, tests, and release evidence.
+
+That means the highest-value development work usually fits one of these lanes:
+
+1. **Compiler baseline:** make `.apg -> generated Python app` more reliable.
+2. **Semantic coverage:** expose records, relationships, screens, workflows,
+   agents, capabilities, rules, themes, and streaming as stable JSON.
+3. **Generated runtime behavior:** make generated apps importable,
+   self-testable, smoke-testable, and inspectable.
+4. **Capability depth:** replace materialized baseline packages with
+   domain-specific service/API/view behavior.
+5. **Capacity delivery:** build numbered examples and package-backed
+   capabilities that prove APG can assemble real business applications.
+6. **Contributor speed:** improve docs, examples, audits, and diagnostics that
+   shorten the next contributor's path to a verified slice.
+
+When several tasks look useful, choose the one that moves a representative APG
+source file closer to a generated, runnable Python application with capability
+evidence. Do not spend early effort adding alternative compiler targets or
+framework-specific generation paths; APG's practical target is `python`.
+
 ## The APG Contract
 
 APG is not just `spec/apg.g4`. The language is useful only when source text
@@ -94,6 +120,49 @@ Then compare the source in `examples/20_enterprise_erp_platform/main.apg` with
 the generated `semantic_model.json`, `app.py`, `apg_capabilities.py`, and
 `apg_application.py`.
 
+## Four-Hour Onboarding Plan
+
+Use this plan when a contributor needs to become productive immediately.
+
+Hour 1: prove the installed toolchain.
+
+```bash
+git status --short
+./.venv/bin/apg version
+./.venv/bin/apg doctor --json
+./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-onboard --verify
+./.venv/bin/python /tmp/apg-onboard/smoke_test.py
+```
+
+Hour 2: trace one rich example from source to generated behavior.
+
+```bash
+./.venv/bin/apg model examples/20_enterprise_erp_platform/main.apg --json
+./.venv/bin/apg graph-suite examples/20_enterprise_erp_platform/main.apg --json
+./.venv/bin/apg release examples/20_enterprise_erp_platform/main.apg --json
+```
+
+Hour 3: inspect one capability package and its implementation depth.
+
+```bash
+./.venv/bin/apg capabilities inspect agnt --json
+./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/agnt --json
+```
+
+Hour 4: take one small work packet. Prefer a docs, example, fixture, CLI field,
+or single-package implementation-depth slice. The result should be small enough
+to verify and commit the same day.
+
+```bash
+git diff --check -- <changed-files>
+./.venv/bin/apg docs audit --json
+git add <only-your-files>
+git diff --cached --check
+git commit
+git push
+```
+
 ## First-Day Execution Checklist
 
 Use this checklist when onboarding yourself or another contributor. It is
@@ -157,6 +226,34 @@ reality:
 
 If a change only adds more files without increasing one of those outcomes, it is
 probably not the next best change.
+
+## Turning A Requirement Into A Patch
+
+Most APG requests arrive as product language: "add agent composition", "make ERP
+screens composable", "support capacity X", or "make this executable". Convert
+that into a patch with this sequence:
+
+1. Name the observable outcome in one sentence.
+2. Identify the APG source construct that should express it.
+3. Identify the semantic-model key that should carry it.
+4. Identify the generated app surface that should expose it.
+5. Identify the capability package or example that proves it.
+6. Choose the narrowest verification command that proves the claim.
+7. Write the docs/progress-log entry using actual command output.
+
+Example:
+
+```text
+Requirement: AI agents should be first-class.
+Source construct: agent and agent team declarations.
+Semantic model: agents, teams, handoffs, runtime assignments.
+Generated app: ai_agents.py plus component manifest entries.
+Capability package: capabilities/common/agnt.
+Proof: focused AGNT tests, implementation-audit, publish-plan, compile example.
+```
+
+This prevents a common failure mode: adding syntax or docs without any generated
+behavior, semantic evidence, or package-backed runtime path.
 
 ## Common Implementation Recipes
 

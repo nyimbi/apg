@@ -48,6 +48,33 @@ Then read these in order:
 6. [Tooling Specification](./tooling.md)
 7. [Goal Progress Log](./progress_log.md)
 
+## Fastest Useful Contribution Path
+
+If you are new and need to help today, use this path:
+
+1. Run the first 30-minute commands above.
+2. Open `docs/progress_log.md` and find the latest known gap.
+3. Pick one gap that touches one owning directory.
+4. Prove the current behavior before editing.
+5. Make the smallest vertical slice that improves the evidence.
+6. Run the focused verification for that slice.
+7. Record the verification in `docs/progress_log.md`.
+8. Commit and push only that slice.
+
+The most useful current gaps are usually visible through these commands:
+
+```bash
+./.venv/bin/apg tooling audit --json
+./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg hygiene audit --include-untracked --json
+```
+
+Use `implementation-audit` to find packages that are complete in file shape but
+still shallow in domain behavior. A good contributor can take one such package,
+replace generated baseline service/model/API/view placeholders with
+domain-specific behavior, add focused tests, run publish-plan, and leave a
+progress-log entry for the next package.
+
 ## First 90 Minutes
 
 After the first baseline commands pass, do one small useful thing end to end:
@@ -104,6 +131,41 @@ Example work packets:
 Good work packets have a visible endpoint. Poor packets say "clean up
 capabilities" or "improve compiler" without a source file, generated artifact,
 or command that proves completion.
+
+## Claiming A Work Packet
+
+Before editing, write down the packet in the issue, branch note, example README,
+or progress-log draft. Keep it concrete:
+
+```text
+Outcome: AGNT execution plans include runtime assignments and approval evidence.
+Owner: <your name>
+Lane: capability implementation depth
+Files expected: capabilities/common/agnt/*
+Public names affected: AgntService, execution_plan, runtime assignments
+Example or fixture: capabilities/common/agnt/test_capability_contract.py
+Verification: pytest focused AGNT tests; implementation-audit; publish-plan
+Docs to update: cap_spec.md; docs/progress_log.md
+Known non-goals: live external Codex/Claude/OpenCode/Pi invocation
+```
+
+If the packet cannot name a file, public contract, and verification command, it
+is not ready to execute. Narrow it until the endpoint is obvious.
+
+## Priority Work Lanes
+
+Use this table to choose work without waiting for architectural context.
+
+| Priority | Lane | Good contribution | Proof |
+| --- | --- | --- | --- |
+| 1 | Compiler baseline | Keep representative APG examples compiling to runnable Python | `apg compile ... --verify`, `smoke_test.py` |
+| 2 | Capability depth | Convert one materialized package into domain-specific behavior | package tests, `implementation-audit`, `publish-plan` |
+| 3 | Capacity example | Add or improve a numbered example with README and output | `apg baseline examples --json` or focused compile |
+| 4 | Semantic/tooling contract | Add one stable JSON field or audit check | focused CLI tests, `apg tooling audit --json` |
+| 5 | Docs and onboarding | Replace vague guidance with exact paths, commands, and gaps | `apg docs audit --json`, `git diff --check -- docs` |
+
+Do not start with broad rewrites. APG advances fastest when many contributors
+land small, verified slices that line up into an executable platform.
 
 ## Immediate Effectiveness Rules
 
