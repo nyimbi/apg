@@ -522,6 +522,66 @@ class AgPaginationInfo(BaseModel):
 	has_next: bool = Field(False, description="Whether there are more pages")
 	has_previous: bool = Field(False, description="Whether there are previous pages")
 
+
+class GatewayUpstreamRecord(BaseModel):
+	"""Tenant-scoped upstream service registration for package governance."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(description="Upstream service ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	name: str = Field(description="Human-readable upstream name")
+	base_url: str = Field(description="Base URL for the upstream service")
+	owner: str = Field(description="Route or service owner")
+	health: str = Field("healthy", description="Current upstream health state")
+	labels: Dict[str, Any] = Field(default_factory=dict, description="Routing and discovery labels")
+
+
+class GatewayRouteRecord(BaseModel):
+	"""Governed route publication record for package composition."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(description="Route ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	path: str = Field(description="Published route path")
+	methods: List[str] = Field(default_factory=list, description="Allowed HTTP methods")
+	upstream_id: str = Field(description="Registered upstream service ID")
+	owner: str = Field(description="Route owner")
+	route_exposure: str = Field("internal", description="Route exposure scope")
+	auth_policy_attached: bool = Field(True, description="Whether auth policy is attached")
+	threat_policy_attached: bool = Field(True, description="Whether threat policy is attached")
+	requested_rps_limit: int = Field(1000, description="Requested RPS quota")
+	wasm_filter_attached: bool = Field(False, description="Whether a WASM edge filter is attached")
+	filter_signature_verified: bool = Field(True, description="Whether attached filter signature is verified")
+	status: str = Field("active", description="Route lifecycle status")
+
+
+class GatewayQuotaReview(BaseModel):
+	"""Approval record for high-throughput gateway route quotas."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(description="Quota review ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	route_id: str = Field(description="Route under review")
+	requested_rps_limit: int = Field(description="Requested RPS limit")
+	requester: str = Field(description="User requesting quota")
+	justification: str = Field(description="Business justification")
+	decision: str = Field("pending", description="pending, approved, or rejected")
+	reviewer: Optional[str] = Field(None, description="Reviewer who decided the request")
+	notes: Optional[str] = Field(None, description="Reviewer notes")
+
+
+class GatewayAuditEvent(BaseModel):
+	"""Tenant-scoped gateway governance evidence event."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(default_factory=uuid7str, description="Audit event ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	event_type: str = Field(description="Gateway lifecycle event type")
+	subject_id: str = Field(description="Subject record ID")
+	message: str = Field(description="Human-readable event message")
+	evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured event evidence")
+	timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # Helper Functions for Model Operations
 
 def _log_model_operation(operation: str, model_name: str, model_id: str) -> None:
@@ -571,7 +631,11 @@ MODEL_REGISTRY = {
 	'http_request': AgHttpRequest,
 	'http_response': AgHttpResponse,
 	'api_error': AgApiError,
-	'pagination_info': AgPaginationInfo
+	'pagination_info': AgPaginationInfo,
+	'gateway_upstream_record': GatewayUpstreamRecord,
+	'gateway_route_record': GatewayRouteRecord,
+	'gateway_quota_review': GatewayQuotaReview,
+	'gateway_audit_event': GatewayAuditEvent
 }
 
 # Export All Models
@@ -587,6 +651,7 @@ __all__ = [
 	'AgWasmModule', 'AgHttpRequest', 'AgHttpResponse',
 	# Utility Models
 	'AgApiError', 'AgPaginationInfo',
+	'GatewayUpstreamRecord', 'GatewayRouteRecord', 'GatewayQuotaReview', 'GatewayAuditEvent',
 	# Registry
 	'MODEL_REGISTRY',
 	# Helper Functions

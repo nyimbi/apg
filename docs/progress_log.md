@@ -12833,3 +12833,26 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/anom --json` passed with `ok: true`; ANOM remains `domain_specific`, with 0 baseline markers and 0 warnings.
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/anom --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
 - `git diff --check -- capabilities/common/anom` passed with no whitespace errors.
+
+### 2026-05-30 00:04 EAT
+
+APIG governed route-publication lifecycle slice:
+
+- Added `capabilities/common/apig/SPECIFICATION.md` and `capabilities/common/apig/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Added dependency-light `gateway_runtime.py` with tenant-qualified upstream, route, quota review, and audit event state.
+- Extended APIG models with gateway upstream, route, quota review, and audit event records.
+- Extended APIG API helpers and view models with upstream registration, route request, quota review decision, route activation, traffic, security, edge-filter, analytics, and audit surfaces.
+- Enforced registered upstreams, auth for public routes, threat policy for unsafe methods, signed WebAssembly filters, high-quota approval, reviewer notes, tenant isolation, and duplicate same-tenant ID rejection.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive high-quota route-review-activation coverage and negative public-auth, unsafe-method, unsigned-filter, tenant-mismatch, duplicate-ID, rejected-review, and API-helper coverage.
+- Updated `cap_spec.md` with the current executable route-publication lifecycle, adapter boundaries, and focused proof commands.
+- Code review found and fixed duplicate ID overwrite risk, rejected review activation coverage, top-level traffic summary fields, and string boolean parsing in API helpers before commit.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/apig/__init__.py capabilities/common/apig/models.py capabilities/common/apig/gateway_runtime.py capabilities/common/apig/api.py capabilities/common/apig/views.py capabilities/common/apig/capability_contract.py capabilities/common/apig/app.py capabilities/common/apig/test_capability_contract.py capabilities/common/apig/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/apig/test_capability_contract.py capabilities/common/apig/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/apig --json` passed with `ok: true`; APIG remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/apig --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/apig` returned no stale APIG materialized markers.
+- `git diff --check -- capabilities/common/apig` passed with no whitespace errors.

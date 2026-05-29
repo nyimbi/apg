@@ -178,6 +178,7 @@ def register_capability() -> Dict[str, Any]:
 		'capabilities': {
 			'intelligent_routing': 'Route traffic to registered upstream services',
 			'traffic_management': 'Apply rate limits, quotas, circuit breakers, and canaries',
+			'quota_review_governance': 'Require approval evidence before high-quota routes activate',
 			'security_gateway': 'Attach auth, threat, mTLS, and edge filter policies',
 			'edge_filters': 'Manage signed WebAssembly gateway filters',
 			'capability_rules': 'Evaluate deterministic gateway governance rules',
@@ -189,7 +190,9 @@ def register_capability() -> Dict[str, Any]:
 			'upstreams': '/apig/api/v1/upstreams',
 			'security': '/apig/api/v1/security',
 			'edge': '/apig/api/v1/edge',
-			'analytics': '/apig/api/v1/analytics'
+			'analytics': '/apig/api/v1/analytics',
+			'quota_reviews': '/apig/api/v1/quota-reviews',
+			'audit_events': '/apig/api/v1/audit-events'
 		},
 		'ui_components': {
 			route['name']: route['path']

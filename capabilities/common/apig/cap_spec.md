@@ -10,6 +10,38 @@ The APG Intelligent Gateway (APIG) represents a revolutionary leap in API Gatewa
 - **Cost Optimization**: Usage-based pricing with intelligent workload placement achieving 70% cost reduction
 - **Developer Experience Revolution**: GitOps-native configuration with natural language policy creation
 
+## Current Executable Governance Slice
+
+The package includes a dependency-light `ApigService` facade in
+`gateway_runtime.py` for generated APG applications and capability composition.
+Reverse proxies, service meshes, Kubernetes deployments, WebAssembly runtimes,
+monitoring backends, and AI optimization providers remain adapter boundaries
+while the local package executes deterministic gateway governance.
+
+Current package-backed lifecycle:
+
+1. Register a tenant-owned upstream service.
+2. Request a route against a registered upstream.
+3. Deny public routes without auth policy.
+4. Deny unsafe methods without threat policy.
+5. Deny unsigned WebAssembly edge filters.
+6. Create a pending quota review for high-RPS routes.
+7. Approve or reject quota reviews with reviewer notes.
+8. Activate only routes that have passed all required guardrails.
+9. Keep upstream, route, review, and audit state tenant-qualified so duplicate
+   IDs across tenants cannot collide.
+10. Emit tenant-scoped audit events for upstream, route, quota review, and
+    activation lifecycle changes.
+
+Focused proof commands:
+
+```bash
+./.venv/bin/pytest -q capabilities/common/apig/test_capability_contract.py capabilities/common/apig/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/apig --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/apig --json
+git diff --check -- capabilities/common/apig
+```
+
 ## Core Business Problems Solved
 
 ### 1. Configuration Complexity Crisis
