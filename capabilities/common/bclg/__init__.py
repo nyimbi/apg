@@ -26,7 +26,7 @@ capability_metadata: dict[str, Any] = {
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
 	"provides": ["ledger_registry", "transaction_signing", "smart_contract_governance", "key_custody", "ledger_audit"],
-	"permissions": ["bclg:view", "bclg:transact", "bclg:manage_ledgers", "bclg:manage_contracts", "bclg:admin"]
+	"permissions": ["bclg:view", "bclg:transact", "bclg:review_transactions", "bclg:manage_ledgers", "bclg:manage_contracts", "bclg:review_contracts", "bclg:admin"]
 }
 
 
@@ -47,12 +47,14 @@ def register_capability() -> dict[str, Any]:
 		"capabilities": {
 			"ledger_registry": "Register ledger networks, owners, consensus profiles, and chain policy",
 			"transaction_signing": "Sign, submit, and audit ledger transactions through governed key custody",
+			"transaction_reviews": "Require independent review evidence before high-value transaction commit",
 			"smart_contract_governance": "Review, approve, deploy, and version smart contract artifacts",
+			"contract_deployment_reviews": "Require independent approval evidence before smart contract deployment",
 			"key_custody": "Bind ledger operations to APG key management and encryption policy",
 			"capability_rules": "Evaluate deterministic distributed-ledger governance rules",
 			"visual_theming": "Apply blockchain ledger theme tokens and components"
 		},
-		"endpoints": {"ledgers": "/bclg/api/v1/ledgers", "transactions": "/bclg/api/v1/transactions", "contracts": "/bclg/api/v1/contracts", "keys": "/bclg/api/v1/keys", "audit": "/bclg/api/v1/audit"},
+		"endpoints": {"ledgers": "/bclg/api/v1/ledgers", "transactions": "/bclg/api/v1/transactions", "transaction_reviews": "/bclg/api/v1/transactions/reviews", "contracts": "/bclg/api/v1/contracts", "contract_reviews": "/bclg/api/v1/contracts/reviews", "keys": "/bclg/api/v1/keys", "audit": "/bclg/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

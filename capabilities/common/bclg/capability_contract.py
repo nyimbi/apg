@@ -27,14 +27,18 @@ RULES: list[dict[str, Any]] = [
 	{"name": "transaction_requires_signature", "description": "Ledger transactions require signatures.", "condition": {"operation": "submit_transaction", "signature_present": False}, "effect": {"decision": "deny", "reason": "transaction_signature_required", "required_action": "sign_transaction"}},
 	{"name": "key_custody_required", "description": "Ledger operations require managed key custody.", "condition": {"key_custody_bound": False}, "effect": {"decision": "deny", "reason": "key_custody_required", "required_action": "bind_key_custody"}},
 	{"name": "contract_requires_review", "description": "Smart contract deployment requires review.", "condition": {"operation": "deploy_contract", "contract_review_recorded": False}, "effect": {"decision": "deny", "reason": "contract_review_required", "required_action": "review_contract"}},
-	{"name": "high_value_transaction_requires_review", "description": "High-value transactions require review.", "condition": {"transaction_value_gt": 100000, "transaction_review_recorded": False}, "effect": {"decision": "require_review", "reason": "high_value_transaction_review_required", "required_action": "review_transaction"}}
+	{"name": "high_value_transaction_requires_review", "description": "High-value transactions require review.", "condition": {"transaction_value_gt": 100000, "transaction_review_recorded": False}, "effect": {"decision": "require_review", "reason": "high_value_transaction_review_required", "required_action": "review_transaction"}},
+	{"name": "transaction_review_requires_independent_reviewer", "description": "High-value transaction reviews require an independent reviewer.", "condition": {"operation": "approve_transaction_review", "reviewer_same_as_submitter": True}, "effect": {"decision": "deny", "reason": "independent_transaction_reviewer_required", "required_action": "route_to_independent_transaction_reviewer"}},
+	{"name": "contract_deployment_review_requires_independent_reviewer", "description": "Smart contract deployment reviews require an independent reviewer.", "condition": {"operation": "approve_contract_deployment", "reviewer_same_as_requester": True}, "effect": {"decision": "deny", "reason": "independent_contract_reviewer_required", "required_action": "route_to_independent_contract_reviewer"}}
 ]
 
 UI_ROUTES: list[dict[str, str]] = [
 	{"name": "dashboard", "path": "/bclg/dashboard", "component": "BCLGDashboard", "permission": "bclg:view", "nav_group": "Overview"},
 	{"name": "ledgers", "path": "/bclg/ledgers", "component": "LedgerConsole", "permission": "bclg:manage_ledgers", "nav_group": "Ledgers"},
 	{"name": "transactions", "path": "/bclg/transactions", "component": "TransactionMonitor", "permission": "bclg:transact", "nav_group": "Transactions"},
+	{"name": "transaction_reviews", "path": "/bclg/transactions/reviews", "component": "TransactionReviewQueue", "permission": "bclg:review_transactions", "nav_group": "Transactions"},
 	{"name": "contracts", "path": "/bclg/contracts", "component": "SmartContractRegistry", "permission": "bclg:manage_contracts", "nav_group": "Contracts"},
+	{"name": "contract_reviews", "path": "/bclg/contracts/reviews", "component": "ContractDeploymentReviewQueue", "permission": "bclg:review_contracts", "nav_group": "Contracts"},
 	{"name": "keys", "path": "/bclg/keys", "component": "KeyCustodyView", "permission": "bclg:admin", "nav_group": "Security"},
 	{"name": "audit", "path": "/bclg/audit", "component": "LedgerAudit", "permission": "bclg:view", "nav_group": "Governance"},
 	{"name": "compliance", "path": "/bclg/compliance", "component": "LedgerCompliance", "permission": "bclg:admin", "nav_group": "Governance"},
@@ -44,7 +48,7 @@ UI_ROUTES: list[dict[str, str]] = [
 THEME: dict[str, Any] = {
 	"name": "bclg_ledger_ops",
 	"tokens": {"color.primary": "#2A4365", "color.accent": "#805AD5", "color.success": "#2F855A", "color.warning": "#B7791F", "color.danger": "#C53030", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D", "border.radius": "8px", "density": "compact"},
-	"components": {"ledger_card": {"icon": "blocks", "status_indicator": "chain-pill", "risk_style": "fork-band"}, "transaction_monitor": {"visual": "signed-ledger-table", "highlight": "review-chip"}, "contract_registry": {"visual": "artifact-list", "status_style": "hash-chip"}, "key_custody": {"visual": "custody-matrix", "status_style": "rotation-chip"}}
+	"components": {"ledger_card": {"icon": "blocks", "status_indicator": "chain-pill", "risk_style": "fork-band"}, "transaction_monitor": {"visual": "signed-ledger-table", "highlight": "review-chip"}, "transaction_review_queue": {"visual": "approval-lane", "status_style": "risk-review-chip"}, "contract_registry": {"visual": "artifact-list", "status_style": "hash-chip"}, "contract_review_queue": {"visual": "deployment-approval-lane", "status_style": "artifact-review-chip"}, "key_custody": {"visual": "custody-matrix", "status_style": "rotation-chip"}}
 }
 
 

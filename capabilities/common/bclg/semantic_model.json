@@ -8,7 +8,10 @@
   },
   "capabilities": {
     "bclg": {
-      "approvals": {},
+      "approvals": {
+        "contract_deployment": "ContractDeploymentApproval",
+        "transaction_review": "TransactionReviewApproval"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -135,6 +138,32 @@
               "required_action": "review_transaction"
             },
             "name": "high_value_transaction_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "approve_transaction_review",
+              "reviewer_same_as_submitter": true
+            },
+            "description": "High-value transaction reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_transaction_reviewer_required",
+              "required_action": "route_to_independent_transaction_reviewer"
+            },
+            "name": "transaction_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "operation": "approve_contract_deployment",
+              "reviewer_same_as_requester": true
+            },
+            "description": "Smart contract deployment reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_contract_reviewer_required",
+              "required_action": "route_to_independent_contract_reviewer"
+            },
+            "name": "contract_deployment_review_requires_independent_reviewer"
           }
         ],
         "type": "deterministic"
@@ -215,6 +244,32 @@
             "required_action": "review_transaction"
           },
           "name": "high_value_transaction_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "approve_transaction_review",
+            "reviewer_same_as_submitter": true
+          },
+          "description": "High-value transaction reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_transaction_reviewer_required",
+            "required_action": "route_to_independent_transaction_reviewer"
+          },
+          "name": "transaction_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "operation": "approve_contract_deployment",
+            "reviewer_same_as_requester": true
+          },
+          "description": "Smart contract deployment reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_contract_reviewer_required",
+            "required_action": "route_to_independent_contract_reviewer"
+          },
+          "name": "contract_deployment_review_requires_independent_reviewer"
         }
       ],
       "runtime": {
@@ -233,6 +288,11 @@
           "component": "LedgerCompliance",
           "permission": "bclg:admin",
           "route": "/bclg/compliance"
+        },
+        "contract_reviews": {
+          "component": "ContractDeploymentReviewQueue",
+          "permission": "bclg:review_contracts",
+          "route": "/bclg/contracts/reviews"
         },
         "contracts": {
           "component": "SmartContractRegistry",
@@ -259,6 +319,11 @@
           "permission": "bclg:admin",
           "route": "/bclg/settings"
         },
+        "transaction_reviews": {
+          "component": "TransactionReviewQueue",
+          "permission": "bclg:review_transactions",
+          "route": "/bclg/transactions/reviews"
+        },
         "transactions": {
           "component": "TransactionMonitor",
           "permission": "bclg:transact",
@@ -272,6 +337,10 @@
             "status_style": "hash-chip",
             "visual": "artifact-list"
           },
+          "contract_review_queue": {
+            "status_style": "artifact-review-chip",
+            "visual": "deployment-approval-lane"
+          },
           "key_custody": {
             "status_style": "rotation-chip",
             "visual": "custody-matrix"
@@ -284,6 +353,10 @@
           "transaction_monitor": {
             "highlight": "review-chip",
             "visual": "signed-ledger-table"
+          },
+          "transaction_review_queue": {
+            "status_style": "risk-review-chip",
+            "visual": "approval-lane"
           }
         },
         "name": "bclg_ledger_ops",
@@ -327,11 +400,25 @@
             "permission": "bclg:transact"
           },
           {
+            "component": "TransactionReviewQueue",
+            "name": "transaction_reviews",
+            "nav_group": "Transactions",
+            "path": "/bclg/transactions/reviews",
+            "permission": "bclg:review_transactions"
+          },
+          {
             "component": "SmartContractRegistry",
             "name": "contracts",
             "nav_group": "Contracts",
             "path": "/bclg/contracts",
             "permission": "bclg:manage_contracts"
+          },
+          {
+            "component": "ContractDeploymentReviewQueue",
+            "name": "contract_reviews",
+            "nav_group": "Contracts",
+            "path": "/bclg/contracts/reviews",
+            "permission": "bclg:review_contracts"
           },
           {
             "component": "KeyCustodyView",
@@ -454,6 +541,19 @@
   },
   "roles": {},
   "rules": {
+    "contract_deployment_review_requires_independent_reviewer": {
+      "condition": {
+        "operation": "approve_contract_deployment",
+        "reviewer_same_as_requester": true
+      },
+      "description": "Smart contract deployment reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_contract_reviewer_required",
+        "required_action": "route_to_independent_contract_reviewer"
+      },
+      "name": "contract_deployment_review_requires_independent_reviewer"
+    },
     "contract_requires_review": {
       "condition": {
         "contract_review_recorded": false,
@@ -529,6 +629,19 @@
         "required_action": "sign_transaction"
       },
       "name": "transaction_requires_signature"
+    },
+    "transaction_review_requires_independent_reviewer": {
+      "condition": {
+        "operation": "approve_transaction_review",
+        "reviewer_same_as_submitter": true
+      },
+      "description": "High-value transaction reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_transaction_reviewer_required",
+        "required_action": "route_to_independent_transaction_reviewer"
+      },
+      "name": "transaction_review_requires_independent_reviewer"
     }
   },
   "security": {},

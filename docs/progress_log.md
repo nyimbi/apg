@@ -12935,3 +12935,31 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, role/privacy approval routes, 9 executable rules, 18 UI routes, self-test passed, and release evidence valid.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/auth` returned no stale AUTH materialized markers.
 - `git diff --check -- capabilities/common/auth` passed with no whitespace errors.
+
+### 2026-05-30 01:42 EAT
+
+BCLG governed ledger-mutation lifecycle slice:
+
+- Added `capabilities/common/bclg/SPECIFICATION.md` and `capabilities/common/bclg/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Converted BCLG service state to tenant-qualified ledgers, custody bindings, transactions, transaction reviews, contract deployment reviews, contracts, ledger heads, and audit events.
+- Added explicit `TransactionReviewApproval` and `ContractDeploymentApproval` records, including requester, reviewer, decision, notes, approval status, and evidence links.
+- Enforced high-value transaction review as fail-closed governance evidence, ignoring caller-supplied `transaction_review_recorded` booleans for high-value submissions.
+- Added request/decision workflows for high-value transaction reviews with independent-reviewer and reviewer-notes guardrails.
+- Added request/decision workflows for smart-contract deployment approval with independent-reviewer, artifact-hash, rollback-plan, matching-approval, and active-custody guardrails.
+- Extended API helpers and view models with transaction-review queues, contract-deployment review queues, contract registry state, audit state, and shared default service state.
+- Extended the BCLG capability contract with review rules, review routes, and theme components for generated APG applications.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive ledger-custody-standard-transaction-high-value-review-contract-approval-deployment-audit coverage and API/view-model coverage.
+- Added negative missing owner, unsigned transaction, missing custody, caller boolean high-value bypass, self-review, missing notes, duplicate pending transaction review, rejected review, missing contract approval, self contract approval, rejected contract approval, stale review, and duplicate-ID tenant-isolation coverage.
+- Updated `cap_spec.md` with the current executable lifecycle, adapter boundaries, routes, guardrails, and focused proof commands.
+- Manual code review found and fixed duplicate pending transaction review and stale review decision gaps before commit.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/bclg/__init__.py capabilities/common/bclg/models.py capabilities/common/bclg/ledger_engine.py capabilities/common/bclg/service.py capabilities/common/bclg/api.py capabilities/common/bclg/views.py capabilities/common/bclg/capability_contract.py capabilities/common/bclg/app.py capabilities/common/bclg/test_capability_contract.py capabilities/common/bclg/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/bclg/test_capability_contract.py capabilities/common/bclg/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/bclg --json` passed with `ok: true`; BCLG remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/bclg --json` passed with BCLG review rules, 10 UI routes, review theme evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/bclg` returned no stale BCLG materialized markers.
+- `git diff --check -- capabilities/common/bclg` passed with no whitespace errors.

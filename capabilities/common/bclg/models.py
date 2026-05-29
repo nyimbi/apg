@@ -72,6 +72,10 @@ class LedgerTransaction:
 	signature: str
 	key_custody_id: str
 	compliance_tags: tuple[str, ...] = ()
+	submitted_by: str = "ledger-operator"
+	review_id: str | None = None
+	reviewer: str | None = None
+	review_notes: str | None = None
 	status: str = "committed"
 	review_status: str = "approved"
 	transaction_hash: str = ""
@@ -89,10 +93,42 @@ class LedgerTransaction:
 			"signature": self.signature,
 			"key_custody_id": self.key_custody_id,
 			"compliance_tags": list(self.compliance_tags),
+			"submitted_by": self.submitted_by,
+			"review_id": self.review_id,
+			"reviewer": self.reviewer,
+			"review_notes": self.review_notes,
 			"status": self.status,
 			"review_status": self.review_status,
 			"transaction_hash": self.transaction_hash,
 			"block_hash": self.block_hash,
+		}
+
+
+@dataclass(frozen=True)
+class TransactionReviewApproval:
+	"""Independent review evidence for a high-value ledger transaction."""
+
+	id: str
+	tenant_id: str
+	transaction_id: str
+	requested_by: str
+	justification: str
+	decision: str = "pending"
+	reviewer: str | None = None
+	notes: str | None = None
+	status: str = "pending"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"transaction_id": self.transaction_id,
+			"requested_by": self.requested_by,
+			"justification": self.justification,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+			"status": self.status,
 		}
 
 
@@ -108,6 +144,7 @@ class SmartContractArtifact:
 	artifact_hash: str
 	reviewed_by: str
 	rollback_plan: str
+	approval_id: str | None = None
 	status: str = "deployed"
 	deployment_hash: str = ""
 
@@ -121,8 +158,43 @@ class SmartContractArtifact:
 			"artifact_hash": self.artifact_hash,
 			"reviewed_by": self.reviewed_by,
 			"rollback_plan": self.rollback_plan,
+			"approval_id": self.approval_id,
 			"status": self.status,
 			"deployment_hash": self.deployment_hash,
+		}
+
+
+@dataclass(frozen=True)
+class ContractDeploymentApproval:
+	"""Independent review evidence for smart contract deployment."""
+
+	id: str
+	tenant_id: str
+	ledger_id: str
+	name: str
+	version: str
+	artifact_hash: str
+	requested_by: str
+	rollback_plan: str
+	decision: str = "pending"
+	reviewer: str | None = None
+	notes: str | None = None
+	status: str = "pending"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"ledger_id": self.ledger_id,
+			"name": self.name,
+			"version": self.version,
+			"artifact_hash": self.artifact_hash,
+			"requested_by": self.requested_by,
+			"rollback_plan": self.rollback_plan,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+			"status": self.status,
 		}
 
 
