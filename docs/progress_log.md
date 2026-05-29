@@ -16,6 +16,68 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 12:39 EAT
+
+ESGN implementation-depth slice:
+
+- Replaced ESGN generic record/service/API/view helpers with a domain-specific
+  digital forms and e-sign runtime.
+- Added `signing_engine.py` for deterministic schema validation hashes, tamper
+  seals, signer signature hashes, evidence seals, and certificate identifiers.
+- Rebuilt `models.py` around governed form templates, validated submissions,
+  signature recipients, envelopes, signing ceremonies, encrypted evidence
+  packages, and audit events.
+- Rebuilt `service.py`, `api.py`, and `views.py` around template creation,
+  publication, submission validation, envelope routing, signing ceremonies,
+  evidence package creation, dashboard summaries, form library models, envelope
+  console models, and evidence vault models.
+- Rewrote `cap_spec.md` so the package specification describes current ESGN
+  domain behavior and the production integration boundary instead of generated
+  package scaffolding.
+- Expanded ESGN focused tests for a full forms/e-sign/evidence lifecycle and
+  policy failures for missing tenant context, template owner, schema fields,
+  regulated DLP, publication approval, compliance review, recipient consent,
+  delegated signing policy, identity verification, and encrypted evidence.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/esgn/__init__.py
+  capabilities/common/esgn/models.py capabilities/common/esgn/signing_engine.py
+  capabilities/common/esgn/service.py capabilities/common/esgn/api.py
+  capabilities/common/esgn/views.py
+  capabilities/common/esgn/test_capability_contract.py
+  capabilities/common/esgn/tests/test_materialized_package.py` -> passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/common/esgn` -> no matches.
+- `./.venv/bin/pytest -q capabilities/common/esgn/test_capability_contract.py
+  capabilities/common/esgn/tests/test_materialized_package.py` -> 8 passed
+  with 10 pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/esgn --json` -> passed with ESGN classified as
+  `domain_specific`, 1 custom Python file, 0 baseline markers, 0 errors, and 0
+  warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/esgn --json`
+  -> passed with runtime self-test loaded, release evidence ok, and
+  side-effect-free catalog patch.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  73 domain-specific packages, 32 materialized-baseline packages, 3 mixed
+  packages, 1 contract-only package, 890 custom Python files, 0 errors, and 36
+  warnings; next warning is `fedl`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+
+Known remaining gaps:
+
+- ESGN is now domain-specific, but implementation-depth still reports 32
+  materialized baselines, 3 mixed implementations, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is `fedl`.
+
 ### 2026-05-29 08:52 EAT
 
 ANOM implementation-depth slice:

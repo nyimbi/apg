@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""ESGN package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import importlib.util
 import sys
 
 from capabilities.capability_contract_registry import validate_contract_shape
+from capabilities.common.esgn.service import EsgnService
+from capabilities.common.esgn.views import dashboard_model
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
@@ -44,3 +46,26 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "esgn" in model["capabilities"]
+
+
+def test_package_runtime_compatibility_surface_creates_submission():
+	service = EsgnService()
+
+	record = service.create_record(
+		record_id="rec-001",
+		tenant_id="tenant-test",
+		metadata={
+			"template_id": "tpl-compat",
+			"template_name": "Compatibility Form",
+			"schema_fields": ["name"],
+			"data": {"name": "Generated package"},
+			"evidence_ref": "audit:rec-001",
+		},
+	)
+	model = dashboard_model(service, "tenant-test")
+
+	assert record["id"] == "rec-001"
+	assert record["validation_status"] == "valid"
+	assert model["summary"]["template_count"] == 1
+	assert model["summary"]["submission_count"] == 1
+	assert model["templates"][0]["status"] == "published"
