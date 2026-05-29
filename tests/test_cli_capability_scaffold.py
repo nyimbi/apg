@@ -12,6 +12,7 @@ from click.testing import CliRunner
 
 from capabilities.capability_contract_registry import validate_contract_shape
 from cli.main import cli
+from compiler.capability_publish import build_capability_publish_report
 
 
 def _load_contract(path: Path):
@@ -73,12 +74,18 @@ def test_capabilities_scaffold_creates_valid_spec_backed_package():
 		view_model = views_module.dashboard_model(service, tenant_id="tenant-demo")
 		api_record = api_module.create_record({"id": "api-1", "tenant_id": "tenant-demo"})
 		api_status = api_module.capability_status("tenant-demo")
+		publish_report = build_capability_publish_report(capability_dir)
+		package_artifacts_exist = all(
+			(capability_dir / artifact).is_file()
+			for artifact in ("app.py", "semantic_model.json", "package_manifest.json", "release_report.json")
+		)
 
 	assert report["format"] == "apg.capability-scaffold-report.v1"
 	assert report["ok"] is True
 	assert report["capability"] == "common_demo"
-	assert len(report["written"]) == 9
+	assert len(report["written"]) == 13
 	assert contract_path.name == "capability_contract.py"
+	assert package_artifacts_exist is True
 	validate_contract_shape(contract, contract_path)
 	assert contract["capability"] == "common_demo"
 	assert contract["display_name"] == "Demo Capacity"
@@ -90,6 +97,10 @@ def test_capabilities_scaffold_creates_valid_spec_backed_package():
 	assert view_model["records"][0]["id"] == "demo-1"
 	assert api_record["id"] == "api-1"
 	assert api_status["record_count"] == 1
+	assert publish_report["format"] == "apg.capability-publish-report.v1"
+	assert publish_report["ok"] is True
+	assert publish_report["capabilities"][0]["capability"] == "common_demo"
+	assert publish_report["runtime_evidence"]["self_test"]["passed"] is True
 
 
 def test_capabilities_scaffold_refuses_to_overwrite_without_force():

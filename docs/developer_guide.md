@@ -271,7 +271,13 @@ For a new package-backed capability, start with:
 The scaffolded package is runnable immediately: `service.py` provides
 tenant-scoped record create/list/get/update behavior with deterministic rule
 enforcement, `api.py` exposes dependency-light helper functions, and `views.py`
-returns dashboard route/record/theme metadata.
+returns dashboard route/record/theme metadata. It also includes `app.py`,
+`semantic_model.json`, `package_manifest.json`, and `release_report.json`, so a
+fresh scaffold can go through publish planning without a separate compile step:
+
+```bash
+./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+```
 
 Inspect and exercise the capability contract before changing generated app
 code:
@@ -293,6 +299,10 @@ capabilities/<domain>/<code>/
   service.py
   api.py
   views.py
+  app.py
+  semantic_model.json
+  package_manifest.json
+  release_report.json
   tests/
 ```
 

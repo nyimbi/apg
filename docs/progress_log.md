@@ -16,6 +16,46 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:36 EAT
+
+Publish-plan-ready scaffold slice:
+
+- Extended `apg capabilities scaffold` so new package-backed capabilities now
+  include `app.py`, `semantic_model.json`, `package_manifest.json`, and
+  `release_report.json` in addition to the executable record/service/API/view
+  runtime.
+- The generated `app.py` exposes `self_test()`, `component_manifest()`, and
+  `semantic_model()` so the existing capability publish planner can load the
+  package entrypoint and gather runtime evidence.
+- The generated semantic model declares the scaffolded capability, provided and
+  required services, deterministic rules, UI route metadata, theme data,
+  runtime files, composition dependencies, contracts, deployment target, and
+  package profile.
+- The generated package manifest and release report satisfy
+  `apg.capability-publish-report.v1` validation without writing catalog state.
+- Strengthened scaffold tests so a fresh scaffold must validate its contract,
+  exercise service/API/view behavior, and pass
+  `build_capability_publish_report()`.
+- Updated developer, capability, capacity, and tooling docs to show the
+  scaffold-to-publish-plan lifecycle.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile cli/capabilities_command.py tests/test_cli_capability_scaffold.py` -> passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_scaffold.py` -> 2 passed.
+- `./.venv/bin/apg capabilities scaffold common demo --name "Demo Capacity" --out /private/tmp/apg-scaffold-publish-proof --force --json` -> emitted `apg.capability-scaffold-report.v1` and wrote 13 files.
+- `./.venv/bin/apg capabilities publish-plan /private/tmp/apg-scaffold-publish-proof/common/demo --json` -> emitted `apg.capability-publish-report.v1`, `ok=true`, one `common_demo` catalog patch, and loaded runtime evidence.
+- `./.venv/bin/pytest -q /private/tmp/apg-scaffold-publish-proof/common/demo/tests` -> 4 passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_scaffold.py tests/test_cli_capability_operability.py tests/test_tooling_audit.py` -> 9 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0 blocking gaps, and 0 errors.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109 valid contracts and 0 errors.
+
+Known remaining gaps:
+
+- Scaffolded publish evidence is intentionally local and side-effect-free.
+  Real catalog publication, signing, provenance, and remote distribution remain
+  separate platform lifecycle work.
+
 ### 2026-05-29 05:28 EAT
 
 Executable scaffold runtime slice:

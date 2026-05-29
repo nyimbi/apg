@@ -307,8 +307,11 @@ Use the CLI scaffold for a new package-backed capability:
 The scaffold produces a valid spec-backed contract plus an executable
 dependency-light package runtime: tenant-scoped records, rule-guarded
 create/update service methods, API helpers, dashboard view metadata, and
-focused contract/runtime tests. Refine that starter behavior into
-domain-specific operations instead of replacing it with inert placeholders.
+focused contract/runtime tests. It also writes `app.py`,
+`semantic_model.json`, `package_manifest.json`, and `release_report.json` so
+the package can pass `apg capabilities publish-plan <package-dir> --json`.
+Refine that starter behavior into domain-specific operations instead of
+replacing it with inert placeholders.
 
 For a Python capability package under `capabilities/<domain>/<code>/`, use this
 shape where practical:
@@ -322,6 +325,10 @@ capabilities/<domain>/<code>/
   service.py
   api.py
   views.py
+  app.py
+  semantic_model.json
+  package_manifest.json
+  release_report.json
   tests/
 ```
 

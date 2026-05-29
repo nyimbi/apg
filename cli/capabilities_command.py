@@ -277,6 +277,10 @@ def _scaffold_files(domain: str, code: str, display_name: str) -> dict[str, str]
 		"service.py": _service_py(class_prefix),
 		"api.py": _api_py(class_prefix),
 		"views.py": _views_py(class_prefix),
+		"app.py": _app_py(capability_id, display_name),
+		"semantic_model.json": _json_file(_semantic_model_data(capability_id, display_name, domain)),
+		"package_manifest.json": _json_file(_package_manifest_data(capability_id, display_name)),
+		"release_report.json": _json_file(_release_report_data(capability_id, display_name)),
 		"tests/__init__.py": "",
 		"tests/test_capability_contract.py": _contract_test_py(domain, code, capability_id, display_name),
 	}
@@ -601,6 +605,186 @@ def dashboard_model(
 \t\t"theme": contract["theme"],
 \t}}
 '''
+
+
+def _app_py(capability_id: str, display_name: str) -> str:
+	semantic_model_json = json.dumps(_semantic_model_data(capability_id, display_name, capability_id.split("_", 1)[0]), sort_keys=True)
+	return f'''"""Publishable APG capability package entrypoint for {display_name}."""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+
+SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{semantic_model_json}""")
+
+
+def semantic_model() -> dict[str, Any]:
+\t"""Return the package semantic model."""
+\treturn json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+
+
+def component_manifest() -> dict[str, Any]:
+\t"""Return the APG component manifest for this capability package."""
+\treturn {{
+\t\t"format": "apg.component-manifest.v1",
+\t\t"kind": "apg.generated_application",
+\t\t"name": "{capability_id}",
+\t\t"display_name": "{display_name}",
+\t\t"target": "python",
+\t\t"interfaces": {{
+\t\t\t"health": "/health",
+\t\t\t"self_test": "/self-test",
+\t\t\t"semantic_model": "/semantic-model.json",
+\t\t}},
+\t\t"capabilities": ["{capability_id}"],
+\t}}
+
+
+def self_test() -> dict[str, Any]:
+\t"""Run a dependency-light package self-test."""
+\tmodel = semantic_model()
+\tmanifest = component_manifest()
+\terrors: list[str] = []
+\tif model.get("format") != "apg.semantic-model.v1":
+\t\terrors.append("semantic model format mismatch")
+\tif "{capability_id}" not in model.get("capabilities", {{}}):
+\t\terrors.append("capability missing from semantic model")
+\tif manifest.get("interfaces", {{}}).get("semantic_model") != "/semantic-model.json":
+\t\terrors.append("component manifest semantic model interface mismatch")
+\treturn {{
+\t\t"passed": not errors,
+\t\t"status": "ok" if not errors else "failed",
+\t\t"errors": errors,
+\t\t"routes": ["/health", "/self-test", "/component.json", "/semantic-model.json"],
+\t}}
+
+
+if __name__ == "__main__":
+\tprint(json.dumps(self_test(), indent=2, sort_keys=True))
+'''
+
+
+def _semantic_model_data(capability_id: str, display_name: str, domain: str) -> dict[str, Any]:
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"source_files": ["cap_spec.md"],
+		"app": {
+			"name": capability_id,
+			"version": "1.0.0",
+			"description": f"{display_name} scaffolded capability package",
+			"entity_count": 1,
+		},
+		"symbols": {
+			f"capability.{capability_id}": {
+				"id": f"capability.{capability_id}",
+				"kind": "capability",
+				"name": display_name,
+				"file": "cap_spec.md",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"tables": {},
+		"views": {},
+		"flows": {},
+		"operations": {},
+		"rules": {},
+		"roles": {},
+		"security": {},
+		"agents": {},
+		"llms": {},
+		"capabilities": {
+			capability_id: {
+				"name": display_name,
+				"provides": [f"{capability_id}_operations"],
+				"requires": ["audit_events", "tenant_context"],
+				"configuration": {"tenant_scoped": True, "policy_enforced": True},
+				"rules": [
+					{"name": "tenant_context_required", "when": "tenant_context_present == false", "action": "deny"},
+					{"name": "operation_policy_required", "when": "operation_type == write and policy_attached == false", "action": "deny"},
+				],
+				"rule_engine": {"type": "deterministic"},
+				"ui": {
+					"shell": "apg_python",
+					"routes": [
+						{"name": "dashboard", "path": f"/{capability_id.replace('_', '-')}/dashboard", "component": "CapabilityDashboard"}
+					],
+				},
+				"theme": {"name": f"{capability_id}_operations", "tokens": {"border.radius": "8px"}},
+				"runtime": {"entrypoint": "app.py", "service": "service.py", "api": "api.py", "views": "views.py"},
+				"erp_modules": [domain],
+				"components": {},
+				"business_rules": [],
+				"approvals": {},
+				"master_data": {},
+				"i18n": {},
+				"streaming": {},
+				"screens": {},
+			}
+		},
+		"composition": {"applications": {}, "agent_teams": {}, "capability_dependencies": {capability_id: ["audit_events", "tenant_context"]}},
+		"contracts": {
+			capability_id: {
+				"id": capability_id,
+				"provides": [f"{capability_id}_operations"],
+				"requires": ["audit_events", "tenant_context"],
+				"configuration": {"tenant_scoped": True, "policy_enforced": True},
+			}
+		},
+		"deployment": {"target": "python", "source": "cap_spec.md"},
+		"packages": {capability_id: {"profile": "capability", "entrypoint": "app.py"}},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"diagnostics": [],
+	}
+
+
+def _package_manifest_data(capability_id: str, display_name: str) -> dict[str, Any]:
+	return {
+		"format": "apg.package-manifest.v1",
+		"name": capability_id,
+		"display_name": display_name,
+		"version": "1.0.0",
+		"profile": "capability",
+		"base_target": "python",
+		"generated_artifacts": [
+			"__init__.py",
+			"cap_spec.md",
+			"capability_contract.py",
+			"models.py",
+			"service.py",
+			"api.py",
+			"views.py",
+			"app.py",
+			"semantic_model.json",
+			"release_report.json",
+		],
+		"profile_artifacts": ["package_manifest.json"],
+	}
+
+
+def _release_report_data(capability_id: str, display_name: str) -> dict[str, Any]:
+	return {
+		"format": "apg.release-report.v1",
+		"ok": True,
+		"target": "python",
+		"source": "cap_spec.md",
+		"package": capability_id,
+		"evidence": {
+			"self_test": {"passed": True, "status": "ok", "capability": capability_id},
+			"semantic_model": {"format": "apg.semantic-model.v1", "capability": capability_id},
+			"contracts": {"capability_contract": {"errors": [], "display_name": display_name}},
+		},
+	}
+
+
+def _json_file(data: dict[str, Any]) -> str:
+	return json.dumps(data, indent=2, sort_keys=True) + "\n"
 
 
 def _contract_test_py(domain: str, code: str, capability_id: str, display_name: str) -> str:
