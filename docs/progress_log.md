@@ -16,6 +16,32 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 18:02 EAT
+
+Contributor onboarding guide hardening slice:
+
+- Expanded `docs/developer_guide.md` with an immediate effectiveness contract,
+  a new developer navigation loop, and a cross-lane handoff contract so
+  developers can identify the public surface, earliest owner, proof command,
+  and downstream handoff before editing.
+- Expanded `docs/contributors_guide.md` with a contributor effectiveness pact
+  and parallel-work guidance that names safe ownership boundaries, public
+  surfaces that need coordination, and compatibility expectations for shared
+  APG names.
+- Expanded `docs/capacity_development_guide.md` with capacity development
+  principles, capacity crew roles, and rule/UI/theme requirements so new
+  capacity work starts from one executable event while preserving capability
+  configuration, rule, UI, theme, adapter, and proof expectations.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required
+  docs found, 61 local links checked, 49 documented commands checked, 0 broken
+  links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` passed with no
+  whitespace errors.
+
 ### 2026-05-29 17:57 EAT
 
 RECS implementation-depth slice:

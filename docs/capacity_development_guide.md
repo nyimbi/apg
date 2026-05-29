@@ -9,6 +9,29 @@ Use this guide when the goal is to make APG able to do something new, such as
 procurement approval, ledger posting, customer onboarding, device management,
 agentic operations, or integration monitoring.
 
+## Capacity Development Principle
+
+A capacity is not a feature list. It is a rerunnable path from one event to one
+observable result.
+
+Every capacity must identify:
+
+| Decision | Why it matters |
+| --- | --- |
+| first event | gives contributors a single executable starting point |
+| tenant and security boundary | prevents later package behavior from being globally scoped by accident |
+| records and relationships | gives the grammar, semantic model, and generated runtime stable names |
+| rules and approvals | turns business policy into deterministic tests and review gates |
+| screens and composition | makes the UI contract inspectable instead of implied |
+| workflow states | gives generated runtime and package services a lifecycle |
+| AI agent boundary | keeps provider choice configurable and auditable |
+| Bytewax stream boundary | keeps event flow semantics platform-native and adapter-friendly |
+| package owners | tells contributors where durable behavior belongs |
+| proof commands | prevents readiness from being based on prose |
+
+The first event should be small enough that a new contributor can model it,
+compile it, smoke-test it, and document the next gap in one working session.
+
 ## Capacity Versus Capability
 
 A **capability** is a composable unit with a contract and package-backed
@@ -109,6 +132,26 @@ Keep it in the example README or package planning note.
 
 This map lets compiler, runtime, package, UI, and docs contributors work in
 parallel without changing public names underneath each other.
+
+## Capacity Crew Roles
+
+Use these roles when multiple contributors are building a capacity at the same
+time. One person may hold several roles on a small slice, but each role should
+still have a named artifact and proof.
+
+| Role | Owns | Proof |
+| --- | --- | --- |
+| capacity lead | first event, readiness level, public names, README | README names event, owners, proof, and next slice |
+| language owner | APG source shape and grammar needs | `apg model ... --json` exposes intended constructs |
+| runtime owner | generated Python routes, helpers, manifests, smoke assertions | `apg compile ... --verify` and generated smoke test |
+| package owner | durable service lifecycle, API helpers, views, rules, theme | package pytest, implementation audit root, publish-plan |
+| agent owner | provider-agnostic agent runtime boundary and approval rules | semantic output and generated manifest expose agent policy |
+| stream owner | Bytewax flow metadata, event envelopes, partitioning | semantic output and manifest expose stream policy |
+| docs owner | guide, README, package spec, progress evidence | docs audit and local diff check |
+
+Parallel work is effective when these roles share stable names: event name,
+record names, route names, workflow states, rule IDs, service names, agent IDs,
+stream names, and package roots.
 
 ## Capacity Packet Template
 
@@ -368,6 +411,38 @@ Capacity composition must be explicit.
 Implicit relationships slow contributors down. If one screen depends on a
 record, rule, workflow, or capability, name the relationship in source,
 semantic output, README, or package spec.
+
+## Rule, UI, And Theme Requirements
+
+Each capacity-level capability must be configurable, rule-aware, visible in UI
+composition, and themeable. Treat those as minimum composition metadata, not
+late polish.
+
+For every package-backed capability in a capacity, document:
+
+| Concern | Required capacity detail |
+| --- | --- |
+| configuration | tenant-scoped keys, defaults, limits, adapter choices, disabled modes |
+| rules | deterministic rule IDs, inputs, decisions, denial reasons, audit events |
+| UI | route names, screen ownership, contained records, actions, permissions |
+| theme | theme name, semantic color tokens, density needs, dashboard/view variants |
+| tests | positive lifecycle and negative guardrails for important rules |
+| adapters | live provider boundaries and local deterministic fallback |
+
+Example:
+
+```text
+Capability: invoice_triage
+Configuration: high_value_threshold, provider_runtime, max_agent_steps
+Rules: invoice_total_positive, supplier_active, human_approval_for_posting
+UI: /ap/invoices contains Invoice and exposes submit, review, approve actions
+Theme: finance_operations with compact tables and status severity tokens
+Adapters: AI provider runtime, document extraction service, supplier API
+Proof: package pytest, implementation-audit root, publish-plan, compile smoke
+```
+
+This keeps capacity work aligned with APG's composable capability model instead
+of producing examples that cannot become larger applications.
 
 ## Capacity Blueprint Example
 

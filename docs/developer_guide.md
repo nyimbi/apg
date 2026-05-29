@@ -9,6 +9,44 @@ enter the repository, prove the current baseline, choose the right owning layer,
 make one executable slice better, verify it, update the handoff trail, and
 commit it without private context.
 
+## Immediate Effectiveness Contract
+
+APG development is effective when every change moves one observable contract
+closer to executable reality. Before editing, write down the contract you are
+improving and the command that will prove it.
+
+Use this contract for every packet:
+
+| Question | Acceptable answer |
+| --- | --- |
+| What user or contributor is helped? | an APG author, generated-app user, capability developer, capacity lead, reviewer, or tool consumer |
+| What public surface changes? | grammar syntax, semantic JSON, generated Python, package API, route metadata, rule ID, example, CLI command, or guide |
+| Where is the earliest owner? | one file or directory from the repository map, not "the platform" |
+| How will it be proven? | one focused command with inspectable output |
+| What remains outside scope? | live integrations, broad suites, provider adapters, full ERP module, or unrelated cleanup |
+
+If you cannot fill the table in five minutes, the packet is too broad. Split it
+until a reviewer can see the owner, proof, and remaining gap without a meeting.
+
+## New Developer Navigation Loop
+
+Use this loop when you are dropped into an unfamiliar APG area:
+
+1. **Find the public promise.** Read the nearest guide, `cap_spec.md`,
+   example README, semantic output, or command help.
+2. **Run the narrow proof.** Prefer one package test, one model command, one
+   compile command, or one audit command over a broad suite.
+3. **Inspect the earliest broken layer.** Parser before AST, AST before
+   semantic model, semantic model before generator, package service before UI
+   docs.
+4. **Make the smallest executable correction.** Avoid sweeping rewrites unless
+   the narrow proof demonstrates that the boundary itself is wrong.
+5. **Leave a rerunnable trail.** Update the local doc, README, package spec, or
+   progress log with the command and result.
+
+This loop makes contributors useful before they understand every APG subsystem.
+Depth comes from repeated verified packets, not from private context.
+
 ## Ten-Minute Start
 
 Run these from the repository root before editing:
@@ -99,6 +137,25 @@ Before changing implementation code, name the contract you are changing:
 
 If the contract is not named, the review will drift into style discussion
 instead of whether APG became more executable.
+
+## Cross-Lane Handoff Contract
+
+Many APG changes span more than one specialty. The fastest way to work in
+parallel is to keep public names stable and hand off explicit evidence between
+lanes.
+
+| From | To | Handoff must include |
+| --- | --- | --- |
+| grammar author | compiler owner | source fixture, intended AST shape, invalid examples |
+| compiler owner | generator owner | semantic JSON keys, reference validation, diagnostic behavior |
+| generator owner | example owner | generated file names, route/helper names, smoke-test assertions |
+| capability owner | capacity lead | service methods, rule IDs, route metadata, package proof |
+| capacity lead | docs owner | readiness level, first event, package owners, proof commands |
+| tooling owner | every lane | JSON shape, command status, known side effects |
+
+Do not hand off vague notes such as "screen support is done." Hand off a file,
+public key, route name, rule ID, and command output that the next contributor can
+rerun.
 
 ## Environment Contract
 

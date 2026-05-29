@@ -7,6 +7,37 @@ leave the repository easier for the next contributor.
 The contribution rule is simple: make one current APG state more executable,
 prove it with commands, document the evidence, and commit only that slice.
 
+## Contributor Effectiveness Pact
+
+APG welcomes contributions that are small, executable, and easy to continue.
+You do not need to know the whole platform to help. You do need to make one
+claim concrete enough that another contributor can rerun it.
+
+Before starting, write this in your working note or commit prep:
+
+```text
+I am improving:
+The owner is:
+The public contract is:
+The proof command is:
+I will not change:
+The next contributor should:
+```
+
+Examples of good contracts:
+
+| Work | Public contract |
+| --- | --- |
+| documentation | guide link, command spelling, onboarding path, proof expectation |
+| example | event name, APG source path, readiness level, generated-output status |
+| compiler | grammar construct, semantic JSON key, diagnostic name |
+| generated runtime | generated file, route/helper name, smoke-test assertion |
+| capability | capability ID, service method, rule ID, route metadata, theme token |
+| capacity | first event, package owner, screen route, workflow state, agent boundary |
+
+If the public contract is still unclear, contribute by clarifying the local
+README, package spec, or guide before changing behavior.
+
 ## First 30 Minutes
 
 Run this baseline from the repository root:
@@ -325,6 +356,33 @@ Every contribution should satisfy these standards:
 
 If a contribution does not meet these standards, narrow it before editing more
 files.
+
+## Working In Parallel
+
+Parallel contribution is safe when each contributor owns a different public
+surface and the handoff names are stable.
+
+Safe parallel packets:
+
+- one contributor deepens `capabilities/common/<code>/` while another updates
+  the matching capacity README;
+- one contributor adds a compiler semantic key while another prepares a
+  generated-runtime test that consumes that key;
+- one contributor fixes documentation commands while another runs package
+  implementation burn-down;
+- different contributors deepen different capability packages.
+
+Coordinate before changing:
+
+- `spec/apg.g4`;
+- semantic model top-level keys;
+- generated file names;
+- route names used by examples or package specs;
+- capability IDs, service names, rule IDs, or theme names;
+- checked-in example `output/` directories.
+
+When in doubt, preserve public names and add compatibility shims until the
+owning docs, tests, and examples move in the same verified slice.
 
 ## Working With The Shared Worktree
 
