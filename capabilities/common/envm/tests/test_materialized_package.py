@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""Environment Management package tests."""
 
 from __future__ import annotations
 
@@ -44,3 +44,25 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "envm" in model["capabilities"]
+
+
+def test_environment_service_exposes_domain_records():
+	from capabilities.common.envm.service import EnvmService
+
+	service = EnvmService()
+	environment = service.create_record(
+		record_id="env-test",
+		tenant_id="tenant-test",
+		metadata={
+			"name": "Test",
+			"stage": "test",
+			"region": "ke-nairobi",
+			"owner": "platform",
+			"configuration_source": "git://test",
+			"rbac_policy": "rbac-test",
+			"secret_scope_policy": "secret-test",
+		},
+	)
+
+	assert environment["stage"] == "test"
+	assert service.dashboard_summary("tenant-test")["environment_count"] == 1

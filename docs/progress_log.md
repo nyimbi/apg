@@ -10560,3 +10560,26 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- capabilities/common/dvrl/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-29 12:13 EAT
+
+Executable ENVM environment-management runtime slice:
+
+- Converted `capabilities/common/envm` from generated record storage into a domain-specific environment-management capability package.
+- Replaced generic records with tenant environment definitions, governed promotion paths, promotion runs, configuration drift reports, secret scopes, and audit events.
+- Added `environment_engine.py` with deterministic environment fingerprints, drift percentage and posture decisions, and promotion-status helpers.
+- Added `EnvmService` behavior for environment registration, production approval enforcement, stage/region/config/RBAC/secret-policy guardrails, promotion-path creation, promotion execution, drift reporting, secret-scope registration, dashboard summaries, compatibility helpers, and APG rule enforcement.
+- Expanded API and view helpers so ENVM exposes environment inventory, promotion console, drift dashboard, secret scopes, audit events, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and the explicit external deployment, configuration repository, secret manager, drift scanner, audit-log, infrastructure, and RBAC integration boundary.
+- Added focused contract/service tests for successful environment-promotion-drift-secret lifecycle execution and guardrails around tenant context, owners, production approval, stage policy, promotion paths, secret policy, and drift review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/envm/__init__.py capabilities/common/envm/models.py capabilities/common/envm/environment_engine.py capabilities/common/envm/service.py capabilities/common/envm/api.py capabilities/common/envm/views.py capabilities/common/envm/test_capability_contract.py capabilities/common/envm/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/envm/test_capability_contract.py capabilities/common/envm/tests/test_materialized_package.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/envm` returned no remaining ENVM baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/envm --json` passed with `ok: true`; `envm` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/envm --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `envm` is now removed from warnings, domain-specific packages increased to 71, materialized baseline packages dropped to 34, and warning count dropped to 38.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
