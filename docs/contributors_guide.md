@@ -33,6 +33,43 @@ Then read only what matches your intended lane:
 Do not try to understand every subsystem before contributing. Understand one
 owner, one public contract, and one proof command.
 
+## Zero-To-Commit Path
+
+Use this path for your first APG contribution. It is intentionally narrow so a
+new contributor can finish a real packet without needing private project
+history.
+
+1. Run `git status --short` and write down unrelated dirty files you will not
+   stage.
+2. Pick one packet from the lane table above.
+3. Run the packet's focused proof before editing so you know the starting
+   state.
+4. Edit only files owned by that packet.
+5. Rerun the focused proof and inspect the output.
+6. Update the local handoff surface: guide, example README, package spec, or
+   progress log.
+7. Stage exact files, run `git diff --cached --check`, commit with the Lore
+   protocol, and push.
+
+Your first contribution does not need to be large. It needs to be executable,
+reviewable, and honest about what was and was not tested.
+
+## First Packet Menu
+
+Choose one of these if you are unsure where to start.
+
+| Packet | Edit | Success condition |
+| --- | --- | --- |
+| Make a guide more runnable | one docs file | `apg docs audit --json` passes and the guide has current commands |
+| Refresh one example README | one example README | README names event, readiness, proof, and next gap |
+| Add one capability guardrail | one package test and service rule | negative test fails before or is clearly covered after implementation |
+| Remove one baseline marker | one capability package | implementation audit root reports `domain_specific` |
+| Expose one semantic field | compiler layer plus focused test | `apg model ... --json` shows the new stable key |
+| Prove one generated behavior | generator plus smoke assertion | generated app imports and smoke-tests |
+
+When a packet touches more than one row, split it unless the second row is
+directly required to prove the first.
+
 ## If You Only Have One Hour
 
 Pick one of these paths and finish it completely.

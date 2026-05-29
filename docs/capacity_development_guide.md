@@ -64,6 +64,52 @@ Minimum artifacts:
 If a capacity cannot name the first event, APG source path, package owners, and
 proof commands, reduce scope.
 
+## Capacity Factory Loop
+
+Use this loop to turn an idea into executable APG without waiting for the whole
+platform to be complete.
+
+1. **Name the event.** Use an event a user or system can trigger today, such as
+   `invoice submitted`, `customer qualified`, `device telemetry received`, or
+   `agent plan approved`.
+2. **Write the capacity blueprint.** Name actors, records, rules, screens,
+   workflows, agents, streams, packages, and proof commands.
+3. **Create or update one example.** Put the smallest parseable APG source in
+   `examples/<nn>_<capacity>/main.apg`.
+4. **Prove semantics.** Run `apg model ... --json` and inspect the relevant
+   records, rules, screens, workflows, agents, streams, and capability
+   references.
+5. **Generate Python.** Run `apg compile ... --verify` into `/tmp`, then run
+   the generated smoke test.
+6. **Deepen one package.** If durable behavior is needed, implement one
+   lifecycle in the owning capability package with positive and guardrail
+   tests.
+7. **Record the handoff.** Update the example README, package `cap_spec.md`,
+   and progress log when readiness or implementation-depth evidence changes.
+
+Repeat the loop for the next event. Do not create a large capacity inventory
+that has no compiled first event.
+
+## Capacity-To-Capability Map
+
+Every capacity needs a small map from business intent to package ownership.
+Keep it in the example README or package planning note.
+
+| Capacity element | Map it to | Example |
+| --- | --- | --- |
+| First event | one command, route action, workflow transition, or stream input | `invoice submitted` |
+| Durable record | one package model and tenant boundary | `Invoice` in an AP package |
+| Rule | one deterministic rule ID and decision vocabulary | `invoice_total_positive -> allow/deny` |
+| Screen | one route and composition relationship | `/ap/invoices` contains `Invoice` and actions |
+| Workflow | states, transitions, guard rules, approval points | `draft -> submitted -> approved` |
+| Agent | runtime adapter, tools, memory, approval rules | `invoice_triage_agent` can draft exceptions |
+| Stream | Bytewax flow, input, output, partition key | `invoice_events -> invoice_alerts by tenant_id` |
+| Integration | adapter boundary and local deterministic fallback | supplier API adapter, local validation proof |
+| Proof | commands that show current readiness | model, compile, smoke test, package pytest |
+
+This map lets compiler, runtime, package, UI, and docs contributors work in
+parallel without changing public names underneath each other.
+
 ## Capacity Packet Template
 
 Put this blueprint in the example README or working note before implementation:

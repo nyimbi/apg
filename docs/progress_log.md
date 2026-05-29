@@ -16,6 +16,32 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 17:41 EAT
+
+Contributor guide documentation slice:
+
+- Expanded `docs/developer_guide.md` with a day-one execution board and
+  internal contract checklist so APG developers can pick the correct owner,
+  public contract, smallest same-day packet, and proof command before editing.
+- Expanded `docs/contributors_guide.md` with a zero-to-commit path and first
+  packet menu so new contributors can get from baseline checks to a pushed
+  Lore commit without broad repository context.
+- Expanded `docs/capacity_development_guide.md` with a capacity factory loop
+  and capacity-to-capability map so capacity work starts from one executable
+  event and maps cleanly into APG source, generated Python, package behavior,
+  UI, agents, Bytewax streams, tests, docs, and proof.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 61
+  local links, 49 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` -> passed with no
+  whitespace errors.
+- Not run: full repository pytest suite because this is a documentation-only
+  onboarding slice and battery-conscious focused verification is sufficient.
+
 ### 2026-05-29 17:31 EAT
 
 PRED implementation-depth slice:

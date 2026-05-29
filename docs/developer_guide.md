@@ -66,6 +66,40 @@ The first hour is successful when you can answer these five questions:
 If you cannot answer those questions, narrow the slice before editing more
 files.
 
+## Day-One Execution Board
+
+Use this board to choose work that can become a reviewed, pushed slice on the
+same day. Each row names the concrete artifact to inspect, the smallest useful
+change, and the proof that makes the change credible.
+
+| Lane | Inspect first | Useful same-day packet | Proof |
+| --- | --- | --- | --- |
+| Grammar | `spec/apg.g4`, one parseable example | add or tighten one terse construct and project it into AST/semantic JSON | `apg parser-golden --json`; `apg model <example> --json` |
+| Semantic model | `compiler/ast_builder.py`, `compiler/semantic_model.py` | expose one missing screen, workflow, agent, stream, or capability field | focused pytest; `apg model <example> --json` |
+| Generator | `compiler/code_generator.py`, generated `/tmp` output | make one existing semantic field executable in generated Python | `apg compile ... --verify`; generated `smoke_test.py` |
+| Capability package | one `capabilities/<domain>/<code>/` tree | replace one generic lifecycle with domain models, service rules, API, views, and tests | package pytest; implementation audit root; publish-plan |
+| Capacity example | one `examples/<nn>_<name>/` tree | make one business event parse, compile, and smoke-test | `apg model`; `apg compile --verify`; smoke test |
+| Tooling/docs | `cli/`, `compiler/*audit*.py`, `docs/` | add one command proof or guide correction that removes ambiguity | relevant `apg ... --json`; docs audit |
+
+Do not pick a packet because it is interesting. Pick it because it advances one
+public APG contract and has a proof command a reviewer can rerun.
+
+## Internal Contract Checklist
+
+Before changing implementation code, name the contract you are changing:
+
+| Contract type | Examples | Required handoff |
+| --- | --- | --- |
+| Syntax | keywords, block shape, field modifiers | grammar guide or cheat sheet when authoring changes |
+| Semantic JSON | `screens`, `workflows`, `agents`, `streams`, graph summaries | fixture or example showing the key |
+| Generated runtime | route handlers, manifests, smoke tests, sidecar files | compile proof and generated smoke evidence |
+| Capability contract | capability ID, rule IDs, permissions, route names, theme | package tests and `cap_spec.md` |
+| Capacity proof | example readiness, package owners, first event | example README and progress log when readiness changes |
+| CLI/tooling | command name, JSON `format`, diagnostics | docs/tooling entry and focused command proof |
+
+If the contract is not named, the review will drift into style discussion
+instead of whether APG became more executable.
+
 ## Environment Contract
 
 APG is developed as a Python-first repository. Use the checked-in project
