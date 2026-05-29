@@ -9,6 +9,54 @@ enter the repository, prove the current baseline, choose the right owning layer,
 make one executable slice better, verify it, update the handoff trail, and
 commit it without private context.
 
+## Read This First: One Executable Packet
+
+APG is too broad to approach as one project. Treat it as a chain of executable
+packets. A useful packet changes one public contract, names one owner, runs one
+focused proof, and leaves one handoff.
+
+Use this path when you need to become effective immediately:
+
+```bash
+git status --short
+uv sync
+./.venv/bin/apg --help
+./.venv/bin/apg docs audit --json
+./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-first-packet --verify
+./.venv/bin/python /tmp/apg-first-packet/smoke_test.py
+```
+
+Then pick exactly one packet:
+
+| Goal | First owner | First proof |
+| --- | --- | --- |
+| make syntax more expressive | `spec/apg.g4` plus compiler fixtures | `./.venv/bin/apg parser-golden --json` |
+| expose a construct to tools | `compiler/ast_builder.py`, `compiler/semantic_model.py` | `./.venv/bin/apg model <source.apg> --json` |
+| make generated apps more executable | `compiler/code_generator.py` | `./.venv/bin/apg compile <source.apg> --output /tmp/apg-packet --verify` |
+| deepen a capability | `capabilities/<domain>/<code>/` | focused package pytest, implementation audit, publish-plan |
+| build a capacity | `examples/<nn>_<capacity>/` plus owning packages | model, compile, generated smoke test |
+| improve contributor velocity | `docs/`, `cli/`, `tests/` | docs/tooling audit and focused tests |
+
+If a packet needs more than one row, write down the dependency order before
+editing. The usual order is grammar, AST, semantic model, generator, package,
+example, documentation.
+
+The first developer artifact should be a short packet note:
+
+```text
+Packet:
+Why it matters:
+Public contract:
+Owner:
+Proof before:
+Proof after:
+Docs or progress-log update:
+Not in this packet:
+```
+
+Keep this note in the local README, package spec, progress log, or commit body.
+Do not leave it only in chat.
+
 ## Immediate Effectiveness Contract
 
 APG development is effective when every change moves one observable contract

@@ -16,6 +16,33 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 19:38 EAT
+
+Developer, contributor, and capacity guide effectiveness slice:
+
+- Strengthened `docs/developer_guide.md` with a top-level one-packet runbook
+  that gives new APG developers baseline commands, owner/proof choices, and a
+  packet note template before they edit grammar, compiler, generator,
+  capability, capacity, tooling, or documentation surfaces.
+- Strengthened `docs/contributors_guide.md` with an immediate contributor
+  runbook that takes a first-time contributor from `git status`, `uv sync`, docs
+  audit, example compile, and generated smoke proof into one scoped
+  contribution class, work-packet note, focused proof, and Lore commit.
+- Strengthened `docs/capacity_development_guide.md` with an executable-thread
+  start path for building new capacities from one business event through APG
+  source, semantic JSON, generated Python, package-owned behavior, proof, and
+  handoff artifacts.
+
+Battery-conscious verification:
+
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` passed with no
+  whitespace errors.
+- `./.venv/bin/apg docs audit --json` passed with all required documentation
+  present, no broken local links, and no unknown documented APG commands.
+- Not run: full repository test suite, because this was a documentation-only
+  contributor-effectiveness slice.
+
 ### 2026-05-29 18:42 EAT
 
 SCRP scraper/data-harvesting runtime implementation-depth slice:

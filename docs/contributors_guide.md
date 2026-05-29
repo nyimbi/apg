@@ -7,6 +7,52 @@ leave the repository easier for the next contributor.
 The contribution rule is simple: make one current APG state more executable,
 prove it with commands, document the evidence, and commit only that slice.
 
+## Immediate Contributor Runbook
+
+Use this runbook for the first contribution, even if you do not yet understand
+the whole APG platform.
+
+1. Inspect local state:
+
+   ```bash
+   git status --short
+   ```
+
+2. Prove the contributor baseline:
+
+   ```bash
+   uv sync
+   ./.venv/bin/apg docs audit --json
+   ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-contributor-baseline --verify
+   ./.venv/bin/python /tmp/apg-contributor-baseline/smoke_test.py
+   ```
+
+3. Choose one contribution class:
+
+   | Class | Edit scope | Proof |
+   | --- | --- | --- |
+   | docs correction | one guide or README | `./.venv/bin/apg docs audit --json` |
+   | example readiness | one `examples/<nn>_*/` directory | model, compile, smoke test |
+   | capability deepening | one `capabilities/<domain>/<code>/` package | package pytest, implementation audit, publish-plan |
+   | compiler exposure | one compiler layer plus fixture/example | focused test and `apg model` |
+   | tooling reliability | one CLI/audit surface | relevant `apg ... --json` command |
+
+4. Write the work packet before editing:
+
+   ```text
+   I will improve:
+   I will edit:
+   I will prove it with:
+   I will update:
+   I will not touch:
+   ```
+
+5. Make the change, rerun the proof, stage only the packet, and commit with
+   Lore trailers.
+
+This runbook deliberately avoids broad repository reading. Your first useful
+job is to make one checked-in fact easier to execute, verify, or continue.
+
 ## Contributor Effectiveness Pact
 
 APG welcomes contributions that are small, executable, and easy to continue.

@@ -9,6 +9,59 @@ Use this guide when the goal is to make APG able to do something new, such as
 procurement approval, ledger posting, customer onboarding, device management,
 agentic operations, or integration monitoring.
 
+## Start With One Executable Thread
+
+A capacity starts when one real event can move through source, semantic model,
+generated Python, package behavior, and proof. Do not begin by designing a
+whole ERP module. Begin with one event that a user, system, workflow, agent, or
+stream can trigger.
+
+Use this thread:
+
+```text
+business event
+  -> APG source in examples/<nn>_<capacity>/main.apg
+  -> semantic JSON from apg model
+  -> generated Python from apg compile --verify
+  -> package-owned durable behavior
+  -> focused package or generated smoke proof
+  -> README, cap_spec, and progress-log handoff
+```
+
+The first two hours of capacity work should produce these artifacts:
+
+| Artifact | Minimum result |
+| --- | --- |
+| event statement | one sentence naming the trigger and observable result |
+| APG source | parseable `main.apg` with records, rules, screens, workflows, agents, streams, or capability references as needed |
+| semantic proof | `./.venv/bin/apg model examples/<nn>_<capacity>/main.apg --json` exposes the intended public names |
+| runtime proof | `./.venv/bin/apg compile ... --output /tmp/apg-<capacity> --verify` and generated `smoke_test.py` pass |
+| package map | durable behavior maps to one or more `capabilities/<domain>/<code>/` packages |
+| handoff | README names readiness, proof commands, owners, gaps, and next slice |
+
+Write the seed before implementation:
+
+```text
+Capacity:
+First event:
+Observable result:
+Primary actor:
+Tenant/security boundary:
+Records:
+Rules:
+Screens:
+Workflow states:
+AI agents:
+Bytewax streams:
+Capability owners:
+Proof commands:
+Next slice:
+```
+
+This seed is the shared contract for parallel work. Grammar, compiler,
+generator, package, UI, agent, stream, and documentation contributors can move
+quickly only when these names stay stable.
+
 ## Capacity Development Principle
 
 A capacity is not a feature list. It is a rerunnable path from one event to one
