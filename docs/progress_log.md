@@ -16,6 +16,44 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 07:05 EAT
+
+Direct checked-output runtime baseline slice:
+
+- Extended `apg.compiler-baseline-report.v1` so the compiler baseline now runs
+  each checked-in numbered example `output/app.py --self-test` and
+  `output/smoke_test.py` directly, in addition to temporary compiler output
+  runtime checks.
+- Added `checked_output_runtime_ok` per example plus aggregate
+  `checked_output_runtime_passed` and `checked_output_runtime_failed` summary
+  counts.
+- Updated tooling and developer documentation so checked-in example outputs are
+  treated as runnable application evidence, not only synchronized generated
+  files.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/baseline.py
+  tests/test_compiler_baseline.py` -> passed.
+- `./.venv/bin/pytest -q
+  tests/test_compiler_baseline.py::test_cli_baseline_json_audits_numbered_examples
+  tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler`
+  -> 2 passed.
+- `./.venv/bin/apg baseline examples --json` -> passed with 20/20 examples, 20
+  current output directories, 20 checked-output runtime passes, 0 checked-output
+  runtime failures, and 0 generated-source hygiene violations.
+- `./.venv/bin/apg tooling audit --json` -> passed with 18/18 surfaces, 20
+  checked-output runtime passes in the compiler baseline surface, 0
+  checked-output runtime failures, 0 blocking gaps, and 0 errors.
+- `git diff --check -- compiler/baseline.py tests/test_compiler_baseline.py
+  docs/tooling.md docs/developer_guide.md docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- The direct runtime proof is still scoped to self-test and smoke-test commands.
+  Full HTTP interaction tests for every generated route remain a larger future
+  gate.
+
 ### 2026-05-29 07:00 EAT
 
 Checked-in example output synchronization slice:

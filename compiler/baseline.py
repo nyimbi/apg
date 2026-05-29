@@ -98,6 +98,22 @@ def build_compiler_baseline_report(
 				.get("ok")
 				is False
 			),
+			"checked_output_runtime_passed": sum(
+				1
+				for example in example_reports
+				if example.get("compile_verify", {})
+				.get("checked_output_runtime", {})
+				.get("ok")
+				is True
+			),
+			"checked_output_runtime_failed": sum(
+				1
+				for example in example_reports
+				if example.get("compile_verify", {})
+				.get("checked_output_runtime", {})
+				.get("ok")
+				is False
+			),
 			"graph_kinds": list(SUPPORTED_GRAPH_KINDS),
 		},
 		"examples": [
@@ -159,6 +175,7 @@ def _audit_example(source: Path, refresh_outputs: bool = False) -> dict[str, Any
 		"compile_verify_ok": compile_verify.get("ok") is True,
 		"generated_source_hygiene_ok": compile_verify.get("source_hygiene", {}).get("ok") is True,
 		"checked_output_current": compile_verify.get("output_sync", {}).get("ok") is True,
+		"checked_output_runtime_ok": compile_verify.get("checked_output_runtime", {}).get("ok") is True,
 	}
 	return {
 		"name": source.parent.name,
@@ -189,6 +206,9 @@ def _compile_verify_in_temp(source: Path, refresh_outputs: bool = False) -> dict
 	output_sync = _checked_output_sync(source.parent / "output", result.generated_files)
 	if not output_sync["ok"]:
 		errors.extend(output_sync["violations"])
+	checked_output_runtime = _run_generated_runtime_checks(source.parent / "output")
+	if not checked_output_runtime["ok"]:
+		errors.extend(checked_output_runtime["errors"])
 
 	with tempfile.TemporaryDirectory(prefix="apg-baseline-") as temporary_dir_name:
 		output_dir = Path(temporary_dir_name)
@@ -196,29 +216,9 @@ def _compile_verify_in_temp(source: Path, refresh_outputs: bool = False) -> dict
 			file_path = output_dir / file_name
 			file_path.parent.mkdir(parents=True, exist_ok=True)
 			file_path.write_text(content, encoding="utf-8")
-		for label, command in (
-			("self-test", [sys.executable, "app.py", "--self-test"]),
-			("smoke-test", [sys.executable, "smoke_test.py"]),
-		):
-			completed = subprocess.run(
-				command,
-				cwd=output_dir,
-				check=False,
-				capture_output=True,
-				text=True,
-			)
-			if completed.returncode != 0:
-				errors.append(
-					f"{label} exited {completed.returncode}: "
-					f"{completed.stdout.rstrip()} {completed.stderr.rstrip()}".strip()
-				)
-				return {
-					"ok": False,
-					"generated_file_count": len(result.generated_files),
-					"errors": errors,
-					"source_hygiene": source_hygiene,
-					"output_sync": output_sync,
-				}
+		temp_runtime = _run_generated_runtime_checks(output_dir)
+		if not temp_runtime["ok"]:
+			errors.extend(temp_runtime["errors"])
 
 	return {
 		"ok": not errors,
@@ -226,6 +226,48 @@ def _compile_verify_in_temp(source: Path, refresh_outputs: bool = False) -> dict
 		"errors": errors,
 		"source_hygiene": source_hygiene,
 		"output_sync": output_sync,
+		"runtime": temp_runtime,
+		"checked_output_runtime": checked_output_runtime,
+	}
+
+
+def _run_generated_runtime_checks(output_dir: Path) -> dict[str, Any]:
+	if not output_dir.exists():
+		return {
+			"ok": False,
+			"output_dir": str(output_dir),
+			"checks": [],
+			"errors": [f"{output_dir}: output directory is missing"],
+		}
+	checks: list[dict[str, Any]] = []
+	errors: list[str] = []
+	for label, command in (
+		("self-test", [sys.executable, "app.py", "--self-test"]),
+		("smoke-test", [sys.executable, "smoke_test.py"]),
+	):
+		completed = subprocess.run(
+			command,
+			cwd=output_dir,
+			check=False,
+			capture_output=True,
+			text=True,
+		)
+		check = {
+			"label": label,
+			"returncode": completed.returncode,
+			"ok": completed.returncode == 0,
+		}
+		checks.append(check)
+		if completed.returncode != 0:
+			errors.append(
+				f"{output_dir}: {label} exited {completed.returncode}: "
+				f"{completed.stdout.rstrip()} {completed.stderr.rstrip()}".strip()
+			)
+	return {
+		"ok": not errors,
+		"output_dir": str(output_dir),
+		"checks": checks,
+		"errors": errors,
 	}
 
 
