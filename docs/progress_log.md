@@ -16,6 +16,78 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 17:21 EAT
+
+PLGN implementation-depth slice:
+
+- Converted `plgn` from a materialized-baseline package into a domain-specific
+  plugin and extension governance runtime package.
+- Added executable tenant-scoped plugin manifests, permission reviews, sandbox
+  policies, marketplace listings, plugin releases, installations, enablement,
+  audit events, dashboard summaries, and contract-rule evaluation.
+- Added `plugin_runtime.py` as the PLGN-specific algorithm surface for stable
+  IDs, release-channel validation, install-policy validation, permission-scope
+  normalization, sensitive-scope detection, manifest readiness, and release
+  readiness so package behavior is no longer generic record scaffolding.
+- Replaced generic package API and view helpers with plugin-governance helpers
+  for plugin registration, permission review, sandbox policy attachment,
+  marketplace listing, release creation, installation, enablement, dashboard,
+  marketplace, registry, review, sandbox, release-manager, governance, routes,
+  rules, and theme metadata.
+- Rewrote `cap_spec.md` to describe current executable behavior, runtime
+  surfaces, guardrails, adapter boundaries, UI surfaces, theme contract, and
+  focused verification commands.
+- Expanded focused tests for the plugin-to-enable lifecycle, marketplace
+  publish path, permission and sandbox view models, compatibility records, and
+  policy failures for missing tenant context, owner, signatures, permission
+  review, external review, schema validation, incomplete reviews, sensitive
+  permissions, uncurated listings, missing sandbox policy, and admin-only
+  installs.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/plgn/__init__.py
+  capabilities/common/plgn/models.py capabilities/common/plgn/plugin_runtime.py
+  capabilities/common/plgn/service.py capabilities/common/plgn/api.py
+  capabilities/common/plgn/views.py
+  capabilities/common/plgn/test_capability_contract.py
+  capabilities/common/plgn/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/pytest -q capabilities/common/plgn/test_capability_contract.py
+  capabilities/common/plgn/tests` -> 9 passed with 10 pre-existing adjacent
+  SQLAlchemy/Pydantic deprecation warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|Materialized capability package"
+  capabilities/common/plgn` -> no matches.
+- `./.venv/bin/python -c "import importlib; ..."` for
+  `capabilities.common.plgn.models`, `plugin_runtime`, `service`, `api`, and
+  `views` -> passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/plgn --json` -> passed with `plgn` classified as
+  `domain_specific`, `plugin_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/plgn --json`
+  -> passed with a side-effect-free catalog patch and no warnings.
+- `./.venv/bin/apg hygiene audit --json` -> passed with 17/17 hygiene checks,
+  0 violations, and 0 tracked-file hygiene failures.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  89 domain-specific packages, 18 materialized-baseline packages, 1 mixed
+  package, 1 contract-only package, 904 custom Python files, 0 errors, and 20
+  warnings; next warning is `pred`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 61
+  local links, 49 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+
+Known remaining gaps:
+
+- `plgn` is now domain-specific, but implementation-depth still reports 18
+  materialized baselines, 1 mixed implementation, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is
+  `pred`.
+
 ### 2026-05-29 15:28 EAT
 
 IDFD implementation-depth slice:
