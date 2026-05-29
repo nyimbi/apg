@@ -8,6 +8,40 @@ applications, tests, docs, and release evidence.
 Use this guide when the goal is "make APG able to do something new", not merely
 "add a file".
 
+## Build One Executable Thread First
+
+Start every capacity with one event that can travel through APG source,
+generated Python, package-backed behavior, and evidence.
+
+```text
+business event
+  -> APG records/rules/screens/workflows/agents
+  -> semantic model
+  -> generated Python app
+  -> capability package behavior
+  -> focused proof
+  -> progress-log handoff
+```
+
+Do not begin with a broad module list. Begin with the smallest event that proves
+the capacity matters:
+
+| Capacity | First event | First proof |
+| --- | --- | --- |
+| Procurement | request submitted -> rule decision -> approval queue | compile example, smoke route, package rule test |
+| Finance | journal entered -> validation -> posting summary | semantic model, generated app, ledger service test |
+| CRM | lead captured -> qualification rule -> owner assignment | model output, generated screen, package workflow test |
+| AI operations | task assigned -> agent plan -> governed tool decision | agent semantic model, generated manifest, rule test |
+| Streaming | source event -> Bytewax flow metadata -> alert route | model graph, compile, stream metadata assertion |
+
+The first slice is successful when another contributor can answer:
+
+- where the APG source lives;
+- what generated artifact proves it exists;
+- which package owns durable behavior;
+- what rule or workflow protects correctness;
+- which command they should run before extending it.
+
 ## Capacity And Capability
 
 A **capability** is a composable unit with a contract: services provided,

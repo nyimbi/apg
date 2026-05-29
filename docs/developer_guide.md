@@ -9,6 +9,37 @@ repository, run one reliable baseline, choose the right implementation surface,
 make a vertical slice executable, prove it, document it, and commit it without
 waiting for tribal knowledge.
 
+## Start Here
+
+If you have just joined APG, do not begin by reading every directory. Run one
+baseline, choose one owning layer, and make one verified packet.
+
+```bash
+git status --short
+./.venv/bin/apg --help
+./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-start --verify
+./.venv/bin/python /tmp/apg-start/smoke_test.py
+```
+
+Then pick exactly one packet:
+
+| Packet | Start in | Prove with |
+| --- | --- | --- |
+| Make APG syntax executable | `spec/apg.g4`, `compiler/ast_builder.py`, `compiler/semantic_analyzer.py`, `compiler/semantic_model.py`, `compiler/code_generator.py` | focused parser/semantic/generator tests and `apg compile ... --verify` |
+| Deepen one capability | `capabilities/<domain>/<code>/` | package tests, `apg capabilities implementation-audit --json`, `apg capabilities publish-plan ... --json` |
+| Build one capacity | `examples/<nn>_<capacity>/`, related packages, docs | `apg model`, `apg compile --verify`, smoke test, package audit when package-backed |
+| Improve contributor flow | `docs/`, examples, focused fixture docs | `apg docs audit --json` and `git diff --check` |
+
+Every packet must name:
+
+- the outcome that becomes more executable;
+- the public contract being changed or preserved;
+- the files that own the change;
+- the command that proves the change;
+- the next gap left for another contributor.
+
+If a packet cannot name those five things, narrow it before editing.
+
 ## Current Development North Star
 
 APG should rapidly produce executable Python applications from terse, readable

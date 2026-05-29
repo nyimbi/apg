@@ -7,6 +7,50 @@ The contribution rule is simple: make one useful final state more true in the
 current repository, prove it with evidence, document it, and commit a reviewable
 slice.
 
+## Immediate Contributor Path
+
+Use this path when you want to become useful quickly.
+
+1. Check the worktree and leave unrelated files alone.
+
+   ```bash
+   git status --short
+   ```
+
+2. Prove the local APG CLI can generate an executable app.
+
+   ```bash
+   ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-contributor --verify
+   ./.venv/bin/python /tmp/apg-contributor/smoke_test.py
+   ```
+
+3. Choose one contribution class:
+
+   | Class | Good first target | Evidence |
+   | --- | --- | --- |
+   | Compiler | one semantic-model or generated-runtime assertion | focused compiler test and `apg compile ... --verify` |
+   | Capability | one materialized package converted to domain behavior | package tests, implementation audit, publish-plan |
+   | Capacity | one example that compiles and documents its generated output | model, compile, smoke test, README update |
+   | Tooling/docs | one exact command, audit, or guide improvement | docs audit, tooling audit, diff check |
+
+4. Write the packet before editing:
+
+   ```text
+   Outcome:
+   Owning files:
+   Public contract:
+   Verification:
+   Progress-log entry:
+   Non-goals:
+   ```
+
+5. Make the smallest vertical change, run the proof, update the progress log
+   when evidence changed, then commit and push only that slice.
+
+The fastest contributors are not the ones who touch the most files. They are the
+ones who leave the next contributor with fewer unknowns and a command that
+proves the current state.
+
 ## What APG Is
 
 APG is a Python-first application generation platform built around a terse,

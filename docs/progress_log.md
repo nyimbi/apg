@@ -10359,3 +10359,16 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- capabilities/common/cons/__init__.py capabilities/common/cons/models.py capabilities/common/cons/privacy_engine.py capabilities/common/cons/service.py capabilities/common/cons/api.py capabilities/common/cons/views.py capabilities/common/cons/test_capability_contract.py capabilities/common/cons/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-29 10:21 EAT
+
+Developer, contributor, and capacity guide immediate-effectiveness slice:
+
+- Added a `Start Here` section to `docs/developer_guide.md` with baseline commands, packet choices, proof commands, and the five facts every APG packet must name.
+- Added an `Immediate Contributor Path` to `docs/contributors_guide.md` so new contributors can prove the local CLI, choose a contribution class, write a packet, verify it, update the progress log, and commit only that slice.
+- Added a `Build One Executable Thread First` section to `docs/capacity_development_guide.md` that forces capacity work to start from one business event and carry it through APG source, semantic model, generated Python, package behavior, proof, and handoff.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
