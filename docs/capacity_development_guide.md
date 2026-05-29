@@ -1,83 +1,89 @@
 # APG Capacity Development Guide
 
-This guide explains how to build new APG capacities: coherent units of platform
-or business ability that may contain one or more APG capabilities, generated
-application surfaces, rules, screens, workflows, agents, tests, docs, and
-release evidence.
+This guide explains how to build new APG capacities: coherent platform or
+business abilities that combine APG source, capability packages, configuration,
+rules, screens, workflows, AI agents, streaming metadata, generated Python
+applications, tests, docs, and release evidence.
 
-Use this guide when the goal is not merely "add a file" but "make APG able to
-do something new."
+Use this guide when the goal is "make APG able to do something new", not merely
+"add a file".
 
-## Capacity Versus Capability
+## Capacity And Capability
 
-In this repository:
+A **capability** is a composable unit with a contract: services provided,
+services required, configuration, rules, UI routes, theme, tenant behavior, and
+tests.
 
-- A **capability** is a composable APG unit with a contract, provided services,
-  dependencies, configuration, rules, UI, theme, and optional i18n/streaming.
-- A **capacity** is a larger executable ability APG can demonstrate and evolve.
-  A capacity may require several capabilities, language support, generated app
-  behavior, CLI tooling, examples, and documentation.
+A **capacity** is an executable ability built from one or more capabilities plus
+the language/runtime surfaces needed to demonstrate it.
 
 Example:
 
 ```text
 Capacity: Procurement approval automation
-  Capability: Purchase request intake
-  Capability: Approval policy engine
-  Capability: Supplier audit trail
-  Workflow: draft -> review -> approved -> ordered
+  Records: PurchaseRequest, Supplier, BudgetCheck
+  Capability: ProcurementApproval
+  Capability: SupplierMaster
+  Capability: PlatformAudit
+  Rules: supplier_required, amount_positive, large_request_review
   Screen: ProcurementApprovalWorkbench
+  Workflow: draft -> review -> approved -> ordered
   Agent: ProcurementPlanner
-  Example: examples/13_procurement_approval_workbench
-  Evidence: compile --verify, generated smoke test, release evidence
+  Streaming: Bytewax procurement_events -> procurement_alerts
+  Evidence: compile --verify, generated smoke test, capability contract validation
 ```
 
-Build capacities as vertical slices. Each slice should become executable before
-the next slice expands scope.
+Build capacities as vertical slices. Each slice should be executable before the
+next slice expands scope.
 
-## Capacity Development Lifecycle
+## Capacity Lifecycle
 
-1. Define the capacity outcome.
-2. Identify the minimum capability set.
-3. Model data records.
+1. Define the outcome.
+2. Choose capability boundaries.
+3. Model records.
 4. Define capability contracts.
 5. Add deterministic rules.
-6. Add screens and UI relationships.
-7. Add workflows where process state matters.
-8. Add AI agents where model-backed work is valuable.
-9. Add streaming with Bytewax where event flow matters.
-10. Compose the application shell.
-11. Compile and verify generated output.
-12. Add package/release evidence when ready.
-13. Document and log progress.
+6. Add screens and element relationships.
+7. Add workflows for stateful processes.
+8. Add AI agents for model-backed work.
+9. Add Bytewax streaming metadata where event flow matters.
+10. Compose the generated application shell.
+11. Compile and verify.
+12. Add focused tests.
+13. Document the capacity and update the progress log.
+14. Commit and push the verified slice.
 
-## Step 1: Define The Outcome
+## 1. Define The Outcome
 
 Write one concrete sentence:
 
 ```text
 This capacity lets a generated APG app receive purchase requests, validate
-budget and supplier rules, route approvals, record audit events, and expose a
+supplier and amount rules, route approvals, record audit events, and expose a
 procurement workbench screen.
 ```
 
-Then define:
+Then list:
 
-- primary users
-- business records
-- decisions and rules
-- workflows
-- screens
-- required integrations
-- tenant and security boundaries
-- success evidence
+- primary users;
+- records and ownership;
+- services provided;
+- services required;
+- deterministic rules;
+- workflows and states;
+- screens and actions;
+- AI-assisted work;
+- streaming events;
+- tenant/security boundaries;
+- verification evidence.
 
 If the outcome cannot be observed in generated code, CLI output, tests, or docs,
-it is not yet concrete enough.
+it is not concrete enough.
 
-## Step 2: Choose The Capability Boundary
+## 2. Choose Capability Boundaries
 
-Start with one core capability. Add more only when ownership differs.
+Start with one core capability. Split only when ownership, lifecycle, or
+dependency direction differs.
 
 Good boundaries:
 
@@ -95,17 +101,18 @@ Weak boundaries:
 - `Helper`
 - `Integration`
 
-Ask:
+Boundary questions:
 
-- What services does it provide?
+- What services does this capability provide?
 - What services does it require?
 - What data does it own?
 - What rules does it enforce?
 - What UI does it expose?
 - What theme tokens does it need?
 - What events does it publish or consume?
+- What tenant context is mandatory?
 
-## Step 3: Model Records
+## 3. Model Records
 
 Use APG tables for durable records:
 
@@ -126,46 +133,26 @@ table Supplier {
 }
 ```
 
-Keep early tables small. Add fields when a rule, screen, workflow, or API needs
-them.
+Keep early records small. Add fields when a rule, screen, workflow, API, or
+test needs them.
 
-## Step 4: Define Capability Contracts
+## 4. Define Capability Contracts
 
-For a package-backed capability, start with the scaffold command:
-
-```bash
-./.venv/bin/apg capabilities scaffold common demo --name "Demo Capacity" --json
-```
-
-That creates a spec-backed package under `capabilities/common/demo/` with
-`cap_spec.md`, `capability_contract.py`, dependency-light `models.py`,
-`service.py`, `api.py`, `views.py`, `app.py`, `semantic_model.json`,
-`package_manifest.json`, `release_report.json`, and contract tests. The
-generated service is executable immediately: it supports tenant-scoped
-in-memory records, rule-guarded create/update operations, API helper functions,
-and a dashboard view model. The generated contract is valid against APG's
-registry shape before you add domain-specific behavior, and the package is
-ready for side-effect-free publish planning:
+For package-backed capabilities, start with the scaffold:
 
 ```bash
-./.venv/bin/apg capabilities publish-plan capabilities/common/demo --json
-./.venv/bin/apg capabilities publish-apply capabilities/common/demo \
-  --catalog /tmp/apg-capability-catalog.json --dry-run --json
-./.venv/bin/apg capabilities publish-apply capabilities/common/demo \
-  --catalog /tmp/apg-capability-catalog.json --json
-./.venv/bin/apg capabilities catalog /tmp/apg-capability-catalog.json --json
+./.venv/bin/apg capabilities scaffold procurement approvals --name "Procurement Approvals" --json
 ```
 
-Once the package lives under `capabilities/`, inspect and execute the rule
-contract directly:
+Move or create the package under `capabilities/<domain>/<code>/`, then validate:
 
 ```bash
-./.venv/bin/apg capabilities inspect common_demo --json
-./.venv/bin/apg capabilities evaluate-rules common_demo \
-  --context-json '{"tenant_context_present": false}' --json
+./.venv/bin/python -m pytest -q capabilities/procurement/approvals/tests
+./.venv/bin/apg capabilities validate-contracts --json
+./.venv/bin/apg capabilities inspect procurement_approvals --json
 ```
 
-Minimum contract:
+A minimum APG source contract shape:
 
 ```apg
 capability ProcurementApproval {
@@ -198,14 +185,14 @@ Contract quality checks:
 - `id` is stable snake_case.
 - `provides` names business services.
 - `requires` names dependencies, not implementation guesses.
-- `configuration` has safe local defaults.
-- `configuration_schema` includes tenant context for tenant-sensitive behavior.
-- `rules` are named.
-- `ui` and `theme` exist.
+- configuration has safe local defaults.
+- configuration schema includes tenant context when tenant-sensitive.
+- rules are named and deterministic.
+- UI and theme contracts exist.
 
-## Step 5: Add Rules
+## 5. Add Rules
 
-Prefer deterministic rule strings over prose.
+Rules should be deterministic and testable:
 
 ```apg
 rules: [
@@ -216,18 +203,18 @@ rules: [
 ];
 ```
 
-Move complex external checks behind dependencies:
+Use dependency capabilities for external checks:
 
-- `supplier_master`
-- `budget_control`
-- `audit_events`
-- `identity_access`
+- `supplier_master`;
+- `budget_control`;
+- `audit_events`;
+- `identity_access`.
 
-Do not put external API calls inside rule strings.
+Do not put network calls or external API behavior inside rule strings.
 
-## Step 6: Add Screens
+## 6. Add Screens And Relationships
 
-Screens make the capacity inspectable and operable.
+Screens make a capacity inspectable and operable:
 
 ```apg
 screens: {
@@ -248,21 +235,12 @@ screens: {
 };
 ```
 
-A good screen declares:
+A good screen declares route, title, layout, contained elements, composed
+elements, bindings, actions, events, and relationships.
 
-- route
-- title
-- layout
-- contained elements
-- composed elements
-- data bindings
-- actions
-- events
-- relationships
+## 7. Add Workflows
 
-## Step 7: Add Workflows
-
-Use workflows for stateful business processes.
+Use workflows when process state matters:
 
 ```apg
 workflow ProcurementApprovalFlow {
@@ -276,13 +254,13 @@ workflow ProcurementApprovalFlow {
 }
 ```
 
-Generated workflow behavior supports deterministic step chains, guards, waits,
-retries, durable run state, resume, and compensation recording.
+Generated workflow behavior should expose deterministic step chains, guards,
+waits, retries, run state, resume, and compensation recording.
 
-## Step 8: Add AI Agents
+## 8. Add AI Agents
 
-Use AI agents for work that benefits from model-backed planning, review,
-summarization, classification, or code/tool orchestration.
+Use AI agents for model-backed planning, review, summarization,
+classification, or tool orchestration:
 
 ```apg
 agent ProcurementPlanner {
@@ -302,16 +280,16 @@ agent ProcurementPlanner {
 
 Agent standards:
 
-- Declare `model`.
-- Declare `role` or `system`.
-- Keep provider details in adapters.
-- Use known runtimes such as `codex`, `claude_code`, `opencode`, `pi`,
-  `openai`, `ollama`, or a custom adapter identifier.
-- Keep deterministic governance outside the model when possible.
+- declare `model`;
+- declare `role` or `system`;
+- keep provider details in adapters;
+- use runtime identifiers such as `codex`, `claude_code`, `opencode`, `pi`,
+  `openai`, or `ollama`;
+- keep deterministic governance outside the model where possible.
 
-## Step 9: Add Bytewax Streaming
+## 9. Add Bytewax Streaming
 
-Use streaming when the capacity needs event processing:
+Use Bytewax when the capacity needs event processing:
 
 ```apg
 streaming: {
@@ -325,12 +303,12 @@ streaming: {
 
 Standards:
 
-- Use `processor: bytewax`.
-- Name input, output, and state explicitly.
-- Treat external brokers as integration capabilities.
-- Do not switch APG internal stream semantics to a broker-first runtime.
+- use `processor: bytewax`;
+- name input, output, and state explicitly;
+- treat external brokers as integration capabilities;
+- do not make APG internal stream semantics broker-first.
 
-## Step 10: Compose The App
+## 10. Compose The Application
 
 The application shell proves the capacity can be assembled:
 
@@ -353,20 +331,20 @@ app ProcurementOperationsApp {
 }
 ```
 
-## Step 11: Compile And Verify
+## 11. Compile And Verify
 
-Use a temp output directory:
+Use a temporary output directory:
 
 ```bash
 ./.venv/bin/apg compile path/to/capacity.apg --output /tmp/apg-capacity --verify
-python /tmp/apg-capacity/smoke_test.py
-python /tmp/apg-capacity/app.py --self-test
+./.venv/bin/python /tmp/apg-capacity/smoke_test.py
+./.venv/bin/python /tmp/apg-capacity/app.py --self-test
 ```
 
 Inspect generated surfaces:
 
 ```bash
-python - <<'PY'
+./.venv/bin/python - <<'PY'
 import sys
 sys.path.insert(0, "/tmp/apg-capacity")
 import app
@@ -377,155 +355,86 @@ print(app.validate_application()["valid"])
 PY
 ```
 
-If the capacity includes packaging/release work:
+If the capacity includes packaging or release evidence:
 
 ```bash
 ./.venv/bin/apg evidence path/to/capacity.apg --target container --out /tmp/apg-evidence --json
 ```
 
-## Step 12: Add Tests
+## 12. Add Focused Tests
 
-Choose tests by what changed.
-
-APG source and generated app:
+Choose tests by the layer changed:
 
 ```bash
 ./.venv/bin/apg compile path/to/capacity.apg --output /tmp/apg-capacity --verify
-```
-
-Capability contracts:
-
-```bash
 ./.venv/bin/apg capabilities validate-contracts --json
 ./.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py
-```
-
-Generated capability runtime:
-
-```bash
-./.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py
-```
-
-Workflow runtime:
-
-```bash
 ./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py
-```
-
-Tooling:
-
-```bash
 ./.venv/bin/apg tooling audit --json
 ```
 
-## Step 13: Document The Capacity
+Do not default to the full repository suite for every capacity slice. Run the
+smallest commands that prove the changed behavior, then broaden verification
+when the slice touches shared compiler or generator contracts.
 
-A capacity doc should state:
+## 13. Document The Capacity
 
-- outcome
-- users
-- records
-- capabilities
-- provided services
-- required services
-- rules
-- workflows
-- screens
-- agents
-- streaming
-- generated routes
-- verification commands
-- known gaps
+A capacity document should state:
 
-If the capacity lives under `examples/`, each example directory needs a
-`README.md` and generated `output/`.
+- outcome;
+- users;
+- records;
+- capabilities;
+- provided and required services;
+- configuration;
+- rules;
+- workflows;
+- screens and relationships;
+- agents;
+- streaming;
+- generated routes and manifests;
+- verification commands;
+- known gaps.
 
-## Example Capacity Skeleton
+If the capacity lives under `examples/`, each example directory needs `main.apg`,
+`README.md`, and generated `output/`.
 
-```apg
-module procurement_capacity version 1.0.0 {
-    description: "Procurement approval capacity";
-}
+## Parallel Delivery
 
-table PurchaseRequest {
-    request_number: str;
-    requester: str;
-    supplier_id: int;
-    amount: decimal;
-    status: str;
-}
+Capacities can be built in parallel when ownership is clear:
 
-capability ProcurementApproval {
-    contract: {
-        id: procurement_approval,
-        provides: [purchase_request_review, approval_routing],
-        requires: [audit_events, supplier_master],
-        configuration: {approval_threshold: 5000, tenant_scoped: true},
-        rules: [
-            {name: "supplier_required", when: "supplier_id missing", action: "deny"},
-            {name: "large_request_review", when: "amount > approval_threshold", action: "require_review"}
-        ],
-        ui: {shell: python},
-        theme: {name: procurement_theme, tokens: {accent: "#174EA6"}}
-    };
-    screens: {
-        ProcurementApprovalWorkbench: {
-            route: "/procurement/approvals",
-            title: "Procurement Approvals",
-            layout: dashboard,
-            contains: [RequestKpis, ApprovalQueue],
-            binds: [purchase_request.status],
-            actions: [approve, reject, escalate],
-            relationships: [RequestKpis -> ApprovalQueue]
-        }
-    };
-    streaming: {processor: bytewax, state: procurement_stream_state};
-}
+| Lane | Owns | Avoid touching |
+| --- | --- | --- |
+| Language/compiler | grammar, AST, semantic model, generator | capability package internals unless needed for fixtures |
+| Capability package | `capabilities/<domain>/<code>/` | shared compiler files |
+| Example/app | `examples/<nn>_*/` | unrelated examples |
+| Tests | focused tests for the slice | broad suite rewrites |
+| Docs | capacity docs, guide updates, progress log | unrelated historical docs |
 
-workflow ProcurementApprovalFlow {
-    steps: str = "draft -> review -> approved";
-    human_tasks: [review];
-    assignments: {review: procurement_manager};
-    guards: {review: "amount > 0"};
-}
+Parallel lanes must agree on public names: capability IDs, provided services,
+routes, workflow names, agent names, and JSON format keys.
 
-agent ProcurementPlanner {
-    role: "procurement analyst";
-    model: "openai:gpt-4.1-mini";
-    runtime: codex;
-    system: "Summarize procurement approval risks.";
-    capabilities: [approval_routing];
-}
-
-app ProcurementOperationsApp {
-    capabilities: [ProcurementApproval];
-    agents: [ProcurementPlanner];
-    workflows: [ProcurementApprovalFlow];
-    routes: ["/procurement/approvals"];
-    runtime: {target: python, streaming: {processor: bytewax}};
-}
-```
-
-## Capacity Acceptance Checklist
+## Acceptance Checklist
 
 A capacity is ready to build on when:
 
 - APG source parses.
 - `apg compile --verify` passes.
-- Generated `smoke_test.py` passes.
-- Generated app exposes expected entities, capabilities, workflows, screens,
+- generated `smoke_test.py` passes.
+- generated app exposes expected entities, capabilities, workflows, screens,
   routes, and manifests.
-- Capability contracts have named `provides`, `requires`, rules, UI, and theme.
-- Rules are deterministic and named.
-- Screens declare relationships.
-- Workflows declare executable steps.
-- Agents declare model and runtime.
-- Streaming uses Bytewax when present.
-- Tests cover the changed behavior.
-- Documentation explains how to use and extend the capacity.
+- capability contracts have named provides, requires, configuration, rules, UI,
+  and theme.
+- rules are deterministic and named.
+- screens declare relationships.
+- workflows declare executable steps.
+- agents declare model and runtime.
+- streaming uses Bytewax when present.
+- focused tests cover the changed behavior.
+- documentation explains how to use and extend the capacity.
 - `docs/progress_log.md` records verification evidence.
 
-## Capacity Expansion Patterns
+## Expansion Order
 
 Expand a capacity in this order:
 
@@ -537,20 +446,20 @@ Expand a capacity in this order:
 6. Add agents.
 7. Add streaming.
 8. Add app composition.
-9. Add package/release evidence.
+9. Add package and release evidence.
 10. Add docs and tests.
 
 This order keeps each step inspectable and executable.
 
-## Capacity Anti-Patterns
+## Anti-Patterns
 
 Avoid:
 
-- one giant capability for an entire ERP domain
-- rules without names
-- screens without routes
-- agents without models
-- hidden external services
-- grammar changes without codegen or semantic model follow-through
-- generated app behavior that is not visible in OpenAPI or component manifests
-- docs that describe unimplemented behavior as current
+- one giant capability for an entire ERP domain;
+- rules without names;
+- screens without routes;
+- agents without models;
+- hidden external services;
+- grammar changes without semantic-model follow-through;
+- generated behavior not visible in OpenAPI, component manifests, or tests;
+- docs that describe unimplemented behavior as current.

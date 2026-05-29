@@ -5,19 +5,28 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 ## Overview
 
-The Application Program Generator (APG) is a comprehensive, production-ready platform for building enterprise applications through a powerful Domain-Specific Language (DSL) and composable capability system. APG combines modern software architecture patterns with AI-driven automation to deliver scalable, maintainable applications.
+The Application Program Generator (APG) is a Python-first application generation
+platform built around a terse, readable DSL, a compiler, generated Python
+application artifacts, and a composable capability system. The current
+engineering priority is closing the gap between intended APG platform behavior
+and executable, verified repository behavior.
 
-## 🚀 Key Features
+## Key Features
 
-- **Production-Ready Implementation**: All capabilities are fully implemented with real SDKs and production-grade code
-- **Composable Architecture**: Modular capability system for flexible application composition  
-- **AI-Powered Orchestration**: Intelligent workflow automation and optimization
-- **Cross-Platform Mobile Apps**: BeeWare-based Python mobile applications
-- **Real-Time Collaboration**: WebRTC, WebSocket, and multi-protocol real-time features
-- **Blockchain Integration**: Smart contract deployment, DeFi operations, and Web3 functionality
-- **Federated Learning**: Production-ready distributed machine learning capabilities
-- **Advanced Security**: Biometric authentication, MFA, role-based access control
-- **Comprehensive Monitoring**: Real-time metrics, performance optimization, and predictive analytics
+- **APG DSL and Compiler**: Parse `.apg` source, build a semantic model, and
+  generate dependency-light Python application artifacts.
+- **Composable Capabilities**: Define package-backed capabilities with
+  configuration, deterministic rules, UI contracts, theme tokens, tests, and
+  publish-plan evidence.
+- **AI Agent Composition**: Model AI agents and adapter runtimes as first-class
+  application components.
+- **Screens, Workflows, and Rules**: Express business records, UI composition,
+  stateful workflows, and rule contracts in APG source.
+- **Tooling Evidence**: Use CLI commands for linting, validation, formatting,
+  graphs, release evidence, packaging, language-server checks, Studio
+  projections, and aggregate tooling audits.
+- **Examples and Capacity Development**: Build from numbered examples toward
+  executable ERP and platform capacities.
 
 ## 📚 Documentation Structure
 
@@ -43,9 +52,9 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 - [Marketplace Microservices Guide](./marketplace_microservices_guide.md) - Marketplace service design and integration
 
 ### Development
-- [Developer Guide](./developer_guide.md) - How to change APG grammar, compiler, generator, CLI, tooling, language server, Studio, examples, tests, and docs
-- [Contributors Guide](./contributors_guide.md) - Contribution workflow, evidence standards, testing expectations, commit protocol, and review checklist
-- [Capacity Development Guide](./capacity_development_guide.md) - How to build new APG capacities from records, capabilities, rules, screens, workflows, agents, Bytewax streaming, tests, and docs
+- [Developer Guide](./developer_guide.md) - Immediate developer onboarding for changing APG grammar, compiler, generator, CLI, tooling, language server, Studio, examples, tests, and docs
+- [Contributors Guide](./contributors_guide.md) - First-30-minutes setup, contribution workflow, evidence standards, testing expectations, commit protocol, and review checklist
+- [Capacity Development Guide](./capacity_development_guide.md) - How to build new executable APG capacities from records, capabilities, rules, screens, workflows, agents, Bytewax streaming, tests, and docs
 - [Repository Hygiene](./repository_hygiene.md) - Canonical root, docs, tests, reports, examples, generated-output, and local-artifact placement rules
 - [API Reference](./api/README.md) - Complete API documentation
 - [Goal Progress Log](./progress_log.md) - Durable progress, verification evidence, and next work for the active APG closure goal
@@ -71,39 +80,38 @@ The Application Program Generator (APG) is a comprehensive, production-ready pla
 
 ## 🏗️ System Requirements
 
-### Minimum Requirements
-- Python 3.9+
-- PostgreSQL 12+
-- Redis 6+
+### Minimum Developer Requirements
+- Python 3.10+
+- `uv`
 - 4GB RAM
 - 20GB disk space
 
-### Recommended Requirements
+### Recommended Developer Requirements
 - Python 3.11+
-- PostgreSQL 14+
-- Redis 7+
-- 16GB RAM
-- 100GB SSD storage
-- Docker & Docker Compose
+- Docker or another container runtime for package/deployment verification
+- Enough battery or power budget for focused pytest slices and generated-app
+  smoke tests
 
-### Optional Dependencies
-- Web3 dependencies for blockchain features
-- BeeWare toolkit for mobile development
-- Prefect/Airflow for advanced workflow orchestration
-- CUDA toolkit for GPU-accelerated AI features
+### Optional Runtime Dependencies
+- PostgreSQL or compatible database services for database-backed deployment
+  profiles
+- Redis or equivalent cache/event infrastructure for capabilities that require
+  it
+- BeeWare toolkit for mobile packaging work
+- provider SDKs for specific AI, payment, blockchain, or integration
+  capabilities
 
 ## 🔧 Core Technologies
 
 | Component | Technology Stack |
 |-----------|------------------|
-| **Backend** | Python artifacts, capability contracts, PostgreSQL-ready services |
-| **Frontend** | UI manifests, theming contracts, React/TypeScript adapters |
-| **Mobile** | BeeWare (Python-based cross-platform) |
-| **AI/ML** | PyTorch, Federated Learning, Real-time Analytics |
-| **Blockchain** | Web3.py, Solidity, Multi-chain support |
-| **Orchestration** | Prefect, Celery, Apache Airflow |
-| **Monitoring** | Prometheus, Grafana, Custom analytics |
-| **Security** | JWT, OAuth2, Biometric authentication, MFA |
+| **Compiler** | ANTLR grammar, Python parser artifacts, semantic model, Python generator |
+| **Backend** | Generated Python artifacts, capability contracts, service helpers |
+| **UI** | Screen contracts, UI manifests, theming contracts |
+| **AI Agents** | Adapter-oriented runtimes such as Codex, Claude Code, OpenCode, OpenAI, Ollama, and Pi |
+| **Streaming** | Bytewax-oriented APG streaming metadata |
+| **Packaging** | Web, desktop, mobile, container, and Python package profiles over generated Python artifacts |
+| **Tooling** | CLI, language server, Studio projections, fixture audits, release evidence |
 
 ## 📖 Documentation Standards
 
@@ -126,5 +134,5 @@ This project is proprietary software owned by Datacraft. All rights reserved.
 
 ---
 
-*Last Updated: January 2025*
+*Last Updated: May 2026*
 *Version: 2.0.0*

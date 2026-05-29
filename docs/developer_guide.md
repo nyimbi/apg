@@ -1,140 +1,155 @@
 # APG Developer Guide
 
-This guide is for contributors who need to change APG itself: the grammar,
-compiler, semantic model, generator, CLI, language server, tooling audits,
-examples, tests, and documentation.
+This guide is for contributors changing APG itself: grammar, parser artifacts,
+compiler, semantic model, generator, CLI, language-server surfaces, capability
+contracts, examples, tests, and documentation.
 
-The purpose is immediate effectiveness. A new developer should be able to pick
-one concrete APG improvement, make it executable, prove it, document it, and
-leave the repository better than they found it.
+The goal is immediate effectiveness. A new developer should be able to clone the
+repository, run one reliable baseline, choose the right implementation surface,
+make a vertical slice executable, prove it, document it, and commit it without
+waiting for tribal knowledge.
 
-## Working Model
+## The APG Contract
 
-APG has one source-of-truth path:
+APG is not just `spec/apg.g4`. The language is useful only when source text
+travels through the full toolchain:
 
 ```text
 .apg source
-  -> spec/apg.g4 parser
+  -> spec/apg.g4
+  -> generated parser in spec/
   -> compiler/ast_builder.py
   -> compiler/semantic_analyzer.py
   -> compiler/semantic_model.py
   -> compiler/code_generator.py
   -> generated Python application
-  -> release/package/tooling evidence
+  -> CLI, examples, packaging, release evidence, and docs
 ```
 
-When adding a language feature, do not stop at parser acceptance. The feature
-is not serviceable until it reaches the right downstream contract:
+A language feature is not done when it parses. It is serviceable when the right
+downstream surfaces can consume it:
 
-- parsed syntax
-- AST or normalized metadata
-- semantic validation
-- generated Python behavior or explicitly documented metadata-only behavior
-- CLI/tooling visibility when relevant
-- focused tests
-- examples or fixtures
-- documentation
+- parser accepts valid syntax and rejects invalid syntax;
+- AST builder normalizes it into stable Python data;
+- semantic analyzer validates references and emits diagnostics;
+- semantic model exposes it as stable JSON;
+- generator executes it or documents that it is metadata-only for now;
+- CLI/tooling can inspect, lint, validate, graph, package, or explain it;
+- tests and examples prove the behavior;
+- docs describe current executable reality, not aspiration.
 
 ## Repository Map
 
-| Path | Purpose |
+| Path | Responsibility |
 | --- | --- |
-| `spec/apg.g4` | ANTLR grammar for the APG language. |
-| `spec/apgLexer.py`, `spec/apgParser.py`, `spec/apgVisitor.py` | Generated parser artifacts. |
-| `compiler/` | Parser wrappers, AST builder, semantic model, diagnostics, formatter, graphs, generator, packaging, release evidence, audits. |
-| `cli/` | Click commands exposed by the installed `apg` CLI. |
-| `language_server/` | Dependency-light language service and LSP entry point. |
-| `capabilities/` | Platform capability packages and executable capability contracts. |
-| `examples/` | Numbered APG examples and checked-in generated outputs. |
-| `tests/` | Repository tests and fixture catalogs. |
-| `tests/fixtures/` | Parser, lint, semantic-model, formatter, graph, language-server, migration, NL-plan, and verifier fixtures. |
-| `docs/` | User, developer, contributor, and architecture documentation. |
-| `vscode-extension/` | APG VS Code extension assets and command integration. |
+| `spec/apg.g4` | ANTLR grammar source. Keep syntax terse but readable. |
+| `spec/apgLexer.py`, `spec/apgParser.py`, `spec/apgVisitor.py` | Generated parser artifacts checked in with grammar changes when needed. |
+| `compiler/parser.py` | Parser wrapper and source loading boundary. |
+| `compiler/ast_builder.py` | Concrete parse tree to APG AST/normalized metadata. |
+| `compiler/semantic_analyzer.py` | Validation, symbol resolution, diagnostics. |
+| `compiler/semantic_model.py` | Stable `apg.semantic-model.v1` projection used by tools. |
+| `compiler/code_generator.py` | Dependency-light generated Python app writer. |
+| `compiler/*` | Formatter, graphs, release evidence, packaging, drift, migrations, NL plans, Studio, audits. |
+| `cli/` | Click commands for `apg`. Every durable command needs JSON output. |
+| `language_server/` | Dependency-light editor-facing semantic service and LSP entry point. |
+| `capabilities/` | Package-backed APG capabilities and executable contracts. |
+| `examples/` | Numbered parseable examples plus checked-in generated outputs. |
+| `tests/` | Focused regression tests and fixture catalogs. |
+| `docs/` | User, contributor, developer, grammar, tooling, standards, and progress docs. |
+| `vscode-extension/` | APG VS Code integration metadata. |
 
-## Setup
+## Environment Setup
 
-From the repository root:
-
-```bash
-uv sync
-./.venv/bin/apg --help
-./.venv/bin/python -m pytest -q tests/test_tooling_audit.py
-```
-
-If dependency state is stale:
+This repository is currently a `setup.py` project. Use `uv` to create and manage
+the virtual environment, then install the editable package:
 
 ```bash
 uv venv .venv
 uv pip install -e ".[dev,language-server]"
+./.venv/bin/apg --help
 ```
 
-The primary CLI command is `apg`. In scripts and verification, prefer the
-virtual environment path when you need certainty:
+When the virtual environment already exists, refresh it with:
+
+```bash
+uv pip install -e ".[dev,language-server]"
+```
+
+Use the explicit virtual-environment path in verification logs:
 
 ```bash
 ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-example --verify
 ```
 
-## Core Commands
+## Baseline Commands
 
-Use these commands constantly:
+Run one quick command to prove the CLI is installed:
 
 ```bash
 ./.venv/bin/apg --help
-./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify
-./.venv/bin/apg tooling audit --json
-./.venv/bin/apg baseline examples --json
-./.venv/bin/apg lint examples/20_enterprise_erp_platform/main.apg --json
-./.venv/bin/apg model examples/20_enterprise_erp_platform/main.apg --json
-./.venv/bin/apg graph-suite examples/20_enterprise_erp_platform/main.apg --json
-./.venv/bin/apg release examples/20_enterprise_erp_platform/main.apg --json
 ```
 
-Use focused pytest slices:
+Run the aggregate tooling gate when touching CLI, compiler, language server, or
+tooling contracts:
 
 ```bash
-./.venv/bin/python -m pytest -q tests/test_compiler_baseline.py
-./.venv/bin/python -m pytest -q tests/test_capability_composition_runtime.py
-./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py
-./.venv/bin/python -m pytest -q tests/test_tooling_audit.py
+./.venv/bin/apg tooling audit --json
 ```
 
-Do not run the entire suite by default when working under a battery or compute
-constraint. Run the smallest tests that prove the change and one representative
-generated-app check.
+Run a representative compile when touching language, semantic model, generator,
+capability composition, or examples:
 
-## Development Workflow
+```bash
+./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify
+./.venv/bin/python /tmp/apg-erp/smoke_test.py
+```
 
-1. Read the current source, tests, and docs for the area you are changing.
-2. Identify the current executable contract.
-3. Make the smallest coherent change that moves APG toward executable reality.
-4. Add or update focused tests.
-5. Regenerate example outputs only when compiler output changes.
-6. Update docs and `docs/progress_log.md`.
-7. Run focused verification.
-8. Commit the verified slice with a Lore commit message.
-9. Push.
+Run focused tests rather than the full suite by default when compute or battery
+is constrained:
 
-Never stage unrelated dirty files. The repository often contains local agent,
-upload, or generated state; keep commits scoped to the slice.
+```bash
+./.venv/bin/python -m pytest -q tests/test_tooling_audit.py
+./.venv/bin/python -m pytest -q tests/test_compiler_baseline.py
+./.venv/bin/python -m pytest -q tests/test_cli_capability_scaffold.py
+./.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py
+```
 
-## Changing The Grammar
+## Daily Development Loop
 
-Start with [APG Grammar Guide](./apg_grammar_guide.md). Then use this checklist:
+1. Check the worktree with `git status --short`.
+2. Read the source, tests, docs, and fixtures for the area you are changing.
+3. Identify the executable contract that proves success.
+4. Make the smallest vertical slice that moves APG closer to executable reality.
+5. Add or update focused tests and fixtures.
+6. Regenerate checked-in example output only when compiler output changes.
+7. Update docs and `docs/progress_log.md`.
+8. Run focused verification and inspect the output.
+9. Stage only the files in your slice.
+10. Commit with a Lore-style commit message and push.
 
-1. Update `spec/apg.g4`.
-2. Regenerate parser artifacts if the generated parser files are part of the
-   change.
-3. Update `compiler/ast_builder.py`.
-4. Update `compiler/semantic_analyzer.py`.
-5. Update `compiler/semantic_model.py`.
-6. Update `compiler/code_generator.py` if the feature should execute.
-7. Add parser/semantic/generator tests or fixtures.
-8. Add a numbered example or update an existing example if the feature is
-   author-facing.
-9. Update docs.
+Never stage unrelated dirty files. This repository often contains local agent
+state, uploads, generated experiments, and nested capability worktrees.
 
-Good grammar changes preserve the universal entity pattern:
+## Where To Change Things
+
+| Desired change | Primary files | Required proof |
+| --- | --- | --- |
+| New syntax | `spec/apg.g4`, parser artifacts, `compiler/ast_builder.py` | parser golden or language contract tests |
+| New semantic meaning | `semantic_analyzer.py`, `semantic_model.py` | semantic-model JSON and diagnostics tests |
+| New generated behavior | `code_generator.py` | compile with `--verify`, generated smoke test |
+| New CLI command | `cli/<command>.py`, `cli/main.py` | JSON output test and `apg tooling audit --json` |
+| New lint rule | `compiler/linting.py`, fixtures | lint fixture/test proving diagnostic code |
+| New graph surface | `compiler/graphs.py` | `apg graph-suite ... --json` and graph tests |
+| New capability package | `capabilities/<domain>/<code>/` | contract validation and focused capability tests |
+| New capacity | APG source, capability packages, examples, docs | compile, smoke, contract validation, progress log |
+| New docs | `docs/` | `git diff --check -- docs` and current command examples |
+
+## Grammar Work
+
+Read [APG Grammar Guide](./apg_grammar_guide.md) before editing
+`spec/apg.g4`.
+
+Good APG syntax follows the existing shape:
 
 ```apg
 entity_type EntityName {
@@ -142,35 +157,48 @@ entity_type EntityName {
 }
 ```
 
-Prefer reusable `contract_object`, `reference_list`, `rule_list`,
-`ui_contract`, `theme_contract`, `screen_set`, and `runtime_contract` rules
-before inventing new special syntax.
+Prefer extending existing generic contracts before adding special-purpose
+syntax:
 
-## Changing The AST And Semantic Model
+- `contract_object`
+- `reference_list`
+- `rule_list`
+- `ui_contract`
+- `theme_contract`
+- `screen_set`
+- `runtime_contract`
 
-The AST builder must normalize APG source into stable Python data classes or
-metadata dictionaries. The semantic model must then expose the same meaning to
-CLI, tooling, language server, Studio, graph builders, release evidence, and
-generated apps.
+Grammar checklist:
+
+1. Update `spec/apg.g4`.
+2. Regenerate parser artifacts when the checked-in generated parser must change.
+3. Update AST building.
+4. Update semantic validation and semantic model JSON.
+5. Update code generation if the construct should execute.
+6. Add parser, semantic, generator, or fixture coverage.
+7. Add or update a numbered example when the syntax is author-facing.
+8. Update language docs and cheat sheet.
+
+## Semantic Model Work
+
+The semantic model is the shared truth for lint, validate, graph, language
+server, Studio, drift, release evidence, and generated apps. Downstream tools
+should not re-parse source text to discover meaning already present in
+`apg.semantic-model.v1`.
 
 When adding semantic data:
 
-- add a model field with a stable JSON shape
-- include the source file and names where possible
-- add diagnostics for invalid or unresolved references
-- add graph nodes/edges if the construct participates in composition
-- avoid making downstream tools re-parse source text
+- use stable JSON field names;
+- include source names and file paths when useful;
+- include graph nodes or edges for composed relationships;
+- include diagnostics for unresolved references;
+- preserve existing JSON keys unless a migration is intentional;
+- update docs when a public JSON format changes.
 
-If the generator needs a construct, the semantic model should usually know
-about it first.
+## Code Generation Work
 
-## Changing Code Generation
-
-`compiler/code_generator.py` emits dependency-light Python applications. The
-generated app should remain importable and runnable without optional platform
-services.
-
-Generated apps should expose:
+Generated apps should remain dependency-light Python artifacts. The baseline
+output includes:
 
 - `app.py`
 - `__init__.py`
@@ -182,118 +210,35 @@ Generated apps should expose:
 - optional sidecars such as `ai_agents.py`, `apg_capabilities.py`, and
   `apg_application.py`
 
-Generated behavior should be surfaced through:
+Generated behavior should be inspectable through Python helpers, route
+dispatch, OpenAPI metadata, component manifests, validation/self-test checks,
+and generated smoke tests.
 
-- Python helpers
-- HTTP route dispatch
-- OpenAPI schema entries
-- component manifest entries
-- validation/self-test checks
-- generated smoke tests
-- package exports where applicable
-
-When changing generated output, run:
+Representative generator verification:
 
 ```bash
 ./.venv/bin/python -m py_compile compiler/code_generator.py
 ./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify
+./.venv/bin/python /tmp/apg-erp/smoke_test.py
 ```
 
-If checked-in example outputs change, regenerate all numbered examples and run
-the checked-in output comparison test:
+If checked-in generated examples change, run the checked-in output comparison
+test:
 
 ```bash
 ./.venv/bin/python -m pytest -q tests/test_compiler_baseline.py::test_checked_in_example_outputs_match_current_compiler
 ```
 
-## Changing CLI And Tooling
+## Capability Work
 
-Every CLI command should have:
-
-- a stable JSON format
-- a human-readable text mode
-- focused tests
-- documentation in `docs/tooling.md`
-- aggregate coverage in `apg tooling audit --json` when it is part of the
-  documented baseline
-
-Current tooling audits cover parser golden fixtures, diagnostics, lint,
-formatter, drift, semantic model, graphs, language server, NL plans, migration,
-release evidence, CLI command registration, IDE integration, and Studio
-designer contracts.
-
-Run:
-
-```bash
-./.venv/bin/apg tooling audit --json
-./.venv/bin/python -m pytest -q tests/test_tooling_audit.py tests/test_enhanced_cli.py
-```
-
-## Changing The Language Server
-
-The language server should consume the shared semantic model instead of
-re-implementing APG meaning.
-
-Required surfaces:
-
-- `apg language-server <file> --check --json`
-- `apg language-server <file> --rename <symbol> --to <new-name> --json`
-- `apg language-server <file> --code-actions --json`
-- `apg language-server --audit-fixtures --json`
-
-Use fixture tests under `tests/fixtures/language_server/` when adding editor
-behavior.
-
-## Changing Studio
-
-Studio is a visual-designer projection of APG source. APG source remains the
-source of truth.
-
-Required surfaces:
-
-- `apg studio snapshot <file> --json`
-- `apg studio plan-edit <file> --edit-json ... --json`
-
-Visual edits must produce reviewable APG diffs. Invalid visual edits should be
-rejected before writing source.
-
-## Changing Capabilities
-
-Use [Capability Building Standards](./capability_standards.md) and [Capacity
-Development Guide](./capacity_development_guide.md).
-
-For a new package-backed capability, start with:
+Capability packages must be composable and executable. Start new package-backed
+capabilities with the scaffold command:
 
 ```bash
 ./.venv/bin/apg capabilities scaffold <domain> <code> --name "Display Name" --json
 ```
 
-The scaffolded package is runnable immediately: `service.py` provides
-tenant-scoped record create/list/get/update behavior with deterministic rule
-enforcement, `api.py` exposes dependency-light helper functions, and `views.py`
-returns dashboard route/record/theme metadata. It also includes `app.py`,
-`semantic_model.json`, `package_manifest.json`, and `release_report.json`, so a
-fresh scaffold can go through publish planning without a separate compile step:
-
-```bash
-./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
-./.venv/bin/apg capabilities publish-apply capabilities/<domain>/<code> \
-  --catalog /tmp/apg-capability-catalog.json --dry-run --json
-./.venv/bin/apg capabilities publish-apply capabilities/<domain>/<code> \
-  --catalog /tmp/apg-capability-catalog.json --json
-./.venv/bin/apg capabilities catalog /tmp/apg-capability-catalog.json --json
-```
-
-Inspect and exercise the capability contract before changing generated app
-code:
-
-```bash
-./.venv/bin/apg capabilities inspect <capability_id> --tenant-id tenant-dev --json
-./.venv/bin/apg capabilities evaluate-rules <capability_id> \
-  --context-json '{"tenant_context_present": false}' --json
-```
-
-At minimum, a capability package should include:
+A scaffolded package includes:
 
 ```text
 capabilities/<domain>/<code>/
@@ -311,103 +256,111 @@ capabilities/<domain>/<code>/
   tests/
 ```
 
-If a capability is first introduced in APG source, make sure it compiles into
-`apg_capabilities.py` and is visible in `component_manifest()`.
-
-## Examples
-
-The numbered examples are the practical language ladder. Keep them parseable,
-compiler-clean, and generated.
-
-Rules:
-
-- One example per directory.
-- Each example has `main.apg`, `README.md`, and `output/`.
-- Examples should increase in complexity.
-- Generated output must match the current compiler.
-- Example docs should explain the specific language concepts exercised.
-
-Representative verification:
+Validate, inspect, and publish-plan capabilities through the CLI:
 
 ```bash
-./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify
-./.venv/bin/python examples/20_enterprise_erp_platform/output/smoke_test.py
-```
-
-## Documentation
-
-Docs must distinguish:
-
-- accepted grammar
-- semantic model contract
-- generated executable behavior
-- metadata-only behavior
-- future work
-
-Do not document aspiration as current behavior unless a command, generated app,
-test, or fixture proves it.
-
-Update `docs/progress_log.md` for every coherent slice. Include:
-
-- what changed
-- verification commands and results
-- known remaining gaps
-
-## Verification Lanes
-
-Use the narrowest verification lane that proves the claim.
-
-Parser or grammar:
-
-```bash
-./.venv/bin/apg parser-golden --json
-./.venv/bin/python -m pytest -q tests/test_apg_language_contract.py
-```
-
-Semantic model:
-
-```bash
-./.venv/bin/apg model --audit-fixtures --json
-./.venv/bin/python -m pytest -q tests/test_semantic_analyzer.py
-```
-
-Generator:
-
-```bash
-./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify
-```
-
-Capabilities:
-
-```bash
-./.venv/bin/apg capabilities inspect composition_events --json
-./.venv/bin/apg capabilities evaluate-rules composition_events --context-json '{"tenant_context_present": false}' --json
 ./.venv/bin/apg capabilities validate-contracts --json
-./.venv/bin/python -m pytest -q tests/test_cli_capability_operability.py tests/test_capability_contract_registry.py tests/test_capability_composition_runtime.py
+./.venv/bin/apg capabilities inspect <capability_id> --json
+./.venv/bin/apg capabilities evaluate-rules <capability_id> --context-json '{}' --json
+./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+./.venv/bin/apg capabilities publish-apply capabilities/<domain>/<code> --catalog /tmp/apg-capability-catalog.json --dry-run --json
+./.venv/bin/apg capabilities catalog /tmp/apg-capability-catalog.json --json
 ```
 
-Tooling:
+Capability changes should keep configuration, deterministic rules, UI routes,
+theme tokens, tenant handling, and tests aligned.
+
+## Capacity Work
+
+A capacity is larger than one capability. It is an executable ability APG can
+demonstrate: records, rules, screens, workflows, agents, capability contracts,
+generated app behavior, tests, and docs.
+
+Use [Capacity Development Guide](./capacity_development_guide.md) when building
+new business or platform abilities. Use [Capability Building Standards](./capability_standards.md)
+for the package and contract details.
+
+## CLI And Tooling Work
+
+Every durable command should have:
+
+- stable JSON output with a `format` key;
+- human-readable text output;
+- focused tests;
+- documentation in [Tooling](./tooling.md);
+- aggregate audit coverage when it becomes part of the baseline.
+
+Run:
 
 ```bash
 ./.venv/bin/apg tooling audit --json
 ./.venv/bin/python -m pytest -q tests/test_tooling_audit.py
 ```
 
-Docs:
+## Language Server And Studio Work
+
+The language server and Studio are projections of APG source. APG source remains
+the source of truth.
+
+Language-server proof commands:
 
 ```bash
-git diff --check -- docs
+./.venv/bin/apg language-server examples/20_enterprise_erp_platform/main.apg --check --json
+./.venv/bin/apg language-server examples/20_enterprise_erp_platform/main.apg --code-actions --json
+./.venv/bin/apg language-server --audit-fixtures --json
 ```
 
-## Done Means Executable
+Studio proof commands:
 
-A change is done when:
+```bash
+./.venv/bin/apg studio snapshot examples/20_enterprise_erp_platform/main.apg --json
+./.venv/bin/apg studio plan-edit examples/20_enterprise_erp_platform/main.apg --edit-json '{"kind":"noop"}' --json
+```
 
-- the current worktree proves it, not just the design intent
-- the feature can be invoked through APG source, CLI, generated app, or a
-  documented package interface
-- tests cover the changed behavior
-- examples or fixtures cover author-facing syntax
-- docs describe the current truth
-- `docs/progress_log.md` records the evidence
-- the verified slice is committed and pushed
+Visual edits must produce reviewable APG diffs or be rejected before source is
+written.
+
+## Documentation Work
+
+Docs must separate:
+
+- accepted syntax;
+- semantic model contract;
+- generated executable behavior;
+- package/capability behavior;
+- metadata-only behavior;
+- known gaps.
+
+Do not write future intent as present behavior. If a command, generated app,
+test, fixture, or contract does not prove it, label it as planned or omit it.
+
+Update `docs/progress_log.md` for every coherent slice. Include changed
+behavior, verification commands, results, and known remaining gaps.
+
+## Verification Lanes
+
+Use the narrowest lane that proves the claim.
+
+| Lane | Commands |
+| --- | --- |
+| Docs | `git diff --check -- docs` |
+| Parser | `./.venv/bin/apg parser-golden --json` |
+| Semantic model | `./.venv/bin/apg model --audit-fixtures --json` |
+| Lint | `./.venv/bin/apg lint --audit-fixtures --json` |
+| Generator | `./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify` |
+| Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` |
+| Tooling | `./.venv/bin/apg tooling audit --json` |
+| Repository hygiene | `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
+
+## Definition Of Done
+
+A developer slice is done when:
+
+- it changes the current repository, not only a plan;
+- the feature is reachable through APG source, CLI, generated app, or a package
+  API;
+- focused tests or commands prove it;
+- examples or fixtures cover author-facing behavior;
+- docs describe current behavior accurately;
+- `docs/progress_log.md` records evidence;
+- the verified slice is committed and pushed.

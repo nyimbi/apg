@@ -16,6 +16,41 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:27 EAT
+
+Contributor effectiveness documentation slice:
+
+- Rewrote `docs/developer_guide.md` around the current APG execution contract:
+  `setup.py`/`uv` setup, grammar-to-generated-app flow, where to change each
+  layer, focused verification lanes, capability lifecycle commands, and
+  definition of done.
+- Rewrote `docs/contributors_guide.md` with a first-30-minutes path, worktree
+  hygiene, first useful task guidance, vertical-slice expectations,
+  documentation/testing standards, capability contribution flow, capacity
+  contribution flow, and Lore commit checklist.
+- Rewrote `docs/capacity_development_guide.md` into an executable capacity
+  lifecycle covering records, capability boundaries, configuration, rules,
+  screens, workflows, AI agents, Bytewax streaming, app composition, tests,
+  parallel delivery lanes, and acceptance criteria.
+- Updated `docs/README.md` to route new contributors to the three guides and
+  replace stale broad platform claims with the current Python-first compiler
+  and capability-tooling baseline.
+
+Verification:
+
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/README.md docs/progress_log.md` ->
+  passed.
+- Local Markdown link sanity check across the new contributor-facing docs ->
+  passed with `missing_links=0`.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0
+  blocking gaps, and 0 errors.
+
+Known remaining gaps:
+
+- This slice improves contributor effectiveness documentation only. It does not
+  add new compiler or capability runtime behavior.
+
 ### 2026-05-29 05:51 EAT
 
 Local capability catalog inspection slice:

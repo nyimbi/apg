@@ -1,184 +1,248 @@
 # APG Contributors Guide
 
-This guide explains how to contribute to APG without slowing the project down
-or adding drift between the language vision and executable reality.
+This guide explains how to contribute to APG without slowing the project down or
+creating drift between the APG vision and executable reality.
 
-The central rule is simple: make the requested final state more true in the
-current repository, prove it with evidence, document what changed, and commit a
-reviewable slice.
+The contribution rule is simple: make one useful final state more true in the
+current repository, prove it with evidence, document it, and commit a reviewable
+slice.
 
-## Contributor Mindset
+## What APG Is
 
-APG is not only a grammar. It is a language, compiler, generated runtime,
-tooling stack, capability platform, documentation set, and example catalog.
+APG is a Python-first application generation platform built around a terse,
+readable DSL. A good contribution improves at least one of these surfaces:
 
-Good contributions:
+- the APG language grammar;
+- parser and AST normalization;
+- semantic validation and diagnostics;
+- generated Python applications;
+- capability contracts and package-backed capabilities;
+- AI agent composition;
+- screen, workflow, rule, theme, i18n, and Bytewax streaming metadata;
+- CLI tooling and JSON evidence;
+- examples, docs, and tests.
 
-- move from aspiration toward executable behavior
-- preserve the Python-first compiler target
-- keep syntax terse but readable
-- make AI agents and capabilities first-class citizens
-- keep Bytewax as the internal streaming direction
-- update tests, examples, docs, and progress evidence
-- avoid unrelated cleanup in the same commit
+APG is not helped by syntax nobody consumes, documentation no command proves, or
+generated code that cannot be imported and smoke-tested.
 
-Poor contributions:
+## First 30 Minutes
 
-- add syntax that nothing consumes
-- document behavior that no command or test proves
-- add generated code drift without updating examples
-- introduce framework targets that multiply the generator matrix
-- hide external services behind untestable placeholders
-- stage unrelated dirty files
-
-## Before Your First Change
-
-Run:
+From the repository root:
 
 ```bash
-uv sync
+uv venv .venv
+uv pip install -e ".[dev,language-server]"
 ./.venv/bin/apg --help
 ./.venv/bin/apg tooling audit --json
 ./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify
 ```
 
-Read:
+Then read these in order:
 
-- [Quick Start](./quickstart.md)
-- [APG Language Guide](./apg_language.md)
-- [APG Tutorial](./apg_tutorial.md)
-- [Developer Guide](./developer_guide.md)
-- [Capability Building Standards](./capability_standards.md)
-- [Capacity Development Guide](./capacity_development_guide.md)
-- [Tooling Specification](./tooling.md)
-- [Goal Progress Log](./progress_log.md)
+1. [Quick Start](./quickstart.md)
+2. [APG Language Guide](./apg_language.md)
+3. [Developer Guide](./developer_guide.md)
+4. [Capability Building Standards](./capability_standards.md)
+5. [Capacity Development Guide](./capacity_development_guide.md)
+6. [Tooling Specification](./tooling.md)
+7. [Goal Progress Log](./progress_log.md)
 
-## Picking Work
+## Contribution Principles
 
-Pick work that has a clear executable endpoint:
+Good contributions:
 
-- a grammar construct reaches generated runtime behavior
-- a compiler warning becomes a diagnostic
-- a generated app route becomes executable
-- a capability contract becomes discoverable and valid
-- a numbered example compiles and smokes
-- a tooling command emits stable JSON
-- documentation reflects the current verified contract
+- move from aspiration toward executable behavior;
+- keep `python` as the compiler target;
+- keep syntax terse but readable;
+- make capabilities and AI agents first-class where relevant;
+- use Bytewax for APG internal streaming semantics;
+- preserve dependency-light generated apps;
+- add focused tests rather than broad, expensive verification by default;
+- update docs and `docs/progress_log.md`;
+- commit completed, verified slices regularly.
 
-If a task is large, split it into vertical slices. A vertical slice includes
-source, behavior, tests, docs, and progress evidence for one coherent outcome.
+Avoid:
 
-## Branch And Worktree Hygiene
+- adding grammar without semantic-model or generator follow-through;
+- documenting future work as current behavior;
+- adding framework targets such as Flask-AppBuilder or Django as compiler
+  targets;
+- hiding external services behind untestable placeholders;
+- staging unrelated dirty files;
+- broad cleanup mixed into feature work.
 
-Check status before editing:
+## Worktree Hygiene
+
+Always start with:
 
 ```bash
 git status --short
 ```
 
-There may be existing modified or untracked files from another user or agent.
-Do not revert or stage them unless they are part of your task.
-
-Stage explicitly:
+There may be modified or untracked files from another contributor or agent.
+Do not revert them. Do not stage them. Stage explicitly:
 
 ```bash
-git add compiler/tooling_audit.py tests/test_tooling_audit.py docs/tooling.md docs/progress_log.md
+git add compiler/code_generator.py tests/test_generated_workflow_runtime.py docs/progress_log.md
 ```
 
-Review staged files:
+Check what you are about to commit:
 
 ```bash
 git diff --cached --stat
 git diff --cached --check
 ```
 
-## Code Style
+## Choosing Your First Useful Task
 
-Follow the existing file style. APG currently uses tabs in several compiler
-modules and tests may use tabs or spaces depending on the file. Match the file.
+Pick work with a clear executable endpoint. Good first tasks include:
 
-General standards:
+- add a lint diagnostic and fixture;
+- improve one generated app helper and smoke test;
+- add one capability contract test;
+- make one numbered example clearer without changing compiler output;
+- add a missing JSON field to an existing CLI report and document it;
+- improve one documentation page by replacing aspiration with verified commands.
 
-- Prefer explicit structured data over string scraping.
-- Use existing helpers before adding abstractions.
-- Keep comments sparse and useful.
-- Do not add dependencies unless the task explicitly requires it.
-- Preserve dependency-light generated apps.
-- Keep generated Python importable without optional external services.
-- Keep public JSON formats stable once documented.
+Avoid first tasks that require changing grammar, generator, and multiple
+capability packages at once unless you are already familiar with the toolchain.
 
-## Documentation Style
+## Vertical Slices
 
-Documentation must be actionable and current.
+A vertical slice contains every layer needed for one coherent outcome. For
+example, adding a new author-facing screen feature usually means:
 
-Use:
+1. grammar accepts the screen shape;
+2. AST builder captures it;
+3. semantic model exposes it;
+4. generated app includes it in manifests/routes;
+5. graph or Studio surfaces can inspect it when relevant;
+6. tests prove it;
+7. examples or docs show it;
+8. progress log records the evidence.
 
-- concrete commands
-- concrete file paths
-- current JSON format names
-- examples that parse today
-- explicit verification instructions
-- known gaps when behavior is partial
+Small vertical slices are preferred over large partial changes.
+
+## Coding Standards
+
+Follow the style of the file you are editing. Some APG modules use tabs; some
+tests and newer modules use spaces. Match the local file.
+
+General rules:
+
+- use structured data rather than string scraping;
+- reuse existing helpers before adding abstractions;
+- keep comments sparse and explanatory;
+- avoid new dependencies unless explicitly required;
+- preserve importable generated Python artifacts;
+- keep public JSON formats stable once documented;
+- prefer deterministic local behavior over external-service assumptions.
+
+## Documentation Standards
+
+Docs should make a contributor faster and safer. Use:
+
+- exact commands;
+- exact paths;
+- current JSON format names;
+- parseable APG snippets;
+- verification instructions;
+- explicit known gaps.
 
 Avoid:
 
-- broad claims without evidence
-- future behavior written as present behavior
-- marketing language that hides the actual contract
-- old target names such as Flask-AppBuilder or Django as compiler targets
+- marketing claims;
+- stale target names;
+- "will support" phrased as current behavior;
+- examples that do not parse;
+- descriptions that require reading hidden context to act.
 
 ## Testing Expectations
 
-Use focused tests for the changed area. Full-suite verification is useful but
-not required for every battery-constrained slice.
+Use focused tests for the changed area. Full-suite runs are not required for
+every contribution, especially when compute or battery is constrained.
 
-Minimum expectations by change type:
-
-| Change | Focused verification |
+| Change | Minimum useful verification |
 | --- | --- |
-| Docs only | `git diff --check -- docs`; link sanity when adding links |
-| CLI/tooling | `apg tooling audit --json`; focused CLI tests |
-| Grammar | parser golden audit; language contract tests |
-| Semantic model | semantic-model fixture audit; focused semantic tests |
-| Generator | compile representative example with `--verify`; generated smoke test |
-| Capability contract | `apg capabilities validate-contracts --json`; focused registry tests |
-| Package/release | release/evidence fixture audit or package verify command |
+| Docs only | `git diff --check -- docs` |
+| CLI/tooling | focused CLI tests plus `./.venv/bin/apg tooling audit --json` |
+| Grammar | parser golden audit and relevant language contract tests |
+| Semantic model | semantic model fixture audit or focused semantic tests |
+| Generator | representative `apg compile ... --verify` and generated smoke test |
+| Capability contract | `apg capabilities validate-contracts --json` and focused contract tests |
+| Capability scaffold/package | scaffold, publish-plan, publish-apply dry run, focused package tests |
+| Repository hygiene | `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
 
-Always read command output. Do not claim a command passed unless you inspected
-the result.
+Always inspect command output before claiming a pass.
+
+## Capability Contributions
+
+For package-backed capabilities, use the scaffold:
+
+```bash
+./.venv/bin/apg capabilities scaffold common demo --name "Demo Capability" --json
+```
+
+Then iterate:
+
+```bash
+./.venv/bin/python -m pytest -q capabilities/common/demo/tests
+./.venv/bin/apg capabilities validate-contracts --json
+./.venv/bin/apg capabilities inspect common_demo --json
+./.venv/bin/apg capabilities evaluate-rules common_demo --context-json '{}' --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/demo --json
+./.venv/bin/apg capabilities publish-apply capabilities/common/demo --catalog /tmp/apg-capability-catalog.json --dry-run --json
+```
+
+Capability PRs should keep these aligned:
+
+- `cap_spec.md`;
+- `capability_contract.py`;
+- `models.py`;
+- `service.py`;
+- `api.py`;
+- `views.py`;
+- `app.py`;
+- `semantic_model.json`;
+- `package_manifest.json`;
+- tests and docs.
+
+## Capacity Contributions
+
+A capacity contribution makes APG able to do something larger than one package:
+for example procurement approvals, inventory operations, general ledger,
+customer service, or AI-assisted compliance review.
+
+Use [Capacity Development Guide](./capacity_development_guide.md). A capacity
+slice should include:
+
+- records or entities;
+- capability contracts;
+- deterministic rules;
+- screens and relationships;
+- workflows where process state matters;
+- AI agents where model-backed work is useful;
+- Bytewax streaming metadata where event flow matters;
+- generated application proof;
+- tests and documentation.
 
 ## Commit Protocol
 
-Commit completed, verified work regularly. APG uses Lore-style commit messages:
+APG uses Lore-style commit messages. The first line explains why the change
+exists, not what files changed.
 
 ```text
-<intent line: why the change exists>
+Make capability scaffolds publish-plan ready
 
-<body: context and approach>
-
-Constraint: <external constraint>
-Rejected: <alternative> | <reason>
-Confidence: <low|medium|high>
-Scope-risk: <narrow|moderate|broad>
-Directive: <future guidance>
-Tested: <verification performed>
-Not-tested: <known gaps>
-```
-
-Example:
-
-```text
-Prove APG tooling surfaces through one audit gate
-
-The tooling spec claims one executable baseline, so the aggregate audit now
-verifies CLI, IDE, and Studio surfaces in addition to fixture catalogs.
+Fresh scaffolds should be usable by contributors immediately, so the generated
+package now includes runtime evidence files consumed by the publish planner.
 
 Constraint: Verification must stay battery-conscious
-Rejected: Manual checklist only | the baseline needs machine-readable evidence
+Rejected: Manual catalog edits | they bypass the executable publish path
 Confidence: high
 Scope-risk: narrow
-Directive: Add documented tooling commands to the aggregate audit
-Tested: apg tooling audit --json; pytest -q tests/test_tooling_audit.py
+Directive: Keep scaffold output valid against publish-plan tests
+Tested: pytest -q tests/test_cli_capability_scaffold.py; apg tooling audit --json
 Not-tested: Full repository test suite
 ```
 
@@ -188,97 +252,30 @@ Push after a verified commit:
 git push
 ```
 
-## Pull Request Or Handoff Checklist
+## Handoff Checklist
 
-Before handing off:
+Before asking for review or handing off:
 
-- `git status --short` shows only unrelated dirty files or a clean tree.
-- Staged/committed files are scoped to the task.
-- Tests or commands proving the task are recorded.
-- `docs/progress_log.md` has a new entry.
-- New docs are linked from `docs/README.md` when they are durable guides.
-- New CLI/tooling surfaces are covered by `apg tooling audit --json`.
-- New examples compile with `--verify`.
+- `git status --short` contains only unrelated dirty files or is clean.
+- The commit contains only the intended slice.
+- Verification commands and outcomes are recorded.
+- `docs/progress_log.md` has a new entry for meaningful work.
+- New durable docs are linked from `docs/README.md`.
+- New author-facing syntax is covered by examples or fixtures.
+- New CLI/tooling behavior emits stable JSON and is documented.
 - Known gaps are explicit.
 
-## Common Contribution Patterns
+## Review Standard
 
-### Add A New APG Language Construct
+Review for correctness before style:
 
-1. Update grammar.
-2. Update AST builder.
-3. Update semantic model.
-4. Add diagnostics.
-5. Add generator behavior or document metadata-only status.
-6. Add tests and fixtures.
-7. Add an example.
-8. Update docs.
-9. Run focused verification.
-
-### Add A Generated Runtime Helper
-
-1. Add helper generation in `compiler/code_generator.py`.
-2. Export it from generated `__init__.py` when public.
-3. Add route dispatch if it is HTTP-visible.
-4. Add OpenAPI and component manifest entries.
-5. Add generated self-test validation.
-6. Add focused generated-runtime tests.
-7. Regenerate checked-in examples if output changes.
-
-### Add A CLI Command
-
-1. Add or update a module under `cli/`.
-2. Register it in `cli/main.py`.
-3. Emit stable JSON.
-4. Add focused CLI tests.
-5. Update `docs/tooling.md`.
-6. Add aggregate audit coverage if it is part of the executable baseline.
-
-### Add A Capability
-
-1. Define the capability boundary and provided services.
-2. Add APG source or package files.
-3. Add `cap_spec.md` and `capability_contract.py`.
-4. Add models/service/API/views as needed.
-5. Add focused tests.
-6. Validate contracts.
-7. Document the capability.
-
-## Review Standards
-
-Review for defects first:
-
-- Does the code actually execute?
-- Does the semantic model carry the feature?
+- Does it execute?
+- Is meaning represented in the semantic model?
 - Does generated output expose the behavior?
-- Are public JSON formats stable?
+- Are public JSON contracts stable?
 - Are tests proving the claim?
-- Are docs aligned with current behavior?
-- Are unrelated files staged?
+- Are docs current?
+- Are unrelated files absent from the commit?
 
-Style is secondary to correctness, scope control, and evidence.
-
-## Safety Rules
-
-- Do not put secrets in APG source, generated examples, docs, or tests.
-- Do not add external side effects to audits that should be side-effect-free.
-- Do not require optional services for dependency-light generated apps.
-- Do not replace Bytewax with a broker-first internal streaming direction.
-- Do not add provider-specific AI grammar for every new agent tool; use
-  adapters.
-- Do not mark broad objectives complete from narrow evidence.
-
-## Effective First Issues
-
-Good first contribution areas:
-
-- add a missing diagnostic fixture
-- improve one generated app self-test check
-- add a small APG example fixture
-- extend `apg tooling audit` for one documented command surface
-- convert one aspirational doc paragraph into current executable guidance
-- add a capability contract wrapper for an existing `cap_spec.md`
-- improve a generated README section
-
-Avoid starting with broad refactors, global formatting, dependency changes, or
-large capability rewrites.
+If a contribution makes APG more executable, easier to extend, and easier to
+verify, it is moving in the right direction.
