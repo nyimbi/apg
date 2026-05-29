@@ -10278,3 +10278,25 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/chat --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+
+### 2026-05-29 09:50 EAT
+
+Executable CICD pipeline runtime slice:
+
+- Converted `capabilities/common/cicd` from a generated materialized baseline into a domain-specific continuous integration and delivery capability package.
+- Replaced generic records with tenant pipeline definitions, worker/cache/secret policy state, build runs, trace IDs, artifact digests and signatures, quality gate results, promotions, and audit events.
+- Added `cicd_engine.py` with deterministic build trace IDs, artifact digests, and quality gate findings.
+- Added `CicdService` behavior for pipeline creation, high-parallelism review, pipeline approval, build execution, artifact publication, quality gate recording, promotion enforcement, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so CICD exposes pipelines, builds, artifacts, quality gates, promotions, audit events, and pipeline summaries instead of generic records.
+- Updated `cap_spec.md` to describe the current runtime behavior and the explicit build-runner, scanner, registry, and deployment integration boundary.
+- Added focused contract/service tests for successful pipeline-build-artifact-gate-promotion flows and guardrails around missing owners, missing secret scope, unsigned artifacts, failed gates, and high-parallelism review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/cicd/__init__.py capabilities/common/cicd/models.py capabilities/common/cicd/cicd_engine.py capabilities/common/cicd/service.py capabilities/common/cicd/api.py capabilities/common/cicd/views.py capabilities/common/cicd/test_capability_contract.py capabilities/common/cicd/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/cicd/test_capability_contract.py capabilities/common/cicd/tests/test_materialized_package.py` passed with 8 tests and only unrelated existing SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/cicd` returned no remaining CICD baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `cicd` is now `domain_specific`, custom Python files increased to 880, domain-specific packages increased to 61, materialized baseline packages dropped to 42, and warning count dropped to 48.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cicd --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
