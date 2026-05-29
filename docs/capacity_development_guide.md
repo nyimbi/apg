@@ -92,6 +92,23 @@ Next slice:
 The blueprint describes current executable intent. Keep it updated as evidence
 lands.
 
+## Capacity Design Sprint
+
+Use this one-hour sprint before writing code for a new capacity:
+
+| Minute | Decision | Output |
+| --- | --- | --- |
+| 0-10 | Name the user and first event | `Primary users` and `First event` in the blueprint |
+| 10-20 | Identify records and ownership | record names, tenant boundary, required relationships |
+| 20-30 | Identify rules and approvals | deterministic rule names and review routes |
+| 30-40 | Identify screens and workflow | screen routes, workflow states, transitions |
+| 40-50 | Identify agents and streams | agent role, provider boundary, Bytewax flow names |
+| 50-60 | Pick proof and package owners | model/compile/smoke commands and package roots |
+
+If the sprint cannot produce an event, route, owner, and proof command, the
+capacity is not ready for implementation. Narrow it until the first event is
+clear.
+
 ## Build Runbook
 
 1. **Name one event.** Use a concrete phrase such as `request submitted`,
@@ -132,6 +149,34 @@ lands.
 If a step fails, fix the earliest failing layer. Do not patch generated output
 around missing APG meaning.
 
+## Example Directory Shape
+
+Use one directory per capacity or capacity slice:
+
+```text
+examples/<nn>_<capacity_name>/
+  main.apg
+  README.md
+  output/
+    app.py
+    smoke_test.py
+    semantic_model.json
+```
+
+The `output/` directory is checked in only when intentionally refreshed as
+evidence. Otherwise compile to `/tmp/apg-capacity` and keep the source tree
+clean.
+
+The README should answer:
+
+- What business event does this capacity execute?
+- Which records, capabilities, rules, screens, workflows, agents, and streams
+  are involved?
+- What readiness level is proven?
+- Which commands were run?
+- Which package owns durable behavior?
+- What is the next smallest executable slice?
+
 ## Authoring Standards For Capacity Source
 
 APG capacity source should read as a compact declaration of the business event,
@@ -169,6 +214,34 @@ Capacity composition must be explicit.
 Implicit relationships slow contributors down. If one screen depends on a
 record, rule, workflow, or capability, name the relationship in source,
 semantic output, README, or package spec.
+
+## Capacity Blueprint Example
+
+Use this as a concrete model for an ERP-style capacity:
+
+```text
+Name: Purchase request approval
+Outcome: an employee submits a purchase request and receives an approval decision.
+Primary users: requester, budget owner, procurement approver
+First event: purchase request submitted
+Tenant/security boundary: requests are tenant-scoped; approvers need workflow permission.
+Records owned: PurchaseRequest, PurchaseRequestLine, ApprovalDecision
+Capabilities provided: procurement request intake
+Capabilities required: supplier master, budget control, workflow orchestration, audit log, notification
+Rules: request_amount_positive, budget_available, high_value_requires_approval
+Screens: request_workbench, approval_queue, request_detail
+Workflows: draft -> submitted -> review -> approved -> ordered or rejected
+Agents: procurement_triage_agent may summarize risk but cannot approve without human review
+Streaming: Bytewax purchase_request_events -> purchase_request_alerts by tenant_id/request_id
+Generated routes/helpers: request workbench route, approval action helper, semantic manifest
+Package owners: capabilities/scm/req/ or a focused procurement package
+Focused proof: model, compile --verify, smoke_test.py, package pytest when durable behavior lands
+Known gaps: live ERP integration, supplier API adapter, purchasing document export
+Next slice: package-backed request lifecycle with approval guardrails
+```
+
+This blueprint is deliberately narrow. It avoids building an entire purchasing
+suite before APG can execute one request event.
 
 ## Readiness Levels
 
@@ -229,6 +302,42 @@ Run:
 
 Use the audit output as the burn-down board for package depth.
 
+## From Capacity To Package Backlog
+
+After the first generated capacity runs, convert remaining work into package
+backlog items. Each backlog item should name one lifecycle and one proof.
+
+```text
+Package:
+Lifecycle:
+Models:
+Service methods:
+Rules:
+Views/API:
+Adapter boundary:
+Positive test:
+Guardrail tests:
+Publish proof:
+```
+
+Example:
+
+```text
+Package: capabilities/common/logt/
+Lifecycle: ingest log -> correlate trace -> search -> approved export
+Models: pipeline, log event, trace, span, query, export, retention policy
+Service methods: create_pipeline, ingest_log, ingest_trace, record_span, search_logs, export_logs
+Rules: tenant required, trace context required, sensitive log redaction, export approval
+Views/API: dashboard, logs, traces, pipelines, retention, analytics
+Adapter boundary: OpenTelemetry collector, search index, object store, audit store
+Positive test: lifecycle executes with tenant-scoped events
+Guardrail tests: missing tenant, missing trace context, unredacted sensitive log, unapproved export
+Publish proof: implementation-audit --root and publish-plan
+```
+
+This is how APG closes the gap between language-level capacity and executable
+capability depth.
+
 ## AI Agent Capacities
 
 AI agents are first-class capacity components when they participate in the
@@ -250,6 +359,20 @@ Keep rapidly changing provider integrations behind adapters. A capacity should
 be able to switch from one provider runtime to another without rewriting the
 business event or package rules.
 
+Agent review rules:
+
+| Action type | Default policy |
+| --- | --- |
+| Read-only summarization | allowed with audit event |
+| Drafting recommendations | allowed with source evidence |
+| Mutating records | human approval unless explicitly safe and tested |
+| Calling external providers | adapter boundary plus timeout, budget, and fallback |
+| Executing code or shell tools | explicit tool allowlist and audit event |
+| Sending messages or payments | human approval and policy guardrail |
+
+An AI agent is first-class only when these boundaries are inspectable in APG
+source, semantic output, generated manifests, package rules, or documentation.
+
 ## Bytewax Streaming Capacities
 
 APG uses Bytewax terminology for streaming capacities. A stream slice should
@@ -268,6 +391,24 @@ name:
 Do not use Kafka as the default architecture. If a future integration needs
 Kafka, model it as an adapter boundary around Bytewax-oriented APG stream
 semantics.
+
+## Capacity Verification Matrix
+
+Use this matrix to decide what to run before committing:
+
+| Capacity change | Proof |
+| --- | --- |
+| New source shape | `apg model ... --json` |
+| Generated runtime changed | `apg compile ... --verify`, generated `smoke_test.py` |
+| Screen or workflow manifest changed | inspect semantic JSON and generated manifest/routes |
+| AI agent surface changed | model JSON, compile proof, agent adapter command when available |
+| Bytewax stream metadata changed | model JSON and generated manifest proof |
+| Capability package behavior changed | package pytest, implementation audit root, publish-plan |
+| Global capability burn-down changed | global implementation audit and progress-log entry |
+| Documentation changed only | docs audit and diff check |
+
+Do not advance readiness levels from prose. Advance them only from command
+evidence.
 
 ## Parallel Capacity Development
 

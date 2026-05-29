@@ -11291,3 +11291,17 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 82, materialized baseline packages dropped to 25, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 897, and warning count dropped to 27. The next implementation-depth warning is `logt`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 60 local links checked, 46 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+
+### 2026-05-29 16:04 EAT
+
+Contributor effectiveness guide expansion slice:
+
+- Expanded `docs/developer_guide.md` with the APG environment contract, command map, grammar-change recipe, generator-change recipe, capability-deepening recipe, new tooling-surface recipe, layer-by-layer debugging table, and progress-log handoff template.
+- Expanded `docs/contributors_guide.md` with the contributor operating loop, capability burn-down workflow, new-capacity start workflow, handoff note template, and common mistakes to avoid.
+- Expanded `docs/capacity_development_guide.md` with a capacity design sprint, example directory shape, ERP-style capacity blueprint, capacity-to-package backlog template, AI-agent review rules, and capacity verification matrix.
+- Kept the guides focused on making a new contributor immediately effective in progressing APG and building executable capacities without private context.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` passed with no whitespace errors before recording this progress-log entry.

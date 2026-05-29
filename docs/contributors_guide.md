@@ -13,6 +13,7 @@ Run this baseline from the repository root:
 
 ```bash
 git status --short
+uv sync
 ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-contributor-start --verify
 ./.venv/bin/python /tmp/apg-contributor-start/smoke_test.py
 ./.venv/bin/apg docs audit --json
@@ -31,6 +32,24 @@ Then read only what matches your intended lane:
 
 Do not try to understand every subsystem before contributing. Understand one
 owner, one public contract, and one proof command.
+
+## Contributor Operating Loop
+
+Use the same loop for every contribution, whether it is grammar, compiler,
+capability, example, tooling, or documentation work.
+
+1. Pull or inspect the current worktree.
+2. Identify unrelated local changes and leave them alone.
+3. Choose one packet with one owner.
+4. Run the smallest baseline that proves the owner currently works or fails.
+5. Make the change.
+6. Run focused proof.
+7. Update docs, README, cap spec, or progress log if readiness changed.
+8. Stage exact files.
+9. Commit with the Lore protocol and push the verified slice.
+
+If a packet grows into multiple owners, split it. APG moves faster when each
+commit has a clear owner and a clear proof command.
 
 ## Pick A Work Packet
 
@@ -111,6 +130,61 @@ Pick work in this order:
 Avoid work whose first proof requires live credentials, a new dependency, or a
 full platform rewrite.
 
+## How To Burn Down Capability Work
+
+Many APG capabilities already have contracts, routes, rules, theme metadata,
+and package shape. The useful contribution is often implementation depth:
+turning a generic package into domain behavior.
+
+Capability burn-down flow:
+
+1. Run `./.venv/bin/apg capabilities implementation-audit --json`.
+2. Pick the next package classified as materialized baseline, mixed, or
+   contract-only.
+3. Read its `capability_contract.py`, `cap_spec.md`, `__init__.py`, and tests.
+4. Implement one lifecycle that matches the contract.
+5. Add one positive lifecycle test and negative guardrail tests.
+6. Run package proof:
+
+   ```bash
+   ./.venv/bin/pytest -q capabilities/<domain>/<code>/test_capability_contract.py capabilities/<domain>/<code>/tests
+   ./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
+   ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+   ```
+
+7. Update `cap_spec.md` with current runtime behavior and adapter boundaries.
+8. Update `docs/progress_log.md` when the global audit counts or next target
+   changed.
+
+Do not wire live providers first. Local deterministic package behavior gives
+the compiler, examples, UI manifests, and publish tooling something stable to
+compose.
+
+## How To Start A New Capacity
+
+A new capacity is not a folder full of aspirations. It starts as one
+executable event.
+
+1. Name the event, for example `purchase request submitted` or
+   `device telemetry received`.
+2. Create or choose one example directory.
+3. Write `main.apg` with the records, rules, screens, workflows, agents,
+   streams, and capabilities needed for that event.
+4. Prove semantics and generation:
+
+   ```bash
+   ./.venv/bin/apg model examples/<nn>_<capacity>/main.apg --json
+   ./.venv/bin/apg compile examples/<nn>_<capacity>/main.apg --output /tmp/apg-capacity --verify
+   ./.venv/bin/python /tmp/apg-capacity/smoke_test.py
+   ```
+
+5. Update the example README with readiness level, proof commands, package
+   owners, and the next event.
+6. Deepen one package when the capacity needs durable behavior.
+
+Use the [Capacity Development Guide](./capacity_development_guide.md) for the
+full blueprint.
+
 ## Contribution Standards
 
 Every contribution should satisfy these standards:
@@ -187,6 +261,34 @@ extends APG.
 Write evidence, not optimism. A useful note names the command, outcome, and
 remaining gap.
 
+## Handoff Notes
+
+Every non-trivial contribution should leave a short handoff in the most local
+place a future contributor will read.
+
+Use this shape:
+
+```text
+Current state:
+Proof run:
+Public contract:
+Known gap:
+Next useful packet:
+```
+
+Where to put it:
+
+| Work | Handoff location |
+| --- | --- |
+| Example or capacity | example `README.md` |
+| Capability package | package `cap_spec.md` and focused tests |
+| Global readiness or audit burn-down | `docs/progress_log.md` |
+| CLI/tooling workflow | `docs/tooling.md` or relevant guide |
+| Contributor workflow | this guide or the developer guide |
+
+Do not leave critical next-step knowledge only in chat, a branch name, or a
+private note.
+
 ## Review Checklist
 
 Use this before asking for review or committing:
@@ -200,6 +302,22 @@ Use this before asking for review or committing:
 
 Reviewers should ask for narrower packets or stronger evidence when those items
 are unclear.
+
+## Common Mistakes To Avoid
+
+- Claiming a capacity is implemented because source parses but generated Python
+  does not run.
+- Updating checked-in generated output without fixing the generator.
+- Deepening a capability package while leaving the `cap_spec.md` describing old
+  generic behavior.
+- Adding AI provider details directly into business source instead of modeling
+  provider choice behind agent runtime configuration and approvals.
+- Modeling Kafka as the default stream architecture instead of Bytewax-oriented
+  stream semantics with adapters.
+- Running a broad suite, seeing unrelated failures, and reporting nothing about
+  the focused contract you changed.
+- Staging `.omx/`, `.claude/`, uploads, copied references, or another
+  contributor's dirty files.
 
 ## Commit Protocol
 

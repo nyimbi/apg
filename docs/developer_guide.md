@@ -15,6 +15,7 @@ Run these from the repository root before editing:
 
 ```bash
 git status --short
+uv sync
 ./.venv/bin/apg --help
 ./.venv/bin/apg docs audit --json
 ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-dev-start --verify
@@ -39,6 +40,35 @@ Non-goals:
 
 Do not start with a broad rewrite. APG advances through small verified packets
 that leave the next developer with a clearer command path.
+
+## Environment Contract
+
+APG is developed as a Python-first repository. Use the checked-in project
+metadata and the local virtual environment; do not assume a global `apg`
+command reflects the repository you are editing.
+
+```bash
+uv sync
+./.venv/bin/apg doctor --json
+./.venv/bin/apg --version
+```
+
+If `.venv` is stale or missing, recreate it with `uv sync`. If the CLI cannot
+import after sync, fix packaging or import errors before changing APG behavior.
+
+Use these command forms in docs, tests, and handoffs:
+
+| Need | Command shape |
+| --- | --- |
+| Current CLI | `./.venv/bin/apg <command>` |
+| Current Python | `./.venv/bin/python <script>` |
+| Focused tests | `./.venv/bin/pytest -q <path>` |
+| Temporary generated output | `/tmp/apg-<packet-name>` |
+| Example source | `examples/<nn>_<name>/main.apg` |
+| Capability root | `capabilities/<domain>/<code>/` |
+
+Do not write generated output into a source directory unless the packet is
+explicitly refreshing checked-in examples. Temporary proof belongs in `/tmp`.
 
 ## Development Mental Model
 
@@ -98,6 +128,27 @@ Generated output is evidence, not the primary owner. If generated files are
 wrong because the generator is wrong, change the generator and refresh output
 only when the output belongs to the packet.
 
+## Command Map
+
+These commands are the fastest way to orient yourself:
+
+| Question | Command |
+| --- | --- |
+| Does the CLI run? | `./.venv/bin/apg doctor --json` |
+| What can APG parse and mean? | `./.venv/bin/apg model <source.apg> --json` |
+| Can this source produce executable Python? | `./.venv/bin/apg compile <source.apg> --output /tmp/apg-slice --verify` |
+| Does generated Python execute? | `./.venv/bin/python /tmp/apg-slice/smoke_test.py` |
+| Which capabilities exist? | `./.venv/bin/apg capabilities list --json` |
+| What does one capability expose? | `./.venv/bin/apg capabilities inspect capabilities/<domain>/<code> --json` |
+| Which packages need implementation depth? | `./.venv/bin/apg capabilities implementation-audit --json` |
+| Is one package publishable? | `./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json` |
+| Are docs navigable and commands known? | `./.venv/bin/apg docs audit --json` |
+| Are tooling contracts healthy? | `./.venv/bin/apg tooling audit --json` |
+| Is repository layout clean? | `./.venv/bin/apg hygiene audit --json` |
+
+Prefer JSON output for evidence because it is easier to compare, cite, and
+inspect in follow-up automation.
+
 ## Primary Work Lanes
 
 ### Language And Compiler
@@ -119,6 +170,31 @@ Required steps:
 Do not add syntax just because it is expressive. Add syntax when it has a
 semantic owner and a path to generated Python, capability behavior, or tooling
 inspection.
+
+#### Grammar Change Recipe
+
+For grammar work, make the smallest syntax change that lets an APG author say
+the missing thing tersely.
+
+1. Add a representative source fixture or example first.
+2. Update `spec/apg.g4`.
+3. Regenerate checked-in parser artifacts only when required for the parser
+   wrapper to consume the grammar change.
+4. Update AST projection with stable field names.
+5. Update semantic-model projection with stable JSON keys.
+6. Add validation errors in the semantic analyzer when references can be wrong.
+7. Update the grammar guide and cheat sheet if the authoring surface changed.
+
+Proof usually looks like:
+
+```bash
+./.venv/bin/apg parser-golden --json
+./.venv/bin/apg model examples/<nn>_<name>/main.apg --json
+./.venv/bin/pytest -q tests/test_apg_language_contract.py tests/test_semantic_analyzer.py
+```
+
+Use focused tests that cover the changed construct. Full grammar-wide sweeps
+can wait until power and runtime budget allow.
 
 ### Generated Python Runtime
 
@@ -143,6 +219,22 @@ Required steps:
 Generated apps should remain dependency-light Python artifacts. Do not introduce
 framework-specific targets unless a separate accepted plan changes the target
 strategy.
+
+#### Generator Change Recipe
+
+Generated output is a contract with APG users. When changing generator behavior:
+
+1. Inspect the semantic JSON key that will drive generation.
+2. Update generator code, not checked-in output, unless the output refresh is
+   part of the packet.
+3. Compile one minimal example and one representative composed example.
+4. Run the generated smoke tests.
+5. Inspect generated `semantic_model.json` and route/helper files if the change
+   affects screens, workflows, agents, streams, or capability manifests.
+
+Keep generated applications readable. A contributor should be able to open the
+generated `app.py` and understand the runtime surface without reverse
+engineering the compiler.
 
 ### Capability Packages
 
@@ -171,6 +263,27 @@ Required steps:
 
 6. Update the package `cap_spec.md` and `docs/progress_log.md` when readiness
    or implementation-depth evidence changes.
+
+#### Capability Deepening Recipe
+
+The fastest valuable package improvement is to replace one generic storage path
+with one real lifecycle.
+
+Minimum package slice:
+
+| File | Expected change |
+| --- | --- |
+| `models.py` | domain dataclasses or Pydantic models with tenant ownership |
+| `<domain>_runtime.py` or similar | deterministic pure helpers for IDs, states, scores, or policy decisions |
+| `service.py` | lifecycle methods, guardrails, list/query helpers, compatibility shim |
+| `api.py` | dependency-light functions over the service |
+| `views.py` | route metadata and UI view models |
+| `cap_spec.md` | current behavior, adapter boundaries, proof commands |
+| `test_capability_contract.py` and `tests/` | lifecycle test plus negative guardrails |
+
+Keep live systems behind named adapters. A package can be domain-specific and
+useful before it has a production OpenTelemetry, payment, model-provider,
+database, or device integration.
 
 ### Examples And Capacity Proof
 
@@ -209,6 +322,42 @@ git diff --check -- docs
 
 Documentation must describe current executable behavior. If the behavior is not
 implemented, name it as a gap and point to the owner and proof command.
+
+#### New Tooling Surface Recipe
+
+When adding or changing a CLI command:
+
+1. Define the command's public JSON shape before wiring display output.
+2. Keep side-effect-free audit commands separate from mutating commands.
+3. Add a focused command test or fixture-backed audit.
+4. Add the command to the relevant guide only after it runs locally.
+5. Include a `--json` mode unless there is a strong reason not to.
+
+Useful proof:
+
+```bash
+./.venv/bin/apg <command> --json
+./.venv/bin/pytest -q tests/test_<command_or_area>.py
+./.venv/bin/apg tooling audit --json
+./.venv/bin/apg docs audit --json
+```
+
+## Debugging By Layer
+
+When a slice fails, locate the earliest broken boundary:
+
+| Symptom | Start here | Typical fix |
+| --- | --- | --- |
+| Parser rejects source | `spec/apg.g4`, parser fixtures | grammar rule or lexer ambiguity |
+| Parse succeeds but field missing | `compiler/ast_builder.py` | AST visitor normalization |
+| AST has data but references are unchecked | `compiler/semantic_analyzer.py` | symbol table or diagnostic rule |
+| Semantic JSON omits construct | `compiler/semantic_model.py` | stable projection key |
+| Semantic JSON is correct but app lacks behavior | `compiler/code_generator.py` | generated runtime helper or manifest |
+| Generated app imports fail | generator output and setup imports | dependency-light import path |
+| Package contract passes but behavior is generic | `capabilities/<domain>/<code>/` | domain models, service, API, views, tests |
+| Docs command fails audit | `docs/` and CLI command names | stale command or missing navigation link |
+
+Do not fix a downstream symptom by hard-coding around missing upstream meaning.
 
 ## Battery-Aware Verification
 
@@ -274,6 +423,25 @@ Not-tested: <known gaps>
 Update `docs/progress_log.md` when the work changes executable readiness,
 capability implementation depth, compiler baseline evidence, or contributor
 workflow. The log should record commands and outcomes, not aspirations.
+
+Use this handoff note in the progress log for substantial slices:
+
+```text
+### <date time timezone>
+
+<Executable slice name>:
+
+- What changed in source/runtime/package/docs.
+- Public contracts preserved or intentionally migrated.
+- New behavior and guardrails.
+- Adapter boundaries or known gaps.
+
+Battery-conscious verification:
+
+- `<command>` passed with `<specific outcome>`.
+- `<command>` passed with `<specific outcome>`.
+- Not run: `<broader check>` because `<reason>`.
+```
 
 ## Developer Definition Of Done
 
