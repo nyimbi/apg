@@ -16,6 +16,46 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 20:55 EAT
+
+Broad tooling and local hygiene closure slice:
+
+- Ran the full APG tooling audit after the ZTNA implementation-depth burn-down
+  and tracked hygiene evidence updates; all audited tooling surfaces passed.
+- Moved the copied `HCL_4GL Concepts and Use, v7.51.pdf` reference document
+  from top-level `docs/` into `docs/reference/`, which is the expected local
+  reference area for copied non-source documents.
+- Added `docs/reference/README.md` to document that local copied PDFs, office
+  documents, spreadsheets, and slide decks belong there and should not be
+  committed as canonical APG Markdown guides unless explicitly required.
+- Updated `.gitignore` so local agent state (`.claude/`, `.omx/`,
+  `.simple-task-master/`, `CLAUDE.local.md`), runtime uploads, and copied
+  reference binaries remain local and do not appear as repository hygiene
+  violations.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg tooling audit --json` passed with 20/20 tooling surfaces
+  passing, 0 failing surfaces, 0 errors, and 0 blocking gaps. The passing
+  surfaces included parser golden fixtures, diagnostics, lint, formatter,
+  drift, semantic model, graph, capability operability, capability
+  implementation, compiler baseline, repository hygiene, doctor, docs,
+  language server, natural-language planning, migrations, release evidence,
+  CLI surface, IDE integration, and Studio designer surfaces.
+- Tooling audit compiler baseline evidence passed with 20/20 examples, 20/20
+  checked-output runtime passes, 20/20 checked-output HTTP passes, 20/20
+  domain HTTP passes, 0 stale output directories, and 0 generated source hygiene
+  violations.
+- Tooling audit capability evidence passed with 109/109 operable contracts,
+  109 complete packages, 0 package gaps, 109 domain-specific implementations,
+  and 0 materialized baselines.
+- `./.venv/bin/apg docs audit --json` passed with all 15 required docs present,
+  0 broken local links, 49 documented commands all registered, and 0
+  violations.
+- `./.venv/bin/apg hygiene audit --include-untracked --json` passed with 21/21
+  checks passing, 0 failing checks, 0 violations, and local root runtime,
+  agent-state, root docs/tests, and reference-document checks all clean.
+
 ### 2026-05-29 20:49 EAT
 
 Tracked repository hygiene evidence slice:

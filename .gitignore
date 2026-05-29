@@ -27,3 +27,14 @@ coverage.xml
 *.egg-info/
 dist/
 build/
+
+# Local agent/runtime state
+.claude/
+.omx/
+.simple-task-master/
+CLAUDE.local.md
+uploads/
+
+# Local copied reference documents belong under docs/reference and stay local.
+docs/reference/*
+!docs/reference/README.md
