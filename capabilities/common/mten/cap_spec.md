@@ -4,6 +4,42 @@
 **Copyright:** © 2025  
 **Author:** Nyimbi Odero
 
+## Current Executable Package Scope
+
+The current package-backed MTEN slice provides dependency-light tenant
+management governance for generated APG applications:
+
+- Tenant-qualified tenant environment records with owner, tier, domain, DNS,
+  projected capacity, encrypted isolation boundary, and lifecycle status.
+- Capacity approval request and decision workflows with independent reviewer
+  and reviewer-note guardrails.
+- Tenant activation that rejects custom domains without DNS validation and
+  rejects high-capacity tenants without approved capacity state.
+- Isolation incident recording that suspends the affected tenant and emits
+  governance evidence.
+- Reactivation workflow that requires actor and remediation evidence.
+- Live migration request, review, and execution evidence with runbook and
+  independent-review guardrails.
+- API helper and view-model surfaces for tenant portfolio, provisioning,
+  capacity approvals, isolation incidents, live migrations, and governance
+  timelines.
+- UI route, theme, semantic-model, and release-report evidence for generated
+  APG applications.
+
+Adapter boundary: production cloud provisioning, live DNS validation, IAM,
+service mesh, billing, analytics, AI optimization, deployment bundles, and
+database persistence must sit behind this lifecycle and preserve its fail-closed
+guardrails.
+
+Focused proof commands for this executable package slice:
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/mten/__init__.py capabilities/common/mten/models.py capabilities/common/mten/mten_runtime.py capabilities/common/mten/api_helpers.py capabilities/common/mten/view_models.py capabilities/common/mten/capability_contract.py capabilities/common/mten/app.py capabilities/common/mten/tests/test_capability_contract.py capabilities/common/mten/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/mten/tests/test_capability_contract.py capabilities/common/mten/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mten --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/mten --json
+```
+
 ## Revolutionary Multi-Tenancy Platform
 
 The MTen capability delivers enterprise-grade multi-tenant management that surpasses industry leaders by 10x through AI-powered automation, universal cloud abstraction, and native APG ecosystem integration.

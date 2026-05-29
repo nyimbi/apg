@@ -34,13 +34,23 @@ class CapabilityConfiguration:
 			"auto_rightsize_enabled": True,
 			"burst_capacity_enabled": True,
 			"quota_alert_threshold_percent": 85,
-			"require_capacity_approval_for_overcommit": True
+			"require_capacity_approval_for_overcommit": True,
+			"capacity_approval_threshold_units": 1000,
+			"require_independent_capacity_review": True
 		},
 		"orchestration": {
 			"enabled_cloud_providers": ["aws", "azure", "gcp"],
 			"multi_cloud_enabled": True,
 			"live_migration_enabled": True,
-			"dns_validation_required": True
+			"dns_validation_required": True,
+			"require_migration_runbook": True,
+			"require_independent_migration_review": True
+		},
+		"governance": {
+			"record_governance_events": True,
+			"suspend_on_isolation_breach": True,
+			"reactivation_evidence_required": True,
+			"allow_tenant_local_ids": True
 		},
 		"analytics": {
 			"real_time_analytics_enabled": True,
@@ -52,7 +62,10 @@ class CapabilityConfiguration:
 			"enable_dashboard": True,
 			"enable_template_library": True,
 			"enable_cost_workspace": True,
-			"enable_isolation_map": True
+			"enable_isolation_map": True,
+			"enable_capacity_approval_queue": True,
+			"enable_live_migration_queue": True,
+			"enable_governance_timeline": True
 		},
 		"theme": {
 			"default_theme": "mten_control_fabric",
@@ -67,6 +80,7 @@ class CapabilityConfiguration:
 			"isolation",
 			"resources",
 			"orchestration",
+			"governance",
 			"analytics",
 			"ui",
 			"theme"
@@ -77,6 +91,7 @@ class CapabilityConfiguration:
 			"isolation": {"type": "object"},
 			"resources": {"type": "object"},
 			"orchestration": {"type": "object"},
+			"governance": {"type": "object"},
 			"analytics": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
@@ -179,6 +194,26 @@ class CapabilityTheme:
 		"quota_burn_indicator": {
 			"visual": "segmented-usage-bar",
 			"threshold_highlight": "capacity-band"
+		},
+		"capacity_approval_queue": {
+			"icon": "gauge",
+			"status_indicator": "left-bar",
+			"variant": "review"
+		},
+		"isolation_incident_panel": {
+			"icon": "shield-alert",
+			"status_indicator": "alert-ring",
+			"variant": "critical"
+		},
+		"live_migration_runbook": {
+			"icon": "route",
+			"status_indicator": "milestone",
+			"variant": "operations"
+		},
+		"tenant_governance_timeline": {
+			"icon": "scroll-text",
+			"line_style": "segmented",
+			"variant": "evidence"
 		}
 	})
 
@@ -237,6 +272,36 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="capacity_review_requires_independent_reviewer",
+			description="Capacity approvals require an independent reviewer.",
+			condition={"operation": "approve_capacity", "capacity_reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_capacity_reviewer_required",
+				"required_action": "assign_independent_reviewer"
+			}
+		),
+		CapabilityRule(
+			name="isolation_boundary_requires_encryption",
+			description="Tenant isolation boundaries must be encrypted before activation.",
+			condition={"isolation_boundary_encrypted": False},
+			effect={
+				"decision": "deny",
+				"reason": "isolation_boundary_encryption_required",
+				"required_action": "enable_encrypted_boundary"
+			}
+		),
+		CapabilityRule(
+			name="isolation_breach_requires_suspension",
+			description="Isolation breaches require immediate tenant suspension.",
+			condition={"isolation_breach_detected": True, "tenant_suspended": False},
+			effect={
+				"decision": "deny",
+				"reason": "isolation_breach_suspension_required",
+				"required_action": "suspend_tenant"
+			}
+		),
+		CapabilityRule(
 			name="live_migration_requires_runbook",
 			description="Live migrations require an attached runbook before execution.",
 			condition={"requested_operation": "live_migration", "runbook_attached": False},
@@ -244,6 +309,16 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "deny",
 				"reason": "live_migration_runbook_required",
 				"required_action": "attach_migration_runbook"
+			}
+		),
+		CapabilityRule(
+			name="live_migration_requires_independent_reviewer",
+			description="Live migration review must be performed by an independent reviewer.",
+			condition={"operation": "approve_live_migration", "migration_reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_migration_reviewer_required",
+				"required_action": "assign_independent_reviewer"
 			}
 		)
 	]
@@ -255,9 +330,13 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("dashboard", "/mten/dashboard", "MultiTenantDashboard", "mten:view", "Overview"),
 		CapabilityUIRoute("tenants", "/mten/tenants", "TenantPortfolioView", "mten:view", "Operations"),
 		CapabilityUIRoute("provisioning", "/mten/provisioning", "TenantProvisioningPipeline", "mten:provision", "Operations"),
+		CapabilityUIRoute("capacity_approvals", "/mten/capacity/approvals", "CapacityApprovalQueue", "mten:approve_capacity", "Governance"),
+		CapabilityUIRoute("isolation", "/mten/isolation", "TenantIsolationIncidentCenter", "mten:admin", "Governance"),
+		CapabilityUIRoute("live_migrations", "/mten/migrations", "LiveMigrationQueue", "mten:migrate", "Operations"),
 		CapabilityUIRoute("templates", "/mten/templates", "TenantTemplateCatalog", "mten:manage_templates", "Build"),
 		CapabilityUIRoute("analytics", "/mten/analytics", "TenantAnalyticsHub", "mten:view_analytics", "Intelligence"),
 		CapabilityUIRoute("optimization", "/mten/optimization", "ResourceOptimizationWorkbench", "mten:optimize", "Intelligence"),
+		CapabilityUIRoute("audit", "/mten/audit", "TenantGovernanceTimeline", "mten:view", "Governance"),
 		CapabilityUIRoute("settings", "/mten/settings", "TenantGovernanceSettings", "mten:admin", "Administration")
 	]
 	return {

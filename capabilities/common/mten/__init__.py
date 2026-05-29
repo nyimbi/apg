@@ -18,6 +18,7 @@ from .models import (
 )
 
 from .service import MultiTenantManager
+from .mten_runtime import MtenService
 
 from .views import (
 	TenantCreateRequest, TenantUpdateRequest, TenantResponse,
@@ -147,7 +148,11 @@ def register_capability() -> dict:
 		'capabilities': {
 			'tenant_provisioning': 'Create and activate tenant environments with policy controls',
 			'tenant_isolation': 'Enforce tenant context and cross-tenant access guardrails',
-			'resource_governance': 'Track quotas, approvals, and overcommit workflows',
+			'resource_governance': 'Track quotas, capacity approvals, and overcommit workflows',
+			'capacity_approvals': 'Review high-capacity tenant provisioning requests',
+			'isolation_incidents': 'Suspend and reactivate tenants based on isolation evidence',
+			'live_migrations': 'Govern live tenant migrations with runbooks and review',
+			'governance_events': 'Expose tenant lifecycle evidence for composition',
 			'tenant_analytics': 'Expose tenant portfolio analytics and health views',
 			'resource_optimization': 'Drive AI-assisted rightsizing and migration decisions',
 			'capability_rules': 'Evaluate deterministic capability-specific tenancy rules',
@@ -156,6 +161,10 @@ def register_capability() -> dict:
 		'endpoints': {
 			'tenants': '/mten/api/v1/tenants',
 			'provisioning': '/mten/api/v1/tenants/{tenant_id}/provisioning',
+			'capacity_approvals': '/mten/api/v1/capacity/approvals',
+			'isolation_incidents': '/mten/api/v1/isolation/incidents',
+			'live_migrations': '/mten/api/v1/migrations',
+			'audit': '/mten/api/v1/audit',
 			'recommendations': '/mten/api/v1/tenants/{tenant_id}/recommendations',
 			'upgrade': '/mten/api/v1/tenants/{tenant_id}/upgrade',
 			'suspend': '/mten/api/v1/tenants/{tenant_id}/suspend',
@@ -173,6 +182,8 @@ def register_capability() -> dict:
 			'mten:create',
 			'mten:update',
 			'mten:provision',
+			'mten:approve_capacity',
+			'mten:migrate',
 			'mten:manage_templates',
 			'mten:view_analytics',
 			'mten:optimize',
@@ -233,6 +244,7 @@ __all__ = [
 	
 	# Service
 	'MultiTenantManager',
+	'MtenService',
 	
 	# Views
 	'TenantCreateRequest', 'TenantUpdateRequest', 'TenantResponse',

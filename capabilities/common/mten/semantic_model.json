@@ -8,7 +8,10 @@
   },
   "capabilities": {
     "mten": {
-      "approvals": {},
+      "approvals": {
+        "capacity": "CapacityApprovalRecord",
+        "live_migration": "LiveMigrationRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -17,6 +20,12 @@
           "optimization_recommendations_enabled": true,
           "provisioning_sla_seconds": 60,
           "real_time_analytics_enabled": true
+        },
+        "governance": {
+          "allow_tenant_local_ids": true,
+          "reactivation_evidence_required": true,
+          "record_governance_events": true,
+          "suspend_on_isolation_breach": true
         },
         "isolation": {
           "allow_cross_tenant_operations": false,
@@ -32,7 +41,9 @@
             "gcp"
           ],
           "live_migration_enabled": true,
-          "multi_cloud_enabled": true
+          "multi_cloud_enabled": true,
+          "require_independent_migration_review": true,
+          "require_migration_runbook": true
         },
         "provisioning": {
           "default_tier": "free",
@@ -43,8 +54,10 @@
         "resources": {
           "auto_rightsize_enabled": true,
           "burst_capacity_enabled": true,
+          "capacity_approval_threshold_units": 1000,
           "quota_alert_threshold_percent": 85,
-          "require_capacity_approval_for_overcommit": true
+          "require_capacity_approval_for_overcommit": true,
+          "require_independent_capacity_review": true
         },
         "tenant_id": "default",
         "theme": {
@@ -52,9 +65,12 @@
           "default_theme": "mten_control_fabric"
         },
         "ui": {
+          "enable_capacity_approval_queue": true,
           "enable_cost_workspace": true,
           "enable_dashboard": true,
+          "enable_governance_timeline": true,
           "enable_isolation_map": true,
+          "enable_live_migration_queue": true,
           "enable_template_library": true
         }
       },
@@ -136,6 +152,44 @@
           },
           {
             "condition": {
+              "capacity_reviewer_same_as_requester": true,
+              "operation": "approve_capacity"
+            },
+            "description": "Capacity approvals require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_capacity_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "capacity_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "isolation_boundary_encrypted": false
+            },
+            "description": "Tenant isolation boundaries must be encrypted before activation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "isolation_boundary_encryption_required",
+              "required_action": "enable_encrypted_boundary"
+            },
+            "name": "isolation_boundary_requires_encryption"
+          },
+          {
+            "condition": {
+              "isolation_breach_detected": true,
+              "tenant_suspended": false
+            },
+            "description": "Isolation breaches require immediate tenant suspension.",
+            "effect": {
+              "decision": "deny",
+              "reason": "isolation_breach_suspension_required",
+              "required_action": "suspend_tenant"
+            },
+            "name": "isolation_breach_requires_suspension"
+          },
+          {
+            "condition": {
               "requested_operation": "live_migration",
               "runbook_attached": false
             },
@@ -146,6 +200,19 @@
               "required_action": "attach_migration_runbook"
             },
             "name": "live_migration_requires_runbook"
+          },
+          {
+            "condition": {
+              "migration_reviewer_same_as_requester": true,
+              "operation": "approve_live_migration"
+            },
+            "description": "Live migration review must be performed by an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_migration_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "live_migration_requires_independent_reviewer"
           }
         ],
         "type": "deterministic"
@@ -217,6 +284,44 @@
         },
         {
           "condition": {
+            "capacity_reviewer_same_as_requester": true,
+            "operation": "approve_capacity"
+          },
+          "description": "Capacity approvals require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_capacity_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "capacity_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "isolation_boundary_encrypted": false
+          },
+          "description": "Tenant isolation boundaries must be encrypted before activation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "isolation_boundary_encryption_required",
+            "required_action": "enable_encrypted_boundary"
+          },
+          "name": "isolation_boundary_requires_encryption"
+        },
+        {
+          "condition": {
+            "isolation_breach_detected": true,
+            "tenant_suspended": false
+          },
+          "description": "Isolation breaches require immediate tenant suspension.",
+          "effect": {
+            "decision": "deny",
+            "reason": "isolation_breach_suspension_required",
+            "required_action": "suspend_tenant"
+          },
+          "name": "isolation_breach_requires_suspension"
+        },
+        {
+          "condition": {
             "requested_operation": "live_migration",
             "runbook_attached": false
           },
@@ -227,12 +332,28 @@
             "required_action": "attach_migration_runbook"
           },
           "name": "live_migration_requires_runbook"
+        },
+        {
+          "condition": {
+            "migration_reviewer_same_as_requester": true,
+            "operation": "approve_live_migration"
+          },
+          "description": "Live migration review must be performed by an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_migration_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "live_migration_requires_independent_reviewer"
         }
       ],
       "runtime": {
         "api": "api.py",
+        "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
+        "runtime": "mten_runtime.py",
         "service": "service.py",
+        "view_models": "view_models.py",
         "views": "views.py"
       },
       "screens": {
@@ -241,10 +362,30 @@
           "permission": "mten:view_analytics",
           "route": "/mten/analytics"
         },
+        "audit": {
+          "component": "TenantGovernanceTimeline",
+          "permission": "mten:view",
+          "route": "/mten/audit"
+        },
+        "capacity_approvals": {
+          "component": "CapacityApprovalQueue",
+          "permission": "mten:approve_capacity",
+          "route": "/mten/capacity/approvals"
+        },
         "dashboard": {
           "component": "MultiTenantDashboard",
           "permission": "mten:view",
           "route": "/mten/dashboard"
+        },
+        "isolation": {
+          "component": "TenantIsolationIncidentCenter",
+          "permission": "mten:admin",
+          "route": "/mten/isolation"
+        },
+        "live_migrations": {
+          "component": "LiveMigrationQueue",
+          "permission": "mten:migrate",
+          "route": "/mten/migrations"
         },
         "optimization": {
           "component": "ResourceOptimizationWorkbench",
@@ -275,9 +416,24 @@
       "streaming": {},
       "theme": {
         "components": {
+          "capacity_approval_queue": {
+            "icon": "gauge",
+            "status_indicator": "left-bar",
+            "variant": "review"
+          },
           "isolation_boundary_map": {
             "breach_indicator": "alert-ring",
             "visual": "zoned-topology"
+          },
+          "isolation_incident_panel": {
+            "icon": "shield-alert",
+            "status_indicator": "alert-ring",
+            "variant": "critical"
+          },
+          "live_migration_runbook": {
+            "icon": "route",
+            "status_indicator": "milestone",
+            "variant": "operations"
           },
           "provisioning_timeline": {
             "milestone_style": "stacked-checkpoints",
@@ -286,6 +442,11 @@
           "quota_burn_indicator": {
             "threshold_highlight": "capacity-band",
             "visual": "segmented-usage-bar"
+          },
+          "tenant_governance_timeline": {
+            "icon": "scroll-text",
+            "line_style": "segmented",
+            "variant": "evidence"
           },
           "tenant_health_card": {
             "icon": "building-2",
@@ -334,6 +495,27 @@
             "permission": "mten:provision"
           },
           {
+            "component": "CapacityApprovalQueue",
+            "name": "capacity_approvals",
+            "nav_group": "Governance",
+            "path": "/mten/capacity/approvals",
+            "permission": "mten:approve_capacity"
+          },
+          {
+            "component": "TenantIsolationIncidentCenter",
+            "name": "isolation",
+            "nav_group": "Governance",
+            "path": "/mten/isolation",
+            "permission": "mten:admin"
+          },
+          {
+            "component": "LiveMigrationQueue",
+            "name": "live_migrations",
+            "nav_group": "Operations",
+            "path": "/mten/migrations",
+            "permission": "mten:migrate"
+          },
+          {
             "component": "TenantTemplateCatalog",
             "name": "templates",
             "nav_group": "Build",
@@ -353,6 +535,13 @@
             "nav_group": "Intelligence",
             "path": "/mten/optimization",
             "permission": "mten:optimize"
+          },
+          {
+            "component": "TenantGovernanceTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/mten/audit",
+            "permission": "mten:view"
           },
           {
             "component": "TenantGovernanceSettings",
@@ -387,6 +576,12 @@
           "provisioning_sla_seconds": 60,
           "real_time_analytics_enabled": true
         },
+        "governance": {
+          "allow_tenant_local_ids": true,
+          "reactivation_evidence_required": true,
+          "record_governance_events": true,
+          "suspend_on_isolation_breach": true
+        },
         "isolation": {
           "allow_cross_tenant_operations": false,
           "enforce_encrypted_boundaries": true,
@@ -401,7 +596,9 @@
             "gcp"
           ],
           "live_migration_enabled": true,
-          "multi_cloud_enabled": true
+          "multi_cloud_enabled": true,
+          "require_independent_migration_review": true,
+          "require_migration_runbook": true
         },
         "provisioning": {
           "default_tier": "free",
@@ -412,8 +609,10 @@
         "resources": {
           "auto_rightsize_enabled": true,
           "burst_capacity_enabled": true,
+          "capacity_approval_threshold_units": 1000,
           "quota_alert_threshold_percent": 85,
-          "require_capacity_approval_for_overcommit": true
+          "require_capacity_approval_for_overcommit": true,
+          "require_independent_capacity_review": true
         },
         "tenant_id": "default",
         "theme": {
@@ -421,9 +620,12 @@
           "default_theme": "mten_control_fabric"
         },
         "ui": {
+          "enable_capacity_approval_queue": true,
           "enable_cost_workspace": true,
           "enable_dashboard": true,
+          "enable_governance_timeline": true,
           "enable_isolation_map": true,
+          "enable_live_migration_queue": true,
           "enable_template_library": true
         }
       },
@@ -477,6 +679,19 @@
       },
       "name": "capacity_overcommit_requires_review"
     },
+    "capacity_review_requires_independent_reviewer": {
+      "condition": {
+        "capacity_reviewer_same_as_requester": true,
+        "operation": "approve_capacity"
+      },
+      "description": "Capacity approvals require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_capacity_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "capacity_review_requires_independent_reviewer"
+    },
     "cross_tenant_access_requires_membership": {
       "condition": {
         "cross_tenant_operation": true,
@@ -502,6 +717,44 @@
         "required_action": "validate_dns_ownership"
       },
       "name": "custom_domain_requires_dns_validation"
+    },
+    "isolation_boundary_requires_encryption": {
+      "condition": {
+        "isolation_boundary_encrypted": false
+      },
+      "description": "Tenant isolation boundaries must be encrypted before activation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "isolation_boundary_encryption_required",
+        "required_action": "enable_encrypted_boundary"
+      },
+      "name": "isolation_boundary_requires_encryption"
+    },
+    "isolation_breach_requires_suspension": {
+      "condition": {
+        "isolation_breach_detected": true,
+        "tenant_suspended": false
+      },
+      "description": "Isolation breaches require immediate tenant suspension.",
+      "effect": {
+        "decision": "deny",
+        "reason": "isolation_breach_suspension_required",
+        "required_action": "suspend_tenant"
+      },
+      "name": "isolation_breach_requires_suspension"
+    },
+    "live_migration_requires_independent_reviewer": {
+      "condition": {
+        "migration_reviewer_same_as_requester": true,
+        "operation": "approve_live_migration"
+      },
+      "description": "Live migration review must be performed by an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_migration_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "live_migration_requires_independent_reviewer"
     },
     "live_migration_requires_runbook": {
       "condition": {

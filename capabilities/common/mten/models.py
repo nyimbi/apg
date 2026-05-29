@@ -9,6 +9,7 @@ Comprehensive Pydantic v2 models for enterprise-grade multi-tenant management
 following CLAUDE.md standards: async throughout, modern typing, strict validation.
 """
 
+from dataclasses import dataclass, field
 from datetime import datetime, UTC
 from decimal import Decimal
 from enum import Enum
@@ -70,6 +71,156 @@ class CloudProvider(str, Enum):
 	GCP = "gcp"
 	HYBRID = "hybrid"
 	ON_PREMISE = "on_premise"
+
+
+@dataclass(frozen=True)
+class TenantEnvironmentRecord:
+	"""Dependency-light tenant environment state for APG composition."""
+
+	id: str
+	tenant_id: str
+	name: str
+	owner: str
+	tier: str
+	primary_domain: str
+	custom_domain: str = ""
+	dns_validated: bool = False
+	projected_compute_units: int = 0
+	isolation_boundary_encrypted: bool = True
+	capacity_approval_id: str = ""
+	status: str = "provisioning"
+	metadata: Dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"owner": self.owner,
+			"tier": self.tier,
+			"primary_domain": self.primary_domain,
+			"custom_domain": self.custom_domain,
+			"dns_validated": self.dns_validated,
+			"projected_compute_units": self.projected_compute_units,
+			"isolation_boundary_encrypted": self.isolation_boundary_encrypted,
+			"capacity_approval_id": self.capacity_approval_id,
+			"status": self.status,
+			"metadata": dict(self.metadata),
+		}
+
+
+@dataclass(frozen=True)
+class CapacityApprovalRecord:
+	"""Capacity overcommit approval evidence."""
+
+	id: str
+	tenant_id: str
+	target_tenant_id: str
+	requested_by: str
+	projected_compute_units: int
+	justification: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"target_tenant_id": self.target_tenant_id,
+			"requested_by": self.requested_by,
+			"projected_compute_units": self.projected_compute_units,
+			"justification": self.justification,
+			"status": self.status,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+		}
+
+
+@dataclass(frozen=True)
+class IsolationIncidentRecord:
+	"""Isolation breach evidence and suspension state."""
+
+	id: str
+	tenant_id: str
+	target_tenant_id: str
+	detected_by: str
+	breach_summary: str
+	severity: str = "high"
+	status: str = "open"
+	suspended: bool = True
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"target_tenant_id": self.target_tenant_id,
+			"detected_by": self.detected_by,
+			"breach_summary": self.breach_summary,
+			"severity": self.severity,
+			"status": self.status,
+			"suspended": self.suspended,
+		}
+
+
+@dataclass(frozen=True)
+class LiveMigrationRecord:
+	"""Live migration request, review, and execution evidence."""
+
+	id: str
+	tenant_id: str
+	target_tenant_id: str
+	requested_by: str
+	source_provider: str
+	target_provider: str
+	runbook: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"target_tenant_id": self.target_tenant_id,
+			"requested_by": self.requested_by,
+			"source_provider": self.source_provider,
+			"target_provider": self.target_provider,
+			"runbook": self.runbook,
+			"status": self.status,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+		}
+
+
+@dataclass(frozen=True)
+class TenantGovernanceEvent:
+	"""Tenant-scoped MTEN governance event."""
+
+	id: str
+	tenant_id: str
+	subject_id: str
+	event_type: str
+	actor: str
+	decision: str = "allow"
+	reasons: tuple[str, ...] = ()
+	metadata: Dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"subject_id": self.subject_id,
+			"event_type": self.event_type,
+			"actor": self.actor,
+			"decision": self.decision,
+			"reasons": list(self.reasons),
+			"metadata": dict(self.metadata),
+		}
 
 
 class ResourceAllocation(BaseModel):

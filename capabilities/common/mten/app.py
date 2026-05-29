@@ -5,13 +5,130 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Multi-Tenant Management package-backed APG capability", "entity_count": 0, "name": "mten", "version": "1.0.0"}, "capabilities": {"mten": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"analytics": {"anomaly_detection_enabled": true, "optimization_recommendations_enabled": true, "provisioning_sla_seconds": 60, "real_time_analytics_enabled": true}, "isolation": {"allow_cross_tenant_operations": false, "enforce_encrypted_boundaries": true, "require_tenant_context": true, "suspend_on_isolation_breach": true}, "orchestration": {"dns_validation_required": true, "enabled_cloud_providers": ["aws", "azure", "gcp"], "live_migration_enabled": true, "multi_cloud_enabled": true}, "provisioning": {"default_tier": "free", "max_concurrent_provisions": 10, "provisioning_timeout_seconds": 60, "require_template_for_custom_tiers": true}, "resources": {"auto_rightsize_enabled": true, "burst_capacity_enabled": true, "quota_alert_threshold_percent": 85, "require_capacity_approval_for_overcommit": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mten_control_fabric"}, "ui": {"enable_cost_workspace": true, "enable_dashboard": true, "enable_isolation_map": true, "enable_template_library": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Multi-Tenant Management", "provides": ["mten_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All tenant management operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"cross_tenant_operation": true, "tenant_membership_confirmed": false}, "description": "Cross-tenant operations require confirmed tenant membership.", "effect": {"decision": "deny", "reason": "tenant_membership_required", "required_action": "confirm_tenant_membership"}, "name": "cross_tenant_access_requires_membership"}, {"condition": {"requested_operation_is_mutation": true, "tenant_status": "suspended"}, "description": "Suspended tenants cannot be mutated until reactivated.", "effect": {"decision": "deny", "reason": "tenant_suspended", "required_action": "reactivate_tenant_or_abort"}, "name": "suspended_tenants_block_mutations"}, {"condition": {"custom_domain_requested": true, "dns_validated": false}, "description": "Custom domains require ownership validation before activation.", "effect": {"decision": "deny", "reason": "dns_validation_required", "required_action": "validate_dns_ownership"}, "name": "custom_domain_requires_dns_validation"}, {"condition": {"capacity_approval_recorded": false, "projected_compute_units_gt": 1000}, "description": "High projected capacity usage requires explicit approval.", "effect": {"decision": "require_review", "reason": "capacity_review_required", "required_action": "record_capacity_approval"}, "name": "capacity_overcommit_requires_review"}, {"condition": {"requested_operation": "live_migration", "runbook_attached": false}, "description": "Live migrations require an attached runbook before execution.", "effect": {"decision": "deny", "reason": "live_migration_runbook_required", "required_action": "attach_migration_runbook"}, "name": "live_migration_requires_runbook"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All tenant management operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"cross_tenant_operation": true, "tenant_membership_confirmed": false}, "description": "Cross-tenant operations require confirmed tenant membership.", "effect": {"decision": "deny", "reason": "tenant_membership_required", "required_action": "confirm_tenant_membership"}, "name": "cross_tenant_access_requires_membership"}, {"condition": {"requested_operation_is_mutation": true, "tenant_status": "suspended"}, "description": "Suspended tenants cannot be mutated until reactivated.", "effect": {"decision": "deny", "reason": "tenant_suspended", "required_action": "reactivate_tenant_or_abort"}, "name": "suspended_tenants_block_mutations"}, {"condition": {"custom_domain_requested": true, "dns_validated": false}, "description": "Custom domains require ownership validation before activation.", "effect": {"decision": "deny", "reason": "dns_validation_required", "required_action": "validate_dns_ownership"}, "name": "custom_domain_requires_dns_validation"}, {"condition": {"capacity_approval_recorded": false, "projected_compute_units_gt": 1000}, "description": "High projected capacity usage requires explicit approval.", "effect": {"decision": "require_review", "reason": "capacity_review_required", "required_action": "record_capacity_approval"}, "name": "capacity_overcommit_requires_review"}, {"condition": {"requested_operation": "live_migration", "runbook_attached": false}, "description": "Live migrations require an attached runbook before execution.", "effect": {"decision": "deny", "reason": "live_migration_runbook_required", "required_action": "attach_migration_runbook"}, "name": "live_migration_requires_runbook"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "TenantAnalyticsHub", "permission": "mten:view_analytics", "route": "/mten/analytics"}, "dashboard": {"component": "MultiTenantDashboard", "permission": "mten:view", "route": "/mten/dashboard"}, "optimization": {"component": "ResourceOptimizationWorkbench", "permission": "mten:optimize", "route": "/mten/optimization"}, "provisioning": {"component": "TenantProvisioningPipeline", "permission": "mten:provision", "route": "/mten/provisioning"}, "settings": {"component": "TenantGovernanceSettings", "permission": "mten:admin", "route": "/mten/settings"}, "templates": {"component": "TenantTemplateCatalog", "permission": "mten:manage_templates", "route": "/mten/templates"}, "tenants": {"component": "TenantPortfolioView", "permission": "mten:view", "route": "/mten/tenants"}}, "streaming": {}, "theme": {"components": {"isolation_boundary_map": {"breach_indicator": "alert-ring", "visual": "zoned-topology"}, "provisioning_timeline": {"milestone_style": "stacked-checkpoints", "orientation": "horizontal"}, "quota_burn_indicator": {"threshold_highlight": "capacity-band", "visual": "segmented-usage-bar"}, "tenant_health_card": {"icon": "building-2", "shape": "rounded-rectangle", "status_indicator": "tier-ribbon"}}, "name": "mten_control_fabric", "tokens": {"border.radius": "12px", "color.accent": "#C67B2F", "color.danger": "#C53030", "color.primary": "#0F5A5C", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "comfortable", "surface.canvas": "#F5F7FA", "surface.panel": "#FFFFFF", "text.primary": "#102A43", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/mten/api/v1", "requires_theme": true, "routes": [{"component": "MultiTenantDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/mten/dashboard", "permission": "mten:view"}, {"component": "TenantPortfolioView", "name": "tenants", "nav_group": "Operations", "path": "/mten/tenants", "permission": "mten:view"}, {"component": "TenantProvisioningPipeline", "name": "provisioning", "nav_group": "Operations", "path": "/mten/provisioning", "permission": "mten:provision"}, {"component": "TenantTemplateCatalog", "name": "templates", "nav_group": "Build", "path": "/mten/templates", "permission": "mten:manage_templates"}, {"component": "TenantAnalyticsHub", "name": "analytics", "nav_group": "Intelligence", "path": "/mten/analytics", "permission": "mten:view_analytics"}, {"component": "ResourceOptimizationWorkbench", "name": "optimization", "nav_group": "Intelligence", "path": "/mten/optimization", "permission": "mten:optimize"}, {"component": "TenantGovernanceSettings", "name": "settings", "nav_group": "Administration", "path": "/mten/settings", "permission": "mten:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "blueprint.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"mten": []}}, "contracts": {"mten": {"configuration": {"analytics": {"anomaly_detection_enabled": true, "optimization_recommendations_enabled": true, "provisioning_sla_seconds": 60, "real_time_analytics_enabled": true}, "isolation": {"allow_cross_tenant_operations": false, "enforce_encrypted_boundaries": true, "require_tenant_context": true, "suspend_on_isolation_breach": true}, "orchestration": {"dns_validation_required": true, "enabled_cloud_providers": ["aws", "azure", "gcp"], "live_migration_enabled": true, "multi_cloud_enabled": true}, "provisioning": {"default_tier": "free", "max_concurrent_provisions": 10, "provisioning_timeout_seconds": 60, "require_template_for_custom_tiers": true}, "resources": {"auto_rightsize_enabled": true, "burst_capacity_enabled": true, "quota_alert_threshold_percent": 85, "require_capacity_approval_for_overcommit": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mten_control_fabric"}, "ui": {"enable_cost_workspace": true, "enable_dashboard": true, "enable_isolation_map": true, "enable_template_library": true}}, "id": "mten", "provides": ["mten_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"mten": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"capacity_overcommit_requires_review": {"condition": {"capacity_approval_recorded": false, "projected_compute_units_gt": 1000}, "description": "High projected capacity usage requires explicit approval.", "effect": {"decision": "require_review", "reason": "capacity_review_required", "required_action": "record_capacity_approval"}, "name": "capacity_overcommit_requires_review"}, "cross_tenant_access_requires_membership": {"condition": {"cross_tenant_operation": true, "tenant_membership_confirmed": false}, "description": "Cross-tenant operations require confirmed tenant membership.", "effect": {"decision": "deny", "reason": "tenant_membership_required", "required_action": "confirm_tenant_membership"}, "name": "cross_tenant_access_requires_membership"}, "custom_domain_requires_dns_validation": {"condition": {"custom_domain_requested": true, "dns_validated": false}, "description": "Custom domains require ownership validation before activation.", "effect": {"decision": "deny", "reason": "dns_validation_required", "required_action": "validate_dns_ownership"}, "name": "custom_domain_requires_dns_validation"}, "live_migration_requires_runbook": {"condition": {"requested_operation": "live_migration", "runbook_attached": false}, "description": "Live migrations require an attached runbook before execution.", "effect": {"decision": "deny", "reason": "live_migration_runbook_required", "required_action": "attach_migration_runbook"}, "name": "live_migration_requires_runbook"}, "suspended_tenants_block_mutations": {"condition": {"requested_operation_is_mutation": true, "tenant_status": "suspended"}, "description": "Suspended tenants cannot be mutated until reactivated.", "effect": {"decision": "deny", "reason": "tenant_suspended", "required_action": "reactivate_tenant_or_abort"}, "name": "suspended_tenants_block_mutations"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All tenant management operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.mten": {"file": "capability_contract.py", "id": "capability.mten", "kind": "capability", "name": "Multi-Tenant Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("mten_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "mten",
+			"version": "1.0.0",
+			"description": "Multi-Tenant Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"mten": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"mten": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["mten_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"api_helpers": "api_helpers.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"runtime": "mten_runtime.py",
+					"views": "views.py",
+					"view_models": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"capacity": "CapacityApprovalRecord",
+					"live_migration": "LiveMigrationRecord",
+				},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"mten": {
+				"id": "mten",
+				"configuration": contract["configuration"],
+				"provides": ["mten_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"mten": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.mten": {
+				"id": "capability.mten",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +153,15 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	routes = model.get("capabilities", {}).get("mten", {}).get("ui", {}).get("routes", [])
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "mten" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 11:
+		errors.append("MTEN semantic model route manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

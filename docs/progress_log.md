@@ -13048,3 +13048,31 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/conf --json` passed with change/approval/drift-remediation/audit routes, 9 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/conf` returned no stale CONF materialized markers.
 - `git diff --check -- capabilities/common/conf docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-30 02:29 EAT
+
+MTEN governed tenant provisioning, capacity, isolation, and migration lifecycle slice:
+
+- Added `capabilities/common/mten/SPECIFICATION.md` and `capabilities/common/mten/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Added dependency-light tenant environment, capacity approval, isolation incident, live migration, and tenant governance event models.
+- Added `mten_runtime.py` with tenant-qualified state for tenants, capacity approvals, isolation incidents, live migrations, and governance events.
+- Added tenant registration and activation guardrails for tenant context, tenant owner, primary domain, custom-domain DNS validation, encrypted isolation boundaries, capacity approval state, and tenant-local duplicate ID isolation.
+- Added capacity approval request and decision workflows with independent reviewer and reviewer notes.
+- Added isolation incident recording that suspends the affected tenant and reactivation that requires actor and remediation evidence.
+- Added live migration request, decision, and execution workflows with runbook, independent reviewer, reviewer notes, approval, and execution evidence.
+- Added dependency-light `api_helpers.py` and `view_models.py` for generated APG applications.
+- Extended the MTEN capability contract with capacity approval, isolation, live migration, and audit routes, plus rules and theme components.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive capacity-approval-tenant-registration-activation-live-migration-isolation-reactivation-governance coverage and API-helper/view-model coverage.
+- Added negative custom-domain DNS, unencrypted isolation boundary, missing capacity review, self capacity review, missing capacity notes, rejected capacity approval, suspended tenant mutation, missing migration runbook, self migration review, missing migration notes, missing migration approval, and duplicate-ID tenant-isolation coverage.
+- Updated `cap_spec.md` with the current executable package scope, adapter boundaries, and focused proof commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mten/__init__.py capabilities/common/mten/models.py capabilities/common/mten/mten_runtime.py capabilities/common/mten/api_helpers.py capabilities/common/mten/view_models.py capabilities/common/mten/capability_contract.py capabilities/common/mten/app.py capabilities/common/mten/tests/test_capability_contract.py capabilities/common/mten/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/mten/tests/test_capability_contract.py capabilities/common/mten/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mten --json` passed with `ok: true`; MTEN remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mten --json` passed with capacity/isolation/live-migration/audit routes, 10 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/mten` returned no stale MTEN materialized markers.
+- `git diff --check -- capabilities/common/mten docs/progress_log.md` passed with no whitespace errors.
