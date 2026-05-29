@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""Quantum Computing package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_materialized_contract_shape_is_valid():
-	module = _load_module("materialized_contract_quan", PACKAGE_DIR / "capability_contract.py")
+def test_quan_contract_shape_is_valid():
+	module = _load_module("quan_contract_shape", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
@@ -32,8 +32,8 @@ def test_materialized_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
-def test_materialized_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_quan", PACKAGE_DIR / "app.py")
+def test_quan_app_entrypoint_is_publishable():
+	module = _load_module("quan_app_entrypoint", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -44,3 +44,19 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "quan" in model["capabilities"]
+
+
+def test_quan_backend_record_compatibility_runtime():
+	from capabilities.common.quan.service import QuanService
+
+	service = QuanService()
+	record = service.create_record(
+		record_id="compat-sim",
+		tenant_id="tenant-test",
+		metadata={"provider": "local", "backend_type": "simulator", "qubit_count": 4},
+		status="active",
+	)
+
+	assert record["id"] == "compat-sim"
+	assert record["provider"] == "local"
+	assert service.dashboard_summary("tenant-test")["backend_count"] == 1

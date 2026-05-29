@@ -16,6 +16,78 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 17:49 EAT
+
+QUAN implementation-depth slice:
+
+- Converted `quan` from a materialized-baseline package into a domain-specific
+  quantum computing runtime package.
+- Added executable tenant-scoped quantum backends, circuit definitions, quota
+  policies, quantum jobs, deterministic result capture, experiment grouping,
+  audit events, dashboard summaries, and contract-rule evaluation.
+- Added `quantum_runtime.py` as the QUAN-specific algorithm surface for stable
+  IDs, provider normalization, backend type normalization, retry policy
+  validation, job cost estimation, deterministic measurement counts, result
+  confidence, result summaries, and qubit-capacity checks so package behavior
+  is no longer generic record scaffolding.
+- Replaced generic package API and view helpers with quantum-lab helpers for
+  backend registration, quota attachment, circuit creation, job submission,
+  job completion, experiment creation, dashboard, backend registry, circuit
+  library, job queue, experiment workbench, result viewer, governance, routes,
+  rules, and theme metadata.
+- Rewrote `cap_spec.md` to describe current executable behavior, runtime
+  surfaces, guardrails, adapter boundaries, UI surfaces, theme contract, and
+  focused verification commands.
+- Expanded focused tests for the backend-to-circuit-to-job-to-result lifecycle,
+  experiment workbench, compatibility records, view models, and policy
+  failures for missing tenant context, unapproved backends, missing provider
+  credentials, missing circuit owners, unencrypted sensitive inputs, missing
+  circuit metadata, jobs without quota, quota overflow, large jobs without
+  review, and missing post-quantum review.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/quan/__init__.py
+  capabilities/common/quan/models.py
+  capabilities/common/quan/quantum_runtime.py
+  capabilities/common/quan/service.py capabilities/common/quan/api.py
+  capabilities/common/quan/views.py
+  capabilities/common/quan/test_capability_contract.py
+  capabilities/common/quan/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/pytest -q capabilities/common/quan/test_capability_contract.py
+  capabilities/common/quan/tests` -> 9 passed with 10 pre-existing adjacent
+  SQLAlchemy/Pydantic deprecation warnings.
+- `rg -n "<baseline marker patterns>" capabilities/common/quan` -> no
+  generated materialization or generic dependency-light marker matches.
+- `./.venv/bin/python -c "import importlib; ..."` for
+  `capabilities.common.quan.models`, `quantum_runtime`, `service`, `api`, and
+  `views` -> passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/quan --json` -> passed with `quan` classified as
+  `domain_specific`, `quantum_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/quan --json`
+  -> passed with a side-effect-free catalog patch and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  91 domain-specific packages, 16 materialized-baseline packages, 1 mixed
+  package, 1 contract-only package, 906 custom Python files, 0 errors, and 18
+  warnings; next warning is `recs`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 61
+  local links, 49 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `./.venv/bin/apg hygiene audit --json` -> passed with 17/17 hygiene checks,
+  0 violations, and 0 tracked-file hygiene failures.
+
+Known remaining gaps:
+
+- `quan` is now domain-specific, but implementation-depth still reports 16
+  materialized baselines, 1 mixed implementation, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is
+  `recs`.
+
 ### 2026-05-29 17:41 EAT
 
 Contributor guide documentation slice:
