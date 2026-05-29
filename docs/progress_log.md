@@ -10336,6 +10336,22 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `git diff --check -- capabilities/common/dtwn/__init__.py capabilities/common/dtwn/models.py capabilities/common/dtwn/twin_engine.py capabilities/common/dtwn/service.py capabilities/common/dtwn/api.py capabilities/common/dtwn/views.py capabilities/common/dtwn/test_capability_contract.py capabilities/common/dtwn/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
 
+### 2026-05-29 11:22 EAT
+
+Developer, contributor, and capacity guide effectiveness expansion:
+
+- Expanded `docs/developer_guide.md` with a core-developer gap triage workflow that uses baseline, capability implementation, tooling, and docs audits to choose the next APG packet from evidence.
+- Added an executable-reality review model to the developer guide so features are classified as idea, parseable, semantic, generated, package-backed, or operable before contributors claim implementation status.
+- Expanded `docs/contributors_guide.md` with same-day contribution choices that map timeboxes to docs, examples, capability tests, baseline-marker removal, and compiler-visible semantic work.
+- Added a package-selection workflow to the contributors guide so new contributors can use `implementation-audit` to pick a clear capability-depth packet and read only the owning package directory first.
+- Expanded `docs/capacity_development_guide.md` with a capacity seed kit that names minimum artifacts, proof commands, README fields, and progress-log handoff expectations.
+- Added a capacity extension matrix that maps common capacity gaps to the next executable artifact and proof command across semantic model, generated app, package behavior, rules, screens, agents, Bytewax streaming, and handoff docs.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 60 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
+
 ### 2026-05-29 10:47 EAT
 
 Executable DIST distributed-computing runtime slice:

@@ -287,6 +287,53 @@ Use this tree when choosing where to edit:
 
 Do not begin with a broad repository rewrite. Begin where the evidence fails.
 
+## Gap Triage For Core Developers
+
+When you are deciding what APG needs next, prefer current evidence over the
+oldest or loudest plan. Run the smallest set of audits that describes the
+surface you intend to improve, then pick one packet.
+
+```bash
+./.venv/bin/apg baseline examples --json
+./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg tooling audit --json
+./.venv/bin/apg docs audit --json
+```
+
+Interpret the results this way:
+
+| Finding | Meaning | Best next packet |
+| --- | --- | --- |
+| numbered example fails baseline | author-facing executable path is broken | fix parser, semantic model, generator, or checked output for that example |
+| capability is `contract_only` | APG can name it but cannot package it | add or materialize package artifacts and focused tests |
+| capability is `materialized_baseline` | APG can publish shape but not domain behavior | replace generic records/services/API/views with domain-specific runtime state |
+| capability is `mixed` | useful code exists but baseline surfaces remain | preserve custom behavior and remove generated placeholders behind tests |
+| tooling audit fails | contributor evidence path is unreliable | fix the failing command, fixture, JSON contract, or guide example |
+| docs audit fails | contributor navigation or command examples drifted | update links, command names, or required docs |
+
+The best next task is usually the first failing or shallow executable contract
+that can be fixed in one owning directory. If a proposed change spans grammar,
+semantic model, generator, capability behavior, examples, and docs, split it in
+that dependency order and commit each verified slice separately.
+
+## Executable Reality Review
+
+Before changing a feature, classify its current state. This prevents edits that
+improve prose but leave APG no closer to generated applications.
+
+| State | Evidence | Developer action |
+| --- | --- | --- |
+| idea | docs only | create or update an APG example packet |
+| parseable | parser accepts source | add semantic-model exposure |
+| semantic | `apg model ... --json` contains it | expose generated runtime behavior |
+| generated | `apg compile --verify` emits it | add smoke/self-test or route evidence |
+| package-backed | capability contract and artifacts exist | deepen service/API/view behavior |
+| operable | tests, audits, publish-plan pass | document extension points and next gap |
+
+Do not claim a feature as implemented at a higher state than the evidence
+proves. If the feature is metadata-only for now, say so in the docs and leave a
+clear next action.
+
 ## First-Day Execution Checklist
 
 Use this checklist when onboarding yourself or another contributor. It is

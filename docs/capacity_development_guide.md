@@ -109,6 +109,65 @@ The loop is intentionally repetitive. APG becomes useful by repeating it across
 ERP, CRM, finance, operations, agentic, and integration capacities until each
 one has source, generated runtime behavior, package evidence, and documentation.
 
+## Capacity Seed Kit
+
+When starting a new capacity, create a seed that another contributor can extend
+without a meeting. The seed should be small, executable, and explicit about
+what is still missing.
+
+Minimum seed artifacts:
+
+```text
+examples/<nn>_<capacity_name>/main.apg
+examples/<nn>_<capacity_name>/README.md
+examples/<nn>_<capacity_name>/output/
+capabilities/<domain>/<code>/capability_contract.py
+docs/progress_log.md
+```
+
+Minimum seed commands:
+
+```bash
+./.venv/bin/apg model examples/<nn>_<capacity_name>/main.apg --json
+./.venv/bin/apg compile examples/<nn>_<capacity_name>/main.apg --output /tmp/apg-capacity-seed --verify
+./.venv/bin/python /tmp/apg-capacity-seed/smoke_test.py
+./.venv/bin/apg capabilities validate-contracts --json
+```
+
+The README must name:
+
+- the first business event;
+- current readiness level;
+- capability packages that own durable behavior;
+- semantic-model keys expected to exist;
+- generated routes, helpers, or manifests expected to exist;
+- rules, screens, workflows, agents, and Bytewax streams included in the seed;
+- exact proof commands;
+- next slice for package behavior, compiler behavior, or documentation.
+
+Do not seed a capacity with a large directory of disconnected files. Seed one
+path from APG source to generated runtime evidence, then let other contributors
+take adjacent packets.
+
+## Capacity Extension Matrix
+
+Use this matrix to decide the next extension after a seed compiles.
+
+| Current gap | Add next | Prove with |
+| --- | --- | --- |
+| source exists but semantic model is thin | stable semantic-model keys and graph relationships | `apg model ... --json`, `apg graph-suite ... --json` |
+| generated app lacks visible behavior | route/helper/manifest output and smoke assertions | `apg compile ... --verify`, generated `smoke_test.py` |
+| package contract exists but behavior is generic | domain models, service methods, API helpers, view models | focused package tests, implementation audit |
+| rules are documented but not enforced | deterministic rule contexts and guardrail tests | package tests and `apg capabilities evaluate-rules ... --json` |
+| screens exist but composition is unclear | explicit routes, components, permissions, and relationships | semantic model, generated manifests, screen docs |
+| agents exist but governance is unclear | runtime adapter config, tool references, memory, approval rules | semantic model, AGNT package tests, publish-plan |
+| streaming is declared vaguely | Bytewax flow names, event envelopes, input/output topics | model graph, generated metadata, package stream tests |
+| contributors cannot extend it | README packet and progress-log handoff | docs audit and diff check |
+
+Only expand horizontally after the current vertical path is inspectable. A
+capacity that does one event end to end is more useful than a capacity that
+lists twenty modules with no generated proof.
+
 ## Two-Hour Capacity Start
 
 Use this sequence when a contributor needs to start a new capacity without

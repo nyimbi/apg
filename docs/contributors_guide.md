@@ -51,6 +51,57 @@ The fastest contributors are not the ones who touch the most files. They are the
 ones who leave the next contributor with fewer unknowns and a command that
 proves the current state.
 
+## Same-Day Contribution Choices
+
+Choose work that can be made real and reviewed the same day. If you are new,
+use one of these packets before taking a larger feature.
+
+| Timebox | Packet | Edit surface | Proof |
+| --- | --- | --- | --- |
+| 30 minutes | fix one stale docs command or link | one guide page | `apg docs audit --json`, `git diff --check -- docs` |
+| 60 minutes | clarify one example README from generated output | one `examples/<nn>_*/README.md` | focused `apg compile ... --verify` |
+| 90 minutes | add one guardrail test to a capability | one package test file | focused package pytest and capability audit |
+| half day | remove one remaining baseline marker from a mixed capability | one capability package | marker search, implementation audit, publish-plan |
+| one day | add one compiler-visible semantic field | compiler layer, fixture, one example | focused semantic/generator test and compile smoke test |
+
+Pick the smallest packet that improves executable reality. A first contribution
+should teach the next contributor where to look, what to run, and what remains
+undone.
+
+## How To Choose The Next Package
+
+Capability depth work is one of the highest-leverage contribution paths. Use
+the implementation audit instead of guessing.
+
+```bash
+./.venv/bin/apg capabilities implementation-audit --json
+```
+
+Choose the first package that satisfies all of these:
+
+- it has a clear business domain;
+- its contract names rules, UI, configuration, and theme surfaces;
+- the next behavior can be implemented without a new external dependency;
+- focused package tests can prove one happy path and one guardrail;
+- the package can be publish-planned after the change.
+
+For that package, read only the owning directory first:
+
+```text
+capabilities/<domain>/<code>/capability_contract.py
+capabilities/<domain>/<code>/cap_spec.md
+capabilities/<domain>/<code>/models.py
+capabilities/<domain>/<code>/service.py
+capabilities/<domain>/<code>/api.py
+capabilities/<domain>/<code>/views.py
+capabilities/<domain>/<code>/test_capability_contract.py
+capabilities/<domain>/<code>/tests/
+```
+
+The goal is not to add a large framework. The goal is to replace generic
+materialized state with deterministic, tenant-aware, rule-aware behavior that
+applications can compose now.
+
 ## What APG Is
 
 APG is a Python-first application generation platform built around a terse,
