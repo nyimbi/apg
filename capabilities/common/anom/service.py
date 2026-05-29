@@ -1,18 +1,32 @@
-"""Service layer for the Anomaly Detection capability."""
+"""Service layer for APG Anomaly Detection."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from .anomaly_engine import AnomalyDetectionEngine
 from .capability_contract import evaluate_capability_rules, get_capability_contract
-from .models import AnomRecord
+from .models import (
+	AnomalySignal,
+	BaselineProfile,
+	DetectionFeedback,
+	Investigation,
+	MonitoringSource,
+	Observation,
+)
 
 
 class AnomService:
-	"""Dependency-light service backed by the capability contract."""
+	"""Monitoring source registry, baseline manager, detector, and investigation queue."""
 
 	def __init__(self) -> None:
-		self._records: dict[str, AnomRecord] = {}
+		self._sources: dict[str, MonitoringSource] = {}
+		self._baselines: dict[str, BaselineProfile] = {}
+		self._observations: dict[str, Observation] = {}
+		self._signals: dict[str, AnomalySignal] = {}
+		self._investigations: dict[str, Investigation] = {}
+		self._feedback: dict[str, DetectionFeedback] = {}
+		self._engine = AnomalyDetectionEngine()
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -20,8 +34,144 @@ class AnomService:
 	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
 		return evaluate_capability_rules(context)
 
+	def register_source(
+		self,
+		source_id: str,
+		tenant_id: str,
+		name: str,
+		kind: str = "metric",
+		owner: str = "operations",
+		labels: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		source = MonitoringSource(
+			id=source_id,
+			tenant_id=tenant_id,
+			name=name,
+			kind=kind,
+			owner=owner,
+			labels=dict(labels or {}),
+		)
+		self._sources[source_id] = source
+		return source.to_dict()
+
+	def list_sources(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		sources = list(self._sources.values())
+		if tenant_id is not None:
+			sources = [item for item in sources if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(sources, key=lambda item: item.id)]
+
+	def create_baseline(
+		self,
+		baseline_id: str,
+		tenant_id: str,
+		source_id: str,
+		metric: str,
+		values: list[float] | tuple[float, ...],
+		sensitivity: str = "medium",
+	) -> dict[str, Any]:
+		self._enforce_baseline_policy(tenant_id, len(values))
+		source = self._sources.get(source_id)
+		if source is None or source.tenant_id != tenant_id:
+			raise KeyError(f"unknown monitoring source: {source_id}")
+		baseline = self._engine.build_baseline(
+			baseline_id=baseline_id,
+			tenant_id=tenant_id,
+			source_id=source_id,
+			metric=metric,
+			values=values,
+			sensitivity=sensitivity,
+		)
+		self._baselines[baseline_id] = baseline
+		return baseline.to_dict()
+
+	def list_baselines(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		baselines = list(self._baselines.values())
+		if tenant_id is not None:
+			baselines = [item for item in baselines if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(baselines, key=lambda item: item.id)]
+
+	def reset_baseline(
+		self,
+		baseline_id: str,
+		values: list[float] | tuple[float, ...],
+		approval_recorded: bool,
+	) -> dict[str, Any]:
+		baseline = self._baselines.get(baseline_id)
+		if baseline is None:
+			raise KeyError(f"unknown baseline: {baseline_id}")
+		self._enforce_reset_policy(baseline.tenant_id, approval_recorded)
+		return self.create_baseline(
+			baseline_id=baseline_id,
+			tenant_id=baseline.tenant_id,
+			source_id=baseline.source_id,
+			metric=baseline.metric,
+			values=values,
+			sensitivity=baseline.sensitivity,
+		)
+
+	def detect(
+		self,
+		detection_id: str,
+		tenant_id: str,
+		source_id: str,
+		baseline_id: str,
+		metric: str,
+		value: float,
+		timestamp: str | None = None,
+		context: dict[str, Any] | None = None,
+		owner: str | None = None,
+	) -> dict[str, Any]:
+		self._enforce_detection_policy(tenant_id, source_id in self._sources)
+		source = self._sources[source_id]
+		baseline = self._baselines.get(baseline_id)
+		if source.tenant_id != tenant_id:
+			raise KeyError(f"unknown monitoring source for tenant: {source_id}")
+		if baseline is None or baseline.tenant_id != tenant_id:
+			raise KeyError(f"unknown baseline: {baseline_id}")
+		observation = Observation(
+			id=f"obs:{detection_id}",
+			tenant_id=tenant_id,
+			source_id=source_id,
+			metric=metric,
+			value=float(value),
+			timestamp=timestamp,
+			context=dict(context or {}),
+		)
+		self._observations[observation.id] = observation
+		scored = self._engine.score_observation(baseline, observation)
+		severity = str(scored["severity"])
+		self._enforce_signal_policy(tenant_id, severity, bool(owner))
+		signal = AnomalySignal(
+			id=detection_id,
+			tenant_id=tenant_id,
+			source_id=source_id,
+			baseline_id=baseline_id,
+			observation_id=observation.id,
+			score=float(scored["score"]),
+			severity=severity,
+			status="open" if scored["anomalous"] else "normal",
+			root_cause_hints=tuple(scored["root_cause_hints"]),
+		)
+		self._signals[detection_id] = signal
+		if owner and scored["anomalous"]:
+			self.open_investigation(
+				investigation_id=f"investigate:{detection_id}",
+				tenant_id=tenant_id,
+				signal_id=detection_id,
+				owner=owner,
+			)
+		return {**signal.to_dict(), "observation": observation.to_dict(), "threshold": scored["threshold"]}
+
+	def list_signals(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		signals = list(self._signals.values())
+		if tenant_id is not None:
+			signals = [item for item in signals if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(signals, key=lambda item: item.id)]
+
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
-		records = list(self._records.values())
+		"""Compatibility alias exposing anomaly signals as ANOM records."""
+		records = list(self._signals.values())
 		if tenant_id is not None:
 			records = [record for record in records if record.tenant_id == tenant_id]
 		return [record.to_dict() for record in sorted(records, key=lambda item: item.id)]
@@ -33,24 +183,172 @@ class AnomService:
 		metadata: dict[str, Any] | None = None,
 		status: str = "active",
 	) -> dict[str, Any]:
-		self._enforce_write_policy(tenant_id)
-		record = AnomRecord(
+		"""Compatibility helper that records a manual anomaly signal."""
+		metadata = dict(metadata or {})
+		self._enforce_signal_policy(tenant_id, str(metadata.get("severity") or "medium"), bool(metadata.get("owner")))
+		signal = AnomalySignal(
 			id=record_id,
 			tenant_id=tenant_id,
+			source_id=str(metadata.get("source_id") or "manual"),
+			baseline_id=str(metadata.get("baseline_id") or "manual"),
+			observation_id=str(metadata.get("observation_id") or "manual"),
+			score=float(metadata.get("score", 0.0)),
+			severity=str(metadata.get("severity") or "medium"),
 			status=status,
-			metadata=dict(metadata or {}),
+			root_cause_hints=tuple(metadata.get("root_cause_hints") or ()),
 		)
-		self._records[record_id] = record
-		return record.to_dict()
+		self._signals[record_id] = signal
+		return signal.to_dict()
 
-	def _enforce_write_policy(self, tenant_id: str) -> None:
+	def open_investigation(
+		self,
+		investigation_id: str,
+		tenant_id: str,
+		signal_id: str,
+		owner: str,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		signal = self._signals.get(signal_id)
+		if signal is None or signal.tenant_id != tenant_id:
+			raise KeyError(f"unknown anomaly signal: {signal_id}")
+		investigation = Investigation(
+			id=investigation_id,
+			tenant_id=tenant_id,
+			signal_id=signal_id,
+			owner=owner,
+		)
+		self._investigations[investigation_id] = investigation
+		return investigation.to_dict()
+
+	def close_investigation(
+		self,
+		investigation_id: str,
+		resolution: str,
+	) -> dict[str, Any]:
+		investigation = self._investigations.get(investigation_id)
+		if investigation is None:
+			raise KeyError(f"unknown investigation: {investigation_id}")
+		updated = Investigation(
+			id=investigation.id,
+			tenant_id=investigation.tenant_id,
+			signal_id=investigation.signal_id,
+			owner=investigation.owner,
+			status="closed",
+			resolution=resolution,
+		)
+		self._investigations[investigation_id] = updated
+		return updated.to_dict()
+
+	def list_investigations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		investigations = list(self._investigations.values())
+		if tenant_id is not None:
+			investigations = [item for item in investigations if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(investigations, key=lambda item: item.id)]
+
+	def record_feedback(
+		self,
+		feedback_id: str,
+		tenant_id: str,
+		signal_id: str,
+		label: str,
+		reviewer: str,
+		notes: str = "",
+		tuning_review_recorded: bool = False,
+	) -> dict[str, Any]:
+		signal = self._signals.get(signal_id)
+		if signal is None or signal.tenant_id != tenant_id:
+			raise KeyError(f"unknown anomaly signal: {signal_id}")
+		projected_feedback = [item.to_dict() for item in self._feedback.values() if item.tenant_id == tenant_id]
+		projected_feedback.append({"label": label})
+		false_positive_rate = self._engine.false_positive_rate(projected_feedback)
+		self._enforce_feedback_policy(tenant_id, false_positive_rate, tuning_review_recorded)
+		feedback = DetectionFeedback(
+			id=feedback_id,
+			tenant_id=tenant_id,
+			signal_id=signal_id,
+			label=label,
+			reviewer=reviewer,
+			notes=notes,
+		)
+		self._feedback[feedback_id] = feedback
+		return feedback.to_dict()
+
+	def list_feedback(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		feedback = list(self._feedback.values())
+		if tenant_id is not None:
+			feedback = [item for item in feedback if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(feedback, key=lambda item: item.id)]
+
+	def signal_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		signals = self.list_signals(tenant_id)
+		feedback = self.list_feedback(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"source_count": len(self.list_sources(tenant_id)),
+			"baseline_count": len(self.list_baselines(tenant_id)),
+			"signal_count": len(signals),
+			"investigation_count": len(self.list_investigations(tenant_id)),
+			"feedback_count": len(feedback),
+			"false_positive_rate": self._engine.false_positive_rate(feedback),
+			**self._engine.summarize_signals(signals),
+		}
+
+	def _enforce_tenant(self, tenant_id: str) -> None:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
-			"operation_type": "write",
-			"policy_attached": True,
-			"risk_level": "low",
-			"review_recorded": True,
 		})
-		if result["decision"] != "allow":
-			reasons = ", ".join(action.get("reason", "capability_policy_blocked") for action in result["actions"])
-			raise PermissionError(reasons or "capability_policy_blocked")
+		_raise_if_blocked(result)
+
+	def _enforce_detection_policy(self, tenant_id: str, source_present: bool) -> None:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "detect",
+			"monitoring_source_present": source_present,
+		})
+		_raise_if_blocked(result)
+
+	def _enforce_baseline_policy(self, tenant_id: str, history_points: int) -> None:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_baseline",
+			"history_points": history_points,
+		})
+		_raise_if_blocked(result)
+
+	def _enforce_signal_policy(self, tenant_id: str, severity: str, owner_assigned: bool) -> None:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"severity": severity,
+			"owner_assigned": owner_assigned,
+		})
+		_raise_if_blocked(result)
+
+	def _enforce_reset_policy(self, tenant_id: str, approval_recorded: bool) -> None:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "reset_baseline",
+			"approval_recorded": approval_recorded,
+		})
+		_raise_if_blocked(result)
+
+	def _enforce_feedback_policy(
+		self,
+		tenant_id: str,
+		false_positive_rate: float,
+		tuning_review_recorded: bool,
+	) -> None:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"false_positive_rate": false_positive_rate,
+			"tuning_review_recorded": tuning_review_recorded,
+		})
+		_raise_if_blocked(result)
+
+
+def _raise_if_blocked(result: dict[str, Any]) -> None:
+	if result["decision"] == "allow":
+		return
+	reasons = ", ".join(action.get("reason", "anomaly_policy_blocked") for action in result["actions"])
+	if result["decision"] == "require_review":
+		raise PermissionError(reasons or "anomaly_review_required")
+	raise PermissionError(reasons or "anomaly_policy_blocked")

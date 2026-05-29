@@ -7,24 +7,36 @@
 
 ## Purpose
 
-This package materializes the executable APG contract for `anom`.
-It provides a dependency-light Python package surface for capability inspection,
-rule evaluation, UI route metadata, semantic-model publication, and publish-plan
-evidence.
+ANOM provides deterministic anomaly detection for APG monitoring, event, and
+behavioral signals. It registers tenant-scoped monitoring sources, builds
+statistical baselines from historical observations, scores new observations,
+opens governed investigations for severe signals, records feedback, and exposes
+view models for signal boards, baseline consoles, investigation queues, and
+tuning review.
 
 ## Provided Services
 
-- `anom_operations`
+- `monitoring_source_registry`
+- `baseline_profile_management`
+- `metric_anomaly_detection`
+- `event_anomaly_scoring`
+- `investigation_queue`
+- `feedback_tuning_loop`
+- `anomaly_signal_view_models`
 
 ## Required Services
 
 - `tenant_context`
+- `pred`
+- `aicr`
+- `moni`
 
 ## Configuration
 
 Configuration is defined by `capability_contract.py` and exposed through
 `get_capability_contract()`. Tenant context is required for executable
-operations.
+operations. Baseline creation enforces the configured minimum historical
+observations before detection can run.
 
 ## Rules
 
@@ -35,11 +47,22 @@ operations.
 - `baseline_reset_requires_approval`
 - `high_false_positive_rate_requires_tuning`
 
+## Runtime Behavior
+
+`service.py` owns dependency-light registries for monitoring sources, baselines,
+observations, anomaly signals, investigations, and feedback. `anomaly_engine.py`
+builds statistical baselines and scores observations with sensitivity-specific
+thresholds. Critical signals require owners before they can enter the
+investigation queue, and false-positive feedback can force tuning review.
+
 ## UI
 
-The package exposes 7 APG Python UI route contract(s) through
-`views.py` and the package semantic model.
+The package exposes 7 APG Python UI route contract(s) through `views.py` and the
+package semantic model. View models cover the dashboard, signal board, baseline
+console, investigation queue, and feedback review.
 
 ## Theme
 
-The package uses the `anom_signal_console` APG theme contract.
+The package uses the `anom_signal_console` APG theme contract for anomaly
+severity cards, baseline drift charts, investigation timelines, and false
+positive review meters.

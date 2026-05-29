@@ -9,6 +9,7 @@ from .capability_contract import (
 	evaluate_capability_rules,
 	get_capability_contract
 )
+from .service import AnomService
 
 __version__ = "1.0.0"
 __capability_id__ = "anom"
@@ -99,6 +100,7 @@ def get_capability_info() -> dict[str, Any]:
 
 
 __all__ = [
+	"AnomService",
 	"capability_metadata",
 	"register_capability",
 	"get_capability_info",

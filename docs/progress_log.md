@@ -16,6 +16,57 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 08:52 EAT
+
+ANOM implementation-depth slice:
+
+- Replaced ANOM generic record/service/API/view helpers with a domain-specific
+  anomaly detection runtime.
+- Added `anomaly_engine.py` for deterministic statistical baseline creation,
+  observation scoring, severity assignment, root-cause hints, signal summaries,
+  and false-positive rate calculation.
+- Rebuilt `models.py` around monitoring sources, baseline profiles,
+  observations, anomaly signals, investigations, and detection feedback.
+- Rebuilt `service.py`, `api.py`, and `views.py` around source registration,
+  baseline creation/reset, detection, critical-signal investigation routing,
+  feedback recording, signal summaries, signal boards, baseline consoles,
+  investigation queues, and tuning review models.
+- Rewrote `cap_spec.md` so the package specification describes current ANOM
+  domain behavior rather than materialized package scaffolding.
+- Expanded ANOM focused tests for baseline creation, critical anomaly
+  detection, investigation closure, feedback recording, and policy failures for
+  missing monitoring sources, insufficient baseline history, missing critical
+  owners, false-positive tuning review, and baseline reset approval.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/anom/models.py
+  capabilities/common/anom/anomaly_engine.py capabilities/common/anom/service.py
+  capabilities/common/anom/api.py capabilities/common/anom/views.py
+  capabilities/common/anom/test_capability_contract.py` -> passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/common/anom` -> no matches.
+- `./.venv/bin/pytest -q capabilities/common/anom/test_capability_contract.py
+  capabilities/common/anom/tests/test_materialized_package.py` -> 7 passed
+  with 10 pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  ANOM classified as `domain_specific`, 57 domain-specific packages, 46
+  materialized-baseline packages, 5 mixed packages, 1 contract-only package,
+  876 custom Python files, 0 errors, and 52 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/anom --json`
+  -> passed with runtime self-test loaded and side-effect-free catalog patch.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
+Known remaining gaps:
+
+- ANOM is now domain-specific, but implementation-depth still reports 46
+  materialized baselines, 5 mixed implementations, and 1 contract-only package
+  to replace with domain-specific behavior.
+
 ### 2026-05-29 08:44 EAT
 
 ACCS implementation-depth slice:
