@@ -16,6 +16,78 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 17:31 EAT
+
+PRED implementation-depth slice:
+
+- Converted `pred` from a materialized-baseline package into a domain-specific
+  predictive analytics runtime package.
+- Added executable tenant-scoped predictive models, feature sets, forecast
+  runs, score runs, scenario simulations, drift reports, audit events,
+  dashboard summaries, and contract-rule evaluation.
+- Added `predictive_runtime.py` as the PRED-specific algorithm surface for
+  stable IDs, environment validation, impact validation, feature normalization,
+  deterministic scoring, forecast projection, scenario projection, and drift
+  status classification so package behavior is no longer generic record
+  scaffolding.
+- Replaced generic package API and view helpers with predictive-analytics
+  helpers for model registration and approval, feature-lineage registration,
+  forecast creation, production scoring, scenario simulation, drift reporting,
+  dashboard, forecast console, score monitor, scenario lab, model board,
+  governance, routes, rules, and theme metadata.
+- Rewrote `cap_spec.md` to describe current executable behavior, runtime
+  surfaces, guardrails, adapter boundaries, UI surfaces, theme contract, and
+  focused verification commands.
+- Expanded focused tests for the model-to-forecast-to-score lifecycle, scenario
+  simulation, drift review, compatibility records, view models, and policy
+  failures for missing tenant context, model ownership, insufficient history,
+  empty forecast horizons, long-horizon review, unapproved production scoring,
+  missing feature lineage, missing high-impact explainability, and missing
+  scenario assumptions.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/pred/__init__.py
+  capabilities/common/pred/models.py
+  capabilities/common/pred/predictive_runtime.py
+  capabilities/common/pred/service.py capabilities/common/pred/api.py
+  capabilities/common/pred/views.py
+  capabilities/common/pred/test_capability_contract.py
+  capabilities/common/pred/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/pytest -q capabilities/common/pred/test_capability_contract.py
+  capabilities/common/pred/tests` -> 9 passed with 10 pre-existing adjacent
+  SQLAlchemy/Pydantic deprecation warnings.
+- `rg -n "<baseline marker patterns>" capabilities/common/pred` -> no
+  generated materialization or generic dependency-light marker matches.
+- `./.venv/bin/python -c "import importlib; ..."` for
+  `capabilities.common.pred.models`, `predictive_runtime`, `service`, `api`,
+  and `views` -> passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/pred --json` -> passed with `pred` classified as
+  `domain_specific`, `predictive_runtime.py` counted as the custom Python file,
+  0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/pred --json`
+  -> passed with a side-effect-free catalog patch and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  90 domain-specific packages, 17 materialized-baseline packages, 1 mixed
+  package, 1 contract-only package, 905 custom Python files, 0 errors, and 19
+  warnings; next warning is `quan`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 61
+  local links, 49 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `./.venv/bin/apg hygiene audit --json` -> passed with 17/17 hygiene checks,
+  0 violations, and 0 tracked-file hygiene failures.
+
+Known remaining gaps:
+
+- `pred` is now domain-specific, but implementation-depth still reports 17
+  materialized baselines, 1 mixed implementation, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is
+  `quan`.
+
 ### 2026-05-29 17:21 EAT
 
 PLGN implementation-depth slice:
