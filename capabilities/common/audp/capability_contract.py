@@ -57,6 +57,7 @@ RULES: list[dict[str, Any]] = [
 	{"name": "recording_consent_required", "description": "Audio processing requires recording consent.", "condition": {"operation": "process_recording", "recording_consent_recorded": False}, "effect": {"decision": "deny", "reason": "recording_consent_required", "required_action": "record_audio_consent"}},
 	{"name": "voice_cloning_requires_consent", "description": "Voice cloning requires voice-owner consent.", "condition": {"operation": "clone_voice", "voice_owner_consent_recorded": False}, "effect": {"decision": "deny", "reason": "voice_owner_consent_required", "required_action": "record_voice_owner_consent"}},
 	{"name": "synthetic_audio_requires_watermark", "description": "Synthetic audio output requires watermarking.", "condition": {"synthetic_audio_requested": True, "watermark_applied": False}, "effect": {"decision": "deny", "reason": "synthetic_audio_watermark_required", "required_action": "apply_audio_watermark"}},
+	{"name": "synthetic_audio_requires_release_review", "description": "Synthetic audio requires explicit release review before completion.", "condition": {"synthetic_audio_requested": True, "synthetic_release_reviewed": False}, "effect": {"decision": "require_review", "reason": "synthetic_audio_release_review_required", "required_action": "review_synthetic_audio"}},
 	{"name": "audio_model_requires_policy", "description": "Audio model use requires an attached policy.", "condition": {"model_invocation": True, "model_policy_attached": False}, "effect": {"decision": "deny", "reason": "model_policy_required", "required_action": "attach_model_policy"}},
 	{"name": "low_transcription_confidence_requires_review", "description": "Low-confidence transcripts require review.", "condition": {"transcription_confidence_lt": 0.78, "human_review_recorded": False}, "effect": {"decision": "require_review", "reason": "transcription_review_required", "required_action": "review_transcript"}}
 ]
@@ -68,6 +69,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "analysis", "path": "/audp/analysis", "component": "AudioAnalysis", "permission": "audp:analyze", "nav_group": "Analysis"},
 	{"name": "sessions", "path": "/audp/sessions", "component": "AudioSessions", "permission": "audp:view", "nav_group": "Runtime"},
 	{"name": "models", "path": "/audp/models", "component": "AudioModelRegistry", "permission": "audp:manage_models", "nav_group": "Models"},
+	{"name": "consents", "path": "/audp/consents", "component": "AudioConsentCenter", "permission": "audp:govern", "nav_group": "Governance"},
+	{"name": "reviews", "path": "/audp/reviews", "component": "AudioReviewQueue", "permission": "audp:review", "nav_group": "Governance"},
 	{"name": "quality", "path": "/audp/quality", "component": "AudioQuality", "permission": "audp:view", "nav_group": "Governance"},
 	{"name": "settings", "path": "/audp/settings", "component": "AUDPSettings", "permission": "audp:admin", "nav_group": "Administration"}
 ]
@@ -91,7 +94,10 @@ THEME: dict[str, Any] = {
 		"waveform_viewer": {"icon": "audio-lines", "status_indicator": "quality-pill", "risk_style": "consent-band"},
 		"transcript_panel": {"visual": "speaker-transcript", "highlight": "confidence-chip"},
 		"synthesis_studio": {"visual": "voice-control", "status_style": "watermark-chip"},
-		"analysis_grid": {"visual": "audio-metrics", "status_style": "topic-chip"}
+		"analysis_grid": {"visual": "audio-metrics", "status_style": "topic-chip"},
+		"consent_banner": {"icon": "badge-check", "status_style": "consent-chip"},
+		"review_queue": {"icon": "list-checks", "highlight": "confidence-review-pill"},
+		"synthetic_watermark": {"icon": "waves", "status_style": "watermark-chip"}
 	}
 }
 

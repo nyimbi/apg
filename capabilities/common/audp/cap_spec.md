@@ -8,6 +8,45 @@ The **Audio Processing** capability transforms the APG platform into a world-cla
 
 ---
 
+## Current Executable Governance Slice
+
+The package includes a dependency-light `AudpService` facade in
+`audio_runtime.py` for generated APG applications and capability composition.
+Speech-to-text providers, text-to-speech providers, voice-cloning engines, GPU
+worker pools, media stores, ByteWax stream processors, and live web servers
+remain adapter boundaries while the local package executes deterministic audio
+governance.
+
+Current package-backed lifecycle:
+
+1. Record tenant-scoped recording consent for audio sources.
+2. Record tenant-scoped voice-owner consent for voice cloning.
+3. Attach tenant-scoped audio model policy for model-backed operations.
+4. Request transcription only when recording consent and model policy exist.
+5. Create pending transcript review for low-confidence transcripts.
+6. Approve or reject transcript reviews with reviewer notes.
+7. Request synthetic audio only when watermark and model policy evidence exist.
+8. Create pending synthetic-audio release review before completion.
+9. Approve or reject synthetic-audio release reviews with reviewer notes.
+10. Request voice cloning only when voice-owner consent exists.
+11. Request audio analysis only when recording consent, model policy, and
+   retention policy exist.
+12. Keep consent, model policy, job, review, and governance state
+    tenant-qualified so duplicate IDs across tenants cannot collide.
+13. Emit tenant-scoped governance events for consent, model policy, job,
+    review, synthesis, cloning, and analysis lifecycle changes.
+
+Focused proof commands:
+
+```bash
+./.venv/bin/pytest -q capabilities/common/audp/test_capability_contract.py capabilities/common/audp/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/audp --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/audp --json
+git diff --check -- capabilities/common/audp
+```
+
+---
+
 ## 🚀 APG Platform Integration Context
 
 ### APG Capability Dependencies & Integration Points

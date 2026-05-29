@@ -804,3 +804,94 @@ class APAudioProcessingMetrics(APGBaseModel):
 				'per_job': str(self.total_processing_cost / max(1, self.total_jobs_processed))
 			}
 		}
+
+
+class AudioConsentRecord(BaseModel):
+	"""Tenant-scoped recording or voice-owner consent evidence."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Consent identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	consent_type: str = Field(..., description="recording or voice_owner")
+	subject_id: str = Field(..., description="Participant, audio source, or voice owner")
+	granted_by: str = Field(..., description="Actor granting consent")
+	scope: dict[str, Any] = Field(default_factory=dict, description="Consent scope")
+	evidence: str = Field(..., description="Consent evidence reference")
+	status: str = Field("active", description="active or revoked")
+	created_at: datetime = Field(default_factory=datetime.utcnow, description="Consent timestamp")
+
+
+class AudioModelPolicyRecord(BaseModel):
+	"""Tenant-scoped model-use policy attachment for audio workloads."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Model policy identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	model_id: str = Field(..., description="Audio model identifier")
+	policy_name: str = Field(..., description="Human-readable policy name")
+	allowed_operations: list[str] = Field(default_factory=list, description="Allowed audio operations")
+	attached_by: str = Field(..., description="Actor attaching the policy")
+	risk_tier: str = Field("standard", description="Model policy risk tier")
+	created_at: datetime = Field(default_factory=datetime.utcnow, description="Policy timestamp")
+
+
+class AudioProcessingJobRecord(BaseModel):
+	"""Governed package-level audio processing job."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Audio job identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	job_type: str = Field(..., description="transcription, synthesis, cloning, analysis, or enhancement")
+	audio_source_id: str = Field(..., description="Audio source or generated audio identifier")
+	requested_by: str = Field(..., description="Requester identity")
+	model_id: str = Field(..., description="Audio model identifier")
+	language_code: str = Field("auto", description="Language code")
+	confidence: float = Field(1.0, ge=0.0, le=1.0, description="Result confidence")
+	status: str = Field("active", description="active, pending_review, blocked, or completed")
+	watermark_applied: bool = Field(False, description="Whether synthetic audio watermark is applied")
+	retention_policy: str = Field("default", description="Retention policy reference")
+	result: dict[str, Any] = Field(default_factory=dict, description="Processing result")
+	created_at: datetime = Field(default_factory=datetime.utcnow, description="Job timestamp")
+
+
+class AudioTranscriptReviewRecord(BaseModel):
+	"""Human review record for low-confidence transcripts."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Transcript review identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	job_id: str = Field(..., description="Transcription job under review")
+	confidence: float = Field(..., ge=0.0, le=1.0, description="Transcript confidence")
+	decision: str = Field("pending", description="pending, approved, or rejected")
+	reviewer: str | None = Field(None, description="Reviewer identity")
+	notes: str | None = Field(None, description="Reviewer notes")
+	created_at: datetime = Field(default_factory=datetime.utcnow, description="Review request timestamp")
+	decided_at: datetime | None = Field(None, description="Review decision timestamp")
+
+
+class AudioSynthesisReviewRecord(BaseModel):
+	"""Review record for synthetic audio release evidence."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Synthesis review identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	job_id: str = Field(..., description="Synthesis job under review")
+	watermark_applied: bool = Field(..., description="Whether watermark is present")
+	decision: str = Field("pending", description="pending, approved, or rejected")
+	reviewer: str | None = Field(None, description="Reviewer identity")
+	notes: str | None = Field(None, description="Reviewer notes")
+	created_at: datetime = Field(default_factory=datetime.utcnow, description="Review request timestamp")
+	decided_at: datetime | None = Field(None, description="Review decision timestamp")
+
+
+class AudioGovernanceEvent(BaseModel):
+	"""Tenant-scoped AUDP governance evidence event."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(default_factory=uuid7str, description="Governance event identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	event_type: str = Field(..., description="Lifecycle event type")
+	subject_id: str = Field(..., description="Subject record identifier")
+	message: str = Field(..., description="Human-readable event message")
+	evidence: dict[str, Any] = Field(default_factory=dict, description="Structured event evidence")
+	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Event timestamp")

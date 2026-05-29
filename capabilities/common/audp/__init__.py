@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["audio_transcription", "voice_synthesis", "audio_analysis", "speaker_diarization", "audio_enhancement"],
-	"permissions": ["audp:view", "audp:transcribe", "audp:synthesize", "audp:analyze", "audp:manage_models", "audp:admin"]
+	"provides": ["audio_transcription", "voice_synthesis", "audio_analysis", "speaker_diarization", "audio_enhancement", "audio_consent_governance", "audio_review_governance"],
+	"permissions": ["audp:view", "audp:transcribe", "audp:synthesize", "audp:analyze", "audp:manage_models", "audp:govern", "audp:review", "audp:admin"]
 }
 
 __capability_code__ = "AUDIO_PROCESSING"
@@ -51,6 +51,8 @@ def register_capability() -> dict[str, Any]:
 			"voice_synthesis": "Generate governed speech output from approved text and voice models",
 			"audio_analysis": "Analyze sentiment, topics, quality, content class, and acoustic signals",
 			"speaker_diarization": "Identify and segment speakers with consent and retention controls",
+			"audio_consent_governance": "Record and enforce recording and voice-owner consent evidence",
+			"audio_review_governance": "Require human review for low-confidence transcripts and governed synthetic audio",
 			"capability_rules": "Evaluate deterministic audio-processing governance rules",
 			"visual_theming": "Apply audio-intelligence theme tokens and components"
 		},
@@ -59,7 +61,10 @@ def register_capability() -> dict[str, Any]:
 			"synthesis": "/audp/api/v1/synthesis",
 			"analysis": "/audp/api/v1/analysis",
 			"sessions": "/audp/api/v1/sessions",
-			"models": "/audp/api/v1/models"
+			"models": "/audp/api/v1/models",
+			"consents": "/audp/api/v1/consents",
+			"reviews": "/audp/api/v1/reviews",
+			"governance_events": "/audp/api/v1/governance-events"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],

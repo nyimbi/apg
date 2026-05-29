@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""Package contract tests for AUDP."""
 
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_materialized_contract_shape_is_valid():
-	module = _load_module("materialized_contract_audp", PACKAGE_DIR / "capability_contract.py")
+def test_package_contract_shape_is_valid():
+	module = _load_module("package_contract_audp", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
@@ -32,8 +32,8 @@ def test_materialized_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
-def test_materialized_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_audp", PACKAGE_DIR / "app.py")
+def test_package_app_entrypoint_is_publishable():
+	module = _load_module("package_app_audp", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()

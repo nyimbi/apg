@@ -5,13 +5,127 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Audio Processing package-backed APG capability", "entity_count": 0, "name": "audp", "version": "1.0.0"}, "capabilities": {"audp": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"analysis": {"content_classification_enabled": true, "quality_assessment_enabled": true, "sentiment_analysis_enabled": true, "topic_detection_enabled": true}, "governance": {"audit_audio_processing": true, "recording_consent_required": true, "require_tenant_context": true, "retention_policy_required": true}, "synthesis": {"max_text_length": 10000, "voice_cloning_consent_required": true, "voice_model_policy_required": true, "watermark_synthetic_audio": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "audp_audio_intelligence"}, "transcription": {"default_language": "auto", "minimum_confidence": 0.78, "real_time_streaming_enabled": true, "speaker_diarization_enabled": true}, "ui": {"enable_analysis_workbench": true, "enable_audio_dashboard": true, "enable_synthesis_studio": true, "enable_transcription_console": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Audio Processing", "provides": ["audp_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All audio operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "process_recording", "recording_consent_recorded": false}, "description": "Audio processing requires recording consent.", "effect": {"decision": "deny", "reason": "recording_consent_required", "required_action": "record_audio_consent"}, "name": "recording_consent_required"}, {"condition": {"operation": "clone_voice", "voice_owner_consent_recorded": false}, "description": "Voice cloning requires voice-owner consent.", "effect": {"decision": "deny", "reason": "voice_owner_consent_required", "required_action": "record_voice_owner_consent"}, "name": "voice_cloning_requires_consent"}, {"condition": {"synthetic_audio_requested": true, "watermark_applied": false}, "description": "Synthetic audio output requires watermarking.", "effect": {"decision": "deny", "reason": "synthetic_audio_watermark_required", "required_action": "apply_audio_watermark"}, "name": "synthetic_audio_requires_watermark"}, {"condition": {"model_invocation": true, "model_policy_attached": false}, "description": "Audio model use requires an attached policy.", "effect": {"decision": "deny", "reason": "model_policy_required", "required_action": "attach_model_policy"}, "name": "audio_model_requires_policy"}, {"condition": {"human_review_recorded": false, "transcription_confidence_lt": 0.78}, "description": "Low-confidence transcripts require review.", "effect": {"decision": "require_review", "reason": "transcription_review_required", "required_action": "review_transcript"}, "name": "low_transcription_confidence_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All audio operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "process_recording", "recording_consent_recorded": false}, "description": "Audio processing requires recording consent.", "effect": {"decision": "deny", "reason": "recording_consent_required", "required_action": "record_audio_consent"}, "name": "recording_consent_required"}, {"condition": {"operation": "clone_voice", "voice_owner_consent_recorded": false}, "description": "Voice cloning requires voice-owner consent.", "effect": {"decision": "deny", "reason": "voice_owner_consent_required", "required_action": "record_voice_owner_consent"}, "name": "voice_cloning_requires_consent"}, {"condition": {"synthetic_audio_requested": true, "watermark_applied": false}, "description": "Synthetic audio output requires watermarking.", "effect": {"decision": "deny", "reason": "synthetic_audio_watermark_required", "required_action": "apply_audio_watermark"}, "name": "synthetic_audio_requires_watermark"}, {"condition": {"model_invocation": true, "model_policy_attached": false}, "description": "Audio model use requires an attached policy.", "effect": {"decision": "deny", "reason": "model_policy_required", "required_action": "attach_model_policy"}, "name": "audio_model_requires_policy"}, {"condition": {"human_review_recorded": false, "transcription_confidence_lt": 0.78}, "description": "Low-confidence transcripts require review.", "effect": {"decision": "require_review", "reason": "transcription_review_required", "required_action": "review_transcript"}, "name": "low_transcription_confidence_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analysis": {"component": "AudioAnalysis", "permission": "audp:analyze", "route": "/audp/analysis"}, "dashboard": {"component": "AUPDDashboard", "permission": "audp:view", "route": "/audp/dashboard"}, "models": {"component": "AudioModelRegistry", "permission": "audp:manage_models", "route": "/audp/models"}, "quality": {"component": "AudioQuality", "permission": "audp:view", "route": "/audp/quality"}, "sessions": {"component": "AudioSessions", "permission": "audp:view", "route": "/audp/sessions"}, "settings": {"component": "AUDPSettings", "permission": "audp:admin", "route": "/audp/settings"}, "synthesis": {"component": "SynthesisStudio", "permission": "audp:synthesize", "route": "/audp/synthesis"}, "transcription": {"component": "TranscriptionConsole", "permission": "audp:transcribe", "route": "/audp/transcription"}}, "streaming": {}, "theme": {"components": {"analysis_grid": {"status_style": "topic-chip", "visual": "audio-metrics"}, "synthesis_studio": {"status_style": "watermark-chip", "visual": "voice-control"}, "transcript_panel": {"highlight": "confidence-chip", "visual": "speaker-transcript"}, "waveform_viewer": {"icon": "audio-lines", "risk_style": "consent-band", "status_indicator": "quality-pill"}}, "name": "audp_audio_intelligence", "tokens": {"border.radius": "8px", "color.accent": "#9F7AEA", "color.danger": "#C53030", "color.primary": "#2A4365", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/audp/api/v1", "requires_theme": true, "routes": [{"component": "AUPDDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/audp/dashboard", "permission": "audp:view"}, {"component": "TranscriptionConsole", "name": "transcription", "nav_group": "Processing", "path": "/audp/transcription", "permission": "audp:transcribe"}, {"component": "SynthesisStudio", "name": "synthesis", "nav_group": "Processing", "path": "/audp/synthesis", "permission": "audp:synthesize"}, {"component": "AudioAnalysis", "name": "analysis", "nav_group": "Analysis", "path": "/audp/analysis", "permission": "audp:analyze"}, {"component": "AudioSessions", "name": "sessions", "nav_group": "Runtime", "path": "/audp/sessions", "permission": "audp:view"}, {"component": "AudioModelRegistry", "name": "models", "nav_group": "Models", "path": "/audp/models", "permission": "audp:manage_models"}, {"component": "AudioQuality", "name": "quality", "nav_group": "Governance", "path": "/audp/quality", "permission": "audp:view"}, {"component": "AUDPSettings", "name": "settings", "nav_group": "Administration", "path": "/audp/settings", "permission": "audp:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"audp": []}}, "contracts": {"audp": {"configuration": {"analysis": {"content_classification_enabled": true, "quality_assessment_enabled": true, "sentiment_analysis_enabled": true, "topic_detection_enabled": true}, "governance": {"audit_audio_processing": true, "recording_consent_required": true, "require_tenant_context": true, "retention_policy_required": true}, "synthesis": {"max_text_length": 10000, "voice_cloning_consent_required": true, "voice_model_policy_required": true, "watermark_synthetic_audio": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "audp_audio_intelligence"}, "transcription": {"default_language": "auto", "minimum_confidence": 0.78, "real_time_streaming_enabled": true, "speaker_diarization_enabled": true}, "ui": {"enable_analysis_workbench": true, "enable_audio_dashboard": true, "enable_synthesis_studio": true, "enable_transcription_console": true}}, "id": "audp", "provides": ["audp_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"audp": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"audio_model_requires_policy": {"condition": {"model_invocation": true, "model_policy_attached": false}, "description": "Audio model use requires an attached policy.", "effect": {"decision": "deny", "reason": "model_policy_required", "required_action": "attach_model_policy"}, "name": "audio_model_requires_policy"}, "low_transcription_confidence_requires_review": {"condition": {"human_review_recorded": false, "transcription_confidence_lt": 0.78}, "description": "Low-confidence transcripts require review.", "effect": {"decision": "require_review", "reason": "transcription_review_required", "required_action": "review_transcript"}, "name": "low_transcription_confidence_requires_review"}, "recording_consent_required": {"condition": {"operation": "process_recording", "recording_consent_recorded": false}, "description": "Audio processing requires recording consent.", "effect": {"decision": "deny", "reason": "recording_consent_required", "required_action": "record_audio_consent"}, "name": "recording_consent_required"}, "synthetic_audio_requires_watermark": {"condition": {"synthetic_audio_requested": true, "watermark_applied": false}, "description": "Synthetic audio output requires watermarking.", "effect": {"decision": "deny", "reason": "synthetic_audio_watermark_required", "required_action": "apply_audio_watermark"}, "name": "synthetic_audio_requires_watermark"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All audio operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, "voice_cloning_requires_consent": {"condition": {"operation": "clone_voice", "voice_owner_consent_recorded": false}, "description": "Voice cloning requires voice-owner consent.", "effect": {"decision": "deny", "reason": "voice_owner_consent_required", "required_action": "record_voice_owner_consent"}, "name": "voice_cloning_requires_consent"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.audp": {"file": "capability_contract.py", "id": "capability.audp", "kind": "capability", "name": "Audio Processing", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("audp_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "audp",
+			"version": "1.0.0",
+			"description": "Audio Processing package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"audp": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"audp": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["audp_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"api_helpers": "api_helpers.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"package_runtime": "audio_runtime.py",
+					"views": "views.py",
+					"view_models": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"audp": {
+				"id": "audp",
+				"configuration": contract["configuration"],
+				"provides": ["audp_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"audp": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.audp": {
+				"id": "capability.audp",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +150,15 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	routes = model.get("capabilities", {}).get("audp", {}).get("ui", {}).get("routes", [])
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "audp" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 10:
+		errors.append("AUDP semantic model route manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

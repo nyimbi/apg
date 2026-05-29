@@ -113,6 +113,19 @@
           },
           {
             "condition": {
+              "synthetic_audio_requested": true,
+              "synthetic_release_reviewed": false
+            },
+            "description": "Synthetic audio requires explicit release review before completion.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "synthetic_audio_release_review_required",
+              "required_action": "review_synthetic_audio"
+            },
+            "name": "synthetic_audio_requires_release_review"
+          },
+          {
+            "condition": {
               "model_invocation": true,
               "model_policy_attached": false
             },
@@ -194,6 +207,19 @@
         },
         {
           "condition": {
+            "synthetic_audio_requested": true,
+            "synthetic_release_reviewed": false
+          },
+          "description": "Synthetic audio requires explicit release review before completion.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "synthetic_audio_release_review_required",
+            "required_action": "review_synthetic_audio"
+          },
+          "name": "synthetic_audio_requires_release_review"
+        },
+        {
+          "condition": {
             "model_invocation": true,
             "model_policy_attached": false
           },
@@ -221,8 +247,11 @@
       ],
       "runtime": {
         "api": "api.py",
+        "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
+        "package_runtime": "audio_runtime.py",
         "service": "service.py",
+        "view_models": "view_models.py",
         "views": "views.py"
       },
       "screens": {
@@ -230,6 +259,11 @@
           "component": "AudioAnalysis",
           "permission": "audp:analyze",
           "route": "/audp/analysis"
+        },
+        "consents": {
+          "component": "AudioConsentCenter",
+          "permission": "audp:govern",
+          "route": "/audp/consents"
         },
         "dashboard": {
           "component": "AUPDDashboard",
@@ -245,6 +279,11 @@
           "component": "AudioQuality",
           "permission": "audp:view",
           "route": "/audp/quality"
+        },
+        "reviews": {
+          "component": "AudioReviewQueue",
+          "permission": "audp:review",
+          "route": "/audp/reviews"
         },
         "sessions": {
           "component": "AudioSessions",
@@ -274,9 +313,21 @@
             "status_style": "topic-chip",
             "visual": "audio-metrics"
           },
+          "consent_banner": {
+            "icon": "badge-check",
+            "status_style": "consent-chip"
+          },
+          "review_queue": {
+            "highlight": "confidence-review-pill",
+            "icon": "list-checks"
+          },
           "synthesis_studio": {
             "status_style": "watermark-chip",
             "visual": "voice-control"
+          },
+          "synthetic_watermark": {
+            "icon": "waves",
+            "status_style": "watermark-chip"
           },
           "transcript_panel": {
             "highlight": "confidence-chip",
@@ -348,6 +399,20 @@
             "nav_group": "Models",
             "path": "/audp/models",
             "permission": "audp:manage_models"
+          },
+          {
+            "component": "AudioConsentCenter",
+            "name": "consents",
+            "nav_group": "Governance",
+            "path": "/audp/consents",
+            "permission": "audp:govern"
+          },
+          {
+            "component": "AudioReviewQueue",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/audp/reviews",
+            "permission": "audp:review"
           },
           {
             "component": "AudioQuality",
@@ -494,6 +559,19 @@
         "required_action": "record_audio_consent"
       },
       "name": "recording_consent_required"
+    },
+    "synthetic_audio_requires_release_review": {
+      "condition": {
+        "synthetic_audio_requested": true,
+        "synthetic_release_reviewed": false
+      },
+      "description": "Synthetic audio requires explicit release review before completion.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "synthetic_audio_release_review_required",
+        "required_action": "review_synthetic_audio"
+      },
+      "name": "synthetic_audio_requires_release_review"
     },
     "synthetic_audio_requires_watermark": {
       "condition": {

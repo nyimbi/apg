@@ -12880,3 +12880,28 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/audl --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, refreshed runtime routes/theme evidence, self-test passed, and release evidence valid.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/audl` returned no stale AUDL materialized markers.
 - `git diff --check -- capabilities/common/audl` passed with no whitespace errors.
+
+### 2026-05-30 00:37 EAT
+
+AUDP governed audio-processing lifecycle slice:
+
+- Added `capabilities/common/audp/SPECIFICATION.md` and `capabilities/common/audp/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Added dependency-light `audio_runtime.py` with tenant-qualified consent, model policy, audio job, transcript review, synthesis release review, and governance-event state.
+- Added dependency-light `api_helpers.py` and `view_models.py` so generated APG applications can compose AUDP without importing production provider, FastAPI, Flask-AppBuilder, GPU-worker, media-store, or stream-processing stacks.
+- Extended AUDP models with audio consent, model policy, processing job, transcript review, synthesis review, and governance-event records.
+- Extended AUDP contract routes and theme metadata with consent-center, review-queue, and synthetic-watermark surfaces.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed AUDP `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive recording-consent, model-policy, transcription-review, synthesis-release-review, voice-clone, analysis, API-helper, and view-model coverage.
+- Added negative missing recording consent, missing model policy, missing synthetic watermark, missing voice-owner consent, missing transcript reviewer notes, missing synthesis reviewer notes, duplicate-ID tenant-isolation, and compatibility-path fail-closed coverage.
+- Updated `cap_spec.md` with the current executable audio governance lifecycle, adapter boundaries, and focused proof commands.
+- Code review found and fixed synthetic audio auto-approval, compatibility `create_record` consent/policy fabrication, string boolean review bypass, and non-persisted compatibility status before commit.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/audp/__init__.py capabilities/common/audp/models.py capabilities/common/audp/audio_runtime.py capabilities/common/audp/api_helpers.py capabilities/common/audp/view_models.py capabilities/common/audp/capability_contract.py capabilities/common/audp/app.py capabilities/common/audp/test_capability_contract.py capabilities/common/audp/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/audp/test_capability_contract.py capabilities/common/audp/tests/test_package_contract.py` passed with 10 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/audp --json` passed with `ok: true`; AUDP remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/audp --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, consent/review routes, synthetic release-review rule, self-test passed, and release evidence valid.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized|manual-record|manual policy" capabilities/common/audp` returned no stale AUDP materialized or fabricated-evidence markers.
+- `git diff --check -- capabilities/common/audp` passed with no whitespace errors.
