@@ -11401,3 +11401,26 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/ncod --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 86, materialized baseline packages dropped to 21, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 901, and warning count dropped to 23. The next implementation-depth warning is `onto`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+
+### 2026-05-29 16:48 EAT
+
+Executable ONTO ontology-management runtime slice:
+
+- Converted `capabilities/common/onto` from generated materialized records into a domain-specific ontology and vocabulary workbench runtime.
+- Replaced generic records with ontologies, ontology terms, taxonomy edges, semantic mappings, curation reviews, ontology publications, and audit events.
+- Added `ontology_runtime.py` with deterministic IDs, label normalization, term status and mapping type validation, confidence normalization, duplicate detection, taxonomy cycle checks, mapping-review posture, version bumping, and publication-readiness checks.
+- Added `OntoService` behavior for ontology registration, term creation, synonym management, taxonomy edge creation, semantic mapping, mapping review, term curation, publication, compatibility records, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so ONTO exposes ontology registry, term editor, taxonomy model, mapping workbench, publication queue, governance, audit events, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and explicit knowledge-graph, metadata-catalog, NLPC, search, vector, RDF/OWL, SPARQL, curation, approval, RBAC, and audit adapter boundaries.
+- Added focused lifecycle and guardrail tests covering successful ontology-term-synonym-taxonomy-mapping-curation-publication execution and tenant context, term ownership, taxonomy cycle, breaking-change review, low-confidence mapping review, publication approval, duplicate term, and tenant-isolation guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/onto/__init__.py capabilities/common/onto/models.py capabilities/common/onto/ontology_runtime.py capabilities/common/onto/service.py capabilities/common/onto/api.py capabilities/common/onto/views.py capabilities/common/onto/test_capability_contract.py capabilities/common/onto/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/onto/test_capability_contract.py capabilities/common/onto/tests` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package|Materialized capability package" capabilities/common/onto` returned no remaining ONTO baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.onto.models','capabilities.common.onto.ontology_runtime','capabilities.common.onto.service','capabilities.common.onto.api','capabilities.common.onto.views']]; print('onto imports ok')"` passed with `onto imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/onto --json` passed with `ok: true`; `onto` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/onto --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 87, materialized baseline packages dropped to 20, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 902, and warning count dropped to 22. The next implementation-depth warning is `plfd`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
