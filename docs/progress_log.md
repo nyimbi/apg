@@ -11452,3 +11452,28 @@ Battery-conscious verification:
 - `./.venv/bin/apg hygiene audit --json` passed with `ok: true`, 17 checks passing, 0 failing checks, and 0 violations.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- capabilities/common/dist/cap_spec.md docs/capacity_development_guide.md docs/contributors_guide.md` passed with no whitespace errors.
+
+### 2026-05-29 17:09 EAT
+
+Executable PLFD platform-foundation runtime slice:
+
+- Converted `capabilities/common/plfd` from generated materialized records into a domain-specific platform foundation runtime.
+- Replaced generic records with foundation services, dependency posture records, baseline records, readiness assessments, platform changes, and audit events.
+- Added `foundation_runtime.py` with deterministic IDs, tier, health, baseline, readiness, and change-review helpers.
+- Added `PlfdService` behavior for service registration, dependency health, baseline attachment, readiness assessment, platform change proposal and approval, compatibility records, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so PLFD exposes foundation service registry, dependency map, baseline manager, readiness gate, change queue, governance, audit events, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and explicit configuration, tenant, auth, audit, monitoring, health, registry, security, plugin, and deployment adapter boundaries.
+- Added focused lifecycle and guardrail tests covering successful foundation-service-dependency-baseline-readiness-change approval execution and tenant context, service owner, configuration baseline, baseline evidence, dependency health, platform approval, broad review, security review, and incomplete-readiness guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/plfd/__init__.py capabilities/common/plfd/models.py capabilities/common/plfd/foundation_runtime.py capabilities/common/plfd/service.py capabilities/common/plfd/api.py capabilities/common/plfd/views.py capabilities/common/plfd/test_capability_contract.py capabilities/common/plfd/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/plfd/test_capability_contract.py capabilities/common/plfd/tests` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package" capabilities/common/plfd` returned no remaining PLFD baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.plfd.models','capabilities.common.plfd.foundation_runtime','capabilities.common.plfd.service','capabilities.common.plfd.api','capabilities.common.plfd.views']]; print('plfd imports ok')"` passed with `plfd imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/plfd --json` passed with `ok: true`; `plfd` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/plfd --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg hygiene audit --json` passed with `ok: true`, 17 checks passing, 0 failing checks, and 0 violations.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 88, materialized baseline packages dropped to 19, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 903, and warning count dropped to 21. The next implementation-depth warning is `plgn`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `git diff --check -- capabilities/common/plfd` passed with no whitespace errors.

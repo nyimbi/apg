@@ -1,4 +1,4 @@
-"""UI metadata helpers for the Platform Foundation capability."""
+"""UI metadata and view-model helpers for Platform Foundation."""
 
 from __future__ import annotations
 
@@ -20,8 +20,57 @@ def dashboard_model(
 		"capability": contract["capability"],
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
+		"summary": service.dashboard_summary(tenant_id),
 		"routes": capability_routes(tenant_id),
-		"records": service.list_records(tenant_id),
+		"services": service.list_services(tenant_id),
+		"readiness": service.list_readiness_assessments(tenant_id),
+		"changes": service.list_changes(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+	}
+
+
+def services_model(service: PlfdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/plfd/services",
+		"services": service.list_services(tenant_id),
+		"dependencies": service.list_dependencies(tenant_id),
+	}
+
+
+def dependency_map_model(service: PlfdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/plfd/dependencies",
+		"nodes": service.list_services(tenant_id),
+		"edges": service.list_dependencies(tenant_id),
+	}
+
+
+def baseline_manager_model(service: PlfdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/plfd/baselines",
+		"baselines": service.list_baselines(tenant_id),
+	}
+
+
+def readiness_gate_model(service: PlfdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/plfd/readiness",
+		"assessments": service.list_readiness_assessments(tenant_id),
+		"summary": service.dashboard_summary(tenant_id),
+	}
+
+
+def change_queue_model(service: PlfdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/plfd/changes",
+		"changes": service.list_changes(tenant_id),
+	}
+
+
+def governance_model(service: PlfdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/plfd/governance",
+		"audit_events": service.list_audit_events(tenant_id),
+		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
 	}
