@@ -1,4 +1,4 @@
-"""UI metadata helpers for the Multi-Channel Output capability."""
+"""UI metadata helpers for APG Multi-Channel Output."""
 
 from __future__ import annotations
 
@@ -21,7 +21,72 @@ def dashboard_model(
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
 		"routes": capability_routes(tenant_id),
-		"records": service.list_records(tenant_id),
+		"summary": service.dashboard_summary(tenant_id),
+		"channels": service.list_channels(tenant_id),
+		"templates": service.list_templates(tenant_id),
+		"policies": service.list_policies(tenant_id),
+		"delivery_routes": service.list_routes(tenant_id),
+		"rendered_outputs": service.list_rendered_outputs(tenant_id),
+		"delivery_batches": service.list_batches(tenant_id),
+		"receipts": service.list_receipts(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+	}
+
+
+def render_console_model(service: MchnService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"templates": service.list_templates(tenant_id),
+		"delivery_routes": service.list_routes(tenant_id),
+		"rendered_outputs": service.list_rendered_outputs(tenant_id),
+	}
+
+
+def template_manager_model(service: MchnService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"templates": service.list_templates(tenant_id),
+		"theme": service.describe(tenant_id)["theme"],
+	}
+
+
+def route_console_model(service: MchnService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"delivery_routes": service.list_routes(tenant_id),
+		"channels": service.list_channels(tenant_id),
+		"policies": service.list_policies(tenant_id),
+	}
+
+
+def channel_monitor_model(service: MchnService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"channels": service.list_channels(tenant_id),
+		"unhealthy_channels": [
+			channel for channel in service.list_channels(tenant_id)
+			if channel["health"] == "unhealthy"
+		],
+	}
+
+
+def analytics_model(service: MchnService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"summary": service.dashboard_summary(tenant_id),
+		"delivery_batches": service.list_batches(tenant_id),
+		"failed_receipts": [
+			receipt for receipt in service.list_receipts(tenant_id)
+			if receipt["delivery_state"] in {"failed", "bounced"}
+		],
+	}
+
+
+def policy_model(service: MchnService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"policies": service.list_policies(tenant_id),
+		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
 	}

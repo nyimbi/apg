@@ -11330,3 +11330,28 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- capabilities/common/logt docs/progress_log.md` passed with no whitespace errors before recording this progress-log entry.
+
+### 2026-05-29 16:19 EAT
+
+Executable MCHN omnichannel-output runtime slice:
+
+- Converted `capabilities/common/mchn` from generated materialized records into a domain-specific multi-channel output runtime.
+- Replaced generic records with output channels, templates, delivery policies, routes, rendered outputs, delivery batches, receipts, and audit events.
+- Added `output_runtime.py` with deterministic IDs, channel and format normalization, template rendering, selected-channel resolution, rendered-output posture, delivery-batch posture, and delivery-state normalization.
+- Added `MchnService` lifecycle behavior for channel onboarding, template publishing, delivery-policy setup, route creation, output rendering, delivery batching, receipt recording, compatibility records, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so MCHN exposes dashboards, render console state, template management, route configuration, channel monitoring, analytics, policy state, receipts, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and the explicit email, SMS, push, PDF, web/API, print, event-bus, compliance, audit, and delivery-analytics adapter boundaries.
+- Added focused lifecycle and guardrail tests covering successful channel-template-policy-route-render-deliver-receipt execution and tenant context, channel ownership, template approval, sensitive-output encryption, unhealthy-channel, large-delivery, policy-limit, and tenant-isolation guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mchn/__init__.py capabilities/common/mchn/models.py capabilities/common/mchn/output_runtime.py capabilities/common/mchn/service.py capabilities/common/mchn/api.py capabilities/common/mchn/views.py capabilities/common/mchn/test_capability_contract.py capabilities/common/mchn/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/mchn/test_capability_contract.py capabilities/common/mchn/tests` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package|Materialized capability package" capabilities/common/mchn` returned no remaining MCHN baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.mchn.models','capabilities.common.mchn.output_runtime','capabilities.common.mchn.service','capabilities.common.mchn.api','capabilities.common.mchn.views']]; print('mchn imports ok')"` passed with `mchn imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mchn --json` passed with `ok: true`; `mchn` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mchn --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 84, materialized baseline packages dropped to 23, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 899, and warning count dropped to 25. The next implementation-depth warning is `mlcm`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations before recording this progress-log entry.
+- `git diff --check -- capabilities/common/mchn docs/progress_log.md` passed with no whitespace errors before recording this progress-log entry.
