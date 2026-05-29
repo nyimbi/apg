@@ -48,6 +48,33 @@ Then read these in order:
 6. [Tooling Specification](./tooling.md)
 7. [Goal Progress Log](./progress_log.md)
 
+## First Useful Commit
+
+Your first APG commit should be small enough to understand, verify, and explain
+the same day. Use this exact shape:
+
+```text
+Goal: make one APG behavior, capacity, package, example, or guide easier to execute.
+Files: one owning directory, plus focused tests/docs/progress log.
+Proof: one command that proves the changed layer and one whitespace/docs check.
+Commit: Lore message with Tested and Not-tested trailers.
+Push: after the verified commit lands locally.
+```
+
+Good first commits:
+
+- improve one guide section with exact current commands and run the docs audit;
+- convert one capability package method from placeholder behavior to
+  deterministic service behavior with focused tests;
+- add one semantic-model assertion for a syntax shape that already parses;
+- make one example README explain its generated output and rerun the focused
+  compile;
+- add one guardrail test for a capability rule.
+
+Bad first commits mix broad cleanup, grammar redesign, package conversion, and
+example-output refreshes in one diff. Split those into separate packets so
+reviewers can prove each claim independently.
+
 ## Zero-To-PR Runbook
 
 Use this path when you need to make a useful contribution without first

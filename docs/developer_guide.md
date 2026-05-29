@@ -120,6 +120,49 @@ Then compare the source in `examples/20_enterprise_erp_platform/main.apg` with
 the generated `semantic_model.json`, `app.py`, `apg_capabilities.py`, and
 `apg_application.py`.
 
+## Seven-Minute Effective Start
+
+Use this path when a new developer joins a session and needs to make a useful
+choice immediately.
+
+1. Check the shared worktree:
+
+   ```bash
+   git status --short
+   ```
+
+2. Prove the CLI and one generated app:
+
+   ```bash
+   ./.venv/bin/apg --help
+   ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-seven --verify
+   ./.venv/bin/python /tmp/apg-seven/smoke_test.py
+   ```
+
+3. Pick the next work lane from evidence, not from memory:
+
+   ```bash
+   ./.venv/bin/apg capabilities implementation-audit --json
+   ./.venv/bin/apg docs audit --json
+   ```
+
+4. Claim one packet using this shape:
+
+   ```text
+   Outcome:
+   Owning path:
+   Public contract:
+   Focused proof:
+   Docs/progress-log update:
+   Not doing:
+   ```
+
+5. Edit only the owning path plus its focused tests/docs. Verify, update
+   `docs/progress_log.md`, stage only the packet, commit, and push.
+
+The point is not to learn every subsystem first. The point is to produce one
+small verified improvement while learning the exact layer that owns it.
+
 ## Four-Hour Onboarding Plan
 
 Use this plan when a contributor needs to become productive immediately.

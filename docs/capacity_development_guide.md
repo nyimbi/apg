@@ -75,6 +75,51 @@ The loop is intentionally repetitive. APG becomes useful by repeating it across
 ERP, CRM, finance, operations, agentic, and integration capacities until each
 one has source, generated runtime behavior, package evidence, and documentation.
 
+## Two-Hour Capacity Start
+
+Use this sequence when a contributor needs to start a new capacity without
+waiting for a full architecture pass.
+
+1. Name the business event that proves value:
+
+   ```text
+   event -> rule decision -> screen/workflow response -> audit/evidence output
+   ```
+
+2. Create or choose one example directory:
+
+   ```text
+   examples/<nn>_<capacity_name>/main.apg
+   examples/<nn>_<capacity_name>/README.md
+   ```
+
+3. Keep the first APG source narrow. Include only the records, capability
+   contract, rules, screen, workflow, agent, and Bytewax metadata needed to
+   prove that event.
+
+4. Compile to a temporary output directory:
+
+   ```bash
+   ./.venv/bin/apg compile examples/<nn>_<capacity_name>/main.apg --output /tmp/apg-capacity --verify
+   ./.venv/bin/python /tmp/apg-capacity/smoke_test.py
+   ```
+
+5. If the source declares a package-backed capability, validate the package
+   separately:
+
+   ```bash
+   ./.venv/bin/apg capabilities validate-contracts --json
+   ./.venv/bin/apg capabilities audit --strict-package-artifacts --json
+   ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+   ```
+
+6. Record the current readiness level and the exact next slice in the example
+   README and `docs/progress_log.md`.
+
+At the end of two hours, a useful capacity may still be small. It should not be
+ambiguous. The next contributor should know the event, APG source path,
+capability package path, proof commands, and next missing executable layer.
+
 ## Capacity Delivery Spine
 
 Every capacity should have one visible spine that a new contributor can follow:

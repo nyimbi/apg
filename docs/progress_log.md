@@ -10300,3 +10300,16 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/cicd --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+
+### 2026-05-29 09:55 EAT
+
+Contributor and capacity guide sharpening slice:
+
+- Added a seven-minute effective-start path to `docs/developer_guide.md` so a new APG developer can prove the CLI, compile a generated app, inspect evidence commands, and claim a packet immediately.
+- Added a first-useful-commit section to `docs/contributors_guide.md` that narrows onboarding work to a same-day, verifiable Lore commit.
+- Added a two-hour capacity-start workflow to `docs/capacity_development_guide.md` that turns a business event into an example path, APG source, focused compile proof, package validation, and progress-log handoff.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
