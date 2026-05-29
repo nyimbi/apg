@@ -7,18 +7,34 @@
 
 ## Purpose
 
-This package materializes the executable APG contract for `cons`.
-It provides a dependency-light Python package surface for capability inspection,
-rule evaluation, UI route metadata, semantic-model publication, and publish-plan
-evidence.
+This package provides the executable APG consent and privacy runtime for
+`cons`. It owns tenant privacy purposes, published notices, consent events,
+preference profiles, consent-gated processing decisions, privacy requests, and
+audit-event metadata behind the APG capability contract.
+
+The implementation is dependency-light and deterministic so generated APG
+applications can compose consent and privacy behavior without requiring a live
+identity provider, DLP engine, document repository, audit-log sink, marketing
+platform, or regulator integration. Those integrations remain explicit APG
+capability boundaries.
 
 ## Provided Services
 
-- `cons_operations`
+- `purpose_registry`
+- `privacy_notice_publication`
+- `consent_capture`
+- `preference_center`
+- `consent_gated_processing`
+- `privacy_request_fulfillment`
+- `privacy_audit_events`
 
 ## Required Services
 
-- `tenant_context`
+- `comp`
+- `auth`
+- `dlpd`
+
+Optional composition targets include `i18n`, `audl`, `mchn`, and `wsbl`.
 
 ## Configuration
 
@@ -37,8 +53,10 @@ operations.
 
 ## UI
 
-The package exposes 8 APG Python UI route contract(s) through
-`views.py` and the package semantic model.
+The package exposes APG Python route contracts through `views.py` and provides
+dashboard, purpose registry, privacy notices, consent ledger, preference
+center, privacy request queue, processing-decision, and audit timeline view
+models.
 
 ## Theme
 

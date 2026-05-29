@@ -10336,3 +10336,26 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- capabilities/common/comp/__init__.py capabilities/common/comp/models.py capabilities/common/comp/compliance_engine.py capabilities/common/comp/service.py capabilities/common/comp/api.py capabilities/common/comp/views.py capabilities/common/comp/test_capability_contract.py capabilities/common/comp/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-29 10:15 EAT
+
+Executable CONS consent and privacy runtime slice:
+
+- Converted `capabilities/common/cons` from a generated materialized baseline into a domain-specific consent and privacy-management capability package.
+- Replaced generic records with tenant privacy purposes, published notices, consent events, preference profiles, privacy requests, consent-gated processing decisions, and audit events.
+- Added `privacy_engine.py` with deterministic provenance/audit hashing, consent age checks, privacy-request SLA state, due-date calculation, and consent coverage summaries.
+- Added `ConsService` behavior for notice publication, purpose registration, consent capture/withdrawal, preference updates, consent-gated processing, privacy request submission/completion, stale-consent review, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so CONS exposes purpose registry, notices, consent ledger, preference center, request queue, processing decisions, audit timeline, and dashboard state instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and the explicit external identity, DLP, document-store, audit-log, marketing-platform, and regulator integration boundary.
+- Added focused contract/service tests for successful privacy lifecycle execution and guardrails around missing legal basis, missing owner, missing notices, missing active consent, unverified privacy requests, missing request evidence, withdrawal, and stale-consent review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/cons/__init__.py capabilities/common/cons/models.py capabilities/common/cons/privacy_engine.py capabilities/common/cons/service.py capabilities/common/cons/api.py capabilities/common/cons/views.py capabilities/common/cons/test_capability_contract.py capabilities/common/cons/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/cons/test_capability_contract.py capabilities/common/cons/tests/test_materialized_package.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/cons` returned no remaining CONS baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `cons` is now `domain_specific`, custom Python files increased to 882, domain-specific packages increased to 63, materialized baseline packages dropped to 40, and warning count dropped to 46.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cons --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- capabilities/common/cons/__init__.py capabilities/common/cons/models.py capabilities/common/cons/privacy_engine.py capabilities/common/cons/service.py capabilities/common/cons/api.py capabilities/common/cons/views.py capabilities/common/cons/test_capability_contract.py capabilities/common/cons/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
