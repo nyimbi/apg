@@ -16,6 +16,41 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:14 EAT
+
+Executable capability scaffold slice:
+
+- Added `apg capabilities scaffold <domain> <code> --name ... --json`, emitting
+  `apg.capability-scaffold-report.v1`.
+- The scaffold writes a valid spec-backed capability package with `cap_spec.md`,
+  `capability_contract.py`, dependency-light `models.py`, `service.py`,
+  `api.py`, `views.py`, package exports, and focused contract tests.
+- Added the scaffold command to the aggregate tooling audit's required
+  capability command surface.
+- Added CLI tests proving scaffolded contracts validate through the capability
+  contract registry and that existing files are protected unless `--force` is
+  used.
+- Updated developer, capability, capacity, and tooling docs with the scaffold
+  command.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile cli/capabilities_command.py compiler/tooling_audit.py tests/test_cli_capability_scaffold.py` -> passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_scaffold.py tests/test_tooling_audit.py tests/test_enhanced_cli.py` -> 8 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0 blocking gaps, and 0 errors.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109 valid contracts and 0 errors.
+- `./.venv/bin/apg capabilities scaffold common demo --name "Demo Capacity" --out /private/tmp/apg-scaffold-proof --force --json` -> emitted `apg.capability-scaffold-report.v1` and wrote 9 files.
+- `./.venv/bin/pytest -q /private/tmp/apg-scaffold-proof/common/demo/tests` -> 2 passed.
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py` -> 17 passed.
+- Markdown relative link sanity over updated developer/capability/capacity/tooling docs -> passed.
+- `git diff --check -- cli/capabilities_command.py compiler/tooling_audit.py tests/test_cli_capability_scaffold.py docs/capacity_development_guide.md docs/capability_standards.md docs/developer_guide.md docs/tooling.md docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- The scaffold creates the executable package starting point; contributors still
+  need to replace generic service/API/view shells with domain-specific behavior
+  for each real capacity.
+
 ### 2026-05-29 05:02 EAT
 
 Repository hygiene enforcement slice:

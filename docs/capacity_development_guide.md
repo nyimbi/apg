@@ -131,6 +131,17 @@ them.
 
 ## Step 4: Define Capability Contracts
 
+For a package-backed capability, start with the scaffold command:
+
+```bash
+./.venv/bin/apg capabilities scaffold common demo --name "Demo Capacity" --json
+```
+
+That creates a spec-backed package under `capabilities/common/demo/` with
+`cap_spec.md`, `capability_contract.py`, dependency-light `models.py`,
+`service.py`, `api.py`, `views.py`, and contract tests. The generated contract
+is valid against APG's registry shape before you add domain-specific behavior.
+
 Minimum contract:
 
 ```apg

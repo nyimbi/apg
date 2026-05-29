@@ -298,6 +298,15 @@ Standards:
 
 ## Python Package Standard
 
+Use the CLI scaffold for a new package-backed capability:
+
+```bash
+./.venv/bin/apg capabilities scaffold common demo --name "Demo Capacity" --json
+```
+
+The scaffold produces a valid spec-backed contract and dependency-light package
+shell that can be refined into domain-specific behavior.
+
 For a Python capability package under `capabilities/<domain>/<code>/`, use this
 shape where practical:
 

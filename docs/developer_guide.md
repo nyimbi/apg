@@ -262,6 +262,12 @@ rejected before writing source.
 Use [Capability Building Standards](./capability_standards.md) and [Capacity
 Development Guide](./capacity_development_guide.md).
 
+For a new package-backed capability, start with:
+
+```bash
+./.venv/bin/apg capabilities scaffold <domain> <code> --name "Display Name" --json
+```
+
 At minimum, a capability package should include:
 
 ```text
@@ -374,4 +380,3 @@ A change is done when:
 - docs describe the current truth
 - `docs/progress_log.md` records the evidence
 - the verified slice is committed and pushed
-
