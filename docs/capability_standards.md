@@ -309,7 +309,9 @@ dependency-light package runtime: tenant-scoped records, rule-guarded
 create/update service methods, API helpers, dashboard view metadata, and
 focused contract/runtime tests. It also writes `app.py`,
 `semantic_model.json`, `package_manifest.json`, and `release_report.json` so
-the package can pass `apg capabilities publish-plan <package-dir> --json`.
+the package can pass `apg capabilities publish-plan <package-dir> --json` and
+then `apg capabilities publish-apply <package-dir> --catalog <catalog.json>
+--json` when you intentionally want to update a local capability catalog.
 Refine that starter behavior into domain-specific operations instead of
 replacing it with inert placeholders.
 

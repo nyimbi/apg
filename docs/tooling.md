@@ -158,7 +158,11 @@ APG currently has an executable compiler path:
   `apg capabilities publish-plan <package-dir> --json`, which emits
   `apg.capability-publish-report.v1` by validating the package manifest,
   loading the generated app entrypoint, attaching release evidence, and
-  returning a side-effect-free catalog patch; the legacy
+  returning a side-effect-free catalog patch;
+- valid publish plans can be applied to an explicit local catalog path with
+  `apg capabilities publish-apply <package-dir> --catalog <catalog.json> --json`,
+  which emits `apg.capability-publish-apply-report.v1` and writes
+  `apg.capability-catalog.v1`; the legacy
   `python cli.py capabilities ...` helper path remains available as a
   compatibility alias.
 
@@ -809,6 +813,7 @@ apg studio plan-edit app.apg --edit-json '{"operation":"add_field","table":"Cust
 apg capabilities contracts --json
 apg capabilities validate-contracts --json
 apg capabilities publish-plan dist/capability_basics-web --json
+apg capabilities publish-apply dist/capability_basics-web --catalog dist/capabilities.json --json
 ```
 
 `python` is the only compiler target. Desktop, mobile, web, and deployment
@@ -1129,8 +1134,9 @@ not grammar changes. `apg capabilities publish-plan <package-dir> --json`
 emits `apg.capability-publish-report.v1`: it loads the package entrypoint,
 validates the manifest, proves the manifest is publishable, returns the catalog
 patch, attaches release-evidence verification, and records that the publish
-plan is side-effect-free. Catalog writes are an explicit downstream step, not
-an implicit CLI side effect.
+plan is side-effect-free. `apg capabilities publish-apply <package-dir>
+--catalog <catalog.json> --json` is the explicit downstream catalog write. Use
+`--dry-run` to validate the same local catalog update without writing.
 
 ### `apg nl-plan`
 

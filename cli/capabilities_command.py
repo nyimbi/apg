@@ -16,7 +16,7 @@ from capabilities.capability_contract_registry import (
 	load_contract_registry,
 	validate_contract_registry,
 )
-from compiler.capability_publish import build_capability_publish_report
+from compiler.capability_publish import apply_capability_publish_report, build_capability_publish_report
 
 
 CAPABILITY_SCAFFOLD_FORMAT = "apg.capability-scaffold-report.v1"
@@ -1055,6 +1055,34 @@ def publish_plan(package_dir: Path, as_json: bool) -> None:
 		)
 		for record in report["capabilities"]:
 			click.echo(f"  {record['capability']} -> {record['package']}")
+		for error in report["errors"]:
+			click.echo(f"  error: {error}")
+		for warning in report["warnings"]:
+			click.echo(f"  warning: {warning}")
+	if not report["ok"]:
+		raise click.exceptions.Exit(1)
+
+
+@capabilities.command(name="publish-apply")
+@click.argument("package_dir", type=click.Path(path_type=Path))
+@click.option("--catalog", "catalog_path", type=click.Path(path_type=Path), required=True, help="Local capability catalog JSON file to update")
+@click.option("--dry-run", is_flag=True, help="Validate and plan the catalog update without writing")
+@click.option("--json", "as_json", is_flag=True, help="Emit apg.capability-publish-apply-report.v1 JSON")
+def publish_apply(package_dir: Path, catalog_path: Path, dry_run: bool, as_json: bool) -> None:
+	"""Apply a valid capability package publish plan to a local catalog."""
+	report = apply_capability_publish_report(package_dir, catalog_path, dry_run=dry_run)
+	if as_json:
+		click.echo(json.dumps(report, indent=2, sort_keys=True))
+	else:
+		status = "OK" if report["ok"] else "FAILED"
+		mode = "dry-run" if dry_run else "write"
+		click.echo(
+			f"Capability publish-apply {status}: "
+			f"{len(report['capabilities'])} capability(ies), "
+			f"catalog={report['catalog']} mode={mode}"
+		)
+		for capability_id in report["capabilities"]:
+			click.echo(f"  applied: {capability_id}")
 		for error in report["errors"]:
 			click.echo(f"  error: {error}")
 		for warning in report["warnings"]:

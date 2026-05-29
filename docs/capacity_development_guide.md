@@ -149,6 +149,10 @@ ready for side-effect-free publish planning:
 
 ```bash
 ./.venv/bin/apg capabilities publish-plan capabilities/common/demo --json
+./.venv/bin/apg capabilities publish-apply capabilities/common/demo \
+  --catalog /tmp/apg-capability-catalog.json --dry-run --json
+./.venv/bin/apg capabilities publish-apply capabilities/common/demo \
+  --catalog /tmp/apg-capability-catalog.json --json
 ```
 
 Once the package lives under `capabilities/`, inspect and execute the rule

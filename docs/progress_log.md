@@ -16,6 +16,44 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:44 EAT
+
+Local capability catalog publication slice:
+
+- Added `compiler.capability_publish.apply_capability_publish_report()` to
+  turn a valid publish plan into an explicit local catalog update.
+- Added `apg capabilities publish-apply <package-dir> --catalog <catalog.json>
+  --json`, emitting `apg.capability-publish-apply-report.v1`.
+- `publish-apply --dry-run` validates the same package and catalog patch
+  without writing; without `--dry-run`, it writes a deterministic
+  `apg.capability-catalog.v1` file at the caller-provided path.
+- Added the new command to the aggregate CLI surface audit so local catalog
+  publication remains part of the executable capability lifecycle.
+- Added focused CLI tests proving dry-run does not write, apply creates a local
+  catalog with the scaffolded capability record, and reapply replaces the same
+  capability without duplicating catalog entries.
+- Updated developer, capability, capacity, and tooling docs to show the
+  scaffold -> publish-plan -> publish-apply lifecycle.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/capability_publish.py cli/capabilities_command.py compiler/tooling_audit.py tests/test_cli_capability_publish_apply.py` -> passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_publish_apply.py` -> 2 passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_publish_apply.py tests/test_cli_capability_scaffold.py tests/test_cli_capability_operability.py tests/test_tooling_audit.py` -> 11 passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0 blocking gaps, and 0 errors.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109 valid contracts and 0 errors.
+- `./.venv/bin/apg capabilities scaffold common demo --name "Demo Capacity" --out /private/tmp/apg-publish-apply-proof --force --json` -> emitted `apg.capability-scaffold-report.v1` and wrote 13 files.
+- `./.venv/bin/apg capabilities publish-apply /private/tmp/apg-publish-apply-proof/common/demo --catalog /private/tmp/apg-publish-apply-proof/catalog/capabilities.json --dry-run --json` -> emitted `apg.capability-publish-apply-report.v1`, `ok=true`, `written=false`.
+- `./.venv/bin/apg capabilities publish-apply /private/tmp/apg-publish-apply-proof/common/demo --catalog /private/tmp/apg-publish-apply-proof/catalog/capabilities.json --json` -> emitted `apg.capability-publish-apply-report.v1`, `ok=true`, `written=true`.
+- `python -m json.tool /private/tmp/apg-publish-apply-proof/catalog/capabilities.json` -> parsed an `apg.capability-catalog.v1` catalog containing `common_demo`.
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py` -> 17 passed.
+
+Known remaining gaps:
+
+- Local catalog publication is now executable. Signing, provenance bundles,
+  remote marketplace upload, and distribution trust policy remain separate
+  platform lifecycle work.
+
 ### 2026-05-29 05:36 EAT
 
 Publish-plan-ready scaffold slice:

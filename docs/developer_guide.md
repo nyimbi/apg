@@ -277,6 +277,10 @@ fresh scaffold can go through publish planning without a separate compile step:
 
 ```bash
 ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+./.venv/bin/apg capabilities publish-apply capabilities/<domain>/<code> \
+  --catalog /tmp/apg-capability-catalog.json --dry-run --json
+./.venv/bin/apg capabilities publish-apply capabilities/<domain>/<code> \
+  --catalog /tmp/apg-capability-catalog.json --json
 ```
 
 Inspect and exercise the capability contract before changing generated app

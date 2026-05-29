@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import importlib.util
 import json
 import sys
@@ -9,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 
+CAPABILITY_CATALOG_FORMAT = "apg.capability-catalog.v1"
+CAPABILITY_PUBLISH_APPLY_FORMAT = "apg.capability-publish-apply-report.v1"
 REQUIRED_PACKAGE_FILES = {
 	"app.py",
 	"package_manifest.json",
@@ -84,6 +87,61 @@ def build_capability_publish_report(package_dir: Path) -> dict[str, Any]:
 	return report
 
 
+def apply_capability_publish_report(
+	package_dir: Path,
+	catalog_path: Path,
+	dry_run: bool = False,
+) -> dict[str, Any]:
+	"""Apply a valid capability publish plan to a local catalog file."""
+	plan = build_capability_publish_report(package_dir)
+	report: dict[str, Any] = {
+		"format": CAPABILITY_PUBLISH_APPLY_FORMAT,
+		"ok": False,
+		"package_dir": str(package_dir),
+		"catalog": str(catalog_path),
+		"dry_run": dry_run,
+		"written": False,
+		"publish_plan_ok": bool(plan.get("ok")),
+		"applied_count": 0,
+		"capabilities": [],
+		"catalog_summary": {},
+		"errors": [],
+		"warnings": list(plan.get("warnings", [])),
+	}
+	if not plan.get("ok"):
+		report["errors"].extend(f"publish plan failed: {error}" for error in plan.get("errors", []))
+		return report
+
+	catalog = _load_or_create_catalog(catalog_path, report)
+	if report["errors"]:
+		return report
+
+	before_count = len(catalog.get("capabilities", {}))
+	applied = _apply_catalog_patch(catalog, plan.get("catalog_patch", []), report)
+	if report["errors"]:
+		return report
+
+	report["applied_count"] = len(applied)
+	report["capabilities"] = applied
+	report["catalog_summary"] = {
+		"format": catalog.get("format"),
+		"capability_count_before": before_count,
+		"capability_count_after": len(catalog.get("capabilities", {})),
+	}
+
+	if not dry_run:
+		try:
+			catalog_path.parent.mkdir(parents=True, exist_ok=True)
+			catalog_path.write_text(json.dumps(catalog, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+			report["written"] = True
+		except OSError as error:
+			report["errors"].append(f"could not write catalog: {error}")
+			return report
+
+	report["ok"] = True
+	return report
+
+
 def _read_json(path: Path, report: dict[str, Any], label: str) -> dict[str, Any]:
 	try:
 		return json.loads(path.read_text(encoding="utf-8"))
@@ -92,6 +150,48 @@ def _read_json(path: Path, report: dict[str, Any], label: str) -> dict[str, Any]
 	except OSError as error:
 		report["errors"].append(f"could not read {label}: {error}")
 	return {}
+
+
+def _load_or_create_catalog(catalog_path: Path, report: dict[str, Any]) -> dict[str, Any]:
+	if not catalog_path.exists():
+		return {"format": CAPABILITY_CATALOG_FORMAT, "capabilities": {}}
+	if not catalog_path.is_file():
+		report["errors"].append(f"catalog path is not a file: {catalog_path}")
+		return {}
+	catalog = _read_json(catalog_path, report, "capability catalog")
+	if report["errors"]:
+		return {}
+	if catalog.get("format") != CAPABILITY_CATALOG_FORMAT:
+		report["errors"].append(f"capability catalog must use {CAPABILITY_CATALOG_FORMAT}")
+	if not isinstance(catalog.get("capabilities"), dict):
+		report["errors"].append("capability catalog capabilities must be an object")
+	return catalog
+
+
+def _apply_catalog_patch(
+	catalog: dict[str, Any],
+	patches: list[dict[str, Any]],
+	report: dict[str, Any],
+) -> list[str]:
+	capabilities = catalog.setdefault("capabilities", {})
+	applied: list[str] = []
+	for patch in patches:
+		if patch.get("op") != "add_or_replace":
+			report["errors"].append(f"unsupported catalog patch op: {patch.get('op')}")
+			continue
+		path = str(patch.get("path", ""))
+		prefix = "/capabilities/"
+		if not path.startswith(prefix) or len(path) <= len(prefix):
+			report["errors"].append(f"unsupported catalog patch path: {path}")
+			continue
+		capability_id = path[len(prefix):]
+		value = deepcopy(patch.get("value", {}))
+		if value.get("capability") != capability_id:
+			report["errors"].append(f"catalog patch value mismatch for {capability_id}")
+			continue
+		capabilities[capability_id] = value
+		applied.append(capability_id)
+	return sorted(applied)
 
 
 def _manifest_summary(manifest: dict[str, Any]) -> dict[str, Any]:
