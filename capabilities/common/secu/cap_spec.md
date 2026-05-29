@@ -9,6 +9,66 @@ The Security Framework capability (`secu`) provides enterprise-grade security co
 ### APG Platform Context
 This capability serves as the foundational security layer for all APG capabilities, integrating seamlessly with the existing Authentication & RBAC (`auth`), Configuration Management (`conf`), and Audit Logging (`audl`) capabilities to provide comprehensive enterprise security posture management.
 
+## Current Executable Runtime
+
+The package now exposes a deterministic, dependency-light `SecuService` for
+generated APG applications, capability composition, publish-plan checks, and
+focused package tests. The runtime keeps live security providers behind adapter
+boundaries while making the SECU contract executable in the local repository.
+
+Current package behavior:
+
+- creates tenant-scoped security policies with owner, security level, required
+  controls, target surfaces, enabled state, and normalized tags;
+- records device posture with trust state, managed state, risk score,
+  indicators, and automatic quarantine for compromised or very high-risk
+  devices;
+- registers tenant-scoped threat indicators with type, value, severity, source,
+  TTL, and active state;
+- evaluates access and security contexts through the SECU deterministic rule
+  engine, producing `allow`, `challenge`, `quarantine`, or `deny` decisions
+  plus matched rule IDs and required actions;
+- records compliance controls with evidence posture and status values such as
+  `implemented`, `evidence_required`, `non_compliant`, and `waived`;
+- records audit events for policy creation, device posture, threat indicator
+  registration, access challenges/denials/quarantines, and compliance gaps;
+- exposes dependency-light API helpers and UI view models for the dashboard,
+  risk console, threat console, policy workbench, compliance console, rule
+  workbench, and settings surfaces.
+
+The compatibility `create_record` and `list_records` helpers map legacy
+generic package calls to risk-assessment behavior so older tooling can still
+exercise the package while new code uses the domain-specific service methods.
+
+## Adapter Boundaries
+
+SECU intentionally keeps the following live integrations outside the
+dependency-light runtime until a future slice verifies them directly:
+
+- identity providers, MFA providers, and authorization services;
+- SIEM, SOAR, threat intelligence, EDR, MDM, and network enforcement systems;
+- compliance evidence repositories, audit exporters, and certification tools;
+- DLP, encryption/key-management, data-classification, and privacy engines;
+- AI/ML threat detection providers, model lifecycle services, and behavior
+  analytics stores;
+- notification, incident-response, ticketing, and case-management systems.
+
+Package behavior should remain deterministic without those integrations. Live
+systems should be introduced as adapters around the current service contract
+rather than replacing the local rule, posture, compliance, and view-model
+surfaces.
+
+## Focused Verification
+
+Use these commands for a battery-conscious SECU package proof:
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/secu/__init__.py capabilities/common/secu/models.py capabilities/common/secu/security_runtime.py capabilities/common/secu/service.py capabilities/common/secu/api.py capabilities/common/secu/views.py capabilities/common/secu/capability_contract.py capabilities/common/secu/app.py capabilities/common/secu/tests/test_capability_contract.py capabilities/common/secu/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/secu/tests/test_capability_contract.py capabilities/common/secu/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/secu --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/secu --json
+```
+
 ## Business Value Proposition
 
 ### Within APG Ecosystem

@@ -12127,3 +12127,26 @@ Battery-conscious verification:
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
 - `rg -n -i "kafka" docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` returned no matches.
+
+### 2026-05-29 18:59 EAT
+
+Executable SECU security framework runtime slice:
+
+- Converted `capabilities/common/secu` from contract-only package status into a domain-specific executable security runtime.
+- Added `security_runtime.py` with dependency-light security policy, device posture, threat indicator, risk assessment, compliance control, audit event, stable ID, risk-band, trust-state, severity, and compliance-status primitives.
+- Added deterministic `SecuService` behavior for tenant-scoped policies, device posture, threat indicators, rule-driven access assessment, compliance controls, compatibility records, dashboard summaries, and audit events while preserving the existing async integration engines.
+- Expanded API and view helpers so SECU exposes dashboard, risk, threat, policy, compliance, rule, settings, posture-listing, and capability-status surfaces instead of relying on generic record helpers.
+- Replaced the generated-package test with package contract/runtime tests covering policy-device-threat-assessment-compliance lifecycle, tenant/owner/device guardrails, deny/quarantine/challenge decisions, API helpers, and UI view models.
+- Updated `cap_spec.md` with the current executable runtime, adapter boundaries, and focused verification commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/secu/__init__.py capabilities/common/secu/models.py capabilities/common/secu/security_runtime.py capabilities/common/secu/service.py capabilities/common/secu/api.py capabilities/common/secu/views.py capabilities/common/secu/capability_contract.py capabilities/common/secu/app.py capabilities/common/secu/tests/test_capability_contract.py capabilities/common/secu/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package" capabilities/common/secu` returned no remaining SECU baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.secu.security_runtime','capabilities.common.secu.service','capabilities.common.secu.api','capabilities.common.secu.views','capabilities.common.secu.capability_contract']]; print('secu imports ok')"` passed with `secu imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/secu/tests/test_capability_contract.py capabilities/common/secu/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/secu --json` passed with `ok: true`; `secu` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/secu --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 98, contract-only packages dropped to 0, materialized baseline packages remain 11, custom Python files increased to 912, and warning count dropped to 11. The next implementation-depth warning is `seop`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `git diff --check -- capabilities/common/secu` passed with no whitespace errors.

@@ -1082,6 +1082,364 @@ class APGSecurityFrameworkService:
 			except Exception as e:
 				print(f"[SECURITY_FRAMEWORK_ERROR] Failed to log to audit: {e}")
 
+
+class SecuService:
+	"""Deterministic package service for SECU capability composition.
+
+	This synchronous service is the dependency-light execution surface used by
+	generated APG applications and package publishing checks. Live identity,
+	SIEM, EDR/MDM, compliance, policy, and audit providers remain behind the
+	older async integration engines and future adapters.
+	"""
+
+	def __init__(self) -> None:
+		from .capability_contract import evaluate_capability_rules, get_capability_contract
+		from .security_runtime import (
+			ComplianceControlRecord,
+			DevicePostureRecord,
+			RiskAssessmentRecord,
+			SecurityAuditEventRecord,
+			SecurityPolicyRecord,
+			ThreatIndicatorRecord,
+			clamp_score,
+			control_status,
+			normalize_device_trust,
+			normalize_security_level,
+			normalize_tags,
+			normalize_threat_severity,
+			required_actions,
+			risk_band,
+			stable_id,
+			summarize_decision,
+		)
+
+		self._evaluate_rules = evaluate_capability_rules
+		self._get_contract = get_capability_contract
+		self._records = {
+			"ComplianceControlRecord": ComplianceControlRecord,
+			"DevicePostureRecord": DevicePostureRecord,
+			"RiskAssessmentRecord": RiskAssessmentRecord,
+			"SecurityAuditEventRecord": SecurityAuditEventRecord,
+			"SecurityPolicyRecord": SecurityPolicyRecord,
+			"ThreatIndicatorRecord": ThreatIndicatorRecord,
+		}
+		self._helpers = {
+			"clamp_score": clamp_score,
+			"control_status": control_status,
+			"normalize_device_trust": normalize_device_trust,
+			"normalize_security_level": normalize_security_level,
+			"normalize_tags": normalize_tags,
+			"normalize_threat_severity": normalize_threat_severity,
+			"required_actions": required_actions,
+			"risk_band": risk_band,
+			"stable_id": stable_id,
+			"summarize_decision": summarize_decision,
+		}
+		self.policies: dict[str, Any] = {}
+		self.devices: dict[str, Any] = {}
+		self.threats: dict[str, Any] = {}
+		self.assessments: dict[str, Any] = {}
+		self.controls: dict[str, Any] = {}
+		self.audit_events: dict[str, Any] = {}
+
+	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+		"""Return the tenant-scoped executable SECU contract."""
+		return self._get_contract(tenant_id, overrides)
+
+	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
+		"""Evaluate the SECU deterministic rule engine against a context."""
+		return self._evaluate_rules(dict(context))
+
+	def create_policy(
+		self,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		security_level: str = "confidential",
+		required_controls: list[str] | None = None,
+		applies_to: list[str] | None = None,
+		enabled: bool = True,
+		tags: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Register a tenant security policy with deterministic guardrails."""
+		self._require_tenant(tenant_id)
+		if not str(name or "").strip():
+			raise ValueError("policy_name_required")
+		if not str(owner or "").strip():
+			raise ValueError("policy_owner_required")
+		level = self._helpers["normalize_security_level"](security_level)
+		record_cls = self._records["SecurityPolicyRecord"]
+		record = record_cls(
+			id=self._helpers["stable_id"]("secu_policy", tenant_id, name),
+			tenant_id=tenant_id,
+			name=name,
+			owner=owner,
+			security_level=level,
+			required_controls=sorted({str(control) for control in required_controls or [] if str(control).strip()}),
+			applies_to=sorted({str(target) for target in applies_to or [] if str(target).strip()}),
+			enabled=bool(enabled),
+			tags=self._helpers["normalize_tags"](tags),
+		)
+		self.policies[record.id] = record
+		self._record_event(tenant_id, "policy_created", record.id, f"Security policy created: {name}", owner)
+		return record.to_dict()
+
+	def record_device_posture(
+		self,
+		tenant_id: str,
+		device_id: str,
+		user_id: str,
+		trust_state: str = "trusted",
+		managed: bool = True,
+		risk_score: int | float = 0,
+		indicators: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Record a device trust posture and quarantine compromised devices."""
+		self._require_tenant(tenant_id)
+		if not str(device_id or "").strip():
+			raise ValueError("device_id_required")
+		if not str(user_id or "").strip():
+			raise ValueError("device_user_required")
+		state = self._helpers["normalize_device_trust"](trust_state)
+		score = self._helpers["clamp_score"](risk_score)
+		record_cls = self._records["DevicePostureRecord"]
+		record = record_cls(
+			id=self._helpers["stable_id"]("secu_device", tenant_id, device_id),
+			tenant_id=tenant_id,
+			device_id=device_id,
+			user_id=user_id,
+			trust_state=state,
+			managed=bool(managed),
+			risk_score=score,
+			indicators=self._helpers["normalize_tags"](indicators),
+			quarantined=state == "compromised" or score >= 85,
+		)
+		self.devices[record.id] = record
+		event_type = "device_quarantined" if record.quarantined else "device_posture_recorded"
+		self._record_event(tenant_id, event_type, record.id, f"Device posture recorded: {device_id}", user_id)
+		return record.to_dict()
+
+	def register_threat_indicator(
+		self,
+		tenant_id: str,
+		name: str,
+		indicator_type: str,
+		value: str,
+		severity: str = "medium",
+		source: str = "manual",
+		ttl_hours: int = 24,
+	) -> dict[str, Any]:
+		"""Register a tenant-scoped threat indicator."""
+		self._require_tenant(tenant_id)
+		if not str(name or "").strip():
+			raise ValueError("threat_name_required")
+		if not str(value or "").strip():
+			raise ValueError("threat_value_required")
+		normalized_severity = self._helpers["normalize_threat_severity"](severity)
+		record_cls = self._records["ThreatIndicatorRecord"]
+		record = record_cls(
+			id=self._helpers["stable_id"]("secu_threat", tenant_id, indicator_type, value),
+			tenant_id=tenant_id,
+			name=name,
+			indicator_type=str(indicator_type or "indicator"),
+			value=str(value),
+			severity=normalized_severity,
+			source=str(source or "manual"),
+			ttl_hours=max(1, int(ttl_hours)),
+		)
+		self.threats[record.id] = record
+		self._record_event(tenant_id, "threat_indicator_registered", record.id, f"Threat indicator registered: {name}", source)
+		return record.to_dict()
+
+	def assess_access(
+		self,
+		tenant_id: str,
+		subject_id: str,
+		subject_type: str,
+		risk_score: int | float,
+		device_id: str | None = None,
+		is_known_malicious: bool = False,
+		challenge_completed: bool = False,
+		compliance_violation: bool = False,
+		audit_evidence_attached: bool = True,
+	) -> dict[str, Any]:
+		"""Assess an access/security context using the SECU rule engine."""
+		self._require_tenant(tenant_id)
+		if not str(subject_id or "").strip():
+			raise ValueError("subject_id_required")
+		score = self._helpers["clamp_score"](risk_score)
+		device = self._find_device(tenant_id, device_id) if device_id else None
+		context = {
+			"tenant_id": tenant_id,
+			"subject_id": subject_id,
+			"subject_type": subject_type,
+			"risk_score": score,
+			"device_trust": getattr(device, "trust_state", "unknown"),
+			"is_known_malicious": bool(is_known_malicious),
+			"challenge_completed": bool(challenge_completed),
+			"compliance_violation": bool(compliance_violation),
+			"audit_evidence_attached": bool(audit_evidence_attached),
+		}
+		result = self.evaluate(context)
+		record_cls = self._records["RiskAssessmentRecord"]
+		record = record_cls(
+			id=self._helpers["stable_id"]("secu_assessment", tenant_id, subject_type, subject_id, score, len(self.assessments)),
+			tenant_id=tenant_id,
+			subject_id=subject_id,
+			subject_type=subject_type,
+			risk_score=score,
+			risk_band=self._helpers["risk_band"](score),
+			decision=result["decision"],
+			summary=self._helpers["summarize_decision"](result),
+			matched_rules=list(result["matched_rules"]),
+			required_actions=self._helpers["required_actions"](result),
+			device_id=device_id,
+			challenge_completed=bool(challenge_completed),
+		)
+		self.assessments[record.id] = record
+		if device is not None and result["decision"] == "quarantine":
+			device.quarantined = True
+		if result["decision"] != "allow":
+			self._record_event(tenant_id, f"access_{result['decision']}", record.id, record.summary, subject_id, "high")
+		return record.to_dict()
+
+	def record_compliance_control(
+		self,
+		tenant_id: str,
+		framework: str,
+		control_id: str,
+		owner: str,
+		compliant: bool,
+		evidence_ref: str | None = None,
+		waived: bool = False,
+	) -> dict[str, Any]:
+		"""Record compliance-control posture and evidence requirements."""
+		self._require_tenant(tenant_id)
+		if not str(control_id or "").strip():
+			raise ValueError("control_id_required")
+		if not str(owner or "").strip():
+			raise ValueError("control_owner_required")
+		evidence_attached = bool(str(evidence_ref or "").strip())
+		status = self._helpers["control_status"](bool(compliant), evidence_attached, waived)
+		record_cls = self._records["ComplianceControlRecord"]
+		record = record_cls(
+			id=self._helpers["stable_id"]("secu_control", tenant_id, framework, control_id),
+			tenant_id=tenant_id,
+			framework=str(framework).lower(),
+			control_id=str(control_id),
+			owner=str(owner),
+			status=status,
+			compliant=bool(compliant),
+			audit_evidence_attached=evidence_attached,
+			evidence_ref=evidence_ref,
+		)
+		self.controls[record.id] = record
+		if status in {"evidence_required", "non_compliant"}:
+			self._record_event(tenant_id, "compliance_gap_recorded", record.id, f"Compliance control requires action: {control_id}", owner, "medium")
+		return record.to_dict()
+
+	def create_record(
+		self,
+		record_id: str,
+		tenant_id: str,
+		metadata: dict[str, Any] | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		"""Compatibility shim that creates a risk assessment from generic input."""
+		metadata = dict(metadata or {})
+		score = metadata.get("risk_score", metadata.get("score", 0))
+		return self.assess_access(
+			tenant_id=tenant_id,
+			subject_id=record_id,
+			subject_type=str(metadata.get("subject_type") or "compatibility_record"),
+			risk_score=score,
+			is_known_malicious=bool(metadata.get("is_known_malicious", False)),
+			challenge_completed=bool(metadata.get("challenge_completed", status == "approved")),
+			compliance_violation=bool(metadata.get("compliance_violation", False)),
+			audit_evidence_attached=bool(metadata.get("audit_evidence_attached", True)),
+		)
+
+	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Compatibility listing of risk assessments."""
+		return self.list_assessments(tenant_id)
+
+	def list_policies(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.policies, tenant_id)
+
+	def list_devices(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.devices, tenant_id)
+
+	def list_threats(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.threats, tenant_id)
+
+	def list_assessments(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.assessments, tenant_id)
+
+	def list_controls(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.controls, tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.audit_events, tenant_id)
+
+	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return a compact security-operations dashboard model."""
+		assessments = self.list_assessments(tenant_id)
+		devices = self.list_devices(tenant_id)
+		threats = self.list_threats(tenant_id)
+		controls = self.list_controls(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"policy_count": len(self.list_policies(tenant_id)),
+			"device_count": len(devices),
+			"quarantined_device_count": sum(1 for device in devices if device["quarantined"]),
+			"active_threat_count": sum(1 for threat in threats if threat["active"]),
+			"assessment_count": len(assessments),
+			"non_allow_decision_count": sum(1 for item in assessments if item["decision"] != "allow"),
+			"compliance_gap_count": sum(1 for item in controls if item["status"] in {"evidence_required", "non_compliant"}),
+			"recent_events": self.list_audit_events(tenant_id)[-5:],
+		}
+
+	def _require_tenant(self, tenant_id: str) -> None:
+		if not str(tenant_id or "").strip():
+			raise PermissionError("tenant_context_required")
+
+	def _find_device(self, tenant_id: str, device_id: str | None) -> Any | None:
+		if not device_id:
+			return None
+		for device in self.devices.values():
+			if device.tenant_id == tenant_id and device.device_id == device_id:
+				return device
+		return None
+
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		actor: str,
+		severity: str = "info",
+	) -> dict[str, Any]:
+		record_cls = self._records["SecurityAuditEventRecord"]
+		record = record_cls(
+			id=self._helpers["stable_id"]("secu_event", tenant_id, event_type, subject_id, len(self.audit_events)),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject_id=subject_id,
+			message=message,
+			actor=actor,
+			severity=severity,
+		)
+		self.audit_events[record.id] = record
+		return record.to_dict()
+
+	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = [record.to_dict() for record in records.values()]
+		if tenant_id is not None:
+			items = [item for item in items if item["tenant_id"] == tenant_id]
+		return sorted(items, key=lambda item: item["id"])
+
+
 # Global service instance
 _security_service = None
 
@@ -1104,6 +1462,7 @@ __all__ = [
 	"PredictiveThreatDetector",
 	"ComplianceAutomationEngine",
 	"APGSecurityFrameworkService",
+	"SecuService",
 	"get_security_framework_service",
 	"init_security_framework_service"
 ]
