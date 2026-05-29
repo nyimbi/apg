@@ -1,5 +1,9 @@
 """Regression coverage for the SECU executable capability contract."""
 
+from __future__ import annotations
+
+import pytest
+
 from .. import get_capability_info, register_capability
 from ..capability_contract import evaluate_capability_rules, get_capability_contract
 
@@ -16,21 +20,32 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"risk",
 		"threat_detection",
 		"compliance",
+		"incident_response",
 		"ui",
-		"theme"
+		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 5
+	assert len(contract["rule_engine"]["rules"]) >= 9
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"risk",
 		"threats",
 		"policies",
+		"exceptions",
+		"incidents",
+		"quarantine",
 		"compliance",
+		"audit",
 		"rules",
-		"settings"
+		"settings",
 	}
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert "risk_score_meter" in contract["theme"]["components"]
+	assert {
+		"risk_score_meter",
+		"policy_exception_queue",
+		"incident_response_panel",
+		"device_quarantine_list",
+		"security_audit_timeline",
+	} <= set(contract["theme"]["components"])
 
 
 def test_rule_engine_denies_high_risk_context():
@@ -40,7 +55,7 @@ def test_rule_engine_denies_high_risk_context():
 		"risk_score": 92,
 		"challenge_completed": False,
 		"compliance_violation": True,
-		"audit_evidence_attached": False
+		"audit_evidence_attached": False,
 	})
 
 	assert result["decision"] == "deny"
@@ -49,11 +64,54 @@ def test_rule_engine_denies_high_risk_context():
 		"compromised_device_quarantined",
 		"critical_risk_denied",
 		"high_risk_requires_challenge",
-		"compliance_violation_alert"
+		"compliance_violation_alert",
 	}
 
 
-def test_capability_info_and_registration_include_manifest_and_theme():
+@pytest.mark.parametrize(
+	"context, reason",
+	[
+		(
+			{
+				"operation": "approve_policy_exception",
+				"exception_reviewer_same_as_requester": True,
+				"policy_exception_expired": False,
+			},
+			"independent_exception_reviewer_required",
+		),
+		(
+			{
+				"operation": "approve_policy_exception",
+				"exception_reviewer_same_as_requester": False,
+				"policy_exception_expired": True,
+			},
+			"policy_exception_expired",
+		),
+		(
+			{
+				"operation": "open_incident",
+				"incident_severity": "critical",
+				"containment_plan_attached": False,
+			},
+			"critical_incident_containment_required",
+		),
+		(
+			{
+				"operation": "resolve_incident",
+				"containment_evidence_attached": False,
+			},
+			"incident_containment_evidence_required",
+		),
+	],
+)
+def test_rule_engine_enforces_exception_and_incident_guardrails(context, reason):
+	result = evaluate_capability_rules(context)
+
+	assert result["decision"] == "deny"
+	assert result["actions"][0]["reason"] == reason
+
+
+def test_capability_info_and_registration_include_manifest_theme_and_permissions():
 	info = get_capability_info()
 	registration = register_capability()
 
@@ -63,3 +121,7 @@ def test_capability_info_and_registration_include_manifest_and_theme():
 	assert info["theme"]["name"] == "secu_zero_trust"
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["ui_components"]["policies"] == "/secu/policies"
+	assert registration["ui_components"]["exceptions"] == "/secu/exceptions"
+	assert registration["ui_components"]["incidents"] == "/secu/incidents"
+	assert "secu:approve_exception" in registration["permissions"]
+	assert "secu:respond" in registration["permissions"]

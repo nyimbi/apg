@@ -18,6 +18,8 @@ SECURITY_LEVELS = {"public", "internal", "confidential", "restricted", "critical
 DEVICE_TRUST_STATES = {"trusted", "known", "unknown", "suspicious", "compromised"}
 THREAT_SEVERITIES = {"info", "low", "medium", "high", "critical"}
 CONTROL_STATUSES = {"implemented", "evidence_required", "non_compliant", "waived"}
+EXCEPTION_STATUSES = {"pending", "approved", "rejected", "expired"}
+INCIDENT_STATUSES = {"open", "contained", "resolved"}
 
 
 def utc_now() -> str:
@@ -216,15 +218,57 @@ class SecurityAuditEventRecord:
 		return serialize_record(self)
 
 
+@dataclass(slots=True)
+class PolicyExceptionRecord:
+	id: str
+	tenant_id: str
+	policy_id: str
+	requested_by: str
+	reason: str
+	expires_at: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize_record(self)
+
+
+@dataclass(slots=True)
+class SecurityIncidentRecord:
+	id: str
+	tenant_id: str
+	title: str
+	severity: str
+	opened_by: str
+	status: str = "open"
+	containment_action: str = ""
+	containment_evidence: str = ""
+	resolution: str = ""
+	resolved_by: str = ""
+	opened_at: str = field(default_factory=utc_now)
+	contained_at: str = ""
+	resolved_at: str = ""
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize_record(self)
+
+
 __all__ = [
 	"CONTROL_STATUSES",
 	"DEVICE_TRUST_STATES",
+	"EXCEPTION_STATUSES",
+	"INCIDENT_STATUSES",
 	"SECURITY_LEVELS",
 	"THREAT_SEVERITIES",
 	"ComplianceControlRecord",
 	"DevicePostureRecord",
+	"PolicyExceptionRecord",
 	"RiskAssessmentRecord",
 	"SecurityAuditEventRecord",
+	"SecurityIncidentRecord",
 	"SecurityPolicyRecord",
 	"ThreatIndicatorRecord",
 	"clamp_score",

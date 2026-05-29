@@ -23,6 +23,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"assessment_count": summary["assessment_count"],
 		"active_threat_count": summary["active_threat_count"],
 		"compliance_gap_count": summary["compliance_gap_count"],
+		"policy_exception_count": summary["policy_exception_count"],
+		"open_incident_count": summary["open_incident_count"],
 	}
 
 
@@ -89,6 +91,58 @@ def record_compliance_control(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def request_policy_exception(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.request_policy_exception(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		exception_id=str(payload["id"]),
+		policy_id=str(payload["policy_id"]),
+		requested_by=str(payload.get("requested_by") or ""),
+		reason=str(payload.get("reason") or ""),
+		expires_at=str(payload.get("expires_at") or ""),
+	)
+
+
+def decide_policy_exception(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.decide_policy_exception(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		exception_id=str(payload["id"]),
+		reviewer=str(payload.get("reviewer") or ""),
+		decision=str(payload.get("decision") or "approved"),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
+def open_incident(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.open_incident(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		incident_id=str(payload["id"]),
+		title=str(payload.get("title") or ""),
+		severity=str(payload.get("severity") or "medium"),
+		opened_by=str(payload.get("opened_by") or ""),
+		containment_plan=str(payload.get("containment_plan") or ""),
+	)
+
+
+def contain_incident(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.contain_incident(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		incident_id=str(payload["id"]),
+		actor=str(payload.get("actor") or ""),
+		containment_action=str(payload.get("containment_action") or ""),
+		containment_evidence=str(payload.get("containment_evidence") or ""),
+	)
+
+
+def resolve_incident(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.resolve_incident(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		incident_id=str(payload["id"]),
+		resolved_by=str(payload.get("resolved_by") or ""),
+		resolution=str(payload.get("resolution") or ""),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -109,6 +163,8 @@ def list_security_posture(tenant_id: str = "default") -> dict[str, Any]:
 		"threats": SERVICE.list_threats(tenant_id),
 		"assessments": SERVICE.list_assessments(tenant_id),
 		"controls": SERVICE.list_controls(tenant_id),
+		"policy_exceptions": SERVICE.list_policy_exceptions(tenant_id),
+		"incidents": SERVICE.list_incidents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

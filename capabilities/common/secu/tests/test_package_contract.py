@@ -6,6 +6,8 @@ from pathlib import Path
 import importlib.util
 import sys
 
+import pytest
+
 from capabilities.capability_contract_registry import validate_contract_shape
 from capabilities.common.secu import api, views
 from capabilities.common.secu.service import SecuService
@@ -25,30 +27,35 @@ def _load_module(name: str, path: Path):
 
 
 def test_contract_shape_is_valid():
-	module = _load_module("materialized_contract_secu", PACKAGE_DIR / "capability_contract.py")
+	module = _load_module("package_contract_secu", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "secu"
-	assert contract["ui"]["routes"]
+	assert len(contract["ui"]["routes"]) >= 11
+	assert len(contract["rule_engine"]["rules"]) >= 9
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
 def test_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_secu", PACKAGE_DIR / "app.py")
+	module = _load_module("package_app_secu", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
 	model = module.semantic_model()
+	capability = model["capabilities"]["secu"]
 
 	assert self_test["passed"] is True
 	assert manifest["kind"] == "apg.generated_application"
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "secu" in model["capabilities"]
+	assert len(capability["ui"]["routes"]) >= 11
+	assert capability["approvals"]["policy_exception"] == "PolicyExceptionRecord"
+	assert capability["approvals"]["incident_response"] == "SecurityIncidentRecord"
 
 
-def test_security_lifecycle_records_policy_device_threat_assessment_and_compliance():
+def test_security_lifecycle_records_governed_exception_incident_and_audit_state():
 	service = SecuService()
 
 	policy = service.create_policy(
@@ -90,6 +97,43 @@ def test_security_lifecycle_records_policy_device_threat_assessment_and_complian
 		owner="security-admin",
 		compliant=False,
 	)
+	exception = service.request_policy_exception(
+		tenant_id="tenant-a",
+		exception_id="break-glass",
+		policy_id=policy["id"],
+		requested_by="app-owner",
+		reason="Emergency production repair",
+		expires_at="2099-01-01T00:00:00Z",
+	)
+	approved = service.decide_policy_exception(
+		tenant_id="tenant-a",
+		exception_id=exception["id"],
+		reviewer="security-reviewer",
+		decision="approved",
+		notes="Time-bound exception with compensating controls.",
+	)
+	incident = service.open_incident(
+		tenant_id="tenant-a",
+		incident_id="inc-1",
+		title="Privileged credential exposure",
+		severity="critical",
+		opened_by="soc-analyst",
+		containment_plan="Disable token and isolate affected host.",
+	)
+	contained = service.contain_incident(
+		tenant_id="tenant-a",
+		incident_id=incident["id"],
+		actor="incident-commander",
+		containment_action="Token disabled and host isolated.",
+		containment_evidence="audit://incident/inc-1/containment",
+	)
+	resolved = service.resolve_incident(
+		tenant_id="tenant-a",
+		incident_id=contained["id"],
+		resolved_by="incident-commander",
+		resolution="Credentials rotated and monitoring confirmed clean.",
+		notes="Post-incident review attached.",
+	)
 	summary = service.dashboard_summary("tenant-a")
 
 	assert policy["security_level"] == "restricted"
@@ -98,34 +142,31 @@ def test_security_lifecycle_records_policy_device_threat_assessment_and_complian
 	assert assessment["decision"] == "challenge"
 	assert assessment["required_actions"] == ["complete_security_challenge"]
 	assert control["status"] == "evidence_required"
+	assert approved["status"] == "approved"
+	assert resolved["status"] == "resolved"
 	assert summary["policy_count"] == 1
 	assert summary["assessment_count"] == 1
 	assert summary["compliance_gap_count"] == 1
+	assert summary["policy_exception_count"] == 1
+	assert summary["open_incident_count"] == 0
+	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
+		"policy_exception_requested",
+		"policy_exception_decided",
+		"security_incident_opened",
+		"security_incident_contained",
+		"security_incident_resolved",
+	}
 
 
 def test_rule_guardrails_deny_quarantine_and_require_tenant_context():
 	service = SecuService()
 
-	try:
+	with pytest.raises(PermissionError, match="tenant_context_required"):
 		service.create_policy("", "No tenant", "owner")
-	except PermissionError as exc:
-		assert str(exc) == "tenant_context_required"
-	else:
-		raise AssertionError("missing tenant context was accepted")
-
-	try:
+	with pytest.raises(ValueError, match="policy_owner_required"):
 		service.create_policy("tenant-a", "No owner", "")
-	except ValueError as exc:
-		assert str(exc) == "policy_owner_required"
-	else:
-		raise AssertionError("missing policy owner was accepted")
-
-	try:
+	with pytest.raises(ValueError, match="unsupported_device_trust:rooted"):
 		service.record_device_posture("tenant-a", "device-1", "user-1", trust_state="rooted")
-	except ValueError as exc:
-		assert str(exc) == "unsupported_device_trust:rooted"
-	else:
-		raise AssertionError("unsupported device trust state was accepted")
 
 	service.record_device_posture("tenant-a", "device-2", "user-1", trust_state="compromised")
 	quarantined = service.assess_access("tenant-a", "user-1", "user", 60, device_id="device-2")
@@ -140,11 +181,118 @@ def test_rule_guardrails_deny_quarantine_and_require_tenant_context():
 	assert "known_malicious_network_denied" in malicious["matched_rules"]
 
 
+def test_exception_and_incident_guardrails_fail_closed():
+	service = SecuService()
+	policy = service.create_policy("tenant-a", "Privileged access", "secops")
+	with pytest.raises(ValueError, match="policy_exception_id_required"):
+		service.request_policy_exception(
+			tenant_id="tenant-a",
+			exception_id="",
+			policy_id=policy["id"],
+			requested_by="requester",
+			reason="Missing exception ID.",
+			expires_at="2099-01-01T00:00:00Z",
+		)
+	with pytest.raises(KeyError, match="security_policy_not_found"):
+		service.request_policy_exception(
+			tenant_id="tenant-a",
+			exception_id="missing-policy",
+			policy_id="missing-policy",
+			requested_by="requester",
+			reason="Policy target does not exist.",
+			expires_at="2099-01-01T00:00:00Z",
+		)
+	with pytest.raises(ValueError, match="policy_exception_expiry_invalid"):
+		service.request_policy_exception(
+			tenant_id="tenant-a",
+			exception_id="bad-expiry",
+			policy_id=policy["id"],
+			requested_by="requester",
+			reason="Invalid expiry.",
+			expires_at="not-a-timestamp",
+		)
+	pending = service.request_policy_exception(
+		tenant_id="tenant-a",
+		exception_id="self-review",
+		policy_id=policy["id"],
+		requested_by="requester",
+		reason="Temporary break glass.",
+		expires_at="2099-01-01T00:00:00Z",
+	)
+	expired = service.request_policy_exception(
+		tenant_id="tenant-a",
+		exception_id="expired",
+		policy_id=policy["id"],
+		requested_by="requester",
+		reason="Expired exception.",
+		expires_at="2000-01-01T00:00:00Z",
+	)
+
+	with pytest.raises(PermissionError, match="independent_exception_reviewer_required"):
+		service.decide_policy_exception("tenant-a", pending["id"], "requester", "approved", "Self review.")
+	with pytest.raises(ValueError, match="policy_exception_notes_required"):
+		service.decide_policy_exception("tenant-a", pending["id"], "security-reviewer", "approved", "")
+	with pytest.raises(PermissionError, match="policy_exception_expired"):
+		service.decide_policy_exception("tenant-a", expired["id"], "security-reviewer", "approved", "Too late.")
+	rejected_expired = service.decide_policy_exception(
+		"tenant-a",
+		expired["id"],
+		"security-reviewer",
+		"rejected",
+		"Expired exceptions are rejected, not approved.",
+	)
+	with pytest.raises(ValueError, match="incident_id_required"):
+		service.open_incident("tenant-a", "", "Credential exposure", "critical", "soc-analyst", "Disable credentials.")
+	with pytest.raises(PermissionError, match="critical_incident_containment_required"):
+		service.open_incident("tenant-a", "critical-1", "Credential exposure", "critical", "soc-analyst")
+	with pytest.raises(PermissionError, match="critical_incident_containment_required"):
+		service.open_incident("tenant-a", "critical-whitespace", "Credential exposure", "critical", "soc-analyst", "   ")
+
+	incident = service.open_incident(
+		"tenant-a",
+		"critical-2",
+		"Credential exposure",
+		"critical",
+		"soc-analyst",
+		containment_plan="Disable credentials.",
+	)
+	with pytest.raises(ValueError, match="incident_containment_evidence_required"):
+		service.contain_incident("tenant-a", incident["id"], "soc-lead", "Disabled credentials.", "")
+	with pytest.raises(PermissionError, match="incident_containment_evidence_required"):
+		service.resolve_incident(
+			"tenant-a",
+			incident["id"],
+			"soc-lead",
+			"Credentials rotated.",
+			"Resolution before containment should fail.",
+		)
+	contained = service.contain_incident(
+		"tenant-a",
+		incident["id"],
+		"soc-lead",
+		"Disabled credentials.",
+		"audit://incident/critical-2/containment",
+	)
+	with pytest.raises(ValueError, match="incident_resolution_notes_required"):
+		service.resolve_incident("tenant-a", contained["id"], "soc-lead", "Credentials rotated.", "")
+	resolved = service.resolve_incident(
+		"tenant-a",
+		contained["id"],
+		"soc-lead",
+		"Credentials rotated.",
+		"Resolution evidence accepted.",
+	)
+	with pytest.raises(ValueError, match="security_incident_already_resolved"):
+		service.resolve_incident("tenant-a", resolved["id"], "soc-lead", "Repeat resolution.", "Duplicate closure.")
+
+	assert rejected_expired["status"] == "rejected"
+
+
 def test_api_and_view_models_expose_security_posture_surfaces():
 	local_api_service = SecuService()
 	api.SERVICE = local_api_service
 
-	api.create_policy({"tenant_id": "tenant-b", "name": "Data access", "owner": "secops"})
+	policy = api.create_policy({"tenant_id": "tenant-b", "name": "Data access", "owner": "secops"})
 	api.record_device_posture({"tenant_id": "tenant-b", "device_id": "device-1", "user_id": "user-1"})
 	api.register_threat_indicator({
 		"tenant_id": "tenant-b",
@@ -161,23 +309,80 @@ def test_api_and_view_models_expose_security_posture_surfaces():
 		"compliant": True,
 		"evidence_ref": "audit://evidence/1",
 	})
+	exception = api.request_policy_exception({
+		"tenant_id": "tenant-b",
+		"id": "exception-1",
+		"policy_id": policy["id"],
+		"requested_by": "owner",
+		"reason": "Temporary external auditor access.",
+		"expires_at": "2099-01-01T00:00:00Z",
+	})
+	api.decide_policy_exception({
+		"tenant_id": "tenant-b",
+		"id": exception["id"],
+		"reviewer": "security-reviewer",
+		"decision": "approved",
+		"notes": "Approved for audit window.",
+	})
+	expired = api.request_policy_exception({
+		"tenant_id": "tenant-b",
+		"id": "expired-exception",
+		"policy_id": policy["id"],
+		"requested_by": "owner",
+		"reason": "Expired exception should not be approved.",
+		"expires_at": "2000-01-01T00:00:00Z",
+	})
+	with pytest.raises(PermissionError, match="policy_exception_expired"):
+		api.decide_policy_exception({
+			"tenant_id": "tenant-b",
+			"id": expired["id"],
+			"reviewer": "security-reviewer",
+			"decision": "approved",
+			"notes": "Caller-supplied now must not bypass expiry.",
+			"now": "0",
+		})
+	incident = api.open_incident({
+		"tenant_id": "tenant-b",
+		"id": "incident-1",
+		"title": "Suspicious admin token",
+		"severity": "high",
+		"opened_by": "soc-analyst",
+	})
+	api.contain_incident({
+		"tenant_id": "tenant-b",
+		"id": incident["id"],
+		"actor": "soc-lead",
+		"containment_action": "Revoked token.",
+		"containment_evidence": "audit://incident/incident-1/containment",
+	})
 
 	status = api.capability_status("tenant-b")
 	posture = api.list_security_posture("tenant-b")
-	dashboard = views.dashboard_model(local_api_service, "tenant-b")
-	risk = views.risk_console_model(local_api_service, "tenant-b")
-	threats = views.threat_console_model(local_api_service, "tenant-b")
-	policies = views.policy_workbench_model(local_api_service, "tenant-b")
-	compliance = views.compliance_console_model(local_api_service, "tenant-b")
+	dashboard = views.dashboard_model(tenant_id="tenant-b")
+	risk = views.risk_console_model(tenant_id="tenant-b")
+	threats = views.threat_console_model(tenant_id="tenant-b")
+	policies = views.policy_workbench_model(tenant_id="tenant-b")
+	exceptions = views.exception_queue_model(tenant_id="tenant-b")
+	incidents = views.incident_response_model(tenant_id="tenant-b")
+	quarantine = views.quarantine_console_model(tenant_id="tenant-b")
+	compliance = views.compliance_console_model(tenant_id="tenant-b")
+	audit = views.audit_timeline_model(tenant_id="tenant-b")
 	rules = views.rule_workbench_model("tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["policy_count"] == 1
+	assert status["policy_exception_count"] == 2
+	assert status["open_incident_count"] == 1
 	assert posture["summary"]["active_threat_count"] == 1
 	assert dashboard["summary"]["assessment_count"] == 1
 	assert risk["route"] == "/secu/risk"
 	assert threats["severity_filters"] == ["info", "low", "medium", "high", "critical"]
 	assert policies["security_levels"][-1] == "critical"
+	assert {item["status"] for item in exceptions["exceptions"]} == {"approved", "pending"}
+	assert len(exceptions["pending"]) == 1
+	assert incidents["open_incidents"][0]["status"] == "contained"
+	assert quarantine["devices"] == []
 	assert compliance["controls"][0]["status"] == "implemented"
+	assert audit["events"]
 	assert rules["decision_order"] == ["deny", "quarantine", "challenge", "allow"]
 	assert settings["theme"]["name"] == "secu_zero_trust"

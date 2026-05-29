@@ -41,11 +41,21 @@ class CapabilityConfiguration:
 			"assessment_interval_days": 30,
 			"require_audit_evidence": True
 		},
+		"incident_response": {
+			"require_containment_for_critical": True,
+			"require_resolution_evidence": True,
+			"require_independent_exception_review": True,
+			"policy_exception_max_days": 30
+		},
 		"ui": {
 			"enable_security_dashboard": True,
 			"enable_policy_workbench": True,
 			"enable_threat_console": True,
-			"enable_compliance_console": True
+			"enable_compliance_console": True,
+			"enable_exception_queue": True,
+			"enable_incident_response": True,
+			"enable_quarantine_console": True,
+			"enable_audit_timeline": True
 		},
 		"theme": {
 			"default_theme": "secu_zero_trust",
@@ -54,13 +64,14 @@ class CapabilityConfiguration:
 	})
 	schema: dict[str, Any] = field(default_factory=lambda: {
 		"type": "object",
-		"required": ["tenant_id", "zero_trust", "risk", "threat_detection", "compliance", "ui", "theme"],
+		"required": ["tenant_id", "zero_trust", "risk", "threat_detection", "compliance", "incident_response", "ui", "theme"],
 		"properties": {
 			"tenant_id": {"type": "string", "minLength": 1},
 			"zero_trust": {"type": "object"},
 			"risk": {"type": "object"},
 			"threat_detection": {"type": "object"},
 			"compliance": {"type": "object"},
+			"incident_response": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -164,6 +175,26 @@ class CapabilityTheme:
 		"compliance_badge": {
 			"icon": "badge-check",
 			"variant": "subtle"
+		},
+		"policy_exception_queue": {
+			"icon": "clipboard-check",
+			"status_indicator": "left-bar",
+			"variant": "review"
+		},
+		"incident_response_panel": {
+			"icon": "siren",
+			"status_indicator": "top-bar",
+			"variant": "critical"
+		},
+		"device_quarantine_list": {
+			"icon": "shield-x",
+			"status_indicator": "lock",
+			"variant": "containment"
+		},
+		"security_audit_timeline": {
+			"icon": "scroll-text",
+			"line_style": "segmented",
+			"variant": "evidence"
 		}
 	})
 
@@ -220,6 +251,46 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "audit_evidence_required",
 				"required_action": "attach_audit_evidence"
 			}
+		),
+		CapabilityRule(
+			name="policy_exception_requires_independent_reviewer",
+			description="Policy exceptions require independent review.",
+			condition={"operation": "approve_policy_exception", "exception_reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_exception_reviewer_required",
+				"required_action": "assign_independent_reviewer"
+			}
+		),
+		CapabilityRule(
+			name="expired_policy_exception_denied",
+			description="Expired policy exceptions cannot be approved.",
+			condition={"operation": "approve_policy_exception", "policy_exception_expired": True},
+			effect={
+				"decision": "deny",
+				"reason": "policy_exception_expired",
+				"required_action": "request_new_exception"
+			}
+		),
+		CapabilityRule(
+			name="critical_incident_requires_containment",
+			description="Critical incidents require a containment plan when opened.",
+			condition={"operation": "open_incident", "incident_severity": "critical", "containment_plan_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "critical_incident_containment_required",
+				"required_action": "attach_containment_plan"
+			}
+		),
+		CapabilityRule(
+			name="incident_resolution_requires_containment",
+			description="Incidents require containment evidence before resolution.",
+			condition={"operation": "resolve_incident", "containment_evidence_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "incident_containment_evidence_required",
+				"required_action": "record_containment_evidence"
+			}
 		)
 	]
 
@@ -231,7 +302,11 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("risk", "/secu/risk", "RiskAssessmentConsole", "secu:view_risk", "Operations"),
 		CapabilityUIRoute("threats", "/secu/threats", "ThreatDetectionConsole", "secu:view_threats", "Operations"),
 		CapabilityUIRoute("policies", "/secu/policies", "SecurityPolicyWorkbench", "secu:manage_policies", "Governance"),
+		CapabilityUIRoute("exceptions", "/secu/exceptions", "PolicyExceptionQueue", "secu:approve_exception", "Governance"),
+		CapabilityUIRoute("incidents", "/secu/incidents", "IncidentResponseConsole", "secu:respond", "Operations"),
+		CapabilityUIRoute("quarantine", "/secu/quarantine", "DeviceQuarantineConsole", "secu:respond", "Operations"),
 		CapabilityUIRoute("compliance", "/secu/compliance", "ComplianceConsole", "secu:view_compliance", "Governance"),
+		CapabilityUIRoute("audit", "/secu/audit", "SecurityAuditTimeline", "secu:view", "Governance"),
 		CapabilityUIRoute("rules", "/secu/rules", "SecurityRuleWorkbench", "secu:admin", "Governance"),
 		CapabilityUIRoute("settings", "/secu/settings", "SecuritySettings", "secu:admin", "Administration")
 	]

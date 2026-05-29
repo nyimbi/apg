@@ -30,11 +30,18 @@ Current package behavior:
   plus matched rule IDs and required actions;
 - records compliance controls with evidence posture and status values such as
   `implemented`, `evidence_required`, `non_compliant`, and `waived`;
+- records policy exception requests with requester, reason, expiry, independent
+  reviewer, decision, reviewer notes, and expired-exception denial;
+- records security incidents with open, contained, and resolved lifecycle
+  state, critical containment plan guardrails, containment evidence, resolver,
+  and resolution audit notes;
 - records audit events for policy creation, device posture, threat indicator
-  registration, access challenges/denials/quarantines, and compliance gaps;
+  registration, access challenges/denials/quarantines, compliance gaps, policy
+  exception decisions, incident containment, and incident resolution;
 - exposes dependency-light API helpers and UI view models for the dashboard,
   risk console, threat console, policy workbench, compliance console, rule
-  workbench, and settings surfaces.
+  workbench, policy exception queue, incident response console, quarantine
+  console, audit timeline, and settings surfaces.
 
 The compatibility `create_record` and `list_records` helpers map legacy
 generic package calls to risk-assessment behavior so older tooling can still

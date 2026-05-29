@@ -5,13 +5,127 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Security Framework package-backed APG capability", "entity_count": 0, "name": "secu", "version": "1.0.0"}, "capabilities": {"secu": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"compliance": {"assessment_interval_days": 30, "frameworks": ["iso_27001", "soc2", "nist"], "require_audit_evidence": true}, "risk": {"auto_quarantine_threshold": 85, "challenge_threshold": 50, "critical_threshold": 90, "high_threshold": 70}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "secu_zero_trust"}, "threat_detection": {"ai_detection_enabled": true, "alert_on_unknown_threats": true, "enabled": true, "indicator_ttl_hours": 24}, "ui": {"enable_compliance_console": true, "enable_policy_workbench": true, "enable_security_dashboard": true, "enable_threat_console": true}, "zero_trust": {"continuous_verification": true, "default_security_level": "confidential", "deny_unknown_devices": true, "enabled": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Security Framework", "provides": ["secu_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"is_known_malicious": true}, "description": "Known malicious network origins are denied.", "effect": {"decision": "deny", "reason": "malicious_network_origin", "required_action": "block_request"}, "name": "known_malicious_network_denied"}, {"condition": {"device_trust": "compromised"}, "description": "Compromised devices require quarantine.", "effect": {"decision": "quarantine", "reason": "compromised_device", "required_action": "isolate_device"}, "name": "compromised_device_quarantined"}, {"condition": {"risk_score_gte": 90}, "description": "Critical risk scores are denied by default.", "effect": {"decision": "deny", "reason": "critical_risk_score", "required_action": "investigate_security_event"}, "name": "critical_risk_denied"}, {"condition": {"challenge_completed": false, "risk_score_gte": 70}, "description": "High risk requests require challenge before access.", "effect": {"decision": "challenge", "reason": "step_up_required", "required_action": "complete_security_challenge"}, "name": "high_risk_requires_challenge"}, {"condition": {"audit_evidence_attached": false, "compliance_violation": true}, "description": "Compliance violations require audit evidence and alerting.", "effect": {"decision": "challenge", "reason": "audit_evidence_required", "required_action": "attach_audit_evidence"}, "name": "compliance_violation_alert"}], "type": "deterministic"}, "rules": [{"condition": {"is_known_malicious": true}, "description": "Known malicious network origins are denied.", "effect": {"decision": "deny", "reason": "malicious_network_origin", "required_action": "block_request"}, "name": "known_malicious_network_denied"}, {"condition": {"device_trust": "compromised"}, "description": "Compromised devices require quarantine.", "effect": {"decision": "quarantine", "reason": "compromised_device", "required_action": "isolate_device"}, "name": "compromised_device_quarantined"}, {"condition": {"risk_score_gte": 90}, "description": "Critical risk scores are denied by default.", "effect": {"decision": "deny", "reason": "critical_risk_score", "required_action": "investigate_security_event"}, "name": "critical_risk_denied"}, {"condition": {"challenge_completed": false, "risk_score_gte": 70}, "description": "High risk requests require challenge before access.", "effect": {"decision": "challenge", "reason": "step_up_required", "required_action": "complete_security_challenge"}, "name": "high_risk_requires_challenge"}, {"condition": {"audit_evidence_attached": false, "compliance_violation": true}, "description": "Compliance violations require audit evidence and alerting.", "effect": {"decision": "challenge", "reason": "audit_evidence_required", "required_action": "attach_audit_evidence"}, "name": "compliance_violation_alert"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"compliance": {"component": "ComplianceConsole", "permission": "secu:view_compliance", "route": "/secu/compliance"}, "dashboard": {"component": "SecurityDashboard", "permission": "secu:view", "route": "/secu/dashboard"}, "policies": {"component": "SecurityPolicyWorkbench", "permission": "secu:manage_policies", "route": "/secu/policies"}, "risk": {"component": "RiskAssessmentConsole", "permission": "secu:view_risk", "route": "/secu/risk"}, "rules": {"component": "SecurityRuleWorkbench", "permission": "secu:admin", "route": "/secu/rules"}, "settings": {"component": "SecuritySettings", "permission": "secu:admin", "route": "/secu/settings"}, "threats": {"component": "ThreatDetectionConsole", "permission": "secu:view_threats", "route": "/secu/threats"}}, "streaming": {}, "theme": {"components": {"compliance_badge": {"icon": "badge-check", "variant": "subtle"}, "policy_card": {"icon": "lock-keyhole", "status_indicator": "top-right"}, "risk_score_meter": {"critical_band": "color.danger", "safe_band": "color.success", "visual": "threshold-gauge"}, "threat_indicator": {"icon": "shield-alert", "severity_style": "left-border"}}, "name": "secu_zero_trust", "tokens": {"border.radius": "8px", "color.accent": "#C2410C", "color.danger": "#B42318", "color.primary": "#1C3D5A", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#102A43", "text.secondary": "#52616B"}}, "ui": {"frontend_bundle": "views.py", "requires_theme": true, "routes": [{"component": "SecurityDashboard", "name": "dashboard", "nav_group": "Operations", "path": "/secu/dashboard", "permission": "secu:view"}, {"component": "RiskAssessmentConsole", "name": "risk", "nav_group": "Operations", "path": "/secu/risk", "permission": "secu:view_risk"}, {"component": "ThreatDetectionConsole", "name": "threats", "nav_group": "Operations", "path": "/secu/threats", "permission": "secu:view_threats"}, {"component": "SecurityPolicyWorkbench", "name": "policies", "nav_group": "Governance", "path": "/secu/policies", "permission": "secu:manage_policies"}, {"component": "ComplianceConsole", "name": "compliance", "nav_group": "Governance", "path": "/secu/compliance", "permission": "secu:view_compliance"}, {"component": "SecurityRuleWorkbench", "name": "rules", "nav_group": "Governance", "path": "/secu/rules", "permission": "secu:admin"}, {"component": "SecuritySettings", "name": "settings", "nav_group": "Administration", "path": "/secu/settings", "permission": "secu:admin"}], "shell": "apg_python", "template_roots": ["templates/"]}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"secu": []}}, "contracts": {"secu": {"configuration": {"compliance": {"assessment_interval_days": 30, "frameworks": ["iso_27001", "soc2", "nist"], "require_audit_evidence": true}, "risk": {"auto_quarantine_threshold": 85, "challenge_threshold": 50, "critical_threshold": 90, "high_threshold": 70}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "secu_zero_trust"}, "threat_detection": {"ai_detection_enabled": true, "alert_on_unknown_threats": true, "enabled": true, "indicator_ttl_hours": 24}, "ui": {"enable_compliance_console": true, "enable_policy_workbench": true, "enable_security_dashboard": true, "enable_threat_console": true}, "zero_trust": {"continuous_verification": true, "default_security_level": "confidential", "deny_unknown_devices": true, "enabled": true}}, "id": "secu", "provides": ["secu_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"secu": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"compliance_violation_alert": {"condition": {"audit_evidence_attached": false, "compliance_violation": true}, "description": "Compliance violations require audit evidence and alerting.", "effect": {"decision": "challenge", "reason": "audit_evidence_required", "required_action": "attach_audit_evidence"}, "name": "compliance_violation_alert"}, "compromised_device_quarantined": {"condition": {"device_trust": "compromised"}, "description": "Compromised devices require quarantine.", "effect": {"decision": "quarantine", "reason": "compromised_device", "required_action": "isolate_device"}, "name": "compromised_device_quarantined"}, "critical_risk_denied": {"condition": {"risk_score_gte": 90}, "description": "Critical risk scores are denied by default.", "effect": {"decision": "deny", "reason": "critical_risk_score", "required_action": "investigate_security_event"}, "name": "critical_risk_denied"}, "high_risk_requires_challenge": {"condition": {"challenge_completed": false, "risk_score_gte": 70}, "description": "High risk requests require challenge before access.", "effect": {"decision": "challenge", "reason": "step_up_required", "required_action": "complete_security_challenge"}, "name": "high_risk_requires_challenge"}, "known_malicious_network_denied": {"condition": {"is_known_malicious": true}, "description": "Known malicious network origins are denied.", "effect": {"decision": "deny", "reason": "malicious_network_origin", "required_action": "block_request"}, "name": "known_malicious_network_denied"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.secu": {"file": "capability_contract.py", "id": "capability.secu", "kind": "capability", "name": "Security Framework", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("secu_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "secu",
+			"version": "1.0.0",
+			"description": "Security Framework package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"secu": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"secu": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["secu_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "views.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"policy_exception": "PolicyExceptionRecord",
+					"incident_response": "SecurityIncidentRecord",
+				},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"secu": {
+				"id": "secu",
+				"configuration": contract["configuration"],
+				"provides": ["secu_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"secu": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.secu": {
+				"id": "capability.secu",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +150,18 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	routes = model.get("capabilities", {}).get("secu", {}).get("ui", {}).get("routes", [])
+	approvals = model.get("capabilities", {}).get("secu", {}).get("approvals", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "secu" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 11:
+		errors.append("SECU semantic model route manifest is stale")
+	if "policy_exception" not in approvals or "incident_response" not in approvals:
+		errors.append("SECU semantic model approval manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

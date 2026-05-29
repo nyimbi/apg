@@ -9,7 +9,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 from typing import Dict, Any, Optional, List, Set, Union, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
 import json
 import hashlib
@@ -1097,8 +1097,10 @@ class SecuService:
 		from .security_runtime import (
 			ComplianceControlRecord,
 			DevicePostureRecord,
+			PolicyExceptionRecord,
 			RiskAssessmentRecord,
 			SecurityAuditEventRecord,
+			SecurityIncidentRecord,
 			SecurityPolicyRecord,
 			ThreatIndicatorRecord,
 			clamp_score,
@@ -1118,8 +1120,10 @@ class SecuService:
 		self._records = {
 			"ComplianceControlRecord": ComplianceControlRecord,
 			"DevicePostureRecord": DevicePostureRecord,
+			"PolicyExceptionRecord": PolicyExceptionRecord,
 			"RiskAssessmentRecord": RiskAssessmentRecord,
 			"SecurityAuditEventRecord": SecurityAuditEventRecord,
+			"SecurityIncidentRecord": SecurityIncidentRecord,
 			"SecurityPolicyRecord": SecurityPolicyRecord,
 			"ThreatIndicatorRecord": ThreatIndicatorRecord,
 		}
@@ -1140,6 +1144,8 @@ class SecuService:
 		self.threats: dict[str, Any] = {}
 		self.assessments: dict[str, Any] = {}
 		self.controls: dict[str, Any] = {}
+		self.policy_exceptions: dict[str, Any] = {}
+		self.incidents: dict[str, Any] = {}
 		self.audit_events: dict[str, Any] = {}
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1338,6 +1344,214 @@ class SecuService:
 			self._record_event(tenant_id, "compliance_gap_recorded", record.id, f"Compliance control requires action: {control_id}", owner, "medium")
 		return record.to_dict()
 
+	def request_policy_exception(
+		self,
+		tenant_id: str,
+		exception_id: str,
+		policy_id: str,
+		requested_by: str,
+		reason: str,
+		expires_at: str,
+	) -> dict[str, Any]:
+		"""Request a time-bound policy exception."""
+		self._require_tenant(tenant_id)
+		if not str(exception_id or "").strip():
+			raise ValueError("policy_exception_id_required")
+		if not str(policy_id or "").strip():
+			raise ValueError("policy_exception_policy_required")
+		if not self._policy_exists(tenant_id, policy_id):
+			raise KeyError(f"security_policy_not_found:{policy_id}")
+		if not str(requested_by or "").strip():
+			raise ValueError("policy_exception_requester_required")
+		if not str(reason or "").strip():
+			raise ValueError("policy_exception_reason_required")
+		if not str(expires_at or "").strip():
+			raise ValueError("policy_exception_expiry_required")
+		self._parse_utc_timestamp(expires_at, "policy_exception_expiry_invalid")
+		record_id = self._helpers["stable_id"]("secu_exception", tenant_id, exception_id)
+		if record_id in self.policy_exceptions:
+			raise ValueError(f"policy_exception_already_exists:{exception_id}")
+		record_cls = self._records["PolicyExceptionRecord"]
+		record = record_cls(
+			id=record_id,
+			tenant_id=tenant_id,
+			policy_id=policy_id,
+			requested_by=requested_by,
+			reason=reason,
+			expires_at=expires_at,
+		)
+		self.policy_exceptions[record.id] = record
+		self._record_event(tenant_id, "policy_exception_requested", record.id, f"Policy exception requested: {policy_id}", requested_by, "medium")
+		return record.to_dict()
+
+	def decide_policy_exception(
+		self,
+		tenant_id: str,
+		exception_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> dict[str, Any]:
+		"""Approve or reject a policy exception with independent review."""
+		record = self._get_policy_exception(tenant_id, exception_id)
+		if record.status != "pending":
+			raise ValueError("policy_exception_already_decided")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("policy_exception_decision_invalid")
+		if not str(reviewer or "").strip():
+			raise ValueError("policy_exception_reviewer_required")
+		if not str(notes or "").strip():
+			raise ValueError("policy_exception_notes_required")
+		result = self.evaluate({
+			"operation": "approve_policy_exception",
+			"exception_reviewer_same_as_requester": reviewer == record.requested_by,
+			"policy_exception_expired": decision == "approved" and self._is_expired(record.expires_at),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record_cls = self._records["PolicyExceptionRecord"]
+		decided = record_cls(
+			id=record.id,
+			tenant_id=record.tenant_id,
+			policy_id=record.policy_id,
+			requested_by=record.requested_by,
+			reason=record.reason,
+			expires_at=record.expires_at,
+			status=decision,
+			decision=decision,
+			reviewer=reviewer,
+			notes=notes,
+			created_at=record.created_at,
+		)
+		self.policy_exceptions[record.id] = decided
+		self._record_event(tenant_id, "policy_exception_decided", record.id, f"Policy exception {decision}: {record.policy_id}", reviewer, "medium")
+		return decided.to_dict()
+
+	def open_incident(
+		self,
+		tenant_id: str,
+		incident_id: str,
+		title: str,
+		severity: str,
+		opened_by: str,
+		containment_plan: str = "",
+	) -> dict[str, Any]:
+		"""Open a security incident with critical containment guardrails."""
+		self._require_tenant(tenant_id)
+		if not str(incident_id or "").strip():
+			raise ValueError("incident_id_required")
+		if not str(title or "").strip():
+			raise ValueError("incident_title_required")
+		if not str(opened_by or "").strip():
+			raise ValueError("incident_opened_by_required")
+		normalized_severity = self._helpers["normalize_threat_severity"](severity)
+		plan = str(containment_plan or "").strip()
+		result = self.evaluate({
+			"operation": "open_incident",
+			"incident_severity": normalized_severity,
+			"containment_plan_attached": bool(plan),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record_id = self._helpers["stable_id"]("secu_incident", tenant_id, incident_id)
+		if record_id in self.incidents:
+			raise ValueError(f"security_incident_already_exists:{incident_id}")
+		record_cls = self._records["SecurityIncidentRecord"]
+		record = record_cls(
+			id=record_id,
+			tenant_id=tenant_id,
+			title=title,
+			severity=normalized_severity,
+			opened_by=opened_by,
+			containment_action=plan,
+		)
+		self.incidents[record.id] = record
+		self._record_event(tenant_id, "security_incident_opened", record.id, f"Security incident opened: {title}", opened_by, normalized_severity)
+		return record.to_dict()
+
+	def contain_incident(
+		self,
+		tenant_id: str,
+		incident_id: str,
+		actor: str,
+		containment_action: str,
+		containment_evidence: str,
+	) -> dict[str, Any]:
+		"""Record containment action and evidence for an incident."""
+		record = self._get_incident(tenant_id, incident_id)
+		if record.status == "resolved":
+			raise ValueError("security_incident_already_resolved")
+		if not str(actor or "").strip():
+			raise ValueError("incident_containment_actor_required")
+		if not str(containment_action or "").strip():
+			raise ValueError("incident_containment_action_required")
+		if not str(containment_evidence or "").strip():
+			raise ValueError("incident_containment_evidence_required")
+		record_cls = self._records["SecurityIncidentRecord"]
+		contained = record_cls(
+			id=record.id,
+			tenant_id=record.tenant_id,
+			title=record.title,
+			severity=record.severity,
+			opened_by=record.opened_by,
+			status="contained",
+			containment_action=containment_action,
+			containment_evidence=containment_evidence,
+			resolution=record.resolution,
+			resolved_by=record.resolved_by,
+			opened_at=record.opened_at,
+			contained_at=self._utc_now(),
+			resolved_at=record.resolved_at,
+		)
+		self.incidents[record.id] = contained
+		self._record_event(tenant_id, "security_incident_contained", record.id, f"Security incident contained: {record.title}", actor, record.severity)
+		return contained.to_dict()
+
+	def resolve_incident(
+		self,
+		tenant_id: str,
+		incident_id: str,
+		resolved_by: str,
+		resolution: str,
+		notes: str,
+	) -> dict[str, Any]:
+		"""Resolve an incident only after containment evidence exists."""
+		record = self._get_incident(tenant_id, incident_id)
+		if record.status == "resolved":
+			raise ValueError("security_incident_already_resolved")
+		if not str(resolved_by or "").strip():
+			raise ValueError("incident_resolver_required")
+		if not str(resolution or "").strip():
+			raise ValueError("incident_resolution_required")
+		if not str(notes or "").strip():
+			raise ValueError("incident_resolution_notes_required")
+		result = self.evaluate({
+			"operation": "resolve_incident",
+			"incident_contained": record.status == "contained",
+			"containment_evidence_attached": bool(record.containment_evidence),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record_cls = self._records["SecurityIncidentRecord"]
+		resolved = record_cls(
+			id=record.id,
+			tenant_id=record.tenant_id,
+			title=record.title,
+			severity=record.severity,
+			opened_by=record.opened_by,
+			status="resolved",
+			containment_action=record.containment_action,
+			containment_evidence=record.containment_evidence,
+			resolution=resolution,
+			resolved_by=resolved_by,
+			opened_at=record.opened_at,
+			contained_at=record.contained_at,
+			resolved_at=self._utc_now(),
+		)
+		self.incidents[record.id] = resolved
+		self._record_event(tenant_id, "security_incident_resolved", record.id, notes, resolved_by, record.severity)
+		return resolved.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -1378,6 +1592,12 @@ class SecuService:
 	def list_controls(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.controls, tenant_id)
 
+	def list_policy_exceptions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.policy_exceptions, tenant_id)
+
+	def list_incidents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.incidents, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
@@ -1396,6 +1616,8 @@ class SecuService:
 			"assessment_count": len(assessments),
 			"non_allow_decision_count": sum(1 for item in assessments if item["decision"] != "allow"),
 			"compliance_gap_count": sum(1 for item in controls if item["status"] in {"evidence_required", "non_compliant"}),
+			"policy_exception_count": len(self.list_policy_exceptions(tenant_id)),
+			"open_incident_count": sum(1 for item in self.list_incidents(tenant_id) if item["status"] != "resolved"),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -1410,6 +1632,12 @@ class SecuService:
 			if device.tenant_id == tenant_id and device.device_id == device_id:
 				return device
 		return None
+
+	def _policy_exists(self, tenant_id: str, policy_id: str) -> bool:
+		for policy in self.policies.values():
+			if policy.tenant_id == tenant_id and policy.id == policy_id:
+				return True
+		return False
 
 	def _record_event(
 		self,
@@ -1432,6 +1660,43 @@ class SecuService:
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
+
+	def _get_policy_exception(self, tenant_id: str, exception_id: str) -> Any:
+		record_id = self._helpers["stable_id"]("secu_exception", tenant_id, exception_id)
+		record = self.policy_exceptions.get(record_id) or self.policy_exceptions.get(exception_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"policy_exception_not_found:{exception_id}")
+		return record
+
+	def _get_incident(self, tenant_id: str, incident_id: str) -> Any:
+		record_id = self._helpers["stable_id"]("secu_incident", tenant_id, incident_id)
+		record = self.incidents.get(record_id) or self.incidents.get(incident_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"security_incident_not_found:{incident_id}")
+		return record
+
+	def _is_expired(self, expires_at: str) -> bool:
+		return self._parse_utc_timestamp(expires_at, "policy_exception_expiry_invalid") <= datetime.now(timezone.utc)
+
+	def _parse_utc_timestamp(self, value: str, error_code: str) -> datetime:
+		try:
+			parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+		except ValueError as exc:
+			raise ValueError(error_code) from exc
+		if parsed.tzinfo is None:
+			return parsed.replace(tzinfo=timezone.utc)
+		return parsed.astimezone(timezone.utc)
+
+	def _utc_now(self) -> str:
+		from .security_runtime import utc_now
+
+		return utc_now()
+
+	def _first_reason(self, result: dict[str, Any]) -> str:
+		for action in result.get("actions", []):
+			if action.get("reason"):
+				return str(action["reason"])
+		return "security_operation_denied"
 
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = [record.to_dict() for record in records.values()]

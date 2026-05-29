@@ -364,7 +364,11 @@ APG_SECURITY_METADATA = {
 		"threat_detection", 
 		"security_policies",
 		"compliance_automation",
-		"zero_trust_architecture"
+		"zero_trust_architecture",
+		"policy_exception_governance",
+		"incident_response_governance",
+		"device_quarantine_governance",
+		"security_audit_timeline"
 	],
 	"load_priority": 50,  # Load after dependencies
 	"multi_tenant": True,
@@ -408,6 +412,8 @@ def register_capability() -> Dict[str, Any]:
 			"secu:view_threats",
 			"secu:view_compliance",
 			"secu:manage_policies",
+			"secu:approve_exception",
+			"secu:respond",
 			"secu:admin"
 		]
 	}

@@ -8,7 +8,10 @@
   },
   "capabilities": {
     "secu": {
-      "approvals": {},
+      "approvals": {
+        "incident_response": "SecurityIncidentRecord",
+        "policy_exception": "PolicyExceptionRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -20,6 +23,12 @@
             "nist"
           ],
           "require_audit_evidence": true
+        },
+        "incident_response": {
+          "policy_exception_max_days": 30,
+          "require_containment_for_critical": true,
+          "require_independent_exception_review": true,
+          "require_resolution_evidence": true
         },
         "risk": {
           "auto_quarantine_threshold": 85,
@@ -39,8 +48,12 @@
           "indicator_ttl_hours": 24
         },
         "ui": {
+          "enable_audit_timeline": true,
           "enable_compliance_console": true,
+          "enable_exception_queue": true,
+          "enable_incident_response": true,
           "enable_policy_workbench": true,
+          "enable_quarantine_console": true,
           "enable_security_dashboard": true,
           "enable_threat_console": true
         },
@@ -124,6 +137,59 @@
               "required_action": "attach_audit_evidence"
             },
             "name": "compliance_violation_alert"
+          },
+          {
+            "condition": {
+              "exception_reviewer_same_as_requester": true,
+              "operation": "approve_policy_exception"
+            },
+            "description": "Policy exceptions require independent review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_exception_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "policy_exception_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "operation": "approve_policy_exception",
+              "policy_exception_expired": true
+            },
+            "description": "Expired policy exceptions cannot be approved.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_exception_expired",
+              "required_action": "request_new_exception"
+            },
+            "name": "expired_policy_exception_denied"
+          },
+          {
+            "condition": {
+              "containment_plan_attached": false,
+              "incident_severity": "critical",
+              "operation": "open_incident"
+            },
+            "description": "Critical incidents require a containment plan when opened.",
+            "effect": {
+              "decision": "deny",
+              "reason": "critical_incident_containment_required",
+              "required_action": "attach_containment_plan"
+            },
+            "name": "critical_incident_requires_containment"
+          },
+          {
+            "condition": {
+              "containment_evidence_attached": false,
+              "operation": "resolve_incident"
+            },
+            "description": "Incidents require containment evidence before resolution.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_containment_evidence_required",
+              "required_action": "record_containment_evidence"
+            },
+            "name": "incident_resolution_requires_containment"
           }
         ],
         "type": "deterministic"
@@ -190,6 +256,59 @@
             "required_action": "attach_audit_evidence"
           },
           "name": "compliance_violation_alert"
+        },
+        {
+          "condition": {
+            "exception_reviewer_same_as_requester": true,
+            "operation": "approve_policy_exception"
+          },
+          "description": "Policy exceptions require independent review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_exception_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "policy_exception_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "operation": "approve_policy_exception",
+            "policy_exception_expired": true
+          },
+          "description": "Expired policy exceptions cannot be approved.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_exception_expired",
+            "required_action": "request_new_exception"
+          },
+          "name": "expired_policy_exception_denied"
+        },
+        {
+          "condition": {
+            "containment_plan_attached": false,
+            "incident_severity": "critical",
+            "operation": "open_incident"
+          },
+          "description": "Critical incidents require a containment plan when opened.",
+          "effect": {
+            "decision": "deny",
+            "reason": "critical_incident_containment_required",
+            "required_action": "attach_containment_plan"
+          },
+          "name": "critical_incident_requires_containment"
+        },
+        {
+          "condition": {
+            "containment_evidence_attached": false,
+            "operation": "resolve_incident"
+          },
+          "description": "Incidents require containment evidence before resolution.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_containment_evidence_required",
+            "required_action": "record_containment_evidence"
+          },
+          "name": "incident_resolution_requires_containment"
         }
       ],
       "runtime": {
@@ -199,6 +318,11 @@
         "views": "views.py"
       },
       "screens": {
+        "audit": {
+          "component": "SecurityAuditTimeline",
+          "permission": "secu:view",
+          "route": "/secu/audit"
+        },
         "compliance": {
           "component": "ComplianceConsole",
           "permission": "secu:view_compliance",
@@ -209,10 +333,25 @@
           "permission": "secu:view",
           "route": "/secu/dashboard"
         },
+        "exceptions": {
+          "component": "PolicyExceptionQueue",
+          "permission": "secu:approve_exception",
+          "route": "/secu/exceptions"
+        },
+        "incidents": {
+          "component": "IncidentResponseConsole",
+          "permission": "secu:respond",
+          "route": "/secu/incidents"
+        },
         "policies": {
           "component": "SecurityPolicyWorkbench",
           "permission": "secu:manage_policies",
           "route": "/secu/policies"
+        },
+        "quarantine": {
+          "component": "DeviceQuarantineConsole",
+          "permission": "secu:respond",
+          "route": "/secu/quarantine"
         },
         "risk": {
           "component": "RiskAssessmentConsole",
@@ -242,14 +381,34 @@
             "icon": "badge-check",
             "variant": "subtle"
           },
+          "device_quarantine_list": {
+            "icon": "shield-x",
+            "status_indicator": "lock",
+            "variant": "containment"
+          },
+          "incident_response_panel": {
+            "icon": "siren",
+            "status_indicator": "top-bar",
+            "variant": "critical"
+          },
           "policy_card": {
             "icon": "lock-keyhole",
             "status_indicator": "top-right"
+          },
+          "policy_exception_queue": {
+            "icon": "clipboard-check",
+            "status_indicator": "left-bar",
+            "variant": "review"
           },
           "risk_score_meter": {
             "critical_band": "color.danger",
             "safe_band": "color.success",
             "visual": "threshold-gauge"
+          },
+          "security_audit_timeline": {
+            "icon": "scroll-text",
+            "line_style": "segmented",
+            "variant": "evidence"
           },
           "threat_indicator": {
             "icon": "shield-alert",
@@ -304,11 +463,39 @@
             "permission": "secu:manage_policies"
           },
           {
+            "component": "PolicyExceptionQueue",
+            "name": "exceptions",
+            "nav_group": "Governance",
+            "path": "/secu/exceptions",
+            "permission": "secu:approve_exception"
+          },
+          {
+            "component": "IncidentResponseConsole",
+            "name": "incidents",
+            "nav_group": "Operations",
+            "path": "/secu/incidents",
+            "permission": "secu:respond"
+          },
+          {
+            "component": "DeviceQuarantineConsole",
+            "name": "quarantine",
+            "nav_group": "Operations",
+            "path": "/secu/quarantine",
+            "permission": "secu:respond"
+          },
+          {
             "component": "ComplianceConsole",
             "name": "compliance",
             "nav_group": "Governance",
             "path": "/secu/compliance",
             "permission": "secu:view_compliance"
+          },
+          {
+            "component": "SecurityAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/secu/audit",
+            "permission": "secu:view"
           },
           {
             "component": "SecurityRuleWorkbench",
@@ -351,6 +538,12 @@
           ],
           "require_audit_evidence": true
         },
+        "incident_response": {
+          "policy_exception_max_days": 30,
+          "require_containment_for_critical": true,
+          "require_independent_exception_review": true,
+          "require_resolution_evidence": true
+        },
         "risk": {
           "auto_quarantine_threshold": 85,
           "challenge_threshold": 50,
@@ -369,8 +562,12 @@
           "indicator_ttl_hours": 24
         },
         "ui": {
+          "enable_audit_timeline": true,
           "enable_compliance_console": true,
+          "enable_exception_queue": true,
+          "enable_incident_response": true,
           "enable_policy_workbench": true,
+          "enable_quarantine_console": true,
           "enable_security_dashboard": true,
           "enable_threat_console": true
         },
@@ -443,6 +640,20 @@
       },
       "name": "compromised_device_quarantined"
     },
+    "critical_incident_requires_containment": {
+      "condition": {
+        "containment_plan_attached": false,
+        "incident_severity": "critical",
+        "operation": "open_incident"
+      },
+      "description": "Critical incidents require a containment plan when opened.",
+      "effect": {
+        "decision": "deny",
+        "reason": "critical_incident_containment_required",
+        "required_action": "attach_containment_plan"
+      },
+      "name": "critical_incident_requires_containment"
+    },
     "critical_risk_denied": {
       "condition": {
         "risk_score_gte": 90
@@ -454,6 +665,19 @@
         "required_action": "investigate_security_event"
       },
       "name": "critical_risk_denied"
+    },
+    "expired_policy_exception_denied": {
+      "condition": {
+        "operation": "approve_policy_exception",
+        "policy_exception_expired": true
+      },
+      "description": "Expired policy exceptions cannot be approved.",
+      "effect": {
+        "decision": "deny",
+        "reason": "policy_exception_expired",
+        "required_action": "request_new_exception"
+      },
+      "name": "expired_policy_exception_denied"
     },
     "high_risk_requires_challenge": {
       "condition": {
@@ -468,6 +692,19 @@
       },
       "name": "high_risk_requires_challenge"
     },
+    "incident_resolution_requires_containment": {
+      "condition": {
+        "containment_evidence_attached": false,
+        "operation": "resolve_incident"
+      },
+      "description": "Incidents require containment evidence before resolution.",
+      "effect": {
+        "decision": "deny",
+        "reason": "incident_containment_evidence_required",
+        "required_action": "record_containment_evidence"
+      },
+      "name": "incident_resolution_requires_containment"
+    },
     "known_malicious_network_denied": {
       "condition": {
         "is_known_malicious": true
@@ -479,6 +716,19 @@
         "required_action": "block_request"
       },
       "name": "known_malicious_network_denied"
+    },
+    "policy_exception_requires_independent_reviewer": {
+      "condition": {
+        "exception_reviewer_same_as_requester": true,
+        "operation": "approve_policy_exception"
+      },
+      "description": "Policy exceptions require independent review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_exception_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "policy_exception_requires_independent_reviewer"
     }
   },
   "security": {},

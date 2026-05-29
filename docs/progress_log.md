@@ -13076,3 +13076,31 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/mten --json` passed with capacity/isolation/live-migration/audit routes, 10 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/mten` returned no stale MTEN materialized markers.
 - `git diff --check -- capabilities/common/mten docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-30 02:41 EAT
+
+SECU governed policy exception and incident response lifecycle slice:
+
+- Added `capabilities/common/secu/SPECIFICATION.md` and `capabilities/common/secu/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Added `capabilities/common/secu/README.md` describing the executable security control plane, service/API/view usage, guardrails, adapter boundaries, and focused proof commands.
+- Added dependency-light policy exception and security incident records with request/decision, open/contain/resolve, reviewer, notes, containment evidence, resolution, and audit fields.
+- Added tenant-qualified SECU service state for policy exceptions and incidents alongside policies, device posture, threat indicators, assessments, compliance controls, and audit events.
+- Added policy exception request and decision workflows with independent reviewer, reviewer notes, duplicate-ID protection, and expired-exception denial.
+- Added security incident open, contain, and resolve workflows with critical incident containment-plan guardrails, containment evidence requirements, resolver notes, and fail-closed resolution behavior.
+- Extended API helpers and view models with policy exception queues, incident response panels, quarantine consoles, audit timelines, and shared default service state.
+- Extended the SECU capability contract with incident response configuration, exception/incident/quarantine/audit routes, 9 deterministic rules, and theme components for generated APG applications.
+- Extended SECU package registration with exception approval, incident response, quarantine, and audit capabilities plus `secu:approve_exception` and `secu:respond` permissions.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Added positive policy-device-threat-assessment-compliance-exception-incident-audit coverage and API-helper/view-model coverage.
+- Added negative missing tenant, missing owner, unsupported device trust, blank exception ID, missing policy target, invalid exception expiry, public API expiry bypass, self exception review, missing exception notes, expired exception approval, blank incident ID, missing/blank critical containment plan, missing containment evidence, premature resolution, duplicate incident resolution, and missing resolution notes coverage.
+- Updated `cap_spec.md` with the current executable exception/incident lifecycle, audit behavior, routes, adapter boundaries, and focused proof commands.
+- Code review found and fixed caller-controlled expiry bypass, whitespace-only containment-plan bypass, missing policy-exception target validation, blank exception IDs, blank incident IDs, expired-exception rejection behavior, and duplicate incident resolution.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/secu/__init__.py capabilities/common/secu/models.py capabilities/common/secu/security_runtime.py capabilities/common/secu/service.py capabilities/common/secu/api.py capabilities/common/secu/views.py capabilities/common/secu/capability_contract.py capabilities/common/secu/app.py capabilities/common/secu/tests/test_capability_contract.py capabilities/common/secu/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/secu/tests/test_capability_contract.py capabilities/common/secu/tests/test_package_contract.py` passed with 13 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/secu --json` passed with `ok: true`; SECU remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/secu --json` passed with exception/incident/quarantine/audit routes, 9 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/secu` returned no stale SECU materialized markers.
+- `git diff --check -- capabilities/common/secu docs/progress_log.md` passed with no whitespace errors.
