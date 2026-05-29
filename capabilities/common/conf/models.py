@@ -8,6 +8,7 @@ with comprehensive validation, type safety, and APG integration patterns.
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
+from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List, Union, Annotated
 from datetime import datetime, timedelta
 from enum import Enum, StrEnum
@@ -42,6 +43,166 @@ def validate_configuration_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
 	assert isinstance(spec, dict), "Configuration spec must be dictionary"
 	assert "resources" in spec or "templates" in spec or "policies" in spec, "Configuration spec must contain resources, templates, or policies"
 	return spec
+
+
+@dataclass(frozen=True)
+class ConfigurationRecord:
+	"""Tenant-scoped configuration record controlled by the CONF package."""
+
+	id: str
+	tenant_id: str
+	key: str
+	value: Any
+	environment: str
+	owner: str
+	contains_secrets: bool = False
+	secrets_encrypted: bool = False
+	validation_status: str = "validated"
+	version: int = 1
+	status: str = "active"
+	metadata: Dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"key": self.key,
+			"value": self.value,
+			"environment": self.environment,
+			"owner": self.owner,
+			"contains_secrets": self.contains_secrets,
+			"secrets_encrypted": self.secrets_encrypted,
+			"validation_status": self.validation_status,
+			"version": self.version,
+			"status": self.status,
+			"metadata": dict(self.metadata),
+		}
+
+
+@dataclass(frozen=True)
+class ConfigurationChange:
+	"""Configuration change request and independent approval evidence."""
+
+	id: str
+	tenant_id: str
+	record_id: str
+	target_environment: str
+	requested_by: str
+	summary: str
+	proposed_value: Any
+	validation_passed: bool
+	contains_secrets: bool = False
+	secrets_encrypted: bool = False
+	rollback_plan: str = ""
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"record_id": self.record_id,
+			"target_environment": self.target_environment,
+			"requested_by": self.requested_by,
+			"summary": self.summary,
+			"proposed_value": self.proposed_value,
+			"validation_passed": self.validation_passed,
+			"contains_secrets": self.contains_secrets,
+			"secrets_encrypted": self.secrets_encrypted,
+			"rollback_plan": self.rollback_plan,
+			"status": self.status,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+		}
+
+
+@dataclass(frozen=True)
+class ConfigurationDeployment:
+	"""Applied configuration deployment evidence."""
+
+	id: str
+	tenant_id: str
+	change_id: str
+	record_id: str
+	target_environment: str
+	requested_by: str
+	strategy: str
+	status: str
+	rollback_plan: str
+	applied_version: int
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"change_id": self.change_id,
+			"record_id": self.record_id,
+			"target_environment": self.target_environment,
+			"requested_by": self.requested_by,
+			"strategy": self.strategy,
+			"status": self.status,
+			"rollback_plan": self.rollback_plan,
+			"applied_version": self.applied_version,
+		}
+
+
+@dataclass(frozen=True)
+class DriftRemediation:
+	"""Configuration drift finding and governed remediation review."""
+
+	id: str
+	tenant_id: str
+	record_id: str
+	detected_by: str
+	drift_summary: str
+	remediation_plan: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"record_id": self.record_id,
+			"detected_by": self.detected_by,
+			"drift_summary": self.drift_summary,
+			"remediation_plan": self.remediation_plan,
+			"status": self.status,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+		}
+
+
+@dataclass(frozen=True)
+class ConfigurationAuditEvent:
+	"""Immutable package-local configuration governance audit event."""
+
+	id: str
+	tenant_id: str
+	subject_id: str
+	event_type: str
+	actor: str
+	decision: str = "allow"
+	reasons: tuple[str, ...] = ()
+	metadata: Dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"subject_id": self.subject_id,
+			"event_type": self.event_type,
+			"actor": self.actor,
+			"decision": self.decision,
+			"reasons": list(self.reasons),
+			"metadata": dict(self.metadata),
+		}
 
 
 # Enums for configuration management

@@ -8,7 +8,7 @@ leaders through predictive intelligence, universal abstraction, and autonomous o
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
-from .service import RevolutionaryConfigurationManager, create_configuration_manager, get_config_manager
+from .service import ConfService, RevolutionaryConfigurationManager, create_configuration_manager, get_config_manager
 from .models import (
 	# Core Models
 	CMResource, CMTemplate, CMPolicy, CMEnvironment, CMDeployment,
@@ -48,17 +48,23 @@ def register_capability() -> dict:
 			"resources": "Manage declarative infrastructure resources",
 			"templates": "Compose reusable configuration templates",
 			"policies": "Enforce configuration governance and compliance",
+			"change_approvals": "Review and approve governed configuration promotions",
 			"deployments": "Coordinate controlled rollout workflows",
 			"gitops": "Manage GitOps-driven configuration promotion",
-			"drift_management": "Detect and remediate configuration drift",
+			"drift_management": "Detect and review configuration drift remediation",
+			"audit_events": "Expose configuration governance evidence",
 			"capability_rules": "Evaluate deterministic capability-specific rules",
 			"visual_theming": "Apply tenant-aware configuration workspace theming"
 		},
 		"endpoints": {
 			"resources": "/api/v1/config/resources",
 			"templates": "/api/v1/config/templates",
+			"changes": "/api/v1/config/changes",
+			"approvals": "/api/v1/config/approvals",
 			"deployments": "/api/v1/config/deployments",
 			"drift": "/api/v1/config/drift",
+			"drift_remediation": "/api/v1/config/drift/remediation",
+			"audit": "/api/v1/config/audit",
 			"insights": "/api/v1/config/insights",
 			"metrics": "/api/v1/config/metrics"
 		},
@@ -74,6 +80,7 @@ def register_capability() -> dict:
 			"conf:edit",
 			"conf:deploy",
 			"conf:approve",
+			"conf:remediate",
 			"conf:admin"
 		]
 	}
@@ -81,6 +88,7 @@ def register_capability() -> dict:
 # Export main components
 __all__ = [
 	# Service Layer
+	"ConfService",
 	"RevolutionaryConfigurationManager",
 	"create_configuration_manager",
 	"get_config_manager",

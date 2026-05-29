@@ -10,6 +10,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 import asyncio
 import json
+from dataclasses import replace
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
@@ -21,8 +22,11 @@ from .models import (
 	CMResource, CMTemplate, CMPolicy, CMEnvironment, CMDeployment,
 	ResourceState, PolicyAction, DeploymentStatus, ConfigurationDSL, ValidationResult,
 	AIModelConfiguration, MLPipelineConfiguration, NLPServiceConfiguration,
-	AIModelFramework, AIModelType, AIModelState, ModelProvider
+	AIModelFramework, AIModelType, AIModelState, ModelProvider,
+	ConfigurationAuditEvent, ConfigurationChange, ConfigurationDeployment,
+	ConfigurationRecord, DriftRemediation
 )
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .ai_engine_advanced import AIIntelligenceEngine
 from .universal_abstraction import UniversalResourceLayer
 UniversalAbstractionLayer = UniversalResourceLayer
@@ -1331,6 +1335,420 @@ class RevolutionaryConfigurationManager:
 			raise RuntimeError(f"Shutdown failed: {e}")
 
 
+class ConfService:
+	"""Dependency-light configuration governance service for APG composition."""
+
+	def __init__(self) -> None:
+		self._records: Dict[tuple[str, str], ConfigurationRecord] = {}
+		self._changes: Dict[tuple[str, str], ConfigurationChange] = {}
+		self._deployments: Dict[tuple[str, str], ConfigurationDeployment] = {}
+		self._drift_remediations: Dict[tuple[str, str], DriftRemediation] = {}
+		self._audit_events: Dict[tuple[str, str], ConfigurationAuditEvent] = {}
+
+	def describe(self, tenant_id: str = "default") -> Dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def evaluate(self, context: Dict[str, Any]) -> Dict[str, Any]:
+		return evaluate_capability_rules(context)
+
+	def create_record(
+		self,
+		record_id: str,
+		tenant_id: str,
+		key: str,
+		value: Any,
+		environment: str,
+		owner: str,
+		contains_secrets: bool = False,
+		secrets_encrypted: bool = False,
+		validation_status: str = "validated",
+		metadata: Dict[str, Any] | None = None,
+	) -> Dict[str, Any]:
+		self._ensure_new(self._records, tenant_id, record_id, "configuration record")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_record",
+			"configuration_owner_assigned": bool(owner),
+			"contains_secrets": bool(contains_secrets),
+			"secrets_encrypted": bool(secrets_encrypted),
+		})
+		self._raise_if_denied(result)
+		if not key:
+			raise ValueError("configuration_key_required")
+		record = ConfigurationRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			key=key,
+			value=value,
+			environment=environment,
+			owner=owner,
+			contains_secrets=contains_secrets,
+			secrets_encrypted=secrets_encrypted,
+			validation_status=validation_status,
+			metadata=dict(metadata or {}),
+		)
+		self._records[self._tenant_key(tenant_id, record_id)] = record
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=record_id,
+			event_type="configuration_record_created",
+			actor=owner,
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			metadata={"key": key, "environment": environment},
+		)
+		return record.to_dict()
+
+	def list_records(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
+		return self._list(self._records.values(), tenant_id)
+
+	def request_change(
+		self,
+		change_id: str,
+		tenant_id: str,
+		record_id: str,
+		target_environment: str,
+		requested_by: str,
+		summary: str,
+		proposed_value: Any,
+		validation_passed: bool,
+		contains_secrets: bool = False,
+		secrets_encrypted: bool = False,
+		rollback_plan: str = "",
+	) -> Dict[str, Any]:
+		self._ensure_new(self._changes, tenant_id, change_id, "configuration change")
+		self._require_record(record_id, tenant_id)
+		if not requested_by:
+			raise ValueError("configuration_change_requester_required")
+		if not summary:
+			raise ValueError("configuration_change_summary_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "request_change",
+			"requested_operation": "apply",
+			"validation_passed": bool(validation_passed),
+			"contains_secrets": bool(contains_secrets),
+			"secrets_encrypted": bool(secrets_encrypted),
+			"target_environment": target_environment,
+			"change_approved": True,
+		})
+		self._raise_if_denied(result)
+		change = ConfigurationChange(
+			id=change_id,
+			tenant_id=tenant_id,
+			record_id=record_id,
+			target_environment=target_environment,
+			requested_by=requested_by,
+			summary=summary,
+			proposed_value=proposed_value,
+			validation_passed=validation_passed,
+			contains_secrets=contains_secrets,
+			secrets_encrypted=secrets_encrypted,
+			rollback_plan=rollback_plan,
+		)
+		self._changes[self._tenant_key(tenant_id, change_id)] = change
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=change_id,
+			event_type="configuration_change_requested",
+			actor=requested_by,
+			decision="require_review" if target_environment == "production" else "allow",
+			reasons=self._reasons(result),
+			metadata={"record_id": record_id, "target_environment": target_environment},
+		)
+		return change.to_dict()
+
+	def decide_change(
+		self,
+		change_id: str,
+		tenant_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> Dict[str, Any]:
+		change = self._require_change(change_id, tenant_id)
+		if change.status != "pending":
+			raise ValueError("configuration_change_already_decided")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("configuration_change_decision_invalid")
+		if not reviewer:
+			raise ValueError("configuration_change_reviewer_required")
+		if not notes:
+			raise ValueError("configuration_change_notes_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "approve_change",
+			"change_reviewer_same_as_requester": reviewer == change.requested_by,
+		})
+		self._raise_if_denied(result)
+		decided = replace(change, status=decision, decision=decision, reviewer=reviewer, notes=notes)
+		self._changes[self._tenant_key(tenant_id, change_id)] = decided
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=change_id,
+			event_type="configuration_change_decided",
+			actor=reviewer,
+			decision=decision,
+			reasons=self._reasons(result),
+			metadata={"record_id": change.record_id, "target_environment": change.target_environment},
+		)
+		return decided.to_dict()
+
+	def deploy_change(
+		self,
+		deployment_id: str,
+		tenant_id: str,
+		change_id: str,
+		requested_by: str,
+		strategy: str = "rolling",
+		change_approved: bool = False,
+		rollback_plan: str | None = None,
+	) -> Dict[str, Any]:
+		self._ensure_new(self._deployments, tenant_id, deployment_id, "configuration deployment")
+		change = self._require_change(change_id, tenant_id)
+		record = self._require_record(change.record_id, tenant_id)
+		if change.status == "rejected":
+			raise PermissionError("configuration_change_rejected")
+		effective_rollback = rollback_plan if rollback_plan is not None else change.rollback_plan
+		approved = change.status == "approved"
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "deploy_change",
+			"requested_operation": "apply",
+			"validation_passed": change.validation_passed,
+			"target_environment": change.target_environment,
+			"change_approved": approved,
+			"contains_secrets": change.contains_secrets,
+			"secrets_encrypted": change.secrets_encrypted,
+			"rollback_plan_available": bool(effective_rollback),
+		})
+		self._raise_if_denied(result)
+		if change.target_environment == "production" and not approved:
+			raise PermissionError("production_approval_required")
+		if change.target_environment == "production" and not effective_rollback:
+			raise PermissionError("production_rollback_plan_required")
+		deployment = ConfigurationDeployment(
+			id=deployment_id,
+			tenant_id=tenant_id,
+			change_id=change_id,
+			record_id=change.record_id,
+			target_environment=change.target_environment,
+			requested_by=requested_by,
+			strategy=strategy,
+			status="completed",
+			rollback_plan=effective_rollback or "",
+			applied_version=record.version + 1,
+		)
+		updated_record = replace(
+			record,
+			value=change.proposed_value,
+			environment=change.target_environment,
+			contains_secrets=change.contains_secrets,
+			secrets_encrypted=change.secrets_encrypted,
+			validation_status="validated",
+			version=record.version + 1,
+			status="active",
+		)
+		self._records[self._tenant_key(tenant_id, record.id)] = updated_record
+		self._deployments[self._tenant_key(tenant_id, deployment_id)] = deployment
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=deployment_id,
+			event_type="configuration_change_deployed",
+			actor=requested_by,
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			metadata={
+				"change_id": change_id,
+				"record_id": record.id,
+				"target_environment": change.target_environment,
+				"caller_claimed_approval": bool(change_approved),
+			},
+		)
+		return deployment.to_dict()
+
+	def list_changes(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
+		return self._list(self._changes.values(), tenant_id)
+
+	def list_deployments(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
+		return self._list(self._deployments.values(), tenant_id)
+
+	def request_drift_remediation(
+		self,
+		remediation_id: str,
+		tenant_id: str,
+		record_id: str,
+		detected_by: str,
+		drift_summary: str,
+		remediation_plan: str,
+	) -> Dict[str, Any]:
+		self._ensure_new(self._drift_remediations, tenant_id, remediation_id, "drift remediation")
+		record = self._require_record(record_id, tenant_id)
+		if not detected_by:
+			raise ValueError("drift_detector_required")
+		if not drift_summary:
+			raise ValueError("drift_summary_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "request_drift_remediation",
+			"drift_detected": True,
+			"remediation_plan_available": bool(remediation_plan),
+		})
+		self._raise_if_denied(result)
+		remediation = DriftRemediation(
+			id=remediation_id,
+			tenant_id=tenant_id,
+			record_id=record_id,
+			detected_by=detected_by,
+			drift_summary=drift_summary,
+			remediation_plan=remediation_plan,
+		)
+		self._drift_remediations[self._tenant_key(tenant_id, remediation_id)] = remediation
+		self._records[self._tenant_key(tenant_id, record_id)] = replace(record, status="drifted")
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=remediation_id,
+			event_type="configuration_drift_detected",
+			actor=detected_by,
+			decision="require_review",
+			reasons=self._reasons(result),
+			metadata={"record_id": record_id},
+		)
+		return remediation.to_dict()
+
+	def decide_drift_remediation(
+		self,
+		remediation_id: str,
+		tenant_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> Dict[str, Any]:
+		remediation = self._require_drift_remediation(remediation_id, tenant_id)
+		if remediation.status != "pending":
+			raise ValueError("drift_remediation_already_decided")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("drift_remediation_decision_invalid")
+		if not reviewer:
+			raise ValueError("drift_remediation_reviewer_required")
+		if not notes:
+			raise ValueError("drift_remediation_notes_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "approve_drift_remediation",
+			"drift_reviewer_same_as_detector": reviewer == remediation.detected_by,
+		})
+		self._raise_if_denied(result)
+		decided = replace(remediation, status=decision, decision=decision, reviewer=reviewer, notes=notes)
+		self._drift_remediations[self._tenant_key(tenant_id, remediation_id)] = decided
+		if decision == "approved":
+			record = self._require_record(remediation.record_id, tenant_id)
+			self._records[self._tenant_key(tenant_id, record.id)] = replace(record, status="active")
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=remediation_id,
+			event_type="configuration_drift_remediation_decided",
+			actor=reviewer,
+			decision=decision,
+			reasons=self._reasons(result),
+			metadata={"record_id": remediation.record_id},
+		)
+		return decided.to_dict()
+
+	def list_drift_remediations(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
+		return self._list(self._drift_remediations.values(), tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
+		return self._list(self._audit_events.values(), tenant_id)
+
+	def governance_summary(self, tenant_id: str | None = None) -> Dict[str, int]:
+		records = self.list_records(tenant_id)
+		changes = self.list_changes(tenant_id)
+		deployments = self.list_deployments(tenant_id)
+		drift = self.list_drift_remediations(tenant_id)
+		audit = self.list_audit_events(tenant_id)
+		return {
+			"record_count": len(records),
+			"pending_change_count": len([item for item in changes if item["status"] == "pending"]),
+			"approved_change_count": len([item for item in changes if item["status"] == "approved"]),
+			"deployment_count": len(deployments),
+			"drift_remediation_count": len(drift),
+			"audit_event_count": len(audit),
+		}
+
+	def _tenant_key(self, tenant_id: str, item_id: str) -> tuple[str, str]:
+		if not tenant_id:
+			raise ValueError("tenant_id_required")
+		if not item_id:
+			raise ValueError("id_required")
+		return tenant_id, item_id
+
+	def _ensure_new(self, store: Dict[tuple[str, str], Any], tenant_id: str, item_id: str, label: str) -> None:
+		key = self._tenant_key(tenant_id, item_id)
+		if key in store:
+			raise ValueError(f"duplicate {label}: {item_id}")
+
+	def _require_record(self, record_id: str, tenant_id: str) -> ConfigurationRecord:
+		try:
+			return self._records[self._tenant_key(tenant_id, record_id)]
+		except KeyError as exc:
+			raise KeyError(f"configuration record not found: {record_id}") from exc
+
+	def _require_change(self, change_id: str, tenant_id: str) -> ConfigurationChange:
+		try:
+			return self._changes[self._tenant_key(tenant_id, change_id)]
+		except KeyError as exc:
+			raise KeyError(f"configuration change not found: {change_id}") from exc
+
+	def _require_drift_remediation(self, remediation_id: str, tenant_id: str) -> DriftRemediation:
+		try:
+			return self._drift_remediations[self._tenant_key(tenant_id, remediation_id)]
+		except KeyError as exc:
+			raise KeyError(f"drift remediation not found: {remediation_id}") from exc
+
+	def _record_audit(
+		self,
+		tenant_id: str,
+		subject_id: str,
+		event_type: str,
+		actor: str,
+		decision: str = "allow",
+		reasons: list[str] | tuple[str, ...] | None = None,
+		metadata: Dict[str, Any] | None = None,
+	) -> None:
+		event_id = uuid7str()
+		event = ConfigurationAuditEvent(
+			id=event_id,
+			tenant_id=tenant_id,
+			subject_id=subject_id,
+			event_type=event_type,
+			actor=actor,
+			decision=decision,
+			reasons=tuple(reasons or ()),
+			metadata=dict(metadata or {}),
+		)
+		self._audit_events[self._tenant_key(tenant_id, event_id)] = event
+
+	def _raise_if_denied(self, result: Dict[str, Any]) -> None:
+		if result.get("decision") == "deny":
+			reasons = self._reasons(result)
+			raise PermissionError(reasons[0] if reasons else "configuration_operation_denied")
+
+	def _reasons(self, result: Dict[str, Any]) -> list[str]:
+		return [
+			str(action.get("reason"))
+			for action in result.get("actions", [])
+			if action.get("reason")
+		]
+
+	def _list(self, values: Any, tenant_id: str | None = None) -> List[Dict[str, Any]]:
+		return [
+			item.to_dict()
+			for item in values
+			if tenant_id is None or item.tenant_id == tenant_id
+		]
+
+
 # Factory function for APG integration
 async def create_configuration_manager(tenant_id: Optional[str] = None, apg_integrations: Optional[Dict[str, Any]] = None) -> RevolutionaryConfigurationManager:
 	"""Factory function to create and initialize configuration manager"""
@@ -1359,6 +1777,7 @@ async def get_config_manager(tenant_id: Optional[str] = None) -> RevolutionaryCo
 # Export main service class
 __all__ = [
 	"RevolutionaryConfigurationManager",
+	"ConfService",
 	"create_configuration_manager", 
 	"get_config_manager"
 ]

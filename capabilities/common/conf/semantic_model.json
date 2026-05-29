@@ -8,7 +8,10 @@
   },
   "capabilities": {
     "conf": {
-      "approvals": {},
+      "approvals": {
+        "configuration_change": "ConfigurationChange",
+        "drift_remediation": "DriftRemediation"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -17,6 +20,12 @@
           "default_deployment_strategy": "rolling",
           "enable_ai_assistance": true,
           "validation_mode": "strict"
+        },
+        "change_management": {
+          "allow_tenant_local_ids": true,
+          "approval_notes_required": true,
+          "drift_remediation_requires_review": true,
+          "production_requires_approval": true
         },
         "gitops": {
           "auto_create_pull_requests": true,
@@ -27,6 +36,8 @@
         "security": {
           "record_audit_trail": true,
           "require_change_approval_for_production": true,
+          "require_independent_review": true,
+          "require_production_rollback_plan": true,
           "require_secret_encryption": true
         },
         "tenant_id": "default",
@@ -35,7 +46,10 @@
           "default_theme": "conf_control_room"
         },
         "ui": {
+          "enable_audit_console": true,
+          "enable_change_queue": true,
           "enable_drift_dashboard": true,
+          "enable_drift_remediation_queue": true,
           "enable_gitops_center": true,
           "enable_policy_workbench": true,
           "enable_topology_view": true
@@ -53,6 +67,31 @@
       "requires": [],
       "rule_engine": {
         "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Configuration operations must execute inside an explicit tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "bind_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "configuration_owner_assigned": false,
+              "operation": "create_record"
+            },
+            "description": "Configuration records require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "configuration_owner_required",
+              "required_action": "assign_configuration_owner"
+            },
+            "name": "configuration_record_requires_owner"
+          },
           {
             "condition": {
               "requested_operation": "apply",
@@ -104,11 +143,75 @@
               "required_action": "generate_remediation_plan"
             },
             "name": "drift_requires_remediation_plan"
+          },
+          {
+            "condition": {
+              "rollback_plan_available": false,
+              "target_environment": "production"
+            },
+            "description": "Production deployments require rollback evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "production_rollback_plan_required",
+              "required_action": "attach_rollback_plan"
+            },
+            "name": "production_deployment_requires_rollback"
+          },
+          {
+            "condition": {
+              "change_reviewer_same_as_requester": true,
+              "operation": "approve_change"
+            },
+            "description": "Configuration change review must be performed by an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_change_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "change_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "drift_reviewer_same_as_detector": true,
+              "operation": "approve_drift_remediation"
+            },
+            "description": "Drift remediation review must be performed by an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_drift_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "drift_review_requires_independent_reviewer"
           }
         ],
         "type": "deterministic"
       },
       "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Configuration operations must execute inside an explicit tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "bind_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "configuration_owner_assigned": false,
+            "operation": "create_record"
+          },
+          "description": "Configuration records require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "configuration_owner_required",
+            "required_action": "assign_configuration_owner"
+          },
+          "name": "configuration_record_requires_owner"
+        },
         {
           "condition": {
             "requested_operation": "apply",
@@ -160,6 +263,45 @@
             "required_action": "generate_remediation_plan"
           },
           "name": "drift_requires_remediation_plan"
+        },
+        {
+          "condition": {
+            "rollback_plan_available": false,
+            "target_environment": "production"
+          },
+          "description": "Production deployments require rollback evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "production_rollback_plan_required",
+            "required_action": "attach_rollback_plan"
+          },
+          "name": "production_deployment_requires_rollback"
+        },
+        {
+          "condition": {
+            "change_reviewer_same_as_requester": true,
+            "operation": "approve_change"
+          },
+          "description": "Configuration change review must be performed by an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_change_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "change_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "drift_reviewer_same_as_detector": true,
+            "operation": "approve_drift_remediation"
+          },
+          "description": "Drift remediation review must be performed by an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_drift_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "drift_review_requires_independent_reviewer"
         }
       ],
       "runtime": {
@@ -169,6 +311,21 @@
         "views": "views.py"
       },
       "screens": {
+        "approvals": {
+          "component": "ConfigurationApprovalQueue",
+          "permission": "conf:approve",
+          "route": "/config/approvals"
+        },
+        "audit": {
+          "component": "ConfigurationAuditConsole",
+          "permission": "conf:view",
+          "route": "/config/audit"
+        },
+        "changes": {
+          "component": "ConfigurationChangeQueue",
+          "permission": "conf:edit",
+          "route": "/config/changes"
+        },
         "dashboard": {
           "component": "ConfigurationDashboard",
           "permission": "conf:view",
@@ -183,6 +340,11 @@
           "component": "ConfigurationDriftConsole",
           "permission": "conf:view",
           "route": "/config/drift"
+        },
+        "drift_remediation": {
+          "component": "ConfigurationDriftRemediationQueue",
+          "permission": "conf:approve",
+          "route": "/config/drift/remediation"
         },
         "gitops": {
           "component": "ConfigurationGitOpsCenter",
@@ -213,6 +375,16 @@
       "streaming": {},
       "theme": {
         "components": {
+          "change_approval_queue": {
+            "icon": "shield-check",
+            "status_indicator": "left-bar",
+            "variant": "review"
+          },
+          "configuration_audit_timeline": {
+            "icon": "scroll-text",
+            "line_style": "segmented",
+            "variant": "evidence"
+          },
           "configuration_resource_card": {
             "icon": "server-stack",
             "shape": "rounded-rectangle",
@@ -225,6 +397,11 @@
           "drift_badge": {
             "icon": "radar",
             "variant": "attention"
+          },
+          "drift_remediation_queue": {
+            "icon": "wrench",
+            "status_indicator": "top-bar",
+            "variant": "governance"
           }
         },
         "name": "conf_control_room",
@@ -269,6 +446,20 @@
             "permission": "conf:create"
           },
           {
+            "component": "ConfigurationChangeQueue",
+            "name": "changes",
+            "nav_group": "Governance",
+            "path": "/config/changes",
+            "permission": "conf:edit"
+          },
+          {
+            "component": "ConfigurationApprovalQueue",
+            "name": "approvals",
+            "nav_group": "Governance",
+            "path": "/config/approvals",
+            "permission": "conf:approve"
+          },
+          {
             "component": "ConfigurationPolicyWorkbench",
             "name": "policies",
             "nav_group": "Governance",
@@ -290,11 +481,25 @@
             "permission": "conf:view"
           },
           {
+            "component": "ConfigurationDriftRemediationQueue",
+            "name": "drift_remediation",
+            "nav_group": "Governance",
+            "path": "/config/drift/remediation",
+            "permission": "conf:approve"
+          },
+          {
             "component": "ConfigurationGitOpsCenter",
             "name": "gitops",
             "nav_group": "Operations",
             "path": "/config/gitops",
             "permission": "conf:deploy"
+          },
+          {
+            "component": "ConfigurationAuditConsole",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/config/audit",
+            "permission": "conf:view"
           },
           {
             "component": "ConfigurationSettings",
@@ -327,6 +532,12 @@
           "enable_ai_assistance": true,
           "validation_mode": "strict"
         },
+        "change_management": {
+          "allow_tenant_local_ids": true,
+          "approval_notes_required": true,
+          "drift_remediation_requires_review": true,
+          "production_requires_approval": true
+        },
         "gitops": {
           "auto_create_pull_requests": true,
           "default_branch": "main",
@@ -336,6 +547,8 @@
         "security": {
           "record_audit_trail": true,
           "require_change_approval_for_production": true,
+          "require_independent_review": true,
+          "require_production_rollback_plan": true,
           "require_secret_encryption": true
         },
         "tenant_id": "default",
@@ -344,7 +557,10 @@
           "default_theme": "conf_control_room"
         },
         "ui": {
+          "enable_audit_console": true,
+          "enable_change_queue": true,
           "enable_drift_dashboard": true,
+          "enable_drift_remediation_queue": true,
           "enable_gitops_center": true,
           "enable_policy_workbench": true,
           "enable_topology_view": true
@@ -387,6 +603,32 @@
   },
   "roles": {},
   "rules": {
+    "change_review_requires_independent_reviewer": {
+      "condition": {
+        "change_reviewer_same_as_requester": true,
+        "operation": "approve_change"
+      },
+      "description": "Configuration change review must be performed by an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_change_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "change_review_requires_independent_reviewer"
+    },
+    "configuration_record_requires_owner": {
+      "condition": {
+        "configuration_owner_assigned": false,
+        "operation": "create_record"
+      },
+      "description": "Configuration records require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "configuration_owner_required",
+        "required_action": "assign_configuration_owner"
+      },
+      "name": "configuration_record_requires_owner"
+    },
     "drift_requires_remediation_plan": {
       "condition": {
         "drift_detected": true,
@@ -399,6 +641,19 @@
         "required_action": "generate_remediation_plan"
       },
       "name": "drift_requires_remediation_plan"
+    },
+    "drift_review_requires_independent_reviewer": {
+      "condition": {
+        "drift_reviewer_same_as_detector": true,
+        "operation": "approve_drift_remediation"
+      },
+      "description": "Drift remediation review must be performed by an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_drift_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "drift_review_requires_independent_reviewer"
     },
     "encrypted_secrets_required": {
       "condition": {
@@ -425,6 +680,31 @@
         "required_action": "collect_change_approval"
       },
       "name": "production_changes_require_approval"
+    },
+    "production_deployment_requires_rollback": {
+      "condition": {
+        "rollback_plan_available": false,
+        "target_environment": "production"
+      },
+      "description": "Production deployments require rollback evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "production_rollback_plan_required",
+        "required_action": "attach_rollback_plan"
+      },
+      "name": "production_deployment_requires_rollback"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "Configuration operations must execute inside an explicit tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "bind_tenant_context"
+      },
+      "name": "tenant_context_required"
     },
     "validate_before_apply": {
       "condition": {

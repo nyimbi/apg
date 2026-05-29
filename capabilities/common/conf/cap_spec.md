@@ -4,6 +4,37 @@
 **Created**: 2025-01-08  
 **Author**: APG Development Team
 
+## Current Executable Package Scope
+
+The current package-backed CONF slice provides dependency-light configuration
+governance for generated APG applications:
+
+- Tenant-qualified configuration records with owner, environment, secret,
+  validation, version, and status evidence.
+- Configuration change requests with validation, proposed value, rollback plan,
+  independent approval, rejection, and audit evidence.
+- Production deployment enforcement that trusts approved CONF change state, not
+  caller-supplied approval booleans.
+- Secret-bearing configuration guardrails that require encrypted secret evidence.
+- Drift remediation requests with remediation plan, independent review, rejection,
+  approval, record status repair, and audit evidence.
+- UI route, theme, semantic-model, and release-report evidence for dashboard,
+  resources, changes, approvals, deployments, drift remediation, GitOps, audit,
+  and settings surfaces.
+
+Adapter boundary: production GitOps, cloud deployment, database persistence,
+secret-manager, HSM, AI, natural-language, and collaboration integrations must sit
+behind this lifecycle and preserve its fail-closed guardrails.
+
+Focused proof commands for this executable package slice:
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/conf/__init__.py capabilities/common/conf/models.py capabilities/common/conf/service.py capabilities/common/conf/api.py capabilities/common/conf/views.py capabilities/common/conf/capability_contract.py capabilities/common/conf/app.py capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/conf --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/conf --json
+```
+
 ## Executive Summary
 
 The APG Configuration Management capability delivers an AI-native, enterprise-grade configuration management platform that is **10x better** than current market leaders (Ansible, Puppet, Chef, SaltStack). Built on a foundation of intelligent automation, universal abstraction, and autonomous operations, this capability transforms how organizations manage infrastructure, applications, and policy configurations across hybrid multi-cloud environments.

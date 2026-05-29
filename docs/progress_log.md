@@ -13018,3 +13018,33 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/bkup --json` passed with restore approval and retention disposition routes, 10 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/bkup` returned no stale BKUP materialized markers.
 - `git diff --check -- capabilities/common/bkup docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-30 02:19 EAT
+
+CONF governed configuration promotion and drift remediation lifecycle slice:
+
+- Added `capabilities/common/conf/SPECIFICATION.md` and `capabilities/common/conf/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Added dependency-light configuration records, configuration changes, configuration deployments, drift remediations, and configuration audit event models.
+- Added tenant-qualified CONF service state for records, changes, deployments, drift remediations, and audit events.
+- Added record creation guardrails for tenant context, accountable owner, configuration key, encrypted secret-bearing values, and tenant-local duplicate ID isolation.
+- Added configuration change request and decision workflows with validation evidence, rollback plan evidence, independent reviewer rules, reviewer notes, approval, and rejection state.
+- Enforced production deployment approval as package state rather than trusting caller-supplied `change_approved` booleans.
+- Enforced production rollback plan evidence before deployment.
+- Added drift remediation request and decision workflows with remediation plan, independent reviewer, reviewer notes, approval, rejection, record drift status, and audit evidence.
+- Added API helper functions and UI view models for capability status, records, change queues, deployments, drift remediation queues, and audit.
+- Extended the CONF capability contract with change, approval, drift-remediation, and audit routes, plus rules and theme components for generated APG applications.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive record-change-approval-production-deployment-drift-remediation-audit coverage and API-helper/view-model coverage.
+- Added negative missing owner, unencrypted secret, failed validation, production approval boolean bypass, self change review, missing notes, rejected production change, missing rollback plan, missing drift remediation plan, self drift review, missing drift notes, rejected non-production change deployment, and duplicate-ID tenant-isolation coverage.
+- Updated `cap_spec.md` with the current executable package scope, adapter boundaries, and focused proof commands.
+- Code review found and fixed a rejected non-production change deployment bypass before commit.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/conf/__init__.py capabilities/common/conf/models.py capabilities/common/conf/service.py capabilities/common/conf/api.py capabilities/common/conf/views.py capabilities/common/conf/capability_contract.py capabilities/common/conf/app.py capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/conf --json` passed with `ok: true`; CONF remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/conf --json` passed with change/approval/drift-remediation/audit routes, 9 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/conf` returned no stale CONF materialized markers.
+- `git diff --check -- capabilities/common/conf docs/progress_log.md` passed with no whitespace errors.

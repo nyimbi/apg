@@ -55,7 +55,7 @@ import logging
 from uuid_extensions import uuid7str
 from pydantic import BaseModel, ValidationError
 
-from .service import RevolutionaryConfigurationManager, get_config_manager
+from .service import ConfService, RevolutionaryConfigurationManager, get_config_manager
 from .models import (
 	CMResource, CMTemplate, CMPolicy, CMEnvironment, CMDeployment,
 	ResourceState, DeploymentStatus, PolicyAction, ResourceType,
@@ -65,6 +65,9 @@ from .models import (
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+SERVICE = ConfService()
 
 
 # API Request/Response Models
@@ -99,6 +102,120 @@ class NaturalLanguageRequest(BaseModel):
 	"""Natural language configuration request"""
 	request: str
 	context: Dict[str, Any] = {}
+
+
+def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
+	"""Return dependency-light CONF status for generated APG applications."""
+	contract = SERVICE.describe(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		**SERVICE.governance_summary(tenant_id),
+	}
+
+
+def create_record(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.create_record(
+		record_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		key=str(payload.get("key") or payload["id"]),
+		value=payload.get("value"),
+		environment=str(payload.get("environment") or "development"),
+		owner=str(payload.get("owner") or ""),
+		contains_secrets=_payload_bool(payload, "contains_secrets", False),
+		secrets_encrypted=_payload_bool(payload, "secrets_encrypted", False),
+		validation_status=str(payload.get("validation_status") or "validated"),
+		metadata=dict(payload.get("metadata") or {}),
+	)
+
+
+def request_change(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.request_change(
+		change_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		record_id=str(payload["record_id"]),
+		target_environment=str(payload.get("target_environment") or "development"),
+		requested_by=str(payload.get("requested_by") or ""),
+		summary=str(payload.get("summary") or ""),
+		proposed_value=payload.get("proposed_value"),
+		validation_passed=_payload_bool(payload, "validation_passed", False),
+		contains_secrets=_payload_bool(payload, "contains_secrets", False),
+		secrets_encrypted=_payload_bool(payload, "secrets_encrypted", False),
+		rollback_plan=str(payload.get("rollback_plan") or ""),
+	)
+
+
+def decide_change(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.decide_change(
+		change_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		reviewer=str(payload.get("reviewer") or ""),
+		decision=str(payload.get("decision") or "approved"),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
+def deploy_change(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.deploy_change(
+		deployment_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		change_id=str(payload["change_id"]),
+		requested_by=str(payload.get("requested_by") or "operator"),
+		strategy=str(payload.get("strategy") or "rolling"),
+		change_approved=_payload_bool(payload, "change_approved", False),
+		rollback_plan=str(payload["rollback_plan"]) if payload.get("rollback_plan") else None,
+	)
+
+
+def request_drift_remediation(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.request_drift_remediation(
+		remediation_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		record_id=str(payload["record_id"]),
+		detected_by=str(payload.get("detected_by") or ""),
+		drift_summary=str(payload.get("drift_summary") or ""),
+		remediation_plan=str(payload.get("remediation_plan") or ""),
+	)
+
+
+def decide_drift_remediation(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.decide_drift_remediation(
+		remediation_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		reviewer=str(payload.get("reviewer") or ""),
+		decision=str(payload.get("decision") or "approved"),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
+def list_records(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return SERVICE.list_records(tenant_id)
+
+
+def list_changes(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return SERVICE.list_changes(tenant_id)
+
+
+def list_deployments(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return SERVICE.list_deployments(tenant_id)
+
+
+def list_drift_remediations(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return SERVICE.list_drift_remediations(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)
+
+
+def _payload_bool(payload: Dict[str, Any], key: str, default: bool) -> bool:
+	value = payload.get(key, default)
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "on"}
+	return bool(value)
 
 
 # API Decorators
