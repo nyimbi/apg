@@ -34,6 +34,24 @@ Then choose one of these first packets:
 Do not start with a broad platform rewrite. Start with a packet that can be
 reviewed, verified, committed, and extended today.
 
+## First 30 Minutes
+
+Use the first 30 minutes to become operational, not to understand every APG
+subsystem.
+
+| Minute | Action | Result |
+| --- | --- | --- |
+| 0-5 | Run `git status --short` and note unrelated dirty files | you know what not to stage |
+| 5-10 | Run one compile-and-smoke baseline | generated app path is known-good or broken |
+| 10-15 | Run `./.venv/bin/apg capabilities implementation-audit --json` | next capability-depth gaps are visible |
+| 15-20 | Read one owning package/example/test, not the whole repo | local context is bounded |
+| 20-25 | Fill in the work packet template | scope and non-goals are explicit |
+| 25-30 | Identify the exact proof command and files to stage | contribution can start without private context |
+
+If the compile baseline fails, your first useful contribution may be a focused
+compiler or generated-runtime repair. If the baseline passes, pick the smallest
+visible capability, capacity, docs, or tooling gap.
+
 ## First Useful Contribution Formula
 
 Use this formula exactly for your first APG change:
@@ -63,6 +81,46 @@ I will not deepen supplier or payment packages in this slice.
 
 This formula keeps APG work parallelizable. Other contributors can read it and
 know where you will touch, what names you protect, and which evidence matters.
+
+## How To Pick Work Without Waiting
+
+Use these commands as a triage board:
+
+```bash
+./.venv/bin/apg docs audit --json
+./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg capabilities audit --strict-package-artifacts --json
+./.venv/bin/apg tooling audit --json
+```
+
+Pick work in this order:
+
+1. Failing docs/tooling/compiler checks that block other contributors.
+2. Capability packages still classified as materialized baseline, mixed, or
+   contract-only.
+3. Numbered examples whose README, APG source, output, or proof commands have
+   drifted.
+4. Generated runtime behavior that is already visible in `apg model` but not
+   yet executable in generated Python.
+5. New capacity slices only after the first event and proof path are clear.
+
+Avoid picking work whose proof requires unrelated files, live credentials, or a
+full platform rewrite. Narrow the packet until it has one owner and one proof.
+
+## Staging Discipline
+
+Before committing, confirm the staged diff contains only the packet:
+
+```bash
+git status --short
+git diff --cached --name-only
+git diff --cached --check
+```
+
+Do not stage local agent state, copied reference documents, unrelated generated
+artifacts, or another contributor's dirty files. If your packet updates docs,
+stage only the changed guide, README, spec, or progress-log entry that belongs
+to the evidence.
 
 ## What To Update When You Change Something
 

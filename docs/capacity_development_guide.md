@@ -104,6 +104,45 @@ Use this runbook for every new capacity:
 If any step fails, fix the earliest failing layer. Do not patch generated output
 around missing APG meaning.
 
+## Capacity Triage Board
+
+Every capacity should have a visible next slice. Use this board to decide what
+to do next and to let multiple contributors work without collision.
+
+| Readiness gap | Owner | Next slice | Proof |
+| --- | --- | --- | --- |
+| source does not parse | language/compiler owner | narrow APG syntax or fix the source | parser test; `apg model ... --json` |
+| source parses but semantics are missing | semantic owner | expose stable semantic-model keys | `apg model ... --json` |
+| semantics exist but generated app is inert | runtime owner | generated helper, route, manifest, or smoke assertion | `apg compile ... --verify`; smoke test |
+| generated app exists but durable behavior is generic | capability owner | package models, service, API, views, rules, tests | package pytest; implementation audit; publish-plan |
+| rules are prose only | capability owner | deterministic rule inputs and negative tests | package tests; rule evaluation |
+| screens are disconnected | source/runtime owner | route, component, permission, relationship, and theme metadata | semantic model; generated manifest |
+| agents are provider-specific or vague | agent/capability owner | provider-agnostic runtime config, tools, memory, approval rules | model output; package tests |
+| streams are vague | source/runtime owner | Bytewax flow names and event envelopes | model output; generated metadata |
+| contributors cannot extend it | docs owner | README packet, proof commands, next slice | docs audit; diff check |
+
+The board should be represented in the example README or progress-log entry for
+active capacities. A contributor should be able to pick one row, own it, and
+prove it without editing unrelated rows.
+
+## Capacity Review Gate
+
+Review capacity work against executable evidence, not ambition.
+
+| Gate | Must be true before merging |
+| --- | --- |
+| Authoring | APG source is terse, readable, and parseable |
+| Semantics | key records, capabilities, rules, screens, workflows, agents, and streams are inspectable in `apg model` when present |
+| Runtime | generated Python imports and the smoke test proves the changed surface |
+| Capability | package-owned behavior has domain service/API/view code, deterministic guardrails, and publish-plan evidence |
+| Composition | relationships between records, screens, workflows, agents, and capabilities are named rather than implied |
+| Governance | tenant, rule, approval, provider, and integration boundaries are explicit |
+| Handoff | README, package spec, or progress log names proof commands and next gap |
+
+If a capacity only clears the first three gates, label it as an early generated
+capacity and make the package-backed gap explicit. If it clears all gates, the
+capacity is ready for broader examples, deployment profiles, and deeper tests.
+
 ## Capacity Expansion Order
 
 Expand capacities in this order so each layer has something real to consume:

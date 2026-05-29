@@ -73,6 +73,86 @@ capacity requires syntax that does not exist, start in the compiler lane. If the
 syntax exists but the generated app is inert, start in generated runtime. If the
 app compiles but real behavior is generic, start in capability depth.
 
+## Repository Work Map
+
+Use this map before opening files. It keeps changes in the owning layer and
+prevents a contributor from fixing symptoms in generated output when the real
+gap is grammar, semantics, or package behavior.
+
+| Need to change | Primary files | Companion proof |
+| --- | --- | --- |
+| Accepted APG syntax | `spec/apg.g4`, generated parser artifacts, parser fixtures | parser/semantic focused pytest; `apg parser-golden --json` |
+| AST projection | `compiler/ast_builder.py`, parser fixtures | focused compiler pytest; `apg model <file> --json` |
+| Semantic-model keys | `compiler/semantic_model.py`, semantic fixtures | `apg model <file> --json`; semantic fixture audit when relevant |
+| Generated Python behavior | `compiler/code_generator.py`, generated-runtime tests, numbered example output when intentionally refreshed | `apg compile <file> --output /tmp/<name> --verify`; generated `smoke_test.py` |
+| Capability contract behavior | one `capabilities/<domain>/<code>/` package | package pytest; implementation audit; publish-plan |
+| Capacity example | one `examples/<nn>_<capacity>/` directory | model, compile, generated smoke test, README evidence |
+| CLI/tooling evidence | `cli.py`, compiler audit modules, tooling tests | focused CLI pytest; `apg tooling audit --json` |
+| Contributor documentation | `docs/*.md`, `docs/progress_log.md` when evidence changes | `apg docs audit --json`; `git diff --check -- docs` |
+
+When a feature crosses rows, implement from top to bottom and commit each
+verified boundary. For example, a new workflow construct should land as syntax
+and semantic evidence before generated route behavior depends on it.
+
+## First-Issue Recipes
+
+These recipes are intentionally small. They create useful repository states
+that teach the contributor how APG moves from intent to executable proof.
+
+### Convert One Capability Baseline
+
+1. Find the next generic package:
+
+   ```bash
+   ./.venv/bin/apg capabilities implementation-audit --json
+   ```
+
+2. Inspect only that package's contract and current package files.
+3. Replace generic record/service/API/view behavior with domain models,
+   deterministic service methods, API helpers, view models, and focused tests.
+4. Keep live integrations behind adapters unless the slice verifies them.
+5. Prove the package:
+
+   ```bash
+   ./.venv/bin/pytest -q capabilities/<domain>/<code>/test_capability_contract.py capabilities/<domain>/<code>/tests
+   ./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
+   ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
+   ```
+
+6. Update the package `cap_spec.md` and `docs/progress_log.md` when the audit
+   burn-down changes.
+
+### Add One Generated Runtime Surface
+
+1. Choose one existing parseable APG example.
+2. Confirm the semantic model already exposes the data needed by the generator.
+3. Add the smallest generated helper, route, manifest field, or smoke assertion.
+4. Prove generation:
+
+   ```bash
+   ./.venv/bin/apg compile examples/<nn>_<capacity>/main.apg --output /tmp/apg-runtime-slice --verify
+   ./.venv/bin/python /tmp/apg-runtime-slice/smoke_test.py
+   ```
+
+5. Add or update focused generator tests only for the contract changed.
+
+### Seed One Capacity
+
+1. Name one business event.
+2. Create or update one numbered example directory.
+3. Ensure the APG source names records, rules, screens, workflows, agents, and
+   Bytewax streams only where they are part of the first event.
+4. Prove the source and generated app:
+
+   ```bash
+   ./.venv/bin/apg model examples/<nn>_<capacity>/main.apg --json
+   ./.venv/bin/apg compile examples/<nn>_<capacity>/main.apg --output /tmp/apg-capacity-slice --verify
+   ./.venv/bin/python /tmp/apg-capacity-slice/smoke_test.py
+   ```
+
+5. Update the example README with readiness, proof commands, package owners,
+   and the next missing executable layer.
+
 ## Source-To-Reality Checklist
 
 Use this checklist for every feature, capacity, or platform change:

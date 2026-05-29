@@ -16,6 +16,35 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 15:18 EAT
+
+Developer/contributor/capacity guide operationalization slice:
+
+- Expanded `docs/developer_guide.md` with a repository work map and first-issue
+  recipes for converting capability baselines, adding generated runtime
+  surfaces, and seeding capacity examples.
+- Expanded `docs/contributors_guide.md` with a first-30-minutes onboarding
+  path, command-driven work triage, and staging discipline so contributors can
+  choose and commit small verified packets without private context.
+- Expanded `docs/capacity_development_guide.md` with a capacity triage board
+  and review gate that tie readiness gaps to owners, next slices, proof
+  commands, and merge expectations.
+
+Verification:
+
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` -> passed.
+
+Known remaining gaps:
+
+- These guide updates improve contributor velocity, but the platform still has
+  implementation-depth burn-down remaining. Continue with the next
+  `apg capabilities implementation-audit --json` finding after this
+  documentation slice is committed.
+
 ### 2026-05-29 15:12 EAT
 
 I18N implementation-depth slice:
