@@ -16,6 +16,81 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 17:57 EAT
+
+RECS implementation-depth slice:
+
+- Converted `recs` from a materialized-baseline package into a domain-specific
+  recommender systems runtime package.
+- Added executable tenant-scoped catalog items, profile features, ranking
+  policies, recommendation models, training runs, recommendation sets,
+  experiments, drift status, audit events, dashboard summaries, and
+  contract-rule evaluation.
+- Added `recommendation_runtime.py` as the RECS-specific algorithm surface for
+  stable IDs, algorithm validation, impact validation, feature normalization,
+  label normalization, feature-affinity scoring, confidence calculation,
+  explanation text, and drift status classification so package behavior is no
+  longer generic record scaffolding.
+- Replaced generic package API and view helpers with recommender-system helpers
+  for catalog registration, profile recording, ranking policy attachment,
+  model training, recommendation generation, experiment creation, drift
+  recording, dashboard, recommendation console, model registry, catalog
+  manager, profile feature view, experiment studio, ranking policy view,
+  governance, routes, rules, and theme metadata.
+- Rewrote `cap_spec.md` to describe current executable behavior, runtime
+  surfaces, guardrails, adapter boundaries, UI surfaces, theme contract, and
+  focused verification commands.
+- Expanded focused tests for the catalog-to-profile-to-policy-to-model-to-
+  recommendation lifecycle, experiments, drift status, compatibility records,
+  view models, and policy failures for missing tenant context, insufficient
+  training events, missing model owners, missing drift monitoring, missing
+  profile consent, missing ranking policy, high-impact recommendations without
+  explanations, missing experiment approval, missing holdout, missing business
+  metrics, and large experiments without review.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/recs/__init__.py
+  capabilities/common/recs/models.py
+  capabilities/common/recs/recommendation_runtime.py
+  capabilities/common/recs/service.py capabilities/common/recs/api.py
+  capabilities/common/recs/views.py
+  capabilities/common/recs/test_capability_contract.py
+  capabilities/common/recs/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/pytest -q capabilities/common/recs/test_capability_contract.py
+  capabilities/common/recs/tests` -> 9 passed with 10 pre-existing adjacent
+  SQLAlchemy/Pydantic deprecation warnings.
+- `rg -n "<baseline marker patterns>" capabilities/common/recs` -> no
+  generated materialization or generic dependency-light marker matches.
+- `./.venv/bin/python -c "import importlib; ..."` for
+  `capabilities.common.recs.models`, `recommendation_runtime`, `service`,
+  `api`, and `views` -> passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/recs --json` -> passed with `recs` classified as
+  `domain_specific`, `recommendation_runtime.py` counted as the custom Python
+  file, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/recs --json`
+  -> passed with a side-effect-free catalog patch and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  92 domain-specific packages, 15 materialized-baseline packages, 1 mixed
+  package, 1 contract-only package, 907 custom Python files, 0 errors, and 17
+  warnings; next warning is `regy`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 61
+  local links, 49 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `./.venv/bin/apg hygiene audit --json` -> passed with 17/17 hygiene checks,
+  0 violations, and 0 tracked-file hygiene failures.
+
+Known remaining gaps:
+
+- `recs` is now domain-specific, but implementation-depth still reports 15
+  materialized baselines, 1 mixed implementation, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is
+  `regy`.
+
 ### 2026-05-29 17:49 EAT
 
 QUAN implementation-depth slice:

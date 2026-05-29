@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""Recommender Systems package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_materialized_contract_shape_is_valid():
-	module = _load_module("materialized_contract_recs", PACKAGE_DIR / "capability_contract.py")
+def test_recs_contract_shape_is_valid():
+	module = _load_module("recs_contract_shape", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
@@ -32,8 +32,8 @@ def test_materialized_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
-def test_materialized_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_recs", PACKAGE_DIR / "app.py")
+def test_recs_app_entrypoint_is_publishable():
+	module = _load_module("recs_app_entrypoint", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -44,3 +44,19 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "recs" in model["capabilities"]
+
+
+def test_recs_model_record_compatibility_runtime():
+	from capabilities.common.recs.service import RecsService
+
+	service = RecsService()
+	record = service.create_record(
+		record_id="compat-model",
+		tenant_id="tenant-test",
+		metadata={"algorithm": "hybrid", "owner": "tester", "training_event_count": 1200},
+		status="active",
+	)
+
+	assert record["id"] == "compat-model"
+	assert record["algorithm"] == "hybrid"
+	assert service.dashboard_summary("tenant-test")["model_count"] == 1
