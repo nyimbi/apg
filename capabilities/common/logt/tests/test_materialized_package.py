@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""Logging and Tracing package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_materialized_contract_shape_is_valid():
+def test_logt_contract_shape_is_valid():
 	module = _load_module("materialized_contract_logt", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
@@ -32,7 +32,7 @@ def test_materialized_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
-def test_materialized_app_entrypoint_is_publishable():
+def test_logt_app_entrypoint_is_publishable():
 	module = _load_module("materialized_app_logt", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
@@ -44,3 +44,23 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "logt" in model["capabilities"]
+
+
+def test_logt_compatibility_record_uses_observability_runtime():
+	from capabilities.common.logt.service import LogtService
+
+	service = LogtService()
+	record = service.create_record(
+		record_id="log-compat",
+		tenant_id="tenant-test",
+		metadata={
+			"owner": "sre",
+			"service_name": "compat-api",
+			"message": "compat event",
+			"severity": "warning",
+		},
+	)
+
+	assert record["service_name"] == "compat-api"
+	assert record["severity"] == "warning"
+	assert service.dashboard_summary("tenant-test")["pipeline_count"] == 1

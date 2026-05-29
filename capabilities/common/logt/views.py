@@ -1,4 +1,4 @@
-"""UI metadata helpers for the Logging and Tracing capability."""
+"""UI metadata helpers for APG Logging and Tracing."""
 
 from __future__ import annotations
 
@@ -21,7 +21,66 @@ def dashboard_model(
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
 		"routes": capability_routes(tenant_id),
-		"records": service.list_records(tenant_id),
+		"summary": service.dashboard_summary(tenant_id),
+		"pipelines": service.list_pipelines(tenant_id),
+		"logs": service.list_logs(tenant_id),
+		"traces": service.list_traces(tenant_id),
+		"spans": service.list_spans(tenant_id),
+		"queries": service.list_queries(tenant_id),
+		"exports": service.list_exports(tenant_id),
+		"retention_policies": service.list_retention_policies(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
+		"service_map": service.service_map(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+	}
+
+
+def log_search_model(service: LogtService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"logs": service.list_logs(tenant_id),
+		"queries": service.list_queries(tenant_id),
+	}
+
+
+def trace_explorer_model(service: LogtService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"traces": service.list_traces(tenant_id),
+		"spans": service.list_spans(tenant_id),
+		"service_map": service.service_map(tenant_id),
+	}
+
+
+def pipeline_manager_model(service: LogtService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"pipelines": service.list_pipelines(tenant_id),
+		"retention_policies": service.list_retention_policies(tenant_id),
+	}
+
+
+def retention_center_model(service: LogtService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"retention_policies": service.list_retention_policies(tenant_id),
+		"exports": service.list_exports(tenant_id),
+	}
+
+
+def analytics_model(service: LogtService, tenant_id: str = "default") -> dict[str, object]:
+	summary = service.dashboard_summary(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"summary": summary,
+		"service_map": service.service_map(tenant_id),
+		"slow_spans": [
+			span for span in service.list_spans(tenant_id)
+			if span["status"] == "slow"
+		],
+		"error_logs": [
+			log for log in service.list_logs(tenant_id)
+			if log["severity"] in {"error", "critical"}
+		],
 	}

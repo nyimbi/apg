@@ -11305,3 +11305,28 @@ Battery-conscious verification:
 
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` passed with no whitespace errors before recording this progress-log entry.
+
+### 2026-05-29 16:08 EAT
+
+Executable LOGT observability-runtime slice:
+
+- Converted `capabilities/common/logt` from generated materialized records into a domain-specific logging and tracing runtime.
+- Replaced generic records with ingestion pipelines, log events, traces, spans, diagnostic queries, diagnostic exports, retention policies, and audit events.
+- Added `observability_runtime.py` with deterministic IDs, severity normalization, redaction, span posture, query posture, service-map generation, and log matching.
+- Added `LogtService` behavior for retention setup, pipeline governance, log ingestion, trace ingestion, span recording, log search, approved export bundles, tenant-scoped dashboard summaries, service maps, compatibility records, and APG rule enforcement.
+- Expanded API and view helpers so LOGT exposes dashboard summaries, log search, trace explorer, pipeline manager, retention center, analytics, service maps, audit events, rules, routes, and theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and the explicit OpenTelemetry, MQEB/event-bus, object-store export, search index, monitoring/alerting, audit-store, anomaly-detection, and compliance-retention adapter boundaries.
+- Added focused lifecycle and guardrail tests covering successful log-trace-span-query-export execution, tenant context, pipeline owner, schema validation, sensitive-log redaction, trace context, large-query review, export approval, cross-tenant trace/span isolation, cross-tenant export isolation, and missing export items.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/logt/__init__.py capabilities/common/logt/models.py capabilities/common/logt/observability_runtime.py capabilities/common/logt/service.py capabilities/common/logt/api.py capabilities/common/logt/views.py capabilities/common/logt/test_capability_contract.py capabilities/common/logt/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/logt/test_capability_contract.py capabilities/common/logt/tests` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package|Materialized capability package" capabilities/common/logt` returned no remaining LOGT baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.logt.models','capabilities.common.logt.observability_runtime','capabilities.common.logt.service','capabilities.common.logt.api','capabilities.common.logt.views']]; print('logt imports ok')"` passed with `logt imports ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/logt --json` passed with `ok: true`; `logt` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/logt --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 83, materialized baseline packages dropped to 24, mixed packages remained 1, contract-only packages remained 1, custom Python files increased to 898, and warning count dropped to 26. The next implementation-depth warning is `mchn`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- capabilities/common/logt docs/progress_log.md` passed with no whitespace errors before recording this progress-log entry.
