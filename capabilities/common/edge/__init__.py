@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .service import EdgeService
 
 __version__ = "1.0.0"
 __capability_id__ = "edge"
@@ -69,4 +70,4 @@ def get_capability_info() -> dict[str, Any]:
 	return info
 
 
-__all__ = ["capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__capability_code__", "__apg_dependencies__", "__composition_keywords__"]
+__all__ = ["EdgeService", "capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__capability_code__", "__apg_dependencies__", "__composition_keywords__"]

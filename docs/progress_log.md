@@ -10352,6 +10352,30 @@ Battery-conscious verification:
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 60 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
 
+### 2026-05-29 11:34 EAT
+
+Executable EDGE edge-computing runtime slice:
+
+- Converted `capabilities/common/edge` from a generated materialized baseline into a domain-specific edge-computing capability package.
+- Replaced generic records and Flask-AppBuilder-era view code with dependency-light tenant edge nodes, edge fleets, signed workload artifacts, deployments, sync sessions, and audit events.
+- Added `edge_engine.py` with deterministic artifact/audit digests, capacity-fit checks, resource-pressure summaries, and sync-status helpers.
+- Added `EdgeService` behavior for node attestation and location-policy guardrails, fleet assignment, signed workload registration, resource-quota deployment, secure state synchronization, long-offline-window review, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so EDGE exposes node manager, fleet manager, workload console, deployment state, sync monitor, dashboard summaries, audit events, route metadata, and theme metadata instead of generic record helpers.
+- Updated `cap_spec.md` to describe current runtime behavior and the explicit external IoT device registry, CI/CD signing, monitoring, geospatial enrichment, physical edge runtime, remote attestation, time-series telemetry, and Bytewax execution integration boundaries.
+- Added focused contract/service tests for successful node-fleet-workload-deployment-sync lifecycle execution and guardrails around missing tenant context, node attestation, signed artifacts, resource quotas, offline review, and view-model state.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/edge/__init__.py capabilities/common/edge/models.py capabilities/common/edge/edge_engine.py capabilities/common/edge/service.py capabilities/common/edge/api.py capabilities/common/edge/views.py capabilities/common/edge/test_capability_contract.py capabilities/common/edge/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/edge/test_capability_contract.py capabilities/common/edge/tests/test_materialized_package.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package|EdgeRecord" capabilities/common/edge` returned no remaining EDGE baseline markers after the spec verification text was tightened.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/edge --json` passed with `ok: true`; `edge` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `edge` is now `domain_specific`, custom Python files increased to 887, domain-specific packages increased to 68, materialized baseline packages dropped to 35, and warning count dropped to 41.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/edge --json` passed with `ok: true`, warnings empty, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 60 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- capabilities/common/edge/__init__.py capabilities/common/edge/models.py capabilities/common/edge/edge_engine.py capabilities/common/edge/service.py capabilities/common/edge/api.py capabilities/common/edge/views.py capabilities/common/edge/test_capability_contract.py capabilities/common/edge/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
+
 ### 2026-05-29 10:47 EAT
 
 Executable DIST distributed-computing runtime slice:
