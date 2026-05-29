@@ -8,7 +8,10 @@
   },
   "capabilities": {
     "auth": {
-      "approvals": {},
+      "approvals": {
+        "privacy_budget": "AuthPrivacyBudgetApproval",
+        "role_assignment": "AuthRoleAssignmentApproval"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -121,6 +124,19 @@
           },
           {
             "condition": {
+              "requested_operation": "approve_role_assignment",
+              "reviewer_same_as_requester": true
+            },
+            "description": "Role assignment approval requires an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_role_approval_reviewer_required",
+              "required_action": "route_to_independent_reviewer"
+            },
+            "name": "role_assignment_approval_requires_independent_reviewer"
+          },
+          {
+            "condition": {
               "auth_source": "federated",
               "issuer_trusted": false
             },
@@ -157,6 +173,19 @@
               "required_action": "approve_budget_replenishment"
             },
             "name": "privacy_queries_require_budget"
+          },
+          {
+            "condition": {
+              "requested_operation": "approve_privacy_budget",
+              "reviewer_same_as_requester": true
+            },
+            "description": "Privacy-budget override approvals require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_privacy_budget_reviewer_required",
+              "required_action": "route_to_independent_privacy_reviewer"
+            },
+            "name": "privacy_budget_approval_requires_independent_reviewer"
           }
         ],
         "type": "deterministic"
@@ -216,6 +245,19 @@
         },
         {
           "condition": {
+            "requested_operation": "approve_role_assignment",
+            "reviewer_same_as_requester": true
+          },
+          "description": "Role assignment approval requires an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_role_approval_reviewer_required",
+            "required_action": "route_to_independent_reviewer"
+          },
+          "name": "role_assignment_approval_requires_independent_reviewer"
+        },
+        {
+          "condition": {
             "auth_source": "federated",
             "issuer_trusted": false
           },
@@ -252,15 +294,35 @@
             "required_action": "approve_budget_replenishment"
           },
           "name": "privacy_queries_require_budget"
+        },
+        {
+          "condition": {
+            "requested_operation": "approve_privacy_budget",
+            "reviewer_same_as_requester": true
+          },
+          "description": "Privacy-budget override approvals require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_privacy_budget_reviewer_required",
+            "required_action": "route_to_independent_privacy_reviewer"
+          },
+          "name": "privacy_budget_approval_requires_independent_reviewer"
         }
       ],
       "runtime": {
         "api": "api.py",
+        "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
         "service": "service.py",
+        "view_models": "view_models.py",
         "views": "views.py"
       },
       "screens": {
+        "access_decisions": {
+          "component": "AccessDecisionConsole",
+          "permission": "auth:view",
+          "route": "/auth/access/decisions"
+        },
         "behavioral_analysis": {
           "component": "BehavioralTrustWorkbench",
           "permission": "auth:view_risk",
@@ -311,6 +373,11 @@
           "permission": "auth:view_privacy",
           "route": "/auth/privacy/analytics"
         },
+        "privacy_reviews": {
+          "component": "PrivacyBudgetApprovalQueue",
+          "permission": "auth:approve_privacy",
+          "route": "/auth/privacy/reviews"
+        },
         "privacy_settings": {
           "component": "PrivacyPreferenceCenter",
           "permission": "auth:manage_privacy",
@@ -325,19 +392,50 @@
           "component": "QuantumKeyVault",
           "permission": "auth:manage_keys",
           "route": "/auth/quantum/keys"
+        },
+        "role_approvals": {
+          "component": "RoleApprovalQueue",
+          "permission": "auth:approve_roles",
+          "route": "/auth/roles/approvals"
+        },
+        "role_workbench": {
+          "component": "RoleWorkbench",
+          "permission": "auth:manage_roles",
+          "route": "/auth/roles/workbench"
+        },
+        "sessions": {
+          "component": "SessionTrustCenter",
+          "permission": "auth:manage_sessions",
+          "route": "/auth/sessions"
         }
       },
       "streaming": {},
       "theme": {
         "components": {
+          "access_decision_panel": {
+            "status_style": "decision-chip",
+            "visual": "permission-matrix"
+          },
           "identity_signal_card": {
             "icon": "shield-lock",
             "shape": "rounded-rectangle",
             "status_indicator": "trust-ring"
           },
+          "privacy_approval_queue": {
+            "icon": "file-check",
+            "status_style": "review-chip"
+          },
+          "privacy_budget_meter": {
+            "visual": "budget-bar",
+            "warning_style": "epsilon-threshold"
+          },
           "risk_posture_meter": {
             "highlight": "threshold-bands",
             "visual": "segmented-gauge"
+          },
+          "role_approval_queue": {
+            "icon": "user-check",
+            "status_style": "approval-chip"
           },
           "role_assignment_timeline": {
             "approval_badge": "inline",
@@ -379,6 +477,34 @@
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/auth/revolutionary/dashboard",
+            "permission": "auth:view"
+          },
+          {
+            "component": "RoleWorkbench",
+            "name": "role_workbench",
+            "nav_group": "Authorization",
+            "path": "/auth/roles/workbench",
+            "permission": "auth:manage_roles"
+          },
+          {
+            "component": "RoleApprovalQueue",
+            "name": "role_approvals",
+            "nav_group": "Authorization",
+            "path": "/auth/roles/approvals",
+            "permission": "auth:approve_roles"
+          },
+          {
+            "component": "SessionTrustCenter",
+            "name": "sessions",
+            "nav_group": "Access",
+            "path": "/auth/sessions",
+            "permission": "auth:manage_sessions"
+          },
+          {
+            "component": "AccessDecisionConsole",
+            "name": "access_decisions",
+            "nav_group": "Authorization",
+            "path": "/auth/access/decisions",
             "permission": "auth:view"
           },
           {
@@ -436,6 +562,13 @@
             "nav_group": "Governance",
             "path": "/auth/privacy/analytics",
             "permission": "auth:view_privacy"
+          },
+          {
+            "component": "PrivacyBudgetApprovalQueue",
+            "name": "privacy_reviews",
+            "nav_group": "Governance",
+            "path": "/auth/privacy/reviews",
+            "permission": "auth:approve_privacy"
           },
           {
             "component": "NeuromorphicDecisionConsole",
@@ -609,6 +742,19 @@
       },
       "name": "locked_accounts_denied"
     },
+    "privacy_budget_approval_requires_independent_reviewer": {
+      "condition": {
+        "requested_operation": "approve_privacy_budget",
+        "reviewer_same_as_requester": true
+      },
+      "description": "Privacy-budget override approvals require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_privacy_budget_reviewer_required",
+        "required_action": "route_to_independent_privacy_reviewer"
+      },
+      "name": "privacy_budget_approval_requires_independent_reviewer"
+    },
     "privacy_queries_require_budget": {
       "condition": {
         "privacy_budget_available": false,
@@ -634,6 +780,19 @@
         "required_action": "complete_mfa_challenge"
       },
       "name": "privileged_access_requires_mfa"
+    },
+    "role_assignment_approval_requires_independent_reviewer": {
+      "condition": {
+        "requested_operation": "approve_role_assignment",
+        "reviewer_same_as_requester": true
+      },
+      "description": "Role assignment approval requires an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_role_approval_reviewer_required",
+        "required_action": "route_to_independent_reviewer"
+      },
+      "name": "role_assignment_approval_requires_independent_reviewer"
     },
     "untrusted_federation_denied": {
       "condition": {

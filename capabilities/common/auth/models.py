@@ -65,6 +65,36 @@ class AuthRole:
 
 
 @dataclass(frozen=True)
+class AuthRoleAssignmentApproval:
+	"""Independent approval evidence for privileged role assignment."""
+
+	id: str
+	tenant_id: str
+	user_id: str
+	role_id: str
+	requested_by: str
+	justification: str
+	decision: str = "pending"
+	reviewer: str | None = None
+	notes: str | None = None
+	status: str = "pending"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"user_id": self.user_id,
+			"role_id": self.role_id,
+			"requested_by": self.requested_by,
+			"justification": self.justification,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+			"status": self.status,
+		}
+
+
+@dataclass(frozen=True)
 class AuthRoleAssignment:
 	"""Assignment of a role to a tenant identity."""
 
@@ -73,6 +103,7 @@ class AuthRoleAssignment:
 	user_id: str
 	role_id: str
 	assigned_by: str
+	approval_id: str | None = None
 	approval_recorded: bool = False
 	status: str = "active"
 
@@ -83,6 +114,7 @@ class AuthRoleAssignment:
 			"user_id": self.user_id,
 			"role_id": self.role_id,
 			"assigned_by": self.assigned_by,
+			"approval_id": self.approval_id,
 			"approval_recorded": self.approval_recorded,
 			"status": self.status,
 		}
@@ -163,6 +195,7 @@ class AuthPrivacyQuery:
 	remaining_budget: float
 	approval_recorded: bool = False
 	reasons: tuple[str, ...] = ()
+	approval_id: str | None = None
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -175,6 +208,39 @@ class AuthPrivacyQuery:
 			"remaining_budget": self.remaining_budget,
 			"approval_recorded": self.approval_recorded,
 			"reasons": list(self.reasons),
+			"approval_id": self.approval_id,
+		}
+
+
+@dataclass(frozen=True)
+class AuthPrivacyBudgetApproval:
+	"""Independent approval evidence for privacy-budget exhaustion."""
+
+	id: str
+	tenant_id: str
+	user_id: str
+	query_type: str
+	epsilon_cost: float
+	requested_by: str
+	justification: str
+	decision: str = "pending"
+	reviewer: str | None = None
+	notes: str | None = None
+	status: str = "pending"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"user_id": self.user_id,
+			"query_type": self.query_type,
+			"epsilon_cost": self.epsilon_cost,
+			"requested_by": self.requested_by,
+			"justification": self.justification,
+			"decision": self.decision,
+			"reviewer": self.reviewer,
+			"notes": self.notes,
+			"status": self.status,
 		}
 
 

@@ -5,13 +5,129 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Authentication & RBAC package-backed APG capability", "entity_count": 0, "name": "auth", "version": "1.0.0"}, "capabilities": {"auth": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"authentication": {"enable_behavioral_auth": true, "enable_biometric_fusion": true, "enable_quantum_safe_auth": true, "enable_zero_knowledge_proofs": true, "require_mfa_for_privileged_access": true}, "authorization": {"default_access_model": "hybrid", "enable_role_templates": true, "enforce_least_privilege": true, "require_approval_for_admin_role_assignment": true}, "federation": {"allow_cross_tenant_federation": false, "mesh_enabled": true, "minimum_trust_level": "medium", "require_trusted_issuer": true}, "privacy": {"allow_behavioral_data_export": false, "analytics_retention_days": 90, "default_privacy_budget": 1.0, "enable_privacy_analytics": true}, "sessions": {"absolute_timeout_hours": 8, "continuous_risk_evaluation": true, "idle_timeout_minutes": 30, "require_device_binding": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "auth_trust_fabric"}, "ui": {"enable_behavioral_console": true, "enable_federation_console": true, "enable_role_workbench": true, "enable_trust_dashboard": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Authentication & RBAC", "provides": ["auth_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"user_locked": true}, "description": "Locked or suspended accounts cannot authenticate.", "effect": {"decision": "deny", "reason": "account_locked", "required_action": "unlock_or_reset_account"}, "name": "locked_accounts_denied"}, {"condition": {"mfa_verified": false, "requested_permission_tier": "privileged"}, "description": "Privileged access requires MFA verification.", "effect": {"decision": "deny", "reason": "mfa_required", "required_action": "complete_mfa_challenge"}, "name": "privileged_access_requires_mfa"}, {"condition": {"risk_level": "high", "step_up_completed": false}, "description": "High-risk sessions require step-up authentication.", "effect": {"decision": "deny", "reason": "step_up_authentication_required", "required_action": "perform_step_up_authentication"}, "name": "high_risk_sessions_require_step_up"}, {"condition": {"approval_recorded": false, "requested_operation": "assign_role", "role_tier": "admin"}, "description": "Administrative role assignments require recorded approval.", "effect": {"decision": "deny", "reason": "approval_required_for_admin_role_assignment", "required_action": "record_role_assignment_approval"}, "name": "elevated_role_assignment_requires_approval"}, {"condition": {"auth_source": "federated", "issuer_trusted": false}, "description": "Federated logins require a trusted issuer.", "effect": {"decision": "deny", "reason": "trusted_issuer_required", "required_action": "approve_or_rotate_identity_provider"}, "name": "untrusted_federation_denied"}, {"condition": {"tenant_membership_confirmed": false, "tenant_mismatch": true}, "description": "Cross-tenant access requires confirmed tenant membership.", "effect": {"decision": "deny", "reason": "tenant_membership_required", "required_action": "confirm_tenant_membership"}, "name": "cross_tenant_access_requires_membership"}, {"condition": {"privacy_budget_available": false, "requested_operation": "privacy_analytics_query"}, "description": "Privacy-preserving analytics queries require remaining budget.", "effect": {"decision": "require_review", "reason": "privacy_budget_exhausted", "required_action": "approve_budget_replenishment"}, "name": "privacy_queries_require_budget"}], "type": "deterministic"}, "rules": [{"condition": {"user_locked": true}, "description": "Locked or suspended accounts cannot authenticate.", "effect": {"decision": "deny", "reason": "account_locked", "required_action": "unlock_or_reset_account"}, "name": "locked_accounts_denied"}, {"condition": {"mfa_verified": false, "requested_permission_tier": "privileged"}, "description": "Privileged access requires MFA verification.", "effect": {"decision": "deny", "reason": "mfa_required", "required_action": "complete_mfa_challenge"}, "name": "privileged_access_requires_mfa"}, {"condition": {"risk_level": "high", "step_up_completed": false}, "description": "High-risk sessions require step-up authentication.", "effect": {"decision": "deny", "reason": "step_up_authentication_required", "required_action": "perform_step_up_authentication"}, "name": "high_risk_sessions_require_step_up"}, {"condition": {"approval_recorded": false, "requested_operation": "assign_role", "role_tier": "admin"}, "description": "Administrative role assignments require recorded approval.", "effect": {"decision": "deny", "reason": "approval_required_for_admin_role_assignment", "required_action": "record_role_assignment_approval"}, "name": "elevated_role_assignment_requires_approval"}, {"condition": {"auth_source": "federated", "issuer_trusted": false}, "description": "Federated logins require a trusted issuer.", "effect": {"decision": "deny", "reason": "trusted_issuer_required", "required_action": "approve_or_rotate_identity_provider"}, "name": "untrusted_federation_denied"}, {"condition": {"tenant_membership_confirmed": false, "tenant_mismatch": true}, "description": "Cross-tenant access requires confirmed tenant membership.", "effect": {"decision": "deny", "reason": "tenant_membership_required", "required_action": "confirm_tenant_membership"}, "name": "cross_tenant_access_requires_membership"}, {"condition": {"privacy_budget_available": false, "requested_operation": "privacy_analytics_query"}, "description": "Privacy-preserving analytics queries require remaining budget.", "effect": {"decision": "require_review", "reason": "privacy_budget_exhausted", "required_action": "approve_budget_replenishment"}, "name": "privacy_queries_require_budget"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"behavioral_analysis": {"component": "BehavioralTrustWorkbench", "permission": "auth:view_risk", "route": "/auth/behavioral/analysis"}, "behavioral_training": {"component": "BehavioralBaselineTraining", "permission": "auth:view_risk", "route": "/auth/behavioral/training"}, "biometric_enrollment": {"component": "BiometricEnrollmentStudio", "permission": "auth:manage_biometrics", "route": "/auth/biometric/enroll"}, "biometric_management": {"component": "BiometricManagementConsole", "permission": "auth:manage_biometrics", "route": "/auth/biometric/manage"}, "dashboard": {"component": "RevolutionaryAuthenticationDashboard", "permission": "auth:view", "route": "/auth/revolutionary/dashboard"}, "federated_mesh": {"component": "FederatedIdentityMeshConsole", "permission": "auth:manage_federation", "route": "/auth/federated/mesh"}, "login": {"component": "RevolutionaryLoginScreen", "permission": "public", "route": "/auth/revolutionary/login"}, "metrics": {"component": "AuthenticationMetricsOverview", "permission": "auth:admin", "route": "/auth/metrics/overview"}, "neuromorphic_dashboard": {"component": "NeuromorphicDecisionConsole", "permission": "auth:view_risk", "route": "/auth/neuromorphic/dashboard"}, "privacy_analytics": {"component": "PrivacyAnalyticsCenter", "permission": "auth:view_privacy", "route": "/auth/privacy/analytics"}, "privacy_settings": {"component": "PrivacyPreferenceCenter", "permission": "auth:manage_privacy", "route": "/auth/privacy/settings"}, "quantum_generate": {"component": "QuantumKeyGenerationFlow", "permission": "auth:manage_keys", "route": "/auth/quantum/generate"}, "quantum_keys": {"component": "QuantumKeyVault", "permission": "auth:manage_keys", "route": "/auth/quantum/keys"}}, "streaming": {}, "theme": {"components": {"identity_signal_card": {"icon": "shield-lock", "shape": "rounded-rectangle", "status_indicator": "trust-ring"}, "risk_posture_meter": {"highlight": "threshold-bands", "visual": "segmented-gauge"}, "role_assignment_timeline": {"approval_badge": "inline", "line_style": "stepped"}, "session_trust_badge": {"icon": "fingerprint", "variant": "elevated"}}, "name": "auth_trust_fabric", "tokens": {"border.radius": "12px", "color.accent": "#0F8B8D", "color.danger": "#C05621", "color.primary": "#12344D", "color.success": "#2D6A4F", "color.warning": "#B7791F", "density": "comfortable", "surface.canvas": "#F4F7FA", "surface.panel": "#FFFFFF", "text.primary": "#102A43", "text.secondary": "#486581"}}, "ui": {"api_prefix": "/api", "requires_theme": true, "routes": [{"component": "RevolutionaryLoginScreen", "name": "login", "nav_group": "Access", "path": "/auth/revolutionary/login", "permission": "public"}, {"component": "RevolutionaryAuthenticationDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/auth/revolutionary/dashboard", "permission": "auth:view"}, {"component": "BiometricEnrollmentStudio", "name": "biometric_enrollment", "nav_group": "Assurance", "path": "/auth/biometric/enroll", "permission": "auth:manage_biometrics"}, {"component": "BiometricManagementConsole", "name": "biometric_management", "nav_group": "Assurance", "path": "/auth/biometric/manage", "permission": "auth:manage_biometrics"}, {"component": "QuantumKeyVault", "name": "quantum_keys", "nav_group": "Cryptography", "path": "/auth/quantum/keys", "permission": "auth:manage_keys"}, {"component": "QuantumKeyGenerationFlow", "name": "quantum_generate", "nav_group": "Cryptography", "path": "/auth/quantum/generate", "permission": "auth:manage_keys"}, {"component": "BehavioralTrustWorkbench", "name": "behavioral_analysis", "nav_group": "Intelligence", "path": "/auth/behavioral/analysis", "permission": "auth:view_risk"}, {"component": "BehavioralBaselineTraining", "name": "behavioral_training", "nav_group": "Intelligence", "path": "/auth/behavioral/training", "permission": "auth:view_risk"}, {"component": "PrivacyPreferenceCenter", "name": "privacy_settings", "nav_group": "Governance", "path": "/auth/privacy/settings", "permission": "auth:manage_privacy"}, {"component": "PrivacyAnalyticsCenter", "name": "privacy_analytics", "nav_group": "Governance", "path": "/auth/privacy/analytics", "permission": "auth:view_privacy"}, {"component": "NeuromorphicDecisionConsole", "name": "neuromorphic_dashboard", "nav_group": "Intelligence", "path": "/auth/neuromorphic/dashboard", "permission": "auth:view_risk"}, {"component": "FederatedIdentityMeshConsole", "name": "federated_mesh", "nav_group": "Federation", "path": "/auth/federated/mesh", "permission": "auth:manage_federation"}, {"component": "AuthenticationMetricsOverview", "name": "metrics", "nav_group": "Operations", "path": "/auth/metrics/overview", "permission": "auth:admin"}], "shell": "apg_python", "template_roots": ["templates/auth/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"auth": []}}, "contracts": {"auth": {"configuration": {"authentication": {"enable_behavioral_auth": true, "enable_biometric_fusion": true, "enable_quantum_safe_auth": true, "enable_zero_knowledge_proofs": true, "require_mfa_for_privileged_access": true}, "authorization": {"default_access_model": "hybrid", "enable_role_templates": true, "enforce_least_privilege": true, "require_approval_for_admin_role_assignment": true}, "federation": {"allow_cross_tenant_federation": false, "mesh_enabled": true, "minimum_trust_level": "medium", "require_trusted_issuer": true}, "privacy": {"allow_behavioral_data_export": false, "analytics_retention_days": 90, "default_privacy_budget": 1.0, "enable_privacy_analytics": true}, "sessions": {"absolute_timeout_hours": 8, "continuous_risk_evaluation": true, "idle_timeout_minutes": 30, "require_device_binding": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "auth_trust_fabric"}, "ui": {"enable_behavioral_console": true, "enable_federation_console": true, "enable_role_workbench": true, "enable_trust_dashboard": true}}, "id": "auth", "provides": ["auth_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"auth": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"cross_tenant_access_requires_membership": {"condition": {"tenant_membership_confirmed": false, "tenant_mismatch": true}, "description": "Cross-tenant access requires confirmed tenant membership.", "effect": {"decision": "deny", "reason": "tenant_membership_required", "required_action": "confirm_tenant_membership"}, "name": "cross_tenant_access_requires_membership"}, "elevated_role_assignment_requires_approval": {"condition": {"approval_recorded": false, "requested_operation": "assign_role", "role_tier": "admin"}, "description": "Administrative role assignments require recorded approval.", "effect": {"decision": "deny", "reason": "approval_required_for_admin_role_assignment", "required_action": "record_role_assignment_approval"}, "name": "elevated_role_assignment_requires_approval"}, "high_risk_sessions_require_step_up": {"condition": {"risk_level": "high", "step_up_completed": false}, "description": "High-risk sessions require step-up authentication.", "effect": {"decision": "deny", "reason": "step_up_authentication_required", "required_action": "perform_step_up_authentication"}, "name": "high_risk_sessions_require_step_up"}, "locked_accounts_denied": {"condition": {"user_locked": true}, "description": "Locked or suspended accounts cannot authenticate.", "effect": {"decision": "deny", "reason": "account_locked", "required_action": "unlock_or_reset_account"}, "name": "locked_accounts_denied"}, "privacy_queries_require_budget": {"condition": {"privacy_budget_available": false, "requested_operation": "privacy_analytics_query"}, "description": "Privacy-preserving analytics queries require remaining budget.", "effect": {"decision": "require_review", "reason": "privacy_budget_exhausted", "required_action": "approve_budget_replenishment"}, "name": "privacy_queries_require_budget"}, "privileged_access_requires_mfa": {"condition": {"mfa_verified": false, "requested_permission_tier": "privileged"}, "description": "Privileged access requires MFA verification.", "effect": {"decision": "deny", "reason": "mfa_required", "required_action": "complete_mfa_challenge"}, "name": "privileged_access_requires_mfa"}, "untrusted_federation_denied": {"condition": {"auth_source": "federated", "issuer_trusted": false}, "description": "Federated logins require a trusted issuer.", "effect": {"decision": "deny", "reason": "trusted_issuer_required", "required_action": "approve_or_rotate_identity_provider"}, "name": "untrusted_federation_denied"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.auth": {"file": "capability_contract.py", "id": "capability.auth", "kind": "capability", "name": "Authentication & RBAC", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("auth_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "auth",
+			"version": "1.0.0",
+			"description": "Authentication & RBAC package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"auth": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"auth": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["auth_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"api_helpers": "api_helpers.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "views.py",
+					"view_models": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"role_assignment": "AuthRoleAssignmentApproval",
+					"privacy_budget": "AuthPrivacyBudgetApproval",
+				},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"auth": {
+				"id": "auth",
+				"configuration": contract["configuration"],
+				"provides": ["auth_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"auth": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.auth": {
+				"id": "capability.auth",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +152,15 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	routes = model.get("capabilities", {}).get("auth", {}).get("ui", {}).get("routes", [])
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "auth" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 18:
+		errors.append("AUTH semantic model route manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

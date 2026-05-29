@@ -11,16 +11,59 @@ The APG Authentication & RBAC capability delivers a comprehensive identity and a
 The package currently exposes a dependency-light `AuthService` that applications
 and tests can compose without starting the full Flask or advanced authentication
 runtime. The service owns tenant identities, role definitions, role assignments,
-authentication sessions, access decisions, privacy analytics budget decisions,
-dashboard summaries, and audit events behind the AUTH capability contract.
+role-assignment approvals, authentication sessions, access decisions, privacy
+analytics budget decisions, privacy-budget approvals, dashboard summaries, and
+audit events behind the AUTH capability contract.
 
 The service enforces the executable rule contract for locked identities,
 privileged access MFA, high-risk step-up authentication, administrative role
-assignment approval, trusted federation issuers, cross-tenant membership, and
-privacy budget review. The larger revolutionary authentication manager,
-Flask-AppBuilder views, and REST API remain the integration boundary for richer
-runtime deployments; the dependency-light service is the package-backed
-composition surface used by APG generated applications and capability evidence.
+assignment approval, independent approval reviewers, trusted federation
+issuers, cross-tenant membership, privacy budget review, and independent
+privacy-budget approval. Tenant-local session revocation is addressable by
+tenant ID so duplicate IDs in different tenants do not collide. Approval and
+assignment actors are verified against tenant role permissions before governed
+changes are recorded, privileged access infers MFA requirements from admin
+permissions and assigned privileged roles, and privacy-budget mutation is
+limited to tenant-local identity budget records. The larger
+revolutionary authentication manager, Flask-AppBuilder views, JWT adapters,
+biometric engines, behavioral engines, post-quantum cryptography providers, and
+REST API remain the integration boundary for richer runtime deployments; the
+dependency-light service is the package-backed composition surface used by APG
+generated applications and capability evidence.
+
+Current package-backed lifecycle:
+
+1. Register tenant identities with MFA, trust, membership, and privacy posture.
+2. Define tenant roles and permission sets.
+3. Request role-assignment approval before assigning administrative roles.
+4. Approve or reject role-assignment requests with independent reviewer notes.
+5. Assign roles only when identity, role, tenant, and approval guardrails pass.
+6. Start sessions only for unlocked identities, trusted federation issuers,
+   confirmed tenant memberships, and acceptable risk posture.
+7. Evaluate access with tenant role assignments, session evidence, MFA, risk,
+   permission checks, and inferred privileged tiers.
+8. Request and decide privacy-budget approval before authorizing analytics that
+   exceed the tenant identity's current privacy budget.
+9. Run privacy analytics against tenant privacy budgets, creating
+   review-required state when budget is exhausted and no approved matching
+   privacy-budget approval exists.
+10. Verify requester, reviewer, and assigner actors against tenant role
+   permissions before recording governed changes.
+11. Revoke tenant-local sessions without affecting the same session ID in
+   another tenant.
+12. Keep identity, role, approval, assignment, session, decision, privacy, and
+   audit state tenant-qualified so duplicate IDs across tenants cannot collide.
+13. Emit tenant-scoped audit events for identity, role, approval, assignment,
+    session, access, privacy, and revocation lifecycle changes.
+
+Focused proof commands:
+
+```bash
+./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json
+git diff --check -- capabilities/common/auth
+```
 
 ### APG Platform Context
 This capability serves as the foundational security layer for all APG capabilities, providing seamless identity management across the entire APG ecosystem while enabling third-party integrations and standalone deployments.

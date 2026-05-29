@@ -178,9 +178,25 @@ class CapabilityTheme:
 			"line_style": "stepped",
 			"approval_badge": "inline"
 		},
+		"role_approval_queue": {
+			"icon": "user-check",
+			"status_style": "approval-chip"
+		},
 		"session_trust_badge": {
 			"icon": "fingerprint",
 			"variant": "elevated"
+		},
+		"access_decision_panel": {
+			"visual": "permission-matrix",
+			"status_style": "decision-chip"
+		},
+		"privacy_budget_meter": {
+			"visual": "budget-bar",
+			"warning_style": "epsilon-threshold"
+		},
+		"privacy_approval_queue": {
+			"icon": "file-check",
+			"status_style": "review-chip"
 		}
 	})
 
@@ -229,6 +245,16 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="role_assignment_approval_requires_independent_reviewer",
+			description="Role assignment approval requires an independent reviewer.",
+			condition={"requested_operation": "approve_role_assignment", "reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_role_approval_reviewer_required",
+				"required_action": "route_to_independent_reviewer"
+			}
+		),
+		CapabilityRule(
 			name="untrusted_federation_denied",
 			description="Federated logins require a trusted issuer.",
 			condition={"auth_source": "federated", "issuer_trusted": False},
@@ -257,6 +283,16 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "privacy_budget_exhausted",
 				"required_action": "approve_budget_replenishment"
 			}
+		),
+		CapabilityRule(
+			name="privacy_budget_approval_requires_independent_reviewer",
+			description="Privacy-budget override approvals require an independent reviewer.",
+			condition={"requested_operation": "approve_privacy_budget", "reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_privacy_budget_reviewer_required",
+				"required_action": "route_to_independent_privacy_reviewer"
+			}
 		)
 	]
 
@@ -266,6 +302,10 @@ def ui_manifest() -> dict[str, Any]:
 	routes = [
 		CapabilityUIRoute("login", "/auth/revolutionary/login", "RevolutionaryLoginScreen", "public", "Access"),
 		CapabilityUIRoute("dashboard", "/auth/revolutionary/dashboard", "RevolutionaryAuthenticationDashboard", "auth:view", "Overview"),
+		CapabilityUIRoute("role_workbench", "/auth/roles/workbench", "RoleWorkbench", "auth:manage_roles", "Authorization"),
+		CapabilityUIRoute("role_approvals", "/auth/roles/approvals", "RoleApprovalQueue", "auth:approve_roles", "Authorization"),
+		CapabilityUIRoute("sessions", "/auth/sessions", "SessionTrustCenter", "auth:manage_sessions", "Access"),
+		CapabilityUIRoute("access_decisions", "/auth/access/decisions", "AccessDecisionConsole", "auth:view", "Authorization"),
 		CapabilityUIRoute("biometric_enrollment", "/auth/biometric/enroll", "BiometricEnrollmentStudio", "auth:manage_biometrics", "Assurance"),
 		CapabilityUIRoute("biometric_management", "/auth/biometric/manage", "BiometricManagementConsole", "auth:manage_biometrics", "Assurance"),
 		CapabilityUIRoute("quantum_keys", "/auth/quantum/keys", "QuantumKeyVault", "auth:manage_keys", "Cryptography"),
@@ -274,6 +314,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("behavioral_training", "/auth/behavioral/training", "BehavioralBaselineTraining", "auth:view_risk", "Intelligence"),
 		CapabilityUIRoute("privacy_settings", "/auth/privacy/settings", "PrivacyPreferenceCenter", "auth:manage_privacy", "Governance"),
 		CapabilityUIRoute("privacy_analytics", "/auth/privacy/analytics", "PrivacyAnalyticsCenter", "auth:view_privacy", "Governance"),
+		CapabilityUIRoute("privacy_reviews", "/auth/privacy/reviews", "PrivacyBudgetApprovalQueue", "auth:approve_privacy", "Governance"),
 		CapabilityUIRoute("neuromorphic_dashboard", "/auth/neuromorphic/dashboard", "NeuromorphicDecisionConsole", "auth:view_risk", "Intelligence"),
 		CapabilityUIRoute("federated_mesh", "/auth/federated/mesh", "FederatedIdentityMeshConsole", "auth:manage_federation", "Federation"),
 		CapabilityUIRoute("metrics", "/auth/metrics/overview", "AuthenticationMetricsOverview", "auth:admin", "Operations")

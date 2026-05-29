@@ -2051,6 +2051,8 @@ def register_capability() -> Dict[str, Any]:
 		"capabilities": {
 			"identity": "Manage tenant-scoped users and identity context",
 			"rbac": "Assign and evaluate roles and permissions",
+			"role_assignment_approvals": "Require independent approval evidence before privileged role assignment",
+			"privacy_budget_approvals": "Require independent approval evidence before privacy-budget overrides",
 			"sessions": "Issue, monitor, and revoke enriched sessions",
 			"behavioral_auth": "Continuously score behavioral trust signals",
 			"biometrics": "Manage biometric fusion enrollment and verification",
@@ -2061,6 +2063,8 @@ def register_capability() -> Dict[str, Any]:
 		"endpoints": {
 			"login": "/api/auth/login",
 			"users": "/api/users",
+			"role_approvals": "/api/auth/role-approvals",
+			"privacy_reviews": "/api/auth/privacy-reviews",
 			"sessions": "/api/sessions",
 			"biometrics": "/api/biometrics/register",
 			"behavioral": "/api/behavioral/analyze",
@@ -2078,6 +2082,8 @@ def register_capability() -> Dict[str, Any]:
 			"auth:view",
 			"auth:login",
 			"auth:manage_roles",
+			"auth:approve_roles",
+			"auth:approve_privacy",
 			"auth:manage_sessions",
 			"auth:manage_biometrics",
 			"auth:manage_keys",

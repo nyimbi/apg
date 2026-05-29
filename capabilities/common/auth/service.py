@@ -10,9 +10,11 @@ from .models import (
 	AuthAccessDecision,
 	AuthAuditEvent,
 	AuthIdentity,
+	AuthPrivacyBudgetApproval,
 	AuthPrivacyQuery,
 	AuthRole,
 	AuthRoleAssignment,
+	AuthRoleAssignmentApproval,
 	AuthSession,
 )
 
@@ -21,13 +23,15 @@ class AuthService:
 	"""Tenant identity control plane backed by the executable AUTH contract."""
 
 	def __init__(self) -> None:
-		self._identities: dict[str, AuthIdentity] = {}
-		self._roles: dict[str, AuthRole] = {}
-		self._assignments: dict[str, AuthRoleAssignment] = {}
-		self._sessions: dict[str, AuthSession] = {}
-		self._access_decisions: dict[str, AuthAccessDecision] = {}
-		self._privacy_queries: dict[str, AuthPrivacyQuery] = {}
-		self._audit_events: dict[str, AuthAuditEvent] = {}
+		self._identities: dict[tuple[str, str], AuthIdentity] = {}
+		self._roles: dict[tuple[str, str], AuthRole] = {}
+		self._role_approvals: dict[tuple[str, str], AuthRoleAssignmentApproval] = {}
+		self._assignments: dict[tuple[str, str], AuthRoleAssignment] = {}
+		self._sessions: dict[tuple[str, str], AuthSession] = {}
+		self._access_decisions: dict[tuple[str, str], AuthAccessDecision] = {}
+		self._privacy_queries: dict[tuple[str, str], AuthPrivacyQuery] = {}
+		self._privacy_approvals: dict[tuple[str, str], AuthPrivacyBudgetApproval] = {}
+		self._audit_events: dict[tuple[str, str], AuthAuditEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -51,6 +55,7 @@ class AuthService:
 		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		self._ensure_new(self._identities, tenant_id, user_id, "identity")
 		if "@" not in email:
 			raise ValueError("identity_email_required")
 		memberships = tuple(dict.fromkeys((tenant_id, *(tenant_memberships or ()))))
@@ -68,7 +73,7 @@ class AuthService:
 			privacy_budget=float(privacy_budget),
 			metadata=dict(metadata or {}),
 		)
-		self._identities[user_id] = identity
+		self._identities[self._tenant_key(tenant_id, user_id)] = identity
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=user_id,
@@ -92,6 +97,7 @@ class AuthService:
 		approval_recorded: bool = False,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		self._ensure_new(self._roles, tenant_id, role_id, "role")
 		if not permissions:
 			raise ValueError("role_permissions_required")
 		role = AuthRole(
@@ -102,7 +108,7 @@ class AuthService:
 			tier=tier,
 			approval_recorded=approval_recorded,
 		)
-		self._roles[role_id] = role
+		self._roles[self._tenant_key(tenant_id, role_id)] = role
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=role_id,
@@ -116,6 +122,88 @@ class AuthService:
 	def list_roles(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._roles.values(), tenant_id)
 
+	def request_role_assignment_approval(
+		self,
+		approval_id: str,
+		tenant_id: str,
+		user_id: str,
+		role_id: str,
+		requested_by: str,
+		justification: str,
+	) -> dict[str, Any]:
+		self._require_identity(user_id, tenant_id)
+		self._require_actor_permission(requested_by, tenant_id, "auth:manage_roles")
+		role = self._require_role(role_id, tenant_id)
+		self._ensure_new(self._role_approvals, tenant_id, approval_id, "role assignment approval")
+		if not requested_by:
+			raise ValueError("role_approval_requester_required")
+		if not justification:
+			raise ValueError("role_approval_justification_required")
+		approval = AuthRoleAssignmentApproval(
+			id=approval_id,
+			tenant_id=tenant_id,
+			user_id=user_id,
+			role_id=role_id,
+			requested_by=requested_by,
+			justification=justification,
+		)
+		self._role_approvals[self._tenant_key(tenant_id, approval_id)] = approval
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=approval_id,
+			event_type="role_assignment_approval_requested",
+			actor=requested_by,
+			decision="require_review",
+			metadata={"user_id": user_id, "role_id": role_id, "role_tier": role.tier},
+		)
+		return approval.to_dict()
+
+	def decide_role_assignment_approval(
+		self,
+		approval_id: str,
+		tenant_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> dict[str, Any]:
+		approval = self._require_role_approval(approval_id, tenant_id)
+		if approval.status != "pending":
+			raise ValueError("role_approval_already_decided")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("role_approval_decision_invalid")
+		if not reviewer:
+			raise ValueError("role_approval_reviewer_required")
+		if not notes:
+			raise ValueError("role_approval_notes_required")
+		self._require_actor_permission(reviewer, tenant_id, "auth:approve_roles")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"requested_operation": "approve_role_assignment",
+			"reviewer_same_as_requester": reviewer == approval.requested_by,
+		})
+		self._raise_if_denied(result)
+		decided = replace(
+			approval,
+			decision=decision,
+			reviewer=reviewer,
+			notes=notes,
+			status=decision,
+		)
+		self._role_approvals[self._tenant_key(tenant_id, approval_id)] = decided
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=approval_id,
+			event_type="role_assignment_approval_decided",
+			actor=reviewer,
+			decision=decision,
+			reasons=self._reasons(result),
+			metadata={"user_id": approval.user_id, "role_id": approval.role_id},
+		)
+		return decided.to_dict()
+
+	def list_role_assignment_approvals(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._role_approvals.values(), tenant_id)
+
 	def assign_role(
 		self,
 		assignment_id: str,
@@ -124,14 +212,18 @@ class AuthService:
 		role_id: str,
 		assigned_by: str,
 		approval_recorded: bool = False,
+		approval_id: str | None = None,
 	) -> dict[str, Any]:
 		identity = self._require_identity(user_id, tenant_id)
 		role = self._require_role(role_id, tenant_id)
+		self._require_actor_permission(assigned_by, tenant_id, "auth:manage_roles")
+		self._ensure_new(self._assignments, tenant_id, assignment_id, "role assignment")
+		approval = self._approved_role_assignment_approval(tenant_id, approval_id, user_id, role_id)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"requested_operation": "assign_role",
 			"role_tier": role.tier,
-			"approval_recorded": approval_recorded or role.approval_recorded,
+			"approval_recorded": approval is not None or (role.tier != "admin" and (approval_recorded or role.approval_recorded)),
 			"user_locked": identity.status in {"locked", "suspended"},
 		})
 		self._raise_if_denied(result)
@@ -141,9 +233,10 @@ class AuthService:
 			user_id=user_id,
 			role_id=role_id,
 			assigned_by=assigned_by,
-			approval_recorded=approval_recorded or role.approval_recorded,
+			approval_id=approval.id if approval else approval_id,
+			approval_recorded=approval is not None or approval_recorded or role.approval_recorded,
 		)
-		self._assignments[assignment_id] = assignment
+		self._assignments[self._tenant_key(tenant_id, assignment_id)] = assignment
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=assignment_id,
@@ -171,9 +264,8 @@ class AuthService:
 		step_up_completed: bool = False,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		identity = self._identities.get(user_id)
-		if identity is None:
-			raise KeyError(f"unknown identity: {user_id}")
+		self._ensure_new(self._sessions, tenant_id, session_id, "session")
+		identity, tenant_membership_confirmed = self._identity_for_tenant_decision(user_id, tenant_id)
 		context = {
 			"user_locked": identity.status in {"locked", "suspended"},
 			"requested_permission_tier": "standard",
@@ -183,7 +275,7 @@ class AuthService:
 			"auth_source": auth_source,
 			"issuer_trusted": bool(issuer_trusted),
 			"tenant_mismatch": tenant_id != identity.tenant_id,
-			"tenant_membership_confirmed": tenant_id in identity.tenant_memberships,
+			"tenant_membership_confirmed": tenant_membership_confirmed,
 		}
 		result = self.evaluate(context)
 		self._raise_if_denied(result)
@@ -206,7 +298,7 @@ class AuthService:
 			trust_score=trust_score,
 			required_actions=required_actions,
 		)
-		self._sessions[session_id] = session
+		self._sessions[self._tenant_key(tenant_id, session_id)] = session
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=session_id,
@@ -218,10 +310,10 @@ class AuthService:
 		)
 		return session.to_dict()
 
-	def revoke_session(self, session_id: str, actor: str) -> dict[str, Any]:
-		session = self._require_session(session_id)
+	def revoke_session(self, session_id: str, actor: str, tenant_id: str | None = None) -> dict[str, Any]:
+		session = self._find_session(session_id, tenant_id) if tenant_id else self._require_session(session_id)
 		revoked = replace(session, status="revoked")
-		self._sessions[session_id] = revoked
+		self._sessions[self._tenant_key(session.tenant_id, session_id)] = revoked
 		self._record_audit(
 			tenant_id=revoked.tenant_id,
 			subject_id=session_id,
@@ -241,26 +333,25 @@ class AuthService:
 		user_id: str,
 		permission: str,
 		session_id: str | None = None,
-		requested_permission_tier: str = "standard",
+		requested_permission_tier: str | None = None,
 		mfa_verified: bool | None = None,
 		step_up_completed: bool | None = None,
 		risk_level: str | None = None,
 	) -> dict[str, Any]:
-		identity = self._require_identity(user_id, tenant_id, allow_membership=True)
-		session = self._sessions.get(session_id) if session_id else None
-		if session is not None and session.tenant_id != tenant_id:
-			raise KeyError(f"session not in tenant: {session_id}")
+		identity, tenant_membership_confirmed = self._identity_for_tenant_decision(user_id, tenant_id)
+		session = self._find_session(session_id, tenant_id) if session_id else None
+		role_ids = self._active_role_ids(user_id, tenant_id, permission)
+		effective_permission_tier = requested_permission_tier or self._permission_tier(permission, role_ids, tenant_id)
 		context = {
 			"user_locked": identity.status in {"locked", "suspended"},
-			"requested_permission_tier": requested_permission_tier,
+			"requested_permission_tier": effective_permission_tier,
 			"mfa_verified": session.mfa_verified if mfa_verified is None and session else bool(mfa_verified),
 			"risk_level": risk_level or (session.risk_level if session else "low"),
 			"step_up_completed": session.step_up_completed if step_up_completed is None and session else bool(step_up_completed),
 			"tenant_mismatch": tenant_id != identity.tenant_id,
-			"tenant_membership_confirmed": tenant_id in identity.tenant_memberships,
+			"tenant_membership_confirmed": tenant_membership_confirmed,
 		}
 		result = self.evaluate(context)
-		role_ids = self._active_role_ids(user_id, tenant_id, permission)
 		decision = result["decision"]
 		reasons = list(self._reasons(result))
 		if decision == "allow" and not role_ids:
@@ -277,7 +368,8 @@ class AuthService:
 			session_id=session_id,
 			role_ids=tuple(role_ids),
 		)
-		self._access_decisions[decision_id] = access_decision
+		self._ensure_new(self._access_decisions, tenant_id, decision_id, "access decision")
+		self._access_decisions[self._tenant_key(tenant_id, decision_id)] = access_decision
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=decision_id,
@@ -292,6 +384,97 @@ class AuthService:
 	def list_access_decisions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._access_decisions.values(), tenant_id)
 
+	def request_privacy_budget_approval(
+		self,
+		approval_id: str,
+		tenant_id: str,
+		user_id: str,
+		query_type: str,
+		epsilon_cost: float,
+		requested_by: str,
+		justification: str,
+	) -> dict[str, Any]:
+		identity, tenant_membership_confirmed = self._tenant_local_privacy_identity(user_id, tenant_id)
+		self._require_actor_permission(requested_by, tenant_id, "auth:manage_privacy")
+		result = self.evaluate({
+			"tenant_mismatch": tenant_id != identity.tenant_id,
+			"tenant_membership_confirmed": tenant_membership_confirmed,
+		})
+		self._raise_if_denied(result)
+		self._ensure_new(self._privacy_approvals, tenant_id, approval_id, "privacy budget approval")
+		if float(epsilon_cost) <= 0:
+			raise ValueError("privacy_approval_epsilon_cost_required")
+		if not requested_by:
+			raise ValueError("privacy_approval_requester_required")
+		if not justification:
+			raise ValueError("privacy_approval_justification_required")
+		approval = AuthPrivacyBudgetApproval(
+			id=approval_id,
+			tenant_id=tenant_id,
+			user_id=user_id,
+			query_type=query_type,
+			epsilon_cost=float(epsilon_cost),
+			requested_by=requested_by,
+			justification=justification,
+		)
+		self._privacy_approvals[self._tenant_key(tenant_id, approval_id)] = approval
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=approval_id,
+			event_type="privacy_budget_approval_requested",
+			actor=requested_by,
+			decision="require_review",
+			reasons=self._reasons(result),
+			metadata={"user_id": user_id, "query_type": query_type, "epsilon_cost": float(epsilon_cost)},
+		)
+		return approval.to_dict()
+
+	def decide_privacy_budget_approval(
+		self,
+		approval_id: str,
+		tenant_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> dict[str, Any]:
+		approval = self._require_privacy_budget_approval(approval_id, tenant_id)
+		if approval.status != "pending":
+			raise ValueError("privacy_approval_already_decided")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("privacy_approval_decision_invalid")
+		if not reviewer:
+			raise ValueError("privacy_approval_reviewer_required")
+		if not notes:
+			raise ValueError("privacy_approval_notes_required")
+		self._require_actor_permission(reviewer, tenant_id, "auth:approve_privacy")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"requested_operation": "approve_privacy_budget",
+			"reviewer_same_as_requester": reviewer == approval.requested_by,
+		})
+		self._raise_if_denied(result)
+		decided = replace(
+			approval,
+			decision=decision,
+			reviewer=reviewer,
+			notes=notes,
+			status=decision,
+		)
+		self._privacy_approvals[self._tenant_key(tenant_id, approval_id)] = decided
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=approval_id,
+			event_type="privacy_budget_approval_decided",
+			actor=reviewer,
+			decision=decision,
+			reasons=self._reasons(result),
+			metadata={"user_id": approval.user_id, "query_type": approval.query_type},
+		)
+		return decided.to_dict()
+
+	def list_privacy_budget_approvals(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._privacy_approvals.values(), tenant_id)
+
 	def run_privacy_query(
 		self,
 		query_id: str,
@@ -300,22 +483,35 @@ class AuthService:
 		query_type: str,
 		epsilon_cost: float,
 		approval_recorded: bool = False,
+		approval_id: str | None = None,
 	) -> dict[str, Any]:
-		identity = self._require_identity(user_id, tenant_id, allow_membership=True)
-		budget_available = identity.privacy_budget >= float(epsilon_cost)
+		self._ensure_new(self._privacy_queries, tenant_id, query_id, "privacy query")
+		identity, tenant_membership_confirmed = self._tenant_local_privacy_identity(user_id, tenant_id)
+		if float(epsilon_cost) <= 0:
+			raise ValueError("privacy_query_epsilon_cost_required")
 		result = self.evaluate({
+			"tenant_mismatch": tenant_id != identity.tenant_id,
+			"tenant_membership_confirmed": tenant_membership_confirmed,
+		})
+		self._raise_if_denied(result)
+		budget_available = identity.privacy_budget >= float(epsilon_cost)
+		privacy_result = self.evaluate({
 			"requested_operation": "privacy_analytics_query",
 			"privacy_budget_available": budget_available,
 		})
-		decision = result["decision"]
-		reasons = list(self._reasons(result))
-		if decision == "require_review" and not approval_recorded:
+		decision = privacy_result["decision"]
+		reasons = list(self._reasons(privacy_result))
+		approval = (
+			self._approved_privacy_budget_approval(tenant_id, approval_id, user_id, query_type, float(epsilon_cost))
+			if approval_id else None
+		)
+		if decision == "require_review" and approval is None:
 			status = "review_required"
 			remaining_budget = identity.privacy_budget
 		else:
 			status = "completed"
 			remaining_budget = max(identity.privacy_budget - float(epsilon_cost), 0.0)
-			self._identities[user_id] = replace(identity, privacy_budget=remaining_budget)
+			self._identities[self._tenant_key(identity.tenant_id, identity.id)] = replace(identity, privacy_budget=remaining_budget)
 		query = AuthPrivacyQuery(
 			id=query_id,
 			tenant_id=tenant_id,
@@ -324,10 +520,11 @@ class AuthService:
 			epsilon_cost=float(epsilon_cost),
 			status=status,
 			remaining_budget=remaining_budget,
-			approval_recorded=approval_recorded,
+			approval_recorded=approval is not None,
 			reasons=tuple(reasons),
+			approval_id=approval.id if approval else approval_id,
 		)
-		self._privacy_queries[query_id] = query
+		self._privacy_queries[self._tenant_key(tenant_id, query_id)] = query
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=query_id,
@@ -353,7 +550,17 @@ class AuthService:
 			"role_count": len([item for item in self._roles.values() if item.tenant_id == tenant_id]),
 			"admin_assignment_count": len([
 				assignment for assignment in self._assignments.values()
-				if assignment.tenant_id == tenant_id and self._roles[assignment.role_id].tier == "admin"
+				if assignment.tenant_id == tenant_id and self._role_for_assignment(assignment).tier == "admin"
+			]),
+			"role_approval_count": len([item for item in self._role_approvals.values() if item.tenant_id == tenant_id]),
+			"pending_role_approval_count": len([
+				item for item in self._role_approvals.values()
+				if item.tenant_id == tenant_id and item.status == "pending"
+			]),
+			"privacy_approval_count": len([item for item in self._privacy_approvals.values() if item.tenant_id == tenant_id]),
+			"pending_privacy_approval_count": len([
+				item for item in self._privacy_approvals.values()
+				if item.tenant_id == tenant_id and item.status == "pending"
 			]),
 			"denied_decision_count": len([item for item in decisions if item.decision == "deny"]),
 			"privacy_review_count": len([
@@ -389,10 +596,17 @@ class AuthService:
 			display_name=str(metadata.get("display_name") or record_id),
 			status=status,
 			tenant_memberships=metadata.get("tenant_memberships") or (),
-			mfa_enabled=bool(metadata.get("mfa_enabled", False)),
+			mfa_enabled=_coerce_bool(metadata.get("mfa_enabled", False)),
 			privacy_budget=float(metadata.get("privacy_budget", 1.0)),
 			metadata=metadata,
 		)
+
+	def _tenant_key(self, tenant_id: str, record_id: str) -> tuple[str, str]:
+		return (tenant_id, record_id)
+
+	def _ensure_new(self, records: dict[tuple[str, str], Any], tenant_id: str, record_id: str, label: str) -> None:
+		if self._tenant_key(tenant_id, record_id) in records:
+			raise ValueError(f"{label} already exists for tenant: {record_id}")
 
 	def _require_tenant(self, tenant_id: str) -> None:
 		if not tenant_id:
@@ -400,37 +614,165 @@ class AuthService:
 
 	def _require_identity(self, user_id: str, tenant_id: str, allow_membership: bool = False) -> AuthIdentity:
 		self._require_tenant(tenant_id)
-		identity = self._identities.get(user_id)
-		if identity is None:
-			raise KeyError(f"unknown identity: {user_id}")
-		if identity.tenant_id != tenant_id and not (allow_membership and tenant_id in identity.tenant_memberships):
-			raise KeyError(f"identity not in tenant: {user_id}")
-		return identity
+		identity = self._identities.get(self._tenant_key(tenant_id, user_id))
+		if identity is not None:
+			return identity
+		if allow_membership:
+			for candidate in self._identities.values():
+				if candidate.id == user_id and tenant_id in candidate.tenant_memberships:
+					return candidate
+		raise KeyError(f"identity not in tenant: {user_id}")
+
+	def _identity_for_tenant_decision(self, user_id: str, tenant_id: str) -> tuple[AuthIdentity, bool]:
+		self._require_tenant(tenant_id)
+		identity = self._identities.get(self._tenant_key(tenant_id, user_id))
+		if identity is not None:
+			return identity, True
+		candidates = [candidate for candidate in self._identities.values() if candidate.id == user_id]
+		for candidate in candidates:
+			if tenant_id in candidate.tenant_memberships:
+				return candidate, True
+		if len(candidates) == 1:
+			return candidates[0], False
+		raise KeyError(f"identity not in tenant: {user_id}")
+
+	def _tenant_local_privacy_identity(self, user_id: str, tenant_id: str) -> tuple[AuthIdentity, bool]:
+		self._require_tenant(tenant_id)
+		identity = self._identities.get(self._tenant_key(tenant_id, user_id))
+		if identity is not None:
+			return identity, True
+		candidates = [candidate for candidate in self._identities.values() if candidate.id == user_id]
+		if candidates:
+			result = self.evaluate({
+				"tenant_mismatch": True,
+				"tenant_membership_confirmed": False,
+			})
+			self._raise_if_denied(result)
+		raise KeyError(f"identity not in tenant: {user_id}")
+
+	def _require_actor_permission(self, actor: str, tenant_id: str, permission: str) -> None:
+		if not actor:
+			raise ValueError("actor_required")
+		if actor == "system":
+			return
+		identity, tenant_membership_confirmed = self._identity_for_tenant_decision(actor, tenant_id)
+		result = self.evaluate({
+			"tenant_mismatch": tenant_id != identity.tenant_id,
+			"tenant_membership_confirmed": tenant_membership_confirmed,
+			"user_locked": identity.status in {"locked", "suspended"},
+		})
+		self._raise_if_denied(result)
+		if permission not in self._actor_permissions(actor, tenant_id):
+			raise PermissionError(f"{permission.replace(':', '_')}_required")
 
 	def _require_role(self, role_id: str, tenant_id: str) -> AuthRole:
 		self._require_tenant(tenant_id)
-		role = self._roles.get(role_id)
+		role = self._roles.get(self._tenant_key(tenant_id, role_id))
 		if role is None:
 			raise KeyError(f"unknown role: {role_id}")
-		if role.tenant_id != tenant_id:
-			raise KeyError(f"role not in tenant: {role_id}")
 		return role
 
+	def _require_role_approval(self, approval_id: str, tenant_id: str) -> AuthRoleAssignmentApproval:
+		self._require_tenant(tenant_id)
+		approval = self._role_approvals.get(self._tenant_key(tenant_id, approval_id))
+		if approval is None:
+			raise KeyError(f"unknown role assignment approval: {approval_id}")
+		return approval
+
+	def _require_privacy_budget_approval(self, approval_id: str, tenant_id: str) -> AuthPrivacyBudgetApproval:
+		self._require_tenant(tenant_id)
+		approval = self._privacy_approvals.get(self._tenant_key(tenant_id, approval_id))
+		if approval is None:
+			raise KeyError(f"unknown privacy budget approval: {approval_id}")
+		return approval
+
 	def _require_session(self, session_id: str) -> AuthSession:
-		session = self._sessions.get(session_id)
+		matches = [session for (_, item_id), session in self._sessions.items() if item_id == session_id]
+		if len(matches) > 1:
+			raise KeyError(f"session ID is ambiguous across tenants: {session_id}")
+		session = matches[0] if matches else None
 		if session is None:
 			raise KeyError(f"unknown session: {session_id}")
 		return session
+
+	def _find_session(self, session_id: str, tenant_id: str) -> AuthSession:
+		session = self._sessions.get(self._tenant_key(tenant_id, session_id))
+		if session is None:
+			raise KeyError(f"session not in tenant: {session_id}")
+		return session
+
+	def _approved_role_assignment_approval(
+		self,
+		tenant_id: str,
+		approval_id: str | None,
+		user_id: str,
+		role_id: str,
+	) -> AuthRoleAssignmentApproval | None:
+		if approval_id is None:
+			return None
+		approval = self._role_approvals.get(self._tenant_key(tenant_id, approval_id))
+		if approval is None:
+			raise PermissionError("role_assignment_approval_required")
+		if approval.user_id != user_id or approval.role_id != role_id:
+			raise PermissionError("role_assignment_approval_mismatch")
+		if approval.status != "approved":
+			raise PermissionError("role_assignment_approval_not_approved")
+		return approval
+
+	def _approved_privacy_budget_approval(
+		self,
+		tenant_id: str,
+		approval_id: str | None,
+		user_id: str,
+		query_type: str,
+		epsilon_cost: float,
+	) -> AuthPrivacyBudgetApproval | None:
+		if approval_id is None:
+			return None
+		approval = self._privacy_approvals.get(self._tenant_key(tenant_id, approval_id))
+		if approval is None:
+			raise PermissionError("privacy_budget_approval_required")
+		if (
+			approval.user_id != user_id
+			or approval.query_type != query_type
+			or abs(approval.epsilon_cost - float(epsilon_cost)) > 0.000001
+		):
+			raise PermissionError("privacy_budget_approval_mismatch")
+		if approval.status != "approved":
+			raise PermissionError("privacy_budget_approval_not_approved")
+		return approval
+
+	def _role_for_assignment(self, assignment: AuthRoleAssignment) -> AuthRole:
+		return self._require_role(assignment.role_id, assignment.tenant_id)
 
 	def _active_role_ids(self, user_id: str, tenant_id: str, permission: str) -> list[str]:
 		role_ids: list[str] = []
 		for assignment in self._assignments.values():
 			if assignment.user_id != user_id or assignment.tenant_id != tenant_id or assignment.status != "active":
 				continue
-			role = self._roles.get(assignment.role_id)
+			role = self._roles.get(self._tenant_key(tenant_id, assignment.role_id))
 			if role and role.status == "active" and permission in role.permissions:
 				role_ids.append(role.id)
 		return sorted(role_ids)
+
+	def _actor_permissions(self, user_id: str, tenant_id: str) -> set[str]:
+		permissions: set[str] = set()
+		for assignment in self._assignments.values():
+			if assignment.user_id != user_id or assignment.tenant_id != tenant_id or assignment.status != "active":
+				continue
+			role = self._roles.get(self._tenant_key(tenant_id, assignment.role_id))
+			if role and role.status == "active":
+				permissions.update(role.permissions)
+		return permissions
+
+	def _permission_tier(self, permission: str, role_ids: list[str], tenant_id: str) -> str:
+		if permission.endswith(":admin") or permission.endswith(":approve") or ":admin" in permission:
+			return "privileged"
+		for role_id in role_ids:
+			role = self._roles.get(self._tenant_key(tenant_id, role_id))
+			if role and role.tier in {"admin", "privileged"}:
+				return "privileged"
+		return "standard"
 
 	def _session_trust(
 		self,
@@ -464,7 +806,7 @@ class AuthService:
 			reasons=tuple(reason for reason in reasons if reason),
 			metadata=dict(metadata or {}),
 		)
-		self._audit_events[event.id] = event
+		self._audit_events[self._tenant_key(tenant_id, event.id)] = event
 		return event
 
 	def _raise_if_denied(self, result: dict[str, Any]) -> None:
@@ -483,3 +825,9 @@ class AuthService:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+
+def _coerce_bool(value: Any) -> bool:
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "on"}
+	return bool(value)

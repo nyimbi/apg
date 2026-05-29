@@ -12905,3 +12905,33 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/audp --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, consent/review routes, synthetic release-review rule, self-test passed, and release evidence valid.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized|manual-record|manual policy" capabilities/common/audp` returned no stale AUDP materialized or fabricated-evidence markers.
 - `git diff --check -- capabilities/common/audp` passed with no whitespace errors.
+
+### 2026-05-30 01:06 EAT
+
+AUTH governed identity, approval, access, and privacy lifecycle slice:
+
+- Added `capabilities/common/auth/SPECIFICATION.md` and `capabilities/common/auth/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Added dependency-light `api_helpers.py` and `view_models.py` so generated APG applications can compose AUTH without importing the production Flask, Flask-AppBuilder, JWT, biometric, behavioral, post-quantum, federation, or neuromorphic stacks.
+- Extended AUTH models with role-assignment approval and privacy-budget approval records, plus approval evidence on role assignments and privacy queries.
+- Converted dependency-light AUTH service state to tenant-qualified stores for identities, roles, approvals, assignments, sessions, access decisions, privacy queries, privacy approvals, and audit events.
+- Added governed role-assignment approval request/decision and privacy-budget approval request/decision lifecycles with independent reviewer rules and reviewer notes.
+- Enforced role-backed tenant actor permissions for role approval, role assignment, privacy approval, and privacy override decisions, with only the `system` actor allowed for bootstrap assignment.
+- Enforced tenant-local privacy-budget mutation so cross-tenant access cannot debit another tenant identity's budget.
+- Added tenant-scoped session revocation for duplicate tenant-local session IDs.
+- Added privileged access tier inference so admin permissions and assigned privileged roles require MFA even when callers omit `requested_permission_tier`.
+- Extended AUTH contract routes, rules, and theme metadata with role workbench, role approvals, session center, access decisions, privacy review queue, approval queues, decision panels, and privacy approval surfaces.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed AUTH `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive identity-role-approval-assignment-session-access-privacy coverage and API-helper/view-model coverage.
+- Added negative direct-admin-assignment, rejected approval, self-approval, missing notes, raw privacy-approval boolean bypass, cross-tenant privacy, inferred privileged MFA, duplicate-ID tenant-isolation, tenant-scoped revocation, and default view-model shared-state coverage.
+- Updated `cap_spec.md` with the current executable AUTH lifecycle, adapter boundaries, and focused proof commands.
+- Code review found and fixed cross-tenant privacy budget mutation, ambiguous session revocation, caller-controlled privacy approval bypass, privileged access MFA tier bypass, forgeable approval actors, and default empty view-model state before commit.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/auth/__init__.py capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py` passed with 11 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json` passed with `ok: true`; AUTH remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, role/privacy approval routes, 9 executable rules, 18 UI routes, self-test passed, and release evidence valid.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/auth` returned no stale AUTH materialized markers.
+- `git diff --check -- capabilities/common/auth` passed with no whitespace errors.
