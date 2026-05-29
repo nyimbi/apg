@@ -1,24 +1,26 @@
-"""Data models for the UI/UX Theming and Branding capability."""
+"""UI/UX Theming and Branding data models."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from .theme_runtime import (
+	BrandAssetRecord,
+	ThemeAuditEventRecord,
+	ThemePreviewRecord,
+	ThemePublicationRecord,
+	ThemeRecord,
+	ThemeTokenRecord,
+)
 
 
-@dataclass
-class ThemRecord:
-	"""Tenant-scoped dependency-light capability record."""
+ThemRecord = ThemeRecord
 
-	id: str
-	tenant_id: str
-	status: str = "active"
-	metadata: dict[str, Any] = field(default_factory=dict)
 
-	def to_dict(self) -> dict[str, Any]:
-		return {
-			"id": self.id,
-			"tenant_id": self.tenant_id,
-			"status": self.status,
-			"metadata": dict(self.metadata),
-		}
+__all__ = [
+	"BrandAssetRecord",
+	"ThemRecord",
+	"ThemeAuditEventRecord",
+	"ThemePreviewRecord",
+	"ThemePublicationRecord",
+	"ThemeRecord",
+	"ThemeTokenRecord",
+]

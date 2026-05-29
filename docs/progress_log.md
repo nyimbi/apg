@@ -16,6 +16,63 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 19:40 EAT
+
+THEM UI/UX theming and branding runtime implementation-depth slice:
+
+- Converted `capabilities/common/them` from generated materialized record
+  scaffolding into a domain-specific theme and brand-governance runtime package.
+- Added `theme_runtime.py` with deterministic IDs, theme/token/asset status
+  vocabularies, token-group validation, rule required-action extraction, UTC
+  timestamps, and serializable records for themes, token versions, brand
+  assets, previews, publications, and audit events.
+- Replaced the generic record model with theme, token, brand asset, preview,
+  publication, and audit-event records.
+- Replaced generic service behavior with `ThemService` lifecycle methods for
+  tenant-scoped theme creation, governed token updates, licensed brand asset
+  approval, preview creation, publish approval, accessibility contrast gates,
+  large rollout review, dashboard summaries, compatibility records, and audit
+  events.
+- Expanded API and view helpers so THEM exposes theme system status, theme
+  console, token editor, brand guidelines, brand asset manager, live preview,
+  policies, settings, route, rule, and theme composition surfaces.
+- Rewrote `cap_spec.md` around current executable THEM behavior, adapter
+  boundaries, UI surfaces, theme metadata, known non-goals, and proof commands.
+- Replaced generated package tests with focused lifecycle, package-publish,
+  guardrail, and view-model tests.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/them` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/them/__init__.py
+  capabilities/common/them/models.py capabilities/common/them/theme_runtime.py
+  capabilities/common/them/service.py capabilities/common/them/api.py
+  capabilities/common/them/views.py
+  capabilities/common/them/capability_contract.py capabilities/common/them/app.py
+  capabilities/common/them/test_capability_contract.py
+  capabilities/common/them/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -c "import importlib; ..."` for THEM `theme_runtime`,
+  service, API, views, and capability contract passed with `them imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/them/test_capability_contract.py
+  capabilities/common/them/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/them --json` passed with `them` classified as
+  `domain_specific`, `theme_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/them --json`
+  passed with `ok: true`, warnings empty, and side-effect-free catalog patch
+  evidence.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 103
+  domain-specific packages, 6 materialized-baseline packages, 0 mixed
+  implementations, 0 contract-only packages, 917 custom Python files, 0 errors,
+  and 6 warnings; the next implementation-depth target is `usrm`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
 ### 2026-05-29 19:38 EAT
 
 Developer, contributor, and capacity guide effectiveness slice:
