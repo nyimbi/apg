@@ -16,6 +16,78 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 15:28 EAT
+
+IDFD implementation-depth slice:
+
+- Converted `idfd` from a materialized-baseline package into a domain-specific
+  identity-federation runtime package.
+- Added executable tenant-scoped federation providers, protocol guardrails,
+  reviewed claim mappings, federated sessions, certificate records, audit
+  events, health reports, compatibility provider records, dashboard summaries,
+  and contract-rule evaluation.
+- Added `federation_runtime.py` as the IDFD-specific algorithm surface for
+  metadata freshness inspection, session expiry, and federation health
+  summaries so package behavior is no longer generic record scaffolding.
+- Replaced generic package API and view helpers with identity-federation
+  helpers for provider registration, metadata refresh, claim mapping, session
+  issue/revoke, certificate registration, health reporting, dashboard,
+  provider console, protocol workbench, mapping table, session monitor,
+  certificate center, and audit models.
+- Rewrote `cap_spec.md` to describe current executable behavior, runtime
+  surfaces, guardrails, adapter boundaries, UI surfaces, theme contract, and
+  focused verification commands.
+- Expanded focused tests for the provider-to-session lifecycle, SAML and OIDC
+  guardrails, claim-mapping review, privileged-session MFA, certificate health,
+  compatibility records, view models, tenant isolation, and policy failures for
+  missing tenant context, signing keys, SAML encryption, OIDC redirect
+  allowlists, stale metadata, and missing providers.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/idfd/__init__.py
+  capabilities/common/idfd/models.py
+  capabilities/common/idfd/federation_runtime.py
+  capabilities/common/idfd/service.py capabilities/common/idfd/api.py
+  capabilities/common/idfd/views.py
+  capabilities/common/idfd/test_capability_contract.py
+  capabilities/common/idfd/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/pytest -q capabilities/common/idfd/test_capability_contract.py
+  capabilities/common/idfd/tests/test_materialized_package.py` -> 8 passed
+  with 10 pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/common/idfd` -> no matches.
+- `./.venv/bin/python -c "import importlib; ..."` for
+  `capabilities.common.idfd.models`, `federation_runtime`, `service`, `api`,
+  and `views` -> passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/idfd --json` -> passed with `idfd` classified as
+  `domain_specific`, `federation_runtime.py` counted as the custom Python file,
+  0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/idfd --json`
+  -> passed with a side-effect-free catalog patch and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  80 domain-specific packages, 27 materialized-baseline packages, 1 mixed
+  package, 1 contract-only package, 895 custom Python files, 0 errors, and 29
+  warnings; next warning is `iotd`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `git diff --check -- capabilities/common/idfd docs/progress_log.md` ->
+  passed.
+
+Known remaining gaps:
+
+- `idfd` is now domain-specific, but implementation-depth still reports 27
+  materialized baselines, 1 mixed implementation, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is
+  `iotd`.
+
 ### 2026-05-29 15:18 EAT
 
 Developer/contributor/capacity guide operationalization slice:
