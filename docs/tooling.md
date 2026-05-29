@@ -32,7 +32,9 @@ APG currently has an executable compiler path:
   strict warning promotion, capability catalog validation, shared semantic-model
   availability, and database-backed form diagnostics;
 - `apg validate <file> --target python --json` emits `apg.validate-report.v1`
-  with lint results and generator-readiness metadata;
+  with lint results and generator-readiness metadata, and accepts the same
+  `--catalog <capability-root-or-catalog.json>` capability validation input as
+  `apg lint`;
 - `apg model <file> --json` emits `apg.semantic-model.v1` with normalized
   symbols, tables, agents, capabilities, composition metadata, diagnostics,
   deployment metadata, graph summaries, and database-backed form binding
@@ -884,13 +886,15 @@ tag lacks a passing fixture.
 
 ```console
 apg validate app.apg --target python --json
+apg validate app.apg --catalog /tmp/apg-capability-catalog.json --target python --json
 ```
 
 Runs lint plus generator-readiness checks without writing generated code.
 Validation fails with `APG0802` when a requested target is not `python`, and
-the `apg.validate-report.v1` payload includes the requested target, declared
-application packaging profiles, the nested `apg.lint-report.v1`, and
-generator-readiness checks.
+validation also fails when the nested lint report cannot resolve declared
+capabilities against `--catalog`. The `apg.validate-report.v1` payload includes
+the requested target, declared application packaging profiles, the nested
+`apg.lint-report.v1`, and generator-readiness checks.
 
 ### `apg model`
 

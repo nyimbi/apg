@@ -348,6 +348,7 @@ Use the narrowest lane that proves the claim.
 | Parser | `./.venv/bin/apg parser-golden --json` |
 | Semantic model | `./.venv/bin/apg model --audit-fixtures --json` |
 | Lint | `./.venv/bin/apg lint --audit-fixtures --json` |
+| Validate | `./.venv/bin/apg validate path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target python --json` |
 | Generator | `./.venv/bin/apg compile examples/20_enterprise_erp_platform/main.apg --output /tmp/apg-erp --verify` |
 | Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` |
 | Tooling | `./.venv/bin/apg tooling audit --json` |

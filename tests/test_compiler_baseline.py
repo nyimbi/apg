@@ -1635,6 +1635,40 @@ def test_cli_validate_json_reports_generator_readiness_without_generation(tmp_pa
 	assert not output.exists()
 
 
+def test_cli_validate_accepts_local_capability_catalog_for_generator_readiness(tmp_path):
+	source = tmp_path / "capability.apg"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "audit_log")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["validate", str(source), "--catalog", str(catalog), "--json"])
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.validate-report.v1"
+	assert report["ok"] is True
+	assert report["generator_ready"] is True
+	assert report["lint"]["capability_catalog"]["catalog_kind"] == "local_catalog"
+	assert report["lint"]["capability_catalog"]["matched_capabilities"] == [
+		{"name": "AuditLog", "matched_key": "audit_log"}
+	]
+
+
+def test_cli_validate_blocks_generator_readiness_for_unknown_catalog_capability(tmp_path):
+	source = tmp_path / "capability.apg"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "customer_master")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(cli, ["validate", str(source), "--catalog", str(catalog), "--json"])
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.validate-report.v1"
+	assert report["ok"] is False
+	assert report["generator_ready"] is False
+	assert report["lint"]["capability_catalog"]["catalog_kind"] == "local_catalog"
+	assert report["diagnostics"][0]["code"] == "APG0901"
+
+
 def test_cli_validate_rejects_non_python_target_with_apg0802(tmp_path):
 	source = tmp_path / "baseline.apg"
 	source.write_text(MINIMAL_AGENT_SOURCE, encoding="utf-8")

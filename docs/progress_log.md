@@ -16,6 +16,41 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 05:41 EAT
+
+Capability catalog validate bridge:
+
+- Extended `apg validate` with `--catalog <capability-root-or-catalog.json>` so
+  generator-readiness validation now consumes the same capability evidence as
+  `apg lint`.
+- Validation now forwards local `apg.capability-catalog.v1` files and
+  directory-backed `capability_contract.py` roots into the nested
+  `apg.lint-report.v1`; unresolved capabilities block `generator_ready`.
+- Added focused CLI regression coverage for successful local catalog
+  validation and unknown capability failure through `apg.validate-report.v1`.
+- Updated tooling and developer docs to show catalog-aware validation.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile cli/validate_command.py
+  tests/test_compiler_baseline.py` -> passed.
+- `./.venv/bin/pytest -q tests/test_compiler_baseline.py -k "validate"` -> 8
+  passed, 82 deselected.
+- `git diff --check -- cli/validate_command.py tests/test_compiler_baseline.py
+  docs/tooling.md docs/developer_guide.md docs/progress_log.md` -> passed.
+- `./.venv/bin/apg lint --audit-fixtures --json` -> passed with 6/6 fixtures,
+  0 blocking gaps.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0
+  blocking gaps, and 0 errors.
+- `./.venv/bin/pytest -q tests/test_tooling_audit.py` -> 3 passed.
+- `./.venv/bin/pytest -q tests/test_repository_hygiene.py` -> 17 passed.
+
+Known remaining gaps:
+
+- Catalog-aware validation now reaches the generator-readiness gate. Compile
+  itself still does not accept a catalog argument before writing generated
+  output.
+
 ### 2026-05-29 05:37 EAT
 
 Local catalog lint consumption slice:

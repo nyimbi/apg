@@ -59,8 +59,13 @@ def _target_diagnostics(target: str, files: list[str]) -> list[dict[str, Any]]:
 	]
 
 
-def validate_path(path: Path, target: str = "python", strict: bool = False) -> dict[str, Any]:
-	lint_report = lint_path(path, strict=strict)
+def validate_path(
+	path: Path,
+	target: str = "python",
+	strict: bool = False,
+	catalog: Path | None = None,
+) -> dict[str, Any]:
+	lint_report = lint_path(path, strict=strict, catalog=catalog)
 	target_diagnostics = _target_diagnostics(target, lint_report["files"])
 	diagnostics = [*lint_report["diagnostics"], *target_diagnostics]
 	counts = dict(lint_report["severity_counts"])
@@ -144,6 +149,7 @@ def _print_table(report: dict[str, Any]) -> None:
 @click.option("--json", "as_json", is_flag=True, help="Alias for --format json")
 @click.option("--warnings", "-w", is_flag=True, help="Compatibility flag; warnings are always counted")
 @click.option("--strict", is_flag=True, help="Treat warnings as errors")
+@click.option("--catalog", type=click.Path(path_type=Path), default=None, help="Capability contract root or local apg.capability-catalog.v1 file")
 @click.option("--recursive", "-r", is_flag=True, help="Validate all APG files in the current directory")
 @click.option("--syntax-only", is_flag=True, help="Compatibility flag; validation still builds the shared lint report")
 @click.option("--semantic-only", is_flag=True, help="Compatibility flag; validation still builds the shared lint report")
@@ -154,6 +160,7 @@ def validate(
 	as_json: bool,
 	warnings: bool,
 	strict: bool,
+	catalog: Path | None,
 	recursive: bool,
 	syntax_only: bool,
 	semantic_only: bool,
@@ -170,8 +177,10 @@ def validate(
 			raise click.ClickException("No APG source file found. Specify a file or create main.apg")
 		if not path.exists():
 			raise click.ClickException(f"Source file not found: {path}")
+	if catalog is not None and not catalog.exists():
+		raise click.ClickException(f"Capability catalog not found: {catalog}")
 
-	report = validate_path(path, target=target, strict=strict)
+	report = validate_path(path, target=target, strict=strict, catalog=catalog)
 	if as_json or output_format == "json":
 		click.echo(json.dumps(report, indent=2, sort_keys=True))
 	elif output_format == "plain":
