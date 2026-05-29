@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""GRPH package contract and runtime tests."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import importlib.util
 import sys
 
 from capabilities.capability_contract_registry import validate_contract_shape
+from capabilities.common.grph.service import GrphService
+from capabilities.common.grph.views import dashboard_model
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
@@ -44,3 +46,24 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "grph" in model["capabilities"]
+
+
+def test_graph_package_compatibility_runtime_is_executable():
+	service = GrphService()
+	record = service.create_record(
+		record_id="node-compat",
+		tenant_id="tenant-test",
+		metadata={
+			"schema_id": "schema-compat",
+			"schema_name": "Compatibility graph",
+			"node_type": "Entity",
+			"owner_id": "owner-test",
+			"labels": ["compat"],
+		},
+	)
+	model = dashboard_model(service, "tenant-test")
+
+	assert record["kind"] == "node"
+	assert record["schema_id"] == "schema-compat"
+	assert model["summary"]["schema_count"] == 1
+	assert model["summary"]["node_count"] == 1

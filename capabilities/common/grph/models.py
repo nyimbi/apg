@@ -1,24 +1,171 @@
-"""Data models for the Graph Data Management capability."""
+"""Executable graph data models for the GRPH capability."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
 
 
-@dataclass
-class GrphRecord:
-	"""Tenant-scoped dependency-light capability record."""
+def utc_now_iso() -> str:
+	return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+class GraphKind(str, Enum):
+	"""Supported graph usage modes."""
+
+	PROPERTY = "property"
+	LINEAGE = "lineage"
+	KNOWLEDGE = "knowledge"
+	DEPENDENCY = "dependency"
+
+
+class RelationshipClassification(str, Enum):
+	"""Governance classification for edges."""
+
+	PUBLIC = "public"
+	INTERNAL = "internal"
+	RESTRICTED = "restricted"
+
+
+@dataclass(slots=True)
+class GraphSchema:
+	"""Tenant-scoped graph schema definition."""
 
 	id: str
 	tenant_id: str
-	status: str = "active"
-	metadata: dict[str, Any] = field(default_factory=dict)
+	name: str
+	graph_kind: GraphKind = GraphKind.PROPERTY
+	node_types: dict[str, list[str]] = field(default_factory=dict)
+	edge_types: dict[str, dict[str, Any]] = field(default_factory=dict)
+	source_asset_id: str | None = None
+	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
 			"id": self.id,
+			"kind": "schema",
 			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"graph_kind": self.graph_kind.value,
+			"node_types": {key: list(value) for key, value in self.node_types.items()},
+			"edge_types": {key: dict(value) for key, value in self.edge_types.items()},
+			"source_asset_id": self.source_asset_id,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass(slots=True)
+class GraphNode:
+	"""Tenant-scoped graph node."""
+
+	id: str
+	tenant_id: str
+	schema_id: str
+	node_type: str
+	owner_id: str
+	labels: list[str] = field(default_factory=list)
+	properties: dict[str, Any] = field(default_factory=dict)
+	source_asset_id: str | None = None
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "node",
+			"tenant_id": self.tenant_id,
+			"schema_id": self.schema_id,
+			"node_type": self.node_type,
+			"owner_id": self.owner_id,
+			"labels": list(self.labels),
+			"properties": dict(self.properties),
+			"source_asset_id": self.source_asset_id,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass(slots=True)
+class GraphEdge:
+	"""Tenant-scoped typed relationship between graph nodes."""
+
+	id: str
+	tenant_id: str
+	schema_id: str
+	from_node_id: str
+	to_node_id: str
+	edge_type: str
+	owner_id: str
+	classification: RelationshipClassification = RelationshipClassification.INTERNAL
+	properties: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "edge",
+			"tenant_id": self.tenant_id,
+			"schema_id": self.schema_id,
+			"from_node_id": self.from_node_id,
+			"to_node_id": self.to_node_id,
+			"edge_type": self.edge_type,
+			"owner_id": self.owner_id,
+			"classification": self.classification.value,
+			"properties": dict(self.properties),
+			"created_at": self.created_at,
+		}
+
+
+@dataclass(slots=True)
+class GraphTraversalResult:
+	"""Bounded traversal result."""
+
+	id: str
+	tenant_id: str
+	start_node_id: str
+	max_depth: int
+	node_ids: list[str]
+	edge_ids: list[str]
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "traversal",
+			"tenant_id": self.tenant_id,
+			"start_node_id": self.start_node_id,
+			"max_depth": self.max_depth,
+			"node_ids": list(self.node_ids),
+			"edge_ids": list(self.edge_ids),
+			"created_at": self.created_at,
+		}
+
+
+@dataclass(slots=True)
+class GraphQualityReport:
+	"""Graph data quality summary."""
+
+	id: str
+	tenant_id: str
+	schema_id: str
+	orphan_node_count: int
+	missing_owner_count: int
+	restricted_edge_count: int
+	created_at: str = field(default_factory=utc_now_iso)
+
+	@property
+	def status(self) -> str:
+		return "attention_required" if self.orphan_node_count or self.missing_owner_count else "healthy"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "quality_report",
+			"tenant_id": self.tenant_id,
+			"schema_id": self.schema_id,
+			"orphan_node_count": self.orphan_node_count,
+			"missing_owner_count": self.missing_owner_count,
+			"restricted_edge_count": self.restricted_edge_count,
 			"status": self.status,
-			"metadata": dict(self.metadata),
+			"created_at": self.created_at,
 		}

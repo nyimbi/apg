@@ -16,6 +16,66 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 14:20 EAT
+
+GRPH implementation-depth slice:
+
+- Converted `grph` from a contract-only implementation-depth finding into a
+  domain-specific graph runtime package.
+- Added executable tenant-scoped graph schemas, graph nodes, typed edges,
+  bounded traversals, lineage paths, graph quality reports, compatibility
+  records, dashboard summaries, and deterministic contract-rule evaluation.
+- Added `graph_runtime.py` as the GRPH-specific algorithm surface for traversal
+  planning and graph quality inspection so domain behavior is no longer hidden
+  inside generic package scaffolding.
+- Replaced the generic package API and view helpers with graph-specific helpers
+  for dashboard, explorer, schema manager, lineage viewer, quality console,
+  route metadata, rules, and theme metadata.
+- Updated `cap_spec.md` to describe the executable graph runtime, adapter
+  boundaries, guardrails, UI surfaces, theme contract, and focused
+  verification commands.
+- Expanded focused tests for graph lifecycle execution, restricted
+  relationship review, lineage traversal, quality reporting, compatibility
+  records, view models, and graph policy failures.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/grph/__init__.py
+  capabilities/common/grph/models.py capabilities/common/grph/graph_runtime.py
+  capabilities/common/grph/service.py capabilities/common/grph/api.py
+  capabilities/common/grph/views.py
+  capabilities/common/grph/test_capability_contract.py
+  capabilities/common/grph/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/python - <<'PY' ... importlib.import_module(...) ... PY` for
+  `capabilities.common.grph.models`, `service`, `api`, and `views` -> passed.
+- `./.venv/bin/pytest -q capabilities/common/grph/test_capability_contract.py
+  capabilities/common/grph/tests/test_materialized_package.py` -> 8 passed
+  with 10 pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/common/grph` -> no matches.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/grph --json` -> passed with `grph` classified as
+  `domain_specific`, `graph_runtime.py` counted as the custom Python file, 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/grph --json`
+  -> passed with a side-effect-free catalog patch and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  77 domain-specific packages, 30 materialized-baseline packages, 1 mixed
+  package, 1 contract-only package, 892 custom Python files, 0 errors, and 32
+  warnings; next warning is `help`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
+Known remaining gaps:
+
+- `grph` is now domain-specific, but implementation-depth still reports 30
+  materialized baselines, 1 mixed implementation, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is
+  `help`.
+
 ### 2026-05-29 13:42 EAT
 
 GRC RCM implementation-depth slice:
