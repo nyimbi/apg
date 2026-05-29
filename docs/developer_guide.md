@@ -163,6 +163,56 @@ git commit
 git push
 ```
 
+## One-Day Developer Packet
+
+By the end of the first day, a new APG developer should have produced one
+verified packet. A packet is deliberately small, but it must cross a useful
+boundary instead of leaving isolated edits behind.
+
+```text
+Packet name:
+Outcome made more executable:
+Primary owning path:
+Public contract affected:
+Representative APG source or package:
+Focused verification:
+Docs/progress-log update:
+Commit:
+Known remaining gap:
+```
+
+Good first-day packets:
+
+| Packet | Why it matters | Typical proof |
+| --- | --- | --- |
+| Clarify one contributor workflow | Speeds every later contributor | `apg docs audit --json` |
+| Convert one materialized package into domain behavior | Turns a contract into reusable runtime capability | package tests, `implementation-audit`, `publish-plan` |
+| Add one semantic-model field consumed by existing tooling | Reduces drift between syntax and tools | semantic fixture or `apg model ... --json` |
+| Make one generated route/helper more real | Moves `.apg` source toward executable apps | compile `--verify`, smoke test |
+| Improve one numbered example and output | Proves a capacity in source and generated artifacts | focused compile or `apg baseline examples --json` |
+
+The packet should be reviewable without private context. If a reviewer cannot
+tell what executable state changed, the packet is too vague or too broad.
+
+## Developer Decision Tree
+
+Use this tree when choosing where to edit:
+
+1. **Does APG source fail to parse?** Start with `spec/apg.g4`, parser golden
+   fixtures, and AST builder behavior.
+2. **Does source parse but tools cannot see the meaning?** Start with
+   `compiler/semantic_analyzer.py` and `compiler/semantic_model.py`.
+3. **Does the semantic model contain the data but generated apps do not expose
+   it?** Start with `compiler/code_generator.py` and a representative example.
+4. **Does a capability contract exist but package behavior is shallow?** Start
+   in one `capabilities/<domain>/<code>/` tree.
+5. **Does behavior exist but contributors cannot find or extend it?** Update
+   the closest guide, example README, and `docs/progress_log.md`.
+6. **Does the work require several of the above?** Land it in dependency order:
+   parse, semantic model, generated behavior, package behavior, docs.
+
+Do not begin with a broad repository rewrite. Begin where the evidence fails.
+
 ## First-Day Execution Checklist
 
 Use this checklist when onboarding yourself or another contributor. It is
@@ -297,6 +347,33 @@ Add a new capacity:
 3. Add or update package-backed capability contracts.
 4. Compile and smoke-test.
 5. Document extension points and known gaps.
+
+Burn down one materialized capability package:
+
+1. Inspect `capability_contract.py`, `cap_spec.md`, `models.py`, `service.py`,
+   `api.py`, `views.py`, `app.py`, and package-local tests.
+2. Identify the business service the package should actually provide.
+3. Replace generic materialized record/service/API/view placeholders with
+   domain data structures and deterministic service behavior.
+4. Keep behavior dependency-light and in-memory unless the capability already
+   has a real integration boundary.
+5. Add rule-aware methods that call the existing capability rule engine rather
+   than duplicating rule evaluation.
+6. Update views/API helpers so the generated app can inspect meaningful state.
+7. Update `cap_spec.md` to describe current runtime behavior and known gaps.
+8. Run `py_compile`, focused package tests, marker search, implementation
+   audit, publish-plan, strict package audit, and `git diff --check`.
+
+Capability package evidence usually looks like:
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/<code>/*.py
+./.venv/bin/python -m pytest -q capabilities/common/<code>/test_capability_contract.py capabilities/common/<code>/tests
+rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|materialized APG capability package" capabilities/common/<code>
+./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/<code> --json
+./.venv/bin/apg capabilities audit --strict-package-artifacts --json
+```
 
 ## How To Read The Codebase
 

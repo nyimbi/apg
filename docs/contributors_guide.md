@@ -48,6 +48,54 @@ Then read these in order:
 6. [Tooling Specification](./tooling.md)
 7. [Goal Progress Log](./progress_log.md)
 
+## Zero-To-PR Runbook
+
+Use this path when you need to make a useful contribution without first
+understanding every APG subsystem.
+
+1. Confirm the worktree and avoid unrelated files:
+
+   ```bash
+   git status --short
+   ```
+
+2. Prove one executable baseline:
+
+   ```bash
+   ./.venv/bin/apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-zero-pr --verify
+   ./.venv/bin/python /tmp/apg-zero-pr/smoke_test.py
+   ```
+
+3. Choose exactly one lane: docs, example, semantic model, generator,
+   capability package, CLI/tooling, or capacity.
+4. Write a one-paragraph work packet before editing:
+
+   ```text
+   Outcome:
+   Files:
+   Public contract:
+   Verification:
+   Non-goals:
+   ```
+
+5. Make the smallest vertical change that improves that outcome.
+6. Run focused verification and inspect the output.
+7. Update `docs/progress_log.md` when the change affects executable behavior,
+   capability readiness, contributor flow, or verification evidence.
+8. Stage only your files and check the staged diff:
+
+   ```bash
+   git add <only-your-files>
+   git diff --cached --stat
+   git diff --cached --check
+   ```
+
+9. Commit with the Lore protocol and push.
+
+This runbook is intentionally narrow. APG has many aspirational documents and
+historical artifacts; contribution speed comes from making one current,
+verified state better.
+
 ## Fastest Useful Contribution Path
 
 If you are new and need to help today, use this path:
@@ -187,6 +235,37 @@ When in doubt, make the next smallest executable state real: parseable source,
 semantic JSON, generated app, capability contract, package evidence, or docs
 that make one of those easier to extend.
 
+## Definition Of Done
+
+A contribution is done when a reviewer can verify it without asking for hidden
+context.
+
+Minimum done:
+
+- the changed files belong to one coherent slice;
+- public names and JSON format keys are stable or intentionally documented;
+- focused verification passed and was inspected;
+- docs or examples were updated when user-facing behavior changed;
+- `docs/progress_log.md` records meaningful platform progress or evidence;
+- unrelated dirty or untracked files were not staged;
+- the commit message explains why the change exists.
+
+Not done:
+
+- syntax parses but semantic model support is missing;
+- semantic data exists but generated apps cannot expose it when execution is
+  expected;
+- capability contracts exist but package behavior is still only generated
+  baseline scaffolding;
+- docs describe behavior that no command, test, example, or package proves;
+- a broad cleanup is mixed with a feature slice.
+
+Use the smallest applicable proof. For docs-only changes, `apg docs audit
+--json` and `git diff --check -- docs` may be enough. For capability behavior,
+focused package tests plus implementation/publish audits are usually the right
+proof. For compiler-facing changes, compile a representative example and run
+the generated smoke test.
+
 ## Picking Safe Parallel Work
 
 Multiple contributors can move quickly if each owns a different surface. Use
@@ -290,6 +369,42 @@ Pick work with a clear executable endpoint. Good first tasks include:
 
 Avoid first tasks that require changing grammar, generator, and multiple
 capability packages at once unless you are already familiar with the toolchain.
+
+## Capability Implementation Packet
+
+Many APG capability packages are valid in shape before they are rich in domain
+behavior. A strong contribution can take one package from materialized baseline
+to domain-specific implementation.
+
+Use this packet:
+
+```text
+Capability id:
+Domain outcome:
+Services to make real:
+Rules to enforce:
+Configuration used:
+UI/view state exposed:
+Tests added:
+Publish-plan command:
+Known gaps:
+```
+
+Implementation steps:
+
+1. Read the package contract and spec first.
+2. Remove generic baseline markers only after replacing them with real
+   behavior.
+3. Keep in-memory runtime state deterministic and tenant-aware where the
+   contract says tenant context matters.
+4. Use existing rule evaluation helpers for configured rules.
+5. Make API helpers and view helpers expose the service state rather than fixed
+   demo rows.
+6. Add focused tests for at least one happy path and one guardrail.
+7. Run implementation audit and publish-plan before claiming readiness.
+
+This is one of the fastest ways to increase APG capacity because it turns an
+already-declared capability into something applications can compose.
 
 ## Vertical Slices
 

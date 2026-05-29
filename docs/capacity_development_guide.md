@@ -75,6 +75,38 @@ The loop is intentionally repetitive. APG becomes useful by repeating it across
 ERP, CRM, finance, operations, agentic, and integration capacities until each
 one has source, generated runtime behavior, package evidence, and documentation.
 
+## Capacity Delivery Spine
+
+Every capacity should have one visible spine that a new contributor can follow:
+
+```text
+README packet
+  -> examples/<nn>_<capacity>/main.apg
+  -> semantic model keys
+  -> generated Python app artifacts
+  -> package-backed capability behavior
+  -> focused tests
+  -> progress-log evidence
+```
+
+Keep this spine intact as the capacity grows. If a contributor adds package
+behavior but no example can compose it, the capacity is hard to discover. If an
+example declares a capability but no package can publish-plan it, the capacity
+is hard to reuse. If generated code changes but no smoke test proves it, the
+capacity is hard to trust.
+
+The spine also defines handoffs:
+
+| Artifact | Owner question | Extension point |
+| --- | --- | --- |
+| README packet | What business outcome exists now? | readiness level and known gaps |
+| APG source | How does an author declare the capacity? | records, screens, workflows, agents, capabilities |
+| Semantic model | How do tools inspect it? | stable JSON keys and graph relationships |
+| Generated app | How does it run locally? | routes, helpers, manifests, smoke tests |
+| Capability package | What durable behavior is reusable? | service/API/view/rule implementation |
+| Tests | What proves the next edit is safe? | focused layer checks |
+| Progress log | What evidence did the last contributor leave? | commands, outcomes, next gap |
+
 ## Capacity Blueprint
 
 Start each capacity with this compact blueprint in its README or design note:
@@ -129,6 +161,47 @@ For an existing capacity, the smallest useful slice is often one of these:
 
 Do not add many capacity files at once if none of them compile, publish-plan, or
 show up in the semantic model.
+
+## Build The Capacity From Both Ends
+
+Move from APG source downward and from package behavior upward.
+
+Top-down path:
+
+1. Write the APG declaration a business author should understand.
+2. Confirm it parses and appears in `apg model ... --json`.
+3. Confirm generated Python exposes routes, manifests, helpers, or sidecars.
+4. Add smoke-test assertions for the generated surface.
+
+Bottom-up path:
+
+1. Build or deepen the package-backed capability that owns durable behavior.
+2. Validate the contract and package artifacts.
+3. Prove deterministic service/rule/API/view behavior with focused tests.
+4. Publish-plan the package and connect it to an APG example or catalog path.
+
+The capacity becomes strong when the two paths meet: APG source declares a
+capability, generated code exposes it, and the package can provide real runtime
+behavior behind the contract.
+
+## Capacity-To-Capability Mapping
+
+Use this mapping before implementing a new capacity:
+
+| Capacity concern | APG surface | Capability package surface |
+| --- | --- | --- |
+| Durable business data | `table` declarations | model dataclasses or persistence adapters |
+| Service ownership | `capability` contract `provides` | service class methods |
+| Dependencies | `requires` and app composition | explicit dependency names and adapters |
+| Configuration | contract configuration/schema | config dataclass and validation |
+| Rules | `rules` lists | deterministic rule evaluation and guardrail tests |
+| UI | `screens`, route metadata, UI contract | view-model helpers and route descriptors |
+| Theme | app/capability theme tokens | theme metadata and token validation |
+| Workflow | `workflow` declarations | state transition helpers when package-owned |
+| AI agent | `agent` declarations | adapter config, tool references, governance rules |
+| Streaming | Bytewax runtime metadata | event envelopes and stream state helpers |
+
+If a concern appears only in prose, it is not yet a capacity contract.
 
 ## Capacity Development Packet
 
@@ -710,6 +783,36 @@ Capacities can be built in parallel when ownership is clear:
 
 Parallel lanes must agree on public names: capability IDs, provided services,
 routes, workflow names, agent names, and JSON format keys.
+
+## Maximum-Velocity Capacity Build
+
+When several contributors are available, split the capacity by artifacts rather
+than by vague themes.
+
+1. The capacity lead freezes public names for the slice: capability IDs, record
+   names, routes, workflow names, agent names, event names, and JSON keys.
+2. The language/compiler owner makes the APG source parse, model, and compile.
+3. The capability owner makes one package publish-plan ready with real service,
+   rule, API, and view behavior.
+4. The runtime owner proves generated app self-test, smoke test, and route or
+   manifest inspection.
+5. The documentation owner updates the example README, relevant guide section,
+   and progress log.
+
+Run integration checks only after each lane has passed its focused proof. This
+keeps velocity high without hiding broken contracts until the end.
+
+Merge order for parallel capacity slices:
+
+1. public-name and APG source slice;
+2. semantic/generator slice;
+3. capability package slice;
+4. example output or release-evidence slice;
+5. documentation/progress-log slice.
+
+If two slices need the same shared file, stop parallel edits for that file and
+choose one owner. Keep the other contributor on package, example, or docs work
+until the shared contract lands.
 
 ## Slice Planning Templates
 

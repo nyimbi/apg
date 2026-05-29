@@ -10199,3 +10199,17 @@ Battery-conscious verification:
 - `.venv/bin/python -m py_compile capabilities/composition/gateway/service.py capabilities/composition/gateway/tests/test_load_balancer_runtime_selection.py` passed.
 - `.venv/bin/python -m pytest -q capabilities/composition/gateway/tests/test_load_balancer_runtime_selection.py` passed with 4 tests.
 - `rg -n "For now, return random endpoint|random\\.choice|import random" capabilities/composition/gateway/service.py capabilities/composition/gateway/tests/test_load_balancer_runtime_selection.py` found no stale random endpoint selection.
+
+### 2026-05-29 08:57 EAT
+
+Contributor onboarding and capacity development guide slice:
+
+- Expanded `docs/developer_guide.md` with a one-day developer packet, a decision tree for choosing the correct APG layer, and a concrete recipe for burning down materialized capability packages into domain-specific behavior.
+- Expanded `docs/contributors_guide.md` with a zero-to-PR runbook, a definition of done, and a reusable capability implementation packet for contributors converting package scaffolds into executable capability behavior.
+- Expanded `docs/capacity_development_guide.md` with a capacity delivery spine, top-down/bottom-up capacity build guidance, capacity-to-capability mapping, and a maximum-velocity parallel build protocol.
+- Kept the guide updates focused on immediately effective contributor work: exact paths, public contract ownership, focused verification, progress-log evidence, and commit discipline.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` passed with no whitespace errors.
