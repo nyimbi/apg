@@ -16,6 +16,33 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 20:55 EAT
+
+Developer, contributor, and capacity guide immediate-effectiveness slice:
+
+- Added an APG one-page developer mental model to `docs/developer_guide.md` so
+  a new developer can identify the earliest owning layer from a visible gap:
+  grammar, AST/semantic model, generator, capability package, capacity example,
+  or documentation handoff.
+- Added a contributor operating contract to `docs/contributors_guide.md` that
+  requires each contribution to name the public contract, owner, proof command,
+  handoff location, next contributor action, and files intentionally left
+  untouched.
+- Added a capacity builder contract and capacity-to-executable flow to
+  `docs/capacity_development_guide.md` so capacity work starts from one event
+  and moves through source, semantics, generated runtime, package behavior,
+  governance, and handoff evidence.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with all 15 required docs
+  present, 0 broken local links, 49 documented commands all registered, and 0
+  violations.
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` passed with no
+  whitespace errors.
+- Not run: full repository test suite because this is documentation-only.
+
 ### 2026-05-29 20:07 EAT
 
 WALT wallet and payment runtime implementation-depth slice:

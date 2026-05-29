@@ -9,6 +9,40 @@ enter the repository, prove the current baseline, choose the right owning layer,
 make one executable slice better, verify it, update the handoff trail, and
 commit it without private context.
 
+## APG In One Page
+
+APG is a Python-first application generator. The repository has one core job:
+turn terse APG source into executable Python applications and package-backed
+capabilities that other applications can compose.
+
+Keep this mental model visible while working:
+
+```text
+author intent
+  -> .apg source
+  -> grammar and parser
+  -> AST and semantic model
+  -> generated Python app
+  -> capability package behavior
+  -> example, audit, release, and documentation evidence
+```
+
+A developer progresses APG by improving the earliest missing link in that
+chain. Do not begin by changing every layer. Begin by proving which link owns
+the gap, then make that link executable.
+
+| If the gap is... | Start in... | Then prove with... |
+| --- | --- | --- |
+| authors cannot express the idea | `spec/apg.g4` and parser fixtures | `apg parser-golden --json`; `apg model ... --json` |
+| syntax parses but tools cannot see it | `compiler/ast_builder.py` and `compiler/semantic_model.py` | focused compiler test; `apg model ... --json` |
+| semantic meaning exists but generated apps cannot use it | `compiler/code_generator.py` | `apg compile ... --verify`; generated smoke test |
+| a capability contract exists but behavior is generic | `capabilities/<domain>/<code>/` | package pytest; implementation audit; publish-plan |
+| a business ability is only an idea | `examples/<nn>_<capacity>/` plus package owners | model; compile; smoke; package proof |
+| contributors cannot continue without chat context | `docs/`, example README, or `cap_spec.md` | docs audit; diff check |
+
+The important question is not "where can I add code?" It is "which public
+contract can I make more executable today?"
+
 ## Immediate Developer Assignment
 
 If you are new to APG and nobody has assigned you a ticket, do this:

@@ -7,6 +7,39 @@ leave the repository easier for the next contributor.
 The contribution rule is simple: make one current APG state more executable,
 prove it with commands, document the evidence, and commit only that slice.
 
+## New Contributor Operating Contract
+
+You can contribute effectively without understanding the entire platform. Your
+first job is to make one public APG contract easier to execute, verify, or
+extend.
+
+Use this contract for every contribution:
+
+```text
+I am improving:
+The public contract is:
+The owner is:
+The proof command is:
+The handoff location is:
+The next contributor should:
+I will not touch:
+```
+
+Good public contracts are concrete:
+
+| Area | Concrete contract |
+| --- | --- |
+| Language | grammar construct, keyword, diagnostic, semantic JSON key |
+| Compiler | AST field, semantic-model field, generated file, route helper |
+| Capability | capability ID, service method, rule ID, route, theme token |
+| Capacity | first event, example path, package owner, readiness level |
+| Tooling | command name, JSON format, audit finding, fixture catalog |
+| Documentation | guide link, command block, proof expectation, next-step note |
+
+If you cannot name the public contract, make the contribution a clarification:
+update the local README, package spec, or guide so the next contributor can
+name it.
+
 ## The Fastest Useful Contribution
 
 The fastest useful contribution is not the largest feature. It is the smallest

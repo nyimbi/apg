@@ -9,6 +9,53 @@ Use this guide when the goal is to make APG able to do something new, such as
 procurement approval, ledger posting, customer onboarding, device management,
 agentic operations, or integration monitoring.
 
+## Capacity Builder Contract
+
+A capacity is useful only when it gives APG a rerunnable path from a named event
+to an observable result. Before implementation, write the contract in the
+example README or local planning note:
+
+```text
+Capacity:
+First event:
+Observable result:
+Primary actor:
+Tenant and security boundary:
+Records and relationships:
+Rules and decisions:
+Screens and actions:
+Workflow states:
+AI agent boundary:
+Bytewax stream boundary:
+Capability package owners:
+Generated-app proof:
+Package proof:
+Next slice:
+```
+
+This is the coordination surface for parallel work. Source, compiler, runtime,
+package, UI, agent, stream, and docs contributors should be able to read this
+contract and know which names must remain stable.
+
+## Capacity-To-Executable Flow
+
+Build capacities by moving one event through these gates. Do not skip from a
+business idea directly to package code or UI polish.
+
+| Gate | Artifact | Owner | Proof |
+| --- | --- | --- | --- |
+| 1. Event | event statement in README | capacity lead | event, actor, result, tenant boundary named |
+| 2. Source | `examples/<nn>_<capacity>/main.apg` | source owner | `apg model ... --json` |
+| 3. Semantics | stable records, rules, screens, workflows, agents, streams | compiler owner | semantic JSON contains intended names |
+| 4. Runtime | generated Python app and smoke test | generator/runtime owner | `apg compile ... --verify`; smoke test |
+| 5. Package | service/API/view behavior in `capabilities/<domain>/<code>/` | package owner | focused pytest; implementation audit; publish-plan |
+| 6. Governance | rule decisions, approvals, audit events, tenant checks | package owner | positive and negative guardrail proof |
+| 7. Handoff | README, `cap_spec.md`, progress log when readiness changes | docs owner | docs audit or diff check |
+
+The capacity is progressing when one gate becomes executable and the next gate
+has a named owner. The capacity is drifting when the README uses broad module
+language but cannot name the first event, package owner, or proof command.
+
 ## Capacity Quickstart For A New Contributor
 
 When you are asked to build a new APG capacity, resist starting with a broad
