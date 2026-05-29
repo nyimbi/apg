@@ -118,6 +118,8 @@ class Investigation:
 	owner: str
 	status: str = "open"
 	resolution: str | None = None
+	closed_by: str | None = None
+	resolution_evidence: tuple[str, ...] = ()
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -127,6 +129,8 @@ class Investigation:
 			"owner": self.owner,
 			"status": self.status,
 			"resolution": self.resolution,
+			"closed_by": self.closed_by,
+			"resolution_evidence": list(self.resolution_evidence),
 		}
 
 
@@ -149,4 +153,26 @@ class DetectionFeedback:
 			"label": self.label,
 			"reviewer": self.reviewer,
 			"notes": self.notes,
+		}
+
+
+@dataclass(frozen=True)
+class AnomalyAuditEvent:
+	"""Tenant-scoped evidence event for anomaly lifecycle changes."""
+
+	id: str
+	tenant_id: str
+	event_type: str
+	subject_id: str
+	message: str
+	evidence: dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_type": self.event_type,
+			"subject_id": self.subject_id,
+			"message": self.message,
+			"evidence": dict(self.evidence),
 		}

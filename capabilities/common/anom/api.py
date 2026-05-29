@@ -49,6 +49,7 @@ def reset_baseline(payload: dict[str, Any]) -> dict[str, Any]:
 		baseline_id=str(payload["id"]),
 		values=[float(item) for item in payload.get("values", [])],
 		approval_recorded=bool(payload.get("approval_recorded", False)),
+		tenant_id=payload.get("tenant_id"),
 	)
 
 
@@ -72,6 +73,16 @@ def open_investigation(payload: dict[str, Any]) -> dict[str, Any]:
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		signal_id=str(payload["signal_id"]),
 		owner=str(payload["owner"]),
+	)
+
+
+def close_investigation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.close_investigation(
+		investigation_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		resolution=str(payload["resolution"]),
+		closed_by=str(payload["closed_by"]),
+		resolution_evidence=[str(item) for item in payload.get("resolution_evidence", [])],
 	)
 
 
@@ -114,3 +125,7 @@ def list_signals(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_investigations(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_investigations(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)

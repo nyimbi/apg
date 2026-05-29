@@ -72,6 +72,7 @@ def register_capability() -> dict[str, Any]:
 			"event_anomaly_detection": "Score unusual events and behavioral sequences",
 			"baseline_management": "Maintain tenant-scoped statistical and model baselines",
 			"investigation_workflows": "Route high-severity anomalies into governed investigations",
+			"investigation_closure_governance": "Require tenant-safe closure evidence for anomaly investigations",
 			"capability_rules": "Evaluate deterministic anomaly-governance rules",
 			"visual_theming": "Apply anomaly-console theme tokens and components"
 		},
@@ -80,7 +81,8 @@ def register_capability() -> dict[str, Any]:
 			"baselines": "/anom/api/v1/baselines",
 			"detections": "/anom/api/v1/detections",
 			"investigations": "/anom/api/v1/investigations",
-			"feedback": "/anom/api/v1/feedback"
+			"feedback": "/anom/api/v1/feedback",
+			"audit_events": "/anom/api/v1/audit-events"
 		},
 		"ui_components": {
 			route["name"]: route["path"]

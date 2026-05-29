@@ -26,6 +26,7 @@ def dashboard_model(
 		"baselines": service.list_baselines(tenant_id),
 		"signals": service.list_signals(tenant_id),
 		"investigations": service.list_investigations(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -63,8 +64,10 @@ def investigation_queue_model(
 	service = service or AnomService()
 	return {
 		"investigations": service.list_investigations(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
 		"status_groups": ["open", "triage", "mitigating", "closed"],
 		"required_fields": ["signal_id", "owner"],
+		"closure_required_fields": ["resolution", "closed_by", "resolution_evidence"],
 	}
 
 

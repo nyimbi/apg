@@ -12809,3 +12809,27 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/aicr --json` passed with `ok: true`; AICR remains `domain_specific`, with 0 baseline markers and 0 warnings.
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/aicr --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
 - `git diff --check -- capabilities/common/aicr` passed with no whitespace errors.
+
+### 2026-05-29 23:49 EAT
+
+ANOM governed investigation-closure lifecycle slice:
+
+- Added `capabilities/common/anom/SPECIFICATION.md` and `capabilities/common/anom/PLAN.md` for the package-specific specification-plan-implementation-review cycle.
+- Extended ANOM models with closure actor/evidence fields and tenant-scoped anomaly audit events.
+- Hardened ANOM service state so sources, baselines, observations, signals, investigations, and feedback are keyed by tenant plus record ID.
+- Extended ANOM lifecycle behavior so source registration, baseline creation/reset, signal detection, investigation open/close, and feedback recording emit audit evidence.
+- Required tenant context for baseline reset and investigation closure; required closure actor, resolution, and resolution evidence before closing investigations; required reviewers for feedback.
+- Extended ANOM API helpers and view models with investigation closure and audit-event surfaces.
+- Renamed the stale materialized-package test file to `tests/test_package_contract.py`.
+- Added positive detect-investigate-close coverage and negative missing source, insufficient baseline history, missing critical owner, missing reset tenant, reset approval, missing closure evidence, missing feedback reviewer, false-positive tuning review, API helper, and duplicate-ID tenant-isolation coverage.
+- Updated `cap_spec.md` with the current executable governance lifecycle and focused proof commands.
+- Code review found and fixed implicit-tenant reset/closure paths and missing human actor checks before commit.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/anom/__init__.py capabilities/common/anom/models.py capabilities/common/anom/anomaly_engine.py capabilities/common/anom/service.py capabilities/common/anom/api.py capabilities/common/anom/views.py capabilities/common/anom/capability_contract.py capabilities/common/anom/app.py capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/anom` returned no stale ANOM materialized markers.
+- `./.venv/bin/pytest -q capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/anom --json` passed with `ok: true`; ANOM remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/anom --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence valid.
+- `git diff --check -- capabilities/common/anom` passed with no whitespace errors.
