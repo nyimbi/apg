@@ -16,6 +16,69 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 18:26 EAT
+
+SCHD scheduling/job orchestration runtime implementation-depth slice:
+
+- Converted `capabilities/common/schd` from interrupted generated
+  materialized scaffolding into a domain-specific scheduler runtime package.
+- Added `scheduling_runtime.py` with stable IDs, trigger/job/worker/retry
+  normalization, schedule-state helpers, next-run hints, run-status
+  classification, retry backoff, and deterministic policy summaries.
+- Replaced generic package models with calendar policies, worker pools, job
+  definitions, schedule definitions, job runs, and audit events.
+- Replaced generic service behavior with tenant-scoped lifecycle methods for
+  calendar policy creation, worker pool registration, job definition,
+  schedule creation, run triggering, run completion, schedule disabling,
+  dashboard summaries, compatibility records, and audit events.
+- Expanded API and view helpers so SCHD exposes scheduler-specific dashboard,
+  schedule console, job library, run monitor, worker dashboard, calendar
+  manager, analytics, settings, route, rule, and theme composition surfaces.
+- Rewrote `cap_spec.md` around current executable SCHD behavior, adapter
+  boundaries, UI surfaces, theme metadata, known non-goals, and proof
+  commands.
+- Replaced generated package tests with focused lifecycle, package-publish,
+  guardrail, and view-model tests.
+
+Battery-conscious verification:
+
+- `rg -n "<baseline marker patterns>" capabilities/common/schd` returned no
+  generated materialization, dependency-light baseline, or
+  `test_materialized_package` matches.
+- `./.venv/bin/python -m py_compile capabilities/common/schd/__init__.py
+  capabilities/common/schd/models.py
+  capabilities/common/schd/scheduling_runtime.py capabilities/common/schd/service.py
+  capabilities/common/schd/api.py capabilities/common/schd/views.py
+  capabilities/common/schd/capability_contract.py capabilities/common/schd/app.py
+  capabilities/common/schd/test_capability_contract.py
+  capabilities/common/schd/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -c "import importlib; ..."` for SCHD models,
+  `scheduling_runtime`, service, API, views, and capability contract passed
+  with `schd imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/schd/test_capability_contract.py
+  capabilities/common/schd/tests/test_package_contract.py` passed with 8
+  tests and only pre-existing adjacent SQLAlchemy/Pydantic deprecation
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/schd --json` passed with `schd` classified as
+  `domain_specific`, `scheduling_runtime.py` counted as the custom Python
+  file, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/schd --json`
+  passed with `ok: true`, warnings empty, and side-effect-free catalog patch
+  evidence.
+- `./.venv/bin/apg docs audit --json` passed with 15/15 required docs, 61
+  local links, 49 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with 95
+  domain-specific packages, 13 materialized-baseline packages, 0 mixed
+  implementations, 1 contract-only package, 909 custom Python files, 0 errors,
+  and 14 warnings; the next implementation-depth target is `scpt`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `git diff --check -- capabilities/common/schd docs/progress_log.md` passed
+  with no whitespace errors.
+
 ### 2026-05-29 18:17 EAT
 
 SBOX sandbox/testing runtime implementation-depth slice:
