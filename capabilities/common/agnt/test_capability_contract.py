@@ -3,6 +3,7 @@
 from agents import DEFAULT_AGENT_INTEGRATIONS
 from capabilities.common.agnt import register_capability
 from capabilities.common.agnt.capability_contract import evaluate_capability_rules, get_capability_contract
+from capabilities.common.agnt.service import AgntService
 
 
 def test_contract_exposes_agent_runtimes_rules_ui_and_theme():
@@ -37,3 +38,76 @@ def test_registration_includes_full_agent_capability_contract():
 	assert registration["ui_components"]["runtimes"] == "/agnt/runtimes"
 	assert "agnt:run" in registration["permissions"]
 	assert "runtime_adapters" in registration["capabilities"]
+
+
+def test_service_registers_agents_teams_and_execution_plans():
+	service = AgntService()
+	agent = service.register_agent(
+		agent_id="builder",
+		tenant_id="tenant-agnt",
+		name="Builder",
+		model="gpt-5.4",
+		runtime="codex",
+		system_prompt="Build APG capability slices.",
+		tool_allowlist=["shell", "pytest"],
+		input_contract={"objective": "string"},
+		output_contract={"patch": "object"},
+		memory_policy={"store": "tenant-vector", "retention_days": 30},
+	)
+	team = service.register_team(
+		team_id="delivery",
+		tenant_id="tenant-agnt",
+		name="Delivery Team",
+		agent_ids=["builder"],
+		handoffs=[],
+		parallel_execution_enabled=True,
+	)
+	plan = service.plan_execution("delivery", "Implement a capability package", tenant_id="tenant-agnt")
+
+	assert agent["runtime"] == "codex"
+	assert team["agent_ids"] == ["builder"]
+	assert plan["team_id"] == "delivery"
+	assert plan["runtime_assignments"] == {"builder": "codex"}
+	assert plan["steps"][0]["tools"] == ["shell", "pytest"]
+
+
+def test_service_blocks_invalid_agent_team_and_runtime_changes():
+	service = AgntService()
+
+	try:
+		service.register_agent(
+			agent_id="missing-model",
+			tenant_id="tenant-agnt",
+			name="Missing Model",
+			model="",
+			runtime="codex",
+			system_prompt="Should fail.",
+		)
+	except PermissionError as exc:
+		assert "agent_model_required" in str(exc)
+	else:
+		raise AssertionError("expected missing model to be blocked")
+
+	try:
+		service.register_runtime(
+			name="unapproved_external",
+			tenant_id="tenant-agnt",
+			external_runtime=True,
+			approved=False,
+		)
+	except PermissionError as exc:
+		assert "external_runtime_approval_required" in str(exc)
+	else:
+		raise AssertionError("expected unapproved external runtime to require review")
+
+	try:
+		service.register_team(
+			team_id="empty",
+			tenant_id="tenant-agnt",
+			name="Empty Team",
+			agent_ids=[],
+		)
+	except PermissionError as exc:
+		assert "team_agent_required" in str(exc)
+	else:
+		raise AssertionError("expected empty team to be blocked")

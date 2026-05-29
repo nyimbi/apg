@@ -16,6 +16,58 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 08:58 EAT
+
+AI Agent Composition implementation-depth slice:
+
+- Replaced AGNT's generic materialized record/service/API/view helpers with a
+  domain-specific AI agent composition runtime.
+- Added `agent_composition.py` with deterministic execution planning for
+  tenant-scoped agent teams, runtime assignments, handoff targets, approval
+  requirements, and cost-limit evidence.
+- Rebuilt `models.py` around first-class agent composition concepts:
+  `AgentRuntime`, `AgentDefinition`, `HandoffEdge`, `AgentTeam`, and
+  `ExecutionPlan`.
+- Rebuilt `service.py`, `api.py`, and `views.py` around runtime registration,
+  agent registration, team validation, execution planning, dashboard view
+  models, team-builder data, runtime-manager data, and execution-trace data.
+- Updated AGNT package tests to prove valid agent/team/plan creation and
+  policy blocks for missing model, unapproved external runtime, and empty
+  teams.
+- Removed AGNT materialized-baseline markers so the implementation-depth audit
+  now classifies `agnt` as domain-specific.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/agnt/models.py
+  capabilities/common/agnt/agent_composition.py
+  capabilities/common/agnt/service.py capabilities/common/agnt/api.py
+  capabilities/common/agnt/views.py
+  capabilities/common/agnt/test_capability_contract.py` -> passed.
+- `./.venv/bin/pytest -q capabilities/common/agnt/test_capability_contract.py
+  capabilities/common/agnt/tests/test_materialized_package.py` -> 7 passed
+  with pre-existing adjacent SQLAlchemy/Pydantic warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  109 capabilities, 55 domain-specific packages, 48 materialized-baseline
+  packages, 5 mixed packages, 1 contract-only package, 874 custom Python files,
+  0 errors, and 54 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/agnt --json`
+  -> passed with runtime self-test loaded and side-effect-free catalog patch.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, and 0 errors.
+- `./.venv/bin/apg tooling audit --json` -> passed with 20/20 surfaces, 0
+  blocking gaps, 0 errors, and the implementation-depth surface reporting 55
+  domain-specific packages and 48 materialized baselines.
+- `git diff --check -- capabilities/common/agnt docs/progress_log.md` ->
+  passed.
+
+Known remaining gaps:
+
+- AGNT is now domain-specific, but implementation-depth still reports 48
+  materialized baselines, 5 mixed implementations, and 1 contract-only package
+  to replace with domain-specific behavior.
+
 ### 2026-05-29 08:32 EAT
 
 Capability implementation-depth audit slice:
