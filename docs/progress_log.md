@@ -16,6 +16,56 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 08:44 EAT
+
+ACCS implementation-depth slice:
+
+- Replaced ACCS generic record/service/API/view helpers with a domain-specific
+  accessibility governance runtime.
+- Added `accessibility_engine.py` for deterministic accessibility checks across
+  contrast, semantic labels, keyboard navigation, and media captions.
+- Rebuilt `models.py` around standards, audit targets, findings, remediation
+  tasks, and completed audit runs.
+- Rebuilt `service.py`, `api.py`, and `views.py` around standard registration,
+  target registration, audit execution, findings tracking, remediation queues,
+  publication validation, compliance summaries, audit consoles, findings
+  boards, remediation queues, and assistive previews.
+- Rewrote `cap_spec.md` so the package specification describes current ACCS
+  domain behavior rather than materialized package scaffolding.
+- Expanded ACCS focused tests for successful audit/remediation flow and policy
+  failures for missing standards, missing remediation owners, contrast
+  failures, and missing media captions.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/accs/models.py
+  capabilities/common/accs/accessibility_engine.py
+  capabilities/common/accs/service.py capabilities/common/accs/api.py
+  capabilities/common/accs/views.py
+  capabilities/common/accs/test_capability_contract.py` -> passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/common/accs` -> no matches.
+- `./.venv/bin/pytest -q capabilities/common/accs/test_capability_contract.py
+  capabilities/common/accs/tests/test_materialized_package.py` -> 7 passed
+  with 10 pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  ACCS classified as `domain_specific`, 56 domain-specific packages, 47
+  materialized-baseline packages, 5 mixed packages, 1 contract-only package,
+  875 custom Python files, 0 errors, and 53 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/accs --json`
+  -> passed with runtime self-test loaded and side-effect-free catalog patch.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+
+Known remaining gaps:
+
+- ACCS is now domain-specific, but implementation-depth still reports 47
+  materialized baselines, 5 mixed implementations, and 1 contract-only package
+  to replace with domain-specific behavior.
+
 ### 2026-05-29 08:35 EAT
 
 Contributor guide strengthening slice:

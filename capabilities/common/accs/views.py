@@ -1,4 +1,4 @@
-"""UI metadata helpers for the Accessibility Services capability."""
+"""UI metadata and view models for APG Accessibility Services."""
 
 from __future__ import annotations
 
@@ -20,8 +20,60 @@ def dashboard_model(
 		"capability": contract["capability"],
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
+		"summary": service.compliance_summary(tenant_id),
 		"routes": capability_routes(tenant_id),
-		"records": service.list_records(tenant_id),
+		"targets": service.list_targets(tenant_id),
+		"findings": service.list_findings(tenant_id),
+		"remediations": service.list_remediations(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+	}
+
+
+def audit_console_model(
+	service: AccsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AccsService()
+	return {
+		"standards": service.list_standards(tenant_id),
+		"targets": service.list_targets(tenant_id),
+		"audits": service.list_audits(tenant_id),
+		"audit_fields": ["id", "standard_id", "target_ids", "remediation_owner"],
+	}
+
+
+def findings_board_model(
+	service: AccsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AccsService()
+	findings = service.list_findings(tenant_id)
+	return {
+		"findings": findings,
+		"columns": ["critical", "high", "medium", "low"],
+		"status_groups": ["open", "in_progress", "blocked", "closed"],
+	}
+
+
+def remediation_queue_model(
+	service: AccsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AccsService()
+	return {
+		"remediations": service.list_remediations(tenant_id),
+		"actions": ["assign", "start", "record_review", "close"],
+		"required_fields": ["owner", "status", "review_recorded"],
+	}
+
+
+def assistive_preview_model(target: dict[str, object]) -> dict[str, object]:
+	return {
+		"target_id": target["id"],
+		"surface": target["surface"],
+		"semantic_tree_ready": bool(target.get("semantic_labels_present")),
+		"keyboard_ready": bool(target.get("keyboard_navigation_present")),
+		"media_ready": not target.get("media_content_present") or bool(target.get("captions_available")),
+		"preview_sections": ["landmarks", "labels", "keyboard_order", "media_alternatives"],
 	}

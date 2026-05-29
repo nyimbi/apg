@@ -1,4 +1,4 @@
-"""Data models for the Accessibility Services capability."""
+"""Domain models for APG Accessibility Services."""
 
 from __future__ import annotations
 
@@ -6,19 +6,134 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
-@dataclass
-class AccsRecord:
-	"""Tenant-scoped dependency-light capability record."""
+@dataclass(frozen=True)
+class AccessibilityStandard:
+	"""Tenant-scoped accessibility standard profile."""
 
 	id: str
 	tenant_id: str
-	status: str = "active"
-	metadata: dict[str, Any] = field(default_factory=dict)
+	name: str = "WCAG"
+	version: str = "2.2"
+	level: str = "AA"
+	criteria: tuple[str, ...] = (
+		"perceivable",
+		"operable",
+		"understandable",
+		"robust",
+	)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
 			"id": self.id,
 			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"version": self.version,
+			"level": self.level,
+			"criteria": list(self.criteria),
+		}
+
+
+@dataclass(frozen=True)
+class AccessibilityTarget:
+	"""UI, content, or media surface that can be audited."""
+
+	id: str
+	tenant_id: str
+	surface: str
+	route: str
+	owner: str
+	published_ui: bool = False
+	contrast_ratio: float = 4.5
+	semantic_labels_present: bool = True
+	keyboard_navigation_present: bool = True
+	media_content_present: bool = False
+	captions_available: bool = True
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"surface": self.surface,
+			"route": self.route,
+			"owner": self.owner,
+			"published_ui": self.published_ui,
+			"contrast_ratio": self.contrast_ratio,
+			"semantic_labels_present": self.semantic_labels_present,
+			"keyboard_navigation_present": self.keyboard_navigation_present,
+			"media_content_present": self.media_content_present,
+			"captions_available": self.captions_available,
+		}
+
+
+@dataclass(frozen=True)
+class AccessibilityFinding:
+	"""Deterministic accessibility finding produced by an audit or manual review."""
+
+	id: str
+	tenant_id: str
+	target_id: str
+	rule: str
+	severity: str
+	description: str
+	remediation_owner: str
+	status: str = "open"
+	evidence: dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"target_id": self.target_id,
+			"rule": self.rule,
+			"severity": self.severity,
+			"description": self.description,
+			"remediation_owner": self.remediation_owner,
 			"status": self.status,
-			"metadata": dict(self.metadata),
+			"evidence": dict(self.evidence),
+		}
+
+
+@dataclass(frozen=True)
+class RemediationTask:
+	"""Tracked remediation work item for an accessibility finding."""
+
+	id: str
+	tenant_id: str
+	finding_id: str
+	owner: str
+	status: str = "open"
+	due_date: str | None = None
+	review_recorded: bool = False
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"finding_id": self.finding_id,
+			"owner": self.owner,
+			"status": self.status,
+			"due_date": self.due_date,
+			"review_recorded": self.review_recorded,
+		}
+
+
+@dataclass(frozen=True)
+class AccessibilityAudit:
+	"""Completed deterministic audit run for one or more targets."""
+
+	id: str
+	tenant_id: str
+	standard_id: str
+	target_ids: tuple[str, ...]
+	finding_ids: tuple[str, ...]
+	status: str = "completed"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"standard_id": self.standard_id,
+			"target_ids": list(self.target_ids),
+			"finding_ids": list(self.finding_ids),
+			"status": self.status,
 		}
