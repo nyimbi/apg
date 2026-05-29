@@ -11437,3 +11437,18 @@ Battery-conscious verification:
 
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-29 17:00 EAT
+
+Bytewax-native hygiene repair slice:
+
+- Removed remaining tracked legacy broker references that violated the APG Bytewax-native streaming hygiene rule.
+- Updated `capabilities/common/dist/cap_spec.md` to keep distributed-computing runtime dependencies local and deterministic while naming Bytewax-backed adapters as the streaming integration path.
+- Updated `docs/contributors_guide.md` and `docs/capacity_development_guide.md` so contributor guidance describes Bytewax-oriented stream semantics without preserving stale broker terminology.
+
+Battery-conscious verification:
+
+- `rg -n -i "kafka" capabilities/common/dist/cap_spec.md docs/capacity_development_guide.md docs/contributors_guide.md` returned no matches.
+- `./.venv/bin/apg hygiene audit --json` passed with `ok: true`, 17 checks passing, 0 failing checks, and 0 violations.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links checked, 49 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- capabilities/common/dist/cap_spec.md docs/capacity_development_guide.md docs/contributors_guide.md` passed with no whitespace errors.

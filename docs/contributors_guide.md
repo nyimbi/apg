@@ -400,8 +400,8 @@ are unclear.
   generic behavior.
 - Adding AI provider details directly into business source instead of modeling
   provider choice behind agent runtime configuration and approvals.
-- Modeling Kafka as the default stream architecture instead of Bytewax-oriented
-  stream semantics with adapters.
+- Modeling a legacy broker as the default stream architecture instead of
+  Bytewax-oriented stream semantics with adapters.
 - Running a broad suite, seeing unrelated failures, and reporting nothing about
   the focused contract you changed.
 - Staging `.omx/`, `.claude/`, uploads, copied references, or another

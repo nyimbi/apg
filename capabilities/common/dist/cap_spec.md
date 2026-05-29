@@ -13,11 +13,11 @@ jobs, partitions, result aggregations, scaling decisions, queue state, and audit
 evidence behind the executable capability contract.
 
 The package is intentionally local and deterministic. It does not start live
-Kubernetes, Ray, Dask, Spark, Slurm, Bytewax, Redis, RabbitMQ, Kafka, or cloud
-compute workers. External schedulers, queues, observability systems, caches, and
-edge runtimes should be composed through APG capabilities such as `mqeb`,
-`schd`, `moni`, `cach`, `edge`, `logt`, `conf`, and Bytewax-backed runtime
-adapters.
+Kubernetes, Ray, Dask, Spark, Slurm, Bytewax, Redis, RabbitMQ, legacy broker, or
+cloud compute workers. External schedulers, queues, observability systems,
+caches, and edge runtimes should be composed through APG capabilities such as
+`mqeb`, `schd`, `moni`, `cach`, `edge`, `logt`, `conf`, and Bytewax-backed
+runtime adapters.
 
 ## Provided Services
 

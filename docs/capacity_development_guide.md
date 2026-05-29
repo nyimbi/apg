@@ -106,7 +106,7 @@ Use this checklist to turn a broad idea into a buildable APG slice.
 | First screen | `/ap/invoices` with invoice list and action | `dashboard` |
 | First workflow | `draft -> submitted -> approved -> posted` | `ERP workflow` |
 | First agent | `invoice_triage_agent drafts exceptions, cannot post` | `AI handles it` |
-| First stream | `Bytewax invoice_events -> invoice_alerts` | `Kafka integration` |
+| First stream | `Bytewax invoice_events -> invoice_alerts` | `legacy broker integration` |
 | Proof | model, compile, smoke test, package pytest | manual inspection |
 
 When an answer is vague, reduce the scope until the event can compile and
@@ -514,9 +514,9 @@ name:
 - generated metadata or manifest output;
 - local deterministic proof.
 
-Do not use Kafka as the default architecture. If a future integration needs
-Kafka, model it as an adapter boundary around Bytewax-oriented APG stream
-semantics.
+Do not use a legacy broker as the default architecture. If a future integration
+needs a broker-specific bridge, model it as an adapter boundary around
+Bytewax-oriented APG stream semantics.
 
 ## Capacity Verification Matrix
 
