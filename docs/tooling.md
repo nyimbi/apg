@@ -110,7 +110,9 @@ APG currently has an executable compiler path:
 - `apg evidence <file> --target web|desktop|mobile|container --out <dir> --json`
   emits `apg.release-evidence-bundle.v1` by running release evidence, package
   creation, package verification, deployment verification, and side-effect-free
-  capability publish planning as one reviewable bundle;
+  capability publish planning as one reviewable bundle; with
+  `--catalog <capability-root-or-catalog.json>`, the release/package preflight
+  blocks unresolved capabilities before package output is written;
 - `apg evidence --audit-fixtures --json` emits
   `apg.release-evidence-fixture-audit.v1` by running checked-in verifier
   fixtures across web, desktop, mobile, and container profiles;
@@ -1113,6 +1115,7 @@ requires the deployment graph to be connected and explainable.
 
 ```console
 apg evidence app.apg --target web --out dist/evidence --json
+apg evidence app.apg --catalog /tmp/apg-capability-catalog.json --target web --out dist/evidence --json
 apg evidence --audit-fixtures --json
 ```
 
@@ -1121,7 +1124,9 @@ package profile, attaches `apg.release-report.v1`, runs package verification,
 runs deployment verification, and emits side-effect-free capability publish
 planning when the package contains capabilities. This is the preferred release
 review payload because it preserves each lower-level verifier report while
-summarizing whether the full evidence chain is green.
+summarizing whether the full evidence chain is green. When `--catalog` is
+supplied, the bundle passes it through release and package preflight; unresolved
+capabilities fail before package output is written.
 
 `--audit-fixtures` loads `tests/fixtures/verifiers/catalog.json` and emits
 `apg.release-evidence-fixture-audit.v1`. The audit fails when any required

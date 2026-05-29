@@ -16,6 +16,51 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 06:02 EAT
+
+Catalog-aware evidence bundle slice:
+
+- Added `catalog` support to `compiler.evidence_bundle.build_release_evidence_bundle()`
+  so the full release/package/deployment/publish evidence chain can consume the
+  same capability catalog preflight as lint, validate, compile, release, and
+  package.
+- Added `apg evidence --catalog <capability-root-or-catalog.json>` and reject
+  combining that option with fixture audits.
+- Evidence bundles now pass the catalog into release and package reports;
+  unresolved capabilities fail before package output is written.
+- Added focused CLI regression coverage for successful local catalog preflight
+  and unresolved capability blocking through `apg.release-evidence-bundle.v1`.
+- Updated tooling and developer docs to show catalog-aware evidence bundle
+  commands.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile cli/evidence_command.py
+  compiler/evidence_bundle.py tests/test_compiler_baseline.py` -> passed.
+- `./.venv/bin/pytest -q
+  tests/test_compiler_baseline.py::test_cli_evidence_json_builds_release_bundle
+  tests/test_compiler_baseline.py::test_cli_evidence_accepts_local_capability_catalog_preflight
+  tests/test_compiler_baseline.py::test_cli_evidence_blocks_unresolved_catalog_capability_before_package
+  tests/test_compiler_baseline.py::test_cli_evidence_audits_release_verifier_fixture_catalog`
+  -> 4 passed.
+- `git diff --check -- cli/evidence_command.py compiler/evidence_bundle.py
+  tests/test_compiler_baseline.py docs/tooling.md docs/developer_guide.md
+  docs/progress_log.md` -> passed.
+- `./.venv/bin/apg lint --audit-fixtures --json` -> passed with 6/6 fixtures,
+  0 blocking gaps.
+- `./.venv/bin/apg capabilities validate-contracts --json` -> passed with 109
+  valid contracts and 0 errors.
+- `./.venv/bin/apg tooling audit --json` -> passed with 14/14 surfaces, 0
+  blocking gaps, and 0 errors.
+- `./.venv/bin/pytest -q tests/test_tooling_audit.py
+  tests/test_repository_hygiene.py` -> 20 passed.
+
+Known remaining gaps:
+
+- The complete CLI build chain now accepts local catalog evidence through lint,
+  validate, compile, release, package, and evidence. Remote catalog sync,
+  signing, and distribution trust policy remain separate lifecycle work.
+
 ### 2026-05-29 05:55 EAT
 
 Catalog-aware release and package preflight slice:
@@ -61,9 +106,8 @@ Verification:
 
 Known remaining gaps:
 
-- Release and package now consume local catalog evidence. Evidence bundle still
-  needs a catalog option to pass the same preflight through its full
-  release/package/deployment/publish orchestration.
+- Release and package now consume local catalog evidence. Full evidence bundle
+  catalog preflight landed in the next slice.
 
 ### 2026-05-29 05:47 EAT
 

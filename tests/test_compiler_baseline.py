@@ -2279,6 +2279,49 @@ def test_cli_evidence_json_builds_release_bundle(tmp_path):
 	assert Path(report["package"]["output_dir"]).exists()
 
 
+def test_cli_evidence_accepts_local_capability_catalog_preflight(tmp_path):
+	source = tmp_path / "capability.apg"
+	out_dir = tmp_path / "evidence"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "audit_log")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(
+		cli,
+		["evidence", str(source), "--target", "web", "--catalog", str(catalog), "--out", str(out_dir), "--json"],
+	)
+
+	assert result.exit_code == 0, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.release-evidence-bundle.v1"
+	assert report["ok"] is True
+	assert report["catalog"] == str(catalog)
+	assert report["release"]["preflight"]["catalog_kind"] == "local_catalog"
+	assert report["package"]["format"] == "apg.package-report.v1"
+	assert Path(report["package"]["output_dir"]).exists()
+
+
+def test_cli_evidence_blocks_unresolved_catalog_capability_before_package(tmp_path):
+	source = tmp_path / "capability.apg"
+	out_dir = tmp_path / "evidence"
+	catalog = write_local_capability_catalog(tmp_path / "catalog" / "capabilities.json", "customer_master")
+	source.write_text(CAPABILITY_CATALOG_SOURCE, encoding="utf-8")
+
+	result = CliRunner().invoke(
+		cli,
+		["evidence", str(source), "--target", "web", "--catalog", str(catalog), "--out", str(out_dir), "--json"],
+	)
+
+	assert result.exit_code == 1, result.output
+	report = json.loads(result.output)
+	assert report["format"] == "apg.release-evidence-bundle.v1"
+	assert report["ok"] is False
+	assert report["catalog"] == str(catalog)
+	assert report["release"]["preflight"]["catalog_kind"] == "local_catalog"
+	assert report["package"] == {}
+	assert not out_dir.exists()
+	assert any("APG0901" in error for error in report["errors"])
+
+
 def test_cli_evidence_audits_release_verifier_fixture_catalog():
 	result = CliRunner().invoke(cli, ["evidence", "--audit-fixtures", "--json"])
 

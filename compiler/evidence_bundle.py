@@ -22,6 +22,7 @@ def build_release_evidence_bundle(
 	target: str = "web",
 	out_dir: Path | None = None,
 	include_capability_publish: bool = True,
+	catalog: Path | None = None,
 ) -> dict[str, Any]:
 	"""Build and verify the complete APG release evidence chain."""
 	report: dict[str, Any] = {
@@ -30,6 +31,7 @@ def build_release_evidence_bundle(
 		"source": str(source_file),
 		"target": target,
 		"output_dir": str(out_dir or "dist"),
+		"catalog": str(catalog) if catalog is not None else None,
 		"release": {},
 		"package": {},
 		"package_verification": {},
@@ -40,14 +42,14 @@ def build_release_evidence_bundle(
 		"warnings": [],
 	}
 
-	release_report = build_release_report(source_file, target="python")
+	release_report = build_release_report(source_file, target="python", catalog=catalog)
 	report["release"] = _release_summary(release_report)
 	_collect_errors("release", release_report, report)
 	_collect_warnings("release", release_report, report)
 	if not release_report.get("ok"):
 		return _finalize(report)
 
-	package_report = build_package_report(source_file, target=target, out_dir=out_dir)
+	package_report = build_package_report(source_file, target=target, out_dir=out_dir, catalog=catalog)
 	report["package"] = _package_summary(package_report)
 	_collect_errors("package", package_report, report)
 	_collect_warnings("package", package_report, report)

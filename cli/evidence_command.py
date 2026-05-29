@@ -23,6 +23,7 @@ from compiler.packager import SUPPORTED_PACKAGE_TARGETS
 	help="Packaging profile to bundle evidence for",
 )
 @click.option("--out", "out_dir", type=click.Path(path_type=Path), default=Path("dist"), help="Evidence package output root")
+@click.option("--catalog", type=click.Path(path_type=Path), default=None, help="Capability contract root or local apg.capability-catalog.v1 file")
 @click.option(
 	"--skip-capability-publish",
 	is_flag=True,
@@ -35,13 +36,14 @@ def evidence(
 	fixtures: Path | None,
 	target: str,
 	out_dir: Path,
+	catalog: Path | None,
 	skip_capability_publish: bool,
 	as_json: bool,
 ) -> None:
 	"""Build package and verifier evidence for an APG application."""
 	if audit_fixtures:
-		if source_file is not None or skip_capability_publish:
-			raise click.ClickException("--audit-fixtures cannot be combined with a source file or --skip-capability-publish")
+		if source_file is not None or skip_capability_publish or catalog is not None:
+			raise click.ClickException("--audit-fixtures cannot be combined with a source file, --catalog, or --skip-capability-publish")
 		report = audit_release_evidence_fixtures(fixtures)
 		if as_json:
 			click.echo(json.dumps(report, indent=2, sort_keys=True))
@@ -63,12 +65,15 @@ def evidence(
 		raise click.ClickException(f"APG source file not found: {source_file}")
 	if not source_file.is_file():
 		raise click.ClickException(f"APG evidence expects a file: {source_file}")
+	if catalog is not None and not catalog.exists():
+		raise click.ClickException(f"Capability catalog not found: {catalog}")
 
 	report = build_release_evidence_bundle(
 		source_file,
 		target=target,
 		out_dir=out_dir,
 		include_capability_publish=not skip_capability_publish,
+		catalog=catalog,
 	)
 	if as_json:
 		click.echo(json.dumps(report, indent=2, sort_keys=True))
