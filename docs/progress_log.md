@@ -16,6 +16,79 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 15:12 EAT
+
+I18N implementation-depth slice:
+
+- Converted `i18n` from a materialized-baseline package into a domain-specific
+  localization runtime package.
+- Added executable tenant-scoped locale definitions, regional formatting
+  metadata, glossary terms, translation entries, translation-memory reuse,
+  fallback resolution, coverage reports, publication batches, compatibility
+  records, dashboard summaries, and contract-rule evaluation.
+- Added `localization_runtime.py` as the I18N-specific algorithm surface for
+  fallback-chain resolution, translation-memory matching, and coverage
+  calculation so package behavior is no longer generic record scaffolding.
+- Replaced generic package API and view helpers with localization-specific
+  helpers for locale creation, glossary management, translation upsert,
+  publication, text resolution, coverage reporting, dashboard, locale console,
+  translation workbench, glossary manager, coverage dashboard, publish queue,
+  routes, rules, and theme metadata.
+- Rewrote `cap_spec.md` to describe current executable behavior, runtime
+  surfaces, guardrails, adapter boundaries, UI surfaces, theme contract, and
+  focused verification commands.
+- Expanded focused tests for locale and translation lifecycle, reviewed
+  machine translations, translation-memory reuse, fallback resolution, coverage
+  review, publication batches, compatibility records, view models, and policy
+  failures for tenant context, locale ownership, machine-translation review,
+  RBAC filtering, publication approval, draft publishing, missing locales,
+  translation-memory misses, and missing text resolution.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/i18n/__init__.py
+  capabilities/common/i18n/models.py
+  capabilities/common/i18n/localization_runtime.py
+  capabilities/common/i18n/service.py capabilities/common/i18n/api.py
+  capabilities/common/i18n/views.py
+  capabilities/common/i18n/test_capability_contract.py
+  capabilities/common/i18n/tests/test_materialized_package.py` -> passed.
+- `./.venv/bin/python - <<'PY' ... importlib.import_module(...) ... PY` for
+  `capabilities.common.i18n.models`, `localization_runtime`, `service`, `api`,
+  and `views` -> passed.
+- `./.venv/bin/pytest -q capabilities/common/i18n/test_capability_contract.py
+  capabilities/common/i18n/tests/test_materialized_package.py` -> 8 passed
+  with 10 pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability
+  record|Dependency-light service backed|dependency-light dashboard view
+  model|materialized APG capability package|test_materialized_package"
+  capabilities/common/i18n` -> no matches.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/i18n --json` -> passed with `i18n` classified as
+  `domain_specific`, `localization_runtime.py` counted as the custom Python
+  file, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/i18n --json`
+  -> passed with a side-effect-free catalog patch and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --json` -> passed with
+  79 domain-specific packages, 28 materialized-baseline packages, 1 mixed
+  package, 1 contract-only package, 894 custom Python files, 0 errors, and 30
+  warnings; next warning is `idfd`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 package
+  gaps, 0 errors, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 61 documented commands, 0 broken links, 0 unknown documented
+  commands, and 0 violations.
+- `git diff --check -- capabilities/common/i18n docs/progress_log.md` ->
+  passed.
+
+Known remaining gaps:
+
+- `i18n` is now domain-specific, but implementation-depth still reports 28
+  materialized baselines, 1 mixed implementation, and 1 contract-only package
+  to replace with domain-specific behavior. The next burn-down target is
+  `idfd`.
+
 ### 2026-05-29 14:55 EAT
 
 HELP implementation-depth slice:
