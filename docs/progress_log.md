@@ -10337,6 +10337,29 @@ Battery-conscious verification:
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- capabilities/common/dist/__init__.py capabilities/common/dist/models.py capabilities/common/dist/distributed_engine.py capabilities/common/dist/service.py capabilities/common/dist/api.py capabilities/common/dist/views.py capabilities/common/dist/test_capability_contract.py capabilities/common/dist/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
 
+### 2026-05-29 11:00 EAT
+
+Executable DLPD data-loss-prevention runtime slice:
+
+- Converted `capabilities/common/dlpd` from a generated materialized baseline into a domain-specific data-loss-prevention capability package.
+- Replaced generic records with tenant DLP policies, data classifiers, egress inspections, encrypted quarantine items, DLP incidents, and audit events.
+- Added `dlp_engine.py` with deterministic local classifiers for PII, PHI, PCI, secrets, financial records, and source-code signals, stable digests, severity mapping, sensitivity labels, and response-action selection.
+- Added `DlpdService` behavior for policy registration, classifier registration, custom-pattern review enforcement, content classification, egress inspection, high-severity block/quarantine guardrails, encrypted quarantine, incident opening/resolution, large-export review, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so DLPD exposes policy console, classifier workbench, egress inspection state, quarantine vault, incident queue, audit events, dashboard summaries, and route/theme metadata instead of generic records.
+- Updated `cap_spec.md` to describe current runtime behavior and the explicit external mail gateway, proxy, CASB, endpoint-agent, object-store scanner, SIEM/SOAR, ticketing, legal-hold, and notification integration boundary.
+- Added focused contract/service tests for successful sensitive-egress quarantine and incident lifecycle execution, tenant/owner/policy/custom-review/channel/classification guardrails, high-severity block enforcement, and large-export review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/dlpd/__init__.py capabilities/common/dlpd/models.py capabilities/common/dlpd/dlp_engine.py capabilities/common/dlpd/service.py capabilities/common/dlpd/api.py capabilities/common/dlpd/views.py capabilities/common/dlpd/test_capability_contract.py capabilities/common/dlpd/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/dlpd/test_capability_contract.py capabilities/common/dlpd/tests/test_materialized_package.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/dlpd` returned no remaining DLPD baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `dlpd` is now `domain_specific`, custom Python files increased to 885, domain-specific packages increased to 66, materialized baseline packages dropped to 37, and warning count dropped to 43.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dlpd --json` passed with warnings empty and side-effect-free publish evidence.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- capabilities/common/dlpd/__init__.py capabilities/common/dlpd/models.py capabilities/common/dlpd/dlp_engine.py capabilities/common/dlpd/service.py capabilities/common/dlpd/api.py capabilities/common/dlpd/views.py capabilities/common/dlpd/test_capability_contract.py capabilities/common/dlpd/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
+
 ### 2026-05-29 10:31 EAT
 
 Executable DEPL deployment-management runtime slice:

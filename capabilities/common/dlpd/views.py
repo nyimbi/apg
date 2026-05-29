@@ -1,4 +1,4 @@
-"""UI metadata helpers for the Data Loss Prevention capability."""
+"""UI view-model helpers for the APG Data Loss Prevention capability."""
 
 from __future__ import annotations
 
@@ -21,7 +21,29 @@ def dashboard_model(
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
 		"routes": capability_routes(tenant_id),
-		"records": service.list_records(tenant_id),
-		"rules": contract["rule_engine"]["rules"],
+		"summary": service.dashboard_summary(tenant_id),
+		"policies": service.list_policies(tenant_id),
+		"classifiers": service.list_classifiers(tenant_id),
+		"recent_inspections": service.list_inspections(tenant_id)[-10:],
+		"open_incidents": [incident for incident in service.list_incidents(tenant_id) if incident["status"] == "open"],
 		"theme": contract["theme"],
+	}
+
+
+def policy_console_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"policies": service.list_policies(tenant_id),
+		"classifiers": service.list_classifiers(tenant_id),
+		"routes": capability_routes(tenant_id),
+	}
+
+
+def incident_queue_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	incidents = service.list_incidents(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"open": [incident for incident in incidents if incident["status"] == "open"],
+		"resolved": [incident for incident in incidents if incident["status"] == "resolved"],
+		"quarantine": service.list_quarantine(tenant_id),
 	}
