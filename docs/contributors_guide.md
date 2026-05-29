@@ -53,6 +53,39 @@ the whole APG platform.
 This runbook deliberately avoids broad repository reading. Your first useful
 job is to make one checked-in fact easier to execute, verify, or continue.
 
+## First-Day Mission Board
+
+Pick one mission. Finish and commit it before starting another.
+
+| Mission | Edit | Commands to run | Handoff |
+| --- | --- | --- | --- |
+| Make onboarding clearer | one guide or docs index entry | `./.venv/bin/apg docs audit --json`; `git diff --check -- docs` | guide paragraph names current command and next doc |
+| Prove one example | one `examples/<nn>_*/README.md` and optional output refresh | `apg model`; `apg compile --verify`; generated smoke test | README readiness level and next slice |
+| Deepen one capability guardrail | one package service/test/spec | package pytest; implementation audit root; publish-plan | `cap_spec.md` names behavior and non-goals |
+| Expose one compiler fact | one parser/AST/semantic/generator owner plus fixture | focused pytest; `apg model ... --json` | guide or fixture names stable semantic key |
+| Seed one capacity | one example directory plus README | model, compile, smoke | README names event, package owners, proof, next gap |
+
+The mission is complete when the handoff lets another contributor continue
+without asking what you meant.
+
+## Before You Edit Checklist
+
+Write these answers before changing files:
+
+```text
+Mission:
+Owner:
+Public names:
+Unrelated dirty files I will leave alone:
+Baseline command:
+Proof after:
+Docs or progress-log update:
+Commit boundary:
+```
+
+If `Owner` names more than one major layer, split the work. If `Public names`
+is empty, you are probably doing hidden cleanup rather than progressing APG.
+
 ## Contributor Effectiveness Pact
 
 APG welcomes contributions that are small, executable, and easy to continue.

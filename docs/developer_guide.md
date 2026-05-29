@@ -76,6 +76,44 @@ Use this contract for every packet:
 If you cannot fill the table in five minutes, the packet is too broad. Split it
 until a reviewer can see the owner, proof, and remaining gap without a meeting.
 
+## Platform Progression Loop
+
+Use this loop to progress APG without waiting for the entire platform to be
+complete. It works for compiler work, generated runtime work, capability
+packages, examples, and documentation.
+
+| Step | Question | Artifact | Proof |
+| --- | --- | --- | --- |
+| 1. Promise | What should an APG author or app user be able to do? | one event, construct, command, route, rule, or service name | local note, README, or spec paragraph |
+| 2. Source | Can APG source express it tersely and readably? | `main.apg`, grammar fixture, or package contract | parser/model command |
+| 3. Meaning | Does the compiler expose stable meaning? | semantic JSON key, diagnostic, graph node, or manifest entry | `apg model ... --json` |
+| 4. Execution | Does generated or package code do something observable? | generated Python route/helper, package service, API, view model | compile smoke or package pytest |
+| 5. Governance | Are rules, permissions, tenant boundaries, and approvals explicit? | rule ID, denial reason, audit event, permission name | negative test or rule evaluation |
+| 6. Composition | Can another app/capacity consume it? | capability contract, screen route, app composition, publish plan | publish-plan, manifest, or composition proof |
+| 7. Handoff | Can the next contributor continue without private context? | README, `cap_spec.md`, guide update, progress-log entry | docs audit or local diff check |
+
+Start at the earliest missing step. If APG source cannot express the idea,
+work on grammar and AST projection. If semantic JSON is correct but generated
+Python cannot execute it, work on the generator. If a capability contract is
+complete but behavior is generic, work in the package.
+
+## New Contributor Task Ladder
+
+When mentoring or reviewing a new contributor, give them one rung at a time.
+Each rung is useful on its own and teaches the next APG layer.
+
+| Rung | Task | Why it helps | Proof |
+| --- | --- | --- | --- |
+| 1 | fix one stale docs command or missing link | teaches command surface and docs audit | `apg docs audit --json` |
+| 2 | compile one numbered example and update its README evidence | teaches source -> generated app flow | `apg compile --verify`; smoke test |
+| 3 | inspect one capability contract and add one guardrail test | teaches rules, UI, theme, and tenant boundaries | focused package pytest |
+| 4 | remove one materialized-baseline marker from a package | teaches domain models, services, API, views, specs | package pytest; implementation audit root; publish-plan |
+| 5 | expose one semantic field from existing syntax | teaches AST, semantic model, diagnostics, and generated consumers | focused compiler test; `apg model` |
+| 6 | build one capacity event end to end | teaches APG composition across examples, packages, rules, screens, agents, streams, and docs | model; compile; smoke; package proof as needed |
+
+Do not assign a broad platform area to a new contributor. Assign a rung with a
+named owner, a proof command, and a local handoff surface.
+
 ## New Developer Navigation Loop
 
 Use this loop when you are dropped into an unfamiliar APG area:

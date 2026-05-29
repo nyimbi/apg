@@ -16,6 +16,35 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 19:57 EAT
+
+Developer, contributor, and capacity guide effectiveness follow-up:
+
+- Strengthened `docs/developer_guide.md` with a platform progression loop that
+  ties promise, source, semantic meaning, execution, governance, composition,
+  and handoff into one repeatable APG development path.
+- Added a new contributor task ladder so maintainers can assign immediately
+  useful work without asking a contributor to understand the whole platform
+  first.
+- Strengthened `docs/contributors_guide.md` with a first-day mission board and
+  before-edit checklist that names owner, public names, baseline proof, staged
+  commit boundary, and handoff expectations.
+- Strengthened `docs/capacity_development_guide.md` with a first-capacity-in-
+  one-day runbook and a capacity slice board for parallel capacity work across
+  source, compiler, runtime, package, governance, UI/theme, agent/stream, and
+  documentation lanes.
+
+Battery-conscious verification:
+
+- `git diff --check -- docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` passed with no
+  whitespace errors.
+- `./.venv/bin/apg docs audit --json` passed with all required documentation
+  present, 0 broken local links, 49 documented commands all registered, and 0
+  violations.
+- Not run: full repository test suite because this was a documentation-only
+  contributor-effectiveness slice.
+
 ### 2026-05-29 19:53 EAT
 
 VIDC video-conferencing runtime implementation-depth slice:

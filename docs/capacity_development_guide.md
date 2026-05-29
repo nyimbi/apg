@@ -62,6 +62,43 @@ This seed is the shared contract for parallel work. Grammar, compiler,
 generator, package, UI, agent, stream, and documentation contributors can move
 quickly only when these names stay stable.
 
+## First Capacity In One Day
+
+This is the fastest path from an idea to something executable. It is designed
+for a new contributor who has one working day and no private APG context.
+
+| Timebox | Work | Output | Proof |
+| --- | --- | --- | --- |
+| 0-30 min | choose one business event and actor | blueprint in the example README | event, actor, tenant boundary named |
+| 30-90 min | write the smallest APG source | `examples/<nn>_<capacity>/main.apg` | `./.venv/bin/apg model ... --json` |
+| 90-150 min | compile and run generated app proof | `/tmp/apg-<capacity>` output | `apg compile --verify`; smoke test |
+| 150-240 min | map durable behavior to package owners | README package map and first lifecycle backlog | package path and service names named |
+| 240-360 min | deepen one package or write one guardrail if needed | package service/test/spec slice | package pytest, implementation-audit root, publish-plan |
+| 360-420 min | update handoff docs | README, `cap_spec.md`, progress log when readiness changed | docs audit or diff check |
+| 420-480 min | stage, commit, and push one verified slice | Lore commit | `git diff --cached --check` |
+
+If the generated app cannot run by the 150-minute mark, stop expanding scope
+and fix the earliest broken layer. A capacity that compiles and smoke-tests
+one event is more valuable than a large unverified module outline.
+
+## Capacity Slice Board
+
+Use this board to keep capacity work parallel and reviewable.
+
+| Slice | Owner | Public names that must stay stable | Done when |
+| --- | --- | --- | --- |
+| event/source | capacity lead and APG source owner | event name, record names, rule names, route names | source models and compiles |
+| semantic exposure | compiler owner | semantic JSON keys, diagnostics, graph relationships | `apg model` exposes the names |
+| generated runtime | runtime owner | generated file names, route/helper names, smoke assertions | compile verify and smoke test pass |
+| package lifecycle | package owner | capability ID, service methods, rule IDs, route metadata | package tests, audit root, publish-plan pass |
+| governance | package owner and capacity lead | tenant boundary, approval names, denial reasons, audit event names | positive and negative guardrail proof exists |
+| UI/theme composition | UI/capability owner | screen route, contains/composes/binds names, theme tokens | generated manifest or view model exposes them |
+| agent/stream extension | agent or stream owner | agent ID, adapter runtime, tool names, Bytewax flow names | semantic/generated manifests expose boundaries |
+| handoff | docs owner | readiness level, proof commands, next slice | README and progress log are current |
+
+Parallel contributors can work on different rows only after the first row has
+stable public names. Public names are the coordination surface.
+
 ## Capacity Development Principle
 
 A capacity is not a feature list. It is a rerunnable path from one event to one
