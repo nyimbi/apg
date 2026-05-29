@@ -1,24 +1,28 @@
-"""Data models for the Workflow Orchestration capability."""
+"""Domain models for the Workflow Orchestration capability."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from .workflow_runtime import (
+	WorkflowApprovalRecord,
+	WorkflowAuditEventRecord,
+	WorkflowDefinitionRecord,
+	WorkflowEventRecord,
+	WorkflowExecutionRecord,
+	WorkflowStepRecord,
+	WorkflowTaskRecord,
+)
 
 
-@dataclass
-class WfloRecord:
-	"""Tenant-scoped dependency-light capability record."""
+WfloRecord = WorkflowDefinitionRecord
 
-	id: str
-	tenant_id: str
-	status: str = "active"
-	metadata: dict[str, Any] = field(default_factory=dict)
 
-	def to_dict(self) -> dict[str, Any]:
-		return {
-			"id": self.id,
-			"tenant_id": self.tenant_id,
-			"status": self.status,
-			"metadata": dict(self.metadata),
-		}
+__all__ = [
+	"WorkflowApprovalRecord",
+	"WorkflowAuditEventRecord",
+	"WorkflowDefinitionRecord",
+	"WorkflowEventRecord",
+	"WorkflowExecutionRecord",
+	"WorkflowStepRecord",
+	"WorkflowTaskRecord",
+	"WfloRecord",
+]

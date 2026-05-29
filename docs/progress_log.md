@@ -12526,3 +12526,22 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/tens --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 102, materialized baseline packages dropped to 7, contract-only packages remain 0, custom Python files increased to 916, and warning count dropped to 7. The next implementation-depth warning is `them`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+
+### 2026-05-29 20:17 EAT
+
+Executable WFLO workflow-orchestration runtime slice:
+
+- Converted `capabilities/common/wflo` from generated materialized baseline package status into a domain-specific workflow runtime.
+- Added `workflow_runtime.py` with deterministic workflow definition, step, execution, task, approval, event, audit event, status, step type, stable ID, and timestamp primitives.
+- Replaced generic record/service/API/view behavior with WFLO methods for definition design, publication approval, execution start, task assignment and completion, approval request and decision capture, completion, event emission, compatibility records, dashboards, list APIs, and UI view models.
+- Replaced generated package tests with package contract/runtime tests covering definition-publication-execution-task-approval-event completion and tenant, owner, publication approval, external trigger, AI policy, long-runtime review, API, and view-model guardrails.
+- Updated `cap_spec.md` to describe current executable WFLO runtime behavior, adapter boundaries, routes, rules, and focused verification commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/pytest -q capabilities/common/wflo/test_capability_contract.py capabilities/common/wflo/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/wflo --json` passed with `ok: true`; `wflo` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/wflo --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 107, materialized baseline packages dropped to 2, contract-only packages remain 0, custom Python files increased to 921, and warning count dropped to 2.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- Remaining implementation-depth warnings are `wsbl` and `ztna`.

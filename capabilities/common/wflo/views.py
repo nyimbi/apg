@@ -21,7 +21,101 @@ def dashboard_model(
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
 		"routes": capability_routes(tenant_id),
-		"records": service.list_records(tenant_id),
+		"summary": service.dashboard_summary(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"theme": contract["theme"],
+	}
+
+
+def designer_model(
+	service: WfloService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or WfloService()
+	return {
+		"route": "/wflo/designer",
+		"tenant_id": tenant_id,
+		"definitions": service.list_definitions(tenant_id),
+		"step_types": ["human", "automation", "approval", "ai", "event"],
+		"versioning_enabled": True,
+	}
+
+
+def definition_library_model(
+	service: WfloService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or WfloService()
+	return {
+		"route": "/wflo/definitions",
+		"tenant_id": tenant_id,
+		"definitions": service.list_definitions(tenant_id),
+		"statuses": ["draft", "review_required", "published", "retired"],
+	}
+
+
+def execution_monitor_model(
+	service: WfloService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or WfloService()
+	return {
+		"route": "/wflo/executions",
+		"tenant_id": tenant_id,
+		"executions": service.list_executions(tenant_id),
+		"events": service.list_events(tenant_id),
+		"statuses": ["running", "waiting_approval", "completed", "failed", "cancelled"],
+	}
+
+
+def task_inbox_model(
+	service: WfloService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or WfloService()
+	return {
+		"route": "/wflo/tasks",
+		"tenant_id": tenant_id,
+		"tasks": service.list_tasks(tenant_id),
+		"statuses": ["open", "claimed", "completed", "escalated"],
+	}
+
+
+def approval_center_model(
+	service: WfloService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or WfloService()
+	return {
+		"route": "/wflo/approvals",
+		"tenant_id": tenant_id,
+		"approvals": service.list_approvals(tenant_id),
+		"statuses": ["pending", "approved", "rejected", "delegated"],
+	}
+
+
+def analytics_model(
+	service: WfloService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or WfloService()
+	return {
+		"route": "/wflo/analytics",
+		"tenant_id": tenant_id,
+		"summary": service.dashboard_summary(tenant_id),
+		"review_required_definitions": [
+			definition
+			for definition in service.list_definitions(tenant_id)
+			if definition["status"] == "review_required"
+		],
+	}
+
+
+def settings_model(tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"route": "/wflo/settings",
+		"tenant_id": tenant_id,
+		"configuration": contract["configuration"],
 		"theme": contract["theme"],
 	}

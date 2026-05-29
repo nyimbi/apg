@@ -12,14 +12,100 @@ SERVICE = WfloService()
 
 def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 	contract = SERVICE.describe(tenant_id)
+	summary = SERVICE.dashboard_summary(tenant_id)
 	return {
 		"capability": contract["capability"],
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
-		"record_count": len(SERVICE.list_records(tenant_id)),
+		"definition_count": summary["definition_count"],
+		"execution_count": summary["execution_count"],
+		"open_task_count": summary["open_task_count"],
+		"pending_approval_count": summary["pending_approval_count"],
 	}
+
+
+def create_workflow_definition(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.create_workflow_definition(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		owner_ref=str(payload.get("owner_ref") or ""),
+		steps=list(payload.get("steps") or []),
+		trigger_type=str(payload.get("trigger_type") or "manual"),
+		trigger_policy_ref=str(payload.get("trigger_policy_ref") or ""),
+		retry_policy_ref=str(payload.get("retry_policy_ref") or ""),
+		compensation_ref=str(payload.get("compensation_ref") or ""),
+		expected_runtime_minutes=int(payload.get("expected_runtime_minutes", 60)),
+		runtime_review_recorded=bool(payload.get("runtime_review_recorded", False)),
+		version=int(payload.get("version", 1)),
+		actor=str(payload.get("actor") or "system"),
+	)
+
+
+def publish_workflow(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.publish_workflow(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		definition_id=str(payload["definition_id"]),
+		approval_ref=str(payload.get("approval_ref") or ""),
+		published_by=str(payload.get("published_by") or "system"),
+	)
+
+
+def start_execution(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.start_execution(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		definition_id=str(payload["definition_id"]),
+		correlation_id=str(payload.get("correlation_id") or ""),
+		started_by=str(payload.get("started_by") or "system"),
+		payload=dict(payload.get("payload") or {}),
+	)
+
+
+def create_task(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.create_task(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		execution_id=str(payload["execution_id"]),
+		step_id=str(payload["step_id"]),
+		title=str(payload.get("title") or ""),
+		assignee_ref=str(payload.get("assignee_ref") or ""),
+		due_at=payload.get("due_at"),
+	)
+
+
+def complete_task(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.complete_task(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		task_id=str(payload["task_id"]),
+		completed_by=str(payload.get("completed_by") or "system"),
+	)
+
+
+def request_approval(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.request_approval(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		execution_id=str(payload["execution_id"]),
+		subject_ref=str(payload.get("subject_ref") or ""),
+		approver_ref=str(payload.get("approver_ref") or ""),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def record_approval(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.record_approval(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		approval_id=str(payload["approval_id"]),
+		decision=str(payload.get("decision") or ""),
+		decision_by=str(payload.get("decision_by") or "system"),
+	)
+
+
+def complete_execution(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.complete_execution(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		execution_id=str(payload["execution_id"]),
+		actor=str(payload.get("actor") or "system"),
+	)
 
 
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
@@ -33,3 +119,15 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_workflow_orchestration(tenant_id: str = "default") -> dict[str, Any]:
+	return {
+		"definitions": SERVICE.list_definitions(tenant_id),
+		"executions": SERVICE.list_executions(tenant_id),
+		"tasks": SERVICE.list_tasks(tenant_id),
+		"approvals": SERVICE.list_approvals(tenant_id),
+		"events": SERVICE.list_events(tenant_id),
+		"audit_events": SERVICE.list_audit_events(tenant_id),
+		"summary": SERVICE.dashboard_summary(tenant_id),
+	}
