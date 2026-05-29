@@ -10213,3 +10213,24 @@ Battery-conscious verification:
 
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- docs/developer_guide.md docs/contributors_guide.md docs/capacity_development_guide.md` passed with no whitespace errors.
+
+### 2026-05-29 09:07 EAT
+
+Executable BCLG ledger runtime slice:
+
+- Converted `capabilities/common/bclg` from a generated materialized baseline into a domain-specific blockchain ledger services package.
+- Replaced generic `BclgRecord` storage with tenant ledger networks, key-custody bindings, signed ledger transactions, smart contract artifacts, and audit events.
+- Added `ledger_engine.py` with deterministic SHA-256 transaction, contract deployment, and block hashing.
+- Added `BclgService` behavior for ledger registration, key-custody binding, transaction submission, high-value review/approval, smart contract deployment governance, audit event recording, and dashboard summaries.
+- Expanded API and view helpers so BCLG exposes ledger, custody, transaction, contract, review queue, and audit state instead of generic records.
+- Updated `cap_spec.md` to describe current executable runtime behavior and the explicit external integration boundary.
+- Added focused contract/service tests for successful ledger operation and guardrails around missing owners, signatures, key custody, and contract review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/bclg/__init__.py capabilities/common/bclg/models.py capabilities/common/bclg/ledger_engine.py capabilities/common/bclg/service.py capabilities/common/bclg/api.py capabilities/common/bclg/views.py capabilities/common/bclg/test_capability_contract.py capabilities/common/bclg/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/bclg/test_capability_contract.py capabilities/common/bclg/tests/test_materialized_package.py` passed with 7 tests and only unrelated existing deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/bclg` returned no remaining BCLG baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `bclg` is now `domain_specific`, custom Python files increased to 877, domain-specific packages increased to 58, materialized baseline packages dropped to 45, and warning count dropped to 51.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/bclg --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
