@@ -1,7 +1,11 @@
 """Regression coverage for the CHAT executable capability contract."""
 
+import pytest
+
 from capabilities.common.chat import register_capability
 from capabilities.common.chat.capability_contract import evaluate_capability_rules, get_capability_contract
+from capabilities.common.chat.service import ChatService
+from capabilities.common.chat.views import dashboard_model
 
 
 def test_contract_exposes_configuration_rules_ui_and_theme():
@@ -54,3 +58,134 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["rooms"] == "/chat/rooms"
 	assert "ntfy" in registration["dependencies"]
 	assert "chat:send" in registration["permissions"]
+
+
+def test_service_creates_rooms_messages_presence_and_dashboard_state():
+	service = ChatService()
+	room = service.create_room(
+		room_id="ops-room",
+		tenant_id="tenant-chat",
+		name="Operations",
+		owner="room-owner",
+		members=["room-owner", "operator"],
+		retention_policy="retain-90-days",
+		visibility="private",
+	)
+	message = service.send_message(
+		message_id="msg-1",
+		tenant_id="tenant-chat",
+		room_id="ops-room",
+		sender="operator",
+		body="handover complete",
+		attachments=["handover.txt"],
+		delivery_receipts=["room-owner"],
+	)
+	presence = service.update_presence(
+		tenant_id="tenant-chat",
+		user_id="operator",
+		status="online",
+		room_id="ops-room",
+		typing=True,
+	)
+	model = dashboard_model(service, "tenant-chat")
+
+	assert room["status"] == "active"
+	assert room["retention_policy"] == "retain-90-days"
+	assert message["status"] == "delivered"
+	assert len(message["fingerprint"]) == 64
+	assert message["delivery_receipts"] == ["room-owner"]
+	assert presence["typing"] is True
+	assert model["summary"]["room_count"] == 1
+	assert model["summary"]["message_count"] == 1
+	assert model["summary"]["presence_count"] == 1
+	assert model["summary"]["audit_event_count"] >= 2
+
+
+def test_service_enforces_room_message_and_moderation_guardrails():
+	service = ChatService()
+
+	with pytest.raises(PermissionError, match="room_owner_required"):
+		service.create_room(
+			room_id="missing-owner",
+			tenant_id="tenant-chat",
+			name="Missing Owner",
+			owner="",
+			members=["member"],
+			retention_policy="retain-30-days",
+		)
+
+	with pytest.raises(PermissionError, match="retention_policy_required"):
+		service.create_room(
+			room_id="missing-retention",
+			tenant_id="tenant-chat",
+			name="Missing Retention",
+			owner="room-owner",
+			members=["member"],
+			retention_policy="",
+		)
+
+	with pytest.raises(PermissionError, match="guest_policy_required"):
+		service.create_room(
+			room_id="guest-without-policy",
+			tenant_id="tenant-chat",
+			name="Guest Room",
+			owner="room-owner",
+			members=["member"],
+			retention_policy="retain-30-days",
+			external_guests=["guest@example.com"],
+			guest_policy_attached=False,
+		)
+
+	service.create_room(
+		room_id="moderated-room",
+		tenant_id="tenant-chat",
+		name="Moderated",
+		owner="room-owner",
+		members=["room-owner", "member"],
+		retention_policy="retain-30-days",
+	)
+
+	with pytest.raises(PermissionError, match="moderation_required"):
+		service.send_message(
+			message_id="blocked-message",
+			tenant_id="tenant-chat",
+			room_id="moderated-room",
+			sender="member",
+			body="contains restricted credential",
+			moderation_completed=False,
+		)
+
+	reviewed = service.review_moderation("mod:000001", reviewer="moderator", decision="rejected")
+	approved_message = service.send_message(
+		message_id="approved-message",
+		tenant_id="tenant-chat",
+		room_id="moderated-room",
+		sender="member",
+		body="contains restricted credential",
+		moderation_completed=True,
+	)
+
+	assert reviewed["status"] == "rejected"
+	assert reviewed["reason"] == "moderation_required"
+	assert approved_message["moderation_status"] == "approved"
+	assert service.conversation_summary("tenant-chat")["moderation_queue_count"] == 0
+
+
+def test_service_routes_large_rooms_to_review_before_activation():
+	service = ChatService()
+	members = [f"member-{index}" for index in range(5001)]
+	room = service.create_room(
+		room_id="large-room",
+		tenant_id="tenant-chat",
+		name="Large Community",
+		owner="room-owner",
+		members=members,
+		retention_policy="retain-30-days",
+		access_review_recorded=False,
+	)
+	approved = service.approve_room("large-room", reviewer="access-reviewer")
+
+	assert room["status"] == "pending_review"
+	assert room["review_status"] == "required"
+	assert service.list_moderation_items("tenant-chat")[0]["reason"] == "large_room_review_required"
+	assert approved["status"] == "active"

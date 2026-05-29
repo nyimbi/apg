@@ -10256,3 +10256,25 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/bkup --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+
+### 2026-05-29 09:30 EAT
+
+Executable CHAT team messaging runtime slice:
+
+- Converted `capabilities/common/chat` from a generated materialized baseline into a domain-specific chat and messaging capability package.
+- Replaced generic records with tenant rooms, owners, members, external guests, retention policy state, messages, delivery receipts, presence, moderation queue items, and audit events.
+- Added `chat_engine.py` with deterministic message fingerprints, thread keys, and restricted-term detection.
+- Added `ChatService` behavior for room creation, large-room review, room approval, message sending, restricted-content moderation, presence updates, moderation review, dashboard summaries, and APG rule enforcement.
+- Expanded API and view helpers so CHAT exposes rooms, messages, presence panels, moderation queues, audit events, and conversation summaries instead of generic records.
+- Updated `cap_spec.md` to describe the current runtime behavior and the explicit realtime broker/notification integration boundary.
+- Added focused contract/service tests for successful room/message/presence flows and guardrails around missing owners, missing retention, missing guest policy, restricted content, and large-room review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/chat/__init__.py capabilities/common/chat/models.py capabilities/common/chat/chat_engine.py capabilities/common/chat/service.py capabilities/common/chat/api.py capabilities/common/chat/views.py capabilities/common/chat/test_capability_contract.py capabilities/common/chat/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/chat/test_capability_contract.py capabilities/common/chat/tests/test_materialized_package.py` passed with 8 tests and only unrelated existing SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|test_materialized_package" capabilities/common/chat` returned no remaining CHAT baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `chat` is now `domain_specific`, custom Python files increased to 879, domain-specific packages increased to 60, materialized baseline packages dropped to 43, and warning count dropped to 49.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/chat --json` passed with `ok: true`, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 58 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.

@@ -1,4 +1,4 @@
-"""API helpers for the Chat and Messaging capability."""
+"""API helpers for APG Chat and Messaging."""
 
 from __future__ import annotations
 
@@ -18,8 +18,63 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
-		"record_count": len(SERVICE.list_records(tenant_id)),
+		**SERVICE.conversation_summary(tenant_id),
 	}
+
+
+def create_room(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.create_room(
+		room_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		owner=str(payload.get("owner") or ""),
+		members=[str(item) for item in payload.get("members", [])],
+		retention_policy=str(payload.get("retention_policy") or ""),
+		visibility=str(payload.get("visibility") or "private"),
+		external_guests=[str(item) for item in payload.get("external_guests", [])],
+		guest_policy_attached=bool(payload.get("guest_policy_attached", True)),
+		access_review_recorded=bool(payload.get("access_review_recorded", True)),
+	)
+
+
+def approve_room(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.approve_room(
+		room_id=str(payload["id"]),
+		reviewer=str(payload.get("reviewer") or "reviewer"),
+	)
+
+
+def send_message(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.send_message(
+		message_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		room_id=str(payload["room_id"]),
+		sender=str(payload.get("sender") or ""),
+		body=str(payload.get("body") or ""),
+		attachments=[str(item) for item in payload.get("attachments", [])],
+		delivery_receipts=[str(item) for item in payload.get("delivery_receipts", [])],
+		restricted_content_detected=bool(payload.get("restricted_content_detected", False)),
+		moderation_completed=bool(payload.get("moderation_completed", True)),
+	)
+
+
+def update_presence(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.update_presence(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		user_id=str(payload["user_id"]),
+		status=str(payload.get("status") or "online"),
+		room_id=str(payload["room_id"]) if payload.get("room_id") else None,
+		typing=bool(payload.get("typing", False)),
+		metadata=dict(payload.get("metadata") or {}),
+	)
+
+
+def review_moderation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.review_moderation(
+		item_id=str(payload["id"]),
+		reviewer=str(payload.get("reviewer") or "moderator"),
+		decision=str(payload.get("decision") or "approved"),
+	)
 
 
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
@@ -33,3 +88,23 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_rooms(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_rooms(tenant_id)
+
+
+def list_messages(tenant_id: str | None = None, room_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_messages(tenant_id, room_id)
+
+
+def list_presence(tenant_id: str | None = None, room_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_presence(tenant_id, room_id)
+
+
+def list_moderation_items(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_moderation_items(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)
