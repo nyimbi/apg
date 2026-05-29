@@ -12728,3 +12728,19 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 108, materialized baseline packages dropped to 1, contract-only packages remain 0, custom Python files increased to 922, and warning count dropped to 1.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - Remaining implementation-depth warning is `ztna`.
+
+### 2026-05-29 23:10 EAT
+
+Capability-development foundation slice:
+
+- Added `capabilities/README.md` as the source-tree guide for capability users and implementers. It documents capability purpose, world-class functionality expectations, package directory shape, all 109 registered capability IDs by category, usage commands, development workflow, proof commands, and review standard.
+- Added `capabilities/SPECIFICATION.md` as the root capability-system specification. It defines registry, runtime package, rule/governance, UI/theme, adapter, documentation, quality, acceptance-gate, and development-order requirements for every capability.
+- Added `capabilities/PLAN.md` as the methodical capability-development plan. It defines the per-capability specification-plan-implementation-review cycle, safe parallel execution model, first-pass queue, review checklist, and full-goal completion criteria.
+
+Battery-conscious verification:
+
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 61 local links valid, 49 documented commands registered, and 0 violations.
+- `./.venv/bin/apg hygiene audit --include-untracked --json` passed with `ok: true`, 21 hygiene checks passing, 0 violations, and the three new capability foundation files accounted for as local untracked files.
+- `./.venv/bin/apg capabilities validate-contracts --json` passed with `ok: true`, 109 contracts valid, and 0 errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `git diff --check -- capabilities/README.md capabilities/SPECIFICATION.md capabilities/PLAN.md` passed with no whitespace errors.
