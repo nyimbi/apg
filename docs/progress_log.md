@@ -12150,3 +12150,25 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 98, contract-only packages dropped to 0, materialized baseline packages remain 11, custom Python files increased to 912, and warning count dropped to 11. The next implementation-depth warning is `seop`.
 - `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
 - `git diff --check -- capabilities/common/secu` passed with no whitespace errors.
+
+### 2026-05-29 19:08 EAT
+
+Executable SEOP security-operations runtime slice:
+
+- Converted `capabilities/common/seop` from generated materialized baseline package status into a domain-specific security operations runtime.
+- Added `ops_runtime.py` with deterministic detection, incident, playbook, response action, posture control, audit event, severity, confidence, stable ID, and timestamp primitives.
+- Replaced generic record/service/API/view behavior with SEOP lifecycle methods for detection creation, incident opening, playbook approval, response execution, posture-control recording, incident closure, compatibility records, dashboards, list APIs, and UI view models.
+- Replaced generated package tests with package contract/runtime tests covering detection-incident-playbook-response-posture-closure execution and tenant, alert-source, owner, critical escalation, playbook approval, confidence, API, and view-model guardrails.
+- Updated `cap_spec.md` to describe current executable SEOP runtime behavior, adapter boundaries, routes, rules, and focused verification commands.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/seop/__init__.py capabilities/common/seop/models.py capabilities/common/seop/ops_runtime.py capabilities/common/seop/service.py capabilities/common/seop/api.py capabilities/common/seop/views.py capabilities/common/seop/capability_contract.py capabilities/common/seop/app.py capabilities/common/seop/test_capability_contract.py capabilities/common/seop/tests/test_package_contract.py` passed.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package" capabilities/common/seop` returned no remaining SEOP baseline markers.
+- `./.venv/bin/python -c "import importlib; [importlib.import_module(name) for name in ['capabilities.common.seop.ops_runtime','capabilities.common.seop.service','capabilities.common.seop.api','capabilities.common.seop.views','capabilities.common.seop.capability_contract']]; print('seop imports ok')"` passed with `seop imports ok`.
+- `./.venv/bin/pytest -q capabilities/common/seop/test_capability_contract.py capabilities/common/seop/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/seop --json` passed with `ok: true`; `seop` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/seop --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; domain-specific packages increased to 99, materialized baseline packages dropped to 10, contract-only packages remain 0, custom Python files increased to 913, and warning count dropped to 10. The next implementation-depth warning is `shdn`.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `git diff --check -- capabilities/common/seop` passed with no whitespace errors.
